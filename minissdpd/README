@@ -1,0 +1,36 @@
+protocole :
+
+connection à la socket unix.
+envoie d'une requete, retour d'une reponse.
+fermeture de la connexion.
+
+format de requete :
+1 octet : type de la requete 
+          1 - type
+		  2 - USN (id unique)
+		  3 - tout
+n octets longueur de la chaine : 1 octet si < 128 sinon le bit haut
+indique s'il existe un octet suplementaire, etc...
+n octets = chaine
+
+format reponse :
+1 octet : nombre de reponses
+pour chaque rep :
+URL :
+  n octets longueur de la chaine
+  n octets = chaine Location
+ST:
+  n octets longueur de la chaine
+  n octets = chaine type
+USN:
+  n octets longueur de la chaine
+  n octets = chaine identifiant
+
+Type de requete 4 = submit service
+1 octet = 4
+(k,n) octets : longueur et chaine "ST" (service type)
+(k,n) octets : longueur et chaine "USN"
+(k,n) octets : longueur et chaine "Server"
+(k,n) octets : longueur et chaine "Location"
+Pas de reponse
+
