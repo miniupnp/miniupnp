@@ -1,0 +1,8 @@
+*.o
+config.h
+miniupnpd
+miniupnpdctl
+testgetifaddr
+testgetifstats
+testupnpdescgen
+testupnppermissions

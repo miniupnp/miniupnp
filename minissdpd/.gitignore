@@ -1,0 +1,5 @@
+*.o
+minissdpd
+testcodelength
+testminissdpd
+Makefile.bak
