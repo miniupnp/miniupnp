@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.19 2011/07/30 13:16:22 nanard Exp $
 
+2011/10/07:
+	unlink unix socket before binding.
+
 VERSION 1.1:
 
 2011/07/30:
