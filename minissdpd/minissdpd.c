@@ -819,18 +819,6 @@ int main(int argc, char * * argv)
 		return 1;
 	}
 
-	/* daemonize or in any case get pid ! */
-	if(debug_flag)
-		pid = getpid();
-	else {
-#ifdef USE_DAEMON
-		if(daemon(0, 0) < 0)
-			perror("daemon()");
-		pid = getpid();
-#else
-		pid = daemonize();
-#endif
-	}
 	/* open log */
 	openlog("minissdpd",
 	        LOG_CONS|LOG_PID|(debug_flag?LOG_PERROR:0),
@@ -843,8 +831,6 @@ int main(int argc, char * * argv)
 		syslog(LOG_ERR, "MiniSSDPd is already running. EXITING");
 		return 1;
 	}
-
-	writepidfile(pidfilename, pid);
 
 	/* set signal handlers */
 	memset(&sa, 0, sizeof(struct sigaction));
@@ -922,6 +908,21 @@ int main(int argc, char * * argv)
 		}
 	}
 #endif
+
+	/* daemonize or in any case get pid ! */
+	if(debug_flag)
+		pid = getpid();
+	else {
+#ifdef USE_DAEMON
+		if(daemon(0, 0) < 0)
+			perror("daemon()");
+		pid = getpid();
+#else
+		pid = daemonize();
+#endif
+	}
+
+	writepidfile(pidfilename, pid);
 
 	/* Main loop */
 	while(!quitting)
