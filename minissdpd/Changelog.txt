@@ -1,7 +1,8 @@
-$Id: Changelog.txt,v 1.19 2011/07/30 13:16:22 nanard Exp $
+$Id: Changelog.txt,v 1.20 2011/10/07 09:21:19 nanard Exp $
 
 2011/10/07:
 	unlink unix socket before binding.
+	set SO_REUSEADDR on SSDP socket.
 
 VERSION 1.1:
 
