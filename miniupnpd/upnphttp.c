@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.62 2011/08/26 12:46:14 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.63 2011/11/18 11:10:09 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -16,6 +16,7 @@
 #include <arpa/inet.h>
 #include <syslog.h>
 #include <ctype.h>
+#include <errno.h>
 #include "config.h"
 #include "upnphttp.h"
 #include "upnpdescgen.h"
@@ -730,6 +731,8 @@ SendResp_upnphttp(struct upnphttp * h)
 		if(n<0)
 		{
 			syslog(LOG_ERR, "send(res_buf): %m");
+			if (errno != EINTR)
+				break; /* avoid infinite loop */
 		}
 		else if(n == 0)
 		{

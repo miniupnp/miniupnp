@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.240 2011/07/30 13:14:34 nanard Exp $
+$Id: Changelog.txt,v 1.241 2011/11/18 11:10:08 nanard Exp $
+
+2011/11/18:
+  avoid infinite loop in SendResp_upnphttp() in case of error
 
 2011/07/30:
   netfilter : Added a tiny_nf_nat.h file to compile with iptables
