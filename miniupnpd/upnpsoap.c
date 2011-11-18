@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.87 2011/07/15 07:48:26 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.88 2011/11/18 11:21:18 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard 
@@ -53,8 +53,7 @@ BuildSendAndCloseSoapResp(struct upnphttp * h,
 	memcpy(h->res_buf + h->res_buflen, afterbody, sizeof(afterbody) - 1);
 	h->res_buflen += sizeof(afterbody) - 1;
 
-	SendResp_upnphttp(h);
-	CloseSocket_upnphttp(h);
+	SendRespAndClose_upnphttp(h);
 }
 
 static void
@@ -1864,7 +1863,6 @@ SoapError(struct upnphttp * h, int errCode, const char * errDesc)
 	syslog(LOG_INFO, "Returning UPnPError %d: %s", errCode, errDesc);
 	bodylen = snprintf(body, sizeof(body), resp, errCode, errDesc);
 	BuildResp2_upnphttp(h, 500, "Internal Server Error", body, bodylen);
-	SendResp_upnphttp(h);
-	CloseSocket_upnphttp(h);
+	SendRespAndClose_upnphttp(h);
 }
 

@@ -1,4 +1,4 @@
-/* $Id: upnphttp.h,v 1.24 2011/06/27 11:06:00 nanard Exp $ */ 
+/* $Id: upnphttp.h,v 1.25 2011/11/18 11:21:18 nanard Exp $ */ 
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard 
@@ -110,9 +110,9 @@ BuildResp2_upnphttp(struct upnphttp * h, int respcode,
                     const char * respmsg,
                     const char * body, int bodylen);
 
-/* SendResp_upnphttp() */
+/* SendRespAndClose_upnphttp() */
 void
-SendResp_upnphttp(struct upnphttp *);
+SendRespAndClose_upnphttp(struct upnphttp *);
 
 #endif
 
