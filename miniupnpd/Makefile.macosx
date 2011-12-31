@@ -47,15 +47,15 @@ LIBS =
 
 INSTALL_BINDIR = $(PREFIX)/sbin
 INSTALL_ETCDIR = $(PREFIX)/etc/miniupnpd
-INSTALL_MANDIR = $(PREFIX)/man/man1
-#INSTALL_MANDIR = /usr/share/man/man1
+INSTALL_MANDIR = $(PREFIX)/share/man/man1
 
 all: $(EXECUTABLES)
 
 clean:
 	$(RM) $(ALL_OBJS) $(EXECUTABLES) \
 	testupnpdescgen.o testgetifstats.o testupnppermissions.o \
-	miniupnpdctl.o testgetifaddr.o config.h
+	miniupnpdctl.o testgetifaddr.o config.h \
+	mac/org.tuxfamily.miniupnpd.plist
 
 install: miniupnpd genuuid genlaunchd
 	$(STRIP) miniupnpd
@@ -65,23 +65,14 @@ install: miniupnpd genuuid genlaunchd
 	$(INSTALL) -m 0644 -b miniupnpd.conf $(INSTALL_ETCDIR)
 	$(INSTALL) -d $(INSTALL_MANDIR)
 	$(INSTALL) miniupnpd.1 $(INSTALL_MANDIR)
-	# TODO Fix these paths and those within the plist
 	$(INSTALL) -d $(PREFIX)/Library/LaunchDaemons
 	$(INSTALL) mac/org.tuxfamily.miniupnpd.plist $(PREFIX)/Library/LaunchDaemons
 	#$(INSTALL) ipfw/ipfw_init.sh $(INSTALL_ETCDIR)
 	#$(INSTALL) ipfw/ipfw_removeall.sh $(INSTALL_ETCDIR)
 
-# genuuid is using the uuid cli tool available under MacOSX
-UUID != if which uuidgen 2>&1 > /dev/null; then \
-        	echo `uuidgen` ; \
-        elif which uuid 2>&1 > /dev/null; then \
-        	echo `uuid` ; \
-        	else echo "00000000-0000-0000-0000-000000000000"; \
-        fi
-
 genuuid:
 	$(MV) miniupnpd.conf miniupnpd.conf.before
-	sed -e "s/^uuid=[-0-9a-f]*/uuid=$(UUID)/" miniupnpd.conf.before > miniupnpd.conf
+	sed -e "s/^uuid=[-0-9a-fA-F]*/uuid=`uuidgen 2>/dev/null`/" miniupnpd.conf.before > miniupnpd.conf
 	$(RM) miniupnpd.conf.before
 
 genlaunchd:
