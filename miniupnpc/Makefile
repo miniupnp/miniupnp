@@ -85,6 +85,7 @@ INSTALLPREFIX ?= $(PREFIX)/usr
 INSTALLDIRINC = $(INSTALLPREFIX)/include/miniupnpc
 INSTALLDIRLIB = $(INSTALLPREFIX)/lib
 INSTALLDIRBIN = $(INSTALLPREFIX)/bin
+INSTALLDIRMAN = $(INSTALLPREFIX)/share/man
 
 FILESTOINSTALL = $(LIBRARY) $(EXECUTABLES)
 ifneq ($(OS), AmigaOS)
@@ -142,6 +143,11 @@ else
 	$(INSTALL) -m 755 upnpc-shared $(INSTALLDIRBIN)/upnpc
 endif
 	$(INSTALL) -m 755 external-ip.sh $(INSTALLDIRBIN)/external-ip
+ifneq ($(OS), AmigaOS)
+	$(INSTALL) -d $(INSTALLDIRMAN)/man3
+	$(INSTALL) man3/miniupnpc.3 $(INSTALLDIRMAN)/man3/miniupnpc.3
+endif
+
 
 cleaninstall:
 	$(RM) -r $(INSTALLDIRINC)
