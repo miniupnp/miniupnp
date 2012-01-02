@@ -16,6 +16,7 @@ CFLAGS = -Wall -Os -D_GNU_SOURCE -fno-strict-aliasing -Wstrict-prototypes
 CC = gcc
 RM = rm -f
 INSTALL = install
+OS = $(shell uname -s)
 
 #EXECUTABLES = minissdpd testminissdpd listifaces
 EXECUTABLES = minissdpd testminissdpd testcodelength
@@ -26,6 +27,8 @@ ALLOBJS = $(MINISSDPDOBJS) $(TESTMINISSDPDOBJS) testcodelength.o
 
 INSTALLPREFIX ?= $(PREFIX)/usr
 SBININSTALLDIR = $(INSTALLPREFIX)/sbin
+MANINSTALLDIR = $(INSTALLPREFIX)/share/man
+
 
 .PHONY:	all clean install depend
 
@@ -37,8 +40,12 @@ clean:
 install:	minissdpd
 	$(INSTALL) -d $(SBININSTALLDIR)
 	$(INSTALL) minissdpd $(SBININSTALLDIR)
+	$(INSTALL) -d $(MANINSTALLDIR)/man1
+	$(INSTALL) minissdpd.1 $(MANINSTALLDIR)/man1/minissdpd.1
+ifneq ($(OS), Darwin)
 	$(INSTALL) -d $(PREFIX)/etc/init.d
 	$(INSTALL) minissdpd.init.d.script $(PREFIX)/etc/init.d/minissdpd
+endif
 
 minissdpd: $(MINISSDPDOBJS)
 	$(CC) $(CFLAGS) -o $@ $(MINISSDPDOBJS)
