@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.242 2011/11/18 11:21:20 nanard Exp $
 
 2012/01/02:
   Fixing netfilter/iptables_*.sh scripts for new ifconfig output format.
+  getifaddr.c: added additional checks on structure returned by getifaddrs()
 
 2011/11/18:
   avoid infinite loop in SendResp_upnphttp() in case of error
