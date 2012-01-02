@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.242 2011/11/18 11:21:20 nanard Exp $
 
+2012/01/02:
+  Fixing netfilter/iptables_*.sh scripts for new ifconfig output format.
+
 2011/11/18:
   avoid infinite loop in SendResp_upnphttp() in case of error
   Replaced SendResp_upnphttp() + CloseSocket_upnphttp() by 

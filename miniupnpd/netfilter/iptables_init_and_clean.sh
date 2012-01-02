@@ -5,7 +5,7 @@
 
 EXTIF=eth0
 IPTABLES=/sbin/iptables
-EXTIP="`LC_ALL=C /sbin/ifconfig $EXTIF | grep 'inet addr' | awk '{print $2}' | sed -e 's/.*://'`"
+EXTIP="`LC_ALL=C /sbin/ifconfig $EXTIF | grep 'inet ' | awk '{print $2}' | sed -e 's/.*://'`"
 NDIRTY="`LC_ALL=C /sbin/iptables -t nat -L -n | grep 'MINIUPNPD' | awk '{printf $1}'`"
 FDIRTY="`LC_ALL=C /sbin/iptables -t filter -L -n | grep 'MINIUPNPD' | awk '{printf $1}'`"
 echo "External IP = $EXTIP"

@@ -4,7 +4,7 @@ IPTABLES=/sbin/iptables
 
 #change this parameters :
 EXTIF=eth0
-EXTIP="`LC_ALL=C /sbin/ifconfig $EXTIF | grep 'inet addr' | awk '{print $2}' | sed -e 's/.*://'`"
+EXTIP="`LC_ALL=C /sbin/ifconfig $EXTIF | grep 'inet ' | awk '{print $2}' | sed -e 's/.*://'`"
 
 #removing the MINIUPNPD chain for nat
 $IPTABLES -t nat -F MINIUPNPD
