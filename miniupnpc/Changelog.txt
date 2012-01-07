@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.153 2011/09/12 09:52:01 nanard Exp $
 miniUPnP client Changelog.
 
+2011/11/25:
+  added header to Port Mappings list in upnpc.c
+
 2011/10/09:
   Makefile : make clean now removes jnaerator generated files.
   MINIUPNPC_VERSION in miniupnpc.h (updated by make)

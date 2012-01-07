@@ -119,6 +119,7 @@ static void ListRedirections(struct UPNPUrls * urls,
 	/*unsigned int num=0;
 	UPNP_GetPortMappingNumberOfEntries(urls->controlURL, data->servicetype, &num);
 	printf("PortMappingNumberOfEntries : %u\n", num);*/
+	printf(" i protocol exPort->inAddr:inPort description remoteHost leaseTime\n");
 	do {
 		snprintf(index, 6, "%d", i);
 		rHost[0] = '\0'; enabled[0] = '\0';
@@ -166,6 +167,7 @@ static void NewListRedirections(struct UPNPUrls * urls,
 	                               &pdata);
 	if(r == UPNPCOMMAND_SUCCESS)
 	{
+		printf(" i protocol exPort->inAddr:inPort description remoteHost leaseTime\n");
 		for(pm = pdata.head.lh_first; pm != NULL; pm = pm->entries.le_next)
 		{
 			printf("%2d %s %5hu->%s:%-5hu '%s' '%s' %u\n",
