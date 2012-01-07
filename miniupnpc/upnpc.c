@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.88 2011/06/17 23:31:01 nanard Exp $ */
+/* $Id: upnpc.c,v 1.90 2012/01/07 10:13:26 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2011 Thomas Bernard
@@ -531,7 +531,7 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "Options:\n");
 		fprintf(stderr, "  -6 : use ip v6 instead of ip v4.\n");
 		fprintf(stderr, "  -u url : bypass discovery process by providing the XML root description url.\n");
-		fprintf(stderr, "  -m address/interface : provide ip address (ip v4) or interface name (ip v6) to use for sending SSDP multicast packets.\n");
+		fprintf(stderr, "  -m address/interface : provide ip address (ip v4) or interface name (ip v4 or v6) to use for sending SSDP multicast packets.\n");
 		fprintf(stderr, "  -p path : use this path for MiniSSDPd socket.\n");
 		return 1;
 	}

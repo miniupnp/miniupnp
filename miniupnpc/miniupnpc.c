@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.96 2011/09/12 09:52:01 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.98 2012/01/07 10:21:25 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
  * copyright (c) 2005-2011 Thomas Bernard
@@ -14,6 +14,10 @@
 #ifndef __BSD_VISIBLE
 #define __BSD_VISIBLE 1
 #endif
+#endif
+
+#if !defined(__OpenBSD__)
+#define HAS_IP_MREQN
 #endif
 
 #include <stdlib.h>
@@ -497,10 +501,28 @@ upnpDiscover(int delay, const char * multicastif,
 		} else {
 			struct in_addr mc_if;
 			mc_if.s_addr = inet_addr(multicastif); /* ex: 192.168.x.x */
-			((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = mc_if.s_addr;
-			if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0)
+			if(mc_if.s_addr != INADDR_NONE)
 			{
-				PRINT_SOCKET_ERROR("setsockopt");
+				((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = mc_if.s_addr;
+				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0)
+				{
+					PRINT_SOCKET_ERROR("setsockopt");
+				}
+			} else {
+#ifdef HAS_IP_MREQN
+				/* was not an ip address, try with an interface name */
+				struct ip_mreqn reqn;	/* only defined with -D_BSD_SOURCE or -D_GNU_SOURCE */
+				memset(&reqn, 0, sizeof(struct ip_mreqn));
+				reqn.imr_ifindex = if_nametoindex(multicastif);
+				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&reqn, sizeof(reqn)) < 0)
+				{
+					PRINT_SOCKET_ERROR("setsockopt");
+				}
+#else
+#ifdef DEBUG
+				printf("Setting of multicast interface not supported with interface name.\n");
+#endif
+#endif
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.81 2011/06/21 15:24:14 nanard Exp $
+# $Id: Makefile,v 1.84 2012/01/07 10:13:25 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # (c) 2005-2011 Thomas Bernard
@@ -12,7 +12,7 @@ OS = $(shell uname -s)
 CC ?= gcc
 #AR = gar
 #CFLAGS = -O -Wall -g -DDEBUG
-CFLAGS ?= -O -Wall -DNDEBUG -DMINIUPNPC_SET_SOCKET_TIMEOUT -Wstrict-prototypes
+CFLAGS ?= -O -Wall -DNDEBUG -DMINIUPNPC_SET_SOCKET_TIMEOUT -Wstrict-prototypes -D_BSD_SOURCE
 # -DNO_GETADDRINFO
 INSTALL = install
 SH = /bin/sh
@@ -94,7 +94,7 @@ endif
 
 
 .PHONY:	install clean depend all check everything \
-	installpythonmodule
+	installpythonmodule updateversion
 #	validateminixml validateminiwget
 
 all:	$(LIBRARY) $(EXECUTABLES)
