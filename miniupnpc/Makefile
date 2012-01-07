@@ -126,6 +126,8 @@ clean:
 	$(RM) pythonmodule validateminixml
 	$(RM) -r build/ dist/
 	#python setup.py clean
+	# clean jnaerator stuff
+	$(RM) _jnaerator.* java/miniupnpc_$(OS).jar
 
 install:	$(FILESTOINSTALL)
 	$(INSTALL) -d $(INSTALLDIRINC)
