@@ -129,7 +129,11 @@ clean:
 	# clean jnaerator stuff
 	$(RM) _jnaerator.* java/miniupnpc_$(OS).jar
 
-install:	$(FILESTOINSTALL)
+updateversion:	miniupnpc.h
+	cp miniupnpc.h miniupnpc.h.bak
+	sed 's/\(.*MINIUPNPC_API_VERSION\s\+\)[0-9]\+/\1$(APIVERSION)/' < miniupnpc.h.bak > miniupnpc.h
+
+install:	updateversion $(FILESTOINSTALL)
 	$(INSTALL) -d $(INSTALLDIRINC)
 	$(INSTALL) -m 644 $(HEADERS) $(INSTALLDIRINC)
 	$(INSTALL) -d $(INSTALLDIRLIB)
