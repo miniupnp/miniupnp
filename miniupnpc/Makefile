@@ -196,12 +196,18 @@ jar:	$(SHAREDLIBRARY)
 	$(JAVA) -jar $(JNAERATOR) -library miniupnpc miniupnpc.h declspec.h upnpcommands.h upnpreplyparse.h igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) -package fr.free.miniupnp -o . -jar java/miniupnpc_$(OS).jar -v
 
 # make .deb packages
-deb:
-	python setup.py --command-packages=stdeb.command bdist_deb
+deb: /usr/share/pyshared/stdeb all
+	(python setup.py --command-packages=stdeb.command bdist_deb)
 
 # install .deb packages
 ideb:
-	sudo dpkg -i deb_dist/*.deb
+	(sudo dpkg -i deb_dist/*.deb)
+
+/usr/share/pyshared/stdeb: /usr/share/doc/python-all-dev
+	(sudo apt-get install python-stdeb)
+
+/usr/share/doc/python-all-dev:
+	(sudo apt-get install python-all-dev)
 
 minihttptestserver:	minihttptestserver.o
 
