@@ -198,7 +198,10 @@ jnaerator-0.9.8-shaded.jar:
 jnaerator-0.9.7.jar:
 	wget http://jnaerator.googlecode.com/files/jnaerator-0.9.7.jar
 
-jar:	$(SHAREDLIBRARY)  $(JNAERATOR)
+jnaerator-0.9.3.jar:
+	wget http://jnaerator.googlecode.com/files/jnaerator-0.9.3.jar
+
+jar: $(SHAREDLIBRARY)  $(JNAERATOR)
 	$(JAVA) -jar $(JNAERATOR) -library miniupnpc miniupnpc.h declspec.h upnpcommands.h upnpreplyparse.h igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) -package fr.free.miniupnp -o . -jar java/miniupnpc_$(OS).jar -v
 
 minihttptestserver:	minihttptestserver.o
