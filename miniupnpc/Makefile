@@ -195,6 +195,14 @@ miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh
 jar:	$(SHAREDLIBRARY) 
 	$(JAVA) -jar $(JNAERATOR) -library miniupnpc miniupnpc.h declspec.h upnpcommands.h upnpreplyparse.h igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) -package fr.free.miniupnp -o . -jar java/miniupnpc_$(OS).jar -v
 
+# make .deb packages
+deb:
+	python setup.py --command-packages=stdeb.command bdist_deb
+
+# install .deb packages
+ideb:
+	sudo dpkg -i deb_dist/*.deb
+
 minihttptestserver:	minihttptestserver.o
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.

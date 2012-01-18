@@ -1,3 +1,4 @@
+deb_dist/
 build/
 *.o
 *.a
