@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.98 2012/01/07 10:21:25 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.100 2012/01/12 09:54:34 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
  * copyright (c) 2005-2011 Thomas Bernard
@@ -16,7 +16,7 @@
 #endif
 #endif
 
-#if !defined(__OpenBSD__)
+#if !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(MACOSX)
 #define HAS_IP_MREQN
 #endif
 
