@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.84 2012/01/07 10:13:25 nanard Exp $
+# $Id: Makefile,v 1.85 2012/01/10 14:28:19 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # (c) 2005-2011 Thomas Bernard
@@ -189,7 +189,7 @@ testupnpreplyparse:	$(TESTUPNPREPLYPARSE)
 
 testigddescparse:	$(TESTIGDDESCPARSE)
 
-miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh
+miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh VERSION
 	$(SH) updateminiupnpcstrings.sh
 
 jar:	$(SHAREDLIBRARY) 
