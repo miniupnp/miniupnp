@@ -1,4 +1,4 @@
-/* $Id: upnppermissions.c,v 1.14 2009/12/22 17:21:43 nanard Exp $ */
+/* $Id: upnppermissions.c,v 1.15 2012/01/20 21:45:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006 Thomas Bernard
@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <syslog.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "config.h"

@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.64 2011/11/18 11:21:17 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.65 2012/01/20 21:45:57 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <syslog.h>
 #include <ctype.h>

@@ -1,4 +1,4 @@
-/* $Id: getifaddr.c,v 1.12 2012/01/02 10:08:42 nanard Exp $ */
+/* $Id: getifaddr.c,v 1.13 2012/01/20 21:45:57 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard 
@@ -13,8 +13,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <net/if.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #if defined(sun)
 #include <sys/sockio.h>
 #endif

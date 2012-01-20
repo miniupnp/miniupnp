@@ -1,8 +1,12 @@
-$Id: Changelog.txt,v 1.242 2011/11/18 11:21:20 nanard Exp $
+$Id: Changelog.txt,v 1.247 2012/01/20 21:45:56 nanard Exp $
+
+2012/01/20:
+  Always #include <netinet/in.h> before #include <arpa/inet.h> (for OpenBSD)
 
 2012/01/02:
   Fixing netfilter/iptables_*.sh scripts for new ifconfig output format.
   getifaddr.c: added additional checks on structure returned by getifaddrs()
+  Fixing Mac OS X makefile for installation
 
 2011/11/18:
   avoid infinite loop in SendResp_upnphttp() in case of error

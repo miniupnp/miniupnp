@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.88 2011/11/18 11:21:18 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.89 2012/01/20 21:45:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard 
@@ -12,8 +12,8 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <sys/types.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 
 #include "config.h"
