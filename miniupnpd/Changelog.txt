@@ -1,7 +1,8 @@
-$Id: Changelog.txt,v 1.247 2012/01/20 21:45:56 nanard Exp $
+$Id: Changelog.txt,v 1.248 2012/01/20 21:57:45 nanard Exp $
 
 2012/01/20:
   Always #include <netinet/in.h> before #include <arpa/inet.h> (for OpenBSD)
+  .onrdomain field was added in ps with OpenBSD 5.0. Add PFRULE_HAS_ONRDOMAIN
 
 2012/01/02:
   Fixing netfilter/iptables_*.sh scripts for new ifconfig output format.

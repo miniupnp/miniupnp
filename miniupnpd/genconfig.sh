@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.50 2011/07/25 16:03:46 nanard Exp $
+# $Id: genconfig.sh,v 1.51 2011/11/18 11:54:00 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2011 Thomas Bernard
@@ -72,6 +72,10 @@ case $OS_NAME in
 		# from the 4.7 version, new pf
 		if [ \( $MAJORVER -ge 5 \) -o \( $MAJORVER -eq 4 -a $MINORVER -ge 7 \) ]; then
 			echo "#define PF_NEWSTYLE" >> ${CONFIGFILE}
+		fi
+		# onrdomain was introduced in OpenBSD 5.0
+		if [ $MAJORVER -ge 5 ]; then
+			echo "#define PFRULE_HAS_ONRDOMAIN" >> ${CONFIGFILE}
 		fi
 		echo "#define USE_PF 1" >> ${CONFIGFILE}
 		FW=pf
