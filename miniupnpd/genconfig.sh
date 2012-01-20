@@ -34,6 +34,12 @@ if [ -f ./os.openwrt ]; then
 	OS_VERSION=$(cat ./os.openwrt)
 fi
 
+# Tomato USB special case
+if [ -f ../shared/tomato_version ]; then
+	OS_NAME=Tomato
+	OS_VERSION="Tomato $(cat ../shared/tomato_version)"
+fi
+
 ${RM} ${CONFIGFILE}
 
 echo "/* MiniUPnP Project" >> ${CONFIGFILE}
@@ -201,6 +207,21 @@ case $OS_NAME in
 		OS_URL=http://www.openwrt.org/
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
+		FW=netfilter
+		;;
+	Tomato)
+		OS_NAME=UPnP
+		OS_URL=http://tomatousb.org/
+		echo "" >> ${CONFIGFILE}
+		echo "#include <tomato_config.h>" >> ${CONFIGFILE}
+		echo "" >> ${CONFIGFILE}
+		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
+		echo "#ifdef LINUX26" >> ${CONFIGFILE}
+		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
+		echo "#endif" >> ${CONFIGFILE}
+		echo "#ifdef TCONFIG_IPV6" >> ${CONFIGFILE}
+		echo "#define ENABLE_IPV6" >> ${CONFIGFILE}
+		echo "#endif" >> ${CONFIGFILE}
 		FW=netfilter
 		;;
 	Darwin)

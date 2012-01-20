@@ -8,6 +8,7 @@ $Id: Changelog.txt,v 1.242 2011/11/18 11:21:20 nanard Exp $
   avoid infinite loop in SendResp_upnphttp() in case of error
   Replaced SendResp_upnphttp() + CloseSocket_upnphttp() by 
     SendRespAndClose_upnphttp()
+  Tomato specifics in genconfig.sh
 
 2011/07/30:
   netfilter : Added a tiny_nf_nat.h file to compile with iptables
