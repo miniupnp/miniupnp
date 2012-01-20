@@ -1,4 +1,4 @@
-/* $Id: miniwget.c,v 1.52 2011/06/17 22:59:42 nanard Exp $ */
+/* $Id: miniwget.c,v 1.53 2012/01/20 22:07:06 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2011 Thomas Bernard
@@ -33,6 +33,7 @@
 #include <sys/select.h>
 #endif /* #else defined(__amigaos__) && !defined(__amigaos4__) */
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #define closesocket close

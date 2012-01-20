@@ -1,4 +1,4 @@
-/* $Id: ifacewatch.c,v 1.2 2011/07/30 13:10:05 nanard Exp $ */
+/* $Id: ifacewatch.c,v 1.3 2012/01/20 22:08:07 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2011 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
 #ifdef __linux__
