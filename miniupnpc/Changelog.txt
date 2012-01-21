@@ -1,6 +1,12 @@
 $Id: Changelog.txt,v 1.157 2012/01/07 10:13:24 nanard Exp $
 miniUPnP client Changelog.
 
+2012/01/19:
+  Fixes in java wrappers thanks to Alexey Kuznetsov :
+    https://github.com/axet/miniupnp/tree/fix-javatest/miniupnpc
+  Make and install .deb packages (python) thanks to Alexey Kuznetsov :
+    https://github.com/axet/miniupnp/tree/feature-debbuild/miniupnpc
+
 2012/01/07:
   The multicast interface can now be specified by name with IPv4.
 
