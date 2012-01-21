@@ -1,7 +1,8 @@
-/* $Id: minissdpc.c,v 1.14 2010/11/25 09:57:25 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.15 2012/01/21 13:30:31 nanard Exp $ */
 /* Project : miniupnp
+ * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2009 Thomas Bernard
+ * copyright (c) 2005-2012 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 /*#include <syslog.h>*/
@@ -10,8 +11,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
-#if defined(WIN32) || defined(__amigaos__) || defined(__amigaos4__)
-#ifdef WIN32
+#if defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__)
+#ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <io.h>
