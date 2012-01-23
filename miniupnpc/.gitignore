@@ -3,6 +3,7 @@ build/
 *.o
 *.a
 *.so
+*.dylib
 Makefile.bak
 miniupnpcstrings.h
 pythonmodule
