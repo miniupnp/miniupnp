@@ -248,6 +248,9 @@ add_redirect_rule2(const char * ifname,
 #ifdef PFRULE_HAS_RTABLEID
 		pcr.rule.rtableid = -1;	/* first appeared in OpenBSD 4.0 */
 #endif
+#ifdef PFRULE_HAS_ONRDOMAIN
+		pcr.rule.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
+#endif
 		pcr.rule.quick = 1;
 		pcr.rule.keep_state = PF_STATE_NORMAL;
 		if(tag)
@@ -377,6 +380,9 @@ add_filter_rule2(const char * ifname,
 		pcr.rule.flagset = (TH_SYN|TH_ACK);
 #ifdef PFRULE_HAS_RTABLEID
 		pcr.rule.rtableid = -1;	/* first appeared in OpenBSD 4.0 */ 
+#endif
+#ifdef PFRULE_HAS_ONRDOMAIN
+		pcr.rule.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		pcr.rule.keep_state = 1;
 		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);

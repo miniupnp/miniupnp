@@ -1,7 +1,7 @@
-/* $Id: upnpc.c,v 1.90 2012/01/07 10:13:26 nanard Exp $ */
+/* $Id: upnpc.c,v 1.91 2012/01/21 13:30:33 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2011 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <winsock2.h>
 #define snprintf _snprintf
 #endif
@@ -466,7 +466,7 @@ int main(int argc, char ** argv)
 	int error = 0;
 	int ipv6 = 0;
 
-#ifdef WIN32
+#ifdef _WIN32
 	WSADATA wsaData;
 	int nResult = WSAStartup(MAKEWORD(2,2), &wsaData);
 	if(nResult != NO_ERROR)

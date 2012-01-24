@@ -1,13 +1,19 @@
-$Id: Changelog.txt,v 1.242 2011/11/18 11:21:20 nanard Exp $
+$Id: Changelog.txt,v 1.248 2012/01/20 21:57:45 nanard Exp $
+
+2012/01/20:
+  Always #include <netinet/in.h> before #include <arpa/inet.h> (for OpenBSD)
+  .onrdomain field was added in ps with OpenBSD 5.0. Add PFRULE_HAS_ONRDOMAIN
 
 2012/01/02:
   Fixing netfilter/iptables_*.sh scripts for new ifconfig output format.
   getifaddr.c: added additional checks on structure returned by getifaddrs()
+  Fixing Mac OS X makefile for installation
 
 2011/11/18:
   avoid infinite loop in SendResp_upnphttp() in case of error
   Replaced SendResp_upnphttp() + CloseSocket_upnphttp() by 
     SendRespAndClose_upnphttp()
+  Tomato specifics in genconfig.sh
 
 2011/07/30:
   netfilter : Added a tiny_nf_nat.h file to compile with iptables

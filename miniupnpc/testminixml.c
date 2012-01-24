@@ -1,21 +1,17 @@
-/* $Id: testminixml.c,v 1.6 2006/11/19 22:32:35 nanard Exp $
+/* $Id: testminixml.c,v 1.7 2012/01/21 13:30:33 nanard Exp $
+ * MiniUPnP project
+ * Website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * Author : Thomas Bernard.
+ * Copyright (c) 2005-2012 Thomas Bernard
+ *
  * testminixml.c
  * test program for the "minixml" functions.
- * Author : Thomas Bernard.
  */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "minixml.h"
 #include "igd_desc_parse.h"
-
-#ifdef WIN32
-#define NO_BZERO
-#endif
-
-#ifdef NO_BZERO
-#define bzero(p, n) memset(p, 0, n)
-#endif
 
 /* ---------------------------------------------------------------------- */
 void printeltname1(void * d, const char * name, int l)
@@ -47,7 +43,7 @@ void burptest(const char * buffer, int bufsize)
 	struct IGDdatas data;
 	struct xmlparser parser;
 	/*objet IGDdatas */
-	bzero(&data, sizeof(struct IGDdatas));
+	memset(&data, 0, sizeof(struct IGDdatas));
 	/* objet xmlparser */
 	parser.xmlstart = buffer;
 	parser.xmlsize = bufsize;

@@ -1,7 +1,8 @@
-/* $Id: miniwget.c,v 1.52 2011/06/17 22:59:42 nanard Exp $ */
+/* $Id: miniwget.c,v 1.54 2012/01/21 13:30:32 nanard Exp $ */
 /* Project : miniupnp
+ * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2011 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
  
@@ -9,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <io.h>
@@ -24,7 +25,7 @@
 #define strncasecmp memicmp
 #endif /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
 #endif /* #ifndef strncasecmp */
-#else /* #ifdef WIN32 */
+#else /* #ifdef _WIN32 */
 #include <unistd.h>
 #include <sys/param.h>
 #if defined(__amigaos__) && !defined(__amigaos4__)
@@ -33,13 +34,14 @@
 #include <sys/select.h>
 #endif /* #else defined(__amigaos__) && !defined(__amigaos4__) */
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #define closesocket close
 /* defining MINIUPNPC_IGNORE_EINTR enable the ignore of interruptions
  * during the connect() call */
 #define MINIUPNPC_IGNORE_EINTR
-#endif /* #else WIN32 */
+#endif /* #else _WIN32 */
 #if defined(__sun) || defined(sun)
 #define MIN(x,y) (((x)<(y))?(x):(y))
 #endif
@@ -343,7 +345,7 @@ miniwget3(const char * url, const char * host,
 			                NULL, 0,
 			                NI_NUMERICHOST | NI_NUMERICSERV);
 			if(n != 0) {
-#ifdef WIN32
+#ifdef _WIN32
 				fprintf(stderr, "getnameinfo() failed : %d\n", n);
 #else
 				fprintf(stderr, "getnameinfo() failed : %s\n", gai_strerror(n));
@@ -507,7 +509,7 @@ void * miniwget_getaddr(const char * url, int * size, char * addr, int addrlen)
 {
 	unsigned short port;
 	char * path;
-	/* protocol://host:port/chemin */
+	/* protocol://host:port/path */
 	char hostname[MAXHOSTNAMELEN+1];
 	*size = 0;
 	if(addr)

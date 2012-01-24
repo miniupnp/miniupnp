@@ -1,7 +1,8 @@
-/* $Id: miniupnpc.c,v 1.100 2012/01/12 09:54:34 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.101 2012/01/21 13:30:31 nanard Exp $ */
 /* Project : miniupnp
+ * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2011 Thomas Bernard
+ * copyright (c) 2005-2012 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #define __EXTENSIONS__ 1
@@ -23,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef WIN32
+#ifdef _WIN32
 /* Win32 Specific includes and defines */
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -38,7 +39,7 @@
 #endif /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
 #endif /* #ifndef strncasecmp */
 #define MAXHOSTNAMELEN 64
-#else /* #ifdef WIN32 */
+#else /* #ifdef _WIN32 */
 /* Standard POSIX includes */
 #include <unistd.h>
 #if defined(__amigaos__) && !defined(__amigaos4__)
@@ -60,7 +61,7 @@
 #include <strings.h>
 #include <errno.h>
 #define closesocket close
-#endif /* #else WIN32 */
+#endif /* #else _WIN32 */
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 #include <sys/time.h>
 #endif
@@ -78,7 +79,7 @@
 #include "connecthostport.h"
 #include "receivedata.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 #define PRINT_SOCKET_ERROR(x)    printf("Socket error: %s, %d\n", x, WSAGetLastError());
 #else
 #define PRINT_SOCKET_ERROR(x) perror(x)
@@ -357,14 +358,14 @@ upnpDiscover(int delay, const char * multicastif,
 	int rv;
 	struct addrinfo hints, *servinfo, *p;
 #endif
-#ifdef WIN32
+#ifdef _WIN32
 	MIB_IPFORWARDROW ip_forward;
 #endif
 	int linklocal = 1;
 
 	if(error)
 		*error = UPNPDISCOVER_UNKNOWN_ERROR;
-#if !defined(WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
+#if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
 	/* first try to get infos from minissdpd ! */
 	if(!minissdpdsock)
 		minissdpdsock = "/var/run/minissdpd.sock";
@@ -382,7 +383,7 @@ upnpDiscover(int delay, const char * multicastif,
 	deviceIndex = 0;
 #endif
 	/* fallback to direct discovery */
-#ifdef WIN32
+#ifdef _WIN32
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 #else
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0);
@@ -409,7 +410,7 @@ upnpDiscover(int delay, const char * multicastif,
 			p->sin_port = htons(PORT);
 		p->sin_addr.s_addr = INADDR_ANY;
 	}
-#ifdef WIN32
+#ifdef _WIN32
 /* This code could help us to use the right Network interface for 
  * SSDP multicast traffic */
 /* Get IP associated with the index given in the ip_forward struct
@@ -469,7 +470,7 @@ upnpDiscover(int delay, const char * multicastif,
 	}
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 	if (setsockopt(sudp, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof (opt)) < 0)
 #else
 	if (setsockopt(sudp, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof (opt)) < 0)
@@ -484,7 +485,7 @@ upnpDiscover(int delay, const char * multicastif,
 	if(multicastif)
 	{
 		if(ipv6) {
-#if !defined(WIN32)
+#if !defined(_WIN32)
 			/* according to MSDN, if_nametoindex() is supported since
 			 * MS Windows Vista and MS Windows Server 2008.
 			 * http://msdn.microsoft.com/en-us/library/bb408409%28v=vs.85%29.aspx */
@@ -594,7 +595,7 @@ upnpDiscover(int delay, const char * multicastif,
 		                      XSTR(PORT), &hints, &servinfo)) != 0) {
 			if(error)
 				*error = UPNPDISCOVER_SOCKET_ERROR;
-#ifdef WIN32
+#ifdef _WIN32
 		    fprintf(stderr, "getaddrinfo() failed: %d\n", rv);
 #else
 		    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
