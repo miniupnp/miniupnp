@@ -216,7 +216,7 @@ mvn_install:
 	mvn install:install-file -Dfile=java/miniupnpc_$(JARSUFFIX).jar \
 	  -DgroupId=com.github \
       -DartifactId=miniupnp \
-      -Dversion=$(VERSION)-SNAPSHOT \
+      -Dversion=$(VERSION) \
       -Dpackaging=jar \
       -Dclassifier=$(JARSUFFIX) \
       -DgeneratePom=true \
