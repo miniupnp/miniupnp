@@ -1,11 +1,11 @@
 MiniUPnP project
-(c) 2006-2011 Thomas Bernard
+(c) 2006-2012 Thomas Bernard
 webpage: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 contact: miniupnp@free.fr
 
 This directory contain the miniUPnP daemon software.
 This software is subject to the conditions detailed in
-the LICENCE file provided with this distribution.
+the LICENSE file provided with this distribution.
 
 
 The miniUPnP daemon is an UPnP IGD (internet gateway device)
@@ -16,7 +16,7 @@ During the year 2011, support for IGD v2 has been added.
 This support is experimental, and should be enabled only
 for testing and development.
 
-Later, support for the NAT Port Mapping Protocol (NAT-PMP) was
+Support for the NAT Port Mapping Protocol (NAT-PMP) has been
 added. See information about NAT-PMP here :
 http://miniupnp.free.fr/nat-pmp.html
 

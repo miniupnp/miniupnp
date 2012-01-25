@@ -1,0 +1,42 @@
+ -= MiniUPnP project =-
+
+Main author : Thomas BERNARD
+Web site : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+Github : https://github.com/miniupnp/miniupnp/
+Freecode : http://freecode.com/projects/miniupnp
+
+miniupnpc/ : MiniUPnP client - an UPnP IGD control point
+miniupnpd/ : MiniUPnP daemon - an implementation of a UPnP IGD
+                               + NAT-PMP gatewayt
+minissdpd/ : SSDP managing daemon. Designed to work with miniupnpc, miniupnpd,
+             minidlna, etc.
+
+Thanks to :
+    * Ryan Wagoner
+    * João Paulo Barraca
+    * Craig Kadziolka
+    * Seth Mos
+    * Rick Richard
+    * Michael van Tellingen
+    * Julien Wajsberg
+    * Jeremy Collake
+    * Matthew Sporleder
+    * Greg Hazel
+    * Rico Huber
+    * Jelle Huitema
+    * Xavier Martin
+    * Thomas Goirand
+    * Darren Reed
+    * Robbie Hanson
+    * Nikos Mavrogiannopoulos
+    * Elsö András
+    * Justin Maggard
+    * David Wu
+    * Michael Trebilcock
+    * Soren Dreijer
+    * Colin McFarlane
+    * Daniel Dickinson
+    * Guillaume Habault
+    * Alexey Osipov
+    * Alexey Kuznetsov
+
