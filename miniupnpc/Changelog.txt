@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.160 2012/01/21 13:30:31 nanard Exp $
+$Id: Changelog.txt,v 1.161 2012/01/25 21:24:02 nanard Exp $
 miniUPnP client Changelog.
+
+2012/01/25:
+  Maven installation thanks to Alexey Kuznetsov
 
 2012/01/21:
   Replace WIN32 macro by _WIN32
