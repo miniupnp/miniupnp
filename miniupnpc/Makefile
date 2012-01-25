@@ -9,6 +9,7 @@
 # or 
 # make install (will go to /usr/bin, /usr/lib, etc...)
 OS = $(shell uname -s)
+VERSION = $(shell cat VERSION)
 
 ifeq ($(OS), Darwin)
 JARSUFFIX=mac
@@ -215,7 +216,7 @@ mvn_install:
 	mvn install:install-file -Dfile=java/miniupnpc_$(JARSUFFIX).jar \
 	  -DgroupId=com.github \
       -DartifactId=miniupnp \
-      -Dversion=1.7-SNAPSHOT \
+      -Dversion=$(VERSION)-SNAPSHOT \
       -Dpackaging=jar \
       -Dclassifier=$(JARSUFFIX) \
       -DgeneratePom=true \
