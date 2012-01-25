@@ -14,6 +14,9 @@ VERSION = $(shell cat VERSION)
 ifeq ($(OS), Darwin)
 JARSUFFIX=mac
 endif
+ifeq ($(OS), Linux)
+JARSUFFIX=linux
+endif
 
 CC ?= gcc
 #AR = gar
