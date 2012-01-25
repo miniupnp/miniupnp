@@ -9,6 +9,15 @@
 # or 
 # make install (will go to /usr/bin, /usr/lib, etc...)
 OS = $(shell uname -s)
+VERSION = $(shell cat VERSION)
+
+ifeq ($(OS), Darwin)
+JARSUFFIX=mac
+endif
+ifeq ($(OS), Linux)
+JARSUFFIX=linux
+endif
+
 CC ?= gcc
 #AR = gar
 #CFLAGS = -O -Wall -g -DDEBUG
@@ -202,7 +211,19 @@ jnaerator-0.9.3.jar:
 	wget http://jnaerator.googlecode.com/files/jnaerator-0.9.3.jar
 
 jar: $(SHAREDLIBRARY)  $(JNAERATOR)
-	$(JAVA) -jar $(JNAERATOR) -library miniupnpc miniupnpc.h declspec.h upnpcommands.h upnpreplyparse.h igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) -package fr.free.miniupnp -o . -jar java/miniupnpc_$(OS).jar -v
+	$(JAVA) -jar $(JNAERATOR) -library miniupnpc miniupnpc.h declspec.h upnpcommands.h \
+	upnpreplyparse.h igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) \
+	-package fr.free.miniupnp -o . -jar java/miniupnpc_$(JARSUFFIX).jar -v
+
+mvn_install:
+	mvn install:install-file -Dfile=java/miniupnpc_$(JARSUFFIX).jar \
+	  -DgroupId=com.github \
+      -DartifactId=miniupnp \
+      -Dversion=$(VERSION) \
+      -Dpackaging=jar \
+      -Dclassifier=$(JARSUFFIX) \
+      -DgeneratePom=true \
+      -DcreateChecksum=true
 
 # make .deb packages
 deb: /usr/share/pyshared/stdeb all
