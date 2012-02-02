@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.248 2012/01/20 21:57:45 nanard Exp $
+$Id: Changelog.txt,v 1.249 2012/02/01 11:13:29 nanard Exp $
+
+2012/02/01:
+  always handle EAGAIN, EWOULDBLOCK and EINTR after recv()/recvfrom() calls
 
 2012/01/20:
   Always #include <netinet/in.h> before #include <arpa/inet.h> (for OpenBSD)

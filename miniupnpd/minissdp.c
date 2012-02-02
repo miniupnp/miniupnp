@@ -1,7 +1,7 @@
-/* $Id: minissdp.c,v 1.27 2011/05/23 12:39:41 nanard Exp $ */
+/* $Id: minissdp.c,v 1.28 2012/02/01 11:13:30 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -12,6 +12,7 @@
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <syslog.h>
 #include "config.h"
 #include "upnpdescstrings.h"
@@ -403,7 +404,14 @@ ProcessSSDPRequest(int s, unsigned short port)
 	             (struct sockaddr *)&sendername, &len_r);
 	if(n < 0)
 	{
-		syslog(LOG_ERR, "recvfrom(udp): %m");
+		/* EAGAIN, EWOULDBLOCK, EINTR : silently ignore (try again next time)
+		 * other errors : log to LOG_ERR */
+		if(errno != EAGAIN &&
+		   errno != EWOULDBLOCK &&
+		   errno != EINTR)
+		{
+			syslog(LOG_ERR, "recvfrom(udp): %m");
+		}
 		return;
 	}
 	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername, port);

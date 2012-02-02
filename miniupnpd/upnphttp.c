@@ -1,8 +1,8 @@
-/* $Id: upnphttp.c,v 1.65 2012/01/20 21:45:57 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.66 2012/02/01 11:13:30 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2011 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -554,8 +554,14 @@ Process_upnphttp(struct upnphttp * h)
 		n = recv(h->socket, buf, 2048, 0);
 		if(n<0)
 		{
-			syslog(LOG_ERR, "recv (state0): %m");
-			h->state = 100;
+			if(errno != EAGAIN &&
+			   errno != EWOULDBLOCK &&
+			   errno != EINTR)
+			{
+				syslog(LOG_ERR, "recv (state0): %m");
+				h->state = 100;
+			}
+			/* if errno is EAGAIN, EWOULDBLOCK or EINTR, try again later */
 		}
 		else if(n==0)
 		{
@@ -584,8 +590,14 @@ Process_upnphttp(struct upnphttp * h)
 		n = recv(h->socket, buf, 2048, 0);
 		if(n<0)
 		{
-			syslog(LOG_ERR, "recv (state1): %m");
-			h->state = 100;
+			if(errno != EAGAIN &&
+			   errno != EWOULDBLOCK &&
+			   errno != EINTR)
+			{
+				syslog(LOG_ERR, "recv (state1): %m");
+				h->state = 100;
+			}
+			/* if errno is EAGAIN, EWOULDBLOCK or EINTR, try again later */
 		}
 		else if(n==0)
 		{

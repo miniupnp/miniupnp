@@ -1,6 +1,6 @@
-/* $Id: natpmp.c,v 1.26 2011/07/15 07:48:26 nanard Exp $ */
+/* $Id: natpmp.c,v 1.27 2012/02/01 11:13:30 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2010 Thomas Bernard
+ * (c) 2007-2012 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <syslog.h>
+#include <errno.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -116,7 +117,13 @@ void ProcessIncomingNATPMPPacket(int s)
 	n = recvfrom(s, req, sizeof(req), 0,
 	             (struct sockaddr *)&senderaddr, &senderaddrlen);
 	if(n<0) {
-		syslog(LOG_ERR, "recvfrom(natpmp): %m");
+		/* EAGAIN, EWOULDBLOCK and EINTR : silently ignore (retry next time)
+		 * other errors : log to LOG_ERR */
+		if(errno != EAGAIN &&
+		   errno != EWOULDBLOCK &&
+		   errno != EINTR) {
+			syslog(LOG_ERR, "recvfrom(natpmp): %m");
+		}
 		return;
 	}
 	if(!inet_ntop(AF_INET, &senderaddr.sin_addr,
