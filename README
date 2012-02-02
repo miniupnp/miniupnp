@@ -7,7 +7,7 @@ Freecode : http://freecode.com/projects/miniupnp
 
 miniupnpc/ : MiniUPnP client - an UPnP IGD control point
 miniupnpd/ : MiniUPnP daemon - an implementation of a UPnP IGD
-                               + NAT-PMP gatewayt
+                               + NAT-PMP gateway
 minissdpd/ : SSDP managing daemon. Designed to work with miniupnpc, miniupnpd,
              minidlna, etc.
 
