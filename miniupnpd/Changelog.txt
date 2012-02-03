@@ -1,7 +1,9 @@
-$Id: Changelog.txt,v 1.250 2012/02/03 11:59:13 nanard Exp $
+$Id: Changelog.txt,v 1.251 2012/02/03 15:10:10 nanard Exp $
 
 2012/02/03:
   Anchor name (PF) is now configurable through the config file with anchor=
+  Added test of presence of /lib/libip4tc.so and /lib/libip6tc.so files in
+    Makefile.linux in order to add -lip4tc and -lip6tc to LIBS accordingly.
 
 2012/02/01:
   always handle EAGAIN, EWOULDBLOCK and EINTR after recv()/recvfrom() calls

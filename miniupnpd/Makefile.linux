@@ -1,4 +1,4 @@
-# $Id: Makefile.linux,v 1.60 2011/07/30 13:14:35 nanard Exp $
+# $Id: Makefile.linux,v 1.61 2012/02/03 15:10:11 nanard Exp $
 # MiniUPnP project
 # (c) 2006-2011 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -48,6 +48,7 @@ else # gentoo
 # see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=1618
 # and http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=2183
 LIBS ?= -lip4tc
+CFLAGS := -DIPTABLES_143 $(CFLAGS)
 endif
 
 ARCH ?= $(shell uname -m | grep -q "x86_64" && echo 64)
@@ -90,7 +91,15 @@ else # ifdef IPTABLESPATH
 TEST := $(shell test -f /usr/include/xtables.h && grep -q "XTABLES_VERSION_CODE" /usr/include/xtables.h && echo 1)
 ifeq ($(TEST), 1)
 CFLAGS := $(CFLAGS) -DIPTABLES_143
-LIBS = -lip4tc
+LIBS = -liptc
+TESTIP4TC := $(shell test -f /lib/libip4tc.so && echo 1)
+ifeq ($(TESTIP4TC), 1)
+LIBS := $(LIBS) -lip4tc
+endif # ($(TESTIP4TC), 1)
+TESTIP6TC := $(shell test -f /lib/libip6tc.so && echo 1)
+ifeq ($(TESTIP6TC), 1)
+LIBS := $(LIBS) -lip6tc
+endif # ($(TESTIP6TC), 1)
 endif # ($(TEST), 1)
 endif # ifdef IPTABLESPATH
 
