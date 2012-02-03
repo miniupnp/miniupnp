@@ -1,4 +1,4 @@
-/* $Id: upnpglobalvars.c,v 1.25 2011/05/27 21:36:22 nanard Exp $ */
+/* $Id: upnpglobalvars.c,v 1.26 2012/02/03 11:59:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2010 Thomas Bernard 
@@ -62,6 +62,7 @@ unsigned short nextnatpmptoclean_proto = 0;
 unsigned int nextruletoclean_timestamp = 0;
 
 #ifdef USE_PF
+const char * anchor_name = "miniupnpd";
 const char * queue = 0;
 const char * tag = 0;
 #endif

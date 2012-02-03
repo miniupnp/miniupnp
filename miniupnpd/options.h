@@ -1,4 +1,4 @@
-/* $Id: options.h,v 1.15 2008/10/06 13:22:02 nanard Exp $ */
+/* $Id: options.h,v 1.16 2012/02/03 11:59:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -35,6 +35,7 @@ enum upnpconfigoptions {
 	UPNPNATCHAIN,
 #endif
 #ifdef USE_PF
+	UPNPANCHOR,				/* anchor */
 	UPNPQUEUE,				/* queue */
 	UPNPTAG,				/* tag */
 #endif

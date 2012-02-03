@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.249 2012/02/01 11:13:29 nanard Exp $
+$Id: Changelog.txt,v 1.250 2012/02/03 11:59:13 nanard Exp $
+
+2012/02/03:
+  Anchor name (PF) is now configurable through the config file with anchor=
 
 2012/02/01:
   always handle EAGAIN, EWOULDBLOCK and EINTR after recv()/recvfrom() calls

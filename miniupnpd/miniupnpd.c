@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.138 2011/05/27 21:58:12 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.139 2012/02/03 11:59:15 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard
@@ -700,6 +700,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				v->clean_ruleset_interval = atoi(ary_options[i].value);
 				break;
 #ifdef USE_PF
+			case UPNPANCHOR:
+				anchor_name = ary_options[i].value;
+				break;
 			case UPNPQUEUE:
 				queue = ary_options[i].value;
 				break;

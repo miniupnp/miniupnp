@@ -1,4 +1,4 @@
-/* $Id: options.c,v 1.20 2008/10/06 13:22:02 nanard Exp $ */
+/* $Id: options.c,v 1.21 2012/02/03 11:59:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -46,6 +46,7 @@ static const struct {
 #endif
 	{ UPNPENABLE, "enable_upnp"},
 #ifdef USE_PF
+	{ UPNPANCHOR, "anchor"},
 	{ UPNPQUEUE, "queue"},
 	{ UPNPTAG, "tag"},
 #endif
