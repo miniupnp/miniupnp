@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.139 2012/02/03 11:59:15 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.140 2012/02/03 14:39:24 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard
@@ -1042,7 +1042,7 @@ print_usage:
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
 #ifdef ENABLE_NATPMP
-			"\t-N enable NAT-PMP functionnality.\n"
+			"\t-N enable NAT-PMP functionality.\n"
 #endif
 			"\t-B sets bitrates reported by daemon in bits per second.\n"
 			"\t-w sets the presentation url. Default is http address on port 80\n"
