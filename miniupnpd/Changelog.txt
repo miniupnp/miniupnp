@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.252 2012/02/04 23:05:20 nanard Exp $
+$Id: Changelog.txt,v 1.253 2012/02/04 23:34:38 nanard Exp $
+
+2012/02/05:
+  Compile ok with -ansi flag.
 
 2012/02/04:
   Added friendl_name= option to config file

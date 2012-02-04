@@ -1,7 +1,7 @@
-/* $Id: upnpsoap.c,v 1.89 2012/01/20 21:45:58 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.90 2012/02/04 23:34:40 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard 
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -1147,8 +1147,7 @@ CheckStatus(struct upnphttp * h)
 static int
 DataVerification(struct upnphttp * h, char * int_ip, unsigned short * int_port, const char * protocol, char * leaseTime)
 {
-	//int n;
-	// **  Internal IP can't be wildcarded
+	/* **  Internal IP can't be wildcarded */
 	if (!int_ip)
 	{
 		SoapError(h, 708, "WildCardNotPermittedInSrcIP");
@@ -1161,16 +1160,17 @@ DataVerification(struct upnphttp * h, char * int_ip, unsigned short * int_port, 
 		return 0;
 	}
 
-	// ** Internal port can't be wilcarded. 
-//	printf("\tint_port: *%d*\n", *int_port);
+	/* ** Internal port can't be wilcarded.  */
+/*	printf("\tint_port: *%d*\n", *int_port); */
 	if (*int_port == 0)
 	{
 		SoapError(h, 706, "InternalPortWilcardingNotAllowed");
 		return 0;
 	}
 
-	// ** Protocol can't be wilcarded and can't be an unknown port (here deal with only UDP, TCP, UDPLITE)
-//	printf("\tprotocol: *%s*\n", protocol);
+	/* ** Protocol can't be wilcarded and can't be an unknown port
+	 * (here deal with only UDP, TCP, UDPLITE) */
+/*	printf("\tprotocol: *%s*\n", protocol); */
 	if (atoi(protocol) == 65535)
 	{
 		SoapError(h, 707, "ProtocolWilcardingNotAllowed");
@@ -1187,8 +1187,8 @@ DataVerification(struct upnphttp * h, char * int_ip, unsigned short * int_port, 
 		return 0;
 	}
 
-	// ** Lease Time can't be wilcarded nor >86400.
-//	printf("\tlease time: %s\n", leaseTime);
+	/* ** Lease Time can't be wilcarded nor >86400. */
+/*	printf("\tlease time: %s\n", leaseTime); */
 	if(!leaseTime || !atoi(leaseTime) || atoi(leaseTime)>86400)
 	{
 		/* lease duration is never infinite, nor wilcarded. In this case, use default value */
@@ -1355,7 +1355,8 @@ AddPinhole(struct upnphttp * h, const char * action)
 	rport = (unsigned short)atoi(rem_port);
 	iport = (unsigned short)atoi(int_port);
 
-	// **  As there is no security policy, InternalClient must be equal to the CP's IP address.
+	/* **  As there is no security policy, InternalClient must be equal
+	 * to the CP's IP address. */
 	if(DataVerification(h, int_ip, &iport, protocol, leaseTime) == 0
 	   || PinholeVerification(h, int_ip, &iport) <= 0)
 	{
@@ -1363,7 +1364,7 @@ AddPinhole(struct upnphttp * h, const char * action)
 		return ;
 	}
 
-	// ** RemoteHost can be wilcarded or an IDN.
+	/* ** RemoteHost can be wilcarded or an IDN. */
 	/*printf("\trem_host: %s\n", rem_host);*/
 	if (rem_host!=NULL && !strchr(rem_host, ':'))
 	{
@@ -1420,7 +1421,8 @@ UpdatePinhole(struct upnphttp * h, const char * action)
 		return;
 	}
 
-	// Check that client is not deleting an pinhole he doesn't have access to, because of its public access
+	/* Check that client is not deleting an pinhole
+	 * it doesn't have access to, because of its public access */
 	n = upnp_get_pinhole_info(0, 0, iaddr, &iport, proto, uid, lt);
 	if (n > 0)
 	{
@@ -1529,7 +1531,8 @@ DeletePinhole(struct upnphttp * h, const char * action)
 		return;
 	}
 
-	// Check that client is not deleting an pinhole he doesn't have access to, because of its public access
+	/* Check that client is not deleting an pinhole
+	 * it doesn't have access to, because of its public access */
 	n = upnp_get_pinhole_info(0, 0, iaddr, &iport, proto, uid, lt);
 	if (n > 0)
 	{
@@ -1591,7 +1594,8 @@ CheckPinholeWorking(struct upnphttp * h, const char * action)
 		return;
 	}
 
-	// Check that client is not checking a pinhole he doesn't have access to, because of its public access
+	/* Check that client is not checking a pinhole
+	 * it doesn't have access to, because of its public access */
 	r = upnp_get_pinhole_info(eaddr, eport, iaddr, &iport, proto, uid, lt);
 	if (r > 0)
 	{
@@ -1688,7 +1692,8 @@ GetPinholePackets(struct upnphttp * h, const char * action)
 		return;
 	}
 
-	// Check that client is not getting infos of a pinhole he doesn't have access to, because of its public access
+	/* Check that client is not getting infos of a pinhole
+	 * it doesn't have access to, because of its public access */
 	r = upnp_get_pinhole_info(0, 0, iaddr, &iport, proto, uid, lt);
 	if (r > 0)
 	{

@@ -1,7 +1,7 @@
-/* $Id: miniupnpdctl.c,v 1.8 2010/02/15 10:19:46 nanard Exp $ */
+/* $Id: miniupnpdctl.c,v 1.9 2012/02/04 23:34:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -31,7 +31,7 @@ main(int argc, char * * argv)
 	int s;
 	struct sockaddr_un addr;
 
-//	signal(SIGINT, sighandler);
+	/*signal(SIGINT, sighandler);*/
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(s<0)
 	{

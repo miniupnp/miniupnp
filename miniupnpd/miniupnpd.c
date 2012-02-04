@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.141 2012/02/04 23:05:22 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.142 2012/02/04 23:34:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -193,32 +193,32 @@ OpenAndConfNFqueue(){
 
 	inet_pton(AF_INET, "239.255.255.250", &(ssdp.sin_addr));
 
-        //Get a queue connection handle from the module
+        /* Get a queue connection handle from the module */
         if (!(nfqHandle = nfq_open())) {
 		syslog(LOG_ERR, "Error in nfq_open(): %m");
                 return -1;
         }
 
-        //Unbind the handler from processing any IP packets
-        //      Not totally sure why this is done, or if it's necessary...
+        /* Unbind the handler from processing any IP packets
+           Not totally sure why this is done, or if it's necessary... */
         if ((e = nfq_unbind_pf(nfqHandle, AF_INET)) < 0) {
 		syslog(LOG_ERR, "Error in nfq_unbind_pf(): %m");
                 return -1;
         }
 
-        //Bind this handler to process IP packets...
+        /* Bind this handler to process IP packets... */
         if (nfq_bind_pf(nfqHandle, AF_INET) < 0) {
 		syslog(LOG_ERR, "Error in nfq_bind_pf(): %m");
                 return -1;
         }
 
-        //      Install a callback on queue -Q
+        /*      Install a callback on queue -Q */
         if (!(myQueue = nfq_create_queue(nfqHandle,  nfqueue, &nfqueue_cb, NULL))) {
 		syslog(LOG_ERR, "Error in nfq_create_queue(): %m");
                 return -1;
         }
 
-        //      Turn on packet copy mode
+        /*      Turn on packet copy mode */
         if (nfq_set_mode(myQueue, NFQNL_COPY_PACKET, 0xffff) < 0) {
 		syslog(LOG_ERR, "Error setting packet copy mode (): %m");
                 return -1;
@@ -289,7 +289,8 @@ static int nfqueue_cb(
 
 	} else {
 		syslog(LOG_ERR,"nfq_get_msg_packet_hdr failed");
-		return 1; // from nfqueue source: 0 = ok, >0 = soft error, <0 hard error
+		return 1;
+		/* from nfqueue source: 0 = ok, >0 = soft error, <0 hard error */
 	}
 
 	return 0;
@@ -1075,7 +1076,7 @@ main(int argc, char * * argv)
 	int sudpv6 = -1;	/* IP v6 socket for receiving SSDP */
 #endif
 #ifdef ENABLE_NATPMP
-	int * snatpmp;
+	int * snatpmp = NULL;
 #endif
 #ifdef ENABLE_NFQUEUE
 	int nfqh = -1;
@@ -1084,7 +1085,7 @@ main(int argc, char * * argv)
 	int sifacewatcher = -1;
 #endif
 
-	int * snotify;
+	int * snotify = NULL;
 	int addr_count;
 	LIST_HEAD(httplisthead, upnphttp) upnphttphead;
 	struct upnphttp * e = 0;
@@ -1114,12 +1115,15 @@ main(int argc, char * * argv)
 	addr_count = 0;
 	for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next)
 		addr_count++;
-	snotify = (int*) malloc(addr_count * sizeof(int));
-	memset(snotify, 0, sizeof(snotify));
+	if(addr_count > 0) {
+		snotify = calloc(addr_count, sizeof(int));
+	}
 #ifdef ENABLE_NATPMP
-	snatpmp = (int*) malloc(addr_count * sizeof(int));
-	for(i = 0; i < addr_count; i++)
-		snatpmp[i] = -1;
+	if(addr_count > 0) {
+		snatpmp = malloc(addr_count * sizeof(int));
+		for(i = 0; i < addr_count; i++)
+			snatpmp[i] = -1;
+	}
 #endif
 
 	LIST_INIT(&upnphttphead);

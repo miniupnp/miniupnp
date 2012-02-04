@@ -1,4 +1,4 @@
-/* $Id: iptcrdr.c,v 1.46 2011/07/30 13:14:36 nanard Exp $ */
+/* $Id: iptcrdr.c,v 1.47 2012/02/04 23:34:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard
@@ -278,7 +278,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 						continue;
 				}
 				target = (void *)e + e->target_offset;
-				//target = ipt_get_target(e);
+				/* target = ipt_get_target(e); */
 				mr = (const struct ip_nat_multi_range *)&target->data[0];
 				snprintip(iaddr, iaddrlen, ntohl(mr->range[0].min_ip));
 				*iport = ntohs(mr->range[0].min.all);

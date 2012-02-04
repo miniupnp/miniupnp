@@ -1,7 +1,7 @@
-/* $Id: ifacewatcher.c,v 1.2 2011/07/30 13:11:39 nanard Exp $ */
+/* $Id: ifacewatcher.c,v 1.3 2012/02/04 23:34:40 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2009 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  *
  * ifacewatcher.c
  *
@@ -239,7 +239,7 @@ ProcessInterfaceWatchNotify(int s)
 	struct ifaddrmsg *ifa;
 	int len;
 
-	struct rtattr *rth; //
+	struct rtattr *rth;
 	int rtl;
 
 	unsigned int ext_if_name_index = 0;

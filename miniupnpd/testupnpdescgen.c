@@ -1,4 +1,4 @@
-/* $Id: testupnpdescgen.c,v 1.26 2012/02/04 23:05:21 nanard Exp $ */
+/* $Id: testupnpdescgen.c,v 1.27 2012/02/04 23:34:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard 
@@ -84,7 +84,7 @@ xml_pretty_print(const char * s, int len, FILE * f)
 			if(elt_close==1)
 			{
 				/*fputc('\n', f); n++; */
-				//elt_close = 0;
+				/* elt_close = 0; */
 				if(indent > 0)
 					indent--;
 			}
