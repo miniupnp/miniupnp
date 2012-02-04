@@ -193,5 +193,11 @@ freeoptions(void)
 		ary_options = NULL;
 		num_options = 0;
 	}
+	if(upnppermlist)
+	{
+		free(upnppermlist);
+		upnppermlist = NULL;
+		num_upnpperm = 0;
+	}
 }
 
