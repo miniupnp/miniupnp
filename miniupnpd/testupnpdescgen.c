@@ -1,7 +1,7 @@
-/* $Id: testupnpdescgen.c,v 1.25 2011/05/18 22:22:23 nanard Exp $ */
+/* $Id: testupnpdescgen.c,v 1.26 2012/02/04 23:05:21 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard 
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -21,6 +21,7 @@ char serialnumber[] = "12345678";
 char modelnumber[] = "1";
 char presentationurl[] = "http://192.168.0.1:8080/";
 /*char presentationurl[] = "";*/
+char friendly_name[] = OS_NAME " router";
 
 char * use_ext_ip_addr = NULL;
 const char * ext_if_name = "eth0";

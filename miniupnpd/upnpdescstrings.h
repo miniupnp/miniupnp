@@ -1,7 +1,7 @@
-/* $Id: upnpdescstrings.h,v 1.5 2007/02/09 10:12:52 nanard Exp $ */
+/* $Id: upnpdescstrings.h,v 1.6 2012/02/04 23:05:21 nanard Exp $ */
 /* miniupnp project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the coditions detailed in
  * the LICENCE file provided within the distribution */
 #ifndef __UPNPDESCSTRINGS_H__
@@ -10,7 +10,7 @@
 #include "config.h"
 
 /* strings used in the root device xml description */
-#define ROOTDEV_FRIENDLYNAME		OS_NAME " router"
+/*#define ROOTDEV_FRIENDLYNAME		OS_NAME " router"*/
 #define ROOTDEV_MANUFACTURER		OS_NAME
 #define ROOTDEV_MANUFACTURERURL		OS_URL
 #define ROOTDEV_MODELNAME			OS_NAME " router"

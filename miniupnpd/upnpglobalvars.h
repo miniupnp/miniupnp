@@ -1,7 +1,7 @@
-/* $Id: upnpglobalvars.h,v 1.30 2012/02/03 11:59:16 nanard Exp $ */
+/* $Id: upnpglobalvars.h,v 1.31 2012/02/04 23:05:21 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard 
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -64,6 +64,9 @@ extern char modelnumber[];
 
 #define PRESENTATIONURL_MAX_LEN (64)
 extern char presentationurl[];
+
+#define FRIENDLY_NAME_MAX_LEN (64)
+extern char friendly_name[];
 
 /* UPnP permission rules : */
 extern struct upnpperm * upnppermlist;

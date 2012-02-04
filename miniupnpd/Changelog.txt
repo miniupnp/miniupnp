@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.251 2012/02/03 15:10:10 nanard Exp $
+$Id: Changelog.txt,v 1.252 2012/02/04 23:05:20 nanard Exp $
+
+2012/02/04:
+  Added friendl_name= option to config file
 
 2012/02/03:
   Anchor name (PF) is now configurable through the config file with anchor=

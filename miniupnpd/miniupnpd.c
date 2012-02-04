@@ -1,7 +1,7 @@
-/* $Id: miniupnpd.c,v 1.140 2012/02/03 14:39:24 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.141 2012/02/04 23:05:22 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -661,6 +661,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 			case UPNPPRESENTATIONURL:
 				presurl = ary_options[i].value;
+				break;
+			case UPNPFRIENDLY_NAME:
+				strncpy(friendly_name, ary_options[i].value, FRIENDLY_NAME_MAX_LEN);
+				friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
 				break;
 #ifdef USE_NETFILTER
 			case UPNPFORWARDCHAIN:

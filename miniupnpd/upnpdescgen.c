@@ -1,7 +1,7 @@
-/* $Id: upnpdescgen.c,v 1.63 2011/05/27 21:36:50 nanard Exp $ */
+/* $Id: upnpdescgen.c,v 1.64 2012/02/04 23:05:21 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard 
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -145,7 +145,7 @@ static const struct XMLElt rootDesc[] =
 /* 5 */
 	{"/deviceType", DEVICE_TYPE_IGD},
 		/* urn:schemas-upnp-org:device:InternetGatewayDevice:1 or 2 */
-	{"/friendlyName", ROOTDEV_FRIENDLYNAME},	/* required */
+	{"/friendlyName", friendly_name/*ROOTDEV_FRIENDLYNAME*/},	/* required */
 	{"/manufacturer", ROOTDEV_MANUFACTURER},		/* required */
 /* 8 */
 	{"/manufacturerURL", ROOTDEV_MANUFACTURERURL},	/* optional */
@@ -1151,7 +1151,7 @@ genEventVars(int * len, const struct serviceDesc * s, const char * servns)
 			str = strcat_str(str, len, &tmplen, "<e:property><s:");
 			str = strcat_str(str, len, &tmplen, v->name);
 			str = strcat_str(str, len, &tmplen, ">");
-			//printf("<e:property><s:%s>", v->name);
+			/*printf("<e:property><s:%s>", v->name);*/
 			switch(v->ieventvalue) {
 			case 0:
 				break;
@@ -1213,14 +1213,16 @@ genEventVars(int * len, const struct serviceDesc * s, const char * servns)
 			str = strcat_str(str, len, &tmplen, "</s:");
 			str = strcat_str(str, len, &tmplen, v->name);
 			str = strcat_str(str, len, &tmplen, "></e:property>");
-			//printf("</s:%s></e:property>\n", v->name);
+			/*printf("</s:%s></e:property>\n", v->name);*/
 		}
 		v++;
 	}
 	str = strcat_str(str, len, &tmplen, "</e:propertyset>");
-	//printf("</e:propertyset>\n");
-	//printf("\n");
-	//printf("%d\n", tmplen);
+#if 0
+	printf("</e:propertyset>\n");
+	printf("\n");
+	printf("%d\n", tmplen);
+#endif
 	str[*len] = '\0';
 	return str;
 }
