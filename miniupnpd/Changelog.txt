@@ -1,7 +1,9 @@
-$Id: Changelog.txt,v 1.253 2012/02/04 23:34:38 nanard Exp $
+$Id: Changelog.txt,v 1.254 2012/02/05 00:29:49 nanard Exp $
 
 2012/02/05:
   Compile ok with -ansi flag.
+  Save a few bytes in options.c using a string repository, instead of a fixed size
+    buffer for each option value.
 
 2012/02/04:
   Added friendl_name= option to config file

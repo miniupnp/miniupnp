@@ -1,4 +1,4 @@
-/* $Id: options.c,v 1.22 2012/02/04 23:05:21 nanard Exp $ */
+/* $Id: options.c,v 1.23 2012/02/05 00:29:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -16,6 +16,7 @@
 #include "upnpglobalvars.h"
 
 struct option * ary_options = NULL;
+static char * string_repo = NULL;
 int num_options = 0;
 
 static const struct {
@@ -73,6 +74,9 @@ readoptionsfile(const char * fname)
 	int linenum = 0;
 	int i;
 	enum upnpconfigoptions id;
+	size_t string_repo_len = 0;
+	size_t len;
+	void *tmp;
 
 	if(!fname || (strlen(fname) == 0))
 		return -1;
@@ -100,6 +104,7 @@ readoptionsfile(const char * fname)
 		{
 			*t = '\0';
 			t--;
+			/* remove spaces at the end of the line */
 			while((t >= buffer) && isspace(*t))
 			{
 				*t = '\0';
@@ -118,17 +123,25 @@ readoptionsfile(const char * fname)
 		/* check for UPnP permissions rule */
 		if(0 == memcmp(name, "allow", 5) || 0 == memcmp(name, "deny", 4))
 		{
-			upnppermlist = realloc(upnppermlist,
-			                       sizeof(struct upnpperm) * (num_upnpperm+1));
-			/* parse the rule */
-			if(read_permission_line(upnppermlist + num_upnpperm, name) >= 0)
+			tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
+			if(tmp == NULL)
 			{
-				num_upnpperm++;
+				fprintf(stderr, "memory allocation error. Permission line in file %s line %d\n",
+				        fname, linenum);
 			}
 			else
 			{
-				fprintf(stderr, "parsing error file %s line %d : %s\n",
-				        fname, linenum, name);
+				upnppermlist = tmp;
+				/* parse the rule */
+				if(read_permission_line(upnppermlist + num_upnpperm, name) >= 0)
+				{
+					num_upnpperm++;
+				}
+				else
+				{
+					fprintf(stderr, "parsing error file %s line %d : %s\n",
+					        fname, linenum, name);
+				}
 			}
 			continue;
 		}
@@ -165,21 +178,50 @@ readoptionsfile(const char * fname)
 
 		if(id == UPNP_INVALID)
 		{
-			fprintf(stderr, "parsing error file %s line %d : %s=%s\n",
+			fprintf(stderr, "invalid option in file %s line %d : %s=%s\n",
 			        fname, linenum, name, value);
 		}
 		else
 		{
-			num_options += 1;
-			ary_options = (struct option *) realloc(ary_options, num_options * sizeof(struct option));
-
-			ary_options[num_options-1].id = id;
-			strncpy(ary_options[num_options-1].value, value, MAX_OPTION_VALUE_LEN);
+			tmp = realloc(ary_options, (num_options + 1) * sizeof(struct option));
+			if(tmp == NULL)
+			{
+				fprintf(stderr, "memory allocation error. Option in file %s line %d.\n",
+				        fname, linenum);
+			}
+			else
+			{
+				ary_options = tmp;
+				len = strlen(value) + 1;	/* +1 for terminating '\0' */
+				tmp = realloc(string_repo, string_repo_len + len);
+				if(tmp == NULL)
+				{
+					fprintf(stderr, "memory allocation error, Option value in file %s line %d : %s=%s\n",
+					        fname, linenum, name, value);
+				}
+				else
+				{
+					string_repo = tmp;
+					memcpy(string_repo + string_repo_len, value, len);
+					ary_options[num_options].id = id;
+					/* save the offset instead of the absolute address because realloc() could
+					 * change it */
+					ary_options[num_options].value = (const char *)string_repo_len;
+					num_options += 1;
+					string_repo_len += len;
+				}
+			}
 		}
 
 	}
 	
 	fclose(hfile);
+
+	for(i = 0; i < num_options; i++)
+	{
+		/* add start address of string_repo to get right pointer */
+		ary_options[i].value = string_repo + (size_t)ary_options[i].value;
+	}
 	
 	return 0;
 }
@@ -192,6 +234,11 @@ freeoptions(void)
 		free(ary_options);
 		ary_options = NULL;
 		num_options = 0;
+	}
+	if(string_repo)
+	{
+		free(string_repo);
+		string_repo = NULL;
 	}
 	if(upnppermlist)
 	{

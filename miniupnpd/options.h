@@ -1,4 +1,4 @@
-/* $Id: options.h,v 1.17 2012/02/04 23:05:21 nanard Exp $ */
+/* $Id: options.h,v 1.18 2012/02/05 00:29:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -62,11 +62,10 @@ readoptionsfile(const char * fname);
 void
 freeoptions(void);
 
-#define MAX_OPTION_VALUE_LEN (80)
 struct option
 {
 	enum upnpconfigoptions id;
-	char value[MAX_OPTION_VALUE_LEN];
+	const char * value;
 };
 
 extern struct option * ary_options;
