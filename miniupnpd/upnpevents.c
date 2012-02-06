@@ -1,4 +1,4 @@
-/* $Id: upnpevents.c,v 1.18 2012/02/01 11:13:30 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.19 2012/02/06 16:21:24 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2008-2012 Thomas Bernard
@@ -16,13 +16,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <errno.h>
 #include "config.h"
 #include "upnpevents.h"
 #include "miniupnpdpath.h"
 #include "upnpglobalvars.h"
 #include "upnpdescgen.h"
+#include "upnputils.h"
 
 #ifdef ENABLE_EVENTS
 /*enum subscriber_service_enum {
@@ -184,7 +184,7 @@ static void
 upnp_event_create_notify(struct subscriber * sub)
 {
 	struct upnp_event_notify * obj;
-	int flags;
+
 	obj = calloc(1, sizeof(struct upnp_event_notify));
 	if(!obj) {
 		syslog(LOG_ERR, "%s: calloc(): %m", "upnp_event_create_notify");
@@ -202,13 +202,8 @@ upnp_event_create_notify(struct subscriber * sub)
 		syslog(LOG_ERR, "%s: socket(): %m", "upnp_event_create_notify");
 		goto error;
 	}
-	if((flags = fcntl(obj->s, F_GETFL, 0)) < 0) {
-		syslog(LOG_ERR, "%s: fcntl(..F_GETFL..): %m",
-		       "upnp_event_create_notify");
-		goto error;
-	}
-	if(fcntl(obj->s, F_SETFL, flags | O_NONBLOCK) < 0) {
-		syslog(LOG_ERR, "%s: fcntl(..F_SETFL..): %m",
+	if(!set_non_blocking(obj->s)) {
+		syslog(LOG_ERR, "%s: set_non_blocking(): %m",
 		       "upnp_event_create_notify");
 		goto error;
 	}
