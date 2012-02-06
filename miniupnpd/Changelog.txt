@@ -1,4 +1,4 @@
-$Id: Changelog.txt,v 1.254 2012/02/05 00:29:49 nanard Exp $
+$Id: Changelog.txt,v 1.255 2012/02/06 16:32:07 nanard Exp $
 
 2012/02/05:
   Compile ok with -ansi flag.
@@ -6,7 +6,7 @@ $Id: Changelog.txt,v 1.254 2012/02/05 00:29:49 nanard Exp $
     buffer for each option value.
 
 2012/02/04:
-  Added friendl_name= option to config file
+  Added friendly_name= option to config file
 
 2012/02/03:
   Anchor name (PF) is now configurable through the config file with anchor=
@@ -18,7 +18,7 @@ $Id: Changelog.txt,v 1.254 2012/02/05 00:29:49 nanard Exp $
 
 2012/01/20:
   Always #include <netinet/in.h> before #include <arpa/inet.h> (for OpenBSD)
-  .onrdomain field was added in ps with OpenBSD 5.0. Add PFRULE_HAS_ONRDOMAIN
+  .onrdomain field was added in pf with OpenBSD 5.0. Add PFRULE_HAS_ONRDOMAIN
 
 2012/01/02:
   Fixing netfilter/iptables_*.sh scripts for new ifconfig output format.
