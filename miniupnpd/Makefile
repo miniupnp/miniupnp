@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.59 2011/05/26 22:47:32 nanard Exp $
+# $Id: Makefile,v 1.60 2012/02/06 16:28:25 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -11,8 +11,8 @@
 # Linux users, please use Makefile.linux :
 #  make -f Makefile.linux
 
-CFLAGS = -pipe -Wall -Os
-#CFLAGS = -pipe -Wall -O -g -DDEBUG
+CFLAGS = -pipe -Wall -Os -ansi
+#CFLAGS = -pipe -Wall -O -g -DDEBUG -ansi
 CC ?= gcc
 RM = rm -f
 MV = mv
