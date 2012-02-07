@@ -1,4 +1,4 @@
-/* $Id: upnpevents.c,v 1.19 2012/02/06 16:21:24 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.20 2012/02/06 23:41:15 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2008-2012 Thomas Bernard
@@ -368,11 +368,16 @@ static void upnp_event_send(struct upnp_event_notify * obj)
 	       "upnp_event_send", obj->buffer + obj->sent);
 	i = send(obj->s, obj->buffer + obj->sent, obj->tosend - obj->sent, 0);
 	if(i<0) {
-		syslog(LOG_NOTICE, "%s: send(): %m", "upnp_event_send");
-		obj->state = EError;
-		return;
+		if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+			syslog(LOG_NOTICE, "%s: send(): %m", "upnp_event_send");
+			obj->state = EError;
+			return;
+		} else {
+			/* EAGAIN or EWOULDBLOCK or EINTR : no data sent */
+			i = 0;
+		}
 	}
-	else if(i != (obj->tosend - obj->sent))
+	if(i != (obj->tosend - obj->sent))
 		syslog(LOG_NOTICE, "%s: %d bytes send out of %d",
 		       "upnp_event_send", i, obj->tosend - obj->sent);
 	obj->sent += i;

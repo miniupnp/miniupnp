@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.255 2012/02/06 16:32:07 nanard Exp $
+$Id: Changelog.txt,v 1.256 2012/02/07 00:21:51 nanard Exp $
+
+2012/02/06:
+  Make HTTP (SOAP) sockets non blocking.
 
 2012/02/05:
   Compile ok with -ansi flag.

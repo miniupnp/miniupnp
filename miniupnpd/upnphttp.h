@@ -1,4 +1,4 @@
-/* $Id: upnphttp.h,v 1.25 2011/11/18 11:21:18 nanard Exp $ */ 
+/* $Id: upnphttp.h,v 1.26 2012/02/07 00:21:54 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard 
@@ -23,6 +23,13 @@
   ...
   >= 100 - to be deleted
 */
+enum httpStates {
+	EWaitingForHttpRequest = 0,
+	EWaitingForHttpContent,
+	ESendingAndClosing,
+	EToDelete = 100
+};
+
 enum httpCommands {
 	EUnknown = 0,
 	EGet,
@@ -38,7 +45,7 @@ struct upnphttp {
 	int ipv6;
 	struct in6_addr clientaddr_v6;
 #endif
-	int state;
+	enum httpStates state;
 	char HttpVer[16];
 	/* request */
 	char * req_buf;
@@ -59,9 +66,8 @@ struct upnphttp {
 	/* response */
 	char * res_buf;
 	int res_buflen;
+	int res_sent;
 	int res_buf_alloclen;
-	/*int res_contentlen;*/
-	/*int res_contentoff;*/		/* header length */
 	LIST_ENTRY(upnphttp) entries;
 };
 

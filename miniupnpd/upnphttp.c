@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.66 2012/02/01 11:13:30 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.67 2012/02/07 00:21:54 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -24,6 +24,7 @@
 #include "miniupnpdpath.h"
 #include "upnpsoap.h"
 #include "upnpevents.h"
+#include "upnputils.h"
 
 struct upnphttp * 
 New_upnphttp(int s)
@@ -36,6 +37,8 @@ New_upnphttp(int s)
 		return NULL;
 	memset(ret, 0, sizeof(struct upnphttp));
 	ret->socket = s;
+	if(!set_non_blocking(s))
+		syslog(LOG_WARNING, "New_upnphttp::set_non_blocking(): %m");
 	return ret;
 }
 
@@ -47,7 +50,7 @@ CloseSocket_upnphttp(struct upnphttp * h)
 		syslog(LOG_ERR, "CloseSocket_upnphttp: close(%d): %m", h->socket);
 	}
 	h->socket = -1;
-	h->state = 100;
+	h->state = EToDelete;
 }
 
 void
@@ -159,24 +162,11 @@ intervening space) by either an integer or the keyword "infinite". */
 static void
 Send404(struct upnphttp * h)
 {
-/*
-	static const char error404[] = "HTTP/1.1 404 Not found\r\n"
-		"Connection: close\r\n"
-		"Content-type: text/html\r\n"
-		"\r\n"
-		"<HTML><HEAD><TITLE>404 Not Found</TITLE></HEAD>"
-		"<BODY><H1>Not Found</H1>The requested URL was not found"
-		" on this server.</BODY></HTML>\r\n";
-	int n;
-	n = send(h->socket, error404, sizeof(error404) - 1, 0);
-	if(n < 0)
-	{
-		syslog(LOG_ERR, "Send404: send(http): %m");
-	}*/
 	static const char body404[] =
 		"<HTML><HEAD><TITLE>404 Not Found</TITLE></HEAD>"
 		"<BODY><H1>Not Found</H1>The requested URL was not found"
 		" on this server.</BODY></HTML>\r\n";
+
 	h->respflags = FLAG_HTML;
 	BuildResp2_upnphttp(h, 404, "Not Found",
 	                    body404, sizeof(body404) - 1);
@@ -187,25 +177,11 @@ Send404(struct upnphttp * h)
 static void
 Send501(struct upnphttp * h)
 {
-/*
-	static const char error501[] = "HTTP/1.1 501 Not Implemented\r\n"
-		"Connection: close\r\n"
-		"Content-type: text/html\r\n"
-		"\r\n"
-		"<HTML><HEAD><TITLE>501 Not Implemented</TITLE></HEAD>"
-		"<BODY><H1>Not Implemented</H1>The HTTP Method "
-		"is not implemented by this server.</BODY></HTML>\r\n";
-	int n;
-	n = send(h->socket, error501, sizeof(error501) - 1, 0);
-	if(n < 0)
-	{
-		syslog(LOG_ERR, "Send501: send(http): %m");
-	}
-*/
 	static const char body501[] = 
 		"<HTML><HEAD><TITLE>501 Not Implemented</TITLE></HEAD>"
 		"<BODY><H1>Not Implemented</H1>The HTTP Method "
 		"is not implemented by this server.</BODY></HTML>\r\n";
+
 	h->respflags = FLAG_HTML;
 	BuildResp2_upnphttp(h, 501, "Not Implemented",
 	                    body501, sizeof(body501) - 1);
@@ -296,7 +272,7 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 	else
 	{
 		/* waiting for remaining data */
-		h->state = 1;
+		h->state = EWaitingForHttpContent;
 	}
 }
 
@@ -546,12 +522,13 @@ Process_upnphttp(struct upnphttp * h)
 {
 	char buf[2048];
 	int n;
+
 	if(!h)
 		return;
 	switch(h->state)
 	{
-	case 0:
-		n = recv(h->socket, buf, 2048, 0);
+	case EWaitingForHttpRequest:
+		n = recv(h->socket, buf, sizeof(buf), 0);
 		if(n<0)
 		{
 			if(errno != EAGAIN &&
@@ -559,14 +536,14 @@ Process_upnphttp(struct upnphttp * h)
 			   errno != EINTR)
 			{
 				syslog(LOG_ERR, "recv (state0): %m");
-				h->state = 100;
+				h->state = EToDelete;
 			}
 			/* if errno is EAGAIN, EWOULDBLOCK or EINTR, try again later */
 		}
 		else if(n==0)
 		{
 			syslog(LOG_WARNING, "HTTP Connection closed unexpectedly");
-			h->state = 100;
+			h->state = EToDelete;
 		}
 		else
 		{
@@ -586,8 +563,8 @@ Process_upnphttp(struct upnphttp * h)
 			}
 		}
 		break;
-	case 1:
-		n = recv(h->socket, buf, 2048, 0);
+	case EWaitingForHttpContent:
+		n = recv(h->socket, buf, sizeof(buf), 0);
 		if(n<0)
 		{
 			if(errno != EAGAIN &&
@@ -595,26 +572,37 @@ Process_upnphttp(struct upnphttp * h)
 			   errno != EINTR)
 			{
 				syslog(LOG_ERR, "recv (state1): %m");
-				h->state = 100;
+				h->state = EToDelete;
 			}
 			/* if errno is EAGAIN, EWOULDBLOCK or EINTR, try again later */
 		}
 		else if(n==0)
 		{
 			syslog(LOG_WARNING, "HTTP Connection closed inexpectedly");
-			h->state = 100;
+			h->state = EToDelete;
 		}
 		else
 		{
-			/*fwrite(buf, 1, n, stdout);*/	/* debug */
-			h->req_buf = (char *)realloc(h->req_buf, n + h->req_buflen);
-			memcpy(h->req_buf + h->req_buflen, buf, n);
-			h->req_buflen += n;
-			if((h->req_buflen - h->req_contentoff) >= h->req_contentlen)
+			void * tmp = realloc(h->req_buf, n + h->req_buflen);
+			if(!tmp)
 			{
-				ProcessHTTPPOST_upnphttp(h);
+				syslog(LOG_ERR, "memory allocation error %m");
+				h->state = EToDelete;
+			}
+			else
+			{
+				h->req_buf = tmp;
+				memcpy(h->req_buf + h->req_buflen, buf, n);
+				h->req_buflen += n;
+				if((h->req_buflen - h->req_contentoff) >= h->req_contentlen)
+				{
+					ProcessHTTPPOST_upnphttp(h);
+				}
 			}
 		}
+		break;
+	case ESendingAndClosing:
+		SendRespAndClose_upnphttp(h);
 		break;
 	default:
 		syslog(LOG_WARNING, "Unexpected state: %d", h->state);
@@ -725,30 +713,34 @@ BuildResp_upnphttp(struct upnphttp * h,
 void
 SendRespAndClose_upnphttp(struct upnphttp * h)
 {
-	char * p;
 	ssize_t n;
-	size_t len;
-	p = h->res_buf;
-	len = h->res_buflen;
-	while (len > 0)
+
+	while (h->res_sent < h->res_buflen)
 	{
-		n = send(h->socket, p, len, 0);
+		n = send(h->socket, h->res_buf + h->res_sent,
+		         h->res_buflen - h->res_sent, 0);
 		if(n<0)
 		{
+			if(errno == EINTR)
+				continue;	/* try again immediatly */
+			if(errno == EAGAIN || errno == EWOULDBLOCK)
+			{
+				/* try again later */
+				h->state = ESendingAndClosing;
+				return;
+			}
 			syslog(LOG_ERR, "send(res_buf): %m");
-			if (errno != EINTR)
-				break; /* avoid infinite loop */
+			break; /* avoid infinite loop */
 		}
 		else if(n == 0)
 		{
-			syslog(LOG_ERR, "send(res_buf): %zd bytes sent (out of %zu)",
-							n, len);
+			syslog(LOG_ERR, "send(res_buf): %d bytes sent (out of %d)",
+							h->res_sent, h->res_buflen);
 			break;
 		}
 		else
 		{
-			p += n;
-			len -= n;
+			h->res_sent += n;
 		}
 	}
 	CloseSocket_upnphttp(h);

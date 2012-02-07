@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.142 2012/02/04 23:34:39 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.143 2012/02/07 00:21:52 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1091,9 +1091,7 @@ main(int argc, char * * argv)
 	struct upnphttp * e = 0;
 	struct upnphttp * next;
 	fd_set readset;	/* for select() */
-#ifdef ENABLE_EVENTS
 	fd_set writeset;
-#endif
 	struct timeval timeout, timeofday, lasttimeofday = {0, 0};
 	int max_fd = -1;
 #ifdef USE_MINIUPNPDCTL
@@ -1359,6 +1357,7 @@ main(int argc, char * * argv)
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
 		FD_ZERO(&readset);
+		FD_ZERO(&writeset);
 
 		if (sudp >= 0) 
 		{
@@ -1396,10 +1395,15 @@ main(int argc, char * * argv)
 		i = 0;	/* active HTTP connections count */
 		for(e = upnphttphead.lh_first; e != NULL; e = e->entries.le_next)
 		{
-			if((e->socket >= 0) && (e->state <= 2))
+			if(e->socket >= 0)
 			{
-				FD_SET(e->socket, &readset);
-				max_fd = MAX( max_fd, e->socket);
+				if(e->state <= EWaitingForHttpContent)
+					FD_SET(e->socket, &readset);
+				else if(e->state == ESendingAndClosing)
+					FD_SET(e->socket, &writeset);
+				else
+					continue;
+				max_fd = MAX(max_fd, e->socket);
 				i++;
 			}
 		}
@@ -1434,15 +1438,10 @@ main(int argc, char * * argv)
 #endif
 
 #ifdef ENABLE_EVENTS
-		FD_ZERO(&writeset);
 		upnpevents_selectfds(&readset, &writeset, &max_fd);
 #endif
 
-#ifdef ENABLE_EVENTS
 		if(select(max_fd+1, &readset, &writeset, 0, &timeout) < 0)
-#else
-		if(select(max_fd+1, &readset, 0, 0, &timeout) < 0)
-#endif
 		{
 			if(quitting) goto shutdown;
 			if(errno == EINTR) continue; /* interrupted by a signal, start again */
@@ -1539,10 +1538,13 @@ main(int argc, char * * argv)
 		/* LIST_FOREACH macro is not available under linux */
 		for(e = upnphttphead.lh_first; e != NULL; e = e->entries.le_next)
 		{
-			if(  (e->socket >= 0) && (e->state <= 2)
-				&&(FD_ISSET(e->socket, &readset)) )
+			if(e->socket >= 0)
 			{
-				Process_upnphttp(e);
+				if(FD_ISSET(e->socket, &readset) ||
+				   FD_ISSET(e->socket, &writeset))
+				{
+					Process_upnphttp(e);
+				}
 			}
 		}
 		/* process incoming HTTP connections */
@@ -1623,7 +1625,7 @@ main(int argc, char * * argv)
 		for(e = upnphttphead.lh_first; e != NULL; )
 		{
 			next = e->entries.le_next;
-			if(e->state >= 100)
+			if(e->state >= EToDelete)
 			{
 				LIST_REMOVE(e, entries);
 				Delete_upnphttp(e);
