@@ -12,7 +12,9 @@
 /* apt-get install libnetfilter-queue-dev */
 #include <netinet/ip.h>
 #include <netinet/udp.h>
-//#include <linux/netfilter_ipv4.h>  /* Defines verdicts (NF_ACCEPT, etc) */
+#if 0
+#include <linux/netfilter_ipv4.h>  /* Defines verdicts (NF_ACCEPT, etc) */
+#endif
 #include <linux/netfilter.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <linux/netfilter/nfnetlink_queue.h>
@@ -1652,7 +1654,6 @@ shutdown:
 	if (shttpl >= 0) close(shttpl);
 #ifdef ENABLE_IPV6
 	if (sudpv6 >= 0) close(sudpv6);
-	//if (shttplv6 >= 0) close(shttplv6);
 #endif
 #ifdef USE_IFACEWATCHER
 	if(sifacewatcher >= 0) close(sifacewatcher);
