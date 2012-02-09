@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.28 2012/02/01 11:13:30 nanard Exp $ */
+/* $Id: minissdp.c,v 1.29 2012/02/09 20:15:24 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -98,7 +98,8 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 
 	if( (s = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0)) < 0)
 	{
-		syslog(LOG_ERR, "socket(udp): %m");
+		syslog(LOG_ERR, "%s: socket(udp): %m",
+		       "OpenAndConfSSDPReceiveSocket");
 		return -1;
 	}
 
@@ -125,10 +126,16 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		syslog(LOG_WARNING, "setsockopt(udp, SO_REUSEADDR): %m");
 	}
 
+	if(!set_non_blocking(s))
+	{
+		syslog(LOG_WARNING, "%s: set_non_blocking(): %m",
+		       "OpenAndConfSSDPReceiveSocket");
+	}
 
 	if(bind(s, (struct sockaddr *)&sockname, sockname_len) < 0)
 	{
-		syslog(LOG_ERR, "bind(udp%s): %m", ipv6 ? "6" : "");
+		syslog(LOG_ERR, "%s: bind(udp%s): %m",
+		       "OpenAndConfSSDPReceiveSocket", ipv6 ? "6" : "");
 		close(s);
 		return -1;
 	}
@@ -263,6 +270,7 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 {
 	int l, n;
 	char buf[512];
+	char addr_str[64];
 	socklen_t addrlen;
 	/* 
 	 * follow guideline from document "UPnP Device Architecture 1.0"
@@ -293,12 +301,13 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 	          ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
 	n = sendto(s, buf, l, 0,
 	           addr, addrlen);
-	syslog(LOG_INFO, "SSDP Announce %d bytes to %s:%d ST: %.*s",n,
-       		inet_ntoa(((const struct sockaddr_in *)addr)->sin_addr),
-          	ntohs(((const struct sockaddr_in *)addr)->sin_port),
+	sockaddr_to_string(addr, addr_str, sizeof(addr_str));
+	syslog(LOG_INFO, "SSDP Announce %d bytes to %s ST: %.*s",n,
+       		addr_str,
 		l, buf);
 	if(n < 0)
 	{
+		/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
 		syslog(LOG_ERR, "sendto(udp): %m");
 	}
 }
@@ -365,6 +374,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 			(struct sockaddr *)&sockname, sizeof(struct sockaddr_in) );
 		if(n < 0)
 		{
+			/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
 			syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s, host);
 		}
 		i++;
@@ -546,6 +556,7 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 	int n, l;
 	int i, j;
 	char bufr[512];
+	int ret = 0;
 
     memset(&sockname, 0, sizeof(struct sockaddr_in));
     sockname.sin_family = AF_INET;
@@ -577,11 +588,11 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 			{
 				syslog(LOG_ERR, "SendSSDPGoodbye: sendto(udp_shutdown=%d): %m",
 				       sockets[j]);
-				return -1;
+				ret = -1;
 			}
     	}
 	}
-	return 0;
+	return ret;
 }
 
 /* SubmitServicesToMiniSSDPD() :

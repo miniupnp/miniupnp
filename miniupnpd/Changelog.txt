@@ -2,6 +2,8 @@ $Id: Changelog.txt,v 1.257 2012/02/09 20:15:48 nanard Exp $
 
 2012/02/09:
   Make HTTP listen socket non blocking (so accept() can't block)
+  Make SSDP receive sockets non blocking
+  use sockaddr_to_string() in SendSSDPAnnonce2 to handle IPv6 addresses
 
 2012/02/06:
   Make HTTP (SOAP) sockets non blocking.
