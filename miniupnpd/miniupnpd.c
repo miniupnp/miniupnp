@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.143 2012/02/07 00:21:52 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.145 2012/02/09 20:15:01 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -132,6 +132,11 @@ OpenAndConfHTTPSocket(unsigned short port)
 		syslog(LOG_WARNING, "setsockopt(http, IPV6_V6ONLY): %m");
 	}
 #endif
+
+	if(!set_non_blocking(s))
+	{
+		syslog(LOG_WARNING, "set_non_blocking(http): %m");
+	}
 
 #ifdef ENABLE_IPV6
 	memset(&listenname, 0, sizeof(struct sockaddr_in6));
@@ -1562,7 +1567,9 @@ main(int argc, char * * argv)
 			shttp = accept(shttpl, (struct sockaddr *)&clientname, &clientnamelen);
 			if(shttp<0)
 			{
-				syslog(LOG_ERR, "accept(http): %m");
+				/* ignore EAGAIN, EWOULDBLOCK, EINTR, we just try again later */
+				if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+					syslog(LOG_ERR, "accept(http): %m");
 			}
 			else
 			{
@@ -1571,9 +1578,6 @@ main(int argc, char * * argv)
 
 				sockaddr_to_string((struct sockaddr *)&clientname, addr_str, sizeof(addr_str));
 				syslog(LOG_INFO, "HTTP connection from %s", addr_str);
-				/*if (fcntl(shttp, F_SETFL, O_NONBLOCK) < 0) {
-					syslog(LOG_ERR, "fcntl F_SETFL, O_NONBLOCK");
-				}*/
 				/* Create a new upnphttp object and add it to
 				 * the active upnphttp object list */
 				tmp = New_upnphttp(shttp);
