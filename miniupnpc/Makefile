@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.85 2012/01/10 14:28:19 nanard Exp $
+# $Id: Makefile,v 1.90 2012/02/12 00:15:36 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # (c) 2005-2011 Thomas Bernard
@@ -177,7 +177,8 @@ $(LIBRARY):	$(LIBOBJS)
 
 $(SHAREDLIBRARY):	$(LIBOBJS)
 ifeq ($(OS), Darwin)
-	$(CC) -dynamiclib $(LDFLAGS) -Wl,-install_name,$(SONAME) -o $@ $^ 
+#	$(CC) -dynamiclib $(LDFLAGS) -Wl,-install_name,$(SONAME) -o $@ $^
+	$(CC) -dynamiclib $(LDFLAGS) -Wl,-install_name,$(INSTALLDIRLIB)/$(SONAME) -o $@ $^
 else
 	$(CC) -shared $(LDFLAGS) -Wl,-soname,$(SONAME) -o $@ $^
 endif
