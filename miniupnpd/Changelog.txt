@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.258 2012/02/11 14:21:49 nanard Exp $
+$Id: Changelog.txt,v 1.259 2012/02/12 13:02:54 nanard Exp $
+
+2012/02/12:
+  More syntax checks in upnppermissions.c
 
 2012/02/11:
   Fix ipfw/Mac OS X specific source files to compile ok with -ansi flag

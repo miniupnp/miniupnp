@@ -1,7 +1,7 @@
-/* $Id: upnppermissions.c,v 1.15 2012/01/20 21:45:58 nanard Exp $ */
+/* $Id: upnppermissions.c,v 1.16 2012/02/12 13:02:54 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -22,6 +22,7 @@ read_permission_line(struct upnpperm * perm,
 {
 	char * q;
 	int n_bits;
+	int i;
 
 	/* first token: (allow|deny) */
 	while(isspace(*p))
@@ -40,28 +41,41 @@ read_permission_line(struct upnpperm * perm,
 	{
 		return -1;
 	}
-
-	/* second token: eport or eport_min-eport_max */
 	while(isspace(*p))
 		p++;
+
+	/* second token: eport or eport_min-eport_max */
 	if(!isdigit(*p))
 		return -1;
 	for(q = p; isdigit(*q); q++);
 	if(*q=='-')
 	{
 		*q = '\0';
-		perm->eport_min = (u_short)atoi(p);
+		i = atoi(p);
+		if(i > 65535)
+			return -1;
+		perm->eport_min = (u_short)i;
 		q++;
 		p = q;
 		while(isdigit(*q))
 			q++;
 		*q = '\0';
-		perm->eport_max = (u_short)atoi(p);
+		i = atoi(p);
+		if(i > 65535)
+			return -1;
+		perm->eport_max = (u_short)i;
+	}
+	else if(isspace(*q))
+	{
+		*q = '\0';
+		i = atoi(p);
+		if(i > 65535)
+			return -1;
+		perm->eport_min = perm->eport_max = (u_short)i;
 	}
 	else
 	{
-		*q = '\0';
-		perm->eport_min = perm->eport_max = (u_short)atoi(p);
+		return -1;
 	}
 	p = q + 1;
 	while(isspace(*p))
@@ -80,16 +94,24 @@ read_permission_line(struct upnpperm * perm,
 		p = q;
 		while(isdigit(*q))
 			q++;
+		if(!isspace(*q))
+			return -1;
 		*q = '\0';
 		n_bits = atoi(p);
+		if(n_bits > 32)
+			return -1;
 		perm->mask.s_addr = htonl(n_bits ? (0xffffffff << (32 - n_bits)) : 0);
 	}
-	else
+	else if(isspace(*q))
 	{
 		*q = '\0';
 		if(!inet_aton(p, &perm->address))
 			return -1;
 		perm->mask.s_addr = 0xffffffff;
+	}
+	else
+	{
+		return -1;
 	}
 	p = q + 1;
 
@@ -102,18 +124,31 @@ read_permission_line(struct upnpperm * perm,
 	if(*q=='-')
 	{
 		*q = '\0';
-		perm->iport_min = (u_short)atoi(p);
+		i = atoi(p);
+		if(i > 65535)
+			return -1;
+		perm->iport_min = (u_short)i;
 		q++;
 		p = q;
 		while(isdigit(*q))
 			q++;
 		*q = '\0';
-		perm->iport_max = (u_short)atoi(p);
+		i = atoi(p);
+		if(i > 65535)
+			return -1;
+		perm->iport_max = (u_short)i;
+	}
+	else if(isspace(*q) || *q == '\0')
+	{
+		*q = '\0';
+		i = atoi(p);
+		if(i > 65535)
+			return -1;
+		perm->iport_min = perm->iport_max = (u_short)i;
 	}
 	else
 	{
-		*q = '\0';
-		perm->iport_min = perm->iport_max = (u_short)atoi(p);
+		return -1;
 	}
 #ifdef DEBUG
 	printf("perm rule added : %s %hu-%hu %08x/%08x %hu-%hu\n",
