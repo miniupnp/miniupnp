@@ -1,4 +1,4 @@
-/* $Id: upnppermissions.c,v 1.16 2012/02/12 13:02:54 nanard Exp $ */
+/* $Id: upnppermissions.c,v 1.17 2012/02/15 22:43:34 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -16,6 +16,11 @@
 #include "config.h"
 #include "upnppermissions.h"
 
+/* read_permission_line()
+ * parse the a permission line which format is :
+ * (deny|allow) [0-9]+(-[0-9]+) ip/mask [0-9]+(-[0-9]+)
+ * ip/mask is either 192.168.1.1/24 or 192.168.1.1/255.255.255.0
+ */
 int
 read_permission_line(struct upnpperm * perm,
                      char * p)
@@ -64,6 +69,8 @@ read_permission_line(struct upnpperm * perm,
 		if(i > 65535)
 			return -1;
 		perm->eport_max = (u_short)i;
+		if(perm->eport_min > perm->eport_max)
+			return -1;
 	}
 	else if(isspace(*q))
 	{
@@ -94,20 +101,33 @@ read_permission_line(struct upnpperm * perm,
 		p = q;
 		while(isdigit(*q))
 			q++;
-		if(!isspace(*q))
+		if(*q == '.')
+		{
+			while(*q == '.' || isdigit(*q))
+				q++;
+			if(!isspace(*q))
+				return -1;
+			*q = '\0';
+			if(!inet_aton(p, &perm->mask))
+				return -1;
+		}
+		else if(!isspace(*q))
 			return -1;
-		*q = '\0';
-		n_bits = atoi(p);
-		if(n_bits > 32)
-			return -1;
-		perm->mask.s_addr = htonl(n_bits ? (0xffffffff << (32 - n_bits)) : 0);
+		else
+		{
+			*q = '\0';
+			n_bits = atoi(p);
+			if(n_bits > 32)
+				return -1;
+			perm->mask.s_addr = htonl(n_bits ? (0xffffffffu << (32 - n_bits)) : 0);
+		}
 	}
 	else if(isspace(*q))
 	{
 		*q = '\0';
 		if(!inet_aton(p, &perm->address))
 			return -1;
-		perm->mask.s_addr = 0xffffffff;
+		perm->mask.s_addr = 0xffffffffu;
 	}
 	else
 	{
@@ -137,6 +157,8 @@ read_permission_line(struct upnpperm * perm,
 		if(i > 65535)
 			return -1;
 		perm->iport_max = (u_short)i;
+		if(perm->iport_min > perm->iport_max)
+			return -1;
 	}
 	else if(isspace(*q) || *q == '\0')
 	{
