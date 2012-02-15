@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.259 2012/02/12 13:02:54 nanard Exp $
+$Id: Changelog.txt,v 1.260 2012/02/15 22:44:26 nanard Exp $
+
+2012/02/15:
+  Change parselanaddr() function to allow 192.168.1.1/255.255.255.0 in
+    configuration file.
 
 2012/02/12:
   More syntax checks in upnppermissions.c

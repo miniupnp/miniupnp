@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.145 2012/02/09 20:15:01 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.147 2012/02/15 22:43:56 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -514,7 +514,7 @@ struct runtime_vars {
 
 /* parselanaddr()
  * parse address with mask
- * ex: 192.168.1.1/24
+ * ex: 192.168.1.1/24 or 192.168.1.1/255.255.255.0
  * When MULTIPLE_EXTERNAL_IP is enabled, the ip address of the
  * external interface associated with the lan subnet follows.
  * ex : 192.168.1.1/24 81.21.41.11
@@ -526,31 +526,49 @@ static int
 parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 {
 	const char * p;
-	int nbits = 24;	/* by default, networks are /24 */
 	int n;
+	char tmp[16];
+
 	p = str;
 	while(*p && *p != '/' && !isspace(*p))
 		p++;
 	n = p - str;
-	if(*p == '/')
-	{
-		nbits = atoi(++p);
-		while(*p && !isspace(*p))
-			p++;
-	}
 	if(n>15)
-	{
-		fprintf(stderr, "Error parsing address/mask : %s\n", str);
-		return -1;
-	}
+		goto parselan_error;
 	memcpy(lan_addr->str, str, n);
 	lan_addr->str[n] = '\0';
 	if(!inet_aton(lan_addr->str, &lan_addr->addr))
+		goto parselan_error;
+	if(*p == '/')
 	{
-		fprintf(stderr, "Error parsing address/mask : %s\n", str);
-		return -1;
+		const char * q = ++p;
+		while(*p && isdigit(*p))
+			p++;
+		if(*p=='.')
+		{
+			while(*p && (*p=='.' || isdigit(*p)))
+				p++;
+			n = p - q;
+			if(n>15)
+				goto parselan_error;
+			memcpy(tmp, q, n);
+			tmp[n] = '\0';
+			if(!inet_aton(tmp, &lan_addr->mask))
+				goto parselan_error;
+		}
+		else
+		{
+			int nbits = atoi(q);
+			if(nbits > 32 || nbits < 0)
+				goto parselan_error;
+			lan_addr->mask.s_addr = htonl(nbits ? (0xffffffffu << (32 - nbits)) : 0);
+		}
 	}
-	lan_addr->mask.s_addr = htonl(nbits ? (0xffffffff << (32 - nbits)) : 0);
+	else
+	{
+		/* by default, networks are /24 */
+		lan_addr->mask.s_addr = htonl(0xffffff00u);
+	}
 #ifdef MULTIPLE_EXTERNAL_IP
 	/* skip spaces */
 	while(*p && isspace(*p))
@@ -571,6 +589,9 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 	}
 #endif
 	return 0;
+parselan_error:
+	fprintf(stderr, "Error parsing address/mask : %s\n", str);
+	return -1;
 }
 
 /* init phase :
