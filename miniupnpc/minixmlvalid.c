@@ -82,7 +82,7 @@ static const struct event evtref[] =
 	{ELTEND, "elt2b", 5},
 	{ELTEND, "elt2a", 5},
 	{ELTEND, "xmlroot", 7}
-};	
+};
 
 void startelt(void * data, const char * p, int l)
 {

@@ -25,7 +25,7 @@ int test_igd_desc_parse(char * buffer, int len)
 	parser.data = &igd;
 	parser.starteltfunc = IGDstartelt;
 	parser.endeltfunc = IGDendelt;
-	parser.datafunc = IGDdata; 
+	parser.datafunc = IGDdata;
 	parsexml(&parser);
 	printIGD(&igd);
 	GetUPNPUrls(&urls, &igd, "http://fake/desc/url/file.xml");
