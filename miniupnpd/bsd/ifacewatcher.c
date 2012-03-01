@@ -69,7 +69,7 @@ ProcessInterfaceWatchNotify(int s)
 	}
 	rtm = (struct rt_msghdr *)buf;
 	syslog(LOG_DEBUG, "%u rt_msg : msglen=%d version=%d type=%d", (unsigned)len,
-	       rtm->rtm_msglen, rtm->rtm_version, rtm->rtm_type);	
+	       rtm->rtm_msglen, rtm->rtm_version, rtm->rtm_type);
 	switch(rtm->rtm_type) {
 	case RTM_IFINFO:	/* iface going up/down etc. */
 		ifm = (struct if_msghdr *)buf;

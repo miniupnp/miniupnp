@@ -42,7 +42,7 @@ AddMulticastMembership(int s, in_addr_t ifaddr)
     imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
     /*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
     imr.imr_interface.s_addr = ifaddr;	/*inet_addr(ifaddr);*/
-	
+
 	if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&imr, sizeof(struct ip_mreq)) < 0)
 	{
         syslog(LOG_ERR, "setsockopt(udp, IP_ADD_MEMBERSHIP): %m");
@@ -84,7 +84,7 @@ AddMulticastMembershipIPv6(int s)
 }
 #endif
 
-/* Open and configure the socket listening for 
+/* Open and configure the socket listening for
  * SSDP udp packets sent on 239.255.255.250 port 1900
  * SSDP v6 udp packets sent on FF02::C, or FF05::C, port 1900 */
 int
@@ -153,7 +153,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 			if(AddMulticastMembership(s, lan_addr->addr.s_addr) < 0)
 			{
 				syslog(LOG_WARNING,
-				       "Failed to add multicast membership for interface %s", 
+				       "Failed to add multicast membership for interface %s",
 				       lan_addr->str);
 			}
 		}
@@ -172,7 +172,7 @@ OpenAndConfSSDPNotifySocket(in_addr_t addr)
 	int bcast = 1;
 	struct in_addr mc_if;
 	struct sockaddr_in sockname;
-	
+
 	if( (s = socket(PF_INET, SOCK_DGRAM, 0)) < 0)
 	{
 		syslog(LOG_ERR, "socket(udp_notify): %m");
@@ -194,7 +194,7 @@ OpenAndConfSSDPNotifySocket(in_addr_t addr)
 		close(s);
 		return -1;
 	}
-	
+
 	if(setsockopt(s, SOL_SOCKET, SO_BROADCAST, &bcast, sizeof(bcast)) < 0)
 	{
 		syslog(LOG_ERR, "setsockopt(udp_notify, SO_BROADCAST): %m");
@@ -272,12 +272,12 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 	char buf[512];
 	char addr_str[64];
 	socklen_t addrlen;
-	/* 
+	/*
 	 * follow guideline from document "UPnP Device Architecture 1.0"
 	 * uppercase is recommended.
 	 * DATE: is recommended
 	 * SERVER: OS/ver UPnP/1.0 miniupnpd/1.0
-	 * - check what to put in the 'Cache-Control' header 
+	 * - check what to put in the 'Cache-Control' header
 	 *
 	 * have a look at the document "UPnP Device Architecture v1.1 */
 	l = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\n"
@@ -345,7 +345,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 
 	while(known_service_types[i])
 	{
-		l = snprintf(bufr, sizeof(bufr), 
+		l = snprintf(bufr, sizeof(bufr),
 			"NOTIFY * HTTP/1.1\r\n"
 			"HOST: %s:%d\r\n"
 			"CACHE-CONTROL: max-age=%u\r\n"
@@ -547,7 +547,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	}
 }
 
-/* This will broadcast ssdp:byebye notifications to inform 
+/* This will broadcast ssdp:byebye notifications to inform
  * the network that UPnP is going down. */
 int
 SendSSDPGoodbye(int * sockets, int n_sockets)
@@ -629,7 +629,7 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 		if(i > 0)
 			p[l-1] = '1';
 		p += l;
-		l = snprintf(strbuf, sizeof(strbuf), "%s::%s%s", 
+		l = snprintf(strbuf, sizeof(strbuf), "%s::%s%s",
 		             uuidvalue, known_service_types[i], (i==0)?"":"1");
 		CODELENGTH(l, p);
 		memcpy(p, strbuf, l);

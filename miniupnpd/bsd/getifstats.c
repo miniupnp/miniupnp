@@ -35,7 +35,7 @@ struct nlist list[] = {
 	{NULL}
 };
 
-int 
+int
 getifstats(const char * ifname, struct ifdata * data)
 {
 #if defined(__FreeBSD__) || defined(__DragonFly__)

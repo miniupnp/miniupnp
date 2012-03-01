@@ -1,7 +1,7 @@
 /* $Id: upnphttp.h,v 1.26 2012/02/07 00:21:54 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2011 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -103,7 +103,7 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
                      const char * respmsg,
                      int bodylen);
 
-/* BuildResp_upnphttp() 
+/* BuildResp_upnphttp()
  * fill the res_buf buffer with the complete
  * HTTP 200 OK response from the body passed as argument */
 void

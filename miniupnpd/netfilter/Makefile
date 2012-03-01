@@ -34,7 +34,7 @@ TEST_LIB := $(shell test -f /usr/lib$(ARCH)/libiptc.a && echo 1)
 ifeq ($(TEST_LIB), 1)
 LIBS = -liptc /usr/lib$(ARCH)/libiptc.a
 endif
-endif 
+endif
 endif
 
 all:	iptcrdr.o testiptcrdr

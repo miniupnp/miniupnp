@@ -1,7 +1,7 @@
 /* $Id: upnpglobalvars.c,v 1.27 2012/02/04 23:05:21 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -43,7 +43,7 @@ char modelnumber[MODELNUMBER_MAX_LEN] = "1";
 
 /* presentation url :
  * http://nnn.nnn.nnn.nnn:ppppp/  => max 30 bytes including terminating 0 */
-char presentationurl[PRESENTATIONURL_MAX_LEN]; 
+char presentationurl[PRESENTATIONURL_MAX_LEN];
 
 /* friendly name for root devices in XML description */
 char friendly_name[FRIENDLY_NAME_MAX_LEN] = OS_NAME " router";
