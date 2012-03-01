@@ -1,7 +1,7 @@
 /* $Id: upnpredirect.c,v 1.60 2011/06/22 20:34:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2011 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -47,7 +47,7 @@
 #define PRIu64 "llu"
 #endif
 
-/* proto_atoi() 
+/* proto_atoi()
  * convert the string "UDP" or "TCP" to IPPROTO_UDP and IPPROTO_UDP */
 static int
 proto_atoi(const char * protocol)
@@ -81,7 +81,7 @@ lease_file_add(unsigned short eport,
 	        ((proto==IPPROTO_TCP)?"TCP":"UDP"), eport, iaddr, iport,
 	        timestamp, desc);
 	fclose(fd);
-	
+
 	return 0;
 }
 
@@ -133,14 +133,14 @@ lease_file_remove(unsigned short eport, int proto)
 	}
 	fclose(fdt);
 	fclose(fd);
-	
+
 	if (rename(tmpfilename, lease_file) < 0) {
 		syslog(LOG_ERR, "could not rename temporary lease file to %s", lease_file);
 		remove(tmpfilename);
 	}
-	
+
 	return 0;
-	
+
 }
 
 /* reload_from_lease_file()
@@ -239,12 +239,12 @@ int reload_from_lease_file()
 		}
 	}
 	fclose(fd);
-	
+
 	return 0;
 }
 #endif
 
-/* upnp_redirect() 
+/* upnp_redirect()
  * calls OS/fw dependant implementation of the redirection.
  * protocol should be the string "TCP" or "UDP"
  * returns: 0 on success
@@ -253,7 +253,7 @@ int reload_from_lease_file()
  *          -3 permission check failed
  */
 int
-upnp_redirect(const char * rhost, unsigned short eport, 
+upnp_redirect(const char * rhost, unsigned short eport,
               const char * iaddr, unsigned short iport,
               const char * protocol, const char * desc,
               unsigned int leaseduration)
@@ -295,7 +295,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	} else {
 		timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
 		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-			eport, iaddr, iport, protocol, desc);			
+			eport, iaddr, iport, protocol, desc);
 		return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
 		                              desc, timestamp);
 	}
@@ -374,7 +374,7 @@ upnp_get_redirection_infos(unsigned short eport, const char * protocol,
 int
 upnp_get_redirection_infos_by_index(int index,
                                     unsigned short * eport, char * protocol,
-                                    unsigned short * iport, 
+                                    unsigned short * iport,
                                     char * iaddr, int iaddrlen,
                                     char * desc, int desclen,
                                     char * rhost, int rhostlen,
@@ -794,7 +794,7 @@ upnp_delete_inboundpinhole(const char * uid)
 {
 	/* TODO : to be implemented */
 #if 0
-	/* this is a alpha implementation calling ip6tables via system(), 
+	/* this is a alpha implementation calling ip6tables via system(),
 	 * it can be usefull as an example to code the netfilter version */
 	int r, s, linenum=0;
 	char cmd[256], cmd_raw[256];

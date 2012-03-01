@@ -25,7 +25,7 @@ To Build and Install :
   and "anchor miniupnpd" lines.
 - install as root using :
   # make install
-  or  
+  or
   # PREFIX=/usr/local make install
 - run as root : The daemon needs rights to modify pf rules.
 
@@ -66,7 +66,7 @@ To Build and install :
   > vi config.h
 - Build the daemon
   > make -f Makefile.linux
-  If not using iptables from your system, 
+  If not using iptables from your system,
   > IPTABLESPATH=/path/to/iptables-1.4.1 make -f Makefile.linux
   note : make sure you have iptables with static libraries compiled.
   use "./configure --enable-static" before compiling iptables
@@ -137,7 +137,7 @@ automatically.
 
 To stop the daemon use :
   # kill `cat /var/run/miniupnpd.pid`
-or if your linux system use /etc/init.d/ 
+or if your linux system use /etc/init.d/
   # /etc/init.d/miniupnpd stop
 
 

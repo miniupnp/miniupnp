@@ -18,7 +18,7 @@
 #include "upnpcommands.h"
 #include "upnperrors.h"
 
-/* protofix() checks if protocol is "UDP" or "TCP" 
+/* protofix() checks if protocol is "UDP" or "TCP"
  * returns NULL if not */
 const char * protofix(const char * proto)
 {
@@ -26,7 +26,7 @@ const char * protofix(const char * proto)
 	static const char proto_udp[4] = { 'U', 'D', 'P', 0};
 	int i, b;
 	for(i=0, b=1; i<4; i++)
-		b = b && (   (proto[i] == proto_tcp[i]) 
+		b = b && (   (proto[i] == proto_tcp[i])
 		          || (proto[i] == (proto_tcp[i] | 32)) );
 	if(b)
 		return proto_tcp;
@@ -211,7 +211,7 @@ static void NewListRedirections(struct UPNPUrls * urls,
 	}
 }
 
-/* Test function 
+/* Test function
  * 1 - get connection type
  * 2 - get extenal ip address
  * 3 - Add port mapping
@@ -241,7 +241,7 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 		fprintf(stderr, "invalid protocol\n");
 		return;
 	}
-	
+
 	UPNP_GetExternalIPAddress(urls->controlURL,
 	                          data->first.servicetype,
 							  externalIPAddress);
@@ -249,7 +249,7 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 		printf("ExternalIPAddress = %s\n", externalIPAddress);
 	else
 		printf("GetExternalIPAddress failed.\n");
-	
+
 	r = UPNP_AddPortMapping(urls->controlURL, data->first.servicetype,
 	                        eport, iport, iaddr, 0, proto, 0, leaseDuration);
 	if(r!=UPNPCOMMAND_SUCCESS)
@@ -264,7 +264,7 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 	if(r!=UPNPCOMMAND_SUCCESS)
 		printf("GetSpecificPortMappingEntry() failed with code %d (%s)\n",
 		       r, strupnperror(r));
-	
+
 	if(intClient[0]) {
 		printf("InternalIP:Port = %s:%s\n", intClient, intPort);
 		printf("external %s:%s %s is redirected to internal %s:%s (duration=%s)\n",
@@ -303,7 +303,7 @@ static void GetFirewallStatus(struct UPNPUrls * urls, struct IGDdatas * data)
 	UPNP_GetFirewallStatus(urls->controlURL_6FC, data->IPv6FC.servicetype, &firewallEnabled, &inboundPinholeAllowed);
 	printf("FirewallEnabled: %d & Inbound Pinhole Allowed: %d\n", firewallEnabled, inboundPinholeAllowed);
 	printf("GetFirewallStatus:\n   Firewall Enabled: %s\n   Inbound Pinhole Allowed: %s\n", (firewallEnabled)? "Yes":"No", (inboundPinholeAllowed)? "Yes":"No");
-	
+
 	bytessent = UPNP_GetTotalBytesSent(urls->controlURL_CIF, data->CIF.servicetype);
 	bytesreceived = UPNP_GetTotalBytesReceived(urls->controlURL_CIF, data->CIF.servicetype);
 	packetssent = UPNP_GetTotalPacketsSent(urls->controlURL_CIF, data->CIF.servicetype);
@@ -312,7 +312,7 @@ static void GetFirewallStatus(struct UPNPUrls * urls, struct IGDdatas * data)
 	printf("Packets: Sent: %8u\tRecv: %8u\n", packetssent, packetsreceived);
 }
 
-/* Test function 
+/* Test function
  * 1 - Add pinhole
  * 2 - Check if pinhole is working from the IGD side */
 static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
@@ -376,7 +376,7 @@ static void GetPinholeAndUpdate(struct UPNPUrls * urls, struct IGDdatas * data,
 	}
 }
 
-/* Test function 
+/* Test function
  * Get pinhole timeout
  */
 static void GetPinholeOutboundTimeout(struct UPNPUrls * urls, struct IGDdatas * data,

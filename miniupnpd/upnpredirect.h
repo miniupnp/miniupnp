@@ -1,7 +1,7 @@
 /* $Id: upnpredirect.h,v 1.24 2011/06/22 20:34:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2011 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -17,7 +17,7 @@
 int reload_from_lease_file(void);
 #endif
 
-/* upnp_redirect() 
+/* upnp_redirect()
  * calls OS/fw dependant implementation of the redirection.
  * protocol should be the string "TCP" or "UDP"
  * returns: 0 on success
@@ -26,7 +26,7 @@ int reload_from_lease_file(void);
  *          -3 permission check failed
  */
 int
-upnp_redirect(const char * rhost, unsigned short eport, 
+upnp_redirect(const char * rhost, unsigned short eport,
               const char * iaddr, unsigned short iport,
               const char * protocol, const char * desc,
               unsigned int leaseduration);
@@ -55,7 +55,7 @@ upnp_get_redirection_infos(unsigned short eport, const char * protocol,
 int
 upnp_get_redirection_infos_by_index(int index,
                                     unsigned short * eport, char * protocol,
-                                    unsigned short * iport, 
+                                    unsigned short * iport,
                                     char * iaddr, int iaddrlen,
                                     char * desc, int desclen,
                                     char * rhost, int rhostlen,
@@ -81,7 +81,7 @@ struct rule_state
 	struct rule_state * next;
 	unsigned short eport;
 	unsigned char proto;
-	unsigned char to_remove; 
+	unsigned char to_remove;
 };
 
 /* return a linked list of all rules

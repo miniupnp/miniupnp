@@ -70,7 +70,7 @@ receivedata(int socket, char * data, int length, int timeout)
         return -1;
     } else if(n == 0) {
         return 0;
-    }    
+    }
 #endif
 	n = recv(socket, data, length, 0);
 	if(n<0) {

@@ -11,7 +11,7 @@
 # make install (miniupnpd will be put in /usr/sbin)
 #
 # install target is made for linux... sorry BSD users...
-#CFLAGS = -Wall -g -D_GNU_SOURCE -Wstrict-prototypes 
+#CFLAGS = -Wall -g -D_GNU_SOURCE -Wstrict-prototypes
 CFLAGS = -Wall -Os -D_GNU_SOURCE -fno-strict-aliasing -Wstrict-prototypes
 CC = gcc
 RM = rm -f

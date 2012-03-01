@@ -192,4 +192,4 @@ config.h:	genconfig.sh
 
 #	$(CC) $(CFLAGS) -c -o $(.TARGET) $(.IMPSRC)
 
-	
+

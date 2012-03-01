@@ -1,7 +1,7 @@
 /* $Id: obsdrdr.c,v 1.69 2012/02/03 11:59:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2010 Thomas Bernard 
+ * (c) 2006-2010 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -217,7 +217,7 @@ add_redirect_rule2(const char * ifname,
 		pcr.rule.nat.addr.type = PF_ADDR_NONE;
 		pcr.rule.rdr.addr.type = PF_ADDR_ADDRMASK;
 #endif
-		
+
 		pcr.rule.dst.port_op = PF_OP_EQ;
 		pcr.rule.dst.port[0] = htons(eport);
 		pcr.rule.dst.port[1] = htons(eport);
@@ -358,7 +358,7 @@ add_filter_rule2(const char * ifname,
 	if(1)
 	{
 #endif
-		
+
 		pcr.rule.dst.port_op = PF_OP_EQ;
 		pcr.rule.dst.port[0] = htons(eport);
 		pcr.rule.direction = PF_IN;
@@ -376,7 +376,7 @@ add_filter_rule2(const char * ifname,
 		pcr.rule.flags = TH_SYN;
 		pcr.rule.flagset = (TH_SYN|TH_ACK);
 #ifdef PFRULE_HAS_RTABLEID
-		pcr.rule.rtableid = -1;	/* first appeared in OpenBSD 4.0 */ 
+		pcr.rule.rtableid = -1;	/* first appeared in OpenBSD 4.0 */
 #endif
 #ifdef PFRULE_HAS_ONRDOMAIN
 		pcr.rule.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
@@ -402,7 +402,7 @@ add_filter_rule2(const char * ifname,
 		TAILQ_INIT(&pcr.rule.rpool.list);
 		inet_pton(AF_INET, iaddr, &a->addr.v.a.addr.v4.s_addr);
 		TAILQ_INSERT_TAIL(&pcr.rule.rpool.list, a, entries);
-		
+
 		/* we have any - any port = # keep state label */
 		/* we want any - iaddr port = # keep state label */
 		/* memcpy(&pcr.rule.dst, a, sizeof(struct pf_pooladdr)); */

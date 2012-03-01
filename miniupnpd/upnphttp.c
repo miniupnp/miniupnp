@@ -26,7 +26,7 @@
 #include "upnpevents.h"
 #include "upnputils.h"
 
-struct upnphttp * 
+struct upnphttp *
 New_upnphttp(int s)
 {
 	struct upnphttp * ret;
@@ -177,7 +177,7 @@ Send404(struct upnphttp * h)
 static void
 Send501(struct upnphttp * h)
 {
-	static const char body501[] = 
+	static const char body501[] =
 		"<HTML><HEAD><TITLE>501 Not Implemented</TITLE></HEAD>"
 		"<BODY><H1>Not Implemented</H1>The HTTP Method "
 		"is not implemented by this server.</BODY></HTML>\r\n";
@@ -254,7 +254,7 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 			/* we can process the request */
 			syslog(LOG_INFO, "SOAPAction: %.*s",
 		    	   h->req_soapActionLen, h->req_soapAction);
-			ExecuteSoapAction(h, 
+			ExecuteSoapAction(h,
 				h->req_soapAction,
 				h->req_soapActionLen);
 		}
@@ -357,7 +357,7 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 		SendRespAndClose_upnphttp(h);
 	} else {
 	/* - add to the subscriber list
-	 * - respond HTTP/x.x 200 OK 
+	 * - respond HTTP/x.x 200 OK
 	 * - Send the initial event message */
 /* Server:, SID:; Timeout: Second-(xx|infinite) */
 	/* Check that the callback URL is on the same IP as
@@ -411,7 +411,7 @@ ProcessHTTPUnSubscribe_upnphttp(struct upnphttp * h, const char * path)
 }
 #endif
 
-/* Parse and process Http Query 
+/* Parse and process Http Query
  * called once all the HTTP headers have been received. */
 static void
 ProcessHttpQuery_upnphttp(struct upnphttp * h)

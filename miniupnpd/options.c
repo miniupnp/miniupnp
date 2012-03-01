@@ -2,7 +2,7 @@
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2012 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -99,7 +99,7 @@ readoptionsfile(const char * fname)
 	while(fgets(buffer, sizeof(buffer), hfile))
 	{
 		linenum++;
-		t = strchr(buffer, '\n'); 
+		t = strchr(buffer, '\n');
 		if(t)
 		{
 			*t = '\0';
@@ -111,7 +111,7 @@ readoptionsfile(const char * fname)
 				t--;
 			}
 		}
-       
+
 		/* skip leading whitespaces */
 		name = buffer;
 		while(isspace(*name))
@@ -214,7 +214,7 @@ readoptionsfile(const char * fname)
 		}
 
 	}
-	
+
 	fclose(hfile);
 
 	for(i = 0; i < num_options; i++)
@@ -222,7 +222,7 @@ readoptionsfile(const char * fname)
 		/* add start address of string_repo to get right pointer */
 		ary_options[i].value = string_repo + (size_t)ary_options[i].value;
 	}
-	
+
 	return 0;
 }
 

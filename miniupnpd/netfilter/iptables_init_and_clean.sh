@@ -33,5 +33,5 @@ else
         echo "Filter table clean..initalizing.."
         $IPTABLES -t filter -N MINIUPNPD
         $IPTABLES -t filter -I FORWARD 4 -i $EXTIF ! -o $EXTIF -j MINIUPNPD
-fi 
+fi
 

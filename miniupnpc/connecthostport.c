@@ -67,7 +67,7 @@ int connecthostport(const char * host, unsigned short port)
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 	struct timeval timeout;
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
-	
+
 #ifdef USE_GETHOSTBYNAME
 	hp = gethostbyname(host);
 	if(hp == NULL)
