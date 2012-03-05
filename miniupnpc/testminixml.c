@@ -53,7 +53,7 @@ void burptest(const char * buffer, int bufsize)
 	parser.datafunc = printdata; */
 	parser.starteltfunc = IGDstartelt;
 	parser.endeltfunc = IGDendelt;
-	parser.datafunc = IGDdata; 
+	parser.datafunc = IGDdata;
 	parsexml(&parser);
 	printIGD(&data);
 }

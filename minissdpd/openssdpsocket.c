@@ -36,7 +36,7 @@ GetIfAddrIPv4(const char * ifaddr)
 	int s;
 	struct ifreq ifr;
 	int ifrlen;
-	
+
 	/* let's suppose ifaddr is a IPv4 address
 	 * such as 192.168.1.1 */
 	addr = inet_addr(ifaddr);
@@ -44,7 +44,7 @@ GetIfAddrIPv4(const char * ifaddr)
 	{
 		return addr;
 	}
-	/* let's suppose the ifaddr was in fact an interface name 
+	/* let's suppose the ifaddr was in fact an interface name
 	 * such as eth0 */
 	s = socket(PF_INET, SOCK_DGRAM, 0);
 	if(s < 0)
@@ -121,7 +121,7 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 			       ifaddr);
 			return -1;
 		}
-		
+
 		if (setsockopt(s, IPPROTO_IP, drop ? IP_DROP_MEMBERSHIP : IP_ADD_MEMBERSHIP,
 		    (void *)&imr, sizeof(struct ip_mreq)) < 0)
 		{
@@ -150,7 +150,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	struct sockaddr_in sockname;
 #endif
 	socklen_t sockname_len;
-	
+
 #ifdef ENABLE_IPV6
 	if( (s = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0)) < 0)
 #else
@@ -159,8 +159,8 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	{
 		syslog(LOG_ERR, "socket(udp): %m");
 		return -1;
-	}	
-	
+	}
+
 #ifdef ENABLE_IPV6
 	memset(&sockname, 0, sizeof(struct sockaddr_storage));
 	if(ipv6)

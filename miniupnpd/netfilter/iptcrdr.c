@@ -219,7 +219,7 @@ add_filter_rule2(const char * ifname,
 	return add_filter_rule(proto, rhost, iaddr, iport);
 }
 
-/* get_redirect_rule() 
+/* get_redirect_rule()
  * returns -1 if the rule is not found */
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
@@ -305,7 +305,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	return r;
 }
 
-/* get_redirect_rule_by_index() 
+/* get_redirect_rule_by_index()
  * return -1 when the rule was not found */
 int
 get_redirect_rule_by_index(int index,
@@ -577,7 +577,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 }
 
 /* ==================================== */
-/* TODO : add the -m state --state NEW,ESTABLISHED,RELATED 
+/* TODO : add the -m state --state NEW,ESTABLISHED,RELATED
  * only for the filter rule */
 static struct ipt_entry_match *
 get_tcp_match(unsigned short dport)
@@ -711,7 +711,7 @@ iptc_init_verify_and_append(const char * table,
 	return 0;
 }
 
-/* add nat rule 
+/* add nat rule
  * iptables -t nat -A MINIUPNPD -p proto --dport eport -j DNAT --to iaddr:iport
  * */
 static int
@@ -753,7 +753,7 @@ addnatrule(int proto, unsigned short eport,
 		e->ip.src.s_addr = inet_addr(rhost);
 		e->ip.smsk.s_addr = INADDR_NONE;
 	}
-	
+
 	r = iptc_init_verify_and_append("nat", miniupnpd_nat_chain, e, "addnatrule()");
 	free(target);
 	free(match);
@@ -816,7 +816,7 @@ add_filter_rule(int proto, const char * rhost,
 		e->ip.src.s_addr = inet_addr(rhost);
 		e->ip.smsk.s_addr = INADDR_NONE;
 	}
-	
+
 	r = iptc_init_verify_and_append("filter", miniupnpd_forward_chain, e, "add_filter_rule()");
 	free(target);
 	free(match);

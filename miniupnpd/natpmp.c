@@ -216,7 +216,7 @@ void ProcessIncomingNATPMPPacket(int s)
 					}
 				} else {
 					/* To improve the interworking between nat-pmp and
-					 * UPnP, we should check that we remove only NAT-PMP 
+					 * UPnP, we should check that we remove only NAT-PMP
 					 * mappings */
 					r = _upnp_delete_redir(eport, proto);
 					/*syslog(LOG_DEBUG, "%hu %d r=%d", eport, proto, r);*/
@@ -344,7 +344,7 @@ int CleanExpiredNATPMP()
 		return ScanNATPMPforExpiration();
 	/* check desc - this is important since we keep expiration time as part
 	 * of the desc.
-	 * If the rule is renewed, timestamp and nextnatpmptoclean_timestamp 
+	 * If the rule is renewed, timestamp and nextnatpmptoclean_timestamp
 	 * can be different. In that case, the rule must not be removed ! */
 	if(sscanf(desc, "NAT-PMP %u", &timestamp) == 1) {
 		if(timestamp > nextnatpmptoclean_timestamp)
@@ -407,7 +407,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		n = sendto(sockets[j], notif, 12, 0,
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
-		{	
+		{
 			syslog(LOG_ERR, "%s: sendto(s_udp=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j]);
 			return;
@@ -417,7 +417,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		n = sendto(sockets[j], notif, 12, 0,
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
-		{	
+		{
 			syslog(LOG_ERR, "%s: sendto(s_udp=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j]);
 			return;

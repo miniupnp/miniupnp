@@ -26,7 +26,7 @@ int main(int argc, char * * argv) {
      dwBuildNumber :
        The build number of the operating system.
      dwPlatformId
-       The operating system platform. This member can be the following value. 
+       The operating system platform. This member can be the following value.
      szCSDVersion
        A null-terminated string, such as "Service Pack 3", that indicates the
        latest Service Pack installed on the system. If no Service Pack has

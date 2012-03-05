@@ -50,7 +50,7 @@ $Id: Changelog.txt,v 1.261 2012/03/05 04:41:21 nanard Exp $
 
 2011/11/18:
   avoid infinite loop in SendResp_upnphttp() in case of error
-  Replaced SendResp_upnphttp() + CloseSocket_upnphttp() by 
+  Replaced SendResp_upnphttp() + CloseSocket_upnphttp() by
     SendRespAndClose_upnphttp()
   Tomato specifics in genconfig.sh
 
@@ -287,7 +287,7 @@ VERSION 1.3 :
   work to support iptables-1.4.3 and up
 
 2009/04/10:
-  fix in upnpevents_removeSubscriber() 
+  fix in upnpevents_removeSubscriber()
 
 2009/02/14:
   added reload_from_lease_file()
@@ -299,7 +299,7 @@ VERSION 1.3 :
 
 2009/01/29:
   Some minor changes to Makefile
-  improving Makefile.linux in order to build with iptables not properly 
+  improving Makefile.linux in order to build with iptables not properly
   installed on the system.
 
 2009/01/23:
@@ -330,7 +330,7 @@ VERSION 1.2 :
 2008/10/01:
   Improvements in genconfig.sh for detecting ipf or pf (under FreeBSD)
   and improve debian/ubuntu stuff.
-  custom chain name patch from : 
+  custom chain name patch from :
     http://miniupnp.tuxfamily.org/forum/viewtopic.php?t=493
 
 2008/08/24:
@@ -378,7 +378,7 @@ VERSION 1.1 :
   fixed a small bug in the description
 
 2008/03/03:
-  Fixed miniupnpd.c for compiling without natpmp support 
+  Fixed miniupnpd.c for compiling without natpmp support
   fixed presentationURL not there with L3F
   fixing lease file creation/modification
 
@@ -646,7 +646,7 @@ VERSION 1.0 :
   minixml updated. should have no impact
   Added support for presentationURL with -w switch
   implemented getifstats() for linux. Added testgetifstats program
-  improved error handling in getifstats() BSD 
+  improved error handling in getifstats() BSD
 
 2006/11/26:
   no need to have miniupnpc sources to compile miniupnpd.
@@ -763,7 +763,7 @@ VERSION 1.0 :
   filtering SSDP requests and responding with same ST: field
 
 2006/07/25:
-  Added a dummy description for the WANDevice 
+  Added a dummy description for the WANDevice
 
 2006/07/20:
   Command line arguments processing

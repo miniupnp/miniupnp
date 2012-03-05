@@ -9,7 +9,7 @@
  * which weren't available during daemon start. It also takes care
  * of interfaces which become unavailable.
  *
- * Copyright (c) 2011, Alexey Osipov <simba@lerlan.ru> 
+ * Copyright (c) 2011, Alexey Osipov <simba@lerlan.ru>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

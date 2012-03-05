@@ -5,7 +5,7 @@
  * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
- 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -162,7 +162,7 @@ getHTTPResponse(int s, int * size)
 					linestart = i;
 					colon = linestart;
 					valuestart = 0;
-				} 
+				}
 			}
 			/* copy the remaining of the received data back to buf */
 			n = header_buf_used - endofheaders;
@@ -231,7 +231,7 @@ getHTTPResponse(int s, int * size)
 						} else {
 							content_buf_len = content_buf_used + (int)bytestocopy;
 						}
-						content_buf = (char *)realloc((void *)content_buf, 
+						content_buf = (char *)realloc((void *)content_buf,
 						                              content_buf_len);
 					}
 					memcpy(content_buf + content_buf_used, buf + i, bytestocopy);
@@ -255,7 +255,7 @@ getHTTPResponse(int s, int * size)
 					} else {
 						content_buf_len = content_buf_used + n;
 					}
-					content_buf = (char *)realloc((void *)content_buf, 
+					content_buf = (char *)realloc((void *)content_buf,
 					                              content_buf_len);
 				}
 				memcpy(content_buf + content_buf_used, buf, n);
@@ -419,7 +419,7 @@ miniwget2(const char * url, const char * host,
  *   url :		source string not modified
  *   hostname :	hostname destination string (size of MAXHOSTNAMELEN+1)
  *   port :		port (destination)
- *   path :		pointer to the path part of the URL 
+ *   path :		pointer to the path part of the URL
  *
  * Return values :
  *    0 - Failure

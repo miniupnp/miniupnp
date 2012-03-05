@@ -1,7 +1,7 @@
 /* $Id: config.h,v 1.4 2011/05/23 12:22:29 nanard Exp $ */
 /*  MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2011 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #ifndef __CONFIG_H__

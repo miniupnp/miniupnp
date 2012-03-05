@@ -298,7 +298,7 @@ containsForbiddenChars(const unsigned char * p, int len)
 #define METHOD_NOTIFY 2
 
 /* ParseSSDPPacket() :
- * parse a received SSDP Packet and call 
+ * parse a received SSDP Packet and call
  * updateDevice() or removeDevice() as needed
  * return value :
  *    -1 : a device was removed
@@ -324,7 +324,7 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 	for(methodlen = 0;
 	    methodlen < n && (isalpha(p[methodlen]) || p[methodlen]=='-');
 		methodlen++);
-	if(methodlen==8 && 0==memcmp(p, "M-SEARCH", 8)) 
+	if(methodlen==8 && 0==memcmp(p, "M-SEARCH", 8))
 		method = METHOD_MSEARCH;
 	else if(methodlen==6 && 0==memcmp(p, "NOTIFY", 6))
 		method = METHOD_NOTIFY;
@@ -825,7 +825,7 @@ int main(int argc, char * * argv)
 			LOG_MINISSDPD);
 	if(!debug_flag) /* speed things up and ignore LOG_INFO and LOG_DEBUG */
 		setlogmask(LOG_UPTO(LOG_NOTICE));
-	
+
 	if(checkforrunning(pidfilename) < 0)
 	{
 		syslog(LOG_ERR, "MiniSSDPd is already running. EXITING");

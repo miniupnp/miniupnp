@@ -263,13 +263,13 @@ static int nfqueue_cb(
 		int dport = get_udp_dst_port(pkt);
 
 		int x = sizeof (struct ip) + sizeof (struct udphdr);
-	
-		/* packets we are interested in are UDP multicast to 239.255.255.250:1900	
+
+		/* packets we are interested in are UDP multicast to 239.255.255.250:1900
 		 * and start with a data string M-SEARCH
 		 */
-		if ( (dport == 1900) && (id_protocol == IPPROTO_UDP) 
+		if ( (dport == 1900) && (id_protocol == IPPROTO_UDP)
 			&& (ssdp.sin_addr.s_addr == iph->ip_dst.s_addr) ) {
-		
+
 			/* get the index that the packet came in on */
 			u_int32_t idx = nfq_get_indev(nfa);
 			int i = 0;
@@ -279,7 +279,7 @@ static int nfqueue_cb(
 					struct udphdr *udp = (struct udphdr *) (pkt + sizeof(struct ip));
 
 					char *dd = pkt + x;
-					
+
 					struct sockaddr_in sendername;
 					sendername.sin_family = AF_INET;
 					sendername.sin_port = udp->source;
@@ -291,7 +291,7 @@ static int nfqueue_cb(
 				}
 			}
 		}
-		
+
 		nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
 	} else {
@@ -411,7 +411,7 @@ write_command_line(int fd, int argc, char * * argv)
 
 #endif
 
-/* Handler for the SIGTERM signal (kill) 
+/* Handler for the SIGTERM signal (kill)
  * SIGINT is also handled */
 static void
 sigterm(int sig)
@@ -519,7 +519,7 @@ struct runtime_vars {
  * external interface associated with the lan subnet follows.
  * ex : 192.168.1.1/24 81.21.41.11
  *
- * return value : 
+ * return value :
  *    0 : ok
  *   -1 : error */
 static int
@@ -721,7 +721,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPSERIAL:
 				strncpy(serialnumber, ary_options[i].value, SERIALNUMBER_MAX_LEN);
 				serialnumber[SERIALNUMBER_MAX_LEN-1] = '\0';
-				break;				
+				break;
 			case UPNPMODEL_NUMBER:
 				strncpy(modelnumber, ary_options[i].value, MODELNUMBER_MAX_LEN);
 				modelnumber[MODELNUMBER_MAX_LEN-1] = '\0';
@@ -990,7 +990,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	{
 		syslog(LOG_ERR, "MiniUPnPd is already running. EXITING");
 		return 1;
-	}	
+	}
 
 	set_startup_time(GETFLAG(SYSUPTIMEMASK));
 
@@ -1275,7 +1275,7 @@ main(int argc, char * * argv)
 		if((startup_time<60*60*24) && (time(NULL)>60*60*24))
 		{
 			set_startup_time(GETFLAG(SYSUPTIMEMASK));
-		} 
+		}
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
 		{
@@ -1387,7 +1387,7 @@ main(int argc, char * * argv)
 		FD_ZERO(&readset);
 		FD_ZERO(&writeset);
 
-		if (sudp >= 0) 
+		if (sudp >= 0)
 		{
 			FD_SET(sudp, &readset);
 			max_fd = MAX( max_fd, sudp);
@@ -1399,7 +1399,7 @@ main(int argc, char * * argv)
 			}
 #endif
 		}
-		if (shttpl >= 0) 
+		if (shttpl >= 0)
 		{
 			FD_SET(shttpl, &readset);
 			max_fd = MAX( max_fd, shttpl);
@@ -1413,7 +1413,7 @@ main(int argc, char * * argv)
 #endif
 
 #ifdef ENABLE_NFQUEUE
-		if (nfqh >= 0) 
+		if (nfqh >= 0)
 		{
 			FD_SET(nfqh, &readset);
 			max_fd = MAX( max_fd, nfqh);
@@ -1455,7 +1455,7 @@ main(int argc, char * * argv)
 			FD_SET(sctl, &readset);
 			max_fd = MAX( max_fd, sctl);
 		}
-		
+
 		for(ectl = ctllisthead.lh_first; ectl; ectl = ectl->entries.le_next)
 		{
 			if(ectl->socket >= 0) {
@@ -1699,7 +1699,7 @@ shutdown:
 		}
 	}
 #endif
-	
+
 	/*if(SendSSDPGoodbye(snotify, v.n_lan_addr) < 0)*/
 	if (GETFLAG(ENABLEUPNPMASK))
 	{
@@ -1728,9 +1728,9 @@ shutdown:
 	free(snatpmp);
 #endif
 	free(snotify);
-	closelog();	
+	closelog();
 	freeoptions();
-	
+
 	return 0;
 }
 

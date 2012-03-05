@@ -1,7 +1,7 @@
 /* $Id: testiptcrdr.c,v 1.16 2011/03/02 16:04:23 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2011 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -22,7 +22,7 @@ main(int argc, char ** argv)
 	unsigned short eport, iport;
 	const char * iaddr;
 	printf("Usage %s <ext_port> <internal_ip> <internal_port>\n", argv[0]);
-	
+
 	if(argc<4)
 		return -1;
 	openlog("testiptcrdr", LOG_PERROR|LOG_CONS, LOG_LOCAL0);

@@ -120,7 +120,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		p += stsize;
 		tmp->buffer[urlsize+1+stsize] = '\0';
 		devlist = tmp;
-		/* added for compatibility with recent versions of MiniSSDPd 
+		/* added for compatibility with recent versions of MiniSSDPd
 		 * >= 2007/12/19 */
 		DECODELENGTH(usnsize, p);
 		p += usnsize;

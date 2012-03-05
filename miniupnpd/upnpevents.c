@@ -299,7 +299,7 @@ upnp_event_notify_connect(struct upnp_event_notify * obj)
 
 static void upnp_event_prepare(struct upnp_event_notify * obj)
 {
-	static const char notifymsg[] = 
+	static const char notifymsg[] =
 		"NOTIFY %s HTTP/1.1\r\n"
 		"Host: %s%s\r\n"
 		"Content-Type: text/xml\r\n"

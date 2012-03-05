@@ -28,7 +28,7 @@ int getifstats(const char * ifname, struct ifdata * data) {
 	size_t needed;
 	char *buf, *end, *p;
 	struct if_msghdr *ifm;
-	struct if_data ifdata;	
+	struct if_data ifdata;
 #ifdef ENABLE_GETIFSTATS_CACHING
 	static time_t cache_timestamp = 0;
 	static struct ifdata cache_data;
@@ -86,7 +86,7 @@ int getifstats(const char * ifname, struct ifdata * data) {
 #endif
 				return 0; /* found, ok */
 			}
-		}		
+		}
 	}
 	free(buf);
 	return -1; /* not found or error */

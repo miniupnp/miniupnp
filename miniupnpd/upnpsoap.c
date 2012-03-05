@@ -1,7 +1,7 @@
 /* $Id: upnpsoap.c,v 1.90 2012/02/04 23:34:40 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -219,7 +219,7 @@ GetStatusInfo(struct upnphttp * h, const char * action)
 	uptime = (time(NULL) - startup_time);
 	bodylen = snprintf(body, sizeof(body), resp,
 		action, SERVICE_TYPE_WANIPC,
-		status, (long)uptime, action);	
+		status, (long)uptime, action);
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
@@ -334,11 +334,11 @@ AddPortMapping(struct upnphttp * h, const char * action)
 #endif
 
 	/* if ip not valid assume hostname and convert */
-	if (inet_pton(AF_INET, int_ip, &result_ip) <= 0) 
+	if (inet_pton(AF_INET, int_ip, &result_ip) <= 0)
 	{
 		hp = gethostbyname(int_ip);
-		if(hp && hp->h_addrtype == AF_INET) 
-		{ 
+		if(hp && hp->h_addrtype == AF_INET)
+		{
 			for(ptr = hp->h_addr_list; ptr && *ptr; ptr++)
 		   	{
 				int_ip = inet_ntoa(*((struct in_addr *) *ptr));
@@ -346,14 +346,14 @@ AddPortMapping(struct upnphttp * h, const char * action)
 				/* TODO : deal with more than one ip per hostname */
 				break;
 			}
-		} 
-		else 
+		}
+		else
 		{
-			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip); 
+			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip);
 			ClearNameValueList(&data);
 			SoapError(h, 402, "Invalid Args");
 			return;
-		}				
+		}
 	}
 
 	/* check if NewInternalAddress is the client address */
@@ -500,11 +500,11 @@ AddAnyPortMapping(struct upnphttp * h, const char * action)
 #endif
 
 	/* if ip not valid assume hostname and convert */
-	if (inet_pton(AF_INET, int_ip, &result_ip) <= 0) 
+	if (inet_pton(AF_INET, int_ip, &result_ip) <= 0)
 	{
 		hp = gethostbyname(int_ip);
-		if(hp && hp->h_addrtype == AF_INET) 
-		{ 
+		if(hp && hp->h_addrtype == AF_INET)
+		{
 			for(ptr = hp->h_addr_list; ptr && *ptr; ptr++)
 		   	{
 				int_ip = inet_ntoa(*((struct in_addr *) *ptr));
@@ -512,14 +512,14 @@ AddAnyPortMapping(struct upnphttp * h, const char * action)
 				/* TODO : deal with more than one ip per hostname */
 				break;
 			}
-		} 
-		else 
+		}
+		else
 		{
-			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip); 
+			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip);
 			ClearNameValueList(&data);
 			SoapError(h, 402, "Invalid Args");
 			return;
-		}				
+		}
 	}
 
 	/* check if NewInternalAddress is the client address */
@@ -535,7 +535,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action)
 		}
 	}
 
-	/* TODO : accept a different external port 
+	/* TODO : accept a different external port
 	 * have some smart strategy to choose the port */
 	for(;;) {
 		r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
@@ -626,7 +626,7 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action)
 	                               &leaseduration);
 
 	if(r < 0)
-	{		
+	{
 		SoapError(h, 714, "NoSuchEntryInArray");
 	}
 	else
@@ -687,13 +687,13 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 	 * just an annoyance for the user using it. So this is not
 	 * a priority. */
 
-	syslog(LOG_INFO, "%s: external port: %hu, protocol: %s", 
+	syslog(LOG_INFO, "%s: external port: %hu, protocol: %s",
 		action, eport, protocol);
 
 	r = upnp_delete_redirection(eport, protocol);
 
 	if(r < 0)
-	{	
+	{
 		SoapError(h, 714, "NoSuchEntryInArray");
 	}
 	else
@@ -755,7 +755,7 @@ static void
 GetGenericPortMappingEntry(struct upnphttp * h, const char * action)
 {
 	int r;
-	
+
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
@@ -786,7 +786,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action)
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
-	}	
+	}
 
 	index = (int)atoi(m_index);
 
@@ -1062,7 +1062,7 @@ QueryStateVariable(struct upnphttp * h, const char * action)
 		SoapError(h, 402, "Invalid Args");
 	}
 	else if(strcmp(var_name, "ConnectionStatus") == 0)
-	{	
+	{
 		const char * status;
 
 		status = get_wan_connection_status_str(ext_if_name);
@@ -1074,12 +1074,12 @@ QueryStateVariable(struct upnphttp * h, const char * action)
 #if 0
 	/* not usefull */
 	else if(strcmp(var_name, "ConnectionType") == 0)
-	{	
+	{
 		bodylen = snprintf(body, sizeof(body), resp, "IP_Routed");
 		BuildSendAndCloseSoapResp(h, body, bodylen);
 	}
 	else if(strcmp(var_name, "LastConnectionError") == 0)
-	{	
+	{
 		bodylen = snprintf(body, sizeof(body), resp, "ERROR_NONE");
 		BuildSendAndCloseSoapResp(h, body, bodylen);
 	}
@@ -1100,7 +1100,7 @@ QueryStateVariable(struct upnphttp * h, const char * action)
 		SoapError(h, 404, "Invalid Var");
 	}
 
-	ClearNameValueList(&data);	
+	ClearNameValueList(&data);
 }
 
 #ifdef ENABLE_6FC_SERVICE
@@ -1153,7 +1153,7 @@ DataVerification(struct upnphttp * h, char * int_ip, unsigned short * int_port, 
 		SoapError(h, 708, "WildCardNotPermittedInSrcIP");
 		return 0;
 	}
-	
+
 	if (!strchr(int_ip, ':'))
 	{
 		SoapError(h, 402, "Invalid Args");
@@ -1265,7 +1265,7 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_por
 	//char str[INET6_ADDRSTRLEN]="";
 	//connecthostport(int_ip, *int_port, str);
 	//printf("int_ip: %s / str: %s\n", int_ip, str);
-	
+
 	struct addrinfo hints, *ai, *p;
 	struct in6_addr result_ip;/*unsigned char result_ip[16];*/ /* inet_pton() */ //IPv6 Modification
 
@@ -1739,9 +1739,9 @@ GetPinholePackets(struct upnphttp * h, const char * action)
  * GetExternalIPAddress
  * QueryStateVariable / ConnectionStatus!
  */
-static const struct 
+static const struct
 {
-	const char * methodName; 
+	const char * methodName;
 	void (*methodImpl)(struct upnphttp *, const char *);
 }
 soapMethods[] =
@@ -1829,7 +1829,7 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
  * --------	---------------- -----------
  * 401 		Invalid Action 	No action by that name at this service.
  * 402 		Invalid Args 	Could be any of the following: not enough in args,
- * 							too many in args, no in arg by that name, 
+ * 							too many in args, no in arg by that name,
  * 							one or more in args are of the wrong data type.
  * 403 		Out of Sync 	Out of synchronization.
  * 501 		Action Failed 	May be returned in current state of service
@@ -1838,13 +1838,13 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
  * 							Technical Committee.
  * 700-799 	TBD 			Action-specific errors for standard actions.
  * 							Defined by UPnP Forum working committee.
- * 800-899 	TBD 			Action-specific errors for non-standard actions. 
+ * 800-899 	TBD 			Action-specific errors for non-standard actions.
  * 							Defined by UPnP vendor.
 */
 void
 SoapError(struct upnphttp * h, int errCode, const char * errDesc)
 {
-	static const char resp[] = 
+	static const char resp[] =
 		"<s:Envelope "
 		"xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" "
 		"s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
