@@ -1,7 +1,7 @@
-/* $Id: upnpredirect.c,v 1.60 2011/06/22 20:34:39 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.61 2012/03/05 04:41:22 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard 
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -194,7 +194,7 @@ int reload_from_lease_file()
 			continue;
 		}
 		*(p++) = '\0';
-		timestamp = (unsigned int)atoi(p);
+		iport = (unsigned short)atoi(p);
 		p = strchr(p, ':');
 		if(!p) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
@@ -207,7 +207,7 @@ int reload_from_lease_file()
 			continue;
 		}
 		*(desc++) = '\0';
-		iport = (unsigned short)atoi(p);
+		timestamp = (unsigned int)atoi(p);
 		/* trim description */
 		while(isspace(*desc))
 			desc++;
@@ -222,7 +222,7 @@ int reload_from_lease_file()
 				syslog(LOG_NOTICE, "already expired lease in lease file");
 				continue;
 			} else {
-				leaseduration = current_time - timestamp;
+				leaseduration = timestamp - current_time;
 			}
 		} else {
 			leaseduration = 0;	/* default value */

@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.260 2012/02/15 22:44:26 nanard Exp $
+$Id: Changelog.txt,v 1.261 2012/03/05 04:41:21 nanard Exp $
+
+2012/03/05:
+  fixed reload_from_lease_file().
 
 2012/02/15:
   Change parselanaddr() function to allow 192.168.1.1/255.255.255.0 in
