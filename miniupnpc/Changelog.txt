@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.161 2012/01/25 21:24:02 nanard Exp $
+$Id: Changelog.txt,v 1.162 2012/03/08 10:02:49 nanard Exp $
 miniUPnP client Changelog.
+
+2012/03/08:
+  make minihttptestserver listen on loopback interface instead of 0.0.0.0
 
 2012/01/25:
   Maven installation thanks to Alexey Kuznetsov

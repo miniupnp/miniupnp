@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.6 2011/05/09 08:53:15 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.7 2012/03/08 10:02:49 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011 Thomas Bernard
@@ -360,12 +360,12 @@ int main(int argc, char * * argv) {
 		struct sockaddr_in6 * addr = (struct sockaddr_in6 *)&server_addr;
 		addr->sin6_family = AF_INET6;
 		addr->sin6_port = htons(port);
-		addr->sin6_addr = in6addr_any;
+		addr->sin6_addr = in6addr_loopback;
 	} else {
 		struct sockaddr_in * addr = (struct sockaddr_in *)&server_addr;
 		addr->sin_family = AF_INET;
 		addr->sin_port = htons(port);
-		addr->sin_addr.s_addr = htonl(INADDR_ANY);
+		addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	}
 	if(bind(s, (struct sockaddr *)&server_addr,
 	        ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)) < 0) {
