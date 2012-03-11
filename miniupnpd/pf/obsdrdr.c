@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.c,v 1.69 2012/02/03 11:59:16 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.71 2012/03/11 08:46:19 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2010 Thomas Bernard
@@ -211,7 +211,7 @@ add_redirect_rule2(const char * ifname,
 	if(1)
 	{
 		pcr.rule.direction = PF_IN;
-		//pcr.rule.src.addr.type = PF_ADDR_NONE;
+		/*pcr.rule.src.addr.type = PF_ADDR_NONE;*/
 		pcr.rule.src.addr.type = PF_ADDR_ADDRMASK;
 		pcr.rule.dst.addr.type = PF_ADDR_ADDRMASK;
 		pcr.rule.nat.addr.type = PF_ADDR_NONE;
