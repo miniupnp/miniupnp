@@ -97,7 +97,8 @@ const char * strupnperror(int err)
 		s = "ExternalPortOnlySupportsWildcard";
 		break;
 	default:
-		s = NULL;
+		s = "UnknownError";
+		break;
 	}
 	return s;
 }
