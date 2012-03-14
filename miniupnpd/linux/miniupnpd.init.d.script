@@ -4,6 +4,8 @@
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 
+set -e
+
 MINIUPNPD=/usr/sbin/miniupnpd
 ARGS='-f /etc/miniupnpd/miniupnpd.conf'
 
@@ -34,6 +36,9 @@ case "$1" in
 	$IPTABLES_CREATE > /dev/null 2>&1
 	start-stop-daemon --start --quiet --pidfile /var/run/miniupnpd.pid --startas $MINIUPNPD -- $ARGS $LSBNAMES
 	log_end_msg $?
+	;;
+  status)
+	status_of_proc /usr/sbin/miniupnpd miniupnpd
 	;;
   *)
 	log_action_msg "Usage: /etc/init.d/miniupnpd {start|stop|restart|reload|force-reload}"
