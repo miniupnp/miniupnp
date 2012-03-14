@@ -4,6 +4,15 @@
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 
+### BEGIN INIT INFO
+# Provides:          miniupnpd
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: MiniUPnPd port-forwarding daemon
+### END INIT INFO
+
 set -e
 
 MINIUPNPD=/usr/sbin/miniupnpd
