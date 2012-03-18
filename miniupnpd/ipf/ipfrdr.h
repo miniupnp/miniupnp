@@ -10,12 +10,12 @@
 #include "../commonrdr.h"
 
 int
-add_redirect_rule2(const char * ifname, unsigned short eport,
+add_redirect_rule2(const char * ifname, const char * rhost, unsigned short eport,
                    const char * iaddr, unsigned short iport, int proto,
-				   const char * desc);
+				   const char * desc, unsigned int timestamp);
 
 int
-add_filter_rule2(const char * ifname, const char * iaddr,
+add_filter_rule2(const char * ifname, const char * rhost, const char * iaddr,
                  unsigned short eport, unsigned short iport,
 				 int proto, const char * desc);
 
