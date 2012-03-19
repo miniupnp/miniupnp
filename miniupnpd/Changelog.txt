@@ -1,4 +1,10 @@
-$Id: Changelog.txt,v 1.261 2012/03/05 04:41:21 nanard Exp $
+$Id: Changelog.txt,v 1.264 2012/03/19 21:14:12 nanard Exp $
+
+2012/03/19:
+  Fix ipfilter support (thanks dhowland https://github.com/dhowland)
+
+2012/03/14:
+  Changes to miniupnpd.init.d.script by Shawn Landden
 
 2012/03/05:
   fixed reload_from_lease_file().
