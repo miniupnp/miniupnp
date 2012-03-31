@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.147 2012/02/15 22:43:56 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.149 2012/03/31 06:57:12 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1038,7 +1038,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		return 1;
 	}
 
-	writepidfile(pidfilename, pid);
+	if(writepidfile(pidfilename, pid) < 0)
+		pidfilename = NULL;
 
 #ifdef ENABLE_LEASEFILE
 	/*remove(lease_file);*/
@@ -1711,7 +1712,7 @@ shutdown:
 			close(snotify[i]);
 	}
 
-	if(unlink(pidfilename) < 0)
+	if(pidfilename && (unlink(pidfilename) < 0))
 	{
 		syslog(LOG_ERR, "Failed to remove pidfile %s: %m", pidfilename);
 	}

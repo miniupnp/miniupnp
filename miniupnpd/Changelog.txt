@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.264 2012/03/19 21:14:12 nanard Exp $
+$Id: Changelog.txt,v 1.265 2012/03/31 06:57:11 nanard Exp $
+
+2012/03/31:
+  Only remove pidfile if one was written in the first place.
 
 2012/03/19:
   Fix ipfilter support (thanks dhowland https://github.com/dhowland)
