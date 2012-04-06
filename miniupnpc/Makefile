@@ -103,11 +103,13 @@ FILESTOINSTALL := $(FILESTOINSTALL) $(SHAREDLIBRARY)
 endif
 
 
-.PHONY:	install clean depend all check everything \
+.PHONY:	install clean depend all check test everything \
 	installpythonmodule updateversion
 #	validateminixml validateminiwget
 
 all:	$(LIBRARY) $(EXECUTABLES)
+
+test:	check
 
 check:	validateminixml validateminiwget
 
