@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.31 2012/04/06 17:24:37 nanard Exp $ */
+/* $Id: minissdp.c,v 1.32 2012/04/06 17:51:55 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -672,8 +672,14 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
                  uuidvalue, known_service_types[i], (i==0?"":"1"),
                  upnp_bootid, upnp_bootid, upnp_configid);
 	        n = sendto(sockets[j], bufr, l, 0,
+#ifdef ENABLE_IPV6
 	                   ipv6 ? (struct sockaddr *)&sockname6 : (struct sockaddr *)&sockname,
-			           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in) );
+	                   ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
+#else
+	                   (struct sockaddr *)&sockname,
+	                   sizeof(struct sockaddr_in)
+#endif
+	                 );
 			if(n < 0)
 			{
 				syslog(LOG_ERR, "SendSSDPGoodbye: sendto(udp_shutdown=%d): %m",
