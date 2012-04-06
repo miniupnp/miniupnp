@@ -1,6 +1,8 @@
 $Id: Changelog.txt,v 1.266 2012/04/06 15:27:20 nanard Exp $
 
 2012/04/06:
+  Allow LAN interface to be given as interface names, instead of interface
+    IP addresses. It will allow IPv6 operations.
   fix linux/getifstats.c when bitrate is unknown
 
 2012/03/31:

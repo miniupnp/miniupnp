@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.149 2012/03/31 06:57:12 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.150 2012/04/06 15:27:20 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -519,6 +519,8 @@ struct runtime_vars {
  * external interface associated with the lan subnet follows.
  * ex : 192.168.1.1/24 81.21.41.11
  *
+ * Can also use the interface name (ie eth0)
+ *
  * return value :
  *    0 : ok
  *   -1 : error */
@@ -529,14 +531,26 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 	int n;
 	char tmp[16];
 
+	memset(lan_addr, 0, sizeof(struct lan_addr_s));
 	p = str;
 	while(*p && *p != '/' && !isspace(*p))
 		p++;
 	n = p - str;
-	if(n>15)
-		goto parselan_error;
-	memcpy(lan_addr->str, str, n);
-	lan_addr->str[n] = '\0';
+	if(!isdigit(str[0]) && n < sizeof(lan_addr->ifname))
+	{
+		/* not starting with a digit : suppose it is an interface name */
+		memcpy(lan_addr->ifname, str, n);
+		lan_addr->ifname[n] = '\0';
+		if(getifaddr(lan_addr->ifname, lan_addr->str, sizeof(lan_addr->str)) < 0)
+			goto parselan_error;
+	}
+	else
+	{
+		if(n>15)
+			goto parselan_error;
+		memcpy(lan_addr->str, str, n);
+		lan_addr->str[n] = '\0';
+	}
 	if(!inet_aton(lan_addr->str, &lan_addr->addr))
 		goto parselan_error;
 	if(*p == '/')
@@ -588,9 +602,19 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		}
 	}
 #endif
+#ifdef ENABLE_IPV6
+	if(lan_addr->ifname[0] != '\0')
+	{
+		lan_addr->index = if_nametoindex(lan_addr->ifname);
+		if(lan_addr->index == 0)
+			fprintf(stderr, "Cannot get index for network interface %s",
+			        lan_addr->ifname);
+	}
+#endif
 	return 0;
 parselan_error:
-	fprintf(stderr, "Error parsing address/mask : %s\n", str);
+	fprintf(stderr, "Error parsing address/mask (or interface name) : %s\n",
+	        str);
 	return -1;
 }
 
