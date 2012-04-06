@@ -1,5 +1,11 @@
-$Id: Changelog.txt,v 1.162 2012/03/08 10:02:49 nanard Exp $
+$Id: Changelog.txt,v 1.163 2012/03/15 01:02:02 nanard Exp $
 miniUPnP client Changelog.
+
+2012/04/05:
+  minor improvements to minihttptestserver.c
+
+2012/03/15:
+  upnperrors.c returns valid error string for unrecognized error codes
 
 2012/03/08:
   make minihttptestserver listen on loopback interface instead of 0.0.0.0

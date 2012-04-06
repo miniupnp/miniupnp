@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.7 2012/03/08 10:02:49 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.8 2012/04/06 13:53:52 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011 Thomas Bernard
@@ -249,10 +249,21 @@ void handle_http_connection(int c)
 	if(0 != strcmp(request_method, "GET")) {
 		const char response405[] = "HTTP/1.1 405 Method Not Allowed\r\n"
 		                           "Allow: GET\r\n\r\n";
+		const char * pc;
 		/* 405 Method Not Allowed */
 		/* The response MUST include an Allow header containing a list
 		 * of valid methods for the requested resource. */
-		write(c, response405, sizeof(response405) - 1);
+		n = sizeof(response405) - 1;
+		pc = response405;
+		while(n > 0) {
+			i = write(c, pc, n);
+			if(i<0) {
+				perror("write");
+				return;
+			}
+			n -= i;
+			pc += i;
+		}
 		return;
 	}
 
@@ -400,9 +411,14 @@ int main(int argc, char * * argv) {
 			char * buffer;
 			buffer = malloc(16*1024);
 			build_content(buffer, 16*1024);
-			fwrite(buffer, 1, 16*1024, f);
+			i = fwrite(buffer, 1, 16*1024, f);
+			if(i != 16*1024) {
+				fprintf(stderr, "error writing to file %s : %dbytes written (out of %d)\n", expected_file_name, i, 16*1024);
+			}
 			free(buffer);
 			fclose(f);
+		} else {
+			fprintf(stderr, "error opening file %s for writing\n", expected_file_name);
 		}
 	}
 
