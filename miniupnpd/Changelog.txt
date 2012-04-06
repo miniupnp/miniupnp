@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.265 2012/03/31 06:57:11 nanard Exp $
+$Id: Changelog.txt,v 1.266 2012/04/06 15:27:20 nanard Exp $
+
+2012/04/06:
+  fix linux/getifstats.c when bitrate is unknown
 
 2012/03/31:
   Only remove pidfile if one was written in the first place.
