@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.150 2012/04/06 15:27:20 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.151 2012/04/06 17:24:37 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1167,7 +1167,12 @@ main(int argc, char * * argv)
 	for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next)
 		addr_count++;
 	if(addr_count > 0) {
+#ifndef ENABLE_IPV6
 		snotify = calloc(addr_count, sizeof(int));
+#else
+		/* one for IPv4, one for IPv6 */
+		snotify = calloc(addr_count * 2, sizeof(int));
+#endif
 	}
 #ifdef ENABLE_NATPMP
 	if(addr_count > 0) {
@@ -1725,14 +1730,21 @@ shutdown:
 	}
 #endif
 
-	/*if(SendSSDPGoodbye(snotify, v.n_lan_addr) < 0)*/
 	if (GETFLAG(ENABLEUPNPMASK))
 	{
+#ifndef ENABLE_IPV6
 		if(SendSSDPGoodbye(snotify, addr_count) < 0)
+#else
+		if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
+#endif
 		{
 			syslog(LOG_ERR, "Failed to broadcast good-bye notifications");
 		}
-		for(i=0; i<addr_count; i++)
+#ifndef ENABLE_IPV6
+		for(i = 0; i < addr_count; i++)
+#else
+		for(i = 0; i < addr_count * 2; i++)
+#endif
 			close(snotify[i]);
 	}
 

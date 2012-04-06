@@ -1,6 +1,8 @@
 $Id: Changelog.txt,v 1.267 2012/04/06 17:24:36 nanard Exp $
 
 2012/04/06:
+  Implementing IPv6 support :
+    Send SSDP NOTIFY ssdp:alive and ssdp:goodbye messages in IPv6.
   Use UPnP/1.1 in SERVER: string as required in UPnP Device architecture 1.1.
   Allow LAN interface to be given as interface names, instead of interface
     IP addresses. It will allow IPv6 operations.
