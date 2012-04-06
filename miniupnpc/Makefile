@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.90 2012/02/12 00:15:36 nanard Exp $
+# $Id: Makefile,v 1.91 2012/03/05 19:42:46 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # (c) 2005-2011 Thomas Bernard
@@ -6,7 +6,7 @@
 # $ PREFIX=/tmp/dummylocation make install
 # or
 # $ INSTALLPREFIX=/usr/local make install
-# or 
+# or
 # make install (will go to /usr/bin, /usr/lib, etc...)
 OS = $(shell uname -s)
 VERSION = $(shell cat VERSION)
@@ -64,7 +64,7 @@ ifeq ($(OS), Darwin)
   SHAREDLIBRARY = libminiupnpc.dylib
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
   CFLAGS := -DMACOSX -D_DARWIN_C_SOURCE $(CFLAGS)
-else 
+else
   SHAREDLIBRARY = libminiupnpc.so
   SONAME = $(SHAREDLIBRARY).$(APIVERSION)
 endif
