@@ -1,6 +1,6 @@
-/* $Id: minissdpd.c,v 1.25 2011/10/07 09:13:25 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.30 2012/04/09 21:50:18 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2011 Thomas Bernard
+ * (c) 2007-2012 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -87,7 +87,7 @@ updateDevice(const struct header * headers, time_t t)
 		  && p->headers[HEADER_USN].l == headers[HEADER_USN].l
 		  && (0==memcmp(p->headers[HEADER_USN].p, headers[HEADER_USN].p, headers[HEADER_USN].l)) )
 		{
-			//printf("found! %d\n", (int)(t - p->t));
+			/*printf("found! %d\n", (int)(t - p->t));*/
 			syslog(LOG_DEBUG, "device updated : %.*s", headers[HEADER_USN].l, headers[HEADER_USN].p);
 			p->t = t;
 			/* update Location ! */
@@ -334,7 +334,7 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 		lineend = linestart;
 		while(lineend < p + n && *lineend != '\n' && *lineend != '\r')
 			lineend++;
-		//printf("line: '%.*s'\n", lineend - linestart, linestart);
+		/*printf("line: '%.*s'\n", lineend - linestart, linestart);*/
 		/* detect name end : ':' character */
 		nameend = linestart;
 		while(nameend < lineend && *nameend != ':')

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.13 2011/07/29 15:21:12 nanard Exp $
+# $Id: Makefile,v 1.16 2012/04/09 12:57:47 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -11,8 +11,8 @@
 # make install (miniupnpd will be put in /usr/sbin)
 #
 # install target is made for linux... sorry BSD users...
-#CFLAGS = -Wall -g -D_GNU_SOURCE -Wstrict-prototypes
-CFLAGS = -Wall -Os -D_GNU_SOURCE -fno-strict-aliasing -Wstrict-prototypes
+#CFLAGS = -Wall -g -D_GNU_SOURCE -Wstrict-prototypes -ansi
+CFLAGS = -Wall -Os -D_GNU_SOURCE -fno-strict-aliasing -Wstrict-prototypes -ansi
 CC = gcc
 RM = rm -f
 INSTALL = install
