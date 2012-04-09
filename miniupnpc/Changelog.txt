@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.166 2012/04/09 12:49:26 nanard Exp $
 miniUPnP client Changelog.
 
 2012/04/09:
+  Only try to fetch XML description once in UPNP_GetValidIGD()
   Added -ansi flag to compilation, and fixed C++ comments to ANSI C comments.
 
 2012/04/05:

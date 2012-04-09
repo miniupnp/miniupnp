@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.25 2011/10/09 16:17:29 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.26 2012/04/09 12:40:11 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
@@ -83,6 +83,7 @@ struct UPNPUrls {
 
 /* UPNP_GetValidIGD() :
  * return values :
+ *    -1 = Internal error
  *     0 = NO IGD found
  *     1 = A valid connected IGD has been found
  *     2 = A valid IGD has been found but it reported as
