@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.163 2012/03/15 01:02:02 nanard Exp $
+$Id: Changelog.txt,v 1.166 2012/04/09 12:49:26 nanard Exp $
 miniUPnP client Changelog.
+
+2012/04/09:
+  Added -ansi flag to compilation, and fixed C++ comments to ANSI C comments.
 
 2012/04/05:
   minor improvements to minihttptestserver.c

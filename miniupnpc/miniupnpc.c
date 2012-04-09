@@ -586,7 +586,7 @@ upnpDiscover(int delay, const char * multicastif,
 		}
 #else /* #ifdef NO_GETADDRINFO */
 		memset(&hints, 0, sizeof(hints));
-		hints.ai_family = AF_UNSPEC; // AF_INET6 or AF_INET
+		hints.ai_family = AF_UNSPEC; /* AF_INET6 or AF_INET */
 		hints.ai_socktype = SOCK_DGRAM;
 		/*hints.ai_flags = */
 		if ((rv = getaddrinfo(ipv6

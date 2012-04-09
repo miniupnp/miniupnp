@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.91 2012/03/05 19:42:46 nanard Exp $
+# $Id: Makefile,v 1.93 2012/04/09 12:49:26 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # (c) 2005-2011 Thomas Bernard
@@ -20,8 +20,8 @@ endif
 
 CC ?= gcc
 #AR = gar
-#CFLAGS = -O -Wall -g -DDEBUG
-CFLAGS ?= -O -Wall -DNDEBUG -DMINIUPNPC_SET_SOCKET_TIMEOUT -Wstrict-prototypes -D_BSD_SOURCE
+#CFLAGS = -O -Wall -g -DDEBUG -ansi -Wstrict-prototypes
+CFLAGS ?= -O -Wall -DNDEBUG -DMINIUPNPC_SET_SOCKET_TIMEOUT -ansi -Wstrict-prototypes -D_BSD_SOURCE
 # -DNO_GETADDRINFO
 INSTALL = install
 SH = /bin/sh

@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.91 2012/01/21 13:30:33 nanard Exp $ */
+/* $Id: upnpc.c,v 1.93 2012/04/09 12:49:26 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2012 Thomas Bernard
@@ -321,7 +321,7 @@ static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
 					const char * proto, const char * lease_time)
 {
 	char uniqueID[8];
-	//int isWorking = 0;
+	/*int isWorking = 0;*/
 	int r;
 
 	if(!intaddr || !remoteaddr || !iport || !eport || !proto || !lease_time)
