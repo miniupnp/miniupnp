@@ -605,6 +605,13 @@ upnpDiscover(int delay, const char * multicastif,
 		for(p = servinfo; p; p = p->ai_next) {
 			n = sendto(sudp, bufr, n, 0, p->ai_addr, p->ai_addrlen);
 			if (n < 0) {
+#ifdef DEBUG
+				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+				if (getnameinfo(p->ai_addr, p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
+						sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+					fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
+				}
+#endif
 				PRINT_SOCKET_ERROR("sendto");
 				continue;
 			}
