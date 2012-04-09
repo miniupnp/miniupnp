@@ -1,7 +1,7 @@
-/* $Id: openssdpsocket.c,v 1.8 2011/10/07 09:21:03 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.10 2012/04/09 21:50:18 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -92,8 +92,9 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 		if(setsockopt(s, IPPROTO_IPV6, drop ? IPV6_LEAVE_GROUP : IPV6_JOIN_GROUP,
 		   &mr, sizeof(struct ipv6_mreq)) < 0)
 		{
-			syslog(LOG_ERR, "setsockopt(udp, %s)(%s): %m",
+			syslog(LOG_ERR, "setsockopt(udp, %s)(%s, %s): %m",
 			       drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
+			       LL_SSDP_MCAST_ADDR,
 			       ifaddr);
 			return -1;
 		}
@@ -101,8 +102,9 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 		if(setsockopt(s, IPPROTO_IPV6, drop ? IPV6_LEAVE_GROUP : IPV6_JOIN_GROUP,
 		   &mr, sizeof(struct ipv6_mreq)) < 0)
 		{
-			syslog(LOG_ERR, "setsockopt(udp, %s)(%s): %m",
+			syslog(LOG_ERR, "setsockopt(udp, %s)(%s, %s): %m",
 			       drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
+			       SL_SSDP_MCAST_ADDR,
 			       ifaddr);
 			return -1;
 		}

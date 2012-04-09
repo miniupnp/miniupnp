@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.24 2012/04/09 21:07:26 nanard Exp $
 
 2012/04/09:
 	Added -ansi to compilation flags.
+	Handle ssdp:update messages and update logging
 
 2012/01/02:
 	Install manpage. Fix installation under Mac OS X.

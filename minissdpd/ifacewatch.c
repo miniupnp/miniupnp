@@ -1,4 +1,4 @@
-/* $Id: ifacewatch.c,v 1.3 2012/01/20 22:08:07 nanard Exp $ */
+/* $Id: ifacewatch.c,v 1.4 2012/04/09 21:50:18 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2011 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -146,7 +146,7 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6,
 		}
 		break;
 	default:
-		syslog(LOG_DEBUG, "rtm->rtm_type=%d", rtm->rtm_type);
+		syslog(LOG_DEBUG, "Unknown RTM message : rtm->rtm_type=%d", rtm->rtm_type);
 	}
 #endif
 	return 0;

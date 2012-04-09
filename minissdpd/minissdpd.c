@@ -61,6 +61,7 @@ struct device {
 
 #define NTS_SSDP_ALIVE	1
 #define NTS_SSDP_BYEBYE	2
+#define NTS_SSDP_UPDATE	3
 
 /* discovered device list kept in memory */
 struct device * devlist = 0;
@@ -69,11 +70,25 @@ struct device * devlist = 0;
 unsigned int upnp_bootid = 1;
 unsigned int upnp_configid = 1337;
 
+static const char *
+nts_to_str(int nts)
+{
+	switch(nts)
+	{
+	case NTS_SSDP_ALIVE:
+		return "ssdp:alive";
+	case NTS_SSDP_BYEBYE:
+		return "ssdp:byebye";
+	case NTS_SSDP_UPDATE:
+		return "ssdp:update";
+	}
+	return "unknown";
+}
+
 /* updateDevice() :
  * adds or updates the device to the list.
  * return value :
- *  -1 : error
- *   0 : the device was updated
+ *   0 : the device was updated (or nothing done)
  *   1 : the device was new    */
 static int
 updateDevice(const struct header * headers, time_t t)
@@ -96,7 +111,10 @@ updateDevice(const struct header * headers, time_t t)
 				p = realloc(p, sizeof(struct device)
 		           + headers[0].l+headers[1].l+headers[2].l );
 				if(!p)	/* allocation error */
+				{
+					syslog(LOG_ERR, "updateDevice() : memory allocation error");
 					return 0;
+				}
 				*pp = p;
 			}
 			memcpy(p->data + p->headers[0].l + p->headers[1].l,
@@ -183,16 +201,16 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 	l = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\n"
 		"CACHE-CONTROL: max-age=120\r\n"
 		/*"DATE: ...\r\n"*/
-	"ST: %s\r\n"
-	"USN: %s\r\n"
-	"EXT:\r\n"
-	"SERVER: %s\r\n"
-	"LOCATION: %s\r\n"
-		"OPT: \"http://schemas.upnp.org/upnp/1/0/\";\r\n" /* UDA v1.1 */
+		"ST: %s\r\n"
+		"USN: %s\r\n"
+		"EXT:\r\n"
+		"SERVER: %s\r\n"
+		"LOCATION: %s\r\n"
+		"OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n" /* UDA v1.1 */
 		"01-NLS: %u\r\n" /* same as BOOTID. UDA v1.1 */
 		"BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 		"CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
-	"\r\n",
+		"\r\n",
 		st, usn,
 		server, location,
 		upnp_bootid, upnp_bootid, upnp_configid);
@@ -371,6 +389,8 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 					nts = NTS_SSDP_ALIVE;
 				else if(m==11 && 0==strncasecmp(valuestart, "ssdp:byebye", 11))
 					nts = NTS_SSDP_BYEBYE;
+				else if(m==11 && 0==strncasecmp(valuestart, "ssdp:update", 11))
+					nts = NTS_SSDP_UPDATE;
 			}
 			else if(l==8 && 0==strncasecmp(linestart, "location", 8))
 				i = HEADER_LOCATION;
@@ -432,11 +452,14 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 			printf("%d-'%.*s'\n", i, headers[i].l, headers[i].p);
 	}
 #endif
-	syslog(LOG_DEBUG,"SSDP request: '%.*s' (%d) st=%.*s",
-	       methodlen, p, method, st_len, st);
+	syslog(LOG_DEBUG,"SSDP request: '%.*s' (%d) %s %s=%.*s",
+	       methodlen, p, method, nts_to_str(nts),
+	       (method==METHOD_NOTIFY)?"nt":"st",
+	       (method==METHOD_NOTIFY)?headers[HEADER_NT].l:st_len,
+	       (method==METHOD_NOTIFY)?headers[HEADER_NT].p:st);
 	switch(method) {
 	case METHOD_NOTIFY:
-		if(headers[0].p && headers[1].p && headers[2].p) {
+		if(headers[HEADER_NT].p && headers[HEADER_USN].p && headers[HEADER_LOCATION].p) {
 			if(nts==NTS_SSDP_ALIVE) {
 				r = updateDevice(headers, time(NULL) + lifetime);
 			}
