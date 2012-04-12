@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.267 2012/04/06 17:24:36 nanard Exp $
+$Id: Changelog.txt,v 1.268 2012/04/12 13:08:15 nanard Exp $
+
+2012/04/12:
+  Set TTL on SSDP Notify sockets (IPv4). TTL is set to 2 (recommendation from
+    UPnP Device Architecture v1.1)
 
 2012/04/06:
   Implementing IPv6 support :

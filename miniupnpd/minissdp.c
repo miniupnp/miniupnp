@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.32 2012/04/06 17:51:55 nanard Exp $ */
+/* $Id: minissdp.c,v 1.33 2012/04/12 13:08:15 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -170,6 +170,10 @@ OpenAndConfSSDPNotifySocket(in_addr_t addr)
 	int s;
 	unsigned char loopchar = 0;
 	int bcast = 1;
+	unsigned char ttl = 2; /* UDA v1.1 says :
+		The TTL for the IP packet SHOULD default to 2 and
+		SHOULD be configurable. */
+	/* TODO: Make TTL be configurable */
 	struct in_addr mc_if;
 	struct sockaddr_in sockname;
 
@@ -193,6 +197,11 @@ OpenAndConfSSDPNotifySocket(in_addr_t addr)
 		syslog(LOG_ERR, "setsockopt(udp_notify, IP_MULTICAST_IF): %m");
 		close(s);
 		return -1;
+	}
+
+	if(setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
+	{
+		syslog(LOG_WARNING, "setsockopt(udp_notify, IP_MULTICAST_TTL,): %m");
 	}
 
 	if(setsockopt(s, SOL_SOCKET, SO_BROADCAST, &bcast, sizeof(bcast)) < 0)
