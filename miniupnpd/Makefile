@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.60 2012/02/06 16:28:25 nanard Exp $
+# $Id: Makefile,v 1.62 2012/04/14 22:26:10 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -10,6 +10,10 @@
 # This Makefile is NOT compatible with GNU Make.
 # Linux users, please use Makefile.linux :
 #  make -f Makefile.linux
+#
+# options can be passed to genconfig.sh through CONFIG_OPTIONS :
+# $ CONFIG_OPTIONS="--ipv6 --igd2" make
+#
 
 CFLAGS = -pipe -Wall -Os -ansi
 #CFLAGS = -pipe -Wall -O -g -DDEBUG -ansi
@@ -184,7 +188,7 @@ testupnppermissions:	config.h $(TESTUPNPPERMISSIONSOBJS)
 #	$(CC) $(CFLAGS) -o $@ $>
 
 config.h:	genconfig.sh
-	./genconfig.sh
+	./genconfig.sh $(CONFIG_OPTIONS)
 
 .SUFFIXES:	.o .c
 .c.o:

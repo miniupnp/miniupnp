@@ -1,9 +1,12 @@
-# $Id: Makefile.linux,v 1.61 2012/02/03 15:10:11 nanard Exp $
+# $Id: Makefile.linux,v 1.63 2012/04/14 22:26:10 nanard Exp $
 # MiniUPnP project
-# (c) 2006-2011 Thomas Bernard
+# (c) 2006-2012 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author : Thomas Bernard
 # for use with GNU Make
+#
+# options can be passed to genconfig.sh through CONFIG_OPTIONS :
+# $ CONFIG_OPTIONS="--ipv6 --igd2" make -f Makefile.linux
 #
 # To install use :
 # $ PREFIX=/dummyinstalldir make -f Makefile.linux install
@@ -17,7 +20,7 @@
 # ./configure them and build them then miniupnpd will build using :
 # $ IPTABLESPATH=/path/to/iptables-1.4.1 make -f Makefile.linux
 #
-#CFLAGS = -Wall -O -D_GNU_SOURCE -g -DDEBUG
+#CFLAGS = -Wall -O -D_GNU_SOURCE -g -DDEBUG -ansi
 CFLAGS ?= -Wall -Os -D_GNU_SOURCE -fno-strict-aliasing -Wstrict-prototypes
 CC ?= gcc
 RM = rm -f
@@ -152,7 +155,7 @@ testgetifaddr:	testgetifaddr.o getifaddr.o
 miniupnpdctl:	miniupnpdctl.o
 
 config.h:	genconfig.sh
-	./genconfig.sh
+	./genconfig.sh $(CONFIG_OPTIONS)
 
 depend:	config.h
 	makedepend -f$(MAKEFILE_LIST) -Y \
@@ -166,7 +169,7 @@ miniupnpd.o: upnphttp.h upnpdescgen.h miniupnpdpath.h getifaddr.h upnpsoap.h
 miniupnpd.o: options.h minissdp.h upnpredirect.h daemonize.h upnpevents.h
 miniupnpd.o: natpmp.h commonrdr.h upnputils.h ifacewatcher.h
 upnphttp.o: config.h upnphttp.h upnpdescgen.h miniupnpdpath.h upnpsoap.h
-upnphttp.o: upnpevents.h
+upnphttp.o: upnpevents.h upnputils.h
 upnpdescgen.o: config.h getifaddr.h upnpredirect.h upnpdescgen.h
 upnpdescgen.o: miniupnpdpath.h upnpglobalvars.h upnppermissions.h
 upnpdescgen.o: miniupnpdtypes.h upnpdescstrings.h upnpurns.h getconnstatus.h
@@ -190,7 +193,7 @@ minissdp.o: upnputils.h codelength.h
 natpmp.o: config.h natpmp.h upnpglobalvars.h upnppermissions.h
 natpmp.o: miniupnpdtypes.h getifaddr.h upnpredirect.h commonrdr.h
 upnpevents.o: config.h upnpevents.h miniupnpdpath.h upnpglobalvars.h
-upnpevents.o: upnppermissions.h miniupnpdtypes.h upnpdescgen.h
+upnpevents.o: upnppermissions.h miniupnpdtypes.h upnpdescgen.h upnputils.h
 upnputils.o: config.h upnputils.h
 getconnstatus.o: getconnstatus.h getifaddr.h
 linux/getifstats.o: config.h getifstats.h

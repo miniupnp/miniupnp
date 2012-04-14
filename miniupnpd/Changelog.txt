@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.270 2012/04/14 22:26:09 nanard Exp $
 
 2012/04/15:
   More C++ => ANSI C comments to compile with -ansi option
+  Add command line arguments to genconfig.sh config script.
 
 2012/04/12:
   Set TTL on SSDP Notify sockets (IPv4). TTL is set to 2 (recommendation from
