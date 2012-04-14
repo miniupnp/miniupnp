@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.61 2012/03/05 04:41:22 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.64 2012/04/14 22:12:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -637,16 +637,18 @@ upnp_add_inboundpinhole(const char * raddr,
                         int * uid)
 {
 	int r, s, t, lt=0;
-	char iaddr_old[40]="", proto[6]="", idfound[5]="", leaseTmp[12]; // IPv6 Modification
+	char iaddr_old[40]="", proto[6]="", idfound[5]="", leaseTmp[12]; /* IPv6 Modification*/
 	snprintf(proto, sizeof(proto), "%.5d", atoi(protocol));
 	unsigned short iport_old = 0;
 	time_t current = time(NULL);
-	/*struct in6_addr address; // IPv6 Modification
-	if(inet_pton(AF_INET6, iaddr, &address) < 0) // IPv6 Modification
+#if 0
+	struct in6_addr address; /* IPv6 Modification*/
+	if(inet_pton(AF_INET6, iaddr, &address) < 0) /* IPv6 Modification */
 	{
 		syslog(LOG_ERR, "inet_pton(%s) : %m", iaddr);
 		return 0;
-	}*/
+	}
+#endif
 
 #if 0
 	r = get_rule_from_file(raddr, rport, iaddr_old, &iport_old, proto, 0, 0, idfound);
@@ -705,7 +707,7 @@ upnp_add_inboundpinhole_internal(const char * raddr, unsigned short rport,
 	static const char cmdval_full_udplite_raw[] = "ip6tables -t raw -I PREROUTING %d -p %s -i %s -s %s -d %s -j TRACE";
 	static const char cmdval_udplite_raw[] = "ip6tables -t raw -I PREROUTING %d -p %s -i %s -d %s -j TRACE";
 #endif
-	//printf("%s\n", raddr);
+	/*printf("%s\n", raddr);*/
 	if(raddr!=NULL)
 	{
 #ifdef IPPROTO_UDPLITE
@@ -742,7 +744,7 @@ upnp_add_inboundpinhole_internal(const char * raddr, unsigned short rport,
 	syslog(LOG_INFO, "  -> %s", cmd);
 	syslog(LOG_INFO, "  -> %s", cmd_raw);
 #endif
-	// TODO Add a better checking error.
+	/* TODO Add a better checking error.*/
 	if(system(cmd) < 0 || system(cmd_raw) < 0)
 	{
 		return 0;

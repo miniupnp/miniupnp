@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.90 2012/02/04 23:34:40 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.92 2012/04/14 22:12:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1262,26 +1262,28 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_por
 	/* Pinhole InternalClient address must correspond to the action sender */
 	syslog(LOG_INFO, "Checking internal IP@ and port (Security policy purpose)");
 	char senderAddr[INET6_ADDRSTRLEN]="";
+#if 0
 	//char str[INET6_ADDRSTRLEN]="";
 	//connecthostport(int_ip, *int_port, str);
 	//printf("int_ip: %s / str: %s\n", int_ip, str);
+#endif
 
 	struct addrinfo hints, *ai, *p;
-	struct in6_addr result_ip;/*unsigned char result_ip[16];*/ /* inet_pton() */ //IPv6 Modification
+	struct in6_addr result_ip;/*unsigned char result_ip[16];*/ /* inet_pton() */
 
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;
 
 	/* if ip not valid assume hostname and convert */
-	if (inet_pton(AF_INET6, int_ip, &result_ip) <= 0) //IPv6 Modification
+	if (inet_pton(AF_INET6, int_ip, &result_ip) <= 0) /*IPv6 Modification*/
 	{
 
-		n = getaddrinfo(int_ip, NULL, &hints, &ai);//hp = gethostbyname(int_ip);
-		if(!n && ai->ai_family == AF_INET6) //IPv6 Modification
+		n = getaddrinfo(int_ip, NULL, &hints, &ai);/*hp = gethostbyname(int_ip);*/
+		if(!n && ai->ai_family == AF_INET6) /*IPv6 Modification*/
 		{
-			for(p = ai; p; p = p->ai_next)//ptr = hp->h_addr_list; ptr && *ptr; ptr++)
+			for(p = ai; p; p = p->ai_next)/*ptr = hp->h_addr_list; ptr && *ptr; ptr++)*/
 		   	{
-				inet_ntop(AF_INET6, (struct in6_addr *) p, int_ip, sizeof(struct in6_addr)); ///IPv6 Modification
+				inet_ntop(AF_INET6, (struct in6_addr *) p, int_ip, sizeof(struct in6_addr)); /*IPv6 Modification*/
 				result_ip = *((struct in6_addr *) p);
 				fprintf(stderr, "upnpsoap / AddPinhole: assuming int addr = %s", int_ip);
 				/* TODO : deal with more than one ip per hostname */
@@ -1299,7 +1301,6 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_por
 
 	if(inet_ntop(AF_INET6, &(h->clientaddr_v6), senderAddr, INET6_ADDRSTRLEN)<=0)
 	{
-		//printf("Failed to inet_ntop\n");
 		syslog(LOG_ERR, "inet_ntop: %m");
 	}
 #ifdef DEBUG
@@ -1619,7 +1620,7 @@ CheckPinholeWorking(struct upnphttp * h, const char * action)
 				}
 				else
 				{
-				// d==-5 not same table // d==-6 not same chain // d==-7 not found a rule but policy traced
+				/* d==-5 not same table // d==-6 not same chain // d==-7 not found a rule but policy traced */
 					isWorking=0;
 					syslog(LOG_INFO, "%s: rule for ID=%s is not working, packet going through %s", action, uid, (d==-5)?"the wrong table":((d==-6)?"the wrong chain":"a chain policy"));
 					bodylen = snprintf(body, sizeof(body), resp,
