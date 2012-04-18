@@ -1,4 +1,4 @@
-/* $Id: testpfpinhole.c,v 1.1 2012/04/18 20:45:33 nanard Exp $ */
+/* $Id: testpfpinhole.c,v 1.2 2012/04/18 23:44:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -31,6 +31,7 @@ int main(int argc, char * *argv)
 	}
 
 	ret = add_pinhole("ep0", "2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP);
+	ret = add_pinhole("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP);
 	return 0;
 }
 

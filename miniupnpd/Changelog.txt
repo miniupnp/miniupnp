@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.270 2012/04/14 22:26:09 nanard Exp $
+$Id: Changelog.txt,v 1.271 2012/04/18 23:44:35 nanard Exp $
+
+2012/04/19:
+  First working experiment of IPv6 "pinhole" with pf
 
 2012/04/15:
   More C++ => ANSI C comments to compile with -ansi option

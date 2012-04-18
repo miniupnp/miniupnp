@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.2 2012/04/18 20:45:33 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.4 2012/04/18 23:44:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -26,6 +26,7 @@
 #include <stdlib.h>
 
 #include "../config.h"
+#include "pfpinhole.h"
 #include "../upnpglobalvars.h"
 
 /* /dev/pf when opened */
@@ -38,6 +39,9 @@ int add_pinhole (const char * ifname,
 {
 	int r;
 	struct pfioc_rule pcr;
+#ifndef PF_NEWSTYLE
+	struct pfioc_pooladdr pp;
+#endif
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
@@ -45,10 +49,26 @@ int add_pinhole (const char * ifname,
 	}
 	r = 0;
 	memset(&pcr, 0, sizeof(pcr));
+	strlcpy(pcr.anchor, anchor_name, MAXPATHLEN);
+
+#ifndef PF_NEWSTYLE
+	memset(&pp, 0, sizeof(pp));
+	strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
+	if(ioctl(dev, DIOCBEGINADDRS, &pp) < 0) {
+		syslog(LOG_ERR, "ioctl(dev, DIOCBEGINADDRS, ...): %m");
+		return -1;
+	} else {
+		pcr.pool_ticket = pp.ticket;
+#else
 	{
+#endif
 		pcr.rule.direction = PF_IN;
 		pcr.rule.action = PF_PASS;
 		pcr.rule.af = AF_INET6;
+#ifdef PF_NEWSTYLE
+		pcr.rule.nat.addr.type = PF_ADDR_NONE;
+		pcr.rule.rdr.addr.type = PF_ADDR_NONE;
+#endif
 #ifdef USE_IFNAME_IN_RULES
 		if(ifname)
 			strlcpy(pcr.rule.ifname, ifname, IFNAMSIZ);
@@ -74,16 +94,21 @@ int add_pinhole (const char * ifname,
 		if(tag)
 			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
 
-		pcr.rule.src.port_op = PF_OP_EQ;
-		pcr.rule.src.port[0] = htons(rem_port);
-		if(rem_host && rem_host[0] != '\0' && rem_host[0] != '*')
-		{
-			inet_pton(AF_INET6, rem_host, &pcr.rule.src.addr.v.a.addr.v6);
+		if(rem_port) {
+			pcr.rule.src.port_op = PF_OP_EQ;
+			pcr.rule.src.port[0] = htons(rem_port);
+		}
+		if(rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
+			pcr.rule.src.addr.type = PF_ADDR_ADDRMASK;
+			if(inet_pton(AF_INET6, rem_host, &pcr.rule.src.addr.v.a.addr.v6) != 1) {
+				syslog(LOG_ERR, "inet_pton(%s) failed", rem_host);
+			}
 			memset(&pcr.rule.src.addr.v.a.mask.addr8, 255, 16);
 		}
 
 		pcr.rule.dst.port_op = PF_OP_EQ;
 		pcr.rule.dst.port[0] = htons(int_port);
+		pcr.rule.dst.addr.type = PF_ADDR_ADDRMASK;
 		if(inet_pton(AF_INET6, int_client, &pcr.rule.dst.addr.v.a.addr.v6) != 1) {
 			syslog(LOG_ERR, "inet_pton(%s) failed", int_client);
 		}
