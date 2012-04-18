@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.h,v 1.19 2011/06/04 15:47:18 nanard Exp $ */
+/* $Id: obsdrdr.h,v 1.20 2012/03/05 20:36:20 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006 Thomas Bernard

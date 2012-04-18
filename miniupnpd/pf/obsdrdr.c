@@ -1,7 +1,7 @@
-/* $Id: obsdrdr.c,v 1.71 2012/03/11 08:46:19 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.73 2012/04/18 20:45:12 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2010 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -102,7 +102,7 @@ remove_timestamp_entry(unsigned short eport, int proto)
 }
 
 /* /dev/pf when opened */
-static int dev = -1;
+int dev = -1;
 
 /* shutdown_redirect() :
  * close the /dev/pf device */
@@ -868,7 +868,7 @@ list_rules(void)
 			perror("DIOCGETRULE");
 		printf(" %s %s %d:%d -> %d:%d  proto %d keep_state=%d action=%d\n",
 			pr.rule.ifname,
-			inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr, buf, 32);
+			inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr, buf, 32),
 			(int)ntohs(pr.rule.dst.port[0]),
 			(int)ntohs(pr.rule.dst.port[1]),
 #ifndef PF_NEWSTYLE
