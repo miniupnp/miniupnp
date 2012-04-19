@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.4 2012/04/18 23:44:51 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.5 2012/04/19 22:02:12 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -32,12 +32,13 @@
 /* /dev/pf when opened */
 extern int dev;
 
+static int uid = 1;
+
 int add_pinhole (const char * ifname,
                  const char * rem_host, unsigned short rem_port,
                  const char * int_client, unsigned short int_port,
                  int proto)
 {
-	int r;
 	struct pfioc_rule pcr;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
@@ -47,7 +48,6 @@ int add_pinhole (const char * ifname,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
-	r = 0;
 	memset(&pcr, 0, sizeof(pcr));
 	strlcpy(pcr.anchor, anchor_name, MAXPATHLEN);
 
@@ -89,6 +89,8 @@ int add_pinhole (const char * ifname,
 #endif
 		pcr.rule.keep_state = 1;
 		/*strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);*/
+		snprintf(pcr.rule.label, PF_RULE_LABEL_SIZE,
+		         "pinhole-%d", uid);
 		if(queue)
 			strlcpy(pcr.rule.qname, queue, PF_QNAME_SIZE);
 		if(tag)
@@ -130,6 +132,54 @@ int add_pinhole (const char * ifname,
 		}
 	}
 
-	return 0;
+	return (uid++);
 }
+
+int delete_pinhole (unsigned short uid)
+{
+	int i, n;
+	struct pfioc_rule pr;
+	char label[PF_RULE_LABEL_SIZE];
+
+	if(dev<0) {
+		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	snprintf(label, sizeof(label),
+	         "pinhole-%hu", uid);
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+#ifndef PF_NEWSTYLE
+	pr.rule.action = PF_PASS;
+#endif
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
+		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
+		return -1;
+	}
+	n = pr.nr;
+	for(i=0; i<n; i++) {
+		pr.nr = i;
+		if(ioctl(dev, DIOCGETRULE, &pr) < 0) {
+			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
+			return -1;
+		}
+		if(0 == strcmp(pr.rule.label, label)) {
+			pr.action = PF_CHANGE_GET_TICKET;
+			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
+				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
+				return -1;
+			}
+			pr.action = PF_CHANGE_REMOVE;
+			pr.nr = i;
+			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
+				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				return -1;
+			}
+			return 0;
+		}
+	}
+	/* not found */
+	return -1;
+}
+
 

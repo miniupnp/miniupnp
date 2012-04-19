@@ -1,4 +1,4 @@
-/* $Id: testpfpinhole.c,v 1.2 2012/04/18 23:44:51 nanard Exp $ */
+/* $Id: testpfpinhole.c,v 1.3 2012/04/19 22:02:12 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -22,6 +22,7 @@ const char * queue = NULL;
 
 int main(int argc, char * *argv)
 {
+	int uid;
 	int ret;
 
 	openlog("testpfpinhole", LOG_PERROR, LOG_USER);
@@ -30,8 +31,21 @@ int main(int argc, char * *argv)
 		return 1;
 	}
 
-	ret = add_pinhole("ep0", "2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP);
-	ret = add_pinhole("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP);
+	uid = add_pinhole("ep0", "2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP);
+	if(uid < 0) {
+		fprintf(stderr, "add_pinhole() failed\n");
+	}
+	printf("add_pinhole() returned %d\n", uid);
+	uid = add_pinhole("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP);
+	if(uid < 0) {
+		fprintf(stderr, "add_pinhole() failed\n");
+	}
+	printf("add_pinhole() returned %d\n", uid);
+
+	ret = delete_pinhole(1);
+	printf("delete_pinhole() returned %d\n", ret);
+	ret = delete_pinhole(2);
+	printf("delete_pinhole() returned %d\n", ret);
 	return 0;
 }
 

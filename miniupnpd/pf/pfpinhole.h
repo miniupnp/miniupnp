@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.h,v 1.1 2012/04/18 20:45:33 nanard Exp $ */
+/* $Id: pfpinhole.h,v 1.2 2012/04/19 22:02:12 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -12,6 +12,8 @@ int add_pinhole (const char * ifname,
                  const char * rem_host, unsigned short rem_port,
                  const char * int_client, unsigned short int_port,
                  int proto);
+
+int delete_pinhole (unsigned short uid);
 
 #endif
 
