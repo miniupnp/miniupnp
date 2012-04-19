@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.92 2012/04/14 22:12:09 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.93 2012/04/19 22:04:48 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1777,13 +1777,13 @@ soapMethods[] =
 #endif
 #ifdef ENABLE_6FC_SERVICE
 	/* WANIPv6FirewallControl */
-	{ "GetFirewallStatus", GetFirewallStatus},
-	{ "AddPinhole", AddPinhole},
-	{ "UpdatePinhole", UpdatePinhole},
-	{ "GetOutboundPinholeTimeout", GetOutboundPinholeTimeout},
-	{ "DeletePinhole", DeletePinhole},
-	{ "CheckPinholeWorking", CheckPinholeWorking},
-	{ "GetPinholePackets", GetPinholePackets},
+	{ "GetFirewallStatus", GetFirewallStatus},	/* Required */
+	{ "AddPinhole", AddPinhole},				/* Required */
+	{ "UpdatePinhole", UpdatePinhole},			/* Required */
+	{ "GetOutboundPinholeTimeout", GetOutboundPinholeTimeout},	/* Optional */
+	{ "DeletePinhole", DeletePinhole},			/* Required */
+	{ "CheckPinholeWorking", CheckPinholeWorking},	/* Optional */
+	{ "GetPinholePackets", GetPinholePackets},	/* Required */
 #endif
 	{ 0, 0 }
 };
