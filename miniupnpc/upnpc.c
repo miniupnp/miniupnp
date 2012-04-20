@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.93 2012/04/09 12:49:26 nanard Exp $ */
+/* $Id: upnpc.c,v 1.94 2012/04/20 14:13:10 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2012 Thomas Bernard
@@ -12,6 +12,9 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #define snprintf _snprintf
+#else
+/* for IPPROTO_TCP / IPPROTO_UDP */
+#include <netinet/in.h>
 #endif
 #include "miniwget.h"
 #include "miniupnpc.h"
@@ -323,25 +326,39 @@ static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
 	char uniqueID[8];
 	/*int isWorking = 0;*/
 	int r;
+	char proto_tmp[8];
 
 	if(!intaddr || !remoteaddr || !iport || !eport || !proto || !lease_time)
 	{
 		fprintf(stderr, "Wrong arguments\n");
 		return;
 	}
-	/*proto = protofix(proto);
-	if(!proto)
+	if(atoi(proto) == 0)
 	{
-		fprintf(stderr, "invalid protocol\n");
-		return;
-	}*/
+		if(strcmp("TCP", protofix(proto)) == 0)
+		{
+			snprintf(proto_tmp, sizeof(proto_tmp), "%d", IPPROTO_TCP);
+			proto = proto_tmp;
+		}
+		else if(strcmp("UDP", protofix(proto)) == 0)
+		{
+			snprintf(proto_tmp, sizeof(proto_tmp), "%d", IPPROTO_UDP);
+			proto = proto_tmp;
+		}
+		else
+		{
+			fprintf(stderr, "invalid protocol\n");
+			return;
+		}
+	}
 	r = UPNP_AddPinhole(urls->controlURL_6FC, data->IPv6FC.servicetype, remoteaddr, eport, intaddr, iport, proto, lease_time, uniqueID);
 	if(r!=UPNPCOMMAND_SUCCESS)
 		printf("AddPinhole([%s]:%s -> [%s]:%s) failed with code %d (%s)\n",
-		       intaddr, iport, remoteaddr, eport, r, strupnperror(r));
+		       remoteaddr, eport, intaddr, iport, r, strupnperror(r));
 	else
 	{
-		printf("AddPinhole: ([%s]:%s -> [%s]:%s) / Pinhole ID = %s\n", intaddr, iport, remoteaddr, eport, uniqueID);
+		printf("AddPinhole: ([%s]:%s -> [%s]:%s) / Pinhole ID = %s\n",
+		       remoteaddr, eport, intaddr, iport, uniqueID);
 		/*r = UPNP_CheckPinholeWorking(urls->controlURL_6FC, data->servicetype_6FC, uniqueID, &isWorking);
 		if(r!=UPNPCOMMAND_SUCCESS)
 			printf("CheckPinholeWorking() failed with code %d (%s)\n", r, strupnperror(r));

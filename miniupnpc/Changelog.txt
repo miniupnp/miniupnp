@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.166 2012/04/09 12:49:26 nanard Exp $
+$Id: Changelog.txt,v 1.167 2012/04/20 14:13:10 nanard Exp $
 miniUPnP client Changelog.
+
+2012/04/20:
+  Allow to specify protocol with TCP or UDP for -A option
 
 2012/04/09:
   Only try to fetch XML description once in UPNP_GetValidIGD()
