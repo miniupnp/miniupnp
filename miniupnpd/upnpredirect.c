@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.64 2012/04/14 22:12:09 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.66 2012/04/20 14:38:38 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -27,6 +27,7 @@
 #endif
 #if defined(USE_PF)
 #include "pf/obsdrdr.h"
+#include "pf/pfpinhole.h"
 #endif
 #if defined(USE_IPF)
 #include "ipf/ipfrdr.h"
@@ -626,6 +627,7 @@ upnp_check_outbound_pinhole(int proto, int * timeout)
  *          -1 failed to add pinhole
  *          -2 already created
  *          -3 inbound pinhole disabled
+ * TODO : return uid on success (positive) or error value (negative)
  */
 int
 upnp_add_inboundpinhole(const char * raddr,
@@ -633,33 +635,34 @@ upnp_add_inboundpinhole(const char * raddr,
                         const char * iaddr,
                         unsigned short iport,
                         const char * protocol,
-                        const char * leaseTime,
+                        unsigned int leasetime,
                         int * uid)
 {
-	int r, s, t, lt=0;
-	char iaddr_old[40]="", proto[6]="", idfound[5]="", leaseTmp[12]; /* IPv6 Modification*/
-	snprintf(proto, sizeof(proto), "%.5d", atoi(protocol));
-	unsigned short iport_old = 0;
-	time_t current = time(NULL);
+	int r;
 #if 0
+	char iaddr_old[40]="", idfound[5]=""; /* IPv6 Modification*/
+	unsigned short iport_old = 0;
+#endif
+	time_t current;
+	unsigned int timestamp;
 	struct in6_addr address; /* IPv6 Modification*/
+	int proto;
+
 	if(inet_pton(AF_INET6, iaddr, &address) < 0) /* IPv6 Modification */
 	{
 		syslog(LOG_ERR, "inet_pton(%s) : %m", iaddr);
 		return 0;
 	}
-#endif
-
+	proto = atoi(protocol); /* for WANIPv6FirewallControl AddPinhole, the protocol argument
+	                         * is passed as an integer, not a string */
+	current = time(NULL);
+	timestamp = current + leasetime;
 #if 0
 	r = get_rule_from_file(raddr, rport, iaddr_old, &iport_old, proto, 0, 0, idfound);
 #endif
 	r = 0;
 
-	lt = (int) current + atoi(leaseTime);
-	snprintf(leaseTmp, sizeof(leaseTmp), "%d", lt);
-	printf("LeaseTime: %d / %d -> %s\n", atoi(leaseTime), (int)current, leaseTmp);
-
-	printf("\tCompare addr: %s // port: %d\n\t     to addr: %s // port: %d\n", iaddr, iport, iaddr_old, iport_old);
+#if 0
 	if(r == 1 && strcmp(iaddr, iaddr_old)==0 && iport==iport_old)
 	{
 		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with protocol %s already done. Updating it.", raddr, rport, iaddr_old, iport_old, protocol);
@@ -668,10 +671,17 @@ upnp_add_inboundpinhole(const char * raddr,
 		return t;
 	}
 	else
+#endif
 	{
-		syslog(LOG_INFO, "Adding pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with protocol %s and %s lease time.", raddr, rport, iaddr, iport, protocol, leaseTime);
-		s = upnp_add_inboundpinhole_internal(raddr, rport, iaddr, iport, protocol, uid);
+		syslog(LOG_INFO, "Adding pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with protocol %s and %u lease time.", raddr, rport, iaddr, iport, protocol, leasetime);
+#ifdef USE_PF
+		*uid = add_pinhole (0/*ext_if_name*/, raddr, rport, iaddr, iport, proto, timestamp);
+		return 1;
+#else
+		return -42;	/* not implemented */
+#endif
 #if 0
+		s = upnp_add_inboundpinhole_internal(raddr, rport, iaddr, iport, protocol, uid);
 		if(rule_file_add(raddr, rport, iaddr, iport, protocol, leaseTmp, uid)<0)
 			return -8;
 		else
@@ -794,39 +804,15 @@ upnp_update_inboundpinhole(const char * uid, const char * leasetime)
 int
 upnp_delete_inboundpinhole(const char * uid)
 {
-	/* TODO : to be implemented */
-#if 0
-	/* this is a alpha implementation calling ip6tables via system(),
-	 * it can be usefull as an example to code the netfilter version */
-	int r, s, linenum=0;
-	char cmd[256], cmd_raw[256];
-	syslog(LOG_INFO, "Removing pinhole for inbound traffic with ID: %s", uid);
-	r = check_rule_from_file(uid, &linenum);
-	if(r > 0)
-	{
-		s = rule_file_remove(uid, linenum);
-		if(s < 0)
-			return s;
-		else
-		{
-			snprintf(cmd, sizeof(cmd), "ip6tables -t filter -D %s %d", miniupnpd_forward_chain, linenum);
-			snprintf(cmd_raw, sizeof(cmd_raw), "ip6tables -t raw -D PREROUTING %d", linenum -1);
-#ifdef DEBUG
-			syslog(LOG_INFO, "Deleting ip6tables rule:");
-			syslog(LOG_INFO, "  -> %s", cmd);
-			syslog(LOG_INFO, "  -> %s", cmd_raw);
-#endif
-			// TODO Add a better checking error.
-			if(system(cmd) < 0 || system(cmd_raw) < 0)
-			{
-				return 0;
-			}
-		}
-	}
-	upnp_update_expiredpinhole();
-	return r;
+	unsigned short uid_s;
+
+	if(!uid)
+		return -1;
+	uid_s = (unsigned short)atoi(uid);
+#ifdef USE_PF
+	return delete_pinhole(uid_s);
 #else
-return -1;
+	return -1;
 #endif
 }
 

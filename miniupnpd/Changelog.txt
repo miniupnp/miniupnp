@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.271 2012/04/18 23:44:35 nanard Exp $
+$Id: Changelog.txt,v 1.272 2012/04/20 14:38:38 nanard Exp $
+
+2012/04/20:
+  Enough WANIPv6FirewallControl is implemented on pf so that AddPinhole() and
+    DeletePinhole() works !
 
 2012/04/19:
   First working experiment of IPv6 "pinhole" with pf

@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.93 2012/04/19 22:04:48 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.96 2012/04/20 14:38:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1259,8 +1259,6 @@ static int
 PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_port)
 {
 	int n;
-	/* Pinhole InternalClient address must correspond to the action sender */
-	syslog(LOG_INFO, "Checking internal IP@ and port (Security policy purpose)");
 	char senderAddr[INET6_ADDRSTRLEN]="";
 #if 0
 	//char str[INET6_ADDRSTRLEN]="";
@@ -1270,6 +1268,9 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_por
 
 	struct addrinfo hints, *ai, *p;
 	struct in6_addr result_ip;/*unsigned char result_ip[16];*/ /* inet_pton() */
+
+	/* Pinhole InternalClient address must correspond to the action sender */
+	syslog(LOG_INFO, "Checking internal IP@ and port (Security policy purpose)");
 
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;
@@ -1341,6 +1342,7 @@ AddPinhole(struct upnphttp * h, const char * action)
 	char * rem_host, * rem_port, * int_ip, * int_port, * protocol, * leaseTime;
 	int uid = 0;
 	unsigned short iport, rport;
+	int ltime;
 
 	if(CheckStatus(h)==0)
 		return;
@@ -1353,9 +1355,17 @@ AddPinhole(struct upnphttp * h, const char * action)
 	protocol = GetValueFromNameValueList(&data, "Protocol");
 	leaseTime = GetValueFromNameValueList(&data, "LeaseTime");
 
-	rport = (unsigned short)atoi(rem_port);
-	iport = (unsigned short)atoi(int_port);
+	rport = (unsigned short)(rem_port ? atoi(rem_port) : 0);
+	iport = (unsigned short)(int_port ? atoi(int_port) : 0);
+	ltime = atoi(leaseTime);
 
+	/* In particular, [IGD2] RECOMMENDS that unauthenticated and
+	 * unauthorized control points are only allowed to invoke
+	 * this action with:
+	 * - InternalPort value greater than or equal to 1024,
+	 * - InternalClient value equals to the control point's IP address.
+	 * It is REQUIRED that InternalClient cannot be one of IPv6
+	 * addresses used by the gateway. */
 	/* **  As there is no security policy, InternalClient must be equal
 	 * to the CP's IP address. */
 	if(DataVerification(h, int_ip, &iport, protocol, leaseTime) == 0
@@ -1377,7 +1387,11 @@ AddPinhole(struct upnphttp * h, const char * action)
 
 	syslog(LOG_INFO, "%s: (inbound) from [%s]:%hu to [%s]:%hu with protocol %s during %ssec", action, rem_host?rem_host:"anywhere", rport, int_ip, iport, protocol, leaseTime);
 
-	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, protocol, leaseTime, &uid);
+	/* In cases where the RemoteHost, RemotePort, InternalPort,
+	 * InternalClient and Protocol are the same than an existing pinhole,
+	 * but LeaseTime is different, the device MUST extend the existing
+	 * pinhole's lease time and return the UniqueID of the existing pinhole. */
+	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, protocol, ltime, &uid);
 
 	switch(r)
 	{
@@ -1407,6 +1421,7 @@ UpdatePinhole(struct upnphttp * h, const char * action)
 	const char * uid, * leaseTime;
 	char iaddr[40], proto[6], lt[12];
 	unsigned short iport;
+	int ltime = -1;
 
 	if(CheckStatus(h)==0)
 		return;
@@ -1414,8 +1429,10 @@ UpdatePinhole(struct upnphttp * h, const char * action)
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	uid = GetValueFromNameValueList(&data, "UniqueID");
 	leaseTime = GetValueFromNameValueList(&data, "NewLeaseTime");
+	if(leaseTime)
+		ltime = atoi(leaseTime);
 
-	if(!uid || !leaseTime || !atoi(leaseTime) || atoi(leaseTime) > 86400)
+	if(!uid || ltime <= 0 || ltime > 86400)
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
@@ -1455,11 +1472,6 @@ UpdatePinhole(struct upnphttp * h, const char * action)
 static void
 GetOutboundPinholeTimeout(struct upnphttp * h, const char * action)
 {
-	if (!ipv6fc_firewall_enabled)
-	{
-		SoapError(h, 702, "FirewallDisabed");
-		return;
-	}
 	int r;
 
 	static const char resp[] =
@@ -1474,6 +1486,12 @@ GetOutboundPinholeTimeout(struct upnphttp * h, const char * action)
 	char * int_ip, * int_port, * rem_host, * rem_port, * protocol;
 	int opt=0, proto=0;
 	unsigned short iport, rport;
+
+	if (!ipv6fc_firewall_enabled)
+	{
+		SoapError(h, 702, "FirewallDisabed");
+		return;
+	}
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	int_ip = GetValueFromNameValueList(&data, "InternalClient");
@@ -1508,8 +1526,6 @@ GetOutboundPinholeTimeout(struct upnphttp * h, const char * action)
 static void
 DeletePinhole(struct upnphttp * h, const char * action)
 {
-	if(CheckStatus(h)==0)
-		return;
 	int r, n;
 
 	static const char resp[] =
@@ -1522,10 +1538,13 @@ DeletePinhole(struct upnphttp * h, const char * action)
 	char iaddr[40], proto[6], lt[12];
 	unsigned short iport;
 
+	if(CheckStatus(h)==0)
+		return;
+
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	uid = GetValueFromNameValueList(&data, "UniqueID");
 
-	if(!uid)
+	if(!uid || atoi(uid) < 0 || atoi(uid) > 65535)
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
@@ -1548,7 +1567,7 @@ DeletePinhole(struct upnphttp * h, const char * action)
 
 	r = upnp_delete_inboundpinhole(uid);
 
-	if(r <= 0)
+	if(r < 0)
 	{
 		syslog(LOG_INFO, "%s: (inbound) failed to remove pinhole with ID: %s", action, uid);
 		if(r==-4)
@@ -1567,8 +1586,6 @@ DeletePinhole(struct upnphttp * h, const char * action)
 static void
 CheckPinholeWorking(struct upnphttp * h, const char * action)
 {
-	if(CheckStatus(h)==0)
-		return;
 	int r, d;
 
 	static const char resp[] =
@@ -1584,6 +1601,9 @@ CheckPinholeWorking(struct upnphttp * h, const char * action)
 	char eaddr[40], iaddr[40], proto[6], lt[12];
 	unsigned short eport, iport;
 	int isWorking = 0;
+
+	if(CheckStatus(h)==0)
+		return;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	uid = GetValueFromNameValueList(&data, "UniqueID");
@@ -1665,8 +1685,6 @@ CheckPinholeWorking(struct upnphttp * h, const char * action)
 static void
 GetPinholePackets(struct upnphttp * h, const char * action)
 {
-	if(CheckStatus(h)==0)
-		return;
 	int r, n;
 
 	static const char resp[] =
@@ -1682,6 +1700,9 @@ GetPinholePackets(struct upnphttp * h, const char * action)
 	char iaddr[40], proto[6], lt[12];
 	unsigned short iport;
 	int pinholePackets = 0;
+
+	if(CheckStatus(h)==0)
+		return;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	uid = GetValueFromNameValueList(&data, "UniqueID");
