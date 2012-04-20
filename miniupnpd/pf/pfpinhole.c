@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.5 2012/04/19 22:02:12 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.7 2012/04/20 14:48:03 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -29,15 +29,26 @@
 #include "pfpinhole.h"
 #include "../upnpglobalvars.h"
 
+/* the pass rules created by add_pinhole() are as follow :
+ *
+ * pass in quick on ep0 inet6 proto udp
+ *   from any to dead:beef::42:42 port = 8080
+ *   flags S/SA keep state
+ *   label "pinhole-2 ts-4321000"
+ *
+ * with the label "pinhole-$uid ts-$timestamp"
+ */
+
+#ifdef ENABLE_IPV6
 /* /dev/pf when opened */
 extern int dev;
 
 static int uid = 1;
 
-int add_pinhole (const char * ifname,
-                 const char * rem_host, unsigned short rem_port,
-                 const char * int_client, unsigned short int_port,
-                 int proto)
+int add_pinhole(const char * ifname,
+                const char * rem_host, unsigned short rem_port,
+                const char * int_client, unsigned short int_port,
+                int proto, unsigned int timestamp)
 {
 	struct pfioc_rule pcr;
 #ifndef PF_NEWSTYLE
@@ -88,9 +99,8 @@ int add_pinhole (const char * ifname,
 		pcr.rule.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		pcr.rule.keep_state = 1;
-		/*strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);*/
 		snprintf(pcr.rule.label, PF_RULE_LABEL_SIZE,
-		         "pinhole-%d", uid);
+		         "pinhole-%d ts-%u", uid, timestamp);
 		if(queue)
 			strlcpy(pcr.rule.qname, queue, PF_QNAME_SIZE);
 		if(tag)
@@ -135,17 +145,18 @@ int add_pinhole (const char * ifname,
 	return (uid++);
 }
 
-int delete_pinhole (unsigned short uid)
+int delete_pinhole(unsigned short uid)
 {
 	int i, n;
 	struct pfioc_rule pr;
-	char label[PF_RULE_LABEL_SIZE];
+	char label_start[PF_RULE_LABEL_SIZE];
+	char tmp_label[PF_RULE_LABEL_SIZE];
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
-	snprintf(label, sizeof(label),
+	snprintf(label_start, sizeof(label_start),
 	         "pinhole-%hu", uid);
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
@@ -163,7 +174,9 @@ int delete_pinhole (unsigned short uid)
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			return -1;
 		}
-		if(0 == strcmp(pr.rule.label, label)) {
+		strlcpy(tmp_label, pr.rule.label, sizeof(tmp_label));
+		strtok(tmp_label, " ");
+		if(0 == strcmp(tmp_label, label_start)) {
 			pr.action = PF_CHANGE_GET_TICKET;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
 				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
@@ -182,4 +195,5 @@ int delete_pinhole (unsigned short uid)
 	return -1;
 }
 
+#endif /* ENABLE_IPV6 */
 
