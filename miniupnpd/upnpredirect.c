@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.66 2012/04/20 14:38:38 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.67 2012/04/20 21:52:57 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -634,7 +634,7 @@ upnp_add_inboundpinhole(const char * raddr,
                         unsigned short rport,
                         const char * iaddr,
                         unsigned short iport,
-                        const char * protocol,
+                        int proto,
                         unsigned int leasetime,
                         int * uid)
 {
@@ -646,15 +646,12 @@ upnp_add_inboundpinhole(const char * raddr,
 	time_t current;
 	unsigned int timestamp;
 	struct in6_addr address; /* IPv6 Modification*/
-	int proto;
 
 	if(inet_pton(AF_INET6, iaddr, &address) < 0) /* IPv6 Modification */
 	{
 		syslog(LOG_ERR, "inet_pton(%s) : %m", iaddr);
 		return 0;
 	}
-	proto = atoi(protocol); /* for WANIPv6FirewallControl AddPinhole, the protocol argument
-	                         * is passed as an integer, not a string */
 	current = time(NULL);
 	timestamp = current + leasetime;
 #if 0
@@ -673,7 +670,7 @@ upnp_add_inboundpinhole(const char * raddr,
 	else
 #endif
 	{
-		syslog(LOG_INFO, "Adding pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with protocol %s and %u lease time.", raddr, rport, iaddr, iport, protocol, leasetime);
+		syslog(LOG_INFO, "Adding pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d and %u lease time.", raddr, rport, iaddr, iport, proto, leasetime);
 #ifdef USE_PF
 		*uid = add_pinhole (0/*ext_if_name*/, raddr, rport, iaddr, iport, proto, timestamp);
 		return 1;

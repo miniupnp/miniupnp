@@ -1,7 +1,7 @@
-/* $Id: upnpredirect.h,v 1.24 2011/06/22 20:34:39 nanard Exp $ */
+/* $Id: upnpredirect.h,v 1.27 2012/04/20 21:52:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -123,7 +123,7 @@ upnp_check_outbound_pinhole(int proto, int * timeout);
 int
 upnp_add_inboundpinhole(const char * raddr, unsigned short rport,
               const char * iaddr, unsigned short iport,
-              const char * protocol, const char * leaseTime, int * uid);
+              int proto, unsigned int leasetime, int * uid);
 
 int
 upnp_add_inboundpinhole_internal(const char * raddr, unsigned short rport,

@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.96 2012/04/20 14:38:39 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.97 2012/04/20 21:52:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <syslog.h>
@@ -1144,62 +1145,6 @@ CheckStatus(struct upnphttp * h)
 		return 1;
 }
 
-static int
-DataVerification(struct upnphttp * h, char * int_ip, unsigned short * int_port, const char * protocol, char * leaseTime)
-{
-	/* **  Internal IP can't be wildcarded */
-	if (!int_ip)
-	{
-		SoapError(h, 708, "WildCardNotPermittedInSrcIP");
-		return 0;
-	}
-
-	if (!strchr(int_ip, ':'))
-	{
-		SoapError(h, 402, "Invalid Args");
-		return 0;
-	}
-
-	/* ** Internal port can't be wilcarded.  */
-/*	printf("\tint_port: *%d*\n", *int_port); */
-	if (*int_port == 0)
-	{
-		SoapError(h, 706, "InternalPortWilcardingNotAllowed");
-		return 0;
-	}
-
-	/* ** Protocol can't be wilcarded and can't be an unknown port
-	 * (here deal with only UDP, TCP, UDPLITE) */
-/*	printf("\tprotocol: *%s*\n", protocol); */
-	if (atoi(protocol) == 65535)
-	{
-		SoapError(h, 707, "ProtocolWilcardingNotAllowed");
-		return 0;
-	}
-	else if (atoi(protocol) != IPPROTO_UDP
-	        && atoi(protocol) != IPPROTO_TCP
-#ifdef IPPROTO_UDPITE
-	        && atoi(protocol) != IPPROTO_UDPLITE
-#endif
-	        )
-	{
-		SoapError(h, 705, "ProtocolNotSupported");
-		return 0;
-	}
-
-	/* ** Lease Time can't be wilcarded nor >86400. */
-/*	printf("\tlease time: %s\n", leaseTime); */
-	if(!leaseTime || !atoi(leaseTime) || atoi(leaseTime)>86400)
-	{
-		/* lease duration is never infinite, nor wilcarded. In this case, use default value */
-		syslog(LOG_WARNING, "LeaseTime=%s not supported, (ip=%s)", leaseTime, int_ip);
-		SoapError(h, 402, "Invalid Args");
-		return 0;
-	}
-
-	return 1;
-}
-
 #if 0
 static int connecthostport(const char * host, unsigned short port, char * result)
 {
@@ -1256,18 +1201,12 @@ static int connecthostport(const char * host, unsigned short port, char * result
 
 /* Check the security policy right */
 static int
-PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_port)
+PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 {
 	int n;
 	char senderAddr[INET6_ADDRSTRLEN]="";
-#if 0
-	//char str[INET6_ADDRSTRLEN]="";
-	//connecthostport(int_ip, *int_port, str);
-	//printf("int_ip: %s / str: %s\n", int_ip, str);
-#endif
-
 	struct addrinfo hints, *ai, *p;
-	struct in6_addr result_ip;/*unsigned char result_ip[16];*/ /* inet_pton() */
+	struct in6_addr result_ip;
 
 	/* Pinhole InternalClient address must correspond to the action sender */
 	syslog(LOG_INFO, "Checking internal IP@ and port (Security policy purpose)");
@@ -1276,17 +1215,16 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_por
 	hints.ai_family = AF_UNSPEC;
 
 	/* if ip not valid assume hostname and convert */
-	if (inet_pton(AF_INET6, int_ip, &result_ip) <= 0) /*IPv6 Modification*/
+	if (inet_pton(AF_INET6, int_ip, &result_ip) <= 0)
 	{
-
-		n = getaddrinfo(int_ip, NULL, &hints, &ai);/*hp = gethostbyname(int_ip);*/
-		if(!n && ai->ai_family == AF_INET6) /*IPv6 Modification*/
+		n = getaddrinfo(int_ip, NULL, &hints, &ai);
+		if(!n && ai->ai_family == AF_INET6)
 		{
-			for(p = ai; p; p = p->ai_next)/*ptr = hp->h_addr_list; ptr && *ptr; ptr++)*/
-		   	{
-				inet_ntop(AF_INET6, (struct in6_addr *) p, int_ip, sizeof(struct in6_addr)); /*IPv6 Modification*/
+			for(p = ai; p; p = p->ai_next)
+			{
+				inet_ntop(AF_INET6, (struct in6_addr *) p, int_ip, sizeof(struct in6_addr));
 				result_ip = *((struct in6_addr *) p);
-				fprintf(stderr, "upnpsoap / AddPinhole: assuming int addr = %s", int_ip);
+				/* fprintf(stderr, "upnpsoap / AddPinhole: assuming int addr = %s", int_ip); */
 				/* TODO : deal with more than one ip per hostname */
 				break;
 			}
@@ -1317,7 +1255,7 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short * int_por
 	}
 
 	/* Pinhole InternalPort must be greater than or equal to 1024 */
-	if (*int_port < 1024)
+	if (int_port < 1024)
 	{
 		syslog(LOG_INFO, "Client %s tried to access pinhole with port < 1024 and is not authorized to do it",
 		       senderAddr);
@@ -1343,6 +1281,7 @@ AddPinhole(struct upnphttp * h, const char * action)
 	int uid = 0;
 	unsigned short iport, rport;
 	int ltime;
+	long proto;
 
 	if(CheckStatus(h)==0)
 		return;
@@ -1357,7 +1296,19 @@ AddPinhole(struct upnphttp * h, const char * action)
 
 	rport = (unsigned short)(rem_port ? atoi(rem_port) : 0);
 	iport = (unsigned short)(int_port ? atoi(int_port) : 0);
-	ltime = atoi(leaseTime);
+	ltime = leaseTime ? atoi(leaseTime) : -1;
+	errno = 0;
+	proto = protocol ? strtol(protocol, NULL, 0) : -1;
+	if(errno != 0 || proto > 65535 || proto < 0)
+	{
+		SoapError(h, 402, "Invalid Args");
+		goto clear_and_exit;
+	}
+	if(iport == 0)
+	{
+		SoapError(h, 706, "InternalPortWilcardingNotAllowed");
+		goto clear_and_exit;
+	}
 
 	/* In particular, [IGD2] RECOMMENDS that unauthenticated and
 	 * unauthorized control points are only allowed to invoke
@@ -1366,37 +1317,59 @@ AddPinhole(struct upnphttp * h, const char * action)
 	 * - InternalClient value equals to the control point's IP address.
 	 * It is REQUIRED that InternalClient cannot be one of IPv6
 	 * addresses used by the gateway. */
-	/* **  As there is no security policy, InternalClient must be equal
-	 * to the CP's IP address. */
-	if(DataVerification(h, int_ip, &iport, protocol, leaseTime) == 0
-	   || PinholeVerification(h, int_ip, &iport) <= 0)
+	if(!int_ip || 0 == strlen(int_ip) || 0 == strcmp(int_ip, "*"))
 	{
-		ClearNameValueList(&data);
-		return ;
+		SoapError(h, 708, "WildCardNotPermittedInSrcIP");
+		goto clear_and_exit;
 	}
+	/* TODO : convert int_ip to literal ipv6 address ? */
+	/* TODO : rem_host should be converted to literal ipv6 ? */
 
-	/* ** RemoteHost can be wilcarded or an IDN. */
-	/*printf("\trem_host: %s\n", rem_host);*/
-	if (rem_host!=NULL && !strchr(rem_host, ':'))
+	if(proto == 65535)
 	{
-		ClearNameValueList(&data);
+		SoapError(h, 707, "ProtocolWilcardingNotAllowed");
+		goto clear_and_exit;
+	}
+	if(proto != IPPROTO_UDP && proto != IPPROTO_TCP
+#ifdef IPPROTO_UDPITE
+	   && atoi(protocol) != IPPROTO_UDPLITE
+#endif
+	  )
+	{
+		SoapError(h, 705, "ProtocolNotSupported");
+		goto clear_and_exit;
+	}
+	if(ltime < 1 || ltime > 86400)
+	{
+		syslog(LOG_WARNING, "%s: LeaseTime=%d not supported, (ip=%s)",
+		       action, ltime, int_ip);
 		SoapError(h, 402, "Invalid Args");
-		return;
+		goto clear_and_exit;
 	}
-	/*printf("\tAddr check passed.\n");*/
 
-	syslog(LOG_INFO, "%s: (inbound) from [%s]:%hu to [%s]:%hu with protocol %s during %ssec", action, rem_host?rem_host:"anywhere", rport, int_ip, iport, protocol, leaseTime);
+	if(PinholeVerification(h, int_ip, iport) <= 0)
+	{
+		goto clear_and_exit;
+	}
+
+	syslog(LOG_INFO, "%s: (inbound) from [%s]:%hu to [%s]:%hu with proto %ld during %d sec",
+	       action, rem_host?rem_host:"any",
+	       rport, int_ip, iport,
+	       proto, ltime);
 
 	/* In cases where the RemoteHost, RemotePort, InternalPort,
 	 * InternalClient and Protocol are the same than an existing pinhole,
 	 * but LeaseTime is different, the device MUST extend the existing
 	 * pinhole's lease time and return the UniqueID of the existing pinhole. */
-	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, protocol, ltime, &uid);
+	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, proto, ltime, &uid);
 
 	switch(r)
 	{
 		case 1:	        /* success */
-			bodylen = snprintf(body, sizeof(body), resp, action, "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1", uid, action);
+			bodylen = snprintf(body, sizeof(body),
+			                   resp, action,
+			                   "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1",
+			                   uid, action);
 			BuildSendAndCloseSoapResp(h, body, bodylen);
 			break;
 		case -1: 	/* not permitted */
@@ -1406,6 +1379,15 @@ AddPinhole(struct upnphttp * h, const char * action)
 			SoapError(h, 501, "ActionFailed");
 			break;
 	}
+	/* 606 Action not authorized
+	 * 701 PinholeSpaceExhausted
+	 * 702 FirewallDisabled
+	 * 703 InboundPinholeNotAllowed
+	 * 705 ProtocolNotSupported
+	 * 706 InternalPortWildcardingNotAllowed
+	 * 707 ProtocolWildcardingNotAllowed
+	 * 708 WildCardNotPermittedInSrcIP */
+clear_and_exit:
 	ClearNameValueList(&data);
 }
 
@@ -1444,7 +1426,7 @@ UpdatePinhole(struct upnphttp * h, const char * action)
 	n = upnp_get_pinhole_info(0, 0, iaddr, &iport, proto, uid, lt);
 	if (n > 0)
 	{
-		if(PinholeVerification(h, iaddr, &iport)==0)
+		if(PinholeVerification(h, iaddr, iport)==0)
 		{
 			ClearNameValueList(&data);
 			return ;
@@ -1556,7 +1538,7 @@ DeletePinhole(struct upnphttp * h, const char * action)
 	n = upnp_get_pinhole_info(0, 0, iaddr, &iport, proto, uid, lt);
 	if (n > 0)
 	{
-		if(PinholeVerification(h, iaddr, &iport)==0)
+		if(PinholeVerification(h, iaddr, iport)==0)
 		{
 			ClearNameValueList(&data);
 			return ;
@@ -1620,7 +1602,7 @@ CheckPinholeWorking(struct upnphttp * h, const char * action)
 	r = upnp_get_pinhole_info(eaddr, eport, iaddr, &iport, proto, uid, lt);
 	if (r > 0)
 	{
-		if(PinholeVerification(h, iaddr, &iport)==0)
+		if(PinholeVerification(h, iaddr, iport)==0)
 		{
 			ClearNameValueList(&data);
 			return ;
@@ -1719,7 +1701,7 @@ GetPinholePackets(struct upnphttp * h, const char * action)
 	r = upnp_get_pinhole_info(0, 0, iaddr, &iport, proto, uid, lt);
 	if (r > 0)
 	{
-		if(PinholeVerification(h, iaddr, &iport)==0)
+		if(PinholeVerification(h, iaddr, iport)==0)
 		{
 			ClearNameValueList(&data);
 			return ;
