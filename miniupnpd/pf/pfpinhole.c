@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.7 2012/04/20 14:48:03 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.9 2012/04/20 22:07:28 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -188,6 +188,60 @@ int delete_pinhole(unsigned short uid)
 				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				return -1;
 			}
+			return 0;
+		}
+	}
+	/* not found */
+	return -1;
+}
+
+int get_pinhole(unsigned short uid,
+                char * rem_host, int rem_hostlen, unsigned short * rem_port,
+                char * int_client, int int_clientlen, unsigned short * int_port,
+                int * proto, unsigned int * timestamp)
+{
+	int i, n;
+	struct pfioc_rule pr;
+	char label_start[PF_RULE_LABEL_SIZE];
+	char tmp_label[PF_RULE_LABEL_SIZE];
+	char * p;
+
+	if(dev<0) {
+		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	snprintf(label_start, sizeof(label_start),
+	         "pinhole-%hu", uid);
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+#ifndef PF_NEWSTYLE
+	pr.rule.action = PF_PASS;
+#endif
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
+		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
+		return -1;
+	}
+	n = pr.nr;
+	for(i=0; i<n; i++) {
+		pr.nr = i;
+		if(ioctl(dev, DIOCGETRULE, &pr) < 0) {
+			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
+			return -1;
+		}
+		strlcpy(tmp_label, pr.rule.label, sizeof(tmp_label));
+		p = tmp_label;
+		strsep(&p, " ");
+		if(0 == strcmp(tmp_label, label_start)) {
+			if(inet_ntop(AF_INET6, &pr.rule.src.addr.v.a.addr.v6, rem_host, rem_hostlen) == NULL) {
+				return -2;
+			}
+			*rem_port = ntohs(pr.rule.src.port[0]);
+			if(inet_ntop(AF_INET6, &pr.rule.dst.addr.v.a.addr.v6, int_client, int_clientlen) == NULL) {
+				return -2;
+			}
+			*int_port = ntohs(pr.rule.dst.port[0]);
+			*proto = pr.rule.proto;
+			sscanf(p, "ts-%u", timestamp);
 			return 0;
 		}
 	}
