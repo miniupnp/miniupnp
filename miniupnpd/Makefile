@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.62 2012/04/14 22:26:10 nanard Exp $
+# $Id: Makefile,v 1.63 2012/04/20 13:50:24 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -74,7 +74,7 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
 BSDOBJS = bsd/getifstats.o bsd/ifacewatcher.o
 SUNOSOBJS = solaris/getifstats.o bsd/ifacewatcher.o
 MACOBJS = mac/getifstats.o bsd/ifacewatcher.o
-PFOBJS = pf/obsdrdr.o
+PFOBJS = pf/obsdrdr.o pf/pfpinhole.o
 IPFOBJS = ipf/ipfrdr.o
 IPFWOBJS = ipfw/ipfwrdr.o
 MISCOBJS = upnpreplyparse.o minixml.o
