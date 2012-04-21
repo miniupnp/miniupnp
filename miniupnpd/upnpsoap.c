@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.97 2012/04/20 21:52:58 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.99 2012/04/22 00:02:46 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1282,6 +1282,7 @@ AddPinhole(struct upnphttp * h, const char * action)
 	unsigned short iport, rport;
 	int ltime;
 	long proto;
+	char rem_ip[INET6_ADDRSTRLEN];
 
 	if(CheckStatus(h)==0)
 		return;
@@ -1322,8 +1323,45 @@ AddPinhole(struct upnphttp * h, const char * action)
 		SoapError(h, 708, "WildCardNotPermittedInSrcIP");
 		goto clear_and_exit;
 	}
-	/* TODO : convert int_ip to literal ipv6 address ? */
-	/* TODO : rem_host should be converted to literal ipv6 ? */
+	/* I guess it is useless to convert int_ip to literal ipv6 address */
+	/* rem_host should be converted to literal ipv6 : */
+	if(rem_host)
+	{
+		struct addrinfo *ai, *p;
+		struct addrinfo hints;
+		int err;
+		memset(&hints, 0, sizeof(struct addrinfo));
+		hints.ai_family = AF_INET6;
+		/*hints.ai_flags = */
+		/* hints.ai_protocol = proto; */
+		err = getaddrinfo(rem_host, rem_port, &hints, &ai);
+		if(err == 0)
+		{
+			/* take the 1st IPv6 address */
+			for(p = ai; p; p = p->ai_next)
+			{
+				if(p->ai_family == AF_INET6)
+				{
+					inet_ntop(AF_INET6,
+					          &(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr),
+					          rem_ip, sizeof(rem_ip));
+					syslog(LOG_INFO, "resolved '%s' to '%s'", rem_host, rem_ip);
+					rem_host = rem_ip;
+					break;
+				}
+			}
+			freeaddrinfo(ai);
+		}
+		else
+		{
+			syslog(LOG_WARNING, "AddPinhole : getaddrinfo(%s) : %s",
+			       rem_host, gai_strerror(err));
+#if 0
+			SoapError(h, 402, "Invalid Args");
+			goto clear_and_exit;
+#endif
+		}
+	}
 
 	if(proto == 65535)
 	{
