@@ -1,4 +1,4 @@
-/* $Id: testpfpinhole.c,v 1.8 2012/04/21 23:31:31 nanard Exp $ */
+/* $Id: testpfpinhole.c,v 1.9 2012/04/22 00:55:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -73,7 +73,7 @@ int main(int argc, char * *argv)
 
 	print_pinhole(1);
 	print_pinhole(2);
-	clean_pinehole_list(NULL);
+	clean_pinhole_list(NULL);
 
 	ret = delete_pinhole(1);
 	printf("delete_pinhole() returned %d\n", ret);

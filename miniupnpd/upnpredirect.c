@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.67 2012/04/20 21:52:57 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.70 2012/04/22 00:55:46 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -764,17 +764,32 @@ upnp_add_inboundpinhole_internal(const char * raddr, unsigned short rport,
 }
 
 int
-upnp_get_pinhole_info(const char * raddr,
-                      unsigned short rport,
-                      char * iaddr,
+upnp_get_pinhole_info(unsigned short uid,
+                      char * raddr, int raddrlen,
+                      unsigned short * rport,
+                      char * iaddr, int iaddrlen,
                       unsigned short * iport,
-                      char * proto,
-                      const char * uid,
-                      char * lt)
+                      int * proto,
+                      unsigned int * leasetime)
 {
-	/* TODO : to be done
-	 * Call Firewall specific code to get IPv6 pinhole infos */
-	return 0;
+	/* Call Firewall specific code to get IPv6 pinhole infos */
+#ifdef USE_PF
+	int r;
+	unsigned int timestamp;
+	r = get_pinhole(uid, raddr, raddrlen, rport,
+	                iaddr, iaddrlen, iport, proto, &timestamp);
+	if(r >= 0) {
+		time_t current_time;
+		current_time = time(NULL);
+		if(timestamp > current_time)
+			*leasetime = timestamp - current_time;
+		else
+			*leasetime = 0;
+	}
+	return r;
+#else
+	return -42;	/* not implemented */
+#endif
 }
 
 int
@@ -799,15 +814,10 @@ upnp_update_inboundpinhole(const char * uid, const char * leasetime)
 }
 
 int
-upnp_delete_inboundpinhole(const char * uid)
+upnp_delete_inboundpinhole(unsigned short uid)
 {
-	unsigned short uid_s;
-
-	if(!uid)
-		return -1;
-	uid_s = (unsigned short)atoi(uid);
 #ifdef USE_PF
-	return delete_pinhole(uid_s);
+	return delete_pinhole(uid);
 #else
 	return -1;
 #endif
@@ -1051,34 +1061,13 @@ upnp_get_pinhole_packets(const char * uid, int * packets)
 }
 
 int
-upnp_update_expiredpinhole(void)
+upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
-#if 0
-	int r;
-	char uid[5], leaseTime[12];
-
-	r = get_rule_from_leasetime(uid, leaseTime);
-	if(r<0)
-		return r;
-	else
-	{
-		strcpy(nextpinholetoclean_uid, uid);
-		nextpinholetoclean_timestamp = atoi(leaseTime);
-		return 1;
-	}
-#endif
+#ifdef USE_PF
+	return clean_pinhole_list(next_timestamp);
+#else
 	return 0;
-}
-
-int
-upnp_clean_expiredpinhole()
-{
-#if 0
-	upnp_delete_inboundpinhole(nextpinholetoclean_uid);
-
-	return upnp_update_expiredpinhole();
 #endif
-	return 0;
 }
 #endif
 

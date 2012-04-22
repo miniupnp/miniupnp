@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.11 2012/04/21 23:31:31 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.12 2012/04/22 00:55:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -256,7 +256,7 @@ int get_pinhole(unsigned short uid,
 	return -1;
 }
 
-int clean_pinehole_list(unsigned int * next_timestamp)
+int clean_pinhole_list(unsigned int * next_timestamp)
 {
 	int i;
 	struct pfioc_rule pr;

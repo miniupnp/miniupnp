@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.151 2012/04/06 17:24:37 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.152 2012/04/22 00:55:44 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1411,6 +1411,10 @@ main(int argc, char * * argv)
 			timeout.tv_usec = 0;
 		}
 #endif
+#endif
+#ifdef ENABLE_6FC_SERVICE
+		/* Clean up expired IPv6 PinHoles */
+		upnp_clean_expired_pinholes(NULL);
 #endif
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */

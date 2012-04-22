@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.h,v 1.27 2012/04/20 21:52:58 nanard Exp $ */
+/* $Id: upnpredirect.h,v 1.30 2012/04/22 00:55:46 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -125,20 +125,18 @@ upnp_add_inboundpinhole(const char * raddr, unsigned short rport,
               const char * iaddr, unsigned short iport,
               int proto, unsigned int leasetime, int * uid);
 
-int
-upnp_add_inboundpinhole_internal(const char * raddr, unsigned short rport,
-                       const char * iaddr, unsigned short iport,
-                       const char * proto, int * uid);
-
 /*
  * return values :
- *  -4 not found
- *  -5 in another table
- *  -6 in another chain
- *  -7 in a chain but not a rule. (chain policy)
+ *  -1 not found
  * */
 int
-upnp_get_pinhole_info(const char * raddr, unsigned short rport, char * iaddr, unsigned short * iport, char * proto, const char * uid, char * lt);
+upnp_get_pinhole_info(unsigned short uid,
+                      char * raddr, int raddrlen,
+                      unsigned short * rport,
+                      char * iaddr, int iaddrlen,
+                      unsigned short * iport,
+                      int * proto,
+                      unsigned int * leasetime);
 
 /* update the lease time */
 int
@@ -146,7 +144,7 @@ upnp_update_inboundpinhole(const char * uid, const char * leasetime);
 
 /* remove the inbound pinhole */
 int
-upnp_delete_inboundpinhole(const char * uid);
+upnp_delete_inboundpinhole(unsigned short uid);
 
 /* ... */
 int
@@ -158,7 +156,7 @@ upnp_get_pinhole_packets(const char * uid, int * packets);
 
 /* ? */
 int
-upnp_clean_expiredpinhole(void);
+upnp_clean_expired_pinholes(unsigned int * next_timestamp);
 
 #endif /* ENABLE_6FC_SERVICE */
 
