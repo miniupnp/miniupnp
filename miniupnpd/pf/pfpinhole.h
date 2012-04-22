@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.h,v 1.6 2012/04/22 00:55:51 nanard Exp $ */
+/* $Id: pfpinhole.h,v 1.7 2012/04/22 23:08:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -18,7 +18,8 @@ int delete_pinhole(unsigned short uid);
 int get_pinhole(unsigned short uid,
                 char * rem_host, int rem_hostlen, unsigned short * rem_port,
                 char * int_client, int int_clientlen, unsigned short * int_port,
-                int * proto, unsigned int * timestamp);
+                int * proto, unsigned int * timestamp,
+                u_int64_t * packets, u_int64_t * bytes);
 
 int clean_pinhole_list(unsigned int * next_timestamp);
 

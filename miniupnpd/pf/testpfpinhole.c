@@ -1,4 +1,4 @@
-/* $Id: testpfpinhole.c,v 1.9 2012/04/22 00:55:51 nanard Exp $ */
+/* $Id: testpfpinhole.c,v 1.10 2012/04/22 23:12:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -30,17 +30,20 @@ static int print_pinhole(int uid)
 	unsigned short int_port;
 	int proto;
 	unsigned int timestamp;
+	u_int64_t packets, bytes;
 
 	r = get_pinhole((unsigned short)uid,
 	                rem_host, sizeof(rem_host), &rem_port,
 	                int_client, sizeof(int_client), &int_port,
-	                &proto, &timestamp);
+	                &proto, &timestamp,
+	                &packets, &bytes);
 	if(r < 0) {
 		fprintf(stderr, "get_pinhole(%d) returned %d\n", uid, r);
 	} else {
 		printf("pinhole %d : [%s]:%hu => [%s]:%hu proto=%d ts=%u\n",
 		       uid, rem_host, rem_port, int_client, int_port,
 		       proto, timestamp);
+		printf("    packets=%llu bytes=%llu\n", packets, bytes);
 	}
 	return r;
 }

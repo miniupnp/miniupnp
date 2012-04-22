@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.12 2012/04/22 00:55:51 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.15 2012/04/22 23:36:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -199,13 +199,14 @@ int delete_pinhole(unsigned short uid)
 		}
 	}
 	/* not found */
-	return -1;
+	return -2;
 }
 
 int get_pinhole(unsigned short uid,
                 char * rem_host, int rem_hostlen, unsigned short * rem_port,
                 char * int_client, int int_clientlen, unsigned short * int_port,
-                int * proto, unsigned int * timestamp)
+                int * proto, unsigned int * timestamp,
+                u_int64_t * packets, u_int64_t * bytes)
 {
 	int i, n;
 	struct pfioc_rule pr;
@@ -239,23 +240,40 @@ int get_pinhole(unsigned short uid,
 		p = tmp_label;
 		strsep(&p, " ");
 		if(0 == strcmp(tmp_label, label_start)) {
-			if(inet_ntop(AF_INET6, &pr.rule.src.addr.v.a.addr.v6, rem_host, rem_hostlen) == NULL) {
-				return -2;
+			if(rem_host && (inet_ntop(AF_INET6, &pr.rule.src.addr.v.a.addr.v6, rem_host, rem_hostlen) == NULL)) {
+				return -1;
 			}
-			*rem_port = ntohs(pr.rule.src.port[0]);
-			if(inet_ntop(AF_INET6, &pr.rule.dst.addr.v.a.addr.v6, int_client, int_clientlen) == NULL) {
-				return -2;
+			if(rem_port)
+				*rem_port = ntohs(pr.rule.src.port[0]);
+			if(int_client && (inet_ntop(AF_INET6, &pr.rule.dst.addr.v.a.addr.v6, int_client, int_clientlen) == NULL)) {
+				return -1;
 			}
-			*int_port = ntohs(pr.rule.dst.port[0]);
-			*proto = pr.rule.proto;
-			sscanf(p, "ts-%u", timestamp);
+			if(int_port)
+				*int_port = ntohs(pr.rule.dst.port[0]);
+			if(proto)
+				*proto = pr.rule.proto;
+			if(timestamp)
+				sscanf(p, "ts-%u", timestamp);
+#ifdef PFRULE_INOUT_COUNTS
+			if(packets)
+				*packets = pr.rule.packets[0] + pr.rule.packets[1];
+			if(bytes)
+				*bytes = pr.rule.bytes[0] + pr.rule.bytes[1];
+#else
+			if(packets)
+				*packets = pr.rule.packets;
+			if(bytes)
+				*bytes = pr.rule.bytes;
+#endif
 			return 0;
 		}
 	}
 	/* not found */
-	return -1;
+	return -2;
 }
 
+/* return the number of rules removed
+ * or a negative integer in case of error */
 int clean_pinhole_list(unsigned int * next_timestamp)
 {
 	int i;
@@ -265,6 +283,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 	int uid;
 	unsigned int min_ts = UINT_MAX;
 	int min_uid = INT_MAX, max_uid = -1;
+	int n = 0;
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
@@ -303,6 +322,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				return -1;
 			}
+			n++;
 #ifndef PF_NEWSTYLE
 			pr.rule.action = PF_PASS;
 #endif
@@ -329,7 +349,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			next_uid = 1;
 		}
 	}
-	return 0;
+	return n;	/* number of rules removed */
 }
 
 #endif /* ENABLE_IPV6 */

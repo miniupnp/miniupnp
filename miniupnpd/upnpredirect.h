@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.h,v 1.30 2012/04/22 00:55:46 nanard Exp $ */
+/* $Id: upnpredirect.h,v 1.31 2012/04/22 23:08:48 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -136,7 +136,8 @@ upnp_get_pinhole_info(unsigned short uid,
                       char * iaddr, int iaddrlen,
                       unsigned short * iport,
                       int * proto,
-                      unsigned int * leasetime);
+                      unsigned int * leasetime,
+                      unsigned int * packets);
 
 /* update the lease time */
 int
@@ -149,10 +150,6 @@ upnp_delete_inboundpinhole(unsigned short uid);
 /* ... */
 int
 upnp_check_pinhole_working(const char * uid, char * eaddr, char * iaddr, unsigned short * eport, unsigned short * iport, char * protocol, int * rulenum_used);
-
-/* number of packets that went through the pinhole */
-int
-upnp_get_pinhole_packets(const char * uid, int * packets);
 
 /* ? */
 int

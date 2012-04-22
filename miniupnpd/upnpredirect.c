@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.70 2012/04/22 00:55:46 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.72 2012/04/22 23:25:22 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -763,6 +763,14 @@ upnp_add_inboundpinhole_internal(const char * raddr, unsigned short rport,
 	return 1;
 }
 
+/* upnp_get_pinhole_info()
+ * return values :
+ *   0   OK
+ *  -1   Internal error
+ *  -2   NOT FOUND (no such entry)
+ *  .. 
+ *  -42  Not implemented
+ */
 int
 upnp_get_pinhole_info(unsigned short uid,
                       char * raddr, int raddrlen,
@@ -770,14 +778,17 @@ upnp_get_pinhole_info(unsigned short uid,
                       char * iaddr, int iaddrlen,
                       unsigned short * iport,
                       int * proto,
-                      unsigned int * leasetime)
+                      unsigned int * leasetime,
+                      unsigned int * packets)
 {
 	/* Call Firewall specific code to get IPv6 pinhole infos */
 #ifdef USE_PF
 	int r;
 	unsigned int timestamp;
+	u_int64_t packets_tmp, bytes_tmp;
 	r = get_pinhole(uid, raddr, raddrlen, rport,
-	                iaddr, iaddrlen, iport, proto, &timestamp);
+	                iaddr, iaddrlen, iport, proto, &timestamp,
+	                &packets_tmp, &bytes_tmp);
 	if(r >= 0) {
 		time_t current_time;
 		current_time = time(NULL);
@@ -785,6 +796,8 @@ upnp_get_pinhole_info(unsigned short uid,
 			*leasetime = timestamp - current_time;
 		else
 			*leasetime = 0;
+		if(packets)
+			*packets = (unsigned int)packets_tmp;
 	}
 	return r;
 #else
@@ -1037,26 +1050,6 @@ upnp_check_pinhole_working(const char * uid,
 	return res;
 #else
 	return -4;
-#endif
-}
-
-int
-upnp_get_pinhole_packets(const char * uid, int * packets)
-{
-	/* TODO : to be implemented */
-#if 0
-	int line=0, r;
-	char cmd[256];
-	r = check_rule_from_file(uid, &line);
-	if(r < 0)
-		return r;
-	else
-	{
-		snprintf(cmd, sizeof(cmd), "ip6tables -L MINIUPNPD %d -v", line);
-		return retrieve_packets(cmd, &line, packets);
-	}
-#else
-	return 0;
 #endif
 }
 
