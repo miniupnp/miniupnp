@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.h,v 1.7 2012/04/22 23:08:51 nanard Exp $ */
+/* $Id: pfpinhole.h,v 1.8 2012/04/23 22:17:34 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -8,6 +8,7 @@
 #ifndef __PFPINHOLE_H__
 #define __PFPINHOLE_H__
 
+#ifdef ENABLE_6FC_SERVICE
 int add_pinhole(const char * ifname,
                 const char * rem_host, unsigned short rem_port,
                 const char * int_client, unsigned short int_port,
@@ -21,7 +22,11 @@ int get_pinhole(unsigned short uid,
                 int * proto, unsigned int * timestamp,
                 u_int64_t * packets, u_int64_t * bytes);
 
+int update_pinhole(unsigned short uid, unsigned int timestamp);
+
 int clean_pinhole_list(unsigned int * next_timestamp);
+
+#endif
 
 #endif
 

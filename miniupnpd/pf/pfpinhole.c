@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.15 2012/04/22 23:36:41 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.16 2012/04/23 22:17:34 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -39,7 +39,7 @@
  * with the label "pinhole-$uid ts-$timestamp"
  */
 
-#ifdef ENABLE_IPV6
+#ifdef ENABLE_6FC_SERVICE
 /* /dev/pf when opened */
 extern int dev;
 
@@ -270,6 +270,16 @@ int get_pinhole(unsigned short uid,
 	}
 	/* not found */
 	return -2;
+}
+
+int update_pinhole(unsigned short uid, unsigned int timestamp)
+{
+	/* TODO :
+	 * As it is not possible to change rule label, we should :
+	 * 1 - delete
+	 * 2 - Add new
+	 * the stats of the rule will then be reset :( */
+	return -42; /* not implemented */
 }
 
 /* return the number of rules removed
