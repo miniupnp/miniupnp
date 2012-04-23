@@ -1133,7 +1133,7 @@ CheckStatus(struct upnphttp * h)
 {
 	if (!ipv6fc_firewall_enabled)
 	{
-		SoapError(h, 702, "FirewallDisabed");
+		SoapError(h, 702, "FirewallDisabled");
 		return 0;
 	}
 	else if(!ipv6fc_inbound_pinhole_allowed)
@@ -1385,9 +1385,7 @@ AddPinhole(struct upnphttp * h, const char * action)
 	}
 
 	if(PinholeVerification(h, int_ip, iport) <= 0)
-	{
 		goto clear_and_exit;
-	}
 
 	syslog(LOG_INFO, "%s: (inbound) from [%s]:%hu to [%s]:%hu with proto %ld during %d sec",
 	       action, rem_host?rem_host:"any",
@@ -1512,7 +1510,7 @@ GetOutboundPinholeTimeout(struct upnphttp * h, const char * action)
 
 	if (!ipv6fc_firewall_enabled)
 	{
-		SoapError(h, 702, "FirewallDisabed");
+		SoapError(h, 702, "FirewallDisabled");
 		return;
 	}
 
