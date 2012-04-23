@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.h,v 1.31 2012/04/22 23:08:48 nanard Exp $ */
+/* $Id: upnpredirect.h,v 1.32 2012/04/23 21:46:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -109,11 +109,13 @@ upnp_get_portmappings_in_range(unsigned short startport,
                                unsigned int * number);
 
 #ifdef ENABLE_6FC_SERVICE
-/* function to be used by WANIPv6_FirewallControl implementation */
+/* functions to be used by WANIPv6_FirewallControl implementation */
 
-/* retreive outbound pinhole timeout*/
+#if 0
+/* retrieve outbound pinhole timeout */
 int
 upnp_check_outbound_pinhole(int proto, int * timeout);
+#endif
 
 /* add an inbound pinehole
  * return value :
@@ -141,7 +143,7 @@ upnp_get_pinhole_info(unsigned short uid,
 
 /* update the lease time */
 int
-upnp_update_inboundpinhole(const char * uid, const char * leasetime);
+upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime);
 
 /* remove the inbound pinhole */
 int

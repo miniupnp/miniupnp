@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.104 2012/04/22 23:36:20 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.106 2012/04/23 22:38:06 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1431,65 +1431,65 @@ clear_and_exit:
 static void
 UpdatePinhole(struct upnphttp * h, const char * action)
 {
-	int r/*, n*/;
 	static const char resp[] =
 		"<u:UpdatePinholeResponse "
 		"xmlns:u=\"urn:schemas-upnp-org:service:WANIPv6FirewallControl:1\">"
 		"</u:UpdatePinholeResponse>";
 	struct NameValueParserData data;
-	const char * uid, * leaseTime;
-#if 0
-	char iaddr[40], proto[6], lt[12];
+	const char * uid_str, * leaseTime;
+	char iaddr[INET6_ADDRSTRLEN];
 	unsigned short iport;
-#endif
-	int ltime = -1;
+	int ltime;
+	int uid;
+	int n;
 
 	if(CheckStatus(h)==0)
 		return;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	uid = GetValueFromNameValueList(&data, "UniqueID");
+	uid_str = GetValueFromNameValueList(&data, "UniqueID");
 	leaseTime = GetValueFromNameValueList(&data, "NewLeaseTime");
-	if(leaseTime)
-		ltime = atoi(leaseTime);
+	uid = uid_str ? atoi(uid_str) : -1;
+	ltime = leaseTime ? atoi(leaseTime) : -1;
+	ClearNameValueList(&data);
 
-	if(!uid || ltime <= 0 || ltime > 86400)
+	if(uid < 0 || uid > 65535 || ltime <= 0 || ltime > 86400)
 	{
-		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
 	}
 
-	/* Check that client is not deleting an pinhole
+	/* Check that client is not updating an pinhole
 	 * it doesn't have access to, because of its public access */
-#if 0
-	n = upnp_get_pinhole_info(0, 0, iaddr, &iport, proto, uid, lt);
-	if (n > 0)
+	n = upnp_get_pinhole_info(uid, NULL, 0, NULL,
+	                          iaddr, sizeof(iaddr), &iport,
+	                          NULL, NULL, NULL);
+	if (n >= 0)
 	{
-		if(PinholeVerification(h, iaddr, iport)==0)
-		{
-			ClearNameValueList(&data);
-			return ;
-		}
+		if(PinholeVerification(h, iaddr, iport) <= 0)
+			return;
 	}
-#endif
-
-	syslog(LOG_INFO, "%s: (inbound) updating lease duration to %s for pinhole with ID: %s", action, leaseTime, uid);
-
-	r = upnp_update_inboundpinhole(uid, leaseTime);
-
-	if(r < 0)
+	else if(n == -2)
 	{
-		if(r == -4 || r == -1)
-			SoapError(h, 704, "NoSuchEntry");
-		else
-			SoapError(h, 501, "ActionFailed");
+		SoapError(h, 704, "NoSuchEntry");
+		return;
 	}
 	else
 	{
-		BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+		SoapError(h, 501, "ActionFailed");
+		return;
 	}
-	ClearNameValueList(&data);
+
+	syslog(LOG_INFO, "%s: (inbound) updating lease duration to %d for pinhole with ID: %d",
+	       action, ltime, uid);
+
+	n = upnp_update_inboundpinhole(uid, ltime);
+	if(n == -1)
+		SoapError(h, 704, "NoSuchEntry");
+	else if(n < 0)
+		SoapError(h, 501, "ActionFailed");
+	else
+		BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
 }
 
 static void
@@ -1529,12 +1529,15 @@ GetOutboundPinholeTimeout(struct upnphttp * h, const char * action)
 
 	syslog(LOG_INFO, "%s: retrieving timeout for outbound pinhole from [%s]:%hu to [%s]:%hu protocol %s", action, int_ip, iport,rem_host, rport, protocol);
 
-	r = upnp_check_outbound_pinhole(proto, &opt);
+	/* TODO */
+	r = -1;/*upnp_check_outbound_pinhole(proto, &opt);*/
 
 	switch(r)
 	{
 		case 1:	/* success */
-			bodylen = snprintf(body, sizeof(body), resp, action, "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1", opt, action);
+			bodylen = snprintf(body, sizeof(body), resp,
+			                   action, "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1",
+			                   opt, action);
 			BuildSendAndCloseSoapResp(h, body, bodylen);
 			break;
 		case -5:	/* Protocol not supported */
@@ -1585,7 +1588,7 @@ DeletePinhole(struct upnphttp * h, const char * action)
 	                          &proto, &leasetime, NULL);
 	if (n >= 0)
 	{
-		if(!PinholeVerification(h, iaddr, iport))
+		if(PinholeVerification(h, iaddr, iport) <= 0)
 			return;
 	}
 	else if(n == -2)
@@ -1615,7 +1618,6 @@ DeletePinhole(struct upnphttp * h, const char * action)
 static void
 CheckPinholeWorking(struct upnphttp * h, const char * action)
 {
-#if 0
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
@@ -1623,96 +1625,52 @@ CheckPinholeWorking(struct upnphttp * h, const char * action)
 		"</u:%sResponse>";
 	char body[512];
 	int bodylen;
-	int r, d;
-#endif
+	int r;
 	struct NameValueParserData data;
-	const char * uid;
-#if 0
-	char eaddr[40], iaddr[40], proto[6], lt[12];
-	unsigned short eport, iport;
-	int isWorking = 0;
-#endif
+	const char * uid_str;
+	int uid;
+	char iaddr[INET6_ADDRSTRLEN];
+	unsigned short iport;
+	unsigned int packets;
 
 	if(CheckStatus(h)==0)
 		return;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	uid = GetValueFromNameValueList(&data, "UniqueID");
+	uid_str = GetValueFromNameValueList(&data, "UniqueID");
+	uid = uid_str ? atoi(uid_str) : -1;
+	ClearNameValueList(&data);
 
-	if(!uid)
+	if(uid < 0 || uid > 65535)
 	{
-		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
 	}
 
 	/* Check that client is not checking a pinhole
 	 * it doesn't have access to, because of its public access */
-#if 0
-	r = upnp_get_pinhole_info(eaddr, eport, iaddr, &iport, proto, uid, lt);
-	if (r > 0)
+	r = upnp_get_pinhole_info(uid,
+	                          NULL, 0, NULL,
+	                          iaddr, sizeof(iaddr), &iport,
+	                          NULL, NULL, &packets);
+	if (r >= 0)
 	{
-		if(PinholeVerification(h, iaddr, iport)==0)
-		{
-			ClearNameValueList(&data);
+		if(PinholeVerification(h, iaddr, iport) <= 0)
 			return ;
-		}
-		else
+		if(packets == 0)
 		{
-			int rulenum_used, rulenum = 0;
-			d = upnp_check_pinhole_working(uid, eaddr, iaddr, &eport, &iport, proto, &rulenum_used);
-			if(d < 0)
-			{
-				if(d == -4)
-				{
-					syslog(LOG_INFO, "%s: rule for ID=%s, no trace found for this pinhole", action, uid);
-					SoapError(h, 709, "NoPacketSent");
-					ClearNameValueList(&data);
-					return ;
-				}
-				else
-				{
-				/* d==-5 not same table // d==-6 not same chain // d==-7 not found a rule but policy traced */
-					isWorking=0;
-					syslog(LOG_INFO, "%s: rule for ID=%s is not working, packet going through %s", action, uid, (d==-5)?"the wrong table":((d==-6)?"the wrong chain":"a chain policy"));
-					bodylen = snprintf(body, sizeof(body), resp,
-						action, "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1",
-						isWorking, action);
-					BuildSendAndCloseSoapResp(h, body, bodylen);
-				}
-			}
-			else
-			{
-				/*check_rule_from_file(uid, &rulenum);*/
-				if(rulenum_used == rulenum)
-				{
-					isWorking=1;
-					syslog(LOG_INFO, "%s: rule for ID=%s is working properly", action, uid);
-				}
-				else
-				{
-					isWorking=0;
-					syslog(LOG_INFO, "%s: rule for ID=%s is not working", action, uid);
-				}
-				bodylen = snprintf(body, sizeof(body), resp,
-						action, "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1",
-						isWorking, action);
-				BuildSendAndCloseSoapResp(h, body, bodylen);
-			}
+			SoapError(h, 709, "NoPacketSent");
+			return;
 		}
+		bodylen = snprintf(body, sizeof(body), resp,
+						action, "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1",
+						1, action);
+		BuildSendAndCloseSoapResp(h, body, bodylen);
 	}
-	else if(r == -4 || r == -1)
-	{
+	else if(r == -2)
 		SoapError(h, 704, "NoSuchEntry");
-	}
 	else
-#endif
-	{
 		SoapError(h, 501, "ActionFailed");
-		ClearNameValueList(&data);
-		return ;
-	}
-	ClearNameValueList(&data);
 }
 
 static void
@@ -1756,10 +1714,8 @@ GetPinholePackets(struct upnphttp * h, const char * action)
 	                          &proto, &leasetime, &packets);
 	if (n >= 0)
 	{
-		if(PinholeVerification(h, iaddr, iport)==0)
-		{
+		if(PinholeVerification(h, iaddr, iport)<=0)
 			return ;
-		}
 	}
 #if 0
 	else if(r == -4 || r == -1)
