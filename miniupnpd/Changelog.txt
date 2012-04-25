@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.272 2012/04/20 14:38:38 nanard Exp $
+$Id: Changelog.txt,v 1.274 2012/04/25 22:26:03 nanard Exp $
+
+2012/04/25:
+  Fixed a bug in upnphttp that happened when POST is received in several
+  recv() calls and realloc() is called so the buffer used is moved.
 
 2012/04/20:
   Enough WANIPv6FirewallControl is implemented on pf so that AddPinhole() and

@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.67 2012/02/07 00:21:54 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.70 2012/04/25 22:28:34 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -108,7 +108,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				{
 					p++; n -= 2;
 				}
-				h->req_soapAction = p;
+				h->req_soapActionOff = p - h->req_buf;
 				h->req_soapActionLen = n;
 			}
 #ifdef ENABLE_EVENTS
@@ -120,7 +120,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				n = 0;
 				while(p[n] != '>' && p[n] != '\r' )
 					n++;
-				h->req_Callback = p + 1;
+				h->req_CallbackOff = p + 1 - h->req_buf;
 				h->req_CallbackLen = MAX(0, n - 1);
 			}
 			else if(strncasecmp(line, "SID", 3)==0)
@@ -131,7 +131,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				n = 0;
 				while(!isspace(p[n]))
 					n++;
-				h->req_SID = p;
+				h->req_SIDOff = p - h->req_buf;
 				h->req_SIDLen = n;
 			}
 			/* Timeout: Seconds-nnnn */
@@ -249,13 +249,13 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 {
 	if((h->req_buflen - h->req_contentoff) >= h->req_contentlen)
 	{
-		if(h->req_soapAction)
+		if(h->req_soapActionOff > 0)
 		{
 			/* we can process the request */
 			syslog(LOG_INFO, "SOAPAction: %.*s",
-		    	   h->req_soapActionLen, h->req_soapAction);
+			       h->req_soapActionLen, h->req_buf + h->req_soapActionOff);
 			ExecuteSoapAction(h,
-				h->req_soapAction,
+				h->req_buf + h->req_soapActionOff,
 				h->req_soapActionLen);
 		}
 		else
@@ -289,22 +289,22 @@ checkCallbackURL(struct upnphttp * h)
 	const char * p;
 	int i;
 
-	if(!h->req_Callback || h->req_CallbackLen < 8)
+	if(h->req_CallbackOff <= 0 || h->req_CallbackLen < 8)
 		return 0;
-	if(memcmp(h->req_Callback, "http://", 7) != 0)
+	if(memcmp(h->req_buf + h->req_CallbackOff, "http://", 7) != 0)
 		return 0;
 	ipv6 = 0;
 	i = 0;
-	p = h->req_Callback + 7;
+	p = h->req_buf + h->req_CallbackOff + 7;
 	if(*p == '[') {
 		p++;
 		ipv6 = 1;
 		while(*p != ']' && i < (sizeof(addrstr)-1)
-		      && p < (h->req_Callback + h->req_CallbackLen))
+		      && p < (h->req_buf + h->req_CallbackOff + h->req_CallbackLen))
 			addrstr[i++] = *(p++);
 	} else {
 		while(*p != '/' && *p != ':' && i < (sizeof(addrstr)-1)
-		      && p < (h->req_Callback + h->req_CallbackLen))
+		      && p < (h->req_buf + h->req_CallbackOff + h->req_CallbackLen))
 			addrstr[i++] = *(p++);
 	}
 	addrstr[i] = '\0';
@@ -347,9 +347,10 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 	const char * sid;
 	syslog(LOG_DEBUG, "ProcessHTTPSubscribe %s", path);
 	syslog(LOG_DEBUG, "Callback '%.*s' Timeout=%d",
-	       h->req_CallbackLen, h->req_Callback, h->req_Timeout);
-	syslog(LOG_DEBUG, "SID '%.*s'", h->req_SIDLen, h->req_SID);
-	if(!h->req_Callback && !h->req_SID) {
+	       h->req_CallbackLen, h->req_buf + h->req_CallbackOff,
+	       h->req_Timeout);
+	syslog(LOG_DEBUG, "SID '%.*s'", h->req_SIDLen, h->req_buf + h->req_SIDOff);
+	if((h->req_CallbackOff <= 0) && (h->req_SIDOff <= 0)) {
 		/* Missing or invalid CALLBACK : 412 Precondition Failed.
 		 * If CALLBACK header is missing or does not contain a valid HTTP URL,
 		 * the publisher must respond with HTTP error 412 Precondition Failed*/
@@ -362,21 +363,20 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 /* Server:, SID:; Timeout: Second-(xx|infinite) */
 	/* Check that the callback URL is on the same IP as
 	 * the request, and not on the internet, nor on ourself (DOS attack ?) */
-		if(h->req_Callback) {
+		if(h->req_CallbackOff > 0) {
 			if(checkCallbackURL(h)) {
-				sid = upnpevents_addSubscriber(path, h->req_Callback,
+				sid = upnpevents_addSubscriber(path, h->req_buf + h->req_CallbackOff,
 				                               h->req_CallbackLen, h->req_Timeout);
 				h->respflags = FLAG_TIMEOUT;
 				if(sid) {
 					syslog(LOG_DEBUG, "generated sid=%s", sid);
 					h->respflags |= FLAG_SID;
-					h->req_SID = sid;
-					h->req_SIDLen = strlen(sid);
+					h->res_SID = sid;
 				}
 				BuildResp_upnphttp(h, 0, 0);
 			} else {
 				syslog(LOG_WARNING, "Invalid Callback in SUBSCRIBE %.*s",
-	       		       h->req_CallbackLen, h->req_Callback);
+				       h->req_CallbackLen, h->req_buf + h->req_CallbackOff);
 				BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
 			}
 		} else {
@@ -385,7 +385,8 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 412 Precondition Failed. If a SID does not correspond to a known,
 un-expired subscription, the publisher must respond
 with HTTP error 412 Precondition Failed. */
-			if(renewSubscription(h->req_SID, h->req_SIDLen, h->req_Timeout) < 0) {
+			if(renewSubscription(h->req_buf + h->req_SIDOff, h->req_SIDLen,
+			                     h->req_Timeout) < 0) {
 				BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
 			} else {
 				h->respflags = FLAG_TIMEOUT;
@@ -400,9 +401,9 @@ static void
 ProcessHTTPUnSubscribe_upnphttp(struct upnphttp * h, const char * path)
 {
 	syslog(LOG_DEBUG, "ProcessHTTPUnSubscribe %s", path);
-	syslog(LOG_DEBUG, "SID '%.*s'", h->req_SIDLen, h->req_SID);
+	syslog(LOG_DEBUG, "SID '%.*s'", h->req_SIDLen, h->req_buf + h->req_SIDOff);
 	/* Remove from the list */
-	if(upnpevents_removeSubscriber(h->req_SID, h->req_SIDLen) < 0) {
+	if(upnpevents_removeSubscriber(h->req_buf + h->req_SIDOff, h->req_SIDLen) < 0) {
 		BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
 	} else {
 		BuildResp_upnphttp(h, 0, 0);
@@ -670,7 +671,7 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 	if(h->respflags & FLAG_SID) {
 		h->res_buflen += snprintf(h->res_buf + h->res_buflen,
 		                          h->res_buf_alloclen - h->res_buflen,
-		                          "SID: %s\r\n", h->req_SID);
+		                          "SID: %s\r\n", h->res_SID);
 	}
 #endif
 	h->res_buf[h->res_buflen++] = '\r';
