@@ -1,4 +1,4 @@
-# $Id: Makefile.linux,v 1.64 2012/04/20 12:54:01 nanard Exp $
+# $Id: Makefile.linux,v 1.65 2012/04/24 22:41:52 nanard Exp $
 # MiniUPnP project
 # (c) 2006-2012 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -40,7 +40,7 @@ BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpevents.o upnputils.o getconnstatus.o
 
 LNXOBJS = linux/getifstats.o linux/ifacewatcher.o
-NETFILTEROBJS = netfilter/iptcrdr.o
+NETFILTEROBJS = netfilter/iptcrdr.o netfilter/iptpinhole.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
@@ -129,6 +129,8 @@ install:	miniupnpd genuuid
 	$(INSTALL) -d $(ETCINSTALLDIR)
 	$(INSTALL) netfilter/iptables_init.sh $(ETCINSTALLDIR)
 	$(INSTALL) netfilter/iptables_removeall.sh $(ETCINSTALLDIR)
+	$(INSTALL) netfilter/ip6tables_init.sh $(ETCINSTALLDIR)
+	$(INSTALL) netfilter/ip6tables_removeall.sh $(ETCINSTALLDIR)
 	$(INSTALL) --mode=0644 -b miniupnpd.conf $(ETCINSTALLDIR)
 	$(INSTALL) -d $(PREFIX)/etc/init.d
 	$(INSTALL) linux/miniupnpd.init.d.script $(PREFIX)/etc/init.d/miniupnpd

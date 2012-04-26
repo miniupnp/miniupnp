@@ -1,8 +1,15 @@
-$Id: Changelog.txt,v 1.274 2012/04/25 22:26:03 nanard Exp $
+$Id: Changelog.txt,v 1.275 2012/04/26 14:01:15 nanard Exp $
+
+2012/04/26:
+  Started to implement add_pinhole() for netfilter (linux)
 
 2012/04/25:
   Fixed a bug in upnphttp that happened when POST is received in several
   recv() calls and realloc() is called so the buffer used is moved.
+
+2012/04/23:
+  Implement CheckPinholeWorking GetPinholePackets. WANIPv6FirewallControl
+  UpdatePinhole still to be done. And also netfilter/ipf/ipfw versions
 
 2012/04/20:
   Enough WANIPv6FirewallControl is implemented on pf so that AddPinhole() and

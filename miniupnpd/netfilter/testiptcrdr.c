@@ -1,7 +1,7 @@
-/* $Id: testiptcrdr.c,v 1.16 2011/03/02 16:04:23 nanard Exp $ */
+/* $Id: testiptcrdr.c,v 1.18 2012/04/24 22:41:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard
+ * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -11,6 +11,7 @@
 #include <syslog.h>
 
 #include "iptcrdr.h"
+#include "../commonrdr.h"
 
 #ifndef PRIu64
 #define PRIu64 "llu"
@@ -29,21 +30,29 @@ main(int argc, char ** argv)
 	eport = (unsigned short)atoi(argv[1]);
 	iaddr = argv[2];
 	iport = (unsigned short)atoi(argv[3]);
+#if 0
 	printf("trying to redirect port %hu to %s:%hu\n", eport, iaddr, iport);
 	if(addnatrule(IPPROTO_TCP, eport, iaddr, iport) < 0)
 		return -1;
 	if(add_filter_rule(IPPROTO_TCP, iaddr, iport) < 0)
 		return -1;
+#endif
 	/* test */
 	{
 		unsigned short p1, p2;
 		char addr[16];
 		int proto2;
 		char desc[256];
+		char rhost[256];
+		unsigned int timestamp;
 		u_int64_t packets, bytes;
+
 		desc[0] = '\0';
-		if(get_redirect_rule_by_index(0, "", &p1, addr, sizeof(addr),
-                                      &p2, &proto2, desc, sizeof(desc),
+		if(get_redirect_rule_by_index(0, "", &p1,
+		                              addr, sizeof(addr), &p2,
+		                              &proto2, desc, sizeof(desc),
+		                              rhost, sizeof(rhost),
+		                              &timestamp,
 									  &packets, &bytes) < 0)
 		{
 			printf("rule not found\n");

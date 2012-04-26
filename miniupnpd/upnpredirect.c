@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.75 2012/04/23 22:36:57 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.76 2012/04/26 14:01:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -24,6 +24,7 @@
 #include "upnpevents.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
+#include "netfilter/iptpinhole.h"
 #endif
 #if defined(USE_PF)
 #include "pf/obsdrdr.h"
@@ -666,6 +667,9 @@ upnp_add_inboundpinhole(const char * raddr,
 		syslog(LOG_INFO, "Adding pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d and %u lease time.", raddr, rport, iaddr, iport, proto, leasetime);
 #ifdef USE_PF
 		*uid = add_pinhole (0/*ext_if_name*/, raddr, rport, iaddr, iport, proto, timestamp);
+		return 1;
+#elif USE_NETFILTER
+		*uid = add_pinhole (0/*ext_if_name*/, raddr, rport, iaddr, iport, proto);
 		return 1;
 #else
 		return -42;	/* not implemented */

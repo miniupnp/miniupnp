@@ -1,4 +1,4 @@
-/* $Id: upnpglobalvars.h,v 1.31 2012/02/04 23:05:21 nanard Exp $ */
+/* $Id: upnpglobalvars.h,v 1.33 2012/04/26 14:01:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -94,6 +94,9 @@ extern const char * tag;
 #ifdef USE_NETFILTER
 extern const char * miniupnpd_nat_chain;
 extern const char * miniupnpd_forward_chain;
+#ifdef ENABLE_6FC_SERVICE
+extern const char * miniupnpd_v6_filter_chain;
+#endif
 #endif
 
 #ifdef ENABLE_NFQUEUE
