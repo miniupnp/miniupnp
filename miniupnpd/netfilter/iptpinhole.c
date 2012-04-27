@@ -1,4 +1,4 @@
-/* $Id: iptpinhole.c,v 1.2 2012/04/26 14:01:17 nanard Exp $ */
+/* $Id: iptpinhole.c,v 1.3 2012/04/27 06:48:44 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -10,6 +10,7 @@
 #include <syslog.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/queue.h>
 
 #include "../config.h"
 #include "iptpinhole.h"
@@ -25,11 +26,64 @@
 
 static int next_uid = 1;
 
+LIST_HEAD(pinhole_list_t, pinhole_t) pinhole_list;
+
+struct pinhole_t {
+	struct in6_addr saddr;
+	struct in6_addr daddr;
+	LIST_ENTRY(pinhole_t) entries;
+	unsigned int timestamp;
+	unsigned short sport;
+	unsigned short dport;
+	unsigned short uid;
+	unsigned char proto;
+};
+
+void init_iptpinhole(void)
+{
+	LIST_INIT(&pinhole_list);
+}
+
+void shutdown_iptpinhole(void)
+{
+	/* TODO empty list */
+}
+
+/* return uid */
+static int
+add_to_pinhole_list(struct in6_addr * saddr, unsigned short sport,
+                    struct in6_addr * daddr, unsigned short dport,
+                    int proto, unsigned int timestamp)
+{
+	struct pinhole_t * p;
+
+	p = calloc(1, sizeof(struct pinhole_t));
+	if(!p) {
+		syslog(LOG_ERR, "add_to_pinhole_list calloc() error");
+		return -1;
+	}
+	memcpy(&p->saddr, saddr, sizeof(struct in6_addr));
+	p->sport = sport;
+	memcpy(&p->daddr, daddr, sizeof(struct in6_addr));
+	p->dport = dport;
+	p->timestamp = timestamp;
+	p->proto = (unsigned char)proto;
+	LIST_INSERT_HEAD(&pinhole_list, p, entries);
+	p->uid = next_uid;
+	next_uid++;
+	if(next_uid > 65535)
+		next_uid = 1;
+	return p->uid;
+}
+
+/* new_match()
+ * Allocate and set a new ip6t_entry_match structure
+ * The caller must free() it after usage */
 static struct ip6t_entry_match *
 new_match(int proto, unsigned short sport, unsigned short dport)
 {
 	struct ip6t_entry_match *match;
-	struct ip6t_tcp *info;
+	struct ip6t_tcp *info;	/* TODO : use ip6t_udp if needed */
 	size_t size;
 	const char * name;
 	size =   XT_ALIGN(sizeof(struct ip6t_entry_match))
@@ -121,7 +175,7 @@ ip6tables -t raw -I PREROUTING %d -p %s -i %s --sport %hu -d %s --dport %hu -j T
 int add_pinhole(const char * ifname,
                 const char * rem_host, unsigned short rem_port,
                 const char * int_client, unsigned short int_port,
-                int proto)
+                int proto, unsigned int timestamp)
 {
 	int uid;
 	struct ip6t_entry * e;
@@ -162,9 +216,10 @@ int add_pinhole(const char * ifname,
 		free(e);
 		return -1;
 	}
+	uid = add_to_pinhole_list(&e->ipv6.src, rem_port,
+	                          &e->ipv6.dst, int_port,
+	                          proto, timestamp);
 	free(e);
-	uid = next_uid;
-	next_uid++;
 	return uid;
 }
 

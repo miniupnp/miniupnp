@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.152 2012/04/22 00:55:44 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.153 2012/04/27 06:48:42 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -68,6 +68,11 @@
 #include "upnputils.h"
 #ifdef USE_IFACEWATCHER
 #include "ifacewatcher.h"
+#endif
+#ifdef ENABLE_6FC_SERVICE
+#ifdef USE_NETFILTER
+void init_iptpinhole(void);
+#endif
 #endif
 
 #ifndef DEFAULT_CONFIG
@@ -1061,6 +1066,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		syslog(LOG_ERR, "Failed to init redirection engine. EXITING");
 		return 1;
 	}
+#ifdef ENABLE_6FC_SERVICE
+#ifdef USE_NETFILTER
+	init_iptpinhole();
+#endif
+#endif
 
 	if(writepidfile(pidfilename, pid) < 0)
 		pidfilename = NULL;
