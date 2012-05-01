@@ -30,7 +30,7 @@
 #include "../getifstats.h"
 #include "../config.h"
 
-struct nlist list[] = {
+static struct nlist list[] = {
 	{"_ifnet", 0, 0, 0, 0},
 	{NULL,0, 0, 0, 0}
 };
