@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.77 2012/04/27 06:48:44 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.79 2012/04/30 21:08:00 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -18,6 +18,7 @@
 #include <ctype.h>
 #include <unistd.h>
 
+#include "macros.h"
 #include "config.h"
 #include "upnpredirect.h"
 #include "upnpglobalvars.h"
@@ -766,6 +767,7 @@ upnp_get_pinhole_info(unsigned short uid,
 	int r;
 	unsigned int timestamp;
 	u_int64_t packets_tmp, bytes_tmp;
+
 	r = get_pinhole(uid, raddr, raddrlen, rport,
 	                iaddr, iaddrlen, iport, proto, &timestamp,
 	                &packets_tmp, &bytes_tmp);
@@ -783,6 +785,10 @@ upnp_get_pinhole_info(unsigned short uid,
 	}
 	return r;
 #else
+	UNUSED(uid);
+	UNUSED(raddr); UNUSED(raddrlen); UNUSED(rport);
+	UNUSED(iaddr); UNUSED(iaddrlen); UNUSED(iport);
+	UNUSED(proto); UNUSED(leasetime); UNUSED(packets);
 	return -42;	/* not implemented */
 #endif
 }
@@ -792,9 +798,12 @@ upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
 {
 #ifdef USE_PF
 	unsigned int timestamp;
+
 	timestamp = time(NULL) + leasetime;
 	return update_pinhole(uid, timestamp);
 #else
+	UNUSED(uid); UNUSED(leasetime);
+
 	return -42; /* not implemented */
 #endif
 }
@@ -805,10 +814,13 @@ upnp_delete_inboundpinhole(unsigned short uid)
 #ifdef USE_PF
 	return delete_pinhole(uid);
 #else
+	UNUSED(uid);
+
 	return -1;
 #endif
 }
 
+#if 0
 /*
  * Result:
  * 	 1: Found Result
@@ -1025,6 +1037,7 @@ upnp_check_pinhole_working(const char * uid,
 	return -42;	/* to be implemented */
 #endif
 }
+#endif
 
 int
 upnp_clean_expired_pinholes(unsigned int * next_timestamp)
@@ -1032,6 +1045,8 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 #ifdef USE_PF
 	return clean_pinhole_list(next_timestamp);
 #else
+	UNUSED(next_timestamp);
+
 	return 0;	/* nothing to do */
 #endif
 }

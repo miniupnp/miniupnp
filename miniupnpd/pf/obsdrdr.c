@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.c,v 1.73 2012/04/18 20:45:12 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.74 2012/05/01 09:20:43 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -55,6 +55,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../macros.h"
 #include "../config.h"
 #include "obsdrdr.h"
 #include "../upnpglobalvars.h"
@@ -327,6 +328,10 @@ add_filter_rule2(const char * ifname,
 				 int proto, const char * desc)
 {
 #ifndef PF_ENABLE_FILTER_RULES
+	UNUSED(ifname);
+	UNUSED(rhost); UNUSED(iaddr);
+	UNUSED(eport); UNUSED(iport);
+	UNUSED(proto); UNUSED(desc);
 	return 0;
 #else
 	int r;
@@ -460,6 +465,8 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
 #endif
+	UNUSED(ifname);
+
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -559,6 +566,8 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 {
 	int i, n;
 	struct pfioc_rule pr;
+	UNUSED(ifname);
+
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -611,6 +620,7 @@ int
 delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 {
 #ifndef PF_ENABLE_FILTER_RULES
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
 	return 0;
 #else
 	int i, n;

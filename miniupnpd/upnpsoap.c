@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.106 2012/04/23 22:38:06 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.108 2012/04/30 21:08:01 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#include "macros.h"
 #include "config.h"
 #include "upnpglobalvars.h"
 #include "upnphttp.h"
@@ -66,6 +67,8 @@ GetConnectionTypeInfo(struct upnphttp * h, const char * action)
 		"<NewConnectionType>IP_Routed</NewConnectionType>"
 		"<NewPossibleConnectionTypes>IP_Routed</NewPossibleConnectionTypes>"
 		"</u:GetConnectionTypeInfoResponse>";
+	UNUSED(action);
+
 	BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
 }
 
@@ -233,6 +236,7 @@ GetNATRSIPStatus(struct upnphttp * h, const char * action)
 		"<NewRSIPAvailable>0</NewRSIPAvailable>"
 		"<NewNATEnabled>1</NewNATEnabled>"
 		"</u:GetNATRSIPStatusResponse>";
+	UNUSED(action);
 	/* 2.2.9. RSIPAvailable
 	 * This variable indicates if Realm-specific IP (RSIP) is available
 	 * as a feature on the InternetGatewayDevice. RSIP is being defined
@@ -720,6 +724,7 @@ DeletePortMappingRange(struct upnphttp * h, const char * action)
 	int manage;
 	unsigned short * port_list;
 	unsigned int i, number = 0;
+	UNUSED(action);
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	startport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewStartPort"));
@@ -1006,6 +1011,7 @@ SetConnectionType(struct upnphttp * h, const char * action)
 {
 	const char * connection_type;
 	struct NameValueParserData data;
+	UNUSED(action);
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	connection_type = GetValueFromNameValueList(&data, "NewConnectionType");
@@ -1019,6 +1025,7 @@ SetConnectionType(struct upnphttp * h, const char * action)
 static void
 RequestConnection(struct upnphttp * h, const char * action)
 {
+	UNUSED(action);
 	SoapError(h, 606, "Action not authorized");
 }
 
@@ -1026,6 +1033,7 @@ RequestConnection(struct upnphttp * h, const char * action)
 static void
 ForceTermination(struct upnphttp * h, const char * action)
 {
+	UNUSED(action);
 	SoapError(h, 606, "Action not authorized");
 }
 

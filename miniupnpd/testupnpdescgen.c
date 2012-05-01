@@ -1,4 +1,4 @@
-/* $Id: testupnpdescgen.c,v 1.27 2012/02/04 23:34:39 nanard Exp $ */
+/* $Id: testupnpdescgen.c,v 1.29 2012/04/30 21:08:00 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <errno.h>
 
+#include "macros.h"
 #include "config.h"
 #include "upnpdescgen.h"
 
@@ -33,6 +34,7 @@ int ipv6fc_inbound_pinhole_allowed = 1;
 
 int getifaddr(const char * ifname, char * buf, int len)
 {
+	UNUSED(ifname);
 	strncpy(buf, "1.2.3.4", len);
 	return 0;
 }
@@ -44,6 +46,7 @@ int upnp_get_portmapping_number_of_entries(void)
 
 int get_wan_connection_status(const char * ifname)
 {
+	UNUSED(ifname);
 	return 2;
 }
 
@@ -54,6 +57,7 @@ xml_pretty_print(const char * s, int len, FILE * f)
 	int n = 0, i;
 	int elt_close = 0;
 	int c, indent = 0;
+
 	if(!s)
 		return n;
 	while(len > 0)
@@ -121,6 +125,8 @@ main(int argc, char * * argv)
 	char * s;
 	int l;
 	FILE * f;
+	UNUSED(argc);
+	UNUSED(argv);
 
 	if(mkdir("testdescs", 0777) < 0) {
 		if(errno != EEXIST) {

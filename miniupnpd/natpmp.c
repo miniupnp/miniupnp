@@ -1,4 +1,4 @@
-/* $Id: natpmp.c,v 1.28 2012/02/04 23:34:39 nanard Exp $ */
+/* $Id: natpmp.c,v 1.30 2012/04/30 21:08:00 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2012 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -14,6 +14,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#include "macros.h"
 #include "config.h"
 #include "natpmp.h"
 #include "upnpglobalvars.h"
@@ -74,6 +76,7 @@ static void FillPublicAddressResponse(unsigned char * resp, in_addr_t senderaddr
 {
 #ifndef MULTIPLE_EXTERNAL_IP
 	char tmp[16];
+	UNUSED(senderaddr);
 
 	if(use_ext_ip_addr) {
         inet_pton(AF_INET, use_ext_ip_addr, resp+8);
@@ -91,6 +94,7 @@ static void FillPublicAddressResponse(unsigned char * resp, in_addr_t senderaddr
 	}
 #else
 	struct lan_addr_s * lan_addr;
+
 	for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next) {
 		if( (senderaddr & lan_addr->mask.s_addr)
 		   == (lan_addr->addr.s_addr & lan_addr->mask.s_addr)) {

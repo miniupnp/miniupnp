@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.h,v 1.32 2012/04/23 21:46:16 nanard Exp $ */
+/* $Id: upnpredirect.h,v 1.33 2012/04/30 13:45:34 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -150,8 +150,10 @@ int
 upnp_delete_inboundpinhole(unsigned short uid);
 
 /* ... */
+#if 0
 int
 upnp_check_pinhole_working(const char * uid, char * eaddr, char * iaddr, unsigned short * eport, unsigned short * iport, char * protocol, int * rulenum_used);
+#endif
 
 /* ? */
 int
