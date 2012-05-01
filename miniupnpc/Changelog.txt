@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.167 2012/04/20 14:13:10 nanard Exp $
+$Id: Changelog.txt,v 1.168 2012/05/01 16:16:51 nanard Exp $
 miniUPnP client Changelog.
+
+2012/05/01:
+  Cleanup settings of CFLAGS in Makefile
 
 2012/04/20:
   Allow to specify protocol with TCP or UDP for -A option
