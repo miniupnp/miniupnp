@@ -1,4 +1,4 @@
-/* $Id: minixmlvalid.c,v 1.4 2011/02/07 13:44:57 nanard Exp $ */
+/* $Id: minixmlvalid.c,v 1.6 2012/05/01 16:24:07 nanard Exp $ */
 /* MiniUPnP Project
  * http://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/
  * minixmlvalid.c :
@@ -32,7 +32,7 @@ int evtlistcmp(struct eventlist * a, struct eventlist * b)
 	if(a->n != b->n)
 	{
 		printf("event number not matching : %d != %d\n", a->n, b->n);
-		//return 1;
+		/*return 1;*/
 	}
 	for(i=0; i<a->n; i++)
 	{
