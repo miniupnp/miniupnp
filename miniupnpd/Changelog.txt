@@ -1,7 +1,9 @@
-$Id: Changelog.txt,v 1.279 2012/05/01 20:08:20 nanard Exp $
+$Id: Changelog.txt,v 1.280 2012/05/01 22:37:52 nanard Exp $
 
 2012/05/01:
   Move IPv6FirewallControl related code from upnpredirect.c to upnppinhole.c
+  Add netfilter implementation for
+    delete_pinhole()/update_pinhole()/get_pinhole_info()
 
 2012/04/30:
   Clean up settings of CFLAGS in Makefile's

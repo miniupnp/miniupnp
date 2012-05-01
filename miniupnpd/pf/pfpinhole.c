@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.17 2012/04/30 13:37:44 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.18 2012/05/01 22:37:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -202,11 +202,12 @@ int delete_pinhole(unsigned short uid)
 	return -2;
 }
 
-int get_pinhole(unsigned short uid,
-                char * rem_host, int rem_hostlen, unsigned short * rem_port,
-                char * int_client, int int_clientlen, unsigned short * int_port,
-                int * proto, unsigned int * timestamp,
-                u_int64_t * packets, u_int64_t * bytes)
+int
+get_pinhole_info(unsigned short uid,
+                 char * rem_host, int rem_hostlen, unsigned short * rem_port,
+                 char * int_client, int int_clientlen, unsigned short * int_port,
+                 int * proto, unsigned int * timestamp,
+                 u_int64_t * packets, u_int64_t * bytes)
 {
 	int i, n;
 	struct pfioc_rule pr;

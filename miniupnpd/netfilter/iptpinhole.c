@@ -1,4 +1,4 @@
-/* $Id: iptpinhole.c,v 1.3 2012/04/27 06:48:44 nanard Exp $ */
+/* $Id: iptpinhole.c,v 1.4 2012/05/01 22:37:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -26,7 +26,7 @@
 
 static int next_uid = 1;
 
-LIST_HEAD(pinhole_list_t, pinhole_t) pinhole_list;
+static LIST_HEAD(pinhole_list_t, pinhole_t) pinhole_list;
 
 struct pinhole_t {
 	struct in6_addr saddr;
@@ -74,6 +74,18 @@ add_to_pinhole_list(struct in6_addr * saddr, unsigned short sport,
 	if(next_uid > 65535)
 		next_uid = 1;
 	return p->uid;
+}
+
+static struct pinhole_t *
+get_pinhole(unsigned short uid)
+{
+	struct pinhole_t * p;
+
+	for(p = pinhole_list.lh_first; p != NULL; p = p->entries.le_next) {
+		if(p->uid == uid)
+			return p;
+	}
+	return NULL;	/* not found */
 }
 
 /* new_match()
@@ -221,6 +233,115 @@ int add_pinhole(const char * ifname,
 	                          proto, timestamp);
 	free(e);
 	return uid;
+}
+
+int
+delete_pinhole(unsigned short uid)
+{
+	struct pinhole_t * p;
+	IP6TC_HANDLE h;
+	const struct ip6t_entry * e;
+	const struct ip6t_entry_match *match = NULL;
+	/*const struct ip6t_entry_target *target = NULL;*/
+	unsigned int index;
+
+	p = get_pinhole(uid);
+	if(!p)
+		return -2;	/* not found */
+
+	h = ip6tc_init("filter");
+	if(!h) {
+		syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
+		return -1;
+	}
+	if(!ip6tc_is_chain(miniupnpd_v6_filter_chain, h)) {
+		syslog(LOG_ERR, "chain %s not found", miniupnpd_v6_filter_chain);
+		goto error;
+	}
+	index = 0;
+	for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
+	    e;
+	    e = ip6tc_next_rule(e, h)) {
+		if((e->ipv6.proto == p->proto) &&
+		   (0 == memcmp(&e->ipv6.src, &p->saddr, sizeof(e->ipv6.src))) &&
+		   (0 == memcmp(&e->ipv6.dst, &p->daddr, sizeof(e->ipv6.dst)))) {
+			const struct ip6t_tcp * info;
+			match = (const struct ip6t_entry_match *)&e->elems;
+			info = (const struct ip6t_tcp *)&match->data;
+			if((info->spts[0] == p->sport) && (info->dpts[0] == p->dport)) {
+				if(!ip6tc_delete_num_entry(miniupnpd_v6_filter_chain, index, h)) {
+					syslog(LOG_ERR, "ip6tc_delete_num_entry(%s,%d,...): %s",
+					       miniupnpd_v6_filter_chain, index, ip6tc_strerror(errno));
+					goto error;
+				}
+				if(!ip6tc_commit(h)) {
+					syslog(LOG_ERR, "ip6tc_commit(): %s",
+					       ip6tc_strerror(errno));
+					goto error;
+				}
+				ip6tc_free(h);
+				LIST_REMOVE(p, entries);
+				return 0;	/* ok */
+			}
+		}
+		index++;
+	}
+	ip6tc_free(h);
+	syslog(LOG_WARNING, "delete_pinhole() rule with PID=%hu not found", uid);
+	return -2;	/* not found */
+error:
+	ip6tc_free(h);
+	return -1;
+}
+
+int
+update_pinhole(unsigned short uid, unsigned int timestamp)
+{
+	struct pinhole_t * p;
+
+	p = get_pinhole(uid);
+	if(p) {
+		p->timestamp = timestamp;
+		return 0;
+	} else {
+		return -2;	/* Not found */
+	}
+}
+
+int
+get_pinhole_info(unsigned short uid,
+                 char * rem_host, int rem_hostlen, unsigned short * rem_port,
+                 char * int_client, int int_clientlen, unsigned short * int_port,
+                 int * proto, unsigned int * timestamp,
+                 u_int64_t * packets, u_int64_t * bytes)
+{
+	struct pinhole_t * p;
+
+	p = get_pinhole(uid);
+	if(!p)
+		return -2;	/* Not found */
+	if(rem_host) {
+		if(inet_ntop(AF_INET6, &p->saddr, rem_host, rem_hostlen) == NULL)
+			return -1;
+	}
+	if(rem_port)
+		*rem_port = p->sport;
+	if(int_client) {
+		if(inet_ntop(AF_INET6, &p->daddr, int_client, int_clientlen) == NULL)
+			return -1;
+	}
+	if(int_port)
+		*int_port = p->dport;
+	if(proto)
+		*proto = p->proto;
+	if(timestamp)
+		*timestamp = p->timestamp;
+	/* TODO */
+	if(packets)
+		*packets = 0;
+	if(bytes)
+		*bytes = 0;
+	return 0;
 }
 
 #endif

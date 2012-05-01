@@ -1,4 +1,4 @@
-/* $Id: upnppinhole.c,v 1.1 2012/05/01 20:08:22 nanard Exp $ */
+/* $Id: upnppinhole.c,v 1.2 2012/05/01 22:37:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -217,14 +217,14 @@ upnp_get_pinhole_info(unsigned short uid,
                       unsigned int * packets)
 {
 	/* Call Firewall specific code to get IPv6 pinhole infos */
-#ifdef USE_PF
+#if defined(USE_PF) || defined(USE_NETFILTER)
 	int r;
 	unsigned int timestamp;
 	u_int64_t packets_tmp, bytes_tmp;
 
-	r = get_pinhole(uid, raddr, raddrlen, rport,
-	                iaddr, iaddrlen, iport, proto, &timestamp,
-	                &packets_tmp, &bytes_tmp);
+	r = get_pinhole_info(uid, raddr, raddrlen, rport,
+	                     iaddr, iaddrlen, iport, proto, &timestamp,
+	                     &packets_tmp, &bytes_tmp);
 	if(r >= 0) {
 		if(leasetime) {
 			time_t current_time;
@@ -250,7 +250,7 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
 {
-#ifdef USE_PF
+#if defined(USE_PF) || defined(USE_NETFILTER)
 	unsigned int timestamp;
 
 	timestamp = time(NULL) + leasetime;
@@ -265,7 +265,7 @@ upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
 int
 upnp_delete_inboundpinhole(unsigned short uid)
 {
-#ifdef USE_PF
+#if defined(USE_PF) || defined(USE_NETFILTER)
 	return delete_pinhole(uid);
 #else
 	UNUSED(uid);
