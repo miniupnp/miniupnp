@@ -220,7 +220,7 @@ error:
 static void
 upnp_event_notify_connect(struct upnp_event_notify * obj)
 {
-	int i;
+	unsigned int i;
 	const char * p;
 	unsigned short port;
 #ifdef ENABLE_IPV6

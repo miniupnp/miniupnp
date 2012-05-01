@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.33 2012/04/12 13:08:15 nanard Exp $ */
+/* $Id: minissdp.c,v 1.34 2012/04/30 13:46:28 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -434,7 +434,12 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 			known_service_types[i], (i==0?"":"1"),
 			uuidvalue, known_service_types[i], (i==0?"":"1"),
 			upnp_bootid, upnp_bootid, upnp_configid );
-		if(l>=sizeof(bufr))
+		if(l<0)
+		{
+			syslog(LOG_ERR, "SendSSDPNotifies() snprintf error");
+			continue;
+		}
+		if((unsigned int)l >= sizeof(bufr))
 		{
 			syslog(LOG_WARNING, "SendSSDPNotifies(): truncated output");
 			l = sizeof(bufr);

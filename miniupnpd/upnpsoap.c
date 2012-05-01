@@ -917,6 +917,11 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	}
 	bodylen = snprintf(body, bodyalloc, resp_start,
 	              action, SERVICE_TYPE_WANIPC);
+	if(bodylen < 0)
+	{
+		SoapError(h, 501, "ActionFailed");
+		return;
+	}
 	memcpy(body+bodylen, list_start, sizeof(list_start));
 	bodylen += (sizeof(list_start) - 1);
 
@@ -926,7 +931,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	for(i = 0; number > 0 && i < list_size; i++)
 	{
 		/* have a margin of 1024 bytes to store the new entry */
-		if(bodylen + 1024 > bodyalloc)
+		if((unsigned int)bodylen + 1024 > bodyalloc)
 		{
 			bodyalloc += 4096;
 			body = realloc(body, bodyalloc);

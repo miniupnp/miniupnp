@@ -210,7 +210,8 @@ int reload_from_lease_file()
 			continue;
 		}
 		*(desc++) = '\0';
-		timestamp = (unsigned int)atoi(p);
+		/*timestamp = (unsigned int)atoi(p);*/
+		timestamp = (unsigned int)strtoul(p, NULL, 10);
 		/* trim description */
 		while(isspace(*desc))
 			desc++;
@@ -221,7 +222,7 @@ int reload_from_lease_file()
 			*(p--) = '\0';
 
 		if(timestamp > 0) {
-			if(timestamp <= current_time) {
+			if(timestamp <= (unsigned int)current_time) {
 				syslog(LOG_NOTICE, "already expired lease in lease file");
 				continue;
 			} else {
@@ -366,7 +367,9 @@ upnp_get_redirection_infos(unsigned short eport, const char * protocol,
 	                      iaddr, iaddrlen, iport, desc, desclen,
 	                      rhost, rhostlen, &timestamp,
 	                      0, 0);
-	if(r == 0 && timestamp > 0 && timestamp > (current_time = time(NULL))) {
+	if(r == 0 &&
+	   timestamp > 0 &&
+	   timestamp > (unsigned int)(current_time = time(NULL))) {
 		*leaseduration = timestamp - current_time;
 	} else {
 		*leaseduration = 0;
@@ -400,7 +403,7 @@ upnp_get_redirection_infos_by_index(int index,
 	else
 	{
 		current_time = time(NULL);
-		*leaseduration = (timestamp > current_time)
+		*leaseduration = (timestamp > (unsigned int)current_time)
 		                 ? (timestamp - current_time)
 		                 : 0;
 		if(proto == IPPROTO_TCP)
@@ -488,9 +491,9 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		tmp->to_remove = 0;
 		if(timestamp > 0) {
 			/* need to remove this port mapping ? */
-			if(timestamp <= current_time)
+			if(timestamp <= (unsigned int)current_time)
 				tmp->to_remove = 1;
-			else if((nextruletoclean_timestamp <= current_time)
+			else if((nextruletoclean_timestamp <= (unsigned int)current_time)
 			       || (timestamp < nextruletoclean_timestamp))
 				nextruletoclean_timestamp = timestamp;
 		}
@@ -775,7 +778,7 @@ upnp_get_pinhole_info(unsigned short uid,
 		if(leasetime) {
 			time_t current_time;
 			current_time = time(NULL);
-			if(timestamp > current_time)
+			if(timestamp > (unsigned int)current_time)
 				*leasetime = timestamp - current_time;
 			else
 				*leasetime = 0;

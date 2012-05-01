@@ -1,4 +1,4 @@
-/* $Id: options.c,v 1.23 2012/02/05 00:29:49 nanard Exp $ */
+/* $Id: options.c,v 1.25 2012/04/30 13:38:21 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -17,7 +17,7 @@
 
 struct option * ary_options = NULL;
 static char * string_repo = NULL;
-int num_options = 0;
+unsigned int num_options = 0;
 
 static const struct {
 	enum upnpconfigoptions id;
@@ -72,7 +72,7 @@ readoptionsfile(const char * fname)
 	char *value;
 	char *t;
 	int linenum = 0;
-	int i;
+	unsigned int i;
 	enum upnpconfigoptions id;
 	size_t string_repo_len = 0;
 	size_t len;

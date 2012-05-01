@@ -1,4 +1,4 @@
-/* $Id: upnpdescgen.c,v 1.64 2012/02/04 23:05:21 nanard Exp $ */
+/* $Id: upnpdescgen.c,v 1.67 2012/04/30 14:03:52 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -824,7 +824,7 @@ strcat_int(char * str, int * len, int * tmplen, int i)
 		return str;
 	}
 	j = 0;
-	while(i && j < sizeof(buf)) {
+	while(i && j < (int)sizeof(buf)) {
 		buf[j++] = '0' + (i % 10);
 		i = i / 10;
 	}

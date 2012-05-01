@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.70 2012/04/25 22:28:34 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.71 2012/04/30 13:46:29 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -287,7 +287,7 @@ checkCallbackURL(struct upnphttp * h)
 	char addrstr[48];
 	int ipv6;
 	const char * p;
-	int i;
+	unsigned int i;
 
 	if(h->req_CallbackOff <= 0 || h->req_CallbackLen < 8)
 		return 0;

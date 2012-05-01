@@ -1,4 +1,4 @@
-/* $Id: options.h,v 1.18 2012/02/05 00:29:49 nanard Exp $ */
+/* $Id: options.h,v 1.20 2012/04/30 13:38:21 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -69,7 +69,7 @@ struct option
 };
 
 extern struct option * ary_options;
-extern int num_options;
+extern unsigned int num_options;
 
 #endif
 
