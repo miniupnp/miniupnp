@@ -286,7 +286,7 @@ end_of_stream:
  * do all the work.
  * Return NULL if something failed. */
 static void *
-miniwget3(const char * url, const char * host,
+miniwget3(const char * host,
           unsigned short port, const char * path,
           int * size, char * addr_str, int addr_str_len,
           const char * httpversion)
@@ -390,22 +390,22 @@ miniwget3(const char * url, const char * host,
 /* miniwget2() :
  * Call miniwget3(); retry with HTTP/1.1 if 1.0 fails. */
 static void *
-miniwget2(const char * url, const char * host,
+miniwget2(const char * host,
 		  unsigned short port, const char * path,
 		  int * size, char * addr_str, int addr_str_len)
 {
 	char * respbuffer;
 
-	respbuffer = miniwget3(url, host, port, path, size, addr_str, addr_str_len, "1.1");
+	respbuffer = miniwget3(host, port, path, size, addr_str, addr_str_len, "1.1");
 /*
-	respbuffer = miniwget3(url, host, port, path, size, addr_str, addr_str_len, "1.0");
+	respbuffer = miniwget3(host, port, path, size, addr_str, addr_str_len, "1.0");
 	if (*size == 0)
 	{
 #ifdef DEBUG
 		printf("Retrying with HTTP/1.1\n");
 #endif
 		free(respbuffer);
-		respbuffer = miniwget3(url, host, port, path, size, addr_str, addr_str_len, "1.1");
+		respbuffer = miniwget3(host, port, path, size, addr_str, addr_str_len, "1.1");
 	}
 */
 	return respbuffer;
@@ -502,7 +502,7 @@ void * miniwget(const char * url, int * size)
 #ifdef DEBUG
 	printf("parsed url : hostname='%s' port=%hu path='%s'\n", hostname, port, path);
 #endif
-	return miniwget2(url, hostname, port, path, size, 0, 0);
+	return miniwget2(hostname, port, path, size, 0, 0);
 }
 
 void * miniwget_getaddr(const char * url, int * size, char * addr, int addrlen)
@@ -519,6 +519,6 @@ void * miniwget_getaddr(const char * url, int * size, char * addr, int addrlen)
 #ifdef DEBUG
 	printf("parsed url : hostname='%s' port=%hu path='%s'\n", hostname, port, path);
 #endif
-	return miniwget2(url, hostname, port, path, size, addr, addrlen);
+	return miniwget2(hostname, port, path, size, addr, addrlen);
 }
 
