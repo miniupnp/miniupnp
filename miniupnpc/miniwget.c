@@ -1,4 +1,4 @@
-/* $Id: miniwget.c,v 1.54 2012/01/21 13:30:32 nanard Exp $ */
+/* $Id: miniwget.c,v 1.56 2012/05/01 16:16:08 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
@@ -69,13 +69,13 @@ getHTTPResponse(int s, int * size)
 	unsigned int bytestocopy = 0;
 	/* buffers : */
 	char * header_buf;
-	int header_buf_len = 2048;
-	int header_buf_used = 0;
+	unsigned int header_buf_len = 2048;
+	unsigned int header_buf_used = 0;
 	char * content_buf;
-	int content_buf_len = 2048;
-	int content_buf_used = 0;
+	unsigned int content_buf_len = 2048;
+	unsigned int content_buf_used = 0;
 	char chunksize_buf[32];
-	int chunksize_buf_index;
+	unsigned int chunksize_buf_index;
 
 	header_buf = malloc(header_buf_len);
 	content_buf = malloc(content_buf_len);
@@ -99,14 +99,14 @@ getHTTPResponse(int s, int * size)
 			/* search for CR LF CR LF (end of headers)
 			 * recognize also LF LF */
 			i = 0;
-			while(i < (header_buf_used-1) && (endofheaders == 0)) {
+			while(i < ((int)header_buf_used-1) && (endofheaders == 0)) {
 				if(header_buf[i] == '\r') {
 					i++;
 					if(header_buf[i] == '\n') {
 						i++;
-						if(i < header_buf_used && header_buf[i] == '\r') {
+						if(i < (int)header_buf_used && header_buf[i] == '\r') {
 							i++;
-							if(i < header_buf_used && header_buf[i] == '\n') {
+							if(i < (int)header_buf_used && header_buf[i] == '\n') {
 								endofheaders = i+1;
 							}
 						}
@@ -196,7 +196,7 @@ getHTTPResponse(int s, int * size)
 							i++; /* discarding chunk-extension */
 						if(i<n && buf[i] == '\r') i++;
 						if(i<n && buf[i] == '\n') {
-							int j;
+							unsigned int j;
 							for(j = 0; j < chunksize_buf_index; j++) {
 							if(chunksize_buf[j] >= '0'
 							   && chunksize_buf[j] <= '9')
@@ -223,13 +223,13 @@ getHTTPResponse(int s, int * size)
 							goto end_of_stream;
 						}
 					}
-					bytestocopy = ((int)chunksize < n - i)?chunksize:(n - i);
-					if((int)(content_buf_used + bytestocopy) > content_buf_len)
+					bytestocopy = ((int)chunksize < (n - i))?chunksize:(unsigned int)(n - i);
+					if((content_buf_used + bytestocopy) > content_buf_len)
 					{
-						if(content_length >= content_buf_used + (int)bytestocopy) {
+						if(content_length >= (int)(content_buf_used + bytestocopy)) {
 							content_buf_len = content_length;
 						} else {
-							content_buf_len = content_buf_used + (int)bytestocopy;
+							content_buf_len = content_buf_used + bytestocopy;
 						}
 						content_buf = (char *)realloc((void *)content_buf,
 						                              content_buf_len);
@@ -244,13 +244,13 @@ getHTTPResponse(int s, int * size)
 			{
 				/* not chunked */
 				if(content_length > 0
-				   && (content_buf_used + n) > content_length) {
+				   && (int)(content_buf_used + n) > content_length) {
 					/* skipping additional bytes */
 					n = content_length - content_buf_used;
 				}
 				if(content_buf_used + n > content_buf_len)
 				{
-					if(content_length >= content_buf_used + n) {
+					if(content_length >= (int)(content_buf_used + n)) {
 						content_buf_len = content_length;
 					} else {
 						content_buf_len = content_buf_used + n;
@@ -263,7 +263,7 @@ getHTTPResponse(int s, int * size)
 			}
 		}
 		/* use the Content-Length header value if available */
-		if(content_length > 0 && content_buf_used >= content_length)
+		if(content_length > 0 && (int)content_buf_used >= content_length)
 		{
 #ifdef DEBUG
 			printf("End of HTTP content\n");

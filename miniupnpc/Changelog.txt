@@ -3,6 +3,7 @@ miniUPnP client Changelog.
 
 2012/05/01:
   Cleanup settings of CFLAGS in Makefile
+  Fix signed/unsigned integer comparaisons
 
 2012/04/20:
   Allow to specify protocol with TCP or UDP for -A option

@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.8 2012/04/06 13:53:52 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.10 2012/05/01 16:24:36 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011 Thomas Bernard
@@ -190,7 +190,7 @@ void handle_http_connection(int c)
 	int content_length = 16*1024;
 
 	/* read the request */
-	while(request_len < sizeof(request_buffer) && !headers_found) {
+	while(request_len < (int)sizeof(request_buffer) && !headers_found) {
 		n = read(c,
 		         request_buffer + request_len,
 		         sizeof(request_buffer) - request_len);
@@ -218,7 +218,7 @@ void handle_http_connection(int c)
 	printf("headers :\n%.*s", request_len, request_buffer);
 	/* the request have been received, now parse the request line */
 	p = request_buffer;
-	for(i = 0; i < sizeof(request_method) - 1; i++) {
+	for(i = 0; i < (int)sizeof(request_method) - 1; i++) {
 		if(*p == ' ' || *p == '\r')
 			break;
 		request_method[i] = *p;
@@ -227,7 +227,7 @@ void handle_http_connection(int c)
 	request_method[i] = '\0';
 	while(*p == ' ')
 		p++;
-	for(i = 0; i < sizeof(request_uri) - 1; i++) {
+	for(i = 0; i < (int)sizeof(request_uri) - 1; i++) {
 		if(*p == ' ' || *p == '\r')
 			break;
 		request_uri[i] = *p;
@@ -236,7 +236,7 @@ void handle_http_connection(int c)
 	request_uri[i] = '\0';
 	while(*p == ' ')
 		p++;
-	for(i = 0; i < sizeof(http_version) - 1; i++) {
+	for(i = 0; i < (int)sizeof(http_version) - 1; i++) {
 		if(*p == ' ' || *p == '\r')
 			break;
 		http_version[i] = *p;
