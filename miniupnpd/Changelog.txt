@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.275 2012/04/26 14:01:15 nanard Exp $
+$Id: Changelog.txt,v 1.278 2012/04/30 21:21:32 nanard Exp $
+
+2012/04/30:
+  Fix error handling in upnpevents.c (was causing segfault on Solaris !)
 
 2012/04/26:
   Started to implement add_pinhole() for netfilter (linux)

@@ -1,4 +1,4 @@
-/* $Id: upnpevents.c,v 1.20 2012/02/06 23:41:15 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.24 2012/04/30 21:21:33 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2008-2012 Thomas Bernard
@@ -346,8 +346,14 @@ static void upnp_event_prepare(struct upnp_event_notify * obj)
 	}
 	obj->buffersize = 1024;
 	obj->buffer = malloc(obj->buffersize);
-	/*if(!obj->buffer) {
-	}*/
+	if(!obj->buffer) {
+		syslog(LOG_ERR, "%s: malloc returned NULL", "upnp_event_prepare");
+		if(xml) {
+			free(xml);
+		}
+		obj->state = EError;
+		return;
+	}
 	obj->tosend = snprintf(obj->buffer, obj->buffersize, notifymsg,
 	                       obj->path, obj->addrstr, obj->portstr, l+2,
 	                       obj->sub->uuid, obj->sub->seq,
@@ -362,6 +368,7 @@ static void upnp_event_prepare(struct upnp_event_notify * obj)
 static void upnp_event_send(struct upnp_event_notify * obj)
 {
 	int i;
+
 	syslog(LOG_DEBUG, "%s: sending event notify message to %s:%s",
 	       "upnp_event_send", obj->addrstr, obj->portstr);
 	syslog(LOG_DEBUG, "%s: msg: %s",
@@ -415,7 +422,8 @@ upnp_event_process_notify(struct upnp_event_notify * obj)
 	case EConnecting:
 		/* now connected or failed to connect */
 		upnp_event_prepare(obj);
-		upnp_event_send(obj);
+		if(obj->state == ESending)
+			upnp_event_send(obj);
 		break;
 	case ESending:
 		upnp_event_send(obj);
