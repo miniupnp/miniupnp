@@ -3,6 +3,7 @@ $Id: Changelog.txt,v 1.278 2012/04/30 21:21:32 nanard Exp $
 2012/04/30:
   Clean up settings of CFLAGS in Makefile's
   Remove Warnings caused by signed/unsigned integer comparaisons
+  Also fix a couple of integer/pointer comparaisons.
   Add UNUSED(arg) macro to remove unused argument warning.
   Fix error handling in upnpevents.c (was causing segfault on Solaris !)
 

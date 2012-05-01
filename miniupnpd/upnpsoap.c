@@ -1250,7 +1250,7 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
         freeaddrinfo(p);
 	}
 
-	if(inet_ntop(AF_INET6, &(h->clientaddr_v6), senderAddr, INET6_ADDRSTRLEN)<=0)
+	if(inet_ntop(AF_INET6, &(h->clientaddr_v6), senderAddr, INET6_ADDRSTRLEN) == NULL)
 	{
 		syslog(LOG_ERR, "inet_ntop: %m");
 	}

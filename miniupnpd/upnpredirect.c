@@ -393,7 +393,7 @@ upnp_get_redirection_infos_by_index(int index,
 
 	if(desc && (desclen > 0))
 		desc[0] = '\0';
-	if(rhost && (rhost > 0))
+	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
 	if(get_redirect_rule_by_index(index, 0/*ifname*/, eport, iaddr, iaddrlen,
 	                              iport, &proto, desc, desclen,
