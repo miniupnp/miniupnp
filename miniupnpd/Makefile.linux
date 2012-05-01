@@ -1,4 +1,4 @@
-# $Id: Makefile.linux,v 1.65 2012/04/24 22:41:52 nanard Exp $
+# $Id: Makefile.linux,v 1.67 2012/04/30 21:06:28 nanard Exp $
 # MiniUPnP project
 # (c) 2006-2012 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -20,8 +20,14 @@
 # ./configure them and build them then miniupnpd will build using :
 # $ IPTABLESPATH=/path/to/iptables-1.4.1 make -f Makefile.linux
 #
-#CFLAGS = -Wall -O -D_GNU_SOURCE -g -DDEBUG -fno-strict-aliasing -Wstrict-prototypes -Wdeclaration-after-statement -ansi
-CFLAGS ?= -Wall -Os -D_GNU_SOURCE -fno-strict-aliasing -Wstrict-prototypes -Wdeclaration-after-statement -ansi
+#CFLAGS = -O -g -DDEBUG
+CFLAGS ?= -Os
+CFLAGS += -fno-strict-aliasing
+CFLAGS += -fno-common
+CFLAGS += -D_GNU_SOURCE
+CFLAGS += -Wall
+CFLAGS += -Wextra -Wstrict-prototypes -Wdeclaration-after-statement
+CFLAGS += -ansi
 CC ?= gcc
 RM = rm -f
 INSTALL = install

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.63 2012/04/20 13:50:24 nanard Exp $
+# $Id: Makefile,v 1.64 2012/04/30 13:58:31 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -15,8 +15,11 @@
 # $ CONFIG_OPTIONS="--ipv6 --igd2" make
 #
 
-CFLAGS = -pipe -Wall -Os -ansi
-#CFLAGS = -pipe -Wall -O -g -DDEBUG -ansi
+CFLAGS ?= -pipe -Os
+#CFLAGS = -pipe -O -g -DDEBUG
+CFLAGS += -ansi
+CFLAGS += -Wall
+CFLAGS += -W
 CC ?= gcc
 RM = rm -f
 MV = mv
