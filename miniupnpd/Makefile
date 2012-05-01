@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.64 2012/04/30 13:58:31 nanard Exp $
+# $Id: Makefile,v 1.65 2012/05/01 20:11:40 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -73,7 +73,8 @@ CFLAGS += -m64 -mcmodel=medlow
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
           options.o upnppermissions.o minissdp.o natpmp.o \
-          upnpevents.o upnputils.o getconnstatus.o
+          upnpevents.o upnputils.o getconnstatus.o \
+          upnppinhole.o
 BSDOBJS = bsd/getifstats.o bsd/ifacewatcher.o
 SUNOSOBJS = solaris/getifstats.o bsd/ifacewatcher.o
 MACOBJS = mac/getifstats.o bsd/ifacewatcher.o

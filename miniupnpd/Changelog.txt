@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.278 2012/04/30 21:21:32 nanard Exp $
+$Id: Changelog.txt,v 1.279 2012/05/01 20:08:20 nanard Exp $
+
+2012/05/01:
+  Move IPv6FirewallControl related code from upnpredirect.c to upnppinhole.c
 
 2012/04/30:
   Clean up settings of CFLAGS in Makefile's

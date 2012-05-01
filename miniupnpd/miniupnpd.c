@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.154 2012/04/30 13:38:21 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.155 2012/05/01 20:13:35 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -58,6 +58,7 @@
 #include "options.h"
 #include "minissdp.h"
 #include "upnpredirect.h"
+#include "upnppinhole.h"
 #include "miniupnpdtypes.h"
 #include "daemonize.h"
 #include "upnpevents.h"
