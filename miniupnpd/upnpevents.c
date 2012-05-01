@@ -140,7 +140,7 @@ renewSubscription(const char * sid, int sidlen, int timeout)
 {
 	struct subscriber * sub;
 	for(sub = subscriberlist.lh_first; sub != NULL; sub = sub->entries.le_next) {
-		if(memcmp(sid, sub->uuid, 41) == 0) {
+		if((sidlen == 41) && (memcmp(sid, sub->uuid, 41) == 0)) {
 			sub->timeout = (timeout ? time(NULL) + timeout : 0);
 			return 0;
 		}
@@ -155,7 +155,7 @@ upnpevents_removeSubscriber(const char * sid, int sidlen)
 	if(!sid)
 		return -1;
 	for(sub = subscriberlist.lh_first; sub != NULL; sub = sub->entries.le_next) {
-		if(memcmp(sid, sub->uuid, 41) == 0) {
+		if((sidlen == 41) && (memcmp(sid, sub->uuid, 41) == 0)) {
 			if(sub->notify) {
 				sub->notify->sub = NULL;
 			}
