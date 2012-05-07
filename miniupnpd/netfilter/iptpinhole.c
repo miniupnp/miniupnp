@@ -1,4 +1,4 @@
-/* $Id: iptpinhole.c,v 1.4 2012/05/01 22:37:53 nanard Exp $ */
+/* $Id: iptpinhole.c,v 1.6 2012/05/07 15:40:04 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -336,11 +336,36 @@ get_pinhole_info(unsigned short uid,
 		*proto = p->proto;
 	if(timestamp)
 		*timestamp = p->timestamp;
-	/* TODO */
-	if(packets)
-		*packets = 0;
-	if(bytes)
-		*bytes = 0;
+	if(packets || bytes) {
+		/* theses informations need to be read from netfilter */
+		IP6TC_HANDLE h;
+		const struct ip6t_entry * e;
+		const struct ip6t_entry_match * match;
+		h = ip6tc_init("filter");
+		if(!h) {
+			syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
+			return -1;
+		}
+		for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
+		    e;
+		    e = ip6tc_next_rule(e, h)) {
+			if((e->ipv6.proto == p->proto) &&
+			   (0 == memcmp(&e->ipv6.src, &p->saddr, sizeof(e->ipv6.src))) &&
+			   (0 == memcmp(&e->ipv6.dst, &p->daddr, sizeof(e->ipv6.dst)))) {
+				const struct ip6t_tcp * info;
+				match = (const struct ip6t_entry_match *)&e->elems;
+				info = (const struct ip6t_tcp *)&match->data;
+				if((info->spts[0] == p->sport) && (info->dpts[0] == p->dport)) {
+					if(packets)
+						*packets = e->counters.pcnt;
+					if(bytes)
+						*bytes = e->counters.bcnt;
+					break;
+				}
+			}
+		}
+		ip6tc_free(h);
+	}
 	return 0;
 }
 
