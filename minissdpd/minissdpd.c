@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.30 2012/04/09 21:50:18 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.31 2012/05/02 10:28:25 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2012 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -573,12 +573,13 @@ void processRequest(struct reqelem * req)
 			} else {
 				/* test if we can put more responses in the buffer */
 				if(d->headers[HEADER_LOCATION].l + d->headers[HEADER_NT].l
-				  + d->headers[HEADER_USN].l + 6 + (rp - rbuf) >= sizeof(rbuf))
-				  	break;
+				  + d->headers[HEADER_USN].l + 6
+				  + (rp - rbuf) >= (int)sizeof(rbuf))
+					break;
 				if( (type==1 && 0==memcmp(d->headers[HEADER_NT].p, p, l))
 				  ||(type==2 && 0==memcmp(d->headers[HEADER_USN].p, p, l))
 				  ||(type==3) ) {
-				  	/* response :
+					/* response :
 					 * 1 - Location
 					 * 2 - NT (device/service type)
 					 * 3 - usn */

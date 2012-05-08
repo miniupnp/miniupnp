@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.25 2012/05/02 10:30:40 nanard Exp $
 
 2012/05/02:
 	Clean CLFAGS in Makefile.
+	Remove a few signed/unsigned compares
 
 2012/04/09:
 	Added -ansi to compilation flags.

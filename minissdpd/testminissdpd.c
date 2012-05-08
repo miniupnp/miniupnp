@@ -1,4 +1,4 @@
-/* $Id: testminissdpd.c,v 1.6 2007/12/19 14:49:30 nanard Exp $ */
+/* $Id: testminissdpd.c,v 1.7 2012/05/02 10:28:25 nanard Exp $ */
 /* Project : miniupnp
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
@@ -26,7 +26,7 @@ void printresponse(const unsigned char * resp, int n)
 	printf("\n");
 	nresp = resp[0];
 	p = resp + 1;
-	for(i = 0; i < nresp; i++) {
+	for(i = 0; i < (int)nresp; i++) {
 		/*l = *(p++);*/
 		DECODELENGTH(l, p);
 		printf("%d - %.*s\n", i, l, p);
