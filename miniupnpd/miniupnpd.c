@@ -1169,7 +1169,6 @@ main(int argc, char * * argv)
 	struct rule_state * rule_list = 0;
 	struct timeval checktime = {0, 0};
 	struct lan_addr_s * lan_addr;
-	syslog(LOG_INFO, "SNet version started");
 
 	if(init(argc, argv, &v) != 0)
 		return 1;
