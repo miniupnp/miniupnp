@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.281 2012/05/07 15:40:03 nanard Exp $
+$Id: Changelog.txt,v 1.282 2012/05/08 20:41:44 nanard Exp $
+
+2012/05/08:
+  Clean expired IPv6 pinholes correctly. and also with linux/netfilter.
 
 2012/05/07:
   Finalizing netfilter version of get_pinhole_info()

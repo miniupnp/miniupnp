@@ -1,4 +1,4 @@
-/* $Id: upnppinhole.c,v 1.3 2012/05/07 15:40:04 nanard Exp $ */
+/* $Id: upnppinhole.c,v 1.4 2012/05/08 20:41:45 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -499,7 +499,7 @@ upnp_check_pinhole_working(const char * uid,
 int
 upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
-#ifdef USE_PF
+#if defined(USE_PF) || defined(USE_NETFILTER)
 	return clean_pinhole_list(next_timestamp);
 #else
 	UNUSED(next_timestamp);

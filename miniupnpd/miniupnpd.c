@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.155 2012/05/01 20:13:35 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.156 2012/05/08 20:41:45 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1169,6 +1169,9 @@ main(int argc, char * * argv)
 	struct rule_state * rule_list = 0;
 	struct timeval checktime = {0, 0};
 	struct lan_addr_s * lan_addr;
+#ifdef ENABLE_6FC_SERVICE
+	unsigned int next_pinhole_ts;
+#endif
 
 	if(init(argc, argv, &v) != 0)
 		return 1;
@@ -1424,7 +1427,13 @@ main(int argc, char * * argv)
 #endif
 #ifdef ENABLE_6FC_SERVICE
 		/* Clean up expired IPv6 PinHoles */
-		upnp_clean_expired_pinholes(NULL);
+		next_pinhole_ts = 0;
+		upnp_clean_expired_pinholes(&next_pinhole_ts);
+		if(next_pinhole_ts &&
+		   timeout.tv_sec >= (next_pinhole_ts - timeofday.tv_sec)) {
+			timeout.tv_sec = next_pinhole_ts - timeofday.tv_sec;
+			timeout.tv_usec = 0;
+		}
 #endif
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
