@@ -1,4 +1,4 @@
-/* $Id: openssdpsocket.c,v 1.10 2012/04/09 21:50:18 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.11 2012/05/02 23:09:45 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -82,6 +82,8 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 	unsigned int ifindex;
 #endif
 
+	if(s <= 0)
+		return -1;	/* nothing to do */
 #ifdef ENABLE_IPV6
 	if(ipv6)
 	{
