@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.94 2012/04/20 14:13:10 nanard Exp $ */
+/* $Id: upnpc.c,v 1.95 2012/05/02 20:14:43 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2012 Thomas Bernard
@@ -335,12 +335,14 @@ static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
 	}
 	if(atoi(proto) == 0)
 	{
-		if(strcmp("TCP", protofix(proto)) == 0)
+		const char * protocol;
+		protocol = protofix(proto);
+		if(protocol && (strcmp("TCP", protocol) == 0))
 		{
 			snprintf(proto_tmp, sizeof(proto_tmp), "%d", IPPROTO_TCP);
 			proto = proto_tmp;
 		}
-		else if(strcmp("UDP", protofix(proto)) == 0)
+		else if(protocol && (strcmp("UDP", protocol) == 0))
 		{
 			snprintf(proto_tmp, sizeof(proto_tmp), "%d", IPPROTO_UDP);
 			proto = proto_tmp;
