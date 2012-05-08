@@ -1,4 +1,4 @@
-/* $Id: testcodelength.c,v 1.2 2011/06/17 23:05:00 nanard Exp $ */
+/* $Id: testcodelength.c,v 1.3 2012/05/02 10:30:26 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
  * copyright (c) 2005-2008 Thomas Bernard
@@ -12,6 +12,7 @@ int main(int argc, char * * argv)
 	unsigned char buf[256];
 	unsigned char * p;
 	long i, j;
+	(void)argc; (void)argv;
 
 	for(i = 1; i < 1000000000; i *= 2) {
 		/* encode i, decode to j */
