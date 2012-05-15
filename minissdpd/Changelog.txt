@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.25 2012/05/02 10:30:40 nanard Exp $
+$Id: Changelog.txt,v 1.26 2012/05/15 22:02:23 nanard Exp $
+
+2012/05/15:
+	Improve ProcessInterfaceWatch() under linux.
 
 2012/05/02:
 	Clean CLFAGS in Makefile.
