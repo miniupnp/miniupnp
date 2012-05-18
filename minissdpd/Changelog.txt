@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.26 2012/05/15 22:02:23 nanard Exp $
+$Id: Changelog.txt,v 1.27 2012/05/18 10:35:11 nanard Exp $
+
+2012/05/18:
+	Improve ProcessInterfaceWatch() under BSD.
 
 2012/05/15:
 	Improve ProcessInterfaceWatch() under linux.

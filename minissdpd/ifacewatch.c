@@ -1,4 +1,4 @@
-/* $Id: ifacewatch.c,v 1.7 2012/05/15 22:02:23 nanard Exp $ */
+/* $Id: ifacewatch.c,v 1.12 2012/05/18 11:46:55 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2011-2012 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -20,10 +20,23 @@
 #include <linux/rtnetlink.h>
 #else	/* __linux__ */
 #include <net/route.h>
+#ifdef AF_LINK
+#include <net/if_dl.h>
 #endif
+#endif	/* __linux__ */
 #include <syslog.h>
 
 #include "openssdpsocket.h"
+#include "upnputils.h"
+
+#ifndef __linux__
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
+#define SALIGN (sizeof(long) - 1)
+#else
+#define SALIGN (sizeof(int32_t) - 1)
+#endif
+#define SA_RLEN(sa) ((sa)->sa_len ? (((sa)->sa_len + SALIGN) & ~SALIGN) : (SALIGN + 1))
+#endif
 
 int
 OpenAndConfInterfaceWatchSocket(void)
@@ -145,6 +158,9 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6,
 				}
 				syslog(LOG_DEBUG, " rta_len=%d rta_type=%d '%s'", rta->rta_len, rta->rta_type, tmp);
 			}
+			syslog(LOG_INFO, "%s: %s/%d %s",
+			       is_del ? "RTM_DELADDR" : "RTM_NEWADDR",
+			       address, ifa->ifa_prefixlen, ifname);
 			for(i = 0; i < n_if_addr; i++) {
 				if((0 == strcmp(address, if_addr[i])) ||
 				   (0 == strcmp(ifname, if_addr[i])) ||
@@ -164,6 +180,18 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6,
 #else /* __linux__ */
 	struct rt_msghdr * rtm;
 	struct ifa_msghdr * ifam;
+	int is_del = 0;
+	char tmp[64];
+	char * p;
+	struct sockaddr * sa;
+	int addr;
+	char address[48];
+	char ifname[IFNAMSIZ];
+	int family = AF_UNSPEC;
+	int prefixlen = 0;
+
+	address[0] = '\0';
+	ifname[0] = '\0';
 
 	len = recv(s, buffer, sizeof(buffer), 0);
 	if(len < 0) {
@@ -172,33 +200,115 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6,
 	}
 	rtm = (struct rt_msghdr *)buffer;
 	switch(rtm->rtm_type) {
+	case RTM_DELADDR:
+		is_del = 1;
 	case RTM_NEWADDR:
 		ifam = (struct ifa_msghdr *)buffer;
-		syslog(LOG_DEBUG, "%s %s index=%d",
-		       "ProcessInterfaceWatchNotify", "RTM_NEWADDR", ifam->ifam_index);
-		for(i = 0; i < n_if_addr; i++) {
-			if(ifam->ifam_index == if_nametoindex(if_addr[i])) {
-				AddDropMulticastMembership(s_ssdp, if_addr[i], 0, 0);
-				AddDropMulticastMembership(s_ssdp6, if_addr[i], 1, 0);
+		syslog(LOG_DEBUG, "%s %s len=%d/%hu index=%hu addrs=%x flags=%x",
+		       "ProcessInterfaceWatchNotify", is_del?"RTM_DELADDR":"RTM_NEWADDR",
+		       (int)len, ifam->ifam_msglen,
+		       ifam->ifam_index, ifam->ifam_addrs, ifam->ifam_flags);
+		p = buffer + sizeof(struct ifa_msghdr);
+		addr = 1;
+		while(p < buffer + len) {
+			sa = (struct sockaddr *)p;
+			while(!(addr & ifam->ifam_addrs) && (addr <= ifam->ifam_addrs))
+				addr = addr << 1;
+			sockaddr_to_string(sa, tmp, sizeof(tmp));
+			syslog(LOG_DEBUG, " %s", tmp);
+			switch(addr) {
+			case RTA_DST:
+			case RTA_GATEWAY:
+				break;
+			case RTA_NETMASK:
+				if(sa->sa_family == AF_INET
+#if defined(__OpenBSD__)
+				   || (sa->sa_family == 0 &&
+				       sa->sa_len <= sizeof(struct sockaddr_in))
+#endif
+				   ) {
+					uint32_t sin_addr = ntohl(((struct sockaddr_in *)sa)->sin_addr.s_addr);
+					while((prefixlen < 32) &&
+					      ((sin_addr & (1 << (31 - prefixlen))) != 0))
+						prefixlen++;
+				} else if(sa->sa_family == AF_INET6
+#if defined(__OpenBSD__)
+				          || (sa->sa_family == 0 &&
+				              sa->sa_len == sizeof(struct sockaddr_in6))
+#endif
+				          ) {
+					int i = 0;
+					uint8_t * q =  ((struct sockaddr_in6 *)sa)->sin6_addr.s6_addr;
+					while((*q == 0xff) && (i < 16)) {
+						prefixlen += 8;
+						q++; i++;
+					}
+					if(i < 16) {
+						i = 0;
+						while((i < 8) &&
+						      ((*q & (1 << (7 - i))) != 0))
+							i++;
+						prefixlen += i;
+					}
+				}
+				break;
+			case RTA_GENMASK:
+				break;
+			case RTA_IFP:
+#ifdef AF_LINK
+				if(sa->sa_family == AF_LINK) {
+					struct sockaddr_dl * sdl = (struct sockaddr_dl *)sa;
+					memset(ifname, 0, sizeof(ifname));
+					memcpy(ifname, sdl->sdl_data, sdl->sdl_nlen);
+				}
+#endif
+				break;
+			case RTA_IFA:
+				family = sa->sa_family;
+				if(sa->sa_family == AF_INET) {
+					inet_ntop(sa->sa_family,
+					          &((struct sockaddr_in *)sa)->sin_addr,
+					          address, sizeof(address));
+				} else if(sa->sa_family == AF_INET6) {
+					inet_ntop(sa->sa_family,
+					          &((struct sockaddr_in6 *)sa)->sin6_addr,
+					          address, sizeof(address));
+				}
+				break;
+			case RTA_AUTHOR:
+				break;
+			case RTA_BRD:
 				break;
 			}
+#if 0
+			syslog(LOG_DEBUG, " %d.%d.%d.%d %02x%02x%02x%02x",
+			       (uint8_t)p[0], (uint8_t)p[1], (uint8_t)p[2], (uint8_t)p[3],
+			       (uint8_t)p[0], (uint8_t)p[1], (uint8_t)p[2], (uint8_t)p[3]); 
+			syslog(LOG_DEBUG, " %d.%d.%d.%d %02x%02x%02x%02x",
+			       (uint8_t)p[4], (uint8_t)p[5], (uint8_t)p[6], (uint8_t)p[7],
+			       (uint8_t)p[4], (uint8_t)p[5], (uint8_t)p[6], (uint8_t)p[7]); 
+#endif
+			p += SA_RLEN(sa);
+			addr = addr << 1;
 		}
-		break;
-	case RTM_DELADDR:
-		ifam = (struct ifa_msghdr *)buffer;
-		syslog(LOG_DEBUG, "%s %s index=%d",
-		       "ProcessInterfaceWatchNotify", "RTM_DELADDR", ifam->ifam_index);
+		syslog(LOG_INFO, "%s: %s/%d %s",
+		       is_del ? "RTM_DELADDR" : "RTM_NEWADDR",
+		       address, prefixlen, ifname);
 		for(i = 0; i < n_if_addr; i++) {
-			if(ifam->ifam_index == if_nametoindex(if_addr[i])) {
-				/* I dont think it is useful */
-				/*AddDropMulticastMembership(s_ssdp, if_addr[i], 0, 1);*/
-				/*AddDropMulticastMembership(s_ssdp6, if_addr[i], 1, 1);*/
+			if(0 == strcmp(address, if_addr[i]) ||
+			   0 == strcmp(ifname, if_addr[i]) ||
+			   ifam->ifam_index == if_nametoindex(if_addr[i])) {
+				if(family == AF_INET && address[0] != '\0')
+					AddDropMulticastMembership(s_ssdp, address, 0, is_del);
+				else if(family == AF_INET6)
+					AddDropMulticastMembership(s_ssdp6, if_addr[i], 1, is_del);
 				break;
 			}
 		}
 		break;
 	default:
-		syslog(LOG_DEBUG, "Unknown RTM message : rtm->rtm_type=%d", rtm->rtm_type);
+		syslog(LOG_DEBUG, "Unknown RTM message : rtm->rtm_type=%d len=%d",
+		       rtm->rtm_type, (int)len);
 	}
 #endif
 	return 0;
