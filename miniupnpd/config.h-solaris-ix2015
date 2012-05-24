@@ -18,6 +18,7 @@
 /* solaris */
 #define LOG_PERROR 0
 #define SOLARIS_KSTATS 1
+typedef uint64_t u_int64_t;
 
 #define MAX(x,y) ((x>y)?x:y)
 
