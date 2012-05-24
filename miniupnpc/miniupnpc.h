@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.26 2012/04/09 12:40:11 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.28 2012/05/23 08:50:10 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
@@ -18,7 +18,7 @@
 #define UPNPDISCOVER_MEMORY_ERROR (-102)
 
 /* versions : */
-#define MINIUPNPC_VERSION	"1.6"
+#define MINIUPNPC_VERSION	"1.7"
 #define MINIUPNPC_API_VERSION	8
 
 #ifdef __cplusplus
@@ -83,7 +83,6 @@ struct UPNPUrls {
 
 /* UPNP_GetValidIGD() :
  * return values :
- *    -1 = Internal error
  *     0 = NO IGD found
  *     1 = A valid connected IGD has been found
  *     2 = A valid IGD has been found but it reported as
