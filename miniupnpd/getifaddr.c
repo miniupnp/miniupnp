@@ -1,4 +1,4 @@
-/* $Id: getifaddr.c,v 1.14 2012/02/07 11:05:07 nanard Exp $ */
+/* $Id: getifaddr.c,v 1.15 2012/03/05 20:36:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard
@@ -28,6 +28,16 @@
 int
 getifaddr(const char * ifname, char * buf, int len)
 {
+#if defined(USE_UPNPPROXY)
+	{
+	  /* We obtain the external address which is set by the
+	     external script. The perl script must be called once in advance. */
+	  extern char *UpnpProxy_external_address(void);
+	  strncpy(buf, UpnpProxy_external_address(), len);
+	  syslog(LOG_INFO, "getifaddr: ifname=<<%s>>, addr: buf=<<%s>\n",
+		 ifname, buf);
+	}
+#else
 #ifndef USE_GETIFADDRS
 	/* use ioctl SIOCGIFADDR. Works only for ip v4 */
 	/* SIOCGIFADDR struct ifreq *  */
@@ -61,6 +71,7 @@ getifaddr(const char * ifname, char * buf, int len)
 	}
 	close(s);
 #else /* ifndef USE_GETIFADDRS */
+
 	/* Works for all address families (both ip v4 and ip v6) */
 	struct ifaddrs * ifap;
 	struct ifaddrs * ife;
@@ -95,6 +106,7 @@ getifaddr(const char * ifname, char * buf, int len)
 		}
 	}
 	freeifaddrs(ifap);
+#endif
 #endif
 	return 0;
 }
