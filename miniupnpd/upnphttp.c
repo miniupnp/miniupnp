@@ -26,6 +26,8 @@
 #include "upnpevents.h"
 #include "upnputils.h"
 
+void dump_struct_upnphttp(struct upnphttp* h);
+
 struct upnphttp *
 New_upnphttp(int s)
 {
@@ -747,3 +749,28 @@ SendRespAndClose_upnphttp(struct upnphttp * h)
 	CloseSocket_upnphttp(h);
 }
 
+#if 1
+
+void
+dump_struct_upnphttp(struct upnphttp* h)
+{
+  fprintf(stderr,"dump_struct_upnphttp:\n");
+  fprintf(stderr,"socket=%d, ", h->socket);
+  fprintf(stderr,"state=%d, ", h->state);
+  fprintf(stderr,"req_buf=%p, ", h->req_buf);
+  fprintf(stderr,"req_buflen=%d, ", h->req_buflen);
+  fprintf(stderr,"req_contentlen=%d, ", h->req_contentlen);
+  fprintf(stderr,"req_conetntoff=%d, ", h->req_contentoff);
+  fprintf(stderr,"req_command=%d\n", h->req_command);
+  fprintf(stderr,"req_soapActionOff=%d, ", h->req_soapActionOff);
+  fprintf(stderr, "req_soapActionLen=%d, n", h->req_soapActionLen);
+	/* response */
+  fprintf(stderr,"res_buf=%p, ", h->res_buf);
+  fprintf(stderr,"res_buflen=%d, ", h->res_buflen);
+  fprintf(stderr,"res_sent=%d, ", h->res_sent);
+  fprintf(stderr,"res_buf_alloc_len=%d\n", h->res_buf_alloclen);
+
+};
+
+
+#endif
