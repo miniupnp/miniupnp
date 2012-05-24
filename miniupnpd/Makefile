@@ -195,7 +195,7 @@ testupnppermissions:	config.h $(TESTUPNPPERMISSIONSOBJS)
 # BSDmake :
 #	$(CC) $(CFLAGS) -o $@ $>
 
-config.h:	genconfig.sh
+config.h:	genconfig.sh VERSION
 	./genconfig.sh $(CONFIG_OPTIONS)
 
 .SUFFIXES:	.o .c
