@@ -48,6 +48,17 @@
 #define PRIu64 "llu"
 #endif
 
+#if defined(USE_UPNPPROXY)
+#include "ix2015/ipfwrdr.h"
+#endif
+
+
+/*
+ * get_redirect_rule(), add_redirect_rule2(), add_filter_rule2(), get_redirect_rule_by_index(), etc.
+ */
+#include "commonrdr.h"
+
+
 /* proto_atoi()
  * convert the string "UDP" or "TCP" to IPPROTO_UDP and IPPROTO_UDP */
 static int
@@ -266,6 +277,14 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	struct in_addr address;
 	unsigned int timestamp;
 
+#if defined(USE_UPNPPROXY)
+	syslog(LOG_INFO, "upnp_redirect: eport=%d, iport=%d, protocol=<<%s>>\n",
+	       eport, iport, protocol);
+	syslog(LOG_INFO, "iaddr=%s, desc=%s, leaseduration=%u\n",
+	       iaddr, desc, leaseduration);
+#endif
+
+
 	proto = proto_atoi(protocol);
 	if(inet_aton(iaddr, &address) < 0) {
 		syslog(LOG_ERR, "inet_aton(%s) : %m", iaddr);
@@ -311,8 +330,11 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp)
 {
-	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-		eport, iaddr, iport, protocol, desc);			*/
+#if defined(USE_UPNPPROXY)
+	syslog(LOG_INFO, "upnp_redirect_internal: reedirecting port %hu to %s:%hu protocol %d for: %s",
+		eport, iaddr, iport, proto, desc);
+#endif
+
 	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
 	                      desc, timestamp) < 0) {
 		return -1;
@@ -321,8 +343,10 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #ifdef ENABLE_LEASEFILE
 	lease_file_add( eport, iaddr, iport, proto, desc, timestamp);
 #endif
-/*	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %s for: %s",
-		iaddr, iport, protocol, desc);*/
+#if defined(USE_UPNPPROXY)
+	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %d for: %s",
+		iaddr, iport, proto, desc);
+#endif
 	if(add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc) < 0) {
 		/* clean up the redirect rule */
 #if !defined(__linux__)
@@ -417,6 +441,9 @@ int
 _upnp_delete_redir(unsigned short eport, int proto)
 {
 	int r;
+	syslog(LOG_INFO, "_upnp_delete_redir: eport=%d, iproto=%d\n",
+	       eport, proto);
+
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(eport, proto);
 #else
@@ -440,6 +467,9 @@ upnp_delete_redirection(unsigned short eport, const char * protocol)
 	return _upnp_delete_redir(eport, proto_atoi(protocol));
 }
 
+#if defined(USE_UPNPPROXY)
+/* upnp_get_portmapping_number_of_entries() is in ix2015/ipfwrdr.c */
+#else
 /* upnp_get_portmapping_number_of_entries()
  * TODO: improve this code. */
 int
@@ -460,6 +490,7 @@ upnp_get_portmapping_number_of_entries()
 	} while(r==0);
 	return (n-1);
 }
+#endif
 
 /* functions used to remove unused rules
  * As a side effect, delete expired rules (based on LeaseDuration) */

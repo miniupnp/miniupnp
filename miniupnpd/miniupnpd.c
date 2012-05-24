@@ -988,6 +988,15 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		case 'f':
 			i++;	/* discarding, the config file is already read */
 			break;
+#if defined(USE_UPNPPROXY)
+		case 'v':
+		  {
+		    /* control verbosity in ix2015 upnp proxy function log .*/
+		    extern int verbose ;
+		    verbose++;
+		  }
+		  break;
+#endif
 		default:
 			fprintf(stderr, "Unknown option: %s\n", argv[i]);
 		}
@@ -1796,6 +1805,11 @@ shutdown:
 		LIST_REMOVE(lan_addrs.lh_first, list);
 		free(lan_addr);
 	}
+
+#if defined(USE_UPNPPROXY)
+	/* we need to remove external lock directory. */
+	shutdown_redirect();
+#endif
 
 #ifdef ENABLE_NATPMP
 	free(snatpmp);
