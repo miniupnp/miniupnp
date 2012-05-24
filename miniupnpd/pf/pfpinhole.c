@@ -1,4 +1,4 @@
-/* $Id: pfpinhole.c,v 1.18 2012/05/01 22:37:53 nanard Exp $ */
+/* $Id: pfpinhole.c,v 1.19 2012/05/21 15:47:57 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012 Thomas Bernard
@@ -350,7 +350,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 				min_ts = ts;
 		}
 	}
-	if(next_timestamp)
+	if(next_timestamp && (min_ts != UINT_MAX))
 		*next_timestamp = min_ts;
 	if(max_uid > 0) {
 		if(((min_uid - 32000) <= next_uid) && (next_uid <= max_uid)) {
