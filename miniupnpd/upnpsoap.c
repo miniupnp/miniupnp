@@ -663,11 +663,16 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 		"</u:DeletePortMappingResponse>";
 
 	struct NameValueParserData data;
-	const char * r_host, * ext_port, * protocol;
+#ifndef SUPPORT_REMOTEHOST
+#ifdef UPNP_STRICT
+	const char * r_host;
+#endif
+#endif
+	const char * ext_port, * protocol;
 	unsigned short eport;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	r_host = GetValueFromNameValueList(&data, "NewRemoteHost");
+	/* moved in the #ifndef #endif : r_host = GetValueFromNameValueList(&data, "NewRemoteHost");*/
 	ext_port = GetValueFromNameValueList(&data, "NewExternalPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
 
@@ -679,6 +684,7 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 	}
 #ifndef SUPPORT_REMOTEHOST
 #ifdef UPNP_STRICT
+	r_host = GetValueFromNameValueList(&data, "NewRemoteHost");
 	if (r_host && (strlen(r_host) > 0) && (0 != strcmp(r_host, "*")))
 	{
 		ClearNameValueList(&data);
@@ -716,7 +722,7 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 static void
 DeletePortMappingRange(struct upnphttp * h, const char * action)
 {
-	int r = -1;
+        int r;
 	static const char resp[] =
 		"<u:DeletePortMappingRangeResponse "
 		"xmlns:u=\"" SERVICE_TYPE_WANIPC "\">"
@@ -724,7 +730,7 @@ DeletePortMappingRange(struct upnphttp * h, const char * action)
 	struct NameValueParserData data;
 	const char * protocol;
 	unsigned short startport, endport;
-	int manage;
+	/* not used  int manage; */
 	unsigned short * port_list;
 	unsigned int i, number = 0;
 	UNUSED(action);
@@ -733,7 +739,10 @@ DeletePortMappingRange(struct upnphttp * h, const char * action)
 	startport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewStartPort"));
 	endport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewEndPort"));
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
-	manage = atoi(GetValueFromNameValueList(&data, "NewManage"));
+
+	/* TODO/FIXME: not used (manage?)
+	 manage = atoi(GetValueFromNameValueList(&data, "NewManage"));
+	*/
 
 	/* possible errors :
 	   606 - Action not authorized
@@ -752,7 +761,7 @@ DeletePortMappingRange(struct upnphttp * h, const char * action)
 	for(i = 0; i < number; i++)
 	{
 		r = upnp_delete_redirection(port_list[i], protocol);
-		/* TODO : check return value for errors */
+		/* TODO/FIXME : check return value for errors */
 	}
 	free(port_list);
 	BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
@@ -872,7 +881,7 @@ GetListOfPortMappings(struct upnphttp * h, const char * action)
 	struct NameValueParserData data;
 	unsigned short startport, endport;
 	const char * protocol;
-	int manage;
+	/* int manage; */
 	int number;
 	unsigned short * port_list;
 	unsigned int i, list_size = 0;
@@ -881,7 +890,11 @@ GetListOfPortMappings(struct upnphttp * h, const char * action)
 	startport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewStartPort"));
 	endport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewEndPort"));
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
-	manage = atoi(GetValueFromNameValueList(&data, "NewManage"));
+
+	/* TODO/FIXME : not used (manage?)
+	 manage = atoi(GetValueFromNameValueList(&data, "NewManage"));
+	*/
+
 	number = atoi(GetValueFromNameValueList(&data, "NewNumberOfPorts"));
 	if(number == 0) number = 1000;	/* return up to 1000 mappings by default */
 
@@ -1017,12 +1030,14 @@ GetDefaultConnectionService(struct upnphttp * h, const char * action)
 static void
 SetConnectionType(struct upnphttp * h, const char * action)
 {
-	const char * connection_type;
+         /*  not used ? const char * connection_type; */
 	struct NameValueParserData data;
 	UNUSED(action);
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
+	/* TODO/FIXME : not used ?
 	connection_type = GetValueFromNameValueList(&data, "NewConnectionType");
+	*/
 	/* Unconfigured, IP_Routed, IP_Bridged */
 	ClearNameValueList(&data);
 	/* always return a ReadOnly error */
