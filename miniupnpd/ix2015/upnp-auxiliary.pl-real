@@ -1,0 +1,788 @@
+#!/usr/bin/perl
+
+### $Id$
+### TODO/FIXME:
+### Add proper GPLV2 attribution, and more verbose
+### acknowledgement to mani-san.
+###
+#
+# Please read READ*.txt available at upnproxy.sourceforge.net
+#
+#########################################
+# upnp-auxiliary.pl
+#
+# written for NEC Univerge IX2015 router IOS command processor.
+# by zephyrus00jp 
+# All copyrights reserved.
+#
+####################################################################
+# derived from ixddns.pl  Version 1.0.0
+# by mani
+####################################################################
+# Original comment in ixddns.pl
+# Thanks to:
+# http://www2u.biglobe.ne.jp/~MAS/perl/waza/telnet.html
+####################################################################
+# 
+# * written  by zephyrus00jp 
+# * released under GPLv2
+# *
+# *  UPNP-Proxy package
+# *  Copyright (C) 2009  zephyrus00jp
+# *
+# *   This program is free software; you can redistribute it and/or
+# *   modify it under the terms of the GNU General Public License
+# *  (version 2) as published by the Free Software Foundation; either
+# *   version 2 of the License, or (at your option) any later version.
+# *
+# *   This program is distributed in the hope that it will be useful,
+# *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+# *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# *   GNU General Public License for more details.
+# *
+# *   You should have received a copy of the GNU General Public License along
+# *   with this program; if not, write to the Free Software Foundation, Inc.,
+# *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# *
+# *   To contact the author, post a message to a forum at
+# *   http://upnpproxy.sourceforge.net 
+# *
+# *   (Or as a last resort, try zephyrus00jp@gmail.com The e-mail is not
+# *   monitored all the time. )
+# *
+#
+# ----------------------------------------
+#
+#
+# Called from an external program (main-daemon)
+#
+# Usage: perl upnp-auxiliary.pl   (same as the following command)
+# Usage: perl upnp-auxiliary.pl -action ref
+#
+# adding or deleting a nat mapping rule
+# Usage: perl upnp-auxiliary.pl -action {add|del} -protocol {tcp|udp} \
+#       -eport PORTNUM -internalip IPADDR -servicename SERVICENAME
+#
+# To be added -action clr  permit-napt-in を clear する。
+#
+
+# takes action {add|del|ref}
+#
+# -action ref
+# action ref is for dumping the rule and INTERFACE state.
+# rule / interface dump
+#
+#  読取った値を書き出す。1文字目に ’X’、2文字目：’U’,’G','N', ...
+#
+# Read ix2015 setting/uptime/rules, etc. on startup and reflect it.
+# by adding ' X', and then {'U'|'G'|'N'|...}.
+#
+#  XUuptime
+#  XGglobalipaddress
+#  XNport,ipaddress,{tcp|upd},anystringevenwithacomma   
+# 
+# action    protocol  eport internalip servicename
+# {add|del} {tcp|udp} eport internalip servicename
+#
+# -action {add|del} -protocol {tcp|udp} -eport EPORT \
+#         -internalip INTERNALIP -servicename NAPTSERVICENAME
+#
+
+# 例 入力パラメータ  と  IX2015に対する操作.
+#
+# Example: Input parameter and the operation on IX2015.
+#
+# add tcp 12346 10.253.235.237  h10d253d235d237e12346tcp
+# 
+# add の場合
+#
+# In the case of "add" operation.
+#
+# ADD: eport=12346, protocol=TCP, internalip=10.253.235.237
+# ADD: BEGIN
+# ADD: ip access-list permit-napt-in permit tcp src any sport any dest any dport eq 12346
+# ADD: For each interface:
+# ADD: ip napt static 10.253.235.237 tcp 12346
+# ADD: ip napt service h10d253d235d237e12346tcp 10.253.235.237 none tcp 12346
+# ADD: END
+#
+# delete の場合
+#
+# In the case of "del" operation.
+#
+# DEL: BEGIN
+# DEL: no ip access-list permit-napt-in permit tcp src any sport any dest any dport eq 12346
+# DEL: For each interface:
+# DEL: no ip napt static 10.253.235.237 tcp 12346
+# DEL: no ip napt service h10d253d235d237e12346tcp 10.253.235.237 none tcp 12346
+# DEL: END
+#
+#########################################
+
+
+use strict;
+use Net::Telnet;
+use LWP::Simple;
+use Getopt::Long;
+use Config;			# for signal
+use Config::Simple;
+
+# Use of 'English' package Removed. 
+# Not friendly on solaris 10. I need to install perl 5.10 myself
+# since Blastware.com doesn't have 5.10-based perl. (It is 5.8.8-based  ?)
+# 'English' requires perl 5.10, thus installing it would have
+# installed the whole 5.10 and the rest.
+#
+# use English; # with this $ERRNO, et al can be used.
+# I rewrote $ERRNO -> $!, etc.   
+
+####################################################################
+# 動作環境設定
+# 
+# Operation Environment Setting
+#
+####################################################################
+#
+# プロンプト(正規表現)
+#
+# prompt (regular expression)
+#
+my $prompt = '/.*\# $/';	
+#
+#
+# TELNETのユーザ、パス、アドレスなどは $HOME/2015.conf から読む。
+#
+# $user, $pass is read from the following file. "~/ix2015.conf"
+#
+# configuration file: 
+#     host=hostname or IPADDR
+#     user=username for IX2015 administrator
+#     password=password
+#     force_config=[1|0]   #optional (default is 0).
+#
+# $user, $pass is read from the following file. "~/ix2015.conf"
+#
+my $configfile = "$ENV{'HOME'}/ix2015.conf";
+#
+# print "configfile = ", $configfile, "\n";
+# print "Home is $ENV{'HOME'}\n";
+
+#
+#
+# We use a directory for locking to avoid the
+# invocation of this script multiple times.
+#
+# 前のscript 実行が正常終了しているだろうか？
+# あるいは操作ミスでこのscript を並列して動作しようとしてないだろうか？
+# ルータに何度も telnet で入りたくないし、config の変更は
+# 普通は一つのtelnet session でしか出来ない。
+# 
+# Directory をつくることでの locking.
+# ある時点で mkdir .
+# 失敗したら sleep, retry, sleep, retry, sleep, retry で
+# 何度か retry する。駄目ならそこでabort.
+#
+
+# lockdir 名
+#
+# lockdir name
+#
+my $lockdir = "/tmp/upnp-ix2015-lock-dir";
+#
+# リトライ回数セット
+#
+# Max Retries.
+#
+my $retry = 4; 
+
+#
+# Setting Signal Handler.
+#
+# シグナルハンドラをセット
+# 自分に送るのは SIGTERM 以外でないとまずい？
+# SIGTERM だとsignal 処理する前に死ぬ？
+
+$SIG{ABRT} = $SIG{KILL}= $SIG{HUP} 
+= $SIG{INT} = $SIG{PIPE} = $SIG{QUIT} = $SIG{TERM} = \&unlock;
+
+sub unlock {
+    print "Deleting $lockdir\n";
+    my $rc = rmdir($lockdir);
+    if(!$rc) {
+	die("$lockdir could not be removed at the end.")	
+    }
+}
+
+# code template.
+# Politically correct template.
+# In reality, we only use eval and catch.
+#
+#  eval を使ってブロック評価。これでエラー捕捉する。
+#  次は flockの例。
+#  実際には、このスクリプトでは mkdir を利用している。
+#  lock は eval 開始直前で行なう。
+#  結局このような大がかりな処理はしてない。eval の利用と、外側での catch のみ。
+#  eval {
+#      local $SIG{ALRM} = sub { die "timeout" }; # 時間まで待つ。
+#      open(OUT, "+< $datafile") or die;
+#      alarm(10);               # 前のプロセスを待つ時間（10秒）
+#      flock(OUT, 2) or die;   # ロック。
+#      alarm(20);              # 自分自身の作業制限時間（20秒）
+#      work/何かする。
+#      close(OUT);             # closeでロック解除
+#      alarm(0);               # alarm()リセット
+#  };
+#  if ($@ =~ /timeout/) {
+#      タイムアウト時の処理
+#  }
+#  elsif ($@) { die or do something else}  # タイムアウト以外の理由
+#
+
+#
+# Configuration 読込。
+#
+# read configuration.
+#
+my $cfg = new Config::Simple($configfile) 
+    or die("$configfile could not be loaded.");
+my $host = $cfg->param('host') 
+    or die("'host' could not be obtained.");
+my $user = $cfg->param('user') 
+    or die("'user' could not be obtained.");
+my $pass = $cfg->param('password') or 
+    die ("'password' could not be obtained.");
+my $force_config = $cfg->param('force_config');
+
+   
+
+### TODO/FIXME: Following should be a list(?).
+### IXルータのグローバルIPアドレス所有Interface (複数あるときにはすべて配列中に指定する。)
+### どのInterfaceにパケットを内側から投げるかは正しく ip route が当然設定されているはず。
+### BFLETs の場合、flets square などと、一般のISPの二つの接続先が定義されることあり。
+### TODO/FIXME: そう考えると 複数の接続先サービスがあるIGD と考えないといけないのか、
+### 論理的にはきれいだけど、ちょっと今のコードでは難しいというかそこまでやる元気がないし、
+### 必要性を感じてない。
+###
+### If we have multiple WAN connections (WAN addresses), maybe we should
+### store it them an array.
+### Sending the packet to a proper interface and should be taken care of
+### the routing already.
+### For example, already in Japan, NTT East's BFLETs service, one ISP 
+### offers two connection services one for ordinary open Internet and the other
+### to closed flets square.
+### TODO/FIXME: This means that we may need to consider a complex IGD with
+### two or more WAN connections. That is an interesting idea, but this
+### code doesn't support such a concept/architecture for now.
+
+
+my @int = (
+    #
+    # IXルータのグローバルIPアドレス所有Interface #1
+    #
+    # IX router Global IP address is at Interface #1.
+    #
+    "FastEthernet0/0.1",  
+    #
+    # IXルータのグローバルIPアドレス所有Interface #2
+    #
+    # IX router Global IP address is at Interface #2.
+    #
+    "FastEthernet0/0.2"   
+    );
+
+my $action;
+my $protocol;
+my $eport;
+my $internalip;
+my $servicename;
+my $debug;
+my $commonrule;
+my $periphrule1;
+my $periphrule2;
+my $prefix = "";
+my $dump = 0;
+my $occupied = 0;  # whether router config process is already occupied by someone else.
+
+my %opts = ( # default values
+	     'debug' => 1,       # 0, 1
+	     'action' => 'ref',  # {add|del|ref}
+	     # 以下は ref の場合には使用しない。
+	     'protocol' => '',   # {tcp|udp}
+	     'eport' => -1,      # ought to be a port number
+	     'internalip' => '', # 10.253.235.237' 
+	     'servicename' => '' # 'h10d253d235d237e12345tcp'
+    );
+
+### Option Processing
+GetOptions(\%opts, 'debug=i', 'action=s',
+	   'protocol=s', 'eport=i', 'internalip=s', 'servicename=s');
+
+if ($opts{'debug'}) { 
+    while (my ($k,$v) = each(%opts)) {
+        printf "%s : %s\n", $k, $v;
+    }
+
+    foreach my $arg (@ARGV) {
+        print "arg : $arg\n";
+    }
+}
+
+$action =      $opts{'action'};
+$protocol =    $opts{'protocol'};
+$servicename = $opts{'servicename'};
+$eport =       $opts{'eport'};
+$internalip =  $opts{'internalip'};
+
+if (($action eq "add") or ($action eq "del") or ($action eq "ref")) {
+    ;
+} else {
+    die("action must be add, del, or ref");
+}
+
+if (($debug) or ($action eq "ref") ) { $dump = 1; }
+
+if ($action eq "ref") {
+    print "Obtaining permit-napt-in rule setting and interface(s):\n";
+    foreach (@int) {
+	print " IF: $_ \n";
+    }
+    print "\n";
+
+} else {
+    # Prefix is "" or "no ". Note the space at the end of "no ".
+    if ($action eq "del") { $prefix = "no "; }
+
+    # input verification
+    unless (0 <= $eport ) {
+	die("You must specify a positive port number using -eport PORTNUM");    
+    }
+    unless ($internalip ne "" ) {
+	die("You must specify -internalip INTERNALCLIENTIP");    
+    }
+    unless (($protocol eq "tcp") or ($protocol eq "udp")) {
+	die("protocol must be udp or tcp");
+    }
+    unless ($servicename ne "" ) {
+	die("You must specify a name for napt service using -servicename SERVICENAME");    
+    }
+
+    # Rules added or deleted.
+    # global
+    $commonrule = "${prefix}ip access-list permit-napt-in permit $protocol src any sport any dest any dport eq $eport";
+    # per interface
+    $periphrule1 = "${prefix}ip napt static $internalip $protocol $eport";
+    $periphrule2 = "${prefix}ip napt service $servicename $internalip none $protocol $eport";
+
+    print "Following Configuration Changes will be made.\n";
+    print "IX2015 $action: BEGIN\n";
+    print "Global Config\n";
+    print "${commonrule}\n";
+    print "Per Interface\n";
+    print "${periphrule1}\n";
+    print "${periphrule2}\n";
+    print "IX2015 $action: END\n";
+}
+
+# directory が作れるか？
+#
+# Can we create the lock directory?
+#
+while (!mkdir($lockdir, 0755)) {   
+    if (--$retry <= 0) { 
+        # 3, 4, 5, 6秒待つ
+	# wait for 3, 4, 5, 6 ... seconds
+	sleep(1 + 5 - $retry);     
+    }
+    else {
+	die("$lockdir can not be created. Script aborting.\n");
+    }
+}
+
+# print STDERR "Created $lockdir\n";
+
+eval {
+
+####################################################################
+# 以下はスクリプト本体です。
+#
+# This is the start of the original script.
+#
+
+# グローバルIPアドレス格納用変数
+#
+# Global IP address on the WAN side.
+#
+    my $globalip = '';
+
+# telnet初期設定
+#
+# Initializing TELNET handling
+#
+    my $telnet = new Net::Telnet(
+	Timeout => 10,
+	Prompt => $prompt,
+	);
+
+# ホストに接続してログインする
+#
+# Let us connect and log in.
+#
+    $telnet->open($host) ;		# error (No route, etc.)
+    $telnet->login($user, $pass) ;
+
+    my @result; # for telnet result hereafter.
+
+
+# enable実行
+#
+# run enable to change the setting of the router.
+#
+    @result = $telnet->cmd("enable");
+    if ($dump) { print @result; }
+    {
+
+	# if there is someone else who has logged in and issued config.
+	# (It seems that there is a default limit of two logins.
+	# if someone has logged in using telnet and issued config,
+	# and someone else has logged in using telnet (2nd),
+	# then this script can't log in at all (with v7).)
+	foreach(@result) {
+	    if(/`svintr-config'/ or /occupied/) {
+		$occupied = 1;
+	    }
+	}
+	# to see if we should issue svintr-config.
+	if($occupied) {
+	    if($force_config) {
+		# at least on V7 firmware, we need to input an extra \n. 
+		# maybe one is enough. 
+		@result = $telnet->cmd("svintr-config\n\n");
+		if ($dump) { print @result; }
+	    } else {
+		die("Someone else is using the router and CONFIG process is occupied.");
+	    }
+	}
+    }
+
+#### terminal length 0 is only accepted in config-enable mode!
+#### if we failed to do this, for example, because someone else
+#### was logging into the router and changing config herself,
+#### we will see timeout when we invoke
+#### show ip napt statistics (prints many lines and causes and pauses
+#### with "---more---" prompt) later.
+####
+    @result = $telnet->cmd("terminal length 0");
+    if ($dump) { print @result; }
+
+
+# インターフェイスによらない共通アクセスリストの定義／削除
+#
+# First the common access list definition/deletion independent of
+# the interface(s).
+#
+# [no] ip access-list permit-napt-in permit tcp src any sport any dest any dport eq 12346
+
+# 追加／削除
+#
+# Add or Delete
+#
+    if (!($action eq "ref")) {
+	@result = $telnet->cmd("${commonrule}");
+	if ($dump) { print @result; }
+    }
+
+# 表示
+#
+# Display the current setup.
+#
+    if ($dump) {
+	@result = $telnet->cmd("show ip access-list");
+	print @result; 
+
+	# result に permit-napt-in があれば
+	@result = $telnet->cmd("show ip access-list permit-napt-in");
+	print @result; 
+    }
+
+# Per Interface での 追加／削除
+#
+# Let us handle the add/delete per interface.
+
+    if(! ($action eq "ref" )) {
+#
+# change to the configuration of each interface 
+#
+	foreach  (@int) {
+
+	    # TODO/FIXME: Exact commands
+	    # Switch to interface
+	    @result = $telnet->cmd("interface $_");    
+	    if ($dump) { print @result; }
+
+# Issue Per Interface rules.
+#e.g.
+#[no] ip napt static 10.253.235.237 tcp 12346
+#[no] ip napt service h10d253d235d237e12346tcp 10.253.235.237 none tcp 12346
+
+	    if(! ($action eq "ref" )) {
+		@result = $telnet->cmd("${periphrule1}");    
+		if ($dump) { print @result; }
+		@result = $telnet->cmd("${periphrule2}");    
+		if ($dump) { print @result; }
+	    }
+
+	    if($dump) {
+		@result = $telnet->cmd("show ip filter");    
+		print @result; 
+
+	    }
+	    # End interface
+	    @result = $telnet->cmd("exit");    
+	    if ($dump) { print @result; }
+
+	}
+    }
+
+# Look at the status of each interface/ 状態を見る。
+# if ($dump) {
+#    foreach  (@int) {
+#	@result = $telnet->cmd("show interface $_ ");    
+#	print @result; 
+#    }
+#}
+
+# napt状態 を見る。# 最初のinterface だけ
+# TODO/FIXME: 複数の接続先サービスがあるIGD と考えないといけないとすると、
+# このようなところで、インターフェイス毎に処理する必要あり。
+# 先に述べたコメント参照。今のところ全然必要性を感じてない。
+#
+# To obtain ipaddress of a NAPT setting.
+# We are looking at only the first interface.
+# If we are building a complex IGD with multiple WANs,
+# we have to perform "per interface" operation here.
+# (Right now, we don't need such complex processing.)
+# ==> "show ip napt statistics IFNAME" prints necessary data.
+# output contains the following part near the end.
+#
+# NAPT Static - 6 entries
+# Prot Address/Interface               Static Port   OutPkt    InPkt
+# udp  192.168.0.112                   7123              83       84
+# tcp  192.168.0.112                   7123               6        8
+#  ...
+#
+# NAPT Service - 7 entries
+# Prot Address:Port          Service Port   OutPkt    InPkt
+# udp  192.168.0.112:53      53                  1        1
+# udp  192.168.0.112:7123    7123                0        0
+# tcp  192.168.0.112:7123    7123                0        0
+#  ...
+# 
+    if ($dump) {
+	@result = $telnet->cmd("show ip napt statistics $int[0]"); 
+	print @result; 
+	my $i;
+	my $j; 
+	my $found = 0;
+	my $num = 0;		# should be 0 in case NAPT is not there.
+	my @lresult;
+
+	# NAPT Service - 7 entries
+	#Prot Address/Interface               Static Port   OutPkt    InPkt
+	#
+	# NAPT Service - NNN entries の行をさがして、その数を読む。
+	# 
+	# NAPT Service - look for "NNN entries" line and read that number.
+	# Sept 30. added strict checking so that this will not go into infinite loop 
+	# pointed out by insina.
+	#
+
+	for($i = 0 ; !$found and $result[$i] and ($i < 1000) ; $i++ ) {
+	    $_ = $result[$i];
+	    if(/NAPT Static -/) {
+		print "Start line:", $_, "\n"; 
+		$_ =~ s/NAPT Static -//g;
+		@lresult = split("\ ", $_);
+		$num = $lresult[0];
+		# print "Number of Items is $num\n";
+		# print "XX$result[0]\n";  # 
+		# print "XX$result[1]\n";  # 
+		# print "XX$result[2]\n";  # 
+		# print "XX$result[3]\n";  # 
+		$found = 1;
+	    }
+	}
+	###
+	### skip "Prot Address/Interface ..." header line.
+	### repeat for $num times from the next line.
+	### 
+
+	$i ++; # skip
+
+	for($j = 0; $j < $num; $j++, $i++ ) {
+	    #print "XN", $result[$i], "\n";
+	    $_ = $result[$i];
+	    @lresult = split("\ ", $_);
+	    print "XN$lresult[2],$lresult[1],$lresult[0],\n";
+	    # print "XX$lresult[0]\n";  # udp
+	    # print "XX$lresult[1]\n";  # 192.168.0.112
+	    # print "XX$lresult[2]\n";  # port
+	}
+    }
+
+# external IPアドレス抽出
+#
+# obtain external IP address.
+#
+    if ($dump) {
+	@result = $telnet->cmd("show ip address $int[0]");
+	print @result;
+	foreach(@result){
+	    if(/Internet address/){
+		$_ =~ s/  Internet address is //g;
+		@result = split("\/", $_);
+		print "XG$result[0]\n";
+	    }
+	}
+    }
+
+#
+# UPTIMEの取得： V8 vs V7 firmware.
+#
+# Obtain UPTIME: V7 and V8 firmware
+#
+# (We can of course use SNMP, instead, by the way.)
+# V8 firmware
+# show uptime
+#  e.g System uptime is 18 hours 20 minutes
+#     System uptime is 1 day 18 hours 20 minutes
+#     Need to take care of the following also
+#     System uptime is 1 week 8 hours 43 minutes
+#
+# fixed different format under v7 firmware: Sept 21, 2009.
+# V7 firmware show uptime response.
+# Last reload:  ....
+# Last restart: 1 day, 17 hours, 33 minutes ago
+# (In comparison with V8 firmware output, it has comma (",")
+# after day units. [We can eliminate the "," AND "s", and pass the resulting
+# string to the same processing routine.)
+# Amazing that unit names for time duration do not have "s" in them!
+# (Actually, it turns out that "show version" command of v7 firmware
+# prints the same "System Uptimes is" output.
+# 
+#
+    if ($dump) {
+	@result = $telnet->cmd("show uptime"); 
+	print @result; 
+
+	foreach(@result) {
+	    if(/Last restart:/ or /System Uptime is/ )
+	    {
+		$_ =~ s/Last restart: //g;
+		$_ =~ s/System Uptime is//g;
+		$_ =~ s/,//g;
+		$_ =~ s/s//g;   # to singular form !
+		@result = split("\ ", $_);
+		my $upt = 0;
+		my $i = 0;
+
+		#print "XU$result[0]\n";  # 18
+		#print "XU$result[1]\n";  # hours
+		#print "XU$result[2]\n";  # 20 
+		#print "XU$result[3]\n";  # minutes
+
+		# TODO/FIXME: deal with a leap year, etc..
+		if($result[ $i + 1 ] eq "year")  {
+		    $upt += 3600 * 24 * 365 * $result[$i];
+		    $i += 2;
+		}
+		if($result[ $i + 1 ] eq "month")  {
+		    $upt += 3600 * 24 * 30 * $result[$i];
+		    $i += 2;
+		}
+		if($result[ $i + 1 ] eq "week") {
+		    $upt += 3600 * 24 * 7 * $result[$i];
+		    $i += 2;
+		}
+		if($result[ $i + 1 ] eq "day") {
+		    $upt += 3600 * 24 * $result[$i];
+		    $i += 2;
+		}
+		if($result[ $i + 1 ] eq "hour") {
+		    $upt += 3600 * $result[$i];
+		    $i += 2;
+		}
+		if($result[ $i + 1 ] eq "minute") {
+		    $upt += 60 * $result[$i];
+		}
+		print "XU", $upt, "\n";
+	    }
+	}
+    }
+
+#
+# 接続の切断
+#
+# Terminate the connection.
+#
+    @result = $telnet->cmd("exit");    
+    if ($dump) { print @result; }
+
+    $telnet->close;
+
+
+    unlock();
+
+    exit 0;
+
+};  # eval
+
+#
+# エラー処理
+#
+# Error processing.
+#
+#define	ECONNREFUSED	111	/* Connection refused */
+#define	EHOSTDOWN	112	/* Host is down */
+#define	EHOSTUNREACH	113	/* No route to host */
+#
+# On Solaris10/x86, perl installed from Blastware.com
+# returned error code, ESPIPE(29), for "Seek error" (on pipe) for
+# telnet open failure. This is a little misleading IMHO.
+#
+
+# Agah, perl automatically converts error code (number) into
+# a corresponding character string in a context where "string" 
+# is a 'natural' data type!
+# I have to put '+ 0' to force the use of a numerical 
+# value to be used in printing a number.
+# DWIM doesn't perform DWIM all the time :-(
+
+if ( $@ =~ /time out/ ) {
+    print STDERR $@, "\n"; 
+    unlock(); 
+    exit $! + 0;
+}
+elsif ($@ =~ /No route to/ ) {
+	     #my $savecode = $! + 0;
+	     #print "NOROUTE branch.\n";
+	     #print "savecode is $savecode \n";
+	     #print "errno = ", $! + 0, "\n";
+	     #print "os_error = ", $OS_ERROR + 0, "\n";
+	     #print "eval_error = $EVAL_ERROR\n";
+	     print STDERR $@, "\n"; 
+	     print STDERR "Add route to the router.\n";
+	     unlock(); 
+	     exit $! + 0;
+}
+elsif ($@) { my $saved = $@; 
+	     #my $savecode = $! + 0;
+	     print STDERR $@, "\n"; 
+	     #print "savecode is $savecode \n";
+	     #print "errno = ", $! + 0, "\n";
+	     #print "os_error = ", $OS_ERROR + 0, "\n";
+	     #print "eval_error = $EVAL_ERROR\n";
+	     unlock(); 
+	     exit $! + 0;
+}                   
+
+# [end of file]
