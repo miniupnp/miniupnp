@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.283 2012/05/21 15:57:17 nanard Exp $
+$Id: Changelog.txt,v 1.284 2012/05/24 16:51:06 nanard Exp $
+
+2012/05/24:
+  More solaris fixes
 
 2012/05/21:
   Clean signal handling

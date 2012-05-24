@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.54 2012/05/09 10:40:34 nanard Exp $
+# $Id: genconfig.sh,v 1.55 2012/05/24 16:51:08 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2012 Thomas Bernard
@@ -175,6 +175,9 @@ case $OS_NAME in
 		FW=ipf
 		echo "#define LOG_PERROR 0" >> ${CONFIGFILE}
 		echo "#define SOLARIS_KSTATS 1" >> ${CONFIGFILE}
+		# solaris 10 does not define u_int64_t ?
+		# but it does define uint64_t
+		echo "typedef uint64_t u_int64_t;" >> ${CONFIGFILE}
 		OS_URL=http://www.sun.com/solaris/
 		;;
 	Linux)

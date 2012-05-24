@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.109 2012/05/01 20:08:23 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.110 2012/05/24 16:51:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -406,7 +406,8 @@ AddPortMapping(struct upnphttp * h, const char * action)
 #endif
 
 	syslog(LOG_INFO, "%s: ext port %hu to %s:%hu protocol %s for: %s leaseduration=%u rhost=%s",
-	       action, eport, int_ip, iport, protocol, desc, leaseduration, r_host);
+	       action, eport, int_ip, iport, protocol, desc, leaseduration,
+	       r_host ? r_host : "NULL");
 
 	r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
 
@@ -639,7 +640,8 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action)
 	{
 		syslog(LOG_INFO, "%s: rhost='%s' %s %s found => %s:%u desc='%s'",
 		       action,
-		       r_host, ext_port, protocol, int_ip, (unsigned int)iport, desc);
+		       r_host ? r_host : "NULL", ext_port, protocol, int_ip,
+		       (unsigned int)iport, desc);
 		bodylen = snprintf(body, sizeof(body), resp,
 				action, SERVICE_TYPE_WANIPC,
 				(unsigned int)iport, int_ip, desc, leaseduration,
