@@ -1,4 +1,4 @@
-/* $Id: ifacewatch.c,v 1.12 2012/05/18 11:46:55 nanard Exp $ */
+/* $Id: ifacewatch.c,v 1.13 2012/05/21 17:13:11 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2011-2012 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -55,8 +55,13 @@ OpenAndConfInterfaceWatchSocket(void)
  * routing socket open per system. */
 #endif
 	if(s < 0) {
-		syslog(LOG_ERR, "OpenAndConfInterfaceWatchSocket socket: %m");
+		syslog(LOG_ERR, "%s socket: %m",
+		       "OpenAndConfInterfaceWatchSocket");
 		return -1;
+	}
+	if(!set_non_blocking(s)) {
+		syslog(LOG_WARNING, "%s failed to set socket non blocking : %m",
+		       "OpenAndConfInterfaceWatchSocket");
 	}
 #ifdef __linux__
 	memset(&addr, 0, sizeof(addr));

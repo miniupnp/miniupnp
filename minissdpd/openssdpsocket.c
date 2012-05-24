@@ -1,4 +1,4 @@
-/* $Id: openssdpsocket.c,v 1.11 2012/05/02 23:09:45 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.12 2012/05/21 17:13:11 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -17,6 +17,7 @@
 #include <syslog.h>
 
 #include "openssdpsocket.h"
+#include "upnputils.h"
 
 /* SSDP ip/port */
 #define SSDP_PORT (1900)
@@ -163,6 +164,10 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	{
 		syslog(LOG_ERR, "socket(udp): %m");
 		return -1;
+	}
+
+	if(!set_non_blocking(s)) {
+		syslog(LOG_WARNING, "Failed to set SSDP socket non blocking : %m");
 	}
 
 #ifdef ENABLE_IPV6

@@ -542,6 +542,8 @@ void processRequest(struct reqelem * req)
 
 	n = read(req->socket, buf, sizeof(buf));
 	if(n<0) {
+		if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+			return;	/* try again later */
 		syslog(LOG_ERR, "(s=%d) processRequest(): read(): %m", req->socket);
 		goto error;
 	}
@@ -1076,6 +1078,8 @@ int main(int argc, char * * argv)
 			else
 			{
 				syslog(LOG_INFO, "(s=%d) new request connection", s);
+				if(!set_non_blocking(s))
+					syslog(LOG_WARNING, "Failed to set new socket non blocking : %m");
 				tmp = malloc(sizeof(struct reqelem));
 				if(!tmp)
 				{

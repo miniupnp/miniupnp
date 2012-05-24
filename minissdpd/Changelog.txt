@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.29 2012/05/23 08:56:35 nanard Exp $
 
 2012/05/21:
 	Clean signal handling
+	Set sockets non blocking
 
 2012/05/18:
 	Improve ProcessInterfaceWatch() under BSD.
