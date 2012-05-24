@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.10 2012/05/01 16:24:36 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.11 2012/05/21 08:47:38 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011 Thomas Bernard
@@ -19,8 +19,8 @@
 
 #define CRAP_LENGTH (2048)
 
-volatile int quit = 0;
-volatile int child_to_wait_for = 0;
+volatile sig_atomic_t quit = 0;
+volatile sig_atomic_t child_to_wait_for = 0;
 
 /**
  * signal handler for SIGCHLD (child status has changed)

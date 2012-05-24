@@ -1,4 +1,4 @@
-/* $Id: ifacewatcher.c,v 1.3 2012/02/04 23:34:40 nanard Exp $ */
+/* $Id: ifacewatcher.c,v 1.6 2012/05/22 22:09:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -46,6 +46,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "../config.h"
 
@@ -57,7 +58,7 @@
 #include "../upnpglobalvars.h"
 #include "../natpmp.h"
 
-extern volatile int should_send_public_address_change_notif;
+extern volatile sig_atomic_t should_send_public_address_change_notif;
 
 
 int

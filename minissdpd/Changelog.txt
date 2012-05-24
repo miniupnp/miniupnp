@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.27 2012/05/18 10:35:11 nanard Exp $
+$Id: Changelog.txt,v 1.29 2012/05/23 08:56:35 nanard Exp $
+
+2012/05/21:
+	Clean signal handling
 
 2012/05/18:
 	Improve ProcessInterfaceWatch() under BSD.

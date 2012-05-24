@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.31 2012/05/02 10:28:25 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.35 2012/05/21 17:13:11 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2012 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -760,14 +760,21 @@ error:
 	return;
 }
 
-static volatile int quitting = 0;
+static volatile sig_atomic_t quitting = 0;
 /* SIGTERM signal handler */
 static void
 sigterm(int sig)
 {
-	signal(sig, SIG_IGN);
+	(void)sig;
+	/*int save_errno = errno;*/
+	/*signal(sig, SIG_IGN);*/
+#if 0
+	/* calling syslog() is forbidden in a signal handler according to
+	 * signal(3) */
 	syslog(LOG_NOTICE, "received signal %d, good-bye", sig);
+#endif
 	quitting = 1;
+	/*errno = save_errno;*/
 }
 
 /* main(): program entry point */
@@ -974,8 +981,11 @@ int main(int argc, char * * argv)
 		if(select(FD_SETSIZE, &readfds, 0, 0, 0) < 0)
 		{
 			if(errno != EINTR)
+			{
 				syslog(LOG_ERR, "select: %m");
-			break;
+				break;	/* quit */
+			}
+			continue;	/* try again */
 		}
 #ifdef ENABLE_IPV6
 		if((s_ssdp6 >= 0) && FD_ISSET(s_ssdp6, &readfds))
