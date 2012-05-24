@@ -264,7 +264,7 @@ ProcessInterfaceWatchNotify(int s)
 	}
 
 	for (nlhdr = (struct nlmsghdr *) buffer;
-	     NLMSG_OK (nlhdr, len);
+	     NLMSG_OK (nlhdr, (unsigned int)len);
 	     nlhdr = NLMSG_NEXT (nlhdr, len))
 	{
 		if (nlhdr->nlmsg_type == NLMSG_DONE)
