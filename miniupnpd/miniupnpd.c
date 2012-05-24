@@ -1323,6 +1323,7 @@ main(int argc, char * * argv)
 		}
 	}
 #endif
+
 	/* main loop */
 	while(!quitting)
 	{
