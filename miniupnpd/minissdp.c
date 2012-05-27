@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.35 2012/05/24 16:51:08 nanard Exp $ */
+/* $Id: minissdp.c,v 1.36 2012/05/27 22:16:26 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -401,15 +401,13 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 		inet_pton(AF_INET6, LL_SSDP_MCAST_ADDR, &(p->sin6_addr));
 	}
 	else
-	{
 #endif
+	{
 		struct sockaddr_in *p = (struct sockaddr_in *)&sockname;
 		p->sin_family = AF_INET;
 		p->sin_port = htons(SSDP_PORT);
 		p->sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
-#ifdef ENABLE_IPV6
 	}
-#endif
 
 	while(known_service_types[i])
 	{
