@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.284 2012/05/24 16:51:06 nanard Exp $
+$Id: Changelog.txt,v 1.286 2012/05/27 22:35:10 nanard Exp $
+
+2012/05/28:
+  clean linux/ifacewatcher.c
 
 2012/05/24:
   More solaris fixes
