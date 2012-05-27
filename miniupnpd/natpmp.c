@@ -1,4 +1,4 @@
-/* $Id: natpmp.c,v 1.30 2012/04/30 21:08:00 nanard Exp $ */
+/* $Id: natpmp.c,v 1.32 2012/05/27 22:36:03 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2012 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -22,19 +22,31 @@
 #include "getifaddr.h"
 #include "upnpredirect.h"
 #include "commonrdr.h"
+#include "upnputils.h"
 
 #ifdef ENABLE_NATPMP
 
 int OpenAndConfNATPMPSocket(in_addr_t addr)
 {
 	int snatpmp;
+	int i = 1;
 	snatpmp = socket(PF_INET, SOCK_DGRAM, 0/*IPPROTO_UDP*/);
 	if(snatpmp<0)
 	{
-		syslog(LOG_ERR, "socket(natpmp): %m");
+		syslog(LOG_ERR, "%s: socket(natpmp): %m",
+		       "OpenAndConfNATPMPSocket");
 		return -1;
 	}
-	else
+	if(setsockopt(snatpmp, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i)) < 0)
+	{
+		syslog(LOG_WARNING, "%s: setsockopt(natpmp, SO_REUSEADDR): %m",
+		       "OpenAndConfNATPMPSocket");
+	}
+	if(!set_non_blocking(snatpmp))
+	{
+		syslog(LOG_WARNING, "%s: set_non_blocking(): %m",
+		       "OpenAndConfNATPMPSocket");
+	}
 	{
 		struct sockaddr_in natpmp_addr;
 		memset(&natpmp_addr, 0, sizeof(natpmp_addr));
