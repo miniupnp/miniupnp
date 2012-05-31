@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.288 2012/05/31 09:32:39 nanard Exp $
 
+2012/05/31:
+  Improvements in autodetecting firewall under (Free)BSD
+
 2012/05/28:
   Cleanup HTTP request handling. Answer 405 when relevant
 
