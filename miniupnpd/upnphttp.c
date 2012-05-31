@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.71 2012/04/30 13:46:29 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.73 2012/05/28 13:26:58 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -170,6 +170,20 @@ Send404(struct upnphttp * h)
 	h->respflags = FLAG_HTML;
 	BuildResp2_upnphttp(h, 404, "Not Found",
 	                    body404, sizeof(body404) - 1);
+	SendRespAndClose_upnphttp(h);
+}
+
+static void
+Send405(struct upnphttp * h)
+{
+	static const char body405[] =
+		"<HTML><HEAD><TITLE>405 Method Not Allowed</TITLE></HEAD>"
+		"<BODY><H1>Method Not Allowed</H1>The HTTP Method "
+		"is not allowed on this resource.</BODY></HTML>\r\n";
+
+	h->respflags |= FLAG_HTML;
+	BuildResp2_upnphttp(h, 405, "Method Not Allowed",
+	                    body405, sizeof(body405) - 1);
 	SendRespAndClose_upnphttp(h);
 }
 
@@ -417,6 +431,27 @@ ProcessHTTPUnSubscribe_upnphttp(struct upnphttp * h, const char * path)
 static void
 ProcessHttpQuery_upnphttp(struct upnphttp * h)
 {
+	static const struct {
+		const char * path;
+		char * (* f)(int *);
+	} path_desc[] = {
+		{ ROOTDESC_PATH, genRootDesc},
+		{ WANIPC_PATH, genWANIPCn},
+		{ WANCFG_PATH, genWANCfg},
+#ifdef HAS_DUMMY_SERVICE
+		{ DUMMY_PATH, NULL},
+#endif
+#ifdef ENABLE_L3F_SERVICE
+		{ L3F_PATH, genL3F},
+#endif
+#ifdef ENABLE_6FC_SERVICE
+		{ WANIP6FC_PATH, gen6FC},
+#endif
+#ifdef ENABLE_DP_SERVICE
+		{ DP_PATH, genDP},
+#endif
+		{ NULL, NULL}
+	};
 	char HttpCommand[16];
 	char HttpUrl[128];
 	char * HttpVer;
@@ -450,47 +485,37 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	else if(strcmp("GET", HttpCommand) == 0)
 	{
 		h->req_command = EGet;
-		if(strcasecmp(ROOTDESC_PATH, HttpUrl) == 0)
-		{
-			sendXMLdesc(h, genRootDesc);
-		}
-		else if(strcasecmp(WANIPC_PATH, HttpUrl) == 0)
-		{
-			sendXMLdesc(h, genWANIPCn);
-		}
-		else if(strcasecmp(WANCFG_PATH, HttpUrl) == 0)
-		{
-			sendXMLdesc(h, genWANCfg);
-		}
+		for(i=0; path_desc[i].path; i++) {
+			if(strcasecmp(path_desc[i].path, HttpUrl) == 0) {
+				if(path_desc[i].f)
+					sendXMLdesc(h, path_desc[i].f);
+				else
 #ifdef HAS_DUMMY_SERVICE
-		else if(strcasecmp(DUMMY_PATH, HttpUrl) == 0)
-		{
-			sendDummyDesc(h);
+					sendDummyDesc(h);
+#else
+					continue;
+#endif
+				return;
+			}
+		}
+		if(0 == memcmp(HttpUrl, "/ctl/", 5)) {
+			/* 405 Method Not Allowed
+			 * Allow: POST */
+			h->respflags = FLAG_ALLOW_POST;
+			Send405(h);
+			return;
+		}
+#ifdef ENABLE_EVENTS
+		if(0 == memcmp(HttpUrl, "/evt/", 5)) {
+			/* 405 Method Not Allowed
+			 * Allow: SUBSCRIBE, UNSUBSCRIBE */
+			h->respflags = FLAG_ALLOW_SUB_UNSUB;
+			Send405(h);
+			return;
 		}
 #endif
-#ifdef ENABLE_L3F_SERVICE
-		else if(strcasecmp(L3F_PATH, HttpUrl) == 0)
-		{
-			sendXMLdesc(h, genL3F);
-		}
-#endif
-#ifdef ENABLE_6FC_SERVICE
-		else if(strcasecmp(WANIP6FC_PATH, HttpUrl) == 0)
-		{
-			sendXMLdesc(h, gen6FC);
-		}
-#endif
-#ifdef ENABLE_DP_SERVICE
-		else if(strcasecmp(DP_PATH, HttpUrl) == 0)
-		{
-			sendXMLdesc(h, genDP);
-		}
-#endif
-		else
-		{
-			syslog(LOG_NOTICE, "%s not found, responding ERROR 404", HttpUrl);
-			Send404(h);
-		}
+		syslog(LOG_NOTICE, "%s not found, responding ERROR 404", HttpUrl);
+		Send404(h);
 	}
 #ifdef ENABLE_EVENTS
 	else if(strcmp("SUBSCRIBE", HttpCommand) == 0)
@@ -674,6 +699,15 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 		                          "SID: %s\r\n", h->res_SID);
 	}
 #endif
+	if(h->respflags & FLAG_ALLOW_POST) {
+		h->res_buflen += snprintf(h->res_buf + h->res_buflen,
+		                          h->res_buf_alloclen - h->res_buflen,
+		                          "Allow: %s\r\n", "POST");
+	} else if(h->respflags & FLAG_ALLOW_SUB_UNSUB) {
+		h->res_buflen += snprintf(h->res_buf + h->res_buflen,
+		                          h->res_buf_alloclen - h->res_buflen,
+		                          "Allow: %s\r\n", "SUBSCRIBE, UNSUBSCRIBE");
+	}
 	h->res_buf[h->res_buflen++] = '\r';
 	h->res_buf[h->res_buflen++] = '\n';
 	if(h->res_buf_alloclen < (h->res_buflen + bodylen))
