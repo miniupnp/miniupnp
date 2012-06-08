@@ -1,4 +1,4 @@
-# $Id: Makefile.linux,v 1.71 2012/05/23 08:46:14 nanard Exp $
+# $Id: Makefile.linux,v 1.72 2012/06/08 18:16:30 nanard Exp $
 # MiniUPnP project
 # (c) 2006-2012 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -28,7 +28,7 @@ CFLAGS += -D_GNU_SOURCE
 CFLAGS += -Wall
 CFLAGS += -Wextra -Wstrict-prototypes -Wdeclaration-after-statement
 #CFLAGS += -Wno-missing-field-initializers
-CFLAGS += -ansi
+#CFLAGS += -ansi	# iptables headers does use typeof which is a gcc extension
 CC ?= gcc
 RM = rm -f
 INSTALL = install

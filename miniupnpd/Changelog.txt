@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.288 2012/05/31 09:32:39 nanard Exp $
+$Id: Changelog.txt,v 1.289 2012/06/08 18:16:30 nanard Exp $
+
+2012/06/08:
+  Disable -ansi CFLAGS in Makefile.linux because recent iptables headers
+  make use of typeof keywork which is a GCC extension.
 
 2012/05/31:
   Improvements in autodetecting firewall under (Free)BSD
