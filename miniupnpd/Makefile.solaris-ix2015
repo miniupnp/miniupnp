@@ -166,14 +166,14 @@ testgetifaddr:	testgetifaddr.o getifaddr.o ix2015/ipfwrdr.o
 miniupnpdctl:	miniupnpdctl.o
 	$(CC) -o $@ $^ $(LIBS)
 
-config.h:	genconfig.sh
-	./genconfig.sh $(CONFIG_OPTIONS)
+config.h:	config.h-solaris-ix2015
+	$(CP) $^ $@
 
 wait-usec: wait-usec.c
 	$(CC) -o $@ $^ -lrt
 
 $(PROXYOBJS): ix2015/ipfwrdr.c ix2015/ix2015-func.c
-	   cd ix2015; CC="${CC}" make ipfwrdr.o
+	CC="${CC}" make -C ix2015 ipfwrdr.o
 
 cflow:
 	cflow -l -r   \

@@ -103,8 +103,8 @@ testgetifaddr:	testgetifaddr.o getifaddr.o ix2015/ipfwrdr.o
 
 miniupnpdctl:	miniupnpdctl.o
 
-config.h:	genconfig.sh
-	./genconfig.sh $(CONFIG_OPTIONS)
+config.h:	config.h-linux-ix2015
+	$(CP) $^ $@
 
 wait-usec: wait-usec.c
 
