@@ -81,10 +81,8 @@ struct file;
 #include <bsd/string.h>
 #endif
 
-/* WEXITSTATUS for solaris */
-#if defined(__sun)
+/* WEXITSTATUS */
 #include <sys/wait.h>
-#endif
 
 /* ======================================== */
 int verbose = 1; 		/* incremented in ../miniupnpd.c  */
