@@ -1,7 +1,7 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.4 2011/05/09 08:53:15 nanard Exp $
+# $Id: testminiwget.sh,v 1.6 2012/05/29 13:03:40 nanard Exp $
 # project miniupnp : http://miniupnp.free.fr/
-# (c) 2011 Thomas Bernard
+# (c) 2011-2012 Thomas Bernard
 #
 # test program for miniwget.c
 # is usually invoked by "make check"
@@ -12,10 +12,13 @@
 #  3 - compares served and received data
 #  4 - kills the local HTTP server and exits
 #
+# The script was tested and works with ksh, bash
+# It fails to run with dash 0.5.5.1 because of "kill %1"
 
-HTTPSERVEROUT=/tmp/httpserverout
-EXPECTEDFILE=/tmp/expectedfile
-DOWNLOADEDFILE=/tmp/downloadedfile
+TMPDIR=`mktemp -d`
+HTTPSERVEROUT="${TMPDIR}/httpserverout"
+EXPECTEDFILE="${TMPDIR}/expectedfile"
+DOWNLOADEDFILE="${TMPDIR}/downloadedfile"
 #ADDR=localhost
 ADDR="[::1]"
 PORT=
@@ -26,7 +29,8 @@ RET=0
 
 # launching the test HTTP server
 ./minihttptestserver -6 -e $EXPECTEDFILE > $HTTPSERVEROUT &
-while [ "$PORT" == "" ]; do
+while [ -z "$PORT" ]; do
+	sleep 1
 	PORT=`cat $HTTPSERVEROUT | sed 's/Listening on port \([0-9]*\)/\1/' `
 done
 echo "Test HTTP server is listening on $PORT"
@@ -72,8 +76,10 @@ if [ $RET -eq 0 ]; then
 	rm -f "${DOWNLOADEDFILE}.2"
 	rm -f "${DOWNLOADEDFILE}.3"
 	rm -f $EXPECTEDFILE $HTTPSERVEROUT
+	rmdir ${TMPDIR}
 else
 	echo "at least one of the test FAILED"
+	echo "directory ${TMPDIR} is left intact"
 fi
 exit $RET
 

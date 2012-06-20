@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.169 2012/05/24 18:08:49 nanard Exp $
+$Id: Changelog.txt,v 1.171 2012/06/20 21:05:56 nanard Exp $
 miniUPnP client Changelog.
+
+2012/05/29
+  Improvements in testminiwget.sh
 
 VERSION 1.7 : released 2012/05/24
 
