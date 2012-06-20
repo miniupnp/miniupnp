@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.68 2012/05/23 08:46:14 nanard Exp $
+# $Id: Makefile,v 1.69 2012/05/31 09:32:39 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -42,6 +42,7 @@ FWNAME = ipf
 .endif
 
 # better way to find if we are using ipf or pf
+.if defined(/etc/rc.subr) && defined(/etc/rc.conf)
 .if $(OSNAME) == "FreeBSD"
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
           if checkyesno ipfilter_enable; then \
@@ -58,6 +59,7 @@ FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
           if chechyesno ipfilter; then \
           echo "ipf"; else echo "pf"; fi
+.endif
 .endif
 
 .if $(OSNAME) == "Darwin"

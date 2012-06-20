@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.55 2012/05/24 16:51:08 nanard Exp $
+# $Id: genconfig.sh,v 1.56 2012/05/31 09:32:39 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2012 Thomas Bernard
@@ -111,20 +111,23 @@ case $OS_NAME in
 		fi
 		# new way to see which one to use PF or IPF.
 		# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=957
-		# source file with handy subroutines like checkyesno
-		. /etc/rc.subr
-		# source config file so we can probe vars
-		. /etc/rc.conf
-		if checkyesno ipfilter_enable; then
-			echo "Using ipf"
+		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
+			# source file with handy subroutines like checkyesno
+			. /etc/rc.subr
+			# source config file so we can probe vars
+			. /etc/rc.conf
+			if checkyesno ipfilter_enable; then
+				echo "Using ipf"
 			FW=ipf
-		elif checkyesno pf_enable; then
-			echo "Using pf"
-			FW=pf
-		elif checkyesno firewall_enable; then
-			echo "Using ifpw"
-			FW=ipfw
-		else
+			elif checkyesno pf_enable; then
+				echo "Using pf"
+				FW=pf
+			elif checkyesno firewall_enable; then
+				echo "Using ifpw"
+				FW=ipfw
+			fi
+		fi
+		if [ -z $FW ] ; then
 			echo "Could not detect usage of ipf, pf, ipfw. Compiling for pf by default"
 			FW=pf
 		fi
@@ -138,15 +141,18 @@ case $OS_NAME in
 		OS_URL=http://www.pfsense.com/
 		;;
 	NetBSD)
-		# source file with handy subroutines like checkyesno
-		. /etc/rc.subr
-		# source config file so we can probe vars
-		. /etc/rc.conf
-		if checkyesno pf; then
-			FW=pf
-		elif checkyesno ipfilter; then
-			FW=ipf
-		else
+		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
+			# source file with handy subroutines like checkyesno
+			. /etc/rc.subr
+			# source config file so we can probe vars
+			. /etc/rc.conf
+			if checkyesno pf; then
+				FW=pf
+			elif checkyesno ipfilter; then
+				FW=ipf
+			fi
+		fi
+		if [ -z $FW ] ; then
 			echo "Could not detect ipf nor pf, defaulting to pf."
 			FW=pf
 		fi
@@ -154,17 +160,19 @@ case $OS_NAME in
 		OS_URL=http://www.netbsd.org/
 		;;
 	DragonFly)
-		# source file with handy subroutines like checkyesno
-		. /etc/rc.subr
-		# source config file so we can probe vars
-		. /etc/rc.conf
-		if checkyesno pf; then
-			FW=pf
-		elif checkyesno ipfilter; then
-			FW=ipf
-		else
+		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
+			# source file with handy subroutines like checkyesno
+			. /etc/rc.subr
+			# source config file so we can probe vars
+			. /etc/rc.conf
+			if checkyesno pf; then
+				FW=pf
+			elif checkyesno ipfilter; then
+				FW=ipf
+			fi
+		fi
+		if [ -z $FW ] ; then
 			echo "Could not detect ipf nor pf, defaulting to pf."
-			echo "#define USE_PF 1" >> ${CONFIGFILE}
 			FW=pf
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}

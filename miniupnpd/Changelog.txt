@@ -1,4 +1,20 @@
-$Id: Changelog.txt,v 1.284 2012/05/24 16:51:06 nanard Exp $
+$Id: Changelog.txt,v 1.289 2012/06/08 18:16:30 nanard Exp $
+
+2012/06/08:
+  Disable -ansi CFLAGS in Makefile.linux because recent iptables headers
+  make use of typeof keywork which is a GCC extension.
+
+2012/05/31:
+  Improvements in autodetecting firewall under (Free)BSD
+
+2012/05/28:
+  Cleanup HTTP request handling. Answer 405 when relevant
+
+VERSION 1.7 : released the 2012/05/28
+
+2012/05/28:
+  clean linux/ifacewatcher.c
+  set natpmp socket non blocking
 
 2012/05/24:
   More solaris fixes

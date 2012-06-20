@@ -1,13 +1,15 @@
 - detect and inform of IP address changes or connectivity status change
   => Done (ifacewatcher 2011/05)
+  To be improved.
 - improve logging.
 - add support for IPv6 thanks to http://www.upnp.org/download/Annex%20A%20-%20IPv6.doc
   => work in progress
   - send also NOTIFY packets in IPv6 => done (2012/04/06)
-  - make minissdpd know IPv6 also...
+  - make minissdpd know IPv6 also... => done
 - improve NAT-PMP compliance
   => to be checked
 - Clean Option parsing/processing.
+  => done 2012/02/05
 
 - Option to hide the windows Interconnection icon and pop-up - something to do with optionally having a blank presentation_url
   Done (2009/02/13)
@@ -20,10 +22,14 @@
 
 support IGD v2 : http://upnp.org/specs/gw/igd2/
  - Lease Duration support (mandatory in v2) => DONE
+ - WANIPv6FirewallControl
+   - pf : updatepinhole to do
+   - netfilter : ok ?
+   - ipfw/ipf : TODO
 
 use non blocking sockets everywhere :
  - HTTP => OK
- - SSDP
- - NAT-PMP
+ - SSDP => OK
+ - NAT-PMP => OK
  - not needed for miniupnpdctl
 

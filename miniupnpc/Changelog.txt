@@ -1,5 +1,13 @@
-$Id: Changelog.txt,v 1.168 2012/05/01 16:16:51 nanard Exp $
+$Id: Changelog.txt,v 1.171 2012/06/20 21:05:56 nanard Exp $
 miniUPnP client Changelog.
+
+2012/06/20:
+  fixed CMakeLists.txt
+
+2012/05/29
+  Improvements in testminiwget.sh
+
+VERSION 1.7 : released 2012/05/24
 
 2012/05/01:
   Cleanup settings of CFLAGS in Makefile

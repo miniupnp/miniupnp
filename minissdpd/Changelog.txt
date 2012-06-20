@@ -1,4 +1,6 @@
-$Id: Changelog.txt,v 1.29 2012/05/23 08:56:35 nanard Exp $
+$Id: Changelog.txt,v 1.30 2012/05/24 18:04:56 nanard Exp $
+
+VERSION 1.2:
 
 2012/05/21:
 	Clean signal handling

@@ -1,7 +1,7 @@
-/* $Id: minihttptestserver.c,v 1.11 2012/05/21 08:47:38 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.13 2012/05/29 13:03:07 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
- * Copyright (c) 2011 Thomas Bernard
+ * Copyright (c) 2011-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <time.h>
+#include <errno.h>
 
 #define CRAP_LENGTH (2048)
 
@@ -129,8 +130,10 @@ char * build_chunked_response(int content_length, int * response_len) {
 		response_buffer[(*response_len)++] = '\r';
 		response_buffer[(*response_len)++] = '\n';
 	}
-	memcpy(response_buffer + *response_len, "0\r\n", 3);
-	*response_len += 3;
+	/* the last chunk : "0\r\n" a empty body and then
+	 * the final "\r\n" */
+	memcpy(response_buffer + *response_len, "0\r\n\r\n", 5);
+	*response_len += 5;
 	free(content_buffer);
 
 	printf("resp_length=%d buffer_length=%d content_length=%d\n",
@@ -161,8 +164,11 @@ void send_response(int c, const char * buffer, int len)
 			n = len;
 		n = write(c, buffer, n);
 		if(n < 0) {
-			perror("write");
-			return;
+			if(errno != EINTR) {
+				perror("write");
+				return;
+			}
+			/* if errno == EINTR, try again */
 		} else {
 			len -= n;
 			buffer += n;
@@ -258,11 +264,14 @@ void handle_http_connection(int c)
 		while(n > 0) {
 			i = write(c, pc, n);
 			if(i<0) {
-				perror("write");
-				return;
+				if(errno != EINTR) {
+					perror("write");
+					return;
+				}
+			} else {
+				n -= i;
+				pc += i;
 			}
-			n -= i;
-			pc += i;
 		}
 		return;
 	}
