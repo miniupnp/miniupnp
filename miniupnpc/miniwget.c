@@ -82,7 +82,7 @@ getHTTPResponse(int s, int * size)
 	chunksize_buf[0] = '\0';
 	chunksize_buf_index = 0;
 
-	while((n = receivedata(s, buf, 2048, 5000)) > 0)
+	while((n = receivedata(s, buf, 2048, 5000, NULL)) > 0)
 	{
 		if(endofheaders == 0)
 		{

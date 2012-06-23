@@ -327,6 +327,7 @@ upnpDiscover(int delay, const char * multicastif,
 {
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = 0;
+	unsigned int scope_id = 0;
 	int opt = 1;
 	static const char MSearchMsgFmt[] =
 	"M-SEARCH * HTTP/1.1\r\n"
@@ -625,7 +626,7 @@ upnpDiscover(int delay, const char * multicastif,
 #endif /* #ifdef NO_GETADDRINFO */
 	}
 	/* Waiting for SSDP REPLY packet to M-SEARCH */
-	n = receivedata(sudp, bufr, sizeof(bufr), delay);
+	n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
 	if (n < 0) {
 		/* error */
 		if(error)
