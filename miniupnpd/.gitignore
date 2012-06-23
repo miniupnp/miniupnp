@@ -7,3 +7,4 @@ testgetifaddr
 testgetifstats
 testupnpdescgen
 testupnppermissions
+testgetroute
