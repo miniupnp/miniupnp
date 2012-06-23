@@ -1,7 +1,7 @@
-/* $Id: upnpcommands.c,v 1.39 2012/04/09 12:49:27 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.40 2012/06/23 22:36:35 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2011 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */

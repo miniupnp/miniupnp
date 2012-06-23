@@ -229,8 +229,9 @@ char * simpleUPnPcommand(int s, const char * url, const char * service,
 {
 	char * buf;
 
+#if 1
 	buf = simpleUPnPcommand2(s, url, service, action, args, bufsize, "1.1");
-/*
+#else
 	buf = simpleUPnPcommand2(s, url, service, action, args, bufsize, "1.0");
 	if (!buf || *bufsize == 0)
 	{
@@ -239,7 +240,7 @@ char * simpleUPnPcommand(int s, const char * url, const char * service,
 #endif
 		buf = simpleUPnPcommand2(s, url, service, action, args, bufsize, "1.1");
 	}
-*/
+#endif
 	return buf;
 }
 
