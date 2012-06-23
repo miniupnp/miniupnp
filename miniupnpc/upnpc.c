@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.95 2012/05/02 20:14:43 nanard Exp $ */
+/* $Id: upnpc.c,v 1.96 2012/06/23 18:25:35 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2012 Thomas Bernard
@@ -52,44 +52,47 @@ static void DisplayInfos(struct UPNPUrls * urls,
 	unsigned int brUp, brDown;
 	time_t timenow, timestarted;
 	int r;
-	UPNP_GetConnectionTypeInfo(urls->controlURL,
-	                           data->first.servicetype,
-							   connectionType);
-	if(connectionType[0])
-		printf("Connection Type : %s\n", connectionType);
-	else
+	if(UPNP_GetConnectionTypeInfo(urls->controlURL,
+	                              data->first.servicetype,
+	                              connectionType) != UPNPCOMMAND_SUCCESS)
 		printf("GetConnectionTypeInfo failed.\n");
-	UPNP_GetStatusInfo(urls->controlURL, data->first.servicetype,
-	                   status, &uptime, lastconnerr);
-	printf("Status : %s, uptime=%us, LastConnectionError : %s\n",
-	       status, uptime, lastconnerr);
+	else
+		printf("Connection Type : %s\n", connectionType);
+	if(UPNP_GetStatusInfo(urls->controlURL, data->first.servicetype,
+	                      status, &uptime, lastconnerr) != UPNPCOMMAND_SUCCESS)
+		printf("GetStatusInfo failed.\n");
+	else
+		printf("Status : %s, uptime=%us, LastConnectionError : %s\n",
+		       status, uptime, lastconnerr);
 	timenow = time(NULL);
 	timestarted = timenow - uptime;
 	printf("  Time started : %s", ctime(&timestarted));
-	UPNP_GetLinkLayerMaxBitRates(urls->controlURL_CIF, data->CIF.servicetype,
-			&brDown, &brUp);
-	printf("MaxBitRateDown : %u bps", brDown);
-	if(brDown >= 1000000) {
-		printf(" (%u.%u Mbps)", brDown / 1000000, (brDown / 100000) % 10);
-	} else if(brDown >= 1000) {
-		printf(" (%u Kbps)", brDown / 1000);
+	if(UPNP_GetLinkLayerMaxBitRates(urls->controlURL_CIF, data->CIF.servicetype,
+	                                &brDown, &brUp) != UPNPCOMMAND_SUCCESS) {
+		printf("GetLinkLayerMaxBitRates failed.\n");
+	} else {
+		printf("MaxBitRateDown : %u bps", brDown);
+		if(brDown >= 1000000) {
+			printf(" (%u.%u Mbps)", brDown / 1000000, (brDown / 100000) % 10);
+		} else if(brDown >= 1000) {
+			printf(" (%u Kbps)", brDown / 1000);
+		}
+		printf("   MaxBitRateUp %u bps", brUp);
+		if(brUp >= 1000000) {
+			printf(" (%u.%u Mbps)", brUp / 1000000, (brUp / 100000) % 10);
+		} else if(brUp >= 1000) {
+			printf(" (%u Kbps)", brUp / 1000);
+		}
+		printf("\n");
 	}
-	printf("   MaxBitRateUp %u bps", brUp);
-	if(brUp >= 1000000) {
-		printf(" (%u.%u Mbps)", brUp / 1000000, (brUp / 100000) % 10);
-	} else if(brUp >= 1000) {
-		printf(" (%u Kbps)", brUp / 1000);
-	}
-	printf("\n");
 	r = UPNP_GetExternalIPAddress(urls->controlURL,
 	                          data->first.servicetype,
 							  externalIPAddress);
-	if(r != UPNPCOMMAND_SUCCESS)
-		printf("GetExternalIPAddress() returned %d\n", r);
-	if(externalIPAddress[0])
+	if(r != UPNPCOMMAND_SUCCESS) {
+		printf("GetExternalIPAddress failed. (errorcode=%d)\n", r);
+	} else {
 		printf("ExternalIPAddress = %s\n", externalIPAddress);
-	else
-		printf("GetExternalIPAddress failed.\n");
+	}
 }
 
 static void GetConnectionStatus(struct UPNPUrls * urls,
