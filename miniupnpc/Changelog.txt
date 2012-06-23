@@ -3,6 +3,7 @@ miniUPnP client Changelog.
 
 2012/06/23:
   More error return checks in upnpc.c
+  increment API_VERSION to 9
 
 2012/06/20:
   fixed CMakeLists.txt

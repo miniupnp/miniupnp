@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.28 2012/05/23 08:50:10 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.29 2012/06/23 22:33:50 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
@@ -19,7 +19,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"1.7"
-#define MINIUPNPC_API_VERSION	8
+#define MINIUPNPC_API_VERSION	9
 
 #ifdef __cplusplus
 extern "C" {

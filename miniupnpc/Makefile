@@ -41,7 +41,7 @@ JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
 #LDLIBS=-lsocket -lnsl -lresolv
 
 # APIVERSION is used to build SONAME
-APIVERSION = 8
+APIVERSION = 9
 
 SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
