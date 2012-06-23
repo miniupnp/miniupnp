@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.289 2012/06/08 18:16:30 nanard Exp $
+$Id: Changelog.txt,v 1.290 2012/06/23 23:34:41 nanard Exp $
+
+2012/06/23:
+  in UPNP_STRICT mode, the literal IPv6 address in "location:" of SSDP
+  messages is the source address used to send the message
 
 2012/06/08:
   Disable -ansi CFLAGS in Makefile.linux because recent iptables headers

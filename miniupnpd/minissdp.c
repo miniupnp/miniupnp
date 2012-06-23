@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.36 2012/05/27 22:16:26 nanard Exp $ */
+/* $Id: minissdp.c,v 1.38 2012/06/23 23:34:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -14,6 +14,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <syslog.h>
+
 #include "config.h"
 #include "upnpdescstrings.h"
 #include "miniupnpdpath.h"
@@ -21,6 +22,7 @@
 #include "upnpglobalvars.h"
 #include "minissdp.h"
 #include "upnputils.h"
+#include "getroute.h"
 #include "codelength.h"
 
 /* SSDP ip/port */
@@ -525,6 +527,9 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	int st_len = 0;
 	char sender_str[64];
 	const char * announced_host = NULL;
+#ifdef UPNP_STRICT
+	char announced_host_buf[64];
+#endif
 
 	/* get the string representation of the sender address */
 	sockaddr_to_string(sender, sender_str, sizeof(sender_str));
@@ -586,7 +591,37 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			else
 			{
 				/* IPv6 address with brackets */
+#ifdef UPNP_STRICT
+				struct in6_addr addr6;
+				size_t addr6_len = sizeof(addr6);
+				/* retrieve the IPv6 address which
+				 * will be used locally to reach sender */
+				memset(&addr6, 0, sizeof(addr6));
+				if(get_src_for_route_to (sender, &addr6, &addr6_len) < 0) {
+					syslog(LOG_WARNING, "get_src_for_route_to() failed, using %s", ipv6_addr_for_http_with_brackets);
+					announced_host = ipv6_addr_for_http_with_brackets;
+				} else {
+					if(inet_ntop(AF_INET6, &addr6,
+					             announced_host_buf+1,
+					             sizeof(announced_host_buf) - 2)) {
+						announced_host_buf[0] = '[';
+						i = strlen(announced_host_buf);
+						if(i < sizeof(announced_host_buf) - 1) {
+							announced_host_buf[i] = ']';
+							announced_host_buf[i+1] = '\0';
+						} else {
+							syslog(LOG_NOTICE, "cannot suffix %s with ']'",
+							       announced_host_buf);
+						}
+						announced_host = announced_host_buf;
+					} else {
+						syslog(LOG_NOTICE, "inet_ntop() failed %m");
+						announced_host = ipv6_addr_for_http_with_brackets;
+					}
+				}
+#else
 				announced_host = ipv6_addr_for_http_with_brackets;
+#endif
 			}
 #endif
 			/* Responds to request with a device as ST header */
