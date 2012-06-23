@@ -1,4 +1,4 @@
-/* $Id: connecthostport.c,v 1.6 2012/01/21 13:30:31 nanard Exp $ */
+/* $Id: connecthostport.c,v 1.8 2012/06/23 22:32:33 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2010-2012 Thomas Bernard
@@ -52,7 +52,8 @@
 /* connecthostport()
  * return a socket connected (TCP) to the host and port
  * or -1 in case of error */
-int connecthostport(const char * host, unsigned short port)
+int connecthostport(const char * host, unsigned short port,
+                    unsigned int scope_id)
 {
 	int s, n;
 #ifdef USE_GETHOSTBYNAME
@@ -145,10 +146,12 @@ int connecthostport(const char * host, unsigned short port)
 	if(host[0] == '[')
 	{
 		/* literal ip v6 address */
-		int i;
-		for(i = 0; host[i+1] && (host[i+1] != ']') && i < MAXHOSTNAMELEN; i++)
+		int i, j;
+		for(i = 0, j = 1; host[j] && (host[j] != ']') && i < MAXHOSTNAMELEN; i++, j++)
 		{
-			tmp_host[i] = host[i+1];
+			tmp_host[i] = host[j];
+			if(0 == memcmp(host+j, "%25", 3))	/* %25 is just url encoding for '%' */
+				j+=2;							/* skip "25" */
 		}
 		tmp_host[i] = '\0';
 	}
@@ -173,6 +176,10 @@ int connecthostport(const char * host, unsigned short port)
 		s = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
 		if(s < 0)
 			continue;
+		if(p->ai_addr->sa_family == AF_INET6 && scope_id > 0) {
+			struct sockaddr_in6 * addr6 = (struct sockaddr_in6 *)p->ai_addr;
+			addr6->sin6_scope_id = scope_id;
+		}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 		/* setting a 3 seconds timeout for the connect() call */
 		timeout.tv_sec = 3;

@@ -1,7 +1,7 @@
-/* $Id: testminiwget.c,v 1.3 2011/05/06 16:33:53 nanard Exp $ */
+/* $Id: testminiwget.c,v 1.4 2012/06/23 22:35:59 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2011 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -20,13 +20,13 @@ int main(int argc, char * * argv)
 	int size, writtensize;
 	FILE *f;
 	char addr[64];
+
 	if(argc < 3) {
 		fprintf(stderr, "Usage:\t%s url file\n", argv[0]);
 		fprintf(stderr, "Example:\t%s http://www.google.com/ out.html\n", argv[0]);
 		return 1;
 	}
-	/*data = miniwget(argv[1], &size);*/
-	data = miniwget_getaddr(argv[1], &size, addr, sizeof(addr));
+	data = miniwget_getaddr(argv[1], &size, addr, sizeof(addr), 0);
 	if(!data) {
 		fprintf(stderr, "Error fetching %s\n", argv[1]);
 		return 1;

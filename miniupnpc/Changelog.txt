@@ -4,6 +4,8 @@ miniUPnP client Changelog.
 2012/06/23:
   More error return checks in upnpc.c
   #define MINIUPNPC_GET_SRC_ADDR enables receivedata() to get scope_id
+  parseURL() now parses IPv6 addresses scope
+  new parameter for miniwget() : IPv6 address scope
   increment API_VERSION to 9
 
 2012/06/20:

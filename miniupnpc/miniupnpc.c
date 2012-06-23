@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.106 2012/06/11 16:08:17 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.107 2012/06/23 22:36:35 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -189,12 +189,11 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 		strncpy(p, "></" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>\r\n",
 		        soapbody + sizeof(soapbody) - p);
 	}
-	if(!parseURL(url, hostname, &port, &path)) return NULL;
-	if(s<0)
-	{
-		s = connecthostport(hostname, port);
-		if(s < 0)
-		{
+	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
+	if(s < 0) {
+		s = connecthostport(hostname, port, 0);
+		if(s < 0) {
+			/* failed to connect */
 			return NULL;
 		}
 	}
@@ -686,6 +685,7 @@ upnpDiscover(int delay, const char * multicastif,
 			tmp->buffer[urlsize] = '\0';
 			memcpy(tmp->buffer + urlsize + 1, st, stsize);
 			tmp->buffer[urlsize+1+stsize] = '\0';
+			tmp->scope_id = scope_id;
 			devlist = tmp;
 		}
 	}
@@ -873,7 +873,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 			if(state == 1)
 			{
 				desc[i].xml = miniwget_getaddr(dev->descURL, &(desc[i].size),
-				   	                           lanaddr, lanaddrlen);
+				   	                           lanaddr, lanaddrlen,
+				                               dev->scope_id);
 #ifdef DEBUG
 				if(!desc[i].xml)
 				{
@@ -944,7 +945,7 @@ UPNP_GetIGDFromUrl(const char * rootdescurl,
 	char * descXML;
 	int descXMLsize = 0;
 	descXML = miniwget_getaddr(rootdescurl, &descXMLsize,
-	   	                       lanaddr, lanaddrlen);
+	   	                       lanaddr, lanaddrlen, 0);
 	if(descXML) {
 		memset(data, 0, sizeof(struct IGDdatas));
 		memset(urls, 0, sizeof(struct UPNPUrls));

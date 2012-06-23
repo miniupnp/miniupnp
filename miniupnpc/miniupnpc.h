@@ -37,6 +37,7 @@ struct UPNPDev {
 	struct UPNPDev * pNext;
 	char * descURL;
 	char * st;
+	unsigned int scope_id;
 	char buffer[2];
 };
 
