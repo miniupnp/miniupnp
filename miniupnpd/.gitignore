@@ -1,4 +1,5 @@
 *.o
+*.bak
 config.h
 miniupnpd
 miniupnpdctl
