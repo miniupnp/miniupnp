@@ -752,10 +752,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(SYSUPTIMEMASK);	/*sysuptime = 1;*/
 				break;
+#if defined(USE_PF) || defined(USE_IPF)
 			case UPNPPACKET_LOG:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(LOGPACKETSMASK);	/*logpackets = 1;*/
 				break;
+#endif
 			case UPNPUUID:
 				strncpy(uuidvalue+5, ary_options[i].value,
 				        strlen(uuidvalue+5) + 1);
@@ -878,10 +880,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		/*case 'l':
 			logfilename = argv[++i];
 			break;*/
+#if defined(USE_PF) || defined(USE_IPF)
 		case 'L':
 			/*logpackets = 1;*/
 			SETFLAG(LOGPACKETSMASK);
 			break;
+#endif
 		case 'S':
 			SETFLAG(SECUREMODEMASK);
 			break;
@@ -1098,11 +1102,15 @@ init(int argc, char * * argv, struct runtime_vars * v)
 print_usage:
 	fprintf(stderr, "Usage:\n\t"
 	        "%s [-f config_file] [-i ext_ifname] [-o ext_ip]\n"
-#ifndef ENABLE_NATPMP
-			"\t\t[-a listening_ip] [-p port] [-d] [-L] [-U] [-S]\n"
-#else
-			"\t\t[-a listening_ip] [-p port] [-d] [-L] [-U] [-S] [-N]\n"
+			"\t\t[-a listening_ip] [-p port] [-d]"
+#if defined(USE_PF) || defined(USE_IPF)
+			" [-L]"
 #endif
+			" [-U] [-S]\n"
+#ifdef ENABLE_NATPMP
+			" [-N]"
+#endif
+			"\n"
 			/*"[-l logfile] " not functionnal */
 			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
 			"\t\t[-t notify_interval] [-P pid_filename]\n"
@@ -1118,7 +1126,9 @@ print_usage:
 			"\tDefault pid file is '%s'.\n"
 			"\tDefault config file is '%s'.\n"
 			"\tWith -d miniupnpd will run as a standard program.\n"
+#if defined(USE_PF) || defined(USE_IPF)
 			"\t-L sets packet log in pf and ipf on.\n"
+#endif
 			"\t-S sets \"secure\" mode : clients can only add mappings to their own ip\n"
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
