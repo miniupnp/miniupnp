@@ -958,6 +958,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes two arguments.\n", argv[i][1]);
 			break;
 		case 'a':
+#ifndef MULTIPLE_EXTERNAL_IP
 			if(i+1 < argc)
 			{
 				i++;
@@ -984,6 +985,47 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+#else			
+			if(i+2 < argc)
+			{
+				char *val=calloc((strlen(argv[i+1]) + strlen(argv[i+2]) + 1), sizeof(char));
+				if (val == NULL)
+				{
+					fprintf(stderr, "memory allocation error for listen address storage\n");
+					break;
+				}
+				sprintf(val, "%s %s", argv[i+1], argv[i+2]);
+
+				lan_addr = (struct lan_addr_s *) malloc(sizeof(struct lan_addr_s));
+				if (lan_addr == NULL)
+				{
+					fprintf(stderr, "malloc(sizeof(struct lan_addr_s)): %m");
+					free(val);
+					break;
+				}
+				if(parselanaddr(lan_addr, val) != 0)
+				{
+					fprintf(stderr, "can't parse \"%s\" as valid lan address\n", val);
+					free(lan_addr);
+					free(val);
+					break;
+				}
+				/* check if we already have this address */
+				for(lan_addr2 = lan_addrs.lh_first; lan_addr2 != NULL; lan_addr2 = lan_addr2->list.le_next)
+				{
+					if (0 == strncmp(lan_addr2->str, lan_addr->str, 15))
+						break;
+				}
+				if (lan_addr2 == NULL)
+					LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
+
+				free(val);
+				i+=2;
+			}
+			else
+				fprintf(stderr, "Option -%c takes two arguments.\n", argv[i][1]);
+#endif			
+			break;
 			break;
 		case 'f':
 			i++;	/* discarding, the config file is already read */
