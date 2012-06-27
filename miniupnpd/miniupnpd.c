@@ -887,6 +887,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			SETFLAG(ENABLENATPMPMASK);
 			break;
 #endif
+		case 'M':
+			SETFLAG(ENABLEUPNPMASK);
+			break;
 		case 'U':
 			/*sysuptime = 1;*/
 			SETFLAG(SYSUPTIMEMASK);
