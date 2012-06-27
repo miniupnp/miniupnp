@@ -820,6 +820,32 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
+#ifdef ENABLE_PERMISSION_RULES
+			case UPNPPERMISSIONRULE:
+			{
+				void *tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
+				if(tmp == NULL)
+				{
+					fprintf(stderr, "memory allocation error. Permission line in file %s\n",
+							optionsfile);
+				}
+				else
+				{
+					upnppermlist = tmp;
+					/* parse the rule */
+					if(read_permission_line(upnppermlist + num_upnpperm, (char *)ary_options[i].value) >= 0)
+					{
+						num_upnpperm++;
+					}
+					else
+					{
+						fprintf(stderr, "parsing error file %s : %s\n", 
+								optionsfile, ary_options[i].value);
+					}
+				}
+			}
+			break;
+#endif /* ENABLE_PERMISSION_RULES */
 			default:
 				fprintf(stderr, "Unknown option in file %s\n",
 				        optionsfile);
@@ -1047,6 +1073,45 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes two arguments.\n", argv[i][1]);
 #endif			
 			break;
+#ifdef ENABLE_PERMISSION_RULES
+		case 'A':
+			if(i+4 < argc)
+			{
+				void *tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
+				if(tmp == NULL)
+				{
+					fprintf(stderr, "memory allocation error for permission ruleset\n");
+				}
+				else
+				{
+					char *val=calloc((strlen(argv[i+1]) + strlen(argv[i+2]) + strlen(argv[i+3]) + strlen(argv[i+4]) + 4), sizeof(char));
+					if(val == NULL)
+					{
+						fprintf(stderr, "memory allocation error for ruleset storage\n");
+					}
+
+					sprintf(val, "%s %s %s %s", argv[i+1], argv[i+2], argv[i+3], argv[i+4]);
+
+					upnppermlist = tmp;
+					/* parse the rule */
+					if(read_permission_line(upnppermlist + num_upnpperm, val) >= 0)
+					{
+						num_upnpperm++;
+					}
+					else
+					{
+						fprintf(stderr, "parsing error file %s : %s\n", 
+								optionsfile, ary_options[i].value);
+					}
+
+					free(val);
+					i+=4;
+				}
+			}
+			else
+				fprintf(stderr, "Option -%c takes four arguments.\n", argv[i][1]);
+			break;
+#endif /* ENABLE_PERMISSION_RULES */
 			break;
 		case 'f':
 			i++;	/* discarding, the config file is already read */
