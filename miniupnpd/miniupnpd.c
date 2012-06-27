@@ -686,6 +686,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	v->clean_ruleset_threshold = 20;
 	v->clean_ruleset_interval = 0;	/* interval between ruleset check. 0=disabled */
 
+#ifndef DISABLE_CONFIG_FILE	
 	/* read options file first since
 	 * command line arguments have final say */
 	if(readoptionsfile(optionsfile) < 0)
@@ -825,7 +826,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 		}
 	}
-
+#endif /* DISABLE_CONFIG_FILE */
 	/* command line arguments processing */
 	for(i=1; i<argc; i++)
 	{
