@@ -752,10 +752,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(SYSUPTIMEMASK);	/*sysuptime = 1;*/
 				break;
+#ifdef USE_PF
 			case UPNPPACKET_LOG:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(LOGPACKETSMASK);	/*logpackets = 1;*/
 				break;
+#endif				
 			case UPNPUUID:
 				strncpy(uuidvalue+5, ary_options[i].value,
 				        strlen(uuidvalue+5) + 1);
@@ -878,10 +880,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		/*case 'l':
 			logfilename = argv[++i];
 			break;*/
+#ifdef USE_PF
 		case 'L':
 			/*logpackets = 1;*/
 			SETFLAG(LOGPACKETSMASK);
 			break;
+#endif
 		case 'S':
 			SETFLAG(SECUREMODEMASK);
 			break;
@@ -1160,7 +1164,9 @@ print_usage:
 			"\tDefault pid file is '%s'.\n"
 			"\tDefault config file is '%s'.\n"
 			"\tWith -d miniupnpd will run as a standard program.\n"
+#ifdef USE_PF
 			"\t-L sets packet log in pf and ipf on.\n"
+#endif
 			"\t-S sets \"secure\" mode : clients can only add mappings to their own ip\n"
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
