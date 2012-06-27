@@ -47,6 +47,9 @@ enum upnpconfigoptions {
 #ifdef ENABLE_LEASEFILE
 	UPNPLEASEFILE,			/* lease_file */
 #endif
+#ifdef ENABLE_PERMISSION_RULES	
+	UPNPPERMISSIONRULE,		/* permission rules */
+#endif
 	UPNPMINISSDPDSOCKET,	/* minissdpdsocket */
 	UPNPENABLE				/* enable_upnp */
 };

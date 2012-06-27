@@ -58,6 +58,9 @@ static const struct {
 #ifdef ENABLE_LEASEFILE
 	{ UPNPLEASEFILE, "lease_file"},
 #endif
+#ifdef ENABLE_PERMISSION_RULES
+	{ UPNPPERMISSIONRULE, "permission_rule"},
+#endif
 	{ UPNPMINISSDPDSOCKET, "minissdpdsocket"},
 	{ UPNPSECUREMODE, "secure_mode"}
 };

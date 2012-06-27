@@ -686,6 +686,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	v->clean_ruleset_threshold = 20;
 	v->clean_ruleset_interval = 0;	/* interval between ruleset check. 0=disabled */
 
+#ifndef DISABLE_CONFIG_FILE	
 	/* read options file first since
 	 * command line arguments have final say */
 	if(readoptionsfile(optionsfile) < 0)
@@ -752,10 +753,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(SYSUPTIMEMASK);	/*sysuptime = 1;*/
 				break;
+#ifdef USE_PF
 			case UPNPPACKET_LOG:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(LOGPACKETSMASK);	/*logpackets = 1;*/
 				break;
+#endif				
 			case UPNPUUID:
 				strncpy(uuidvalue+5, ary_options[i].value,
 				        strlen(uuidvalue+5) + 1);
@@ -817,13 +820,39 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
+#ifdef ENABLE_PERMISSION_RULES
+			case UPNPPERMISSIONRULE:
+			{
+				void *tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
+				if(tmp == NULL)
+				{
+					fprintf(stderr, "memory allocation error. Permission line in file %s\n",
+							optionsfile);
+				}
+				else
+				{
+					upnppermlist = tmp;
+					/* parse the rule */
+					if(read_permission_line(upnppermlist + num_upnpperm, (char *)ary_options[i].value) >= 0)
+					{
+						num_upnpperm++;
+					}
+					else
+					{
+						fprintf(stderr, "parsing error file %s : %s\n", 
+								optionsfile, ary_options[i].value);
+					}
+				}
+			}
+			break;
+#endif /* ENABLE_PERMISSION_RULES */
 			default:
 				fprintf(stderr, "Unknown option in file %s\n",
 				        optionsfile);
 			}
 		}
 	}
-
+#endif /* DISABLE_CONFIG_FILE */
 	/* command line arguments processing */
 	for(i=1; i<argc; i++)
 	{
@@ -845,11 +874,24 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
+		case 'r':
+			if(i+1 < argc)
+				v->clean_ruleset_interval = atoi(argv[++i]);
+			else
+				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			break;
 		case 'u':
 			if(i+1 < argc)
 				strncpy(uuidvalue+5, argv[++i], strlen(uuidvalue+5) + 1);
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			break;
+		case 'z':
+			if(i+1 < argc)
+				strncpy(friendly_name, argv[++i], FRIENDLY_NAME_MAX_LEN);
+			else
+				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
 			break;
 		case 's':
 			if(i+1 < argc)
@@ -871,6 +913,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			SETFLAG(ENABLENATPMPMASK);
 			break;
 #endif
+		case 'M':
+			SETFLAG(ENABLEUPNPMASK);
+			break;
 		case 'U':
 			/*sysuptime = 1;*/
 			SETFLAG(SYSUPTIMEMASK);
@@ -878,10 +923,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		/*case 'l':
 			logfilename = argv[++i];
 			break;*/
+#ifdef USE_PF
 		case 'L':
 			/*logpackets = 1;*/
 			SETFLAG(LOGPACKETSMASK);
 			break;
+#endif
 		case 'S':
 			SETFLAG(SECUREMODEMASK);
 			break;
@@ -958,6 +1005,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes two arguments.\n", argv[i][1]);
 			break;
 		case 'a':
+#ifndef MULTIPLE_EXTERNAL_IP
 			if(i+1 < argc)
 			{
 				i++;
@@ -984,6 +1032,86 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+#else			
+			if(i+2 < argc)
+			{
+				char *val=calloc((strlen(argv[i+1]) + strlen(argv[i+2]) + 1), sizeof(char));
+				if (val == NULL)
+				{
+					fprintf(stderr, "memory allocation error for listen address storage\n");
+					break;
+				}
+				sprintf(val, "%s %s", argv[i+1], argv[i+2]);
+
+				lan_addr = (struct lan_addr_s *) malloc(sizeof(struct lan_addr_s));
+				if (lan_addr == NULL)
+				{
+					fprintf(stderr, "malloc(sizeof(struct lan_addr_s)): %m");
+					free(val);
+					break;
+				}
+				if(parselanaddr(lan_addr, val) != 0)
+				{
+					fprintf(stderr, "can't parse \"%s\" as valid lan address\n", val);
+					free(lan_addr);
+					free(val);
+					break;
+				}
+				/* check if we already have this address */
+				for(lan_addr2 = lan_addrs.lh_first; lan_addr2 != NULL; lan_addr2 = lan_addr2->list.le_next)
+				{
+					if (0 == strncmp(lan_addr2->str, lan_addr->str, 15))
+						break;
+				}
+				if (lan_addr2 == NULL)
+					LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
+
+				free(val);
+				i+=2;
+			}
+			else
+				fprintf(stderr, "Option -%c takes two arguments.\n", argv[i][1]);
+#endif			
+			break;
+#ifdef ENABLE_PERMISSION_RULES
+		case 'A':
+			if(i+4 < argc)
+			{
+				void *tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
+				if(tmp == NULL)
+				{
+					fprintf(stderr, "memory allocation error for permission ruleset\n");
+				}
+				else
+				{
+					char *val=calloc((strlen(argv[i+1]) + strlen(argv[i+2]) + strlen(argv[i+3]) + strlen(argv[i+4]) + 4), sizeof(char));
+					if(val == NULL)
+					{
+						fprintf(stderr, "memory allocation error for ruleset storage\n");
+					}
+
+					sprintf(val, "%s %s %s %s", argv[i+1], argv[i+2], argv[i+3], argv[i+4]);
+
+					upnppermlist = tmp;
+					/* parse the rule */
+					if(read_permission_line(upnppermlist + num_upnpperm, val) >= 0)
+					{
+						num_upnpperm++;
+					}
+					else
+					{
+						fprintf(stderr, "parsing error file %s : %s\n", 
+								optionsfile, ary_options[i].value);
+					}
+
+					free(val);
+					i+=4;
+				}
+			}
+			else
+				fprintf(stderr, "Option -%c takes four arguments.\n", argv[i][1]);
+			break;
+#endif /* ENABLE_PERMISSION_RULES */
 			break;
 		case 'f':
 			i++;	/* discarding, the config file is already read */
@@ -1118,7 +1246,9 @@ print_usage:
 			"\tDefault pid file is '%s'.\n"
 			"\tDefault config file is '%s'.\n"
 			"\tWith -d miniupnpd will run as a standard program.\n"
+#ifdef USE_PF
 			"\t-L sets packet log in pf and ipf on.\n"
+#endif
 			"\t-S sets \"secure\" mode : clients can only add mappings to their own ip\n"
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
