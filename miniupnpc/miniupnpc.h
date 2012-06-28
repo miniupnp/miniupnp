@@ -1,8 +1,8 @@
-/* $Id: miniupnpc.h,v 1.29 2012/06/23 22:33:50 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.30 2012/06/28 18:52:12 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2011 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
 #ifndef __MINIUPNPC_H__
@@ -111,9 +111,12 @@ UPNP_GetIGDFromUrl(const char * rootdescurl,
                    struct IGDdatas * data,
                    char * lanaddr, int lanaddrlen);
 
-LIBSPEC void GetUPNPUrls(struct UPNPUrls *, struct IGDdatas *, const char *);
+LIBSPEC void
+GetUPNPUrls(struct UPNPUrls *, struct IGDdatas *,
+            const char *, unsigned int);
 
-LIBSPEC void FreeUPNPUrls(struct UPNPUrls *);
+LIBSPEC void
+FreeUPNPUrls(struct UPNPUrls *);
 
 /* return 0 or 1 */
 LIBSPEC int UPNPIGD_IsConnected(struct UPNPUrls *, struct IGDdatas *);

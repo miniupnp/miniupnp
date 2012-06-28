@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.107 2012/06/23 22:36:35 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.108 2012/06/28 18:52:12 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -733,15 +733,22 @@ url_cpy_or_cat(char * dst, const char * src, int n)
 
 /* Prepare the Urls for usage...
  */
-LIBSPEC void GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
-                 const char * descURL)
+LIBSPEC void
+GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
+            const char * descURL, unsigned int scope_id)
 {
 	char * p;
 	int n1, n2, n3, n4;
+	char ifname[IF_NAMESIZE];
 
 	n1 = strlen(data->urlbase);
 	if(n1==0)
 		n1 = strlen(descURL);
+	if(scope_id != 0) {
+		if(if_indextoname(scope_id, ifname)) {
+			n1 += 3 + strlen(ifname);	/* 3 == strlen(%25) */
+		}
+	}
 	n1 += 2;	/* 1 byte more for Null terminator, 1 byte for '/' if needed */
 	n2 = n1; n3 = n1; n4 = n1;
 	n1 += strlen(data->first.scpdurl);
@@ -765,6 +772,18 @@ LIBSPEC void GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
 		strncpy(urls->ipcondescURL, descURL, n1);
 	p = strchr(urls->ipcondescURL+7, '/');
 	if(p) p[0] = '\0';
+	if(scope_id != 0) {
+		if(0 == memcmp(urls->ipcondescURL, "http://[fe80:", 13)) {
+			/* this is a linklocal IPv6 address */
+			p = strchr(urls->ipcondescURL, ']');
+			if(p) {
+				/* insert %25<scope> into URL */
+				memmove(p + 3 + strlen(ifname), p, strlen(p) + 1);
+				memcpy(p, "%25", 3);
+				memcpy(p + 3, ifname, strlen(ifname));
+			}
+		}
+	}
 	strncpy(urls->controlURL, urls->ipcondescURL, n2);
 	strncpy(urls->controlURL_CIF, urls->ipcondescURL, n3);
 	strncpy(urls->controlURL_6FC, urls->ipcondescURL, n4);
@@ -892,7 +911,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				   "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1")
 				   || state >= 3 )
 				{
-				  GetUPNPUrls(urls, data, dev->descURL);
+				  GetUPNPUrls(urls, data, dev->descURL, dev->scope_id);
 
 #ifdef DEBUG
 				  printf("UPNPIGD_IsConnected(%s) = %d\n",
@@ -911,7 +930,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				    memcpy(&data->tmp, &data->first, sizeof(struct IGDdatas_service));
 				    memcpy(&data->first, &data->second, sizeof(struct IGDdatas_service));
 				    memcpy(&data->second, &data->tmp, sizeof(struct IGDdatas_service));
-				    GetUPNPUrls(urls, data, dev->descURL);
+				    GetUPNPUrls(urls, data, dev->descURL, dev->scope_id);
 #ifdef DEBUG
 				    printf("UPNPIGD_IsConnected(%s) = %d\n",
 				       urls->controlURL,
@@ -953,7 +972,7 @@ UPNP_GetIGDFromUrl(const char * rootdescurl,
 		parserootdesc(descXML, descXMLsize, data);
 		free(descXML);
 		descXML = NULL;
-		GetUPNPUrls(urls, data, rootdescurl);
+		GetUPNPUrls(urls, data, rootdescurl, 0);
 		return 1;
 	} else {
 		return 0;

@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.173 2012/06/23 22:36:34 nanard Exp $
+$Id: Changelog.txt,v 1.174 2012/06/28 18:52:11 nanard Exp $
 miniUPnP client Changelog.
+
+2012/06/28:
+  GetUPNPUrls() now inserts scope into link-local IPv6 addresses
 
 2012/06/23:
   More error return checks in upnpc.c
