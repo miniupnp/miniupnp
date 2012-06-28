@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.38 2012/06/23 23:34:41 nanard Exp $ */
+/* $Id: minissdp.c,v 1.39 2012/06/25 23:52:23 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -606,7 +606,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					             sizeof(announced_host_buf) - 2)) {
 						announced_host_buf[0] = '[';
 						i = strlen(announced_host_buf);
-						if(i < sizeof(announced_host_buf) - 1) {
+						if(i < (int)sizeof(announced_host_buf) - 1) {
 							announced_host_buf[i] = ']';
 							announced_host_buf[i+1] = '\0';
 						} else {
