@@ -1,4 +1,4 @@
-/* $Id: connecthostport.c,v 1.8 2012/06/23 22:32:33 nanard Exp $ */
+/* $Id: connecthostport.c,v 1.9 2012/06/26 00:00:27 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2010-2012 Thomas Bernard
@@ -27,6 +27,7 @@
 #include <errno.h>
 #define closesocket close
 #include <netdb.h>
+#include <netinet/in.h>
 /* defining MINIUPNPC_IGNORE_EINTR enable the ignore of interruptions
  * during the connect() call */
 #define MINIUPNPC_IGNORE_EINTR
