@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.96 2012/06/23 18:25:35 nanard Exp $ */
+/* $Id: upnpc.c,v 1.97 2012/06/23 23:16:00 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2012 Thomas Bernard
@@ -497,7 +497,7 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 #endif
-    printf("upnpc : miniupnpc library test client. (c) 2006-2011 Thomas Bernard\n");
+    printf("upnpc : miniupnpc library test client. (c) 2006-2012 Thomas Bernard\n");
     printf("Go to http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/\n"
 	       "for more information.\n");
 	/* command line processing */
