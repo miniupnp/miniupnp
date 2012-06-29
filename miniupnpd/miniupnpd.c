@@ -756,7 +756,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(SYSUPTIMEMASK);	/*sysuptime = 1;*/
 				break;
-#if defined(USE_PF) || defined(USE_IPF)
+#if defined(USE_PF) || defined(USE_IPF)
 			case UPNPPACKET_LOG:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(LOGPACKETSMASK);	/*logpackets = 1;*/
@@ -1167,7 +1167,7 @@ print_usage:
 #if defined(USE_PF) || defined(USE_IPF)
 			" [-L]"
 #endif
-			" [-U] [-S]\n"
+			" [-U] [-S]"
 #ifdef ENABLE_NATPMP
 			" [-N]"
 #endif
