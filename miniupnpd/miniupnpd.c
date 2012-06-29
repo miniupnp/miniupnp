@@ -852,6 +852,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
+		case 'r':
+			if(i+1 < argc)
+				v->clean_ruleset_interval = atoi(argv[++i]);
+			else
+				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			break;
 		case 'u':
 			if(i+1 < argc)
 				strncpy(uuidvalue+5, argv[++i], strlen(uuidvalue+5) + 1);
@@ -1169,7 +1175,7 @@ print_usage:
 			/*"[-l logfile] " not functionnal */
 			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
 			"\t\t[-t notify_interval] [-P pid_filename]\n"
-			"\t\t[-B down up] [-w url]\n"
+			"\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
 #ifdef USE_PF
                         "\t\t[-q queue] [-T tag]\n"
 #endif

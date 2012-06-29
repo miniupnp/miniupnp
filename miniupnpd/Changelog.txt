@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.292 2012/06/29 19:26:07 nanard Exp $
 
 2012/06/29:
   added DISABLE_CONFIG_FILE in options.h to disable miniupnpd.conf parsing
+  Add command line parsing for clean_ruleset_interval option
 
 2012/06/28:
   Only activate -L option for PF and IPF
