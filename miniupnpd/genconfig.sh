@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.56 2012/05/31 09:32:39 nanard Exp $
+# $Id: genconfig.sh,v 1.58 2012/06/29 19:29:55 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2012 Thomas Bernard
@@ -397,6 +397,10 @@ if [ -n "$STRICT" ] ; then
 else
 	echo "/*#define UPNP_STRICT*/" >> ${CONFIGFILE}
 fi
+echo "" >> ${CONFIGFILE}
+
+echo "/* disable reading and parsing of config file (miniupnpd.conf) */" >> ${CONFIGFILE}
+echo "/*#define DISABLE_CONFIG_FILE*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
 echo "#endif" >> ${CONFIGFILE}

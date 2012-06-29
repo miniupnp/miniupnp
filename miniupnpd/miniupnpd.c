@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.161 2012/05/21 15:50:03 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.164 2012/06/29 19:33:37 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -651,12 +651,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	int i;
 	int pid;
 	int debug_flag = 0;
-	int options_flag = 0;
 	int openlog_option;
 	struct sigaction sa;
 	/*const char * logfilename = 0;*/
 	const char * presurl = 0;
+#ifndef DISABLE_CONFIG_FILE
+	int options_flag = 0;
 	const char * optionsfile = DEFAULT_CONFIG;
+#endif /* DISABLE_CONFIG_FILE */
 	struct lan_addr_s * lan_addr;
 	struct lan_addr_s * lan_addr2;
 
@@ -666,6 +668,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		if(0 == strcmp(argv[i], "-h"))
 			goto print_usage;
 	}
+#ifndef DISABLE_CONFIG_FILE
 	/* first check if "-f" option is used */
 	for(i=2; i<argc; i++)
 	{
@@ -676,16 +679,17 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			break;
 		}
 	}
+#endif /* DISABLE_CONFIG_FILE */
 
 	/* set initial values */
-	SETFLAG(ENABLEUPNPMASK);
+	SETFLAG(ENABLEUPNPMASK);	/* UPnP is enabled by default */
 
 	LIST_INIT(&lan_addrs);
 	v->port = -1;
 	v->notify_interval = 30;	/* seconds between SSDP announces */
 	v->clean_ruleset_threshold = 20;
 	v->clean_ruleset_interval = 0;	/* interval between ruleset check. 0=disabled */
-
+#ifndef DISABLE_CONFIG_FILE
 	/* read options file first since
 	 * command line arguments have final say */
 	if(readoptionsfile(optionsfile) < 0)
@@ -825,6 +829,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 		}
 	}
+#endif /* DISABLE_CONFIG_FILE */
 
 	/* command line arguments processing */
 	for(i=1; i<argc; i++)
@@ -1142,7 +1147,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	return 0;
 print_usage:
 	fprintf(stderr, "Usage:\n\t"
-	        "%s [-f config_file] [-i ext_ifname] [-o ext_ip]\n"
+	        "%s "
+#ifndef DISABLE_CONFIG_FILE
+			"[-f config_file] "
+#endif
+			"[-i ext_ifname] [-o ext_ip]\n"
 #ifndef MULTIPLE_EXTERNAL_IP
 			"\t\t[-a listening_ip]"
 #else
@@ -1858,7 +1867,9 @@ shutdown:
 #endif
 	free(snotify);
 	closelog();
+#ifndef DISABLE_CONFIG_FILE
 	freeoptions();
+#endif
 
 	return 0;
 }
