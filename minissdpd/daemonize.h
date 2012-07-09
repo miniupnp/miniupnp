@@ -8,9 +8,8 @@
 #ifndef __DAEMONIZE_H__
 #define __DAEMONIZE_H__
 
-#include "config.h"
 
-#ifndef USE_DAEMON
+#ifndef HAVE_DAEMON
 /* daemonize()
  * "fork" to background, detach from terminal, etc...
  * returns: pid of the daemon, exits upon failure */

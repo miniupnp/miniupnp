@@ -4,6 +4,10 @@
  * copyright (c) 2005-2008 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include "codelength.h"
 

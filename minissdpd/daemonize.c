@@ -5,6 +5,10 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -16,9 +20,8 @@
 #include <signal.h>
 
 #include "daemonize.h"
-#include "config.h"
 
-#ifndef USE_DAEMON
+#ifndef HAVE_DAEMON
 
 int
 daemonize(void)
