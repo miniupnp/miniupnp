@@ -5,6 +5,10 @@
  * copyright (c) 2005-2007 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>

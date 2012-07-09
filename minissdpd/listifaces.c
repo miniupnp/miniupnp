@@ -1,4 +1,8 @@
 /* $Id: listifaces.c,v 1.4 2007/09/23 16:59:02 nanard Exp $ */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>

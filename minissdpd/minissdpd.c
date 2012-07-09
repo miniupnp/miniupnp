@@ -5,7 +5,10 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
+
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,6 +38,14 @@
 #include "daemonize.h"
 #include "codelength.h"
 #include "ifacewatch.h"
+
+#ifndef LOG_MINISSDPD
+#define LOG_MINISSDPD LOG_DAEMON
+#endif
+
+#ifndef MAX_IF_ADDR
+#define MAX_IF_ADDR 8
+#endif
 
 /* current request management stucture */
 struct reqelem {
@@ -946,7 +957,7 @@ int main(int argc, char * * argv)
 	if(debug_flag)
 		pid = getpid();
 	else {
-#ifdef USE_DAEMON
+#ifdef HAVE_DAEMON
 		if(daemon(0, 0) < 0)
 			perror("daemon()");
 		pid = getpid();
