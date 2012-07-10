@@ -23,6 +23,7 @@
 #include "upnpredirect.h"
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
+#include "portinuse.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
 #endif
@@ -294,6 +295,10 @@ upnp_redirect(const char * rhost, unsigned short eport,
 				eport, protocol, iaddr_old, iport_old);
 			return -2;
 		}
+	}
+	else if (port_in_use(ext_if_name, eport, proto, iaddr, iport)) {
+		syslog(LOG_INFO, "port %hu protocol %s already in use", eport, protocol);
+		return -2;
 	} else {
 		timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
 		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",

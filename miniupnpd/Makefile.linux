@@ -41,7 +41,7 @@ SBININSTALLDIR = $(INSTALLPREFIX)/sbin
 ETCINSTALLDIR = $(PREFIX)/etc/miniupnpd
 
 BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
-           upnpreplyparse.o minixml.o \
+           upnpreplyparse.o minixml.o portinuse.o \
            upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
            options.o upnppermissions.o minissdp.o natpmp.o \
            upnpevents.o upnputils.o getconnstatus.o \
@@ -196,14 +196,16 @@ upnpsoap.o: upnpredirect.h upnppinhole.h getifaddr.h getifstats.h
 upnpsoap.o: getconnstatus.h upnpurns.h
 upnpreplyparse.o: upnpreplyparse.h minixml.h
 minixml.o: minixml.h
+portinuse.o: macros.h config.h upnpglobalvars.h upnppermissions.h
+portinuse.o: miniupnpdtypes.h getifaddr.h portinuse.h
 upnpredirect.o: macros.h config.h upnpredirect.h upnpglobalvars.h
-upnpredirect.o: upnppermissions.h miniupnpdtypes.h upnpevents.h
+upnpredirect.o: upnppermissions.h miniupnpdtypes.h upnpevents.h portinuse.h
 upnpredirect.o: netfilter/iptcrdr.h commonrdr.h
 getifaddr.o: config.h getifaddr.h
 daemonize.o: daemonize.h config.h
 upnpglobalvars.o: config.h upnpglobalvars.h upnppermissions.h
 upnpglobalvars.o: miniupnpdtypes.h
-options.o: options.h config.h upnppermissions.h upnpglobalvars.h
+options.o: config.h options.h upnppermissions.h upnpglobalvars.h
 options.o: miniupnpdtypes.h
 upnppermissions.o: config.h upnppermissions.h
 minissdp.o: config.h upnpdescstrings.h miniupnpdpath.h upnphttp.h
@@ -211,6 +213,7 @@ minissdp.o: upnpglobalvars.h upnppermissions.h miniupnpdtypes.h minissdp.h
 minissdp.o: upnputils.h getroute.h codelength.h
 natpmp.o: macros.h config.h natpmp.h upnpglobalvars.h upnppermissions.h
 natpmp.o: miniupnpdtypes.h getifaddr.h upnpredirect.h commonrdr.h upnputils.h
+natpmp.o: portinuse.h
 upnpevents.o: config.h upnpevents.h miniupnpdpath.h upnpglobalvars.h
 upnpevents.o: upnppermissions.h miniupnpdtypes.h upnpdescgen.h upnputils.h
 upnputils.o: config.h upnputils.h
@@ -228,7 +231,6 @@ netfilter/iptcrdr.o: config.h upnpglobalvars.h upnppermissions.h
 netfilter/iptcrdr.o: miniupnpdtypes.h
 netfilter/iptpinhole.o: config.h netfilter/iptpinhole.h upnpglobalvars.h
 netfilter/iptpinhole.o: upnppermissions.h config.h miniupnpdtypes.h
-netfilter/iptpinhole.o: netfilter/tiny_nf_nat.h
 testupnpdescgen.o: macros.h config.h upnpdescgen.h
 upnpdescgen.o: config.h getifaddr.h upnpredirect.h upnpdescgen.h
 upnpdescgen.o: miniupnpdpath.h upnpglobalvars.h upnppermissions.h

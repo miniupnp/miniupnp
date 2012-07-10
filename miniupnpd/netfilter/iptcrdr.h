@@ -25,6 +25,14 @@ add_filter_rule2(const char * ifname,
 int
 delete_redirect_and_filter_rules(unsigned short eport, int proto);
 
+int
+get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned short eport, int proto,
+                  char * iaddr, int iaddrlen, unsigned short * iport,
+                  char * desc, int desclen,
+                  char * rhost, int rhostlen,
+                  unsigned int * timestamp,
+                  u_int64_t * packets, u_int64_t * bytes);
+
 /* for debug */
 int
 list_redirect_rule(const char * ifname);

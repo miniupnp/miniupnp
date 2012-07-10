@@ -23,8 +23,10 @@
 #include "upnpredirect.h"
 #include "commonrdr.h"
 #include "upnputils.h"
+#include "portinuse.h"
 
 #ifdef ENABLE_NATPMP
+
 
 int OpenAndConfNATPMPSocket(in_addr_t addr)
 {
@@ -266,6 +268,12 @@ void ProcessIncomingNATPMPPacket(int s)
 						eport++;
 						continue;
 					}
+				}
+				if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport)) {
+					syslog(LOG_INFO, "port %hu protocol %s already in use", eport, (proto==IPPROTO_TCP)?"tcp":"udp");
+					eport++;
+					r = 0;
+					continue;
 				}
 				{ /* do the redirection */
 					char desc[64];
