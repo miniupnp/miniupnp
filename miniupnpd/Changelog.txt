@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.292 2012/06/29 19:26:07 nanard Exp $
+$Id: Changelog.txt,v 1.294 2012/07/14 15:12:50 nanard Exp $
+
+2012/07/14:
+  Add -z command line option to change friendly name (thanks to Shawn Fisher)
 
 2012/06/29:
   added DISABLE_CONFIG_FILE in options.h to disable miniupnpd.conf parsing

@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.164 2012/06/29 19:33:37 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.166 2012/07/14 15:12:51 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -864,6 +864,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
+		case 'z':
+			if(i+1 < argc)
+				strncpy(friendly_name, argv[++i], FRIENDLY_NAME_MAX_LEN);
+			else
+				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
+			break;
 		case 's':
 			if(i+1 < argc)
 				strncpy(serialnumber, argv[++i], SERIALNUMBER_MAX_LEN);
@@ -1174,7 +1181,7 @@ print_usage:
 			"\n"
 			/*"[-l logfile] " not functionnal */
 			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
-			"\t\t[-t notify_interval] [-P pid_filename]\n"
+			"\t\t[-t notify_interval] [-P pid_filename] [-z fiendly_name]\n"
 			"\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
 #ifdef USE_PF
                         "\t\t[-q queue] [-T tag]\n"
