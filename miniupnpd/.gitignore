@@ -7,4 +7,5 @@ testgetifaddr
 testgetifstats
 testupnpdescgen
 testupnppermissions
+testgetroute
 wait-usec

@@ -1,4 +1,22 @@
-$Id: Changelog.txt,v 1.289 2012/06/08 18:16:30 nanard Exp $
+$Id: Changelog.txt,v 1.295 2012/07/17 19:35:43 nanard Exp $
+
+2012/07/17:
+  Add -A command line option to add permission rules
+
+2012/07/14:
+  Add -z command line option to change friendly name (thanks to Shawn Fisher)
+
+2012/06/29:
+  added DISABLE_CONFIG_FILE in options.h to disable miniupnpd.conf parsing
+  Add command line parsing for clean_ruleset_interval option
+
+2012/06/28:
+  Only activate -L option for PF and IPF
+  -a option takes two arguments with MULTIPLE_EXTERNAL_IP defined
+
+2012/06/23:
+  in UPNP_STRICT mode, the literal IPv6 address in "location:" of SSDP
+  messages is the source address used to send the message
 
 2012/06/08:
   Disable -ansi CFLAGS in Makefile.linux because recent iptables headers

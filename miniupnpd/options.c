@@ -1,4 +1,4 @@
-/* $Id: options.c,v 1.25 2012/04/30 13:38:21 nanard Exp $ */
+/* $Id: options.c,v 1.26 2012/06/29 19:26:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -11,10 +11,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <syslog.h>
+#include "config.h"
 #include "options.h"
 #include "upnppermissions.h"
 #include "upnpglobalvars.h"
 
+#ifndef DISABLE_CONFIG_FILE
 struct option * ary_options = NULL;
 static char * string_repo = NULL;
 unsigned int num_options = 0;
@@ -247,4 +249,6 @@ freeoptions(void)
 		num_upnpperm = 0;
 	}
 }
+
+#endif /* DISABLE_CONFIG_FILE */
 

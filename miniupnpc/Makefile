@@ -1,7 +1,9 @@
-# $Id: Makefile,v 1.95 2012/05/01 16:16:50 nanard Exp $
+# $Id: Makefile,v 1.96 2012/06/23 22:30:42 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
-# (c) 2005-2011 Thomas Bernard
+# http://miniupnp.tuxfamily.org/
+# https://github.com/miniupnp/miniupnp
+# (c) 2005-2012 Thomas Bernard
 # to install use :
 # $ PREFIX=/tmp/dummylocation make install
 # or
@@ -26,6 +28,7 @@ CFLAGS += -Wall
 CFLAGS += -W -Wstrict-prototypes
 CFLAGS += -fno-common
 CFLAGS += -DMINIUPNPC_SET_SOCKET_TIMEOUT
+CFLAGS += -DMINIUPNPC_GET_SRC_ADDR
 CFLAGS += -D_BSD_SOURCE -D_POSIX_C_SOURCE=1
 CFLAGS += -ansi
 # -DNO_GETADDRINFO
@@ -39,7 +42,7 @@ JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
 #LDLIBS=-lsocket -lnsl -lresolv
 
 # APIVERSION is used to build SONAME
-APIVERSION = 8
+APIVERSION = 9
 
 SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
@@ -141,7 +144,7 @@ validateminiwget:	testminiwget minihttptestserver testminiwget.sh
 clean:
 	$(RM) $(LIBRARY) $(SHAREDLIBRARY) $(EXECUTABLES) $(OBJS) miniupnpcstrings.h
 	# clean python stuff
-	$(RM) pythonmodule validateminixml
+	$(RM) pythonmodule validateminixml validateminiwget
 	$(RM) -r build/ dist/
 	#python setup.py clean
 	# clean jnaerator stuff

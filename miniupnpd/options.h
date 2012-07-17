@@ -1,4 +1,4 @@
-/* $Id: options.h,v 1.20 2012/04/30 13:38:21 nanard Exp $ */
+/* $Id: options.h,v 1.21 2012/06/29 19:26:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -11,6 +11,7 @@
 
 #include "config.h"
 
+#ifndef DISABLE_CONFIG_FILE
 /* enum of option available in the miniupnpd.conf */
 enum upnpconfigoptions {
 	UPNP_INVALID = 0,
@@ -71,5 +72,7 @@ struct option
 extern struct option * ary_options;
 extern unsigned int num_options;
 
-#endif
+#endif /* DISABLE_CONFIG_FILE */
+
+#endif /* __OPTIONS_H__ */
 
