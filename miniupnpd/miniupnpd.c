@@ -1210,8 +1210,8 @@ print_usage:
 			"\t-T sets the tag name in pf.\n"
 #endif
 #ifdef ENABLE_NFQUEUE
-                        "\t-Q sets the queue number that is used by NFQUEUE.\n"
-                        "\t-n sets the name of the interface(s) that packets will arrive on.\n"
+			"\t-Q sets the queue number that is used by NFQUEUE.\n"
+			"\t-n sets the name of the interface(s) that packets will arrive on.\n"
 #endif
 			"\t-h prints this help and quits.\n"
 	        "", argv[0], pidfilename, DEFAULT_CONFIG);
