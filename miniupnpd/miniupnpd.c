@@ -389,7 +389,7 @@ write_option_list(int fd)
 {
 	char buffer[256];
 	int len;
-	int i;
+	unsigned int i;
 	write(fd, "Options :\n", 10);
 	for(i=0; i<num_options; i++)
 	{
