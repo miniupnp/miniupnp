@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.294 2012/07/14 15:12:50 nanard Exp $
+$Id: Changelog.txt,v 1.295 2012/07/17 19:35:43 nanard Exp $
+
+2012/07/17:
+  Add -A command line option to add permission rules
 
 2012/07/14:
   Add -z command line option to change friendly name (thanks to Shawn Fisher)
