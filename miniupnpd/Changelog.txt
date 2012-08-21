@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.295 2012/07/17 19:35:43 nanard Exp $
+$Id: Changelog.txt,v 1.296 2012/08/10 12:00:08 nanard Exp $
+
+2012/08/10:
+  improved SubmitServicesToMiniSSDPD() function fiability
 
 2012/07/17:
   Add -A command line option to add permission rules

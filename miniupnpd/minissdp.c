@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.39 2012/06/25 23:52:23 nanard Exp $ */
+/* $Id: minissdp.c,v 1.40 2012/08/10 12:00:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -749,7 +749,7 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 	unsigned char buffer[2048];
 	char strbuf[256];
 	unsigned char * p;
-	int i, l;
+	int i, l, n;
 
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(s < 0) {
@@ -760,10 +760,12 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 	strncpy(addr.sun_path, minissdpdsocketpath, sizeof(addr.sun_path));
 	if(connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
 		syslog(LOG_ERR, "connect(\"%s\"): %m", minissdpdsocketpath);
+		close(s);
 		return -1;
 	}
 	for(i = 0; known_service_types[i]; i++) {
-		buffer[0] = 4;
+		buffer[0] = 4;	/* request type 4 : submit service */
+		/* 4 strings following : ST (service type), USN, Server, Location */
 		p = buffer + 1;
 		l = (int)strlen(known_service_types[i]);
 		if(i > 0)
@@ -787,9 +789,22 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 		CODELENGTH(l, p);
 		memcpy(p, strbuf, l);
 		p += l;
-		if(write(s, buffer, p - buffer) < 0) {
-			syslog(LOG_ERR, "write(): %m");
-			return -1;
+		/* now write the encoded data */
+		n = p - buffer;	/* bytes to send */
+		p = buffer;	/* start */
+		while(n > 0) {
+			l = write(s, p, n);
+			if (l < 0) {
+				syslog(LOG_ERR, "write(): %m");
+				close(s);
+				return -1;
+			} else if (l == 0) {
+				syslog(LOG_ERR, "write() returned 0");
+				close(s);
+				return -1;
+			}
+			p += l;
+			n -= l;
 		}
 	}
  	close(s);
