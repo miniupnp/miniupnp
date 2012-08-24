@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.296 2012/08/10 12:00:08 nanard Exp $
+$Id: Changelog.txt,v 1.297 2012/08/24 17:48:15 nanard Exp $
+
+2012/08/24:
+  Moved man page to section 8. miniupnpd.1 => miniupnpd.8
 
 2012/08/10:
   improved SubmitServicesToMiniSSDPD() function fiability

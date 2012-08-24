@@ -47,7 +47,7 @@ LIBS =
 
 INSTALL_BINDIR = $(PREFIX)/sbin
 INSTALL_ETCDIR = $(PREFIX)/etc/miniupnpd
-INSTALL_MANDIR = $(PREFIX)/share/man/man1
+INSTALL_MANDIR = $(PREFIX)/share/man/man8
 
 all: $(EXECUTABLES)
 
@@ -64,7 +64,7 @@ install: miniupnpd genuuid genlaunchd
 	$(INSTALL) -d $(INSTALL_ETCDIR)
 	$(INSTALL) -m 0644 -b miniupnpd.conf $(INSTALL_ETCDIR)
 	$(INSTALL) -d $(INSTALL_MANDIR)
-	$(INSTALL) miniupnpd.1 $(INSTALL_MANDIR)
+	$(INSTALL) miniupnpd.8 $(INSTALL_MANDIR)
 	$(INSTALL) -d $(PREFIX)/Library/LaunchDaemons
 	$(INSTALL) mac/org.tuxfamily.miniupnpd.plist $(PREFIX)/Library/LaunchDaemons
 	#$(INSTALL) ipfw/ipfw_init.sh $(INSTALL_ETCDIR)
