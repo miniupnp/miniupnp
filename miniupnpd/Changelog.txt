@@ -1,7 +1,8 @@
-$Id: Changelog.txt,v 1.297 2012/08/24 17:48:15 nanard Exp $
+$Id: Changelog.txt,v 1.298 2012/08/24 18:09:19 nanard Exp $
 
 2012/08/24:
   Moved man page to section 8. miniupnpd.1 => miniupnpd.8
+  Added install of miniupnpd.8 man page in Makefile.linux
 
 2012/08/10:
   improved SubmitServicesToMiniSSDPD() function fiability
