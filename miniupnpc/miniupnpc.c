@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.109 2012/07/20 08:07:44 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.110 2012/08/11 05:52:48 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -947,7 +947,14 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	}
 	state = 0;
 free_and_return:
-	free(desc);
+	if(desc) {
+		for(i = 0; i < ndev; i++) {
+			if(desc[i].xml) {
+				free(desc[i].xml);
+			}
+		}
+		free(desc);
+	}
 	return state;
 }
 

@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.175 2012/07/20 08:07:44 nanard Exp $
+$Id: Changelog.txt,v 1.177 2012/08/29 07:51:29 nanard Exp $
 miniUPnP client Changelog.
+
+2012/08/11:
+  Fix a memory link in UPNP_GetValidIGD()
 
 2012/07/20:
   Disable HAS_IP_MREQN on DragonFly BSD
