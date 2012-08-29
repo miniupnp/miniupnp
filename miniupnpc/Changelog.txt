@@ -3,6 +3,7 @@ miniUPnP client Changelog.
 
 2012/08/11:
   Fix a memory link in UPNP_GetValidIGD()
+  Try to handle scope id in link local IPv6 URL under MS Windows
 
 2012/07/20:
   Disable HAS_IP_MREQN on DragonFly BSD

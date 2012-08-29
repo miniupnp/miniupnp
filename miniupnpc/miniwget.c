@@ -1,4 +1,4 @@
-/* $Id: miniwget.c,v 1.57 2012/06/23 22:35:58 nanard Exp $ */
+/* $Id: miniwget.c,v 1.58 2012/08/11 05:52:49 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
@@ -470,6 +470,20 @@ parseURL(const char * url,
 			if(*scope_id == 0) {
 				*scope_id = (unsigned int)strtoul(tmp, NULL, 10);
 			}
+#else
+			/* under windows, scope is numerical */
+			char tmp[8];
+			int l;
+			scope++;
+			/* "%25" is just '%' in URL encoding */
+			if(scope[0] == '2' && scope[1] == '5')
+				scope += 2;	/* skip "25" */
+			l = p2 - scope;
+			if(l >= sizeof(tmp))
+				l = sizeof(tmp) - 1;
+			memcpy(tmp, scope, l);
+			tmp[l] = '\0';
+			*scope_id = (unsigned int)strtoul(tmp, NULL, 10);
 #endif
 		}
 		p3 = strchr(p1, '/');
