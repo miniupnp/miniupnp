@@ -131,6 +131,13 @@ pythonmodule:	$(LIBRARY) miniupnpcmodule.c setup.py
 installpythonmodule:	pythonmodule
 	python setup.py install
 
+pythonmodule3:	$(LIBRARY) miniupnpcmodule.c setup.py
+	python3 setup.py build
+	touch $@
+
+installpythonmodule3:	pythonmodule3
+	python3 setup.py install
+
 validateminixml:	minixmlvalid
 	@echo "minixml validation test"
 	./minixmlvalid
@@ -144,7 +151,7 @@ validateminiwget:	testminiwget minihttptestserver testminiwget.sh
 clean:
 	$(RM) $(LIBRARY) $(SHAREDLIBRARY) $(EXECUTABLES) $(OBJS) miniupnpcstrings.h
 	# clean python stuff
-	$(RM) pythonmodule validateminixml validateminiwget
+	$(RM) pythonmodule pythonmodule3 validateminixml validateminiwget
 	$(RM) -r build/ dist/
 	#python setup.py clean
 	# clean jnaerator stuff
