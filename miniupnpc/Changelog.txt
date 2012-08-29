@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.177 2012/08/29 07:51:29 nanard Exp $
 miniUPnP client Changelog.
 
+2012/08/29:
+  Python 3 support (thanks to Christopher Foo)
+
 2012/08/11:
   Fix a memory link in UPNP_GetValidIGD()
   Try to handle scope id in link local IPv6 URL under MS Windows
