@@ -25,6 +25,16 @@
 #define Py_RETURN_FALSE return Py_INCREF(Py_False), Py_False
 #endif
 
+/* for compatibility with Python < 3.0 */
+#ifndef PyVarObject_HEAD_INIT
+#define PyVarObject_HEAD_INIT(type, size) \
+    PyObject_HEAD_INIT(type) size,
+#endif
+
+#ifndef Py_TYPE
+#define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
+#endif
+
 typedef struct {
     PyObject_HEAD
     /* Type-specific fields go here. */
@@ -59,7 +69,7 @@ UPnPObject_dealloc(UPnPObject *self)
 {
 	freeUPNPDevlist(self->devlist);
 	FreeUPNPUrls(&self->urls);
-	self->ob_type->tp_free((PyObject*)self);
+	Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject *
@@ -434,8 +444,8 @@ static PyMethodDef UPnP_methods[] = {
 };
 
 static PyTypeObject UPnPType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL,
+    0)                         /*ob_size*/
     "miniupnpc.UPnP",          /*tp_name*/
     sizeof(UPnPObject),        /*tp_basicsize*/
     0,                         /*tp_itemsize*/
@@ -484,11 +494,30 @@ static PyMethodDef miniupnpc_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "miniupnpc",     /* m_name */
+    "miniupnpc module.",  /* m_doc */
+    -1,                  /* m_size */
+    miniupnpc_methods,    /* m_methods */
+    NULL,                /* m_reload */
+    NULL,                /* m_traverse */
+    NULL,                /* m_clear */
+    NULL,                /* m_free */
+};
+#endif
+
 #ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
 #define PyMODINIT_FUNC void
 #endif
+
 PyMODINIT_FUNC
+#if PY_MAJOR_VERSION >= 3
+PyInit_miniupnpc(void)
+#else
 initminiupnpc(void)
+#endif
 {
     PyObject* m;
 
@@ -498,10 +527,18 @@ initminiupnpc(void)
     if (PyType_Ready(&UPnPType) < 0)
         return;
 
+#if PY_MAJOR_VERSION >= 3
+    m = PyModule_Create(&moduledef);
+#else
     m = Py_InitModule3("miniupnpc", miniupnpc_methods,
                        "miniupnpc module.");
+#endif
 
     Py_INCREF(&UPnPType);
     PyModule_AddObject(m, "UPnP", (PyObject *)&UPnPType);
+    
+#if PY_MAJOR_VERSION >= 3
+    return m;
+#endif
 }
 
