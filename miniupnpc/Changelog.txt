@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.177 2012/08/29 07:51:29 nanard Exp $
+$Id: Changelog.txt,v 1.178 2012/08/30 10:37:18 nanard Exp $
 miniUPnP client Changelog.
+
+2012/08/30:
+  Added -e option to upnpc program (set description for port mappings)
 
 2012/08/29:
   Python 3 support (thanks to Christopher Foo)
