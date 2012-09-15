@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.168 2012/07/17 19:35:44 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.169 2012/09/15 15:35:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1322,6 +1322,15 @@ main(int argc, char * * argv)
 		return 0;
 	}
 
+	syslog(LOG_INFO, "Starting%s%swith external interface %s",
+#ifdef ENABLE_NATPMP
+	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP " : " ",
+#else
+	       " ",
+#endif
+	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
+	       ext_if_name);
+
 	if(GETFLAG(ENABLEUPNPMASK))
 	{
 
@@ -1356,7 +1365,7 @@ main(int argc, char * * argv)
 		sudp = OpenAndConfSSDPReceiveSocket(0);
 		if(sudp < 0)
 		{
-			syslog(LOG_INFO, "Failed to open socket for receiving SSDP. Trying to use MiniSSDPd");
+			syslog(LOG_NOTICE, "Failed to open socket for receiving SSDP. Trying to use MiniSSDPd");
 			if(SubmitServicesToMiniSSDPD(lan_addrs.lh_first->str, v.port) < 0) {
 				syslog(LOG_ERR, "Failed to connect to MiniSSDPd. EXITING");
 				return 1;
@@ -1366,7 +1375,7 @@ main(int argc, char * * argv)
 		sudpv6 = OpenAndConfSSDPReceiveSocket(1);
 		if(sudpv6 < 0)
 		{
-			syslog(LOG_INFO, "Failed to open socket for receiving SSDP (IP v6).");
+			syslog(LOG_WARNING, "Failed to open socket for receiving SSDP (IP v6).");
 		}
 #endif
 

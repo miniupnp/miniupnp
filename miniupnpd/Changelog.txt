@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.299 2012/08/28 10:31:30 nanard Exp $
+$Id: Changelog.txt,v 1.300 2012/09/15 15:35:08 nanard Exp $
+
+2012/09/15:
+  Adding an informational message at startup
 
 2012/08/24:
   Moved man page to section 8. miniupnpd.1 => miniupnpd.8
