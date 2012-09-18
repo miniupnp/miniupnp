@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.300 2012/09/15 15:35:08 nanard Exp $
+$Id: Changelog.txt,v 1.301 2012/09/18 08:29:16 nanard Exp $
+
+2012/09/18:
+  Fixing a bug in clean_pinhole_list() under linux/netfilter
 
 2012/09/15:
   Adding an informational message at startup
