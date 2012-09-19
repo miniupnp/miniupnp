@@ -3,15 +3,15 @@ CC=gcc
 CFLAGS=-Wall -g -I.
 RM=rm -f
 
-all:	testipfwrdr
+all: testipfwrdr
 
 clean:
 	$(RM) *.o testipfwrdr
 
-testipfwrdr:	testipfwrdr.o ipfwrdr.o
+testipfwrdr: testipfwrdr.o ipfwrdr.o ipfwaux.o
 	$(CC) -o $@ $^
 
-ipfwrdr.o:	ipfwrdr.c
+ipfwrdr.o: ipfwrdr.c ipfwaux.c
 
-testipfwrdr.o:	testipfwrdr.c
+testipfwrdr.o: testipfwrdr.c
 
