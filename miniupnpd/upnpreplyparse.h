@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPREPLYPARSE_H__
-#define __UPNPREPLYPARSE_H__
+#ifndef UPNPREPLYPARSE_H_INCLUDED
+#define UPNPREPLYPARSE_H_INCLUDED
 
 #if defined(NO_SYS_QUEUE_H) || defined(_WIN32) || defined(__HAIKU__)
 #include "bsdqueue.h"

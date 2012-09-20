@@ -6,8 +6,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __OPTIONS_H__
-#define __OPTIONS_H__
+#ifndef OPTIONS_H_INCLUDED
+#define OPTIONS_H_INCLUDED
 
 #include "config.h"
 
@@ -74,5 +74,5 @@ extern unsigned int num_options;
 
 #endif /* DISABLE_CONFIG_FILE */
 
-#endif /* __OPTIONS_H__ */
+#endif /* OPTIONS_H_INCLUDED */
 

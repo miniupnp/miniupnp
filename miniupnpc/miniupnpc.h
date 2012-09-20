@@ -5,8 +5,8 @@
  * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
-#ifndef __MINIUPNPC_H__
-#define __MINIUPNPC_H__
+#ifndef MINIUPNPC_H_INCLUDED
+#define MINIUPNPC_H_INCLUDED
 
 #include "declspec.h"
 #include "igd_desc_parse.h"

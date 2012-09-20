@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __GETIFADDR_H__
-#define __GETIFADDR_H__
+#ifndef GETIFADDR_H_INCLUDED
+#define GETIFADDR_H_INCLUDED
 
 /* getifaddr()
  * take a network interface name and write the

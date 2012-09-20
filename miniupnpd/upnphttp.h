@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPHTTP_H__
-#define __UPNPHTTP_H__
+#ifndef UPNPHTTP_H_INCLUDED
+#define UPNPHTTP_H_INCLUDED
 
 #include <netinet/in.h>
 #include <sys/queue.h>

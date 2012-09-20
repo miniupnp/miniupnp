@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __PFPINHOLE_H__
-#define __PFPINHOLE_H__
+#ifndef PFPINHOLE_H_INCLUDED
+#define PFPINHOLE_H_INCLUDED
 
 #ifdef ENABLE_6FC_SERVICE
 int add_pinhole(const char * ifname,

@@ -4,8 +4,8 @@
  * copyright (c) 2005-2011 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
-#ifndef __CODELENGTH_H__
-#define __CODELENGTH_H__
+#ifndef CODELENGTH_H_INCLUDED
+#define CODELENGTH_H_INCLUDED
 
 /* Encode length by using 7bit per Byte :
  * Most significant bit of each byte specifies that the

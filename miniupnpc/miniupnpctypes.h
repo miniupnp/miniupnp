@@ -4,8 +4,8 @@
  * Copyright (c) 2011 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided within this distribution */
-#ifndef __MINIUPNPCTYPES_H__
-#define __MINIUPNPCTYPES_H__
+#ifndef MINIUPNPCTYPES_H_INCLUDED
+#define MINIUPNPCTYPES_H_INCLUDED
 
 #if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L)
 #define UNSIGNED_INTEGER unsigned long long
