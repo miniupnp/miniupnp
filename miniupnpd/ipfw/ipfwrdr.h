@@ -7,8 +7,8 @@
  * in the LICENCE file provided within the distribution
  */
 
-#ifndef __IPFWRDR_H__
-#define __IPFWRDR_H__
+#ifndef IPFWRDR_H_INCLUDED
+#define IPFWRDR_H_INCLUDED
 
 #include "../commonrdr.h"
 

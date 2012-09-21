@@ -5,8 +5,8 @@
  * Copyright (c) 2010-2012 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
-#ifndef __CONNECTHOSTPORT_H__
-#define __CONNECTHOSTPORT_H__
+#ifndef CONNECTHOSTPORT_H_INCLUDED
+#define CONNECTHOSTPORT_H_INCLUDED
 
 /* connecthostport()
  * return a socket connected (TCP) to the host and port

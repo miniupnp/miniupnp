@@ -4,8 +4,8 @@
  * (c) 2006-2007 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __IPFRDR_H__
-#define __IPFRDR_H__
+#ifndef IPFRDR_H_INCLUDED
+#define IPFRDR_H_INCLUDED
 
 #include "../commonrdr.h"
 

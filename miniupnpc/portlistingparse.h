@@ -4,8 +4,8 @@
  * (c) 2011-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __PORTLISTINGPARSE_H__
-#define __PORTLISTINGPARSE_H__
+#ifndef PORTLISTINGPARSE_H_INCLUDED
+#define PORTLISTINGPARSE_H_INCLUDED
 
 #include "declspec.h"
 /* for the definition of UNSIGNED_INTEGER */

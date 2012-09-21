@@ -5,8 +5,8 @@
  * Copyright (c) 2005-2007 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
-#ifndef __MINISSDPC_H__
-#define __MINISSDPC_H__
+#ifndef MINISSDPC_H_INCLUDED
+#define MINISSDPC_H_INCLUDED
 
 struct UPNPDev *
 getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath);

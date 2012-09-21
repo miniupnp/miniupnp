@@ -5,8 +5,8 @@
  * Copyright (c) 2011-2012 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
-#ifndef __RECEIVEDATA_H__
-#define __RECEIVEDATA_H__
+#ifndef RECEIVEDATA_H_INCLUDED
+#define RECEIVEDATA_H_INCLUDED
 
 /* Reads data from the specified socket.
  * Returns the number of bytes read if successful, zero if no bytes were

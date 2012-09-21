@@ -4,8 +4,8 @@
  * (c) 2006-2011 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __CONFIG_H__
-#define __CONFIG_H__
+#ifndef CONFIG_H_INCLUDED
+#define CONFIG_H_INCLUDED
 
 /* use BSD daemon() ? */
 #define USE_DAEMON

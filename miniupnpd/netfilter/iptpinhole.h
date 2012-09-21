@@ -4,8 +4,8 @@
  * (c) 2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __IPTPINHOLE_H__
-#define __IPTPINHOLE_H__
+#ifndef IPTPINHOLE_H_INCLUDED
+#define IPTPINHOLE_H_INCLUDED
 
 #ifdef ENABLE_6FC_SERVICE
 int add_pinhole(const char * ifname,

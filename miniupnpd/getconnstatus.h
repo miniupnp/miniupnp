@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __GETCONNSTATUS_H__
-#define __GETCONNSTATUS_H__
+#ifndef GETCONNSTATUS_H_INCLUDED
+#define GETCONNSTATUS_H_INCLUDED
 
 /**
  * get the connection status

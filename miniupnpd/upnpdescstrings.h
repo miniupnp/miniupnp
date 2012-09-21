@@ -4,8 +4,8 @@
  * (c) 2006-2012 Thomas Bernard
  * This software is subject to the coditions detailed in
  * the LICENCE file provided within the distribution */
-#ifndef __UPNPDESCSTRINGS_H__
-#define __UPNPDESCSTRINGS_H__
+#ifndef UPNPDESCSTRINGS_H_INCLUDED
+#define UPNPDESCSTRINGS_H_INCLUDED
 
 #include "config.h"
 

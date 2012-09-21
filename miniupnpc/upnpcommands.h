@@ -4,8 +4,8 @@
  * Copyright (c) 2005-2011 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided within this distribution */
-#ifndef __UPNPCOMMANDS_H__
-#define __UPNPCOMMANDS_H__
+#ifndef UPNPCOMMANDS_H_INCLUDED
+#define UPNPCOMMANDS_H_INCLUDED
 
 #include "upnpreplyparse.h"
 #include "portlistingparse.h"

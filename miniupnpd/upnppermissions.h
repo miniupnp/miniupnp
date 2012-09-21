@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPPERMISSIONS_H__
-#define __UPNPPERMISSIONS_H__
+#ifndef UPNPPERMISSIONS_H_INCLUDED
+#define UPNPPERMISSIONS_H_INCLUDED
 
 #include <sys/types.h>
 #include <sys/socket.h>
