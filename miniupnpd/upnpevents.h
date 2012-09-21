@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPEVENTS_H__
-#define __UPNPEVENTS_H__
+#ifndef UPNPEVENTS_H_INCLUDED
+#define UPNPEVENTS_H_INCLUDED
 
 #include "config.h"
 

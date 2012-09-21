@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPGLOBALVARS_H__
-#define __UPNPGLOBALVARS_H__
+#ifndef UPNPGLOBALVARS_H_INCLUDED
+#define UPNPGLOBALVARS_H_INCLUDED
 
 #include <time.h>
 #include "upnppermissions.h"

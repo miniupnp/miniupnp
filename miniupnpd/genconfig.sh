@@ -30,7 +30,7 @@ done
 
 RM="rm -f"
 CONFIGFILE="config.h"
-CONFIGMACRO="__CONFIG_H__"
+CONFIGMACRO="CONFIG_H_INCLUDED"
 
 # version reported in XML descriptions
 #UPNP_VERSION=20070827

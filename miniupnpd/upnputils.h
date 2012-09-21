@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPUTILS_H__
-#define __UPNPUTILS_H__
+#ifndef UPNPUTILS_H_INCLUDED
+#define UPNPUTILS_H_INCLUDED
 
 /**
  * convert a struct sockaddr to a human readable string.

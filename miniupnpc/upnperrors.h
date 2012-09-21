@@ -5,8 +5,8 @@
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
-#ifndef __UPNPERRORS_H__
-#define __UPNPERRORS_H__
+#ifndef UPNPERRORS_H_INCLUDED
+#define UPNPERRORS_H_INCLUDED
 
 #include "declspec.h"
 

@@ -4,8 +4,8 @@
  * (c) 2006-2012 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __MINIUPNPDTYPES_H__
-#define __MINIUPNPDTYPES_H__
+#ifndef MINIUPNPDTYPES_H_INCLUDED
+#define MINIUPNPDTYPES_H_INCLUDED
 
 #include "config.h"
 #include <netinet/in.h>

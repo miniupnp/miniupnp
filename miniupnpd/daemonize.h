@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __DAEMONIZE_H__
-#define __DAEMONIZE_H__
+#ifndef DAEMONIZE_H_INCLUDED
+#define DAEMONIZE_H_INCLUDED
 
 #include "config.h"
 

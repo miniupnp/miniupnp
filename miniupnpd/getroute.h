@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef  __GETROUTE_H__
-#define  __GETROUTE_H__
+#ifndef  GETROUTE_H_INCLUDED
+#define  GETROUTE_H_INCLUDED
 
 int
 get_src_for_route_to(const struct sockaddr * dst,

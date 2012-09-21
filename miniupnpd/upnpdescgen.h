@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPDESCGEN_H__
-#define __UPNPDESCGEN_H__
+#ifndef UPNPDESCGEN_H_INCLUDED
+#define UPNPDESCGEN_H_INCLUDED
 
 #include "config.h"
 

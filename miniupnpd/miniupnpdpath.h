@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __MINIUPNPDPATH_H__
-#define __MINIUPNPDPATH_H__
+#ifndef MINIUPNPDPATH_H_INCLUDED
+#define MINIUPNPDPATH_H_INCLUDED
 
 #include "config.h"
 

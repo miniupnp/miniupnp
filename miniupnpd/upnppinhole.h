@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPPINHOLE_H__
-#define __UPNPPINHOLE_H__
+#ifndef UPNPPINHOLE_H_INCLUDED
+#define UPNPPINHOLE_H_INCLUDED
 
 #include "config.h"
 
