@@ -1,4 +1,4 @@
-/* $Id: upnpdescgen.c,v 1.67 2012/04/30 14:03:52 nanard Exp $ */
+/* $Id: upnpdescgen.c,v 1.69 2012/09/27 12:01:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -202,7 +202,7 @@ static const struct XMLElt rootDesc[] =
 	{"/modelURL", WANDEV_MODELURL},
 	{"/serialNumber", serialnumber},
 	{"/UDN", uuidvalue},
-	{"/UPC", WANDEV_UPC},
+	{"/UPC", WANDEV_UPC},	/* UPC (=12 digit barcode) is optional */
 /* 30 */
 	{"serviceList", INITHELPER(32,1)},
 	{"deviceList", INITHELPER(38,1)},
@@ -230,7 +230,7 @@ static const struct XMLElt rootDesc[] =
 	{"/modelURL", WANCDEV_MODELURL},
 	{"/serialNumber", serialnumber},
 	{"/UDN", uuidvalue},
-	{"/UPC", WANCDEV_UPC},
+	{"/UPC", WANCDEV_UPC},	/* UPC (=12 digit Barcode) is optional */
 #ifdef ENABLE_6FC_SERVICE
 	{"serviceList", INITHELPER(51,2)},
 #else
@@ -423,15 +423,15 @@ static const struct action WANIPCnActions[] =
 	{"SetConnectionType", SetConnectionTypeArgs}, /* R */
 	{"GetConnectionTypeInfo", GetConnectionTypeInfoArgs}, /* R */
 	{"RequestConnection", 0}, /* R */
-	{"RequestTermination", 0}, /* O */
+	/*{"RequestTermination", 0},*/ /* O */
 	{"ForceTermination", 0}, /* R */
 	/*{"SetAutoDisconnectTime", 0},*/ /* O */
 	/*{"SetIdleDisconnectTime", 0},*/ /* O */
 	/*{"SetWarnDisconnectDelay", 0}, */ /* O */
 	{"GetStatusInfo", GetStatusInfoArgs}, /* R */
-	/*GetAutoDisconnectTime*/
-	/*GetIdleDisconnectTime*/
-	/*GetWarnDisconnectDelay*/
+	/*GetAutoDisconnectTime*/ /* O */
+	/*GetIdleDisconnectTime*/ /* O */
+	/*GetWarnDisconnectDelay*/ /* O */
 	{"GetNATRSIPStatus", GetNATRSIPStatusArgs}, /* R */
 	{"GetGenericPortMappingEntry", GetGenericPortMappingEntryArgs}, /* R */
 	{"GetSpecificPortMappingEntry", GetSpecificPortMappingEntryArgs}, /* R */

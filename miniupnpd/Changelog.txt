@@ -3,6 +3,7 @@ $Id: Changelog.txt,v 1.309 2012/09/27 16:01:10 nanard Exp $
 2012/09/27:
   Fixes with DISABLE_CONFIG_FILE
   and UPNP_STRICT
+  UPC must be a 12 decimal digit code
 
 2012/09/20:
   Cleaning code in ipfw (Jardel Weyrich)
