@@ -527,8 +527,10 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	int st_len = 0;
 	char sender_str[64];
 	const char * announced_host = NULL;
+#ifdef ENABLE_IPV6
 #ifdef UPNP_STRICT
 	char announced_host_buf[64];
+#endif
 #endif
 
 	/* get the string representation of the sender address */

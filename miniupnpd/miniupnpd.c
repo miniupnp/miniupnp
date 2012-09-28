@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.169 2012/09/15 15:35:09 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.170 2012/09/27 10:59:44 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -384,6 +384,7 @@ write_ctlsockets_list(int fd, struct ctlelem * e)
 	}
 }
 
+#ifndef DISABLE_CONFIG_FILE
 static void
 write_option_list(int fd)
 {
@@ -399,6 +400,7 @@ write_option_list(int fd)
 		write(fd, buffer, len);
 	}
 }
+#endif
 
 static void
 write_command_line(int fd, int argc, char * * argv)
@@ -1666,7 +1668,9 @@ main(int argc, char * * argv)
 				{
 					/*write(ectl->socket, buf, l);*/
 					write_command_line(ectl->socket, argc, argv);
+#ifndef DISABLE_CONFIG_FILE
 					write_option_list(ectl->socket);
+#endif
 					write_permlist(ectl->socket, upnppermlist, num_upnpperm);
 					write_upnphttp_details(ectl->socket, upnphttphead.lh_first);
 					write_ctlsockets_list(ectl->socket, ctllisthead.lh_first);
