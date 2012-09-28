@@ -129,6 +129,19 @@ ParseHttpHeaders(struct upnphttp * h)
 				memcpy(h->accept_language, p, n);
 				h->accept_language[n] = '\0';
 			}
+			else if(strncasecmp(line, "expect", 6) == 0)
+			{
+				p = colon;
+				n = 0;
+				while(*p == ':' || *p == ' ' || *p == '\t')
+					p++;
+				while(p[n]>=' ')
+					n++;
+				if(strncasecmp(p, "100-continue", 12) == 0) {
+					h->respflags |= FLAG_CONTINUE;
+					syslog(LOG_DEBUG, "\"Expect: 100-Continue\" header detected");
+				}
+			}
 #ifdef ENABLE_EVENTS
 			else if(strncasecmp(line, "Callback", 8)==0)
 			{
@@ -281,6 +294,7 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 {
 	if((h->req_buflen - h->req_contentoff) >= h->req_contentlen)
 	{
+		/* the request body is received */
 		if(h->req_soapActionOff > 0)
 		{
 			/* we can process the request */
@@ -300,6 +314,20 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 			                    err400str, sizeof(err400str) - 1);
 			SendRespAndClose_upnphttp(h);
 		}
+	}
+	else if(h->respflags & FLAG_CONTINUE)
+	{
+		/* Sending the 100 Continue response */
+		if(!h->res_buf) {
+			h->res_buf = malloc(256);
+			h->res_buf_alloclen = 256;
+		}
+		h->res_buflen = snprintf(h->res_buf, h->res_buf_alloclen,
+		                         "%s 100 Continue\r\n\r\n", h->HttpVer);
+		h->res_sent = 0;
+		h->state = ESendingContinue;
+		if(SendResp_upnphttp(h))
+			h->state = EWaitingForHttpContent;
 	}
 	else
 	{
@@ -645,6 +673,10 @@ Process_upnphttp(struct upnphttp * h)
 			}
 		}
 		break;
+	case ESendingContinue:
+		if(SendResp_upnphttp(h))
+			h->state = EWaitingForHttpContent;
+		break;
 	case ESendingAndClosing:
 		SendRespAndClose_upnphttp(h);
 		break;
@@ -770,6 +802,41 @@ BuildResp_upnphttp(struct upnphttp * h,
                         const char * body, int bodylen)
 {
 	BuildResp2_upnphttp(h, 200, "OK", body, bodylen);
+}
+
+int
+SendResp_upnphttp(struct upnphttp * h)
+{
+	ssize_t n;
+
+	while (h->res_sent < h->res_buflen)
+	{
+		n = send(h->socket, h->res_buf + h->res_sent,
+		         h->res_buflen - h->res_sent, 0);
+		if(n<0)
+		{
+			if(errno == EINTR)
+				continue;	/* try again immediatly */
+			if(errno == EAGAIN || errno == EWOULDBLOCK)
+			{
+				/* try again later */
+				return 0;
+			}
+			syslog(LOG_ERR, "send(res_buf): %m");
+			break; /* avoid infinite loop */
+		}
+		else if(n == 0)
+		{
+			syslog(LOG_ERR, "send(res_buf): %d bytes sent (out of %d)",
+							h->res_sent, h->res_buflen);
+			break;
+		}
+		else
+		{
+			h->res_sent += n;
+		}
+	}
+	return 1;	/* finished */
 }
 
 void

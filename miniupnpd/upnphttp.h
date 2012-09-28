@@ -34,6 +34,7 @@
 enum httpStates {
 	EWaitingForHttpRequest = 0,
 	EWaitingForHttpContent,
+	ESendingContinue,
 	ESendingAndClosing,
 	EToDelete = 100
 };
@@ -86,6 +87,9 @@ struct upnphttp {
 /* Include the "SID:" header in response */
 #define FLAG_SID		0x02
 
+/* If set, the POST request included a "Expect: 100-continue" header */
+#define FLAG_CONTINUE	0x40
+
 /* If set, the Content-Type is set to text/xml, otherwise it is text/xml */
 #define FLAG_HTML		0x80
 
@@ -130,6 +134,9 @@ void
 BuildResp2_upnphttp(struct upnphttp * h, int respcode,
                     const char * respmsg,
                     const char * body, int bodylen);
+
+int
+SendResp_upnphttp(struct upnphttp *);
 
 /* SendRespAndClose_upnphttp() */
 void
