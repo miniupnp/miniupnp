@@ -8,6 +8,7 @@ $Id: Changelog.txt,v 1.309 2012/09/27 16:01:10 nanard Exp $
   Support for Accept-Language/Content-Language HTTP headers
   Content-Type is now text/xml; charset="utf-8" to conform with UDA v1.1
   Support Expect: 100-continue for POST HTTP requests
+  Manage services/devices versions in minissdp.c
 
 2012/09/20:
   Cleaning code in ipfw (Jardel Weyrich)
