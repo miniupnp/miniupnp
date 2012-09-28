@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.73 2012/05/28 13:26:58 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.76 2012/09/27 13:15:03 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -110,6 +110,24 @@ ParseHttpHeaders(struct upnphttp * h)
 				}
 				h->req_soapActionOff = p - h->req_buf;
 				h->req_soapActionLen = n;
+			}
+			else if(strncasecmp(line, "accept-language", 15) == 0)
+			{
+				p = colon;
+				n = 0;
+				while(*p == ':' || *p == ' ' || *p == '\t')
+					p++;
+				while(p[n]>=' ')
+					n++;
+				syslog(LOG_DEBUG, "accept-language HTTP header : '%.*s'", n, p);
+				/* keep only the 1st accepted language */
+				n = 0;
+				while(p[n]>' ' && p[n] != ',')
+					n++;
+				if(n >= (int)sizeof(h->accept_language))
+					n = (int)sizeof(h->accept_language) - 1;
+				memcpy(h->accept_language, p, n);
+				h->accept_language[n] = '\0';
 			}
 #ifdef ENABLE_EVENTS
 			else if(strncasecmp(line, "Callback", 8)==0)
@@ -707,6 +725,13 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 		h->res_buflen += snprintf(h->res_buf + h->res_buflen,
 		                          h->res_buf_alloclen - h->res_buflen,
 		                          "Allow: %s\r\n", "SUBSCRIBE, UNSUBSCRIBE");
+	}
+	if(h->accept_language[0] != '\0') {
+		/* defaulting to "en" */
+		h->res_buflen += snprintf(h->res_buf + h->res_buflen,
+		                          h->res_buf_alloclen - h->res_buflen,
+		                          "Content-Language: %s\r\n",
+		                          h->accept_language[0] == '*' ? "en" : h->accept_language);
 	}
 	h->res_buf[h->res_buflen++] = '\r';
 	h->res_buf[h->res_buflen++] = '\n';

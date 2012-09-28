@@ -1,4 +1,4 @@
-/* $Id: upnphttp.h,v 1.31 2012/05/28 11:00:44 nanard Exp $ */
+/* $Id: upnphttp.h,v 1.34 2012/09/27 15:47:15 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -57,6 +57,7 @@ struct upnphttp {
 	char HttpVer[16];
 	/* request */
 	char * req_buf;
+	char accept_language[8];
 	int req_buflen;
 	int req_contentlen;
 	int req_contentoff;     /* header length */
@@ -91,6 +92,7 @@ struct upnphttp {
 /* If set, the corresponding Allow: header is set */
 #define FLAG_ALLOW_POST			0x100
 #define FLAG_ALLOW_SUB_UNSUB	0x200
+
 
 /* New_upnphttp() */
 struct upnphttp *
