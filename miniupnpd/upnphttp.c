@@ -655,7 +655,6 @@ Process_upnphttp(struct upnphttp * h)
 
 static const char httpresphead[] =
 	"%s %d %s\r\n"
-	/*"Content-Type: text/xml; charset=\"utf-8\"\r\n"*/
 	"Content-Type: %s\r\n"
 	"Connection: close\r\n"
 	"Content-Length: %d\r\n"
@@ -690,11 +689,14 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 		}
 		h->res_buf_alloclen = templen;
 	}
+	h->res_sent = 0;
 	h->res_buflen = snprintf(h->res_buf, h->res_buf_alloclen,
 	                         httpresphead, h->HttpVer,
 	                         respcode, respmsg,
-	                         (h->respflags&FLAG_HTML)?"text/html":"text/xml",
+	                         (h->respflags&FLAG_HTML)?"text/html":"text/xml; charset=\"utf-8\"",
 							 bodylen);
+	/* Content-Type MUST be 'text/xml; charset="utf-8"' according to UDA v1.1 */
+	/* Content-Type MUST be 'text/xml' according to UDA v1.0 */
 	/* Additional headers */
 #ifdef ENABLE_EVENTS
 	if(h->respflags & FLAG_TIMEOUT) {

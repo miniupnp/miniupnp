@@ -6,6 +6,7 @@ $Id: Changelog.txt,v 1.309 2012/09/27 16:01:10 nanard Exp $
   UPC must be a 12 decimal digit code
   SetDefaultConnectionService() checks its argumnents in UPNP_STRICT mode
   Support for Accept-Language/Content-Language HTTP headers
+  Content-Type is now text/xml; charset="utf-8" to conform with UDA v1.1
 
 2012/09/20:
   Cleaning code in ipfw (Jardel Weyrich)
