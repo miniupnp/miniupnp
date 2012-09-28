@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.301 2012/09/18 08:29:16 nanard Exp $
+$Id: Changelog.txt,v 1.309 2012/09/27 16:01:10 nanard Exp $
+
+2012/09/20:
+  Cleaning code in ipfw (Jardel Weyrich)
 
 2012/09/18:
   Fixing a bug in clean_pinhole_list() under linux/netfilter
