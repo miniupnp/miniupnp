@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.110 2012/05/24 16:51:09 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.111 2012/09/27 11:54:57 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -987,9 +987,14 @@ SetDefaultConnectionService(struct upnphttp * h, const char * action)
 	p = GetValueFromNameValueList(&data, "NewDefaultConnectionService");
 	if(p) {
 		syslog(LOG_INFO, "%s(%s) : Ignored", action, p);
+		BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+#ifdef UPNP_STRICT
+	} else {
+		/* missing argument */
+		SoapError(h, 402, "Invalid Args");
+#endif
 	}
 	ClearNameValueList(&data);
-	BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
 }
 
 static void
