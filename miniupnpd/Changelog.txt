@@ -3,6 +3,7 @@ $Id: Changelog.txt,v 1.318 2012/10/04 22:11:55 nanard Exp $
 2012/10/04:
   updated DEFAULTCONNECTIONSERVICE_MAGICALVALUE for IGDv2
   increased default buffer size for HTTP response
+  More argument check for SOAP actions in UPNP_STRICT mode
 
 2012/10/03:
   Fix atoi() on null pointer in upnpsoap.c

@@ -603,7 +603,11 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action)
 	ext_port = GetValueFromNameValueList(&data, "NewExternalPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
 
+#ifdef UPNP_STRICT
+	if(!ext_port || !protocol || !r_host)
+#else
 	if(!ext_port || !protocol)
+#endif
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
@@ -671,7 +675,11 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 	ext_port = GetValueFromNameValueList(&data, "NewExternalPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
 
+#ifdef UPNP_STRICT
+	if(!ext_port || !protocol || !r_host)
+#else
 	if(!ext_port || !protocol)
+#endif
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
@@ -1007,13 +1015,21 @@ SetDefaultConnectionService(struct upnphttp * h, const char * action)
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	p = GetValueFromNameValueList(&data, "NewDefaultConnectionService");
 	if(p) {
-		syslog(LOG_INFO, "%s(%s) : Ignored", action, p);
-		BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+		/* 720 InvalidDeviceUUID
+		 * 721 InvalidServiceID
+		 * 723 InvalidConnServiceSelection */
 #ifdef UPNP_STRICT
+		if(0 != memcmp(uuidvalue, p, sizeof("uuid:00000000-0000-0000-0000-000000000000") - 1)) {
+			SoapError(h, 720, "InvalidDeviceUUID");
+		} else
+#endif
+		{
+			syslog(LOG_INFO, "%s(%s) : Ignored", action, p);
+			BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+		}
 	} else {
 		/* missing argument */
 		SoapError(h, 402, "Invalid Args");
-#endif
 	}
 	ClearNameValueList(&data);
 }
@@ -1049,6 +1065,13 @@ SetConnectionType(struct upnphttp * h, const char * action)
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	connection_type = GetValueFromNameValueList(&data, "NewConnectionType");
+#ifdef UPNP_STRICT
+	if(!connection_type) {
+		ClearNameValueList(&data);
+		SoapError(h, 402, "Invalid Args");
+		return;
+	}
+#endif
 	/* Unconfigured, IP_Routed, IP_Bridged */
 	ClearNameValueList(&data);
 	/* always return a ReadOnly error */
