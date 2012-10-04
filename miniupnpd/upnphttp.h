@@ -1,4 +1,4 @@
-/* $Id: upnphttp.h,v 1.34 2012/09/27 15:47:15 nanard Exp $ */
+/* $Id: upnphttp.h,v 1.35 2012/10/03 21:03:50 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -72,6 +72,10 @@ struct upnphttp {
 	int req_SIDOff;		/* For UNSUBSCRIBE */
 	int req_SIDLen;
 	const char * res_SID;
+#ifdef UPNP_STRICT
+	int req_NTOff;
+	int req_NTLen;
+#endif
 #endif
 	int respflags;				/* see FLAG_* constants below */
 	/* response */

@@ -184,6 +184,19 @@ intervening space) by either an integer or the keyword "infinite". */
 					h->req_Timeout = atoi(p+7);
 				}
 			}
+#ifdef UPNP_STRICT
+			else if(strncasecmp(line, "nt", 2)==0)
+			{
+				p = colon + 1;
+				while(isspace(*p))
+					p++;
+				n = 0;
+				while(!isspace(p[n]))
+					n++;
+				h->req_NTOff = p - h->req_buf;
+				h->req_NTLen = n;
+			}
+#endif
 #endif
 		}
 		while(!(line[0] == '\r' && line[1] == '\n'))
@@ -427,6 +440,19 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 	/* Check that the callback URL is on the same IP as
 	 * the request, and not on the internet, nor on ourself (DOS attack ?) */
 		if(h->req_CallbackOff > 0) {
+#ifdef UPNP_STRICT
+			/* SID: and Callback: are incompatible */
+			if(h->req_SIDOff > 0) {
+				syslog(LOG_WARNING, "Both Callback: and SID: in SUBSCRIBE");
+				BuildResp2_upnphttp(h, 400, "Incompatible header fields", 0, 0);
+			/* "NT: upnp:event" header is mandatory */
+			} else if(h->req_NTOff <= 0 || h->req_NTLen != 10 ||
+			   0 != memcmp("upnp:event", h->req_buf + h->req_NTOff, 10)) {
+				syslog(LOG_WARNING, "Invalid NT in SUBSCRIBE %.*s",
+				       h->req_NTLen, h->req_buf + h->req_NTOff);
+				BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
+			} else
+#endif
 			if(checkCallbackURL(h)) {
 				sid = upnpevents_addSubscriber(path, h->req_buf + h->req_CallbackOff,
 				                               h->req_CallbackLen, h->req_Timeout);
@@ -448,6 +474,13 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 412 Precondition Failed. If a SID does not correspond to a known,
 un-expired subscription, the publisher must respond
 with HTTP error 412 Precondition Failed. */
+#ifdef UPNP_STRICT
+			/* SID: and NT: headers are incompatibles */
+			if(h->req_NTOff > 0) {
+				syslog(LOG_WARNING, "Both NT: and SID: in SUBSCRIBE");
+				BuildResp2_upnphttp(h, 400, "Incompatible header fields", 0, 0);
+			} else
+#endif
 			if(renewSubscription(h->req_buf + h->req_SIDOff, h->req_SIDLen,
 			                     h->req_Timeout) < 0) {
 				BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
@@ -466,6 +499,15 @@ ProcessHTTPUnSubscribe_upnphttp(struct upnphttp * h, const char * path)
 	syslog(LOG_DEBUG, "ProcessHTTPUnSubscribe %s", path);
 	syslog(LOG_DEBUG, "SID '%.*s'", h->req_SIDLen, h->req_buf + h->req_SIDOff);
 	/* Remove from the list */
+#ifdef UPNP_STRICT
+	if(h->req_SIDOff <= 0 || h->req_SIDLen == 0) {
+		/* SID: header missing or empty */
+		BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
+	} else if(h->req_CallbackOff > 0 || h->req_NTOff > 0) {
+		/* no NT: or Callback: header must be present */
+		BuildResp2_upnphttp(h, 400, "Incompatible header fields", 0, 0);
+	} else
+#endif
 	if(upnpevents_removeSubscriber(h->req_buf + h->req_SIDOff, h->req_SIDLen) < 0) {
 		BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
 	} else {
