@@ -1,4 +1,4 @@
-/* $Id: upnpdescgen.c,v 1.69 2012/09/27 12:01:58 nanard Exp $ */
+/* $Id: upnpdescgen.c,v 1.71 2012/10/04 22:08:08 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -465,6 +465,9 @@ static const struct action WANIPCnActions[] =
 	{0, 0}
 };
 /* R=Required, O=Optional */
+
+/* ignore "warning: missing initializer" */
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
 static const struct stateVar WANIPCnVars[] =
 {
