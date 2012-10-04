@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.42 2012/09/27 15:35:08 nanard Exp $ */
+/* $Id: minissdp.c,v 1.43 2012/10/03 15:21:48 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -404,6 +404,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 #endif
 	int l, n, i=0;
 	char bufr[512];
+	char ver_str[4];
 
 	memset(&sockname, 0, sizeof(sockname));
 #ifdef ENABLE_IPV6
@@ -425,6 +426,10 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 
 	while(known_service_types[i].s)
 	{
+		if(i==0)
+			ver_str[0] = '\0';
+		else
+			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 		l = snprintf(bufr, sizeof(bufr),
 			"NOTIFY * HTTP/1.1\r\n"
 			"HOST: %s:%d\r\n"
@@ -443,8 +448,8 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 			SSDP_PORT,
 			lifetime,
 			host, port,
-			known_service_types[i].s, (i==0?"":"1"),	/* TODO : proper version */
-			uuidvalue, known_service_types[i].s, (i==0?"":"1"),
+			known_service_types[i].s, ver_str,
+			uuidvalue, known_service_types[i].s, ver_str,
 			upnp_bootid, upnp_bootid, upnp_configid );
 		if(l<0)
 		{
@@ -539,6 +544,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	int st_len = 0;
 	int st_ver = 0;
 	char sender_str[64];
+	char ver_str[4];
 	const char * announced_host = NULL;
 #ifdef ENABLE_IPV6
 #ifdef UPNP_STRICT
@@ -668,9 +674,13 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				syslog(LOG_INFO, "ssdp:all found");
 				for(i=0; known_service_types[i].s; i++)
 				{
+					if(i==0)
+						ver_str[0] = '\0';
+					else
+						snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 					l = (int)strlen(known_service_types[i].s);
 					SendSSDPAnnounce2(s, sender,
-					                  known_service_types[i].s, l, i==0?"":"1", /* send proper version */
+					                  known_service_types[i].s, l, ver_str,
 					                  announced_host, port);
 				}
 				/* also answer for uuid */
@@ -709,6 +719,7 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 	int n, l;
 	int i, j;
 	char bufr[512];
+	char ver_str[4];
 	int ret = 0;
 	int ipv6 = 0;
 
@@ -730,6 +741,10 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 #endif
 	    for(i=0; known_service_types[i].s; i++)
 	    {
+			if(i==0)
+				ver_str[0] = '\0';
+			else
+				snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 	        l = snprintf(bufr, sizeof(bufr),
                  "NOTIFY * HTTP/1.1\r\n"
                  "HOST: %s:%d\r\n"
@@ -743,8 +758,8 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
                  "\r\n",
                  ipv6 ? "[" LL_SSDP_MCAST_ADDR "]" : SSDP_MCAST_ADDR,
 			     SSDP_PORT,
-				 known_service_types[i].s, (i==0?"":"1"),/* TODO : proper version */
-                 uuidvalue, known_service_types[i].s, (i==0?"":"1"),
+				 known_service_types[i].s, ver_str,
+                 uuidvalue, known_service_types[i].s, ver_str,
                  upnp_bootid, upnp_bootid, upnp_configid);
 	        n = sendto(sockets[j], bufr, l, 0,
 #ifdef ENABLE_IPV6
@@ -777,6 +792,7 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 	char strbuf[256];
 	unsigned char * p;
 	int i, l, n;
+	char ver_str[4];
 
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(s < 0) {
@@ -802,8 +818,12 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 		if(i > 0)
 			p[l-1] = '1';
 		p += l;
+		if(i==0)
+			ver_str[0] = '\0';
+		else
+			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 		l = snprintf(strbuf, sizeof(strbuf), "%s::%s%s",
-		             uuidvalue, known_service_types[i].s, (i==0)?"":"1");
+		             uuidvalue, known_service_types[i].s, ver_str);
 		CODELENGTH(l, p);
 		memcpy(p, strbuf, l);
 		p += l;
