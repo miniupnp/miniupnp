@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.309 2012/09/27 16:01:10 nanard Exp $
+$Id: Changelog.txt,v 1.318 2012/10/04 22:11:55 nanard Exp $
+
+2012/10/03:
+  ENABLE_HTTP_DATE : add a Date: header to all HTTP responses
 
 2012/09/27:
   Fixes with DISABLE_CONFIG_FILE

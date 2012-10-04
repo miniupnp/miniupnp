@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.76 2012/09/27 13:15:03 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.81 2012/10/04 22:09:34 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -19,6 +19,9 @@
 #include <ctype.h>
 #include <errno.h>
 #include "config.h"
+#ifdef ENABLE_HTTP_DATE
+#include <time.h>
+#endif
 #include "upnphttp.h"
 #include "upnpdescgen.h"
 #include "miniupnpdpath.h"
@@ -730,6 +733,21 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 	/* Content-Type MUST be 'text/xml; charset="utf-8"' according to UDA v1.1 */
 	/* Content-Type MUST be 'text/xml' according to UDA v1.0 */
 	/* Additional headers */
+#ifdef ENABLE_HTTP_DATE
+	{
+		char http_date[64];
+		time_t t;
+		struct tm tm;
+		time(&t);
+		gmtime_r(&t, &tm);
+		/* %a and %b depend on locale */
+		strftime(http_date, sizeof(http_date),
+		         "%a, %d %b %Y %H:%M:%S GMT", &tm);
+		h->res_buflen += snprintf(h->res_buf + h->res_buflen,
+		                          h->res_buf_alloclen - h->res_buflen,
+		                          "Date: %s\r\n", http_date);
+	}
+#endif
 #ifdef ENABLE_EVENTS
 	if(h->respflags & FLAG_TIMEOUT) {
 		h->res_buflen += snprintf(h->res_buf + h->res_buflen,
