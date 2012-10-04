@@ -1,4 +1,4 @@
-/* $Id: upnpevents.c,v 1.24 2012/04/30 21:21:33 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.26 2012/10/04 22:11:56 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2008-2012 Thomas Bernard
@@ -93,6 +93,14 @@ newSubscriber(const char * eventurl, const char * callback, int callbacklen)
 #ifdef ENABLE_L3F_SERVICE
 	else if(strcmp(eventurl, L3F_EVENTURL)==0)
 		tmp->service = EL3F;
+#endif
+#ifdef ENABLE_6FC_SERVICE
+	else if(strcmp(eventurl, WANIP6FC_EVENTURL)==0)
+		tmp->service = E6FC;
+#endif
+#ifdef ENABLE_DP_SERVICE
+	else if(strcmp(eventurl, DP_EVENTURL)==0)
+		tmp->service = EDP;
 #endif
 	else {
 		free(tmp);
