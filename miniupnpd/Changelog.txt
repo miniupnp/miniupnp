@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.318 2012/10/04 22:11:55 nanard Exp $
 
+2012/10/04:
+  increased default buffer size for HTTP response
+
 2012/10/03:
   Fix atoi() on null pointer in upnpsoap.c
   properly set service/device version in SSDP messages
@@ -7,6 +10,7 @@ $Id: Changelog.txt,v 1.318 2012/10/04 22:11:55 nanard Exp $
   Enforce compliance for SUBSCRIBE messages (UPNP_STRICT mode)
   Enforce compliance for UNSUBSCRIBE messages (UPNP_STRICT mode)
   Ignore "-Wmissing-field-initializers" in upnpdescgen.c
+  check size of h->res_buf before building HTTP response
   ENABLE_HTTP_DATE : add a Date: header to all HTTP responses
 
 2012/09/27:

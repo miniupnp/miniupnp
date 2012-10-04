@@ -755,12 +755,13 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
                      int bodylen)
 {
 	int templen;
-	if(!h->res_buf)
-	{
-		templen = sizeof(httpresphead) + 128 + bodylen;
+	if(!h->res_buf ||
+	   h->res_buf_alloclen < ((int)sizeof(httpresphead) + 256 + bodylen)) {
+		if(h->res_buf)
+			free(h->res_buf);
+		templen = sizeof(httpresphead) + 256 + bodylen;
 		h->res_buf = (char *)malloc(templen);
-		if(!h->res_buf)
-		{
+		if(!h->res_buf) {
 			syslog(LOG_ERR, "malloc error in BuildHeader_upnphttp()");
 			return;
 		}
