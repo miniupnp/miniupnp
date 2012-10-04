@@ -1208,7 +1208,11 @@ genEventVars(int * len, const struct serviceDesc * s, const char * servns)
 			case DEFAULTCONNECTIONSERVICE_MAGICALVALUE:
 				/* DefaultConnectionService magical value */
 				str = strcat_str(str, len, &tmplen, uuidvalue);
+#ifdef IGD_V2
+				str = strcat_str(str, len, &tmplen, ":WANConnectionDevice:2,urn:upnp-org:serviceId:WANIPConn1");
+#else
 				str = strcat_str(str, len, &tmplen, ":WANConnectionDevice:1,urn:upnp-org:serviceId:WANIPConn1");
+#endif
 				break;
 			default:
 				str = strcat_str(str, len, &tmplen, upnpallowedvalues[v->ieventvalue]);
