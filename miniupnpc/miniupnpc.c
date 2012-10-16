@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.110 2012/08/11 05:52:48 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.111 2012/10/09 17:53:14 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -31,6 +31,7 @@
 #include <io.h>
 #include <iphlpapi.h>
 #define snprintf _snprintf
+#define strdup _strdup
 #ifndef strncasecmp
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
 #define strncasecmp _memicmp
