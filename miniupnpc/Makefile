@@ -20,6 +20,9 @@ ifeq ($(OS), Linux)
 JARSUFFIX=linux
 endif
 
+HAVE_IPV6 ?= yes
+export HAVE_IPV6
+
 CC ?= gcc
 #AR = gar
 #CFLAGS = -O -g -DDEBUG
@@ -99,10 +102,11 @@ TESTMINIWGETOBJS := $(TESTMINIWGETOBJS) minissdpc.o
 TESTIGDDESCPARSE := $(TESTIGDDESCPARSE) minissdpc.o
 endif
 
+LIBDIR ?= lib
 # install directories
 INSTALLPREFIX ?= $(PREFIX)/usr
 INSTALLDIRINC = $(INSTALLPREFIX)/include/miniupnpc
-INSTALLDIRLIB = $(INSTALLPREFIX)/lib
+INSTALLDIRLIB = $(INSTALLPREFIX)/$(LIBDIR)
 INSTALLDIRBIN = $(INSTALLPREFIX)/bin
 INSTALLDIRMAN = $(INSTALLPREFIX)/share/man
 
