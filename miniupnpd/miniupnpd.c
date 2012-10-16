@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.170 2012/09/27 10:59:44 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.171 2012/10/04 22:36:46 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1701,7 +1701,7 @@ main(int argc, char * * argv)
 			struct sockaddr_un clientname;
 			struct ctlelem * tmp;
 			socklen_t clientnamelen = sizeof(struct sockaddr_un);
-			//syslog(LOG_DEBUG, "sctl!");
+			/*syslog(LOG_DEBUG, "sctl!");*/
 			s = accept(sctl, (struct sockaddr *)&clientname,
 			           &clientnamelen);
 			syslog(LOG_DEBUG, "sctl! : '%s'", clientname.sun_path);
