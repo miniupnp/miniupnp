@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.318 2012/10/04 22:11:55 nanard Exp $
+$Id: Changelog.txt,v 1.319 2012/10/23 12:24:31 nanard Exp $
+
+2012/10/23:
+  minor modifications to linux/getroute.c and testgetroute.c
 
 2012/10/04:
   updated DEFAULTCONNECTIONSERVICE_MAGICALVALUE for IGDv2

@@ -1,4 +1,4 @@
-/* $Id: getroute.c,v 1.2 2012/06/23 23:34:42 nanard Exp $ */
+/* $Id: getroute.c,v 1.3 2012/10/23 12:24:33 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -76,6 +76,10 @@ get_src_for_route_to(const struct sockaddr * dst,
 	}
 
 	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+	if (fd < 0) {
+		syslog(LOG_ERR, "socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE) : %m");
+		return -1;
+	}
 
 	memset(&nladdr, 0, sizeof(nladdr));
 	nladdr.nl_family = AF_NETLINK;
@@ -87,7 +91,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 
 	if (status < 0) {
 		syslog(LOG_ERR, "sendmsg(rtnetlink) : %m");
-		return -1;
+		goto error;
 	}
 
 	memset(&req, 0, sizeof(req));

@@ -1,4 +1,4 @@
-/* $Id: testgetroute.c,v 1.2 2012/06/23 23:32:32 nanard Exp $ */
+/* $Id: testgetroute.c,v 1.3 2012/10/23 12:24:33 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -43,19 +43,25 @@ main(int argc, char ** argv)
 	r = inet_pton (AF_INET, argv[1], &dst4.sin_addr);
 	if(r < 0) {
 		syslog(LOG_ERR, "inet_pton(AF_INET, %s) : %m", argv[1]);
+		closelog();
 		return 2;
 	}
 	if (r == 0) {
 		r = inet_pton (AF_INET6, argv[1], &dst6.sin6_addr);
 		if(r < 0) {
 			syslog(LOG_ERR, "inet_pton(AF_INET6, %s) : %m", argv[1]);
+			closelog();
 			return 2;
-		}
-		if(r > 0) {
+		} else if(r > 0) {
 			dst6.sin6_family = AF_INET6;
 			dst = (struct sockaddr *)&dst6;
 			src = &dst6.sin6_addr;
 			src_len = sizeof(dst6.sin6_addr);
+		} else {
+			/* r == 0 */
+			syslog(LOG_ERR, "%s is not a correct IPv4 or IPv6 address", argv[1]);
+			closelog();
+			return 1;
 		}
 	} else {
 		dst4.sin_family = AF_INET;
@@ -73,6 +79,7 @@ main(int argc, char ** argv)
 			syslog(LOG_DEBUG, "src=%s", src_str);
 		}
 	}
+	closelog();
 	return 0;
 }
 
