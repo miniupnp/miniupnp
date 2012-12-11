@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.319 2012/10/23 12:24:31 nanard Exp $
+$Id: Changelog.txt,v 1.320 2012/12/11 21:07:35 nanard Exp $
+
+2012/12/11:
+  More return value check for malloc() and realloc()
 
 2012/10/23:
   minor modifications to linux/getroute.c and testgetroute.c

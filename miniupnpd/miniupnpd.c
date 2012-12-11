@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.171 2012/10/04 22:36:46 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.172 2012/12/11 21:07:36 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -1706,8 +1706,16 @@ main(int argc, char * * argv)
 			           &clientnamelen);
 			syslog(LOG_DEBUG, "sctl! : '%s'", clientname.sun_path);
 			tmp = malloc(sizeof(struct ctlelem));
-			tmp->socket = s;
-			LIST_INSERT_HEAD(&ctllisthead, tmp, entries);
+			if (tmp == NULL)
+			{
+				syslog(LOG_ERR, "Unable to allocate memory for ctlelem in main()");
+				close(s);
+			}
+			else
+			{
+				tmp->socket = s;
+				LIST_INSERT_HEAD(&ctllisthead, tmp, entries);
+			}
 		}
 #endif
 #ifdef ENABLE_EVENTS

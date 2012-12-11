@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.81 2012/10/04 22:09:34 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.82 2012/12/11 21:07:37 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -637,6 +637,7 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 void
 Process_upnphttp(struct upnphttp * h)
 {
+	char * h_tmp;
 	char buf[2048];
 	int n;
 
@@ -667,10 +668,19 @@ Process_upnphttp(struct upnphttp * h)
 			const char * endheaders;
 			/* if 1st arg of realloc() is null,
 			 * realloc behaves the same as malloc() */
-			h->req_buf = (char *)realloc(h->req_buf, n + h->req_buflen + 1);
-			memcpy(h->req_buf + h->req_buflen, buf, n);
-			h->req_buflen += n;
-			h->req_buf[h->req_buflen] = '\0';
+			h_tmp = (char *)realloc(h->req_buf, n + h->req_buflen + 1);
+			if (h_tmp == NULL)
+			{
+				syslog(LOG_WARNING, "Unable to allocate new memory for h->req_buf)");
+				h->state = EToDelete;
+			}
+			else
+			{
+				h->req_buf = h_tmp;
+				memcpy(h->req_buf + h->req_buflen, buf, n);
+				h->req_buflen += n;
+				h->req_buf[h->req_buflen] = '\0';
+			}
 			/* search for the string "\r\n\r\n" */
 			endheaders = findendheaders(h->req_buf, h->req_buflen);
 			if(endheaders)
