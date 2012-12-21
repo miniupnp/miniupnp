@@ -19,6 +19,9 @@ endif
 ifeq ($(OS), Linux)
 JARSUFFIX=linux
 endif
+ifneq (,$(findstring NT-5.1,$(OS)))
+JARSUFFIX=win32
+endif
 
 HAVE_IPV6 ?= yes
 export HAVE_IPV6
@@ -77,8 +80,13 @@ ifeq ($(OS), Darwin)
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
   CFLAGS := -DMACOSX -D_DARWIN_C_SOURCE $(CFLAGS)
 else
+ifeq ($(OS), Linux)
   SHAREDLIBRARY = libminiupnpc.so
   SONAME = $(SHAREDLIBRARY).$(APIVERSION)
+endif
+ifeq ($(JARSUFFIX), win32)
+  SHAREDLIBRARY = miniupnpc.dll
+endif
 endif
 
 EXECUTABLES = upnpc-static

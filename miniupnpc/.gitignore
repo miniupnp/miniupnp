@@ -3,6 +3,7 @@ build/
 *.o
 *.a
 *.so
+*.dll
 *.dylib
 Makefile.bak
 miniupnpcstrings.h
