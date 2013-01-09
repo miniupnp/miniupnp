@@ -54,7 +54,7 @@ SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
 	   minixmlvalid.c testupnpreplyparse.c minissdpc.c \
 	   upnperrors.c testigddescparse.c testminiwget.c \
-       connecthostport.c portlistringparse.c receivedata.c
+       connecthostport.c portlistingparse.c receivedata.c
 
 LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
