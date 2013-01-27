@@ -92,6 +92,10 @@ ParseHttpHeaders(struct upnphttp * h)
 				while(*p < '0' || *p > '9')
 					p++;
 				h->req_contentlen = atoi(p);
+				if(h->req_contentlen < 0) {
+					syslog(LOG_WARNING, "ParseHttpHeaders() invalid Content-Length %d", h->req_contentlen);
+					h->req_contentlen = 0;
+				}
 				/*printf("*** Content-Lenght = %d ***\n", h->req_contentlen);
 				printf("    readbufflen=%d contentoff = %d\n",
 					h->req_buflen, h->req_contentoff);*/
