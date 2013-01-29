@@ -71,7 +71,9 @@ Delete_upnphttp(struct upnphttp * h)
 	}
 }
 
-/* parse HttpHeaders of the REQUEST */
+/* parse HttpHeaders of the REQUEST
+ * This function is called after the \r\n\r\n character
+ * sequence has been found in h->req_buf */
 static void
 ParseHttpHeaders(struct upnphttp * h)
 {
@@ -79,8 +81,9 @@ ParseHttpHeaders(struct upnphttp * h)
 	char * colon;
 	char * p;
 	int n;
+	if((h->req_buf == NULL) || (h->req_contentoff <= 0))
+		return;
 	line = h->req_buf;
-	/* TODO : check if req_buf, contentoff are ok */
 	while(line < (h->req_buf + h->req_contentoff))
 	{
 		colon = line;
@@ -116,9 +119,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				while(*p == ':' || *p == ' ' || *p == '\t')
 					p++;
 				while(p[n]>=' ')
-				{
 					n++;
-				}
 				if((p[0] == '"' && p[n-1] == '"')
 				  || (p[0] == '\'' && p[n-1] == '\''))
 				{
@@ -212,6 +213,9 @@ intervening space) by either an integer or the keyword "infinite". */
 #endif
 #endif
 		}
+		/* the loop below won't run off the end of the buffer
+		 * because the buffer is guaranteed to contain the \r\n\r\n
+		 * character sequence */
 		while(!(line[0] == '\r' && line[1] == '\n'))
 			line++;
 		line += 2;
@@ -534,7 +538,9 @@ ProcessHTTPUnSubscribe_upnphttp(struct upnphttp * h, const char * path)
 #endif
 
 /* Parse and process Http Query
- * called once all the HTTP headers have been received. */
+ * called once all the HTTP headers have been received,
+ * so it is guaranteed that h->req_buf contains the \r\n\r\n
+ * character sequence */
 static void
 ProcessHttpQuery_upnphttp(struct upnphttp * h)
 {
@@ -567,6 +573,9 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	p = h->req_buf;
 	if(!p)
 		return;
+	/* note : checking (*p != '\r') is enough to avoid runing off the
+	 * end of the buffer, because h->req_buf is guaranteed to contain
+	 * the \r\n\r\n character sequence */
 	for(i = 0; i<15 && *p != ' ' && *p != '\r'; i++)
 		HttpCommand[i] = *(p++);
 	HttpCommand[i] = '\0';
@@ -701,6 +710,8 @@ Process_upnphttp(struct upnphttp * h)
 			endheaders = findendheaders(h->req_buf, h->req_buflen);
 			if(endheaders)
 			{
+				/* at this point, the request buffer (h->req_buf)
+				 * is guaranteed to contain the \r\n\r\n character sequence */
 				h->req_contentoff = endheaders - h->req_buf + 4;
 				ProcessHttpQuery_upnphttp(h);
 			}
