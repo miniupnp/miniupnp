@@ -83,7 +83,16 @@ ParseHttpHeaders(struct upnphttp * h)
 	/* TODO : check if req_buf, contentoff are ok */
 	while(line < (h->req_buf + h->req_contentoff))
 	{
-		colon = strchr(line, ':');
+		colon = line;
+		while(*colon != ':')
+		{
+			if(*colon == '\r' || *colon == '\n')
+			{
+				colon = NULL;	/* no ':' character found on the line */
+				break;
+			}
+			colon++;
+		}
 		if(colon)
 		{
 			if(strncasecmp(line, "Content-Length", 14)==0)

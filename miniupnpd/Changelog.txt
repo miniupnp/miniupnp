@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.322 2013/01/29 21:52:44 nanard Exp $
 
 2013/01/29:
   upnphttp.c: Fix and comment the findendheaders() function
+  upnphttp.c: remove strchr() call in ParseHttpHeaders()
 
 2013/01/27:
   upnphttp.c: ParseHttpHeaders() now checks atoi() return
