@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.82 2012/12/11 21:07:37 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.85 2013/01/29 21:52:43 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -253,10 +253,13 @@ Send501(struct upnphttp * h)
 	SendRespAndClose_upnphttp(h);
 }
 
+/* findendheaders() find the \r\n\r\n character sequence and
+ * return a pointer to it.
+ * It returns NULL if not found */
 static const char *
 findendheaders(const char * s, int len)
 {
-	while(len-->0)
+	while(len-->3)
 	{
 		if(s[0]=='\r' && s[1]=='\n' && s[2]=='\r' && s[3]=='\n')
 			return s;
