@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.113 2012/10/04 22:10:26 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.114 2013/02/06 12:40:25 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -952,6 +952,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	if(bodylen < 0)
 	{
 		SoapError(h, 501, "ActionFailed");
+		free(body);
 		return;
 	}
 	memcpy(body+bodylen, list_start, sizeof(list_start));
@@ -965,12 +966,14 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 		/* have a margin of 1024 bytes to store the new entry */
 		if((unsigned int)bodylen + 1024 > bodyalloc)
 		{
+			char * body_sav = body;
 			bodyalloc += 4096;
 			body = realloc(body, bodyalloc);
 			if(!body)
 			{
 				ClearNameValueList(&data);
 				SoapError(h, 501, "ActionFailed");
+				free(body_sav);
 				free(port_list);
 				return;
 			}
