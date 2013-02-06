@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.30 2012/06/28 18:52:12 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.32 2013/02/06 14:44:42 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
@@ -18,7 +18,7 @@
 #define UPNPDISCOVER_MEMORY_ERROR (-102)
 
 /* versions : */
-#define MINIUPNPC_VERSION	"1.7"
+#define MINIUPNPC_VERSION	"1.8"
 #define MINIUPNPC_API_VERSION	9
 
 #ifdef __cplusplus
