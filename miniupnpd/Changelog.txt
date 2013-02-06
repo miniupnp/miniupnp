@@ -1,6 +1,8 @@
 $Id: Changelog.txt,v 1.325 2013/02/06 13:14:50 nanard Exp $
 
 2013/02/06:
+  Check source address of incomining HTTP connections and SSDP
+    packets in order to filter out WAN SSDP and HTTP trafic.
   Implement get_src_for_route_to() for *BSD
   fix 2 potential memory leaks in GetListOfPortMappings()
 

@@ -1,7 +1,7 @@
-/* $Id: miniupnpd.c,v 1.172 2012/12/11 21:07:36 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.173 2013/02/06 10:50:04 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -1789,42 +1789,53 @@ main(int argc, char * * argv)
 
 				sockaddr_to_string((struct sockaddr *)&clientname, addr_str, sizeof(addr_str));
 				syslog(LOG_INFO, "HTTP connection from %s", addr_str);
-				/* Create a new upnphttp object and add it to
-				 * the active upnphttp object list */
-				tmp = New_upnphttp(shttp);
-				if(tmp)
+				if(get_lan_for_peer((struct sockaddr *)&clientname) == NULL)
 				{
-#ifdef ENABLE_IPV6
-					if(clientname.ss_family == AF_INET)
-					{
-						tmp->clientaddr = ((struct sockaddr_in *)&clientname)->sin_addr;
-					}
-					else if(clientname.ss_family == AF_INET6)
-					{
-						struct sockaddr_in6 * addr = (struct sockaddr_in6 *)&clientname;
-						if(IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr))
-						{
-							memcpy(&tmp->clientaddr,
-							       &addr->sin6_addr.s6_addr[12],
-							       4);
-						}
-						else
-						{
-							tmp->ipv6 = 1;
-							memcpy(&tmp->clientaddr_v6,
-							       &addr->sin6_addr,
-							       sizeof(struct in6_addr));
-						}
-					}
-#else
-					tmp->clientaddr = clientname.sin_addr;
-#endif
-					LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
+					/* The peer is not a LAN ! */
+					syslog(LOG_WARNING,
+					       "HTTP peer %s is not from a LAN, closing the connection",
+					       addr_str);
+					close(shttp);
 				}
 				else
 				{
-					syslog(LOG_ERR, "New_upnphttp() failed");
-					close(shttp);
+					/* Create a new upnphttp object and add it to
+					 * the active upnphttp object list */
+					tmp = New_upnphttp(shttp);
+					if(tmp)
+					{
+#ifdef ENABLE_IPV6
+						if(clientname.ss_family == AF_INET)
+						{
+							tmp->clientaddr = ((struct sockaddr_in *)&clientname)->sin_addr;
+						}
+						else if(clientname.ss_family == AF_INET6)
+						{
+							struct sockaddr_in6 * addr = (struct sockaddr_in6 *)&clientname;
+							if(IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr))
+							{
+								memcpy(&tmp->clientaddr,
+								       &addr->sin6_addr.s6_addr[12],
+								       4);
+							}
+							else
+							{
+								tmp->ipv6 = 1;
+								memcpy(&tmp->clientaddr_v6,
+								       &addr->sin6_addr,
+								       sizeof(struct in6_addr));
+							}
+						}
+#else
+						tmp->clientaddr = clientname.sin_addr;
+#endif
+						LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
+					}
+					else
+					{
+						syslog(LOG_ERR, "New_upnphttp() failed");
+						close(shttp);
+					}
 				}
 			}
 		}

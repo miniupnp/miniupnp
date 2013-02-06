@@ -554,6 +554,13 @@ ProcessSSDPData(int s, const char *bufr, int n,
 
 	/* get the string representation of the sender address */
 	sockaddr_to_string(sender, sender_str, sizeof(sender_str));
+	lan_addr = get_lan_for_peer(sender);
+	if(lan_addr == NULL)
+	{
+		syslog(LOG_WARNING, "SSDP packet sender %s not from a LAN, ignoring",
+		       sender_str);
+		return;
+	}
 
 	if(memcmp(bufr, "NOTIFY", 6) == 0)
 	{
@@ -597,14 +604,6 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			/* find in which sub network the client is */
 			if(sender->sa_family == AF_INET)
 			{
-				for(lan_addr = lan_addrs.lh_first;
-				    lan_addr != NULL;
-				    lan_addr = lan_addr->list.le_next)
-				{
-					if( (((const struct sockaddr_in *)sender)->sin_addr.s_addr & lan_addr->mask.s_addr)
-					   == (lan_addr->addr.s_addr & lan_addr->mask.s_addr))
-						break;
-				}
 				if (lan_addr == NULL)
 				{
 					syslog(LOG_ERR, "Can't find in which sub network the client is");
