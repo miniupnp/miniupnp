@@ -1,7 +1,7 @@
-/* $Id: minissdp.c,v 1.43 2012/10/03 15:21:48 nanard Exp $ */
+/* $Id: minissdp.c,v 1.44 2013/02/06 10:50:04 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -617,12 +617,13 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			{
 				/* IPv6 address with brackets */
 #ifdef UPNP_STRICT
+				int index;
 				struct in6_addr addr6;
 				size_t addr6_len = sizeof(addr6);
 				/* retrieve the IPv6 address which
 				 * will be used locally to reach sender */
 				memset(&addr6, 0, sizeof(addr6));
-				if(get_src_for_route_to (sender, &addr6, &addr6_len) < 0) {
+				if(get_src_for_route_to (sender, &addr6, &addr6_len, &index) < 0) {
 					syslog(LOG_WARNING, "get_src_for_route_to() failed, using %s", ipv6_addr_for_http_with_brackets);
 					announced_host = ipv6_addr_for_http_with_brackets;
 				} else {

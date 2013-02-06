@@ -1,7 +1,7 @@
-/* $Id: testgetroute.c,v 1.3 2012/10/23 12:24:33 nanard Exp $ */
+/* $Id: testgetroute.c,v 1.5 2013/02/06 12:07:36 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -15,11 +15,14 @@
 
 #include "getroute.h"
 #include "upnputils.h"
+#include "upnpglobalvars.h"
 
 #ifndef LOG_PERROR
 /* solaris does not define LOG_PERROR */
 #define LOG_PERROR 0
 #endif
+
+struct lan_addr_list lan_addrs;
 
 int
 main(int argc, char ** argv)
@@ -30,6 +33,7 @@ main(int argc, char ** argv)
 	void * src;
 	size_t src_len;
 	int r;
+	int index = -1;
 
 	memset(&dst4, 0, sizeof(dst4));
 	memset(&dst6, 0, sizeof(dst6));
@@ -71,12 +75,15 @@ main(int argc, char ** argv)
 	}
 
 	if (dst) {
-		r = get_src_for_route_to (dst, src, &src_len);
+		syslog(LOG_DEBUG, "calling get_src_for_route_to(%p, %p, %p(%u), %p)",
+		       dst, src, &src_len, (unsigned)src_len, &index);
+		r = get_src_for_route_to (dst, src, &src_len, &index);
 		syslog(LOG_DEBUG, "get_src_for_route_to() returned %d", r);
 		if(r >= 0) {
 			char src_str[128];
 			sockaddr_to_string(dst, src_str, sizeof(src_str));
 			syslog(LOG_DEBUG, "src=%s", src_str);
+			syslog(LOG_DEBUG, "index=%d", index);
 		}
 	}
 	closelog();

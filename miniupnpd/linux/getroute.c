@@ -1,7 +1,7 @@
-/* $Id: getroute.c,v 1.3 2012/10/23 12:24:33 nanard Exp $ */
+/* $Id: getroute.c,v 1.4 2013/02/06 10:50:04 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -23,7 +23,8 @@
 
 int
 get_src_for_route_to(const struct sockaddr * dst,
-                     void * src, size_t * src_len)
+                     void * src, size_t * src_len,
+                     int * index)
 {
 	int fd = -1;
 	struct nlmsghdr *h;
@@ -141,13 +142,18 @@ get_src_for_route_to(const struct sockaddr * dst,
 				for(rta = RTM_RTA(NLMSG_DATA((h))); RTA_OK(rta, len); rta = RTA_NEXT(rta,len)) {
 					unsigned char * data = RTA_DATA(rta);
 					if(rta->rta_type == RTA_PREFSRC) {
-						if(*src_len < RTA_PAYLOAD(rta)) {
-							syslog(LOG_WARNING, "cannot copy src: %u<%lu",
-							       (unsigned)*src_len, RTA_PAYLOAD(rta));
-							goto error;
+						if(src_len && src) {
+							if(*src_len < RTA_PAYLOAD(rta)) {
+								syslog(LOG_WARNING, "cannot copy src: %u<%lu",
+								       (unsigned)*src_len, RTA_PAYLOAD(rta));
+								goto error;
+							}
+							*src_len = RTA_PAYLOAD(rta);
+							memcpy(src, data, RTA_PAYLOAD(rta));
 						}
-						*src_len = RTA_PAYLOAD(rta);
-						memcpy(src, data, RTA_PAYLOAD(rta));
+					} else if(rta->rta_type == RTA_OIF) {
+						if(index)
+							memcpy(index, data, sizeof(int));
 					}
 				}
 				close(fd);
