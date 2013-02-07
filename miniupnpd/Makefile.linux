@@ -1,4 +1,4 @@
-# $Id: Makefile.linux,v 1.75 2012/08/24 18:09:20 nanard Exp $
+# $Id: Makefile.linux,v 1.76 2013/02/07 15:56:10 nanard Exp $
 # MiniUPnP project
 # (c) 2006-2012 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -182,7 +182,8 @@ config.h:	genconfig.sh VERSION
 depend:	config.h
 	makedepend -f$(MAKEFILE_LIST) -Y \
 	$(ALLOBJS:.o=.c) $(TESTUPNPDESCGENOBJS:.o=.c) \
-	testgetifstats.c 2>/dev/null
+	testgetifstats.c testupnppermissions.c testgetifaddr.c \
+	testgetroute.c miniupnpdctl.c 2>/dev/null
 
 # DO NOT DELETE
 
@@ -209,7 +210,7 @@ getifaddr.o: config.h getifaddr.h
 daemonize.o: daemonize.h config.h
 upnpglobalvars.o: config.h upnpglobalvars.h upnppermissions.h
 upnpglobalvars.o: miniupnpdtypes.h
-options.o: options.h config.h upnppermissions.h upnpglobalvars.h
+options.o: config.h options.h upnppermissions.h upnpglobalvars.h
 options.o: miniupnpdtypes.h
 upnppermissions.o: config.h upnppermissions.h
 minissdp.o: config.h upnpdescstrings.h miniupnpdpath.h upnphttp.h
@@ -219,7 +220,8 @@ natpmp.o: macros.h config.h natpmp.h upnpglobalvars.h upnppermissions.h
 natpmp.o: miniupnpdtypes.h getifaddr.h upnpredirect.h commonrdr.h upnputils.h
 upnpevents.o: config.h upnpevents.h miniupnpdpath.h upnpglobalvars.h
 upnpevents.o: upnppermissions.h miniupnpdtypes.h upnpdescgen.h upnputils.h
-upnputils.o: config.h upnputils.h
+upnputils.o: config.h upnputils.h upnpglobalvars.h upnppermissions.h
+upnputils.o: miniupnpdtypes.h getroute.h
 getconnstatus.o: getconnstatus.h getifaddr.h
 upnppinhole.o: macros.h config.h upnpredirect.h upnpglobalvars.h
 upnppinhole.o: upnppermissions.h miniupnpdtypes.h upnpevents.h
@@ -234,9 +236,13 @@ netfilter/iptcrdr.o: config.h upnpglobalvars.h upnppermissions.h
 netfilter/iptcrdr.o: miniupnpdtypes.h
 netfilter/iptpinhole.o: config.h netfilter/iptpinhole.h upnpglobalvars.h
 netfilter/iptpinhole.o: upnppermissions.h config.h miniupnpdtypes.h
-netfilter/iptpinhole.o: netfilter/tiny_nf_nat.h
 testupnpdescgen.o: macros.h config.h upnpdescgen.h
 upnpdescgen.o: config.h getifaddr.h upnpredirect.h upnpdescgen.h
 upnpdescgen.o: miniupnpdpath.h upnpglobalvars.h upnppermissions.h
 upnpdescgen.o: miniupnpdtypes.h upnpdescstrings.h upnpurns.h getconnstatus.h
 testgetifstats.o: getifstats.h
+testupnppermissions.o: upnppermissions.h config.h
+testgetifaddr.o: getifaddr.h
+testgetroute.o: getroute.h upnputils.h upnpglobalvars.h upnppermissions.h
+testgetroute.o: config.h miniupnpdtypes.h
+miniupnpdctl.o: macros.h
