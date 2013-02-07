@@ -566,10 +566,11 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	char sender_str[64];
 	char ver_str[4];
 	const char * announced_host = NULL;
-#ifdef ENABLE_IPV6
 #ifdef UPNP_STRICT
+#ifdef ENABLE_IPV6
 	char announced_host_buf[64];
 #endif
+	int mx_value = -1;
 #endif
 
 	/* get the string representation of the sender address */
@@ -613,7 +614,29 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				/*while(bufr[i+j]!='\r') j++;*/
 				/*syslog(LOG_INFO, "%.*s", j, bufr+i);*/
 			}
+#ifdef UPNP_STRICT
+			else if((i < n - 3) && (strncasecmp(bufr+i, "mx:", 3) == 0))
+			{
+				const char * mx;
+				int mx_len;
+				mx = bufr+i+3;
+				mx_len = 0;
+				while((*mx == ' ' || *mx == '\t') && (mx < bufr + n))
+					mx++;
+				while(mx[mx_len]!='\r' && mx[mx_len]!='\n'
+				     && (mx + mx_len < bufr + n))
+					mx_len++;
+				mx_value = atoi(mx);
+				syslog(LOG_DEBUG, "MX: %.*s (value=%d)", mx_len, mx, mx_value);
+			}
+#endif
 		}
+#ifdef UPNP_STRICT
+		if(mx_value < 0) {
+			syslog(LOG_INFO, "ignoring SSDP packet missing MX: header");
+			return;
+		}
+#endif
 		/*syslog(LOG_INFO, "SSDP M-SEARCH packet received from %s",
 	           sender_str );*/
 		if(st && (st_len > 0))
