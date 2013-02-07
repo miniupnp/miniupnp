@@ -324,6 +324,7 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 	char buf[512];
 	char addr_str[64];
 	socklen_t addrlen;
+	int st_is_uuid;
 #ifdef ENABLE_HTTP_DATE
 	char http_date[64];
 	time_t t;
@@ -335,6 +336,8 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 		    "%a, %d %b %Y %H:%M:%S GMT", &tm);
 #endif
 
+	st_is_uuid = (st_len == (int)strlen(uuidvalue)) &&
+	              (memcmp(uuidvalue, st, st_len) == 0);
 	/*
 	 * follow guideline from document "UPnP Device Architecture 1.0"
 	 * uppercase is recommended.
@@ -349,7 +352,7 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 		"DATE: %s\r\n"
 #endif
 		"ST: %.*s%s\r\n"
-		"USN: %s::%.*s%s\r\n"
+		"USN: %s%s%.*s%s\r\n"
 		"EXT:\r\n"
 		"SERVER: " MINIUPNPD_SERVER_STRING "\r\n"
 		"LOCATION: http://%s:%u" ROOTDESC_PATH "\r\n"
@@ -362,7 +365,8 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 		http_date,
 #endif
 		st_len, st, suffix,
-		uuidvalue, st_len, st, suffix,
+		uuidvalue, st_is_uuid ? "" : "::",
+		st_is_uuid ? 0 : st_len, st, suffix,
 		host, (unsigned int)port,
 		upnp_bootid, upnp_bootid, upnp_configid);
 	addrlen = (addr->sa_family == AF_INET6)

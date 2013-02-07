@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.328 2013/02/06 23:37:27 nanard Exp $
 
 2013/02/07:
   Add DATE: header in SSDP packets
+  Fix SSDP packets sent with uuid as ST: header to conform to UDA
 
 VERSION 1.8 : released on 2013/02/06
 
