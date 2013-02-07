@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.44 2013/02/06 10:50:04 nanard Exp $ */
+/* $Id: minissdp.c,v 1.47 2013/02/06 23:37:28 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -324,6 +324,17 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 	char buf[512];
 	char addr_str[64];
 	socklen_t addrlen;
+#ifdef ENABLE_HTTP_DATE
+	char http_date[64];
+	time_t t;
+	struct tm tm;
+
+	time(&t);
+	gmtime_r(&t, &tm);
+	strftime(http_date, sizeof(http_date),
+		    "%a, %d %b %Y %H:%M:%S GMT", &tm);
+#endif
+
 	/*
 	 * follow guideline from document "UPnP Device Architecture 1.0"
 	 * uppercase is recommended.
@@ -334,7 +345,9 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 	 * have a look at the document "UPnP Device Architecture v1.1 */
 	l = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\n"
 		"CACHE-CONTROL: max-age=120\r\n"
-		/*"DATE: ...\r\n"*/
+#ifdef ENABLE_HTTP_DATE
+		"DATE: %s\r\n"
+#endif
 		"ST: %.*s%s\r\n"
 		"USN: %s::%.*s%s\r\n"
 		"EXT:\r\n"
@@ -345,6 +358,9 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 		"BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 		"CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 		"\r\n",
+#ifdef ENABLE_HTTP_DATE
+		http_date,
+#endif
 		st_len, st, suffix,
 		uuidvalue, st_len, st, suffix,
 		host, (unsigned int)port,

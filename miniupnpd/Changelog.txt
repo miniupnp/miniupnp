@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.325 2013/02/06 13:14:50 nanard Exp $
+$Id: Changelog.txt,v 1.328 2013/02/06 23:37:27 nanard Exp $
+
+2013/02/07:
+  Add DATE: header in SSDP packets
 
 VERSION 1.8 : released on 2013/02/06
 
