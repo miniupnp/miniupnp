@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.47 2013/02/06 23:37:28 nanard Exp $ */
+/* $Id: minissdp.c,v 1.48 2013/02/07 12:22:25 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -414,6 +414,66 @@ static struct {
 };
 
 static void
+SendSSDPNotify(int s, const struct sockaddr * dest,
+               const char * host, unsigned short port,
+               const char * nt, const char * suffix,
+               const char * usn1, const char * usn2, const char * usn3,
+               unsigned int lifetime, int ipv6)
+{
+	char bufr[512];
+	int n, l;
+
+	l = snprintf(bufr, sizeof(bufr),
+		"NOTIFY * HTTP/1.1\r\n"
+		"HOST: %s:%d\r\n"
+		"CACHE-CONTROL: max-age=%u\r\n"
+		"LOCATION: http://%s:%d" ROOTDESC_PATH"\r\n"
+		"SERVER: " MINIUPNPD_SERVER_STRING "\r\n"
+		"NT: %s%s\r\n"
+		"USN: %s%s%s%s\r\n"
+		"NTS: ssdp:alive\r\n"
+		"OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n" /* UDA v1.1 */
+		"01-NLS: %u\r\n" /* same as BOOTID field. UDA v1.1 */
+		"BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
+		"CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
+		"\r\n",
+		ipv6 ? "[" LL_SSDP_MCAST_ADDR "]" : SSDP_MCAST_ADDR,
+		SSDP_PORT,
+		lifetime,
+		host, port,
+		nt, suffix, /* NT: */
+		usn1, usn2, usn3, suffix, /* USN: */
+		upnp_bootid, upnp_bootid, upnp_configid );
+	if(l<0)
+	{
+		syslog(LOG_ERR, "SendSSDPNotifies() snprintf error");
+		return;
+	}
+	else if((unsigned int)l >= sizeof(bufr))
+	{
+		syslog(LOG_WARNING, "SendSSDPNotifies(): truncated output");
+		l = sizeof(bufr);
+	}
+	n = sendto(s, bufr, l, 0, dest,
+#ifdef ENABLE_IPV6
+		ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
+#else
+		sizeof(struct sockaddr_in)
+#endif
+		);
+	if(n < 0)
+	{
+		/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
+		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
+		       host ? host : "NULL");
+	}
+	else if(n != l)
+	{
+		syslog(LOG_NOTICE, "sendto() sent %d out of %d bytes", n, l);
+	}
+}
+
+static void
 SendSSDPNotifies(int s, const char * host, unsigned short port,
                  unsigned int lifetime, int ipv6)
 {
@@ -422,8 +482,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 #else
 	struct sockaddr_in sockname;
 #endif
-	int l, n, i=0;
-	char bufr[512];
+	int i=0;
 	char ver_str[4];
 
 	memset(&sockname, 0, sizeof(sockname));
@@ -450,51 +509,15 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 			ver_str[0] = '\0';
 		else
 			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
-		l = snprintf(bufr, sizeof(bufr),
-			"NOTIFY * HTTP/1.1\r\n"
-			"HOST: %s:%d\r\n"
-			"CACHE-CONTROL: max-age=%u\r\n"
-			"lOCATION: http://%s:%d" ROOTDESC_PATH"\r\n"
-			"SERVER: " MINIUPNPD_SERVER_STRING "\r\n"
-			"NT: %s%s\r\n"
-			"USN: %s::%s%s\r\n"
-			"NTS: ssdp:alive\r\n"
-			"OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n" /* UDA v1.1 */
-			"01-NLS: %u\r\n" /* same as BOOTID field. UDA v1.1 */
-			"BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
-			"CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
-			"\r\n",
-			ipv6 ? "[" LL_SSDP_MCAST_ADDR "]" : SSDP_MCAST_ADDR,
-			SSDP_PORT,
-			lifetime,
-			host, port,
-			known_service_types[i].s, ver_str,
-			uuidvalue, known_service_types[i].s, ver_str,
-			upnp_bootid, upnp_bootid, upnp_configid );
-		if(l<0)
-		{
-			syslog(LOG_ERR, "SendSSDPNotifies() snprintf error");
-			continue;
-		}
-		if((unsigned int)l >= sizeof(bufr))
-		{
-			syslog(LOG_WARNING, "SendSSDPNotifies(): truncated output");
-			l = sizeof(bufr);
-		}
-		n = sendto(s, bufr, l, 0,
-			(struct sockaddr *)&sockname,
-#ifdef ENABLE_IPV6
-			ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
-#else
-			sizeof(struct sockaddr_in)
-#endif
-			);
-		if(n < 0)
-		{
-			/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
-			syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
-			       host ? host : "NULL");
-		}
+		SendSSDPNotify(s, (struct sockaddr *)&sockname, host, port,
+		               known_service_types[i].s, ver_str,	/* NT: */
+		               uuidvalue, "::", known_service_types[i].s, /* ver_str,	USN: */
+		               lifetime, ipv6);
+		if(i==0) /* rootdevice */
+			SendSSDPNotify(s, (struct sockaddr *)&sockname, host, port,
+			               uuidvalue, "",	/* NT: */
+			               uuidvalue, "", "", /* ver_str,	USN: */
+			               lifetime, ipv6);
 		i++;
 	}
 }
@@ -750,6 +773,61 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	}
 }
 
+static int
+SendSSDPbyebye(int s, const struct sockaddr * dest,
+               const char * nt, const char * suffix,
+               const char * usn1, const char * usn2, const char * usn3,
+               int ipv6)
+{
+	int n, l;
+	char bufr[512];
+
+	l = snprintf(bufr, sizeof(bufr),
+	             "NOTIFY * HTTP/1.1\r\n"
+	             "HOST: %s:%d\r\n"
+	             "NT: %s%s\r\n"
+	             "USN: %s%s%s%s\r\n"
+	             "NTS: ssdp:byebye\r\n"
+	             "OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n" /* UDA v1.1 */
+	             "01-NLS: %u\r\n" /* same as BOOTID field. UDA v1.1 */
+	             "BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
+	             "CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
+	             "\r\n",
+	             ipv6 ? "[" LL_SSDP_MCAST_ADDR "]" : SSDP_MCAST_ADDR,
+	             SSDP_PORT,
+	             nt, suffix,	/* NT: */
+	             usn1, usn2, usn3, suffix,	/* USN: */
+	             upnp_bootid, upnp_bootid, upnp_configid);
+	if(l<0)
+	{
+		syslog(LOG_ERR, "SendSSDPbyebye() snprintf error");
+		return -1;
+	}
+	else if((unsigned int)l >= sizeof(bufr))
+	{
+		syslog(LOG_WARNING, "SendSSDPbyebye(): truncated output");
+		l = sizeof(bufr);
+	}
+	n = sendto(s, bufr, l, 0, dest,
+#ifdef ENABLE_IPV6
+	           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
+#else
+	           sizeof(struct sockaddr_in)
+#endif
+	          );
+	if(n < 0)
+	{
+		syslog(LOG_ERR, "sendto(udp_shutdown=%d): %m", s);
+		return -1;
+	}
+	else if(n != l)
+	{
+		syslog(LOG_NOTICE, "sendto() sent %d out of %d bytes", n, l);
+		return -1;
+	}
+	return 0;
+}
+
 /* This will broadcast ssdp:byebye notifications to inform
  * the network that UPnP is going down. */
 int
@@ -759,9 +837,7 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 #ifdef ENABLE_IPV6
 	struct sockaddr_in6 sockname6;
 #endif
-	int n, l;
 	int i, j;
-	char bufr[512];
 	char ver_str[4];
 	int ret = 0;
 	int ipv6 = 0;
@@ -788,36 +864,26 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 				ver_str[0] = '\0';
 			else
 				snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
-	        l = snprintf(bufr, sizeof(bufr),
-                 "NOTIFY * HTTP/1.1\r\n"
-                 "HOST: %s:%d\r\n"
-                 "NT: %s%s\r\n"
-                 "USN: %s::%s%s\r\n"
-                 "NTS: ssdp:byebye\r\n"
-				 "OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n" /* UDA v1.1 */
-				 "01-NLS: %u\r\n" /* same as BOOTID field. UDA v1.1 */
-				 "BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
-				 "CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
-                 "\r\n",
-                 ipv6 ? "[" LL_SSDP_MCAST_ADDR "]" : SSDP_MCAST_ADDR,
-			     SSDP_PORT,
-				 known_service_types[i].s, ver_str,
-                 uuidvalue, known_service_types[i].s, ver_str,
-                 upnp_bootid, upnp_bootid, upnp_configid);
-	        n = sendto(sockets[j], bufr, l, 0,
+			ret += SendSSDPbyebye(sockets[j],
 #ifdef ENABLE_IPV6
-	                   ipv6 ? (struct sockaddr *)&sockname6 : (struct sockaddr *)&sockname,
-	                   ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
+			                      ipv6 ? (struct sockaddr *)&sockname6 : (struct sockaddr *)&sockname,
 #else
-	                   (struct sockaddr *)&sockname,
-	                   sizeof(struct sockaddr_in)
+			                      (struct sockaddr *)&sockname,
 #endif
-	                 );
-			if(n < 0)
+			                      known_service_types[i].s, ver_str,	/* NT: */
+			                      uuidvalue, "::", known_service_types[i].s, /* ver_str, USN: */
+			                      ipv6);
+			if(i==0)	/* root device */
 			{
-				syslog(LOG_ERR, "SendSSDPGoodbye: sendto(udp_shutdown=%d): %m",
-				       sockets[j]);
-				ret = -1;
+				ret += SendSSDPbyebye(sockets[j],
+#ifdef ENABLE_IPV6
+				                      ipv6 ? (struct sockaddr *)&sockname6 : (struct sockaddr *)&sockname,
+#else
+				                      (struct sockaddr *)&sockname,
+#endif
+				                      uuidvalue, "",	/* NT: */
+				                      uuidvalue, "", "", /* ver_str, USN: */
+				                      ipv6);
 			}
     	}
 	}
