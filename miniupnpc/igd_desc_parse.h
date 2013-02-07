@@ -6,8 +6,8 @@
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
-#ifndef __IGD_DESC_PARSE_H__
-#define __IGD_DESC_PARSE_H__
+#ifndef IGD_DESC_PARSE_H_INCLUDED
+#define IGD_DESC_PARSE_H_INCLUDED
 
 /* Structure to store the result of the parsing of UPnP
  * descriptions of Internet Gateway Devices */

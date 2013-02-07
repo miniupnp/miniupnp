@@ -19,16 +19,26 @@ TMPDIR=`mktemp -d`
 HTTPSERVEROUT="${TMPDIR}/httpserverout"
 EXPECTEDFILE="${TMPDIR}/expectedfile"
 DOWNLOADEDFILE="${TMPDIR}/downloadedfile"
-#ADDR=localhost
-ADDR="[::1]"
 PORT=
 RET=0
+
+case "$HAVE_IPV6" in
+    n|no|0)
+        ADDR=localhost
+        SERVERARGS=""
+        ;;
+    *)
+        ADDR="[::1]"
+        SERVERARGS="-6"
+        ;;
+
+esac
 
 #make minihttptestserver
 #make testminiwget
 
 # launching the test HTTP server
-./minihttptestserver -6 -e $EXPECTEDFILE > $HTTPSERVEROUT &
+./minihttptestserver $SERVERARGS -e $EXPECTEDFILE > $HTTPSERVEROUT &
 while [ -z "$PORT" ]; do
 	sleep 1
 	PORT=`cat $HTTPSERVEROUT | sed 's/Listening on port \([0-9]*\)/\1/' `

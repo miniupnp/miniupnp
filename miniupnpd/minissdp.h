@@ -4,8 +4,8 @@
  * (c) 2006-2007 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __MINISSDP_H__
-#define __MINISSDP_H__
+#ifndef MINISSDP_H_INCLUDED
+#define MINISSDP_H_INCLUDED
 
 #include "miniupnpdtypes.h"
 

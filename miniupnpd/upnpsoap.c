@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.110 2012/05/24 16:51:09 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.114 2013/02/06 12:40:25 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -486,15 +486,15 @@ AddAnyPortMapping(struct upnphttp * h, const char * action)
 	if(leaseduration == 0)
 		leaseduration = 604800;
 
-	eport = (unsigned short)atoi(ext_port);
-	iport = (unsigned short)atoi(int_port);
-
-	if (!int_ip)
+	if (!int_ip || !ext_port || !int_port)
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
 	}
+
+	eport = (unsigned short)atoi(ext_port);
+	iport = (unsigned short)atoi(int_port);
 #ifndef SUPPORT_REMOTEHOST
 #ifdef UPNP_STRICT
 	if (r_host && (strlen(r_host) > 0) && (0 != strcmp(r_host, "*")))
@@ -603,7 +603,11 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action)
 	ext_port = GetValueFromNameValueList(&data, "NewExternalPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
 
+#ifdef UPNP_STRICT
+	if(!ext_port || !protocol || !r_host)
+#else
 	if(!ext_port || !protocol)
+#endif
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
@@ -671,7 +675,11 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 	ext_port = GetValueFromNameValueList(&data, "NewExternalPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
 
+#ifdef UPNP_STRICT
+	if(!ext_port || !protocol || !r_host)
+#else
 	if(!ext_port || !protocol)
+#endif
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
@@ -723,17 +731,25 @@ DeletePortMappingRange(struct upnphttp * h, const char * action)
 		"</u:DeletePortMappingRangeResponse>";
 	struct NameValueParserData data;
 	const char * protocol;
+	const char * startport_s, * endport_s;
 	unsigned short startport, endport;
-	int manage;
+	/*int manage;*/
 	unsigned short * port_list;
 	unsigned int i, number = 0;
 	UNUSED(action);
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	startport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewStartPort"));
-	endport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewEndPort"));
+	startport_s = GetValueFromNameValueList(&data, "NewStartPort");
+	endport_s = GetValueFromNameValueList(&data, "NewEndPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
-	manage = atoi(GetValueFromNameValueList(&data, "NewManage"));
+	/*manage = atoi(GetValueFromNameValueList(&data, "NewManage"));*/
+	if(startport_s == NULL || endport_s == NULL || protocol == NULL) {
+		SoapError(h, 402, "Invalid Args");
+		ClearNameValueList(&data);
+		return;
+	}
+	startport = (unsigned short)atoi(startport_s);
+	endport = (unsigned short)atoi(endport_s);
 
 	/* possible errors :
 	   606 - Action not authorized
@@ -870,19 +886,32 @@ GetListOfPortMappings(struct upnphttp * h, const char * action)
 	unsigned int leaseduration = 0;
 
 	struct NameValueParserData data;
+	const char * startport_s, * endport_s;
 	unsigned short startport, endport;
 	const char * protocol;
-	int manage;
+	/*int manage;*/
+	const char * number_s;
 	int number;
 	unsigned short * port_list;
 	unsigned int i, list_size = 0;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	startport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewStartPort"));
-	endport = (unsigned short)atoi(GetValueFromNameValueList(&data, "NewEndPort"));
+	startport_s = GetValueFromNameValueList(&data, "NewStartPort");
+	endport_s = GetValueFromNameValueList(&data, "NewEndPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
-	manage = atoi(GetValueFromNameValueList(&data, "NewManage"));
-	number = atoi(GetValueFromNameValueList(&data, "NewNumberOfPorts"));
+	/*manage_s = GetValueFromNameValueList(&data, "NewManage");*/
+	number_s = GetValueFromNameValueList(&data, "NewNumberOfPorts");
+	if(startport_s == NULL || endport_s == NULL || protocol == NULL ||
+	   number_s == NULL) {
+		SoapError(h, 402, "Invalid Args");
+		ClearNameValueList(&data);
+		return;
+	}
+
+	startport = (unsigned short)atoi(startport_s);
+	endport = (unsigned short)atoi(endport_s);
+	/*manage = atoi(manage_s);*/
+	number = atoi(number_s);
 	if(number == 0) number = 1000;	/* return up to 1000 mappings by default */
 
 	if(startport > endport)
@@ -923,6 +952,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	if(bodylen < 0)
 	{
 		SoapError(h, 501, "ActionFailed");
+		free(body);
 		return;
 	}
 	memcpy(body+bodylen, list_start, sizeof(list_start));
@@ -936,12 +966,14 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 		/* have a margin of 1024 bytes to store the new entry */
 		if((unsigned int)bodylen + 1024 > bodyalloc)
 		{
+			char * body_sav = body;
 			bodyalloc += 4096;
 			body = realloc(body, bodyalloc);
 			if(!body)
 			{
 				ClearNameValueList(&data);
 				SoapError(h, 501, "ActionFailed");
+				free(body_sav);
 				free(port_list);
 				return;
 			}
@@ -986,10 +1018,23 @@ SetDefaultConnectionService(struct upnphttp * h, const char * action)
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	p = GetValueFromNameValueList(&data, "NewDefaultConnectionService");
 	if(p) {
-		syslog(LOG_INFO, "%s(%s) : Ignored", action, p);
+		/* 720 InvalidDeviceUUID
+		 * 721 InvalidServiceID
+		 * 723 InvalidConnServiceSelection */
+#ifdef UPNP_STRICT
+		if(0 != memcmp(uuidvalue, p, sizeof("uuid:00000000-0000-0000-0000-000000000000") - 1)) {
+			SoapError(h, 720, "InvalidDeviceUUID");
+		} else
+#endif
+		{
+			syslog(LOG_INFO, "%s(%s) : Ignored", action, p);
+			BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+		}
+	} else {
+		/* missing argument */
+		SoapError(h, 402, "Invalid Args");
 	}
 	ClearNameValueList(&data);
-	BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
 }
 
 static void
@@ -1023,6 +1068,13 @@ SetConnectionType(struct upnphttp * h, const char * action)
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	connection_type = GetValueFromNameValueList(&data, "NewConnectionType");
+#ifdef UPNP_STRICT
+	if(!connection_type) {
+		ClearNameValueList(&data);
+		SoapError(h, 402, "Invalid Args");
+		return;
+	}
+#endif
 	/* Unconfigured, IP_Routed, IP_Bridged */
 	ClearNameValueList(&data);
 	/* always return a ReadOnly error */

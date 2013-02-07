@@ -4,8 +4,8 @@
  * (c) 2006-2011 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __OPENSSDPSOCKET_H__
-#define __OPENSSDPSOCKET_H__
+#ifndef OPENSSDPSOCKET_H_INCLUDED
+#define OPENSSDPSOCKET_H_INCLUDED
 
 /**
  * Open a socket and configure it for receiving SSDP packets

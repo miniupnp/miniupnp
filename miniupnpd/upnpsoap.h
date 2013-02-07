@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPSOAP_H__
-#define __UPNPSOAP_H__
+#ifndef UPNPSOAP_H_INCLUDED
+#define UPNPSOAP_H_INCLUDED
 
 /* ExecuteSoapAction():
  * this method executes the requested Soap Action */

@@ -1,4 +1,4 @@
-# $Id: Makefile.linux,v 1.74 2012/06/23 23:33:57 nanard Exp $
+# $Id: Makefile.linux,v 1.75 2012/08/24 18:09:20 nanard Exp $
 # MiniUPnP project
 # (c) 2006-2012 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -39,6 +39,7 @@ CP = cp
 INSTALLPREFIX ?= $(PREFIX)/usr
 SBININSTALLDIR = $(INSTALLPREFIX)/sbin
 ETCINSTALLDIR = $(PREFIX)/etc/miniupnpd
+MANINSTALLDIR = $(INSTALLPREFIX)/share/man/man8
 
 BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o portinuse.o \
@@ -134,7 +135,10 @@ clean:
 	$(RM) testgetroute.o
 	$(RM) miniupnpdctl.o
 
-install:	miniupnpd genuuid
+install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
+	netfilter/iptables_init.sh netfilter/iptables_removeall.sh \
+	netfilter/ip6tables_init.sh netfilter/ip6tables_removeall.sh \
+	linux/miniupnpd.init.d.script
 	$(STRIP) miniupnpd
 	$(INSTALL) -d $(SBININSTALLDIR)
 	$(INSTALL) miniupnpd $(SBININSTALLDIR)
@@ -146,6 +150,8 @@ install:	miniupnpd genuuid
 	$(INSTALL) --mode=0644 -b miniupnpd.conf $(ETCINSTALLDIR)
 	$(INSTALL) -d $(PREFIX)/etc/init.d
 	$(INSTALL) linux/miniupnpd.init.d.script $(PREFIX)/etc/init.d/miniupnpd
+	$(INSTALL) miniupnpd.8 $(MANINSTALLDIR)
+	gzip $(MANINSTALLDIR)/miniupnpd.8
 
 # genuuid is using the uuidgen CLI tool which is part of libuuid
 # from the e2fsprogs

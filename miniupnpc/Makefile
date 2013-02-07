@@ -19,6 +19,12 @@ endif
 ifeq ($(OS), Linux)
 JARSUFFIX=linux
 endif
+ifneq (,$(findstring NT-5.1,$(OS)))
+JARSUFFIX=win32
+endif
+
+HAVE_IPV6 ?= yes
+export HAVE_IPV6
 
 CC ?= gcc
 #AR = gar
@@ -48,7 +54,7 @@ SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
 	   minixmlvalid.c testupnpreplyparse.c minissdpc.c \
 	   upnperrors.c testigddescparse.c testminiwget.c \
-       connecthostport.c portlistringparse.c receivedata.c
+       connecthostport.c portlistingparse.c receivedata.c
 
 LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
@@ -74,8 +80,13 @@ ifeq ($(OS), Darwin)
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
   CFLAGS := -DMACOSX -D_DARWIN_C_SOURCE $(CFLAGS)
 else
+ifeq ($(OS), Linux)
   SHAREDLIBRARY = libminiupnpc.so
   SONAME = $(SHAREDLIBRARY).$(APIVERSION)
+endif
+ifeq ($(JARSUFFIX), win32)
+  SHAREDLIBRARY = miniupnpc.dll
+endif
 endif
 
 EXECUTABLES = upnpc-static
@@ -99,10 +110,11 @@ TESTMINIWGETOBJS := $(TESTMINIWGETOBJS) minissdpc.o
 TESTIGDDESCPARSE := $(TESTIGDDESCPARSE) minissdpc.o
 endif
 
+LIBDIR ?= lib
 # install directories
 INSTALLPREFIX ?= $(PREFIX)/usr
 INSTALLDIRINC = $(INSTALLPREFIX)/include/miniupnpc
-INSTALLDIRLIB = $(INSTALLPREFIX)/lib
+INSTALLDIRLIB = $(INSTALLPREFIX)/$(LIBDIR)
 INSTALLDIRBIN = $(INSTALLPREFIX)/bin
 INSTALLDIRMAN = $(INSTALLPREFIX)/share/man
 
@@ -131,6 +143,13 @@ pythonmodule:	$(LIBRARY) miniupnpcmodule.c setup.py
 installpythonmodule:	pythonmodule
 	python setup.py install
 
+pythonmodule3:	$(LIBRARY) miniupnpcmodule.c setup.py
+	python3 setup.py build
+	touch $@
+
+installpythonmodule3:	pythonmodule3
+	python3 setup.py install
+
 validateminixml:	minixmlvalid
 	@echo "minixml validation test"
 	./minixmlvalid
@@ -144,11 +163,14 @@ validateminiwget:	testminiwget minihttptestserver testminiwget.sh
 clean:
 	$(RM) $(LIBRARY) $(SHAREDLIBRARY) $(EXECUTABLES) $(OBJS) miniupnpcstrings.h
 	# clean python stuff
-	$(RM) pythonmodule validateminixml validateminiwget
+	$(RM) pythonmodule pythonmodule3 validateminixml validateminiwget
 	$(RM) -r build/ dist/
 	#python setup.py clean
 	# clean jnaerator stuff
 	$(RM) _jnaerator.* java/miniupnpc_$(OS).jar
+
+distclean: clean
+	$(RM) $(JNAERATOR) java/*.jar java/*.class out.errors.txt
 
 updateversion:	miniupnpc.h
 	cp miniupnpc.h miniupnpc.h.bak

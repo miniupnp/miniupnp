@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __MACROS_H__
-#define __MACROS_H__
+#ifndef MACROS_H_INCLUDED
+#define MACROS_H_INCLUDED
 
 #define UNUSED(arg)	(void)(arg)
 

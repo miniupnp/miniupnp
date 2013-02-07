@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.69 2012/05/31 09:32:39 nanard Exp $
+# $Id: Makefile,v 1.73 2013/02/06 13:11:45 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -81,24 +81,27 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           options.o upnppermissions.o minissdp.o natpmp.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnppinhole.o
-BSDOBJS = bsd/getifstats.o bsd/ifacewatcher.o
-SUNOSOBJS = solaris/getifstats.o bsd/ifacewatcher.o
-MACOBJS = mac/getifstats.o bsd/ifacewatcher.o
+BSDOBJS = bsd/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
+SUNOSOBJS = solaris/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
+MACOBJS = mac/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
 PFOBJS = pf/obsdrdr.o pf/pfpinhole.o
 IPFOBJS = ipf/ipfrdr.o
-IPFWOBJS = ipfw/ipfwrdr.o
+IPFWOBJS = ipfw/ipfwrdr.o ipfw/ipfwaux.o
 MISCOBJS = upnpreplyparse.o minixml.o
 
 ALLOBJS = $(STDOBJS) $(MISCOBJS)
 .if $(OSNAME) == "SunOS"
 ALLOBJS += $(SUNOSOBJS)
 TESTGETIFSTATSOBJS = testgetifstats.o solaris/getifstats.o
+TESTGETROUTEOBJS = testgetroute.o upnputils.o bsd/getroute.o
 .elif $(OSNAME) == "Darwin"
 ALLOBJS += $(MACOBJS)
 TESTGETIFSTATSOBJS = testgetifstats.o mac/getifstats.o
+TESTGETROUTEOBJS = testgetroute.o upnputils.o bsd/getroute.o
 .else
 ALLOBJS += $(BSDOBJS)
 TESTGETIFSTATSOBJS = testgetifstats.o bsd/getifstats.o
+TESTGETROUTEOBJS = testgetroute.o upnputils.o bsd/getroute.o
 .endif
 
 .if $(FWNAME) == "pf"
@@ -116,7 +119,7 @@ MINIUPNPDCTLOBJS = miniupnpdctl.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
-              testgetifaddr
+              testgetifaddr testgetroute
 .if $(OSNAME) == "Darwin"
 LIBS =
 .else
@@ -139,7 +142,7 @@ clean:
 	$(RM) $(STDOBJS) $(BSDOBJS) $(SUNOSOBJS) $(MACOBJS) $(EXECUTABLES) \
 	testupnpdescgen.o \
 	$(MISCOBJS) config.h testgetifstats.o testupnppermissions.o \
-	miniupnpdctl.o testgetifaddr.o \
+	miniupnpdctl.o testgetifaddr.o testgetroute.o \
 	$(PFOBJS) $(IPFOBJS) $(IPFWOBJS)
 
 install:	miniupnpd genuuid
@@ -150,7 +153,7 @@ install:	miniupnpd genuuid
 	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)
 	# TODO : install man page correctly
 #	$(INSTALL) -d $(INSTALLMANDIR)
-#	$(INSTALL) miniupnpd.1 $(INSTALLMANDIR)/cat1/miniupnpd.0
+#	$(INSTALL) miniupnpd.8 $(INSTALLMANDIR)/cat8/miniupnpd.0
 
 # genuuid is using the uuid cli tool available under OpenBSD 4.0 in
 # the uuid-1.5.0 package
@@ -169,7 +172,8 @@ genuuid:
 
 depend:	config.h
 	mkdep $(ALLOBJS:.o=.c) testupnpdescgen.c testgetifstats.c \
-    testupnppermissions.c miniupnpdctl.c testgetifaddr.c
+    testupnppermissions.c miniupnpdctl.c testgetifaddr.c \
+	testgetroute.c
 
 miniupnpd: config.h $(ALLOBJS)
 	$(CC) $(CFLAGS) -o $@ $(ALLOBJS) $(LIBS)
@@ -191,6 +195,9 @@ testgetifaddr:	config.h $(TESTGETIFADDROBJS)
 
 testupnppermissions:	config.h $(TESTUPNPPERMISSIONSOBJS)
 	$(CC) $(CFLAGS) -o $@ $(TESTUPNPPERMISSIONSOBJS)
+
+testgetroute:	config.h $(TESTGETROUTEOBJS)
+	$(CC) $(CFLAGS) -o $@ $(TESTGETROUTEOBJS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^

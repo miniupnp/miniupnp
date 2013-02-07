@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.108 2012/06/28 18:52:12 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.111 2012/10/09 17:53:14 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -17,7 +17,7 @@
 #endif
 #endif
 
-#if !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(MACOSX) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun)
+#if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(MACOSX) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun)
 #define HAS_IP_MREQN
 #endif
 
@@ -31,6 +31,7 @@
 #include <io.h>
 #include <iphlpapi.h>
 #define snprintf _snprintf
+#define strdup _strdup
 #ifndef strncasecmp
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
 #define strncasecmp _memicmp
@@ -739,15 +740,24 @@ GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
 {
 	char * p;
 	int n1, n2, n3, n4;
+#ifdef IF_NAMESIZE
 	char ifname[IF_NAMESIZE];
+#else
+	char scope_str[8];
+#endif
 
 	n1 = strlen(data->urlbase);
 	if(n1==0)
 		n1 = strlen(descURL);
 	if(scope_id != 0) {
+#ifdef IF_NAMESIZE
 		if(if_indextoname(scope_id, ifname)) {
 			n1 += 3 + strlen(ifname);	/* 3 == strlen(%25) */
 		}
+#else
+	/* under windows, scope is numerical */
+	snprintf(scope_str, sizeof(scope_str), "%u", scope_id);
+#endif
 	}
 	n1 += 2;	/* 1 byte more for Null terminator, 1 byte for '/' if needed */
 	n2 = n1; n3 = n1; n4 = n1;
@@ -778,9 +788,15 @@ GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
 			p = strchr(urls->ipcondescURL, ']');
 			if(p) {
 				/* insert %25<scope> into URL */
+#ifdef IF_NAMESIZE
 				memmove(p + 3 + strlen(ifname), p, strlen(p) + 1);
 				memcpy(p, "%25", 3);
 				memcpy(p + 3, ifname, strlen(ifname));
+#else
+				memmove(p + 3 + strlen(scope_str), p, strlen(p) + 1);
+				memcpy(p, "%25", 3);
+				memcpy(p + 3, scope_str, strlen(scope_str));
+#endif
 			}
 		}
 	}
@@ -947,7 +963,14 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	}
 	state = 0;
 free_and_return:
-	free(desc);
+	if(desc) {
+		for(i = 0; i < ndev; i++) {
+			if(desc[i].xml) {
+				free(desc[i].xml);
+			}
+		}
+		free(desc);
+	}
 	return state;
 }
 

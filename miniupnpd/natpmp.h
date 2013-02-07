@@ -3,8 +3,8 @@
  * author : Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  */
-#ifndef __NATPMP_H__
-#define __NATPMP_H__
+#ifndef NATPMP_H_INCLUDED
+#define NATPMP_H_INCLUDED
 
 /* The NAT-PMP specification which can be found at the url :
  * http://files.dns-sd.org/draft-cheshire-nat-pmp.txt

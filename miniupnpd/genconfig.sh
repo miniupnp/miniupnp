@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.58 2012/06/29 19:29:55 nanard Exp $
+# $Id: genconfig.sh,v 1.61 2012/10/03 21:07:29 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2012 Thomas Bernard
@@ -30,7 +30,7 @@ done
 
 RM="rm -f"
 CONFIGFILE="config.h"
-CONFIGMACRO="__CONFIG_H__"
+CONFIGMACRO="CONFIG_H_INCLUDED"
 
 # version reported in XML descriptions
 #UPNP_VERSION=20070827
@@ -407,6 +407,14 @@ if [ -n "$STRICT" ] ; then
 	echo "#define UPNP_STRICT" >> ${CONFIGFILE}
 else
 	echo "/*#define UPNP_STRICT*/" >> ${CONFIGFILE}
+fi
+echo "" >> ${CONFIGFILE}
+
+echo "/* Add the optional Date: header in all HTTP responses */" >> ${CONFIGFILE}
+if [ -n "$STRICT" ] ; then
+	echo "#define ENABLE_HTTP_DATE" >> ${CONFIGFILE}
+else
+	echo "/*#define ENABLE_HTTP_DATE*/" >> ${CONFIGFILE}
 fi
 echo "" >> ${CONFIGFILE}
 

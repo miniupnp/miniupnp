@@ -1,7 +1,7 @@
-/* $Id: upnpc.c,v 1.97 2012/06/23 23:16:00 nanard Exp $ */
+/* $Id: upnpc.c,v 1.99 2013/02/06 12:56:41 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2012 Thomas Bernard
+ * Copyright (c) 2005-2013 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -228,7 +228,8 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 							   const char * iport,
 							   const char * eport,
                                const char * proto,
-                               const char * leaseDuration)
+                               const char * leaseDuration,
+                               const char * description)
 {
 	char externalIPAddress[40];
 	char intClient[40];
@@ -257,7 +258,8 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 		printf("GetExternalIPAddress failed.\n");
 
 	r = UPNP_AddPortMapping(urls->controlURL, data->first.servicetype,
-	                        eport, iport, iaddr, 0, proto, 0, leaseDuration);
+	                        eport, iport, iaddr, description,
+	                        proto, 0, leaseDuration);
 	if(r!=UPNPCOMMAND_SUCCESS)
 		printf("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n",
 		       eport, iport, iaddr, r, strupnperror(r));
@@ -487,6 +489,7 @@ int main(int argc, char ** argv)
 	int retcode = 0;
 	int error = 0;
 	int ipv6 = 0;
+	const char * description = 0;
 
 #ifdef _WIN32
 	WSADATA wsaData;
@@ -497,7 +500,7 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 #endif
-    printf("upnpc : miniupnpc library test client. (c) 2006-2012 Thomas Bernard\n");
+    printf("upnpc : miniupnpc library test client. (c) 2005-2013 Thomas Bernard\n");
     printf("Go to http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/\n"
 	       "for more information.\n");
 	/* command line processing */
@@ -513,6 +516,8 @@ int main(int argc, char ** argv)
 				minissdpdpath = argv[++i];
 			else if(argv[i][1] == '6')
 				ipv6 = 1;
+			else if(argv[i][1] == 'e')
+				description = argv[++i];
 			else
 			{
 				command = argv[i][1];
@@ -551,6 +556,7 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "       \t%s [options] -P\n\t\tGet Presentation url\n", argv[0]);
 		fprintf(stderr, "\nprotocol is UDP or TCP\n");
 		fprintf(stderr, "Options:\n");
+		fprintf(stderr, "  -e description : set description for port mapping.\n");
 		fprintf(stderr, "  -6 : use ip v6 instead of ip v4.\n");
 		fprintf(stderr, "  -u url : bypass discovery process by providing the XML root description url.\n");
 		fprintf(stderr, "  -m address/interface : provide ip address (ip v4) or interface name (ip v4 or v6) to use for sending SSDP multicast packets.\n");
@@ -622,7 +628,8 @@ int main(int argc, char ** argv)
 				SetRedirectAndTest(&urls, &data,
 				                   commandargv[0], commandargv[1],
 				                   commandargv[2], commandargv[3],
-				                   (commandargc > 4)?commandargv[4]:"0");
+				                   (commandargc > 4)?commandargv[4]:"0",
+				                   description);
 				break;
 			case 'd':
 				for(i=0; i<commandargc; i+=2)
@@ -639,7 +646,8 @@ int main(int argc, char ** argv)
 					/*printf("port %s protocol %s\n", argv[i], argv[i+1]);*/
 					SetRedirectAndTest(&urls, &data,
 					                   lanaddr, commandargv[i],
-									   commandargv[i], commandargv[i+1], "0");
+									   commandargv[i], commandargv[i+1], "0",
+					                   description);
 				}
 				break;
 			case 'A':

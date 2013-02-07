@@ -1,7 +1,7 @@
-/* $Id: miniupnpd.c,v 1.164 2012/06/29 19:33:37 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.173 2013/02/06 10:50:04 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -384,12 +384,13 @@ write_ctlsockets_list(int fd, struct ctlelem * e)
 	}
 }
 
+#ifndef DISABLE_CONFIG_FILE
 static void
 write_option_list(int fd)
 {
 	char buffer[256];
 	int len;
-	int i;
+	unsigned int i;
 	write(fd, "Options :\n", 10);
 	for(i=0; i<num_options; i++)
 	{
@@ -399,6 +400,7 @@ write_option_list(int fd)
 		write(fd, buffer, len);
 	}
 }
+#endif
 
 static void
 write_command_line(int fd, int argc, char * * argv)
@@ -864,6 +866,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
+		case 'z':
+			if(i+1 < argc)
+				strncpy(friendly_name, argv[++i], FRIENDLY_NAME_MAX_LEN);
+			else
+				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
+			break;
 		case 's':
 			if(i+1 < argc)
 				strncpy(serialnumber, argv[++i], SERIALNUMBER_MAX_LEN);
@@ -1041,6 +1050,23 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes two arguments.\n", argv[i][1]);
 #endif
 			break;
+		case 'A':
+			if(i+1 < argc) {
+				void * tmp;
+				tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
+				if(tmp == NULL) {
+					fprintf(stderr, "memory allocation error for permission\n");
+				} else {
+					upnppermlist = tmp;
+					if(read_permission_line(upnppermlist + num_upnpperm, argv[++i]) >= 0) {
+						num_upnpperm++;
+					} else {
+						fprintf(stderr, "Permission rule parsing error :\n%s\n", argv[i]);
+					}
+				}
+			} else
+				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			break;
 		case 'f':
 			i++;	/* discarding, the config file is already read */
 			break;
@@ -1174,7 +1200,7 @@ print_usage:
 			"\n"
 			/*"[-l logfile] " not functionnal */
 			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
-			"\t\t[-t notify_interval] [-P pid_filename]\n"
+			"\t\t[-t notify_interval] [-P pid_filename] [-z fiendly_name]\n"
 			"\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
 #ifdef USE_PF
                         "\t\t[-q queue] [-T tag]\n"
@@ -1182,6 +1208,7 @@ print_usage:
 #ifdef ENABLE_NFQUEUE
                         "\t\t[-Q queue] [-n name]\n"
 #endif
+			"\t\t[-A \"permission rule\"]\n"
 	        "\nNotes:\n\tThere can be one or several listening_ips.\n"
 	        "\tNotify interval is in seconds. Default is 30 seconds.\n"
 			"\tDefault pid file is '%s'.\n"
@@ -1203,9 +1230,14 @@ print_usage:
 			"\t-T sets the tag name in pf.\n"
 #endif
 #ifdef ENABLE_NFQUEUE
-                        "\t-Q sets the queue number that is used by NFQUEUE.\n"
-                        "\t-n sets the name of the interface(s) that packets will arrive on.\n"
+			"\t-Q sets the queue number that is used by NFQUEUE.\n"
+			"\t-n sets the name of the interface(s) that packets will arrive on.\n"
 #endif
+			"\t-A use following syntax for permission rules :\n"
+			"\t  (allow|deny) (external port range) ip/mask (internal port range)\n"
+			"\texamples :\n"
+			"\t  \"allow 1024-65535 192.168.1.0/24 1024-65535\"\n"
+			"\t  \"deny 0-65535 0.0.0.0/0 0-65535\"\n"
 			"\t-h prints this help and quits.\n"
 	        "", argv[0], pidfilename, DEFAULT_CONFIG);
 	return 1;
@@ -1292,6 +1324,15 @@ main(int argc, char * * argv)
 		return 0;
 	}
 
+	syslog(LOG_INFO, "Starting%s%swith external interface %s",
+#ifdef ENABLE_NATPMP
+	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP " : " ",
+#else
+	       " ",
+#endif
+	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
+	       ext_if_name);
+
 	if(GETFLAG(ENABLEUPNPMASK))
 	{
 
@@ -1326,7 +1367,7 @@ main(int argc, char * * argv)
 		sudp = OpenAndConfSSDPReceiveSocket(0);
 		if(sudp < 0)
 		{
-			syslog(LOG_INFO, "Failed to open socket for receiving SSDP. Trying to use MiniSSDPd");
+			syslog(LOG_NOTICE, "Failed to open socket for receiving SSDP. Trying to use MiniSSDPd");
 			if(SubmitServicesToMiniSSDPD(lan_addrs.lh_first->str, v.port) < 0) {
 				syslog(LOG_ERR, "Failed to connect to MiniSSDPd. EXITING");
 				return 1;
@@ -1336,7 +1377,7 @@ main(int argc, char * * argv)
 		sudpv6 = OpenAndConfSSDPReceiveSocket(1);
 		if(sudpv6 < 0)
 		{
-			syslog(LOG_INFO, "Failed to open socket for receiving SSDP (IP v6).");
+			syslog(LOG_WARNING, "Failed to open socket for receiving SSDP (IP v6).");
 		}
 #endif
 
@@ -1627,7 +1668,9 @@ main(int argc, char * * argv)
 				{
 					/*write(ectl->socket, buf, l);*/
 					write_command_line(ectl->socket, argc, argv);
+#ifndef DISABLE_CONFIG_FILE
 					write_option_list(ectl->socket);
+#endif
 					write_permlist(ectl->socket, upnppermlist, num_upnpperm);
 					write_upnphttp_details(ectl->socket, upnphttphead.lh_first);
 					write_ctlsockets_list(ectl->socket, ctllisthead.lh_first);
@@ -1658,13 +1701,21 @@ main(int argc, char * * argv)
 			struct sockaddr_un clientname;
 			struct ctlelem * tmp;
 			socklen_t clientnamelen = sizeof(struct sockaddr_un);
-			//syslog(LOG_DEBUG, "sctl!");
+			/*syslog(LOG_DEBUG, "sctl!");*/
 			s = accept(sctl, (struct sockaddr *)&clientname,
 			           &clientnamelen);
 			syslog(LOG_DEBUG, "sctl! : '%s'", clientname.sun_path);
 			tmp = malloc(sizeof(struct ctlelem));
-			tmp->socket = s;
-			LIST_INSERT_HEAD(&ctllisthead, tmp, entries);
+			if (tmp == NULL)
+			{
+				syslog(LOG_ERR, "Unable to allocate memory for ctlelem in main()");
+				close(s);
+			}
+			else
+			{
+				tmp->socket = s;
+				LIST_INSERT_HEAD(&ctllisthead, tmp, entries);
+			}
 		}
 #endif
 #ifdef ENABLE_EVENTS
@@ -1738,42 +1789,53 @@ main(int argc, char * * argv)
 
 				sockaddr_to_string((struct sockaddr *)&clientname, addr_str, sizeof(addr_str));
 				syslog(LOG_INFO, "HTTP connection from %s", addr_str);
-				/* Create a new upnphttp object and add it to
-				 * the active upnphttp object list */
-				tmp = New_upnphttp(shttp);
-				if(tmp)
+				if(get_lan_for_peer((struct sockaddr *)&clientname) == NULL)
 				{
-#ifdef ENABLE_IPV6
-					if(clientname.ss_family == AF_INET)
-					{
-						tmp->clientaddr = ((struct sockaddr_in *)&clientname)->sin_addr;
-					}
-					else if(clientname.ss_family == AF_INET6)
-					{
-						struct sockaddr_in6 * addr = (struct sockaddr_in6 *)&clientname;
-						if(IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr))
-						{
-							memcpy(&tmp->clientaddr,
-							       &addr->sin6_addr.s6_addr[12],
-							       4);
-						}
-						else
-						{
-							tmp->ipv6 = 1;
-							memcpy(&tmp->clientaddr_v6,
-							       &addr->sin6_addr,
-							       sizeof(struct in6_addr));
-						}
-					}
-#else
-					tmp->clientaddr = clientname.sin_addr;
-#endif
-					LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
+					/* The peer is not a LAN ! */
+					syslog(LOG_WARNING,
+					       "HTTP peer %s is not from a LAN, closing the connection",
+					       addr_str);
+					close(shttp);
 				}
 				else
 				{
-					syslog(LOG_ERR, "New_upnphttp() failed");
-					close(shttp);
+					/* Create a new upnphttp object and add it to
+					 * the active upnphttp object list */
+					tmp = New_upnphttp(shttp);
+					if(tmp)
+					{
+#ifdef ENABLE_IPV6
+						if(clientname.ss_family == AF_INET)
+						{
+							tmp->clientaddr = ((struct sockaddr_in *)&clientname)->sin_addr;
+						}
+						else if(clientname.ss_family == AF_INET6)
+						{
+							struct sockaddr_in6 * addr = (struct sockaddr_in6 *)&clientname;
+							if(IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr))
+							{
+								memcpy(&tmp->clientaddr,
+								       &addr->sin6_addr.s6_addr[12],
+								       4);
+							}
+							else
+							{
+								tmp->ipv6 = 1;
+								memcpy(&tmp->clientaddr_v6,
+								       &addr->sin6_addr,
+								       sizeof(struct in6_addr));
+							}
+						}
+#else
+						tmp->clientaddr = clientname.sin_addr;
+#endif
+						LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
+					}
+					else
+					{
+						syslog(LOG_ERR, "New_upnphttp() failed");
+						close(shttp);
+					}
 				}
 			}
 		}

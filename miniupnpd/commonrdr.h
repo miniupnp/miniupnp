@@ -4,8 +4,8 @@
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
-#ifndef __COMMONRDR_H__
-#define __COMMONRDR_H__
+#ifndef COMMONRDR_H_INCLUDED
+#define COMMONRDR_H_INCLUDED
 
 #include "config.h"
 

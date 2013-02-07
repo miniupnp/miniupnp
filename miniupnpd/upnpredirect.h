@@ -5,8 +5,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-#ifndef __UPNPREDIRECT_H__
-#define __UPNPREDIRECT_H__
+#ifndef UPNPREDIRECT_H_INCLUDED
+#define UPNPREDIRECT_H_INCLUDED
 
 /* for u_int64_t */
 #include <sys/types.h>
