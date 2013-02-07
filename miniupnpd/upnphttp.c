@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.85 2013/01/29 21:52:43 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.86 2013/02/07 10:26:07 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -773,6 +773,7 @@ static const char httpresphead[] =
 	"Connection: close\r\n"
 	"Content-Length: %d\r\n"
 	"Server: " MINIUPNPD_SERVER_STRING "\r\n"
+	"Ext:\r\n"
 	;	/*"\r\n";*/
 /*
 		"<?xml version=\"1.0\"?>\n"

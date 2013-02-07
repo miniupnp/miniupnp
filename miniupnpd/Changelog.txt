@@ -1,9 +1,10 @@
-$Id: Changelog.txt,v 1.328 2013/02/06 23:37:27 nanard Exp $
+$Id: Changelog.txt,v 1.329 2013/02/07 10:21:34 nanard Exp $
 
 2013/02/07:
   Add DATE: header in SSDP packets
   Fix SSDP packets sent with uuid as ST: header to conform to UDA
   ignore SSDP packets missing the MX: header in UPNP_STRICT mode
+  Added Ext: header to HTTP responses to conform to UDA
 
 VERSION 1.8 : released on 2013/02/06
 
