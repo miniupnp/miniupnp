@@ -1,6 +1,6 @@
 # $Id: Makefile.linux,v 1.76 2013/02/07 15:56:10 nanard Exp $
 # MiniUPnP project
-# (c) 2006-2012 Thomas Bernard
+# (c) 2006-2013 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author : Thomas Bernard
 # for use with GNU Make
@@ -9,11 +9,12 @@
 # $ CONFIG_OPTIONS="--ipv6 --igd2" make -f Makefile.linux
 #
 # To install use :
-# $ PREFIX=/dummyinstalldir make -f Makefile.linux install
+# $ DESTDIR=/dummyinstalldir make -f Makefile.linux install
 # or :
 # $ INSTALLPREFIX=/usr/local make -f Makefile.linux install
 # or :
 # $ make -f Makefile.linux install
+# (default INSTALLPREFIX is /usr)
 #
 # if your system hasn't iptables libiptc headers and binary correctly
 # installed, you need to get iptables sources from http://netfilter.org/
@@ -140,18 +141,19 @@ install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
 	netfilter/ip6tables_init.sh netfilter/ip6tables_removeall.sh \
 	linux/miniupnpd.init.d.script
 	$(STRIP) miniupnpd
-	$(INSTALL) -d $(SBININSTALLDIR)
-	$(INSTALL) miniupnpd $(SBININSTALLDIR)
-	$(INSTALL) -d $(ETCINSTALLDIR)
-	$(INSTALL) netfilter/iptables_init.sh $(ETCINSTALLDIR)
-	$(INSTALL) netfilter/iptables_removeall.sh $(ETCINSTALLDIR)
-	$(INSTALL) netfilter/ip6tables_init.sh $(ETCINSTALLDIR)
-	$(INSTALL) netfilter/ip6tables_removeall.sh $(ETCINSTALLDIR)
-	$(INSTALL) --mode=0644 -b miniupnpd.conf $(ETCINSTALLDIR)
-	$(INSTALL) -d $(PREFIX)/etc/init.d
-	$(INSTALL) linux/miniupnpd.init.d.script $(PREFIX)/etc/init.d/miniupnpd
-	$(INSTALL) miniupnpd.8 $(MANINSTALLDIR)
-	gzip $(MANINSTALLDIR)/miniupnpd.8
+	$(INSTALL) -d $(DESTDIR)$(SBININSTALLDIR)
+	$(INSTALL) miniupnpd $(DESTDIR)$(SBININSTALLDIR)
+	$(INSTALL) -d $(DESTDIR)$(ETCINSTALLDIR)
+	$(INSTALL) netfilter/iptables_init.sh $(DESTDIR)$(ETCINSTALLDIR)
+	$(INSTALL) netfilter/iptables_removeall.sh $(DESTDIR)$(ETCINSTALLDIR)
+	$(INSTALL) netfilter/ip6tables_init.sh $(DESTDIR)$(ETCINSTALLDIR)
+	$(INSTALL) netfilter/ip6tables_removeall.sh $(DESTDIR)$(ETCINSTALLDIR)
+	$(INSTALL) --mode=0644 -b miniupnpd.conf $(DESTDIR)$(ETCINSTALLDIR)
+	$(INSTALL) -d $(DESTDIR)$(PREFIX)/etc/init.d
+	$(INSTALL) linux/miniupnpd.init.d.script $(DESTDIR)$(PREFIX)/etc/init.d/miniupnpd
+	$(INSTALL) -d $(DESTDIR)$(MANINSTALLDIR)
+	$(INSTALL) --mode=0644 miniupnpd.8 $(DESTDIR)$(MANINSTALLDIR)
+	gzip $(DESTDIR)$(MANINSTALLDIR)/miniupnpd.8
 
 # genuuid is using the uuidgen CLI tool which is part of libuuid
 # from the e2fsprogs

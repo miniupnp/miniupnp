@@ -3,13 +3,13 @@
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2012 Thomas Bernard
+# (c) 2005-2013 Thomas Bernard
 # to install use :
-# $ PREFIX=/tmp/dummylocation make install
+# $ make DESTDIR=/tmp/dummylocation install
 # or
 # $ INSTALLPREFIX=/usr/local make install
 # or
-# make install (will go to /usr/bin, /usr/lib, etc...)
+# $ make install (default INSTALLPREFIX is /usr)
 OS = $(shell uname -s)
 VERSION = $(shell cat VERSION)
 
@@ -177,31 +177,34 @@ updateversion:	miniupnpc.h
 	sed 's/\(.*MINIUPNPC_API_VERSION\s\+\)[0-9]\+/\1$(APIVERSION)/' < miniupnpc.h.bak > miniupnpc.h
 
 install:	updateversion $(FILESTOINSTALL)
-	$(INSTALL) -d $(INSTALLDIRINC)
-	$(INSTALL) -m 644 $(HEADERS) $(INSTALLDIRINC)
-	$(INSTALL) -d $(INSTALLDIRLIB)
-	$(INSTALL) -m 644 $(LIBRARY) $(INSTALLDIRLIB)
+	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRINC)
+	$(INSTALL) -m 644 $(HEADERS) $(DESTDIR)$(INSTALLDIRINC)
+	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRLIB)
+	$(INSTALL) -m 644 $(LIBRARY) $(DESTDIR)$(INSTALLDIRLIB)
 ifneq ($(OS), AmigaOS)
-	$(INSTALL) -m 644 $(SHAREDLIBRARY) $(INSTALLDIRLIB)/$(SONAME)
-	ln -fs $(SONAME) $(INSTALLDIRLIB)/$(SHAREDLIBRARY)
+	$(INSTALL) -m 644 $(SHAREDLIBRARY) $(DESTDIR)$(INSTALLDIRLIB)/$(SONAME)
+	ln -fs $(SONAME) $(DESTDIR)$(INSTALLDIRLIB)/$(SHAREDLIBRARY)
 endif
-	$(INSTALL) -d $(INSTALLDIRBIN)
+	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRBIN)
 ifeq ($(OS), AmigaOS)
-	$(INSTALL) -m 755 upnpc-static $(INSTALLDIRBIN)/upnpc
+	$(INSTALL) -m 755 upnpc-static $(DESTDIR)$(INSTALLDIRBIN)/upnpc
 else
-	$(INSTALL) -m 755 upnpc-shared $(INSTALLDIRBIN)/upnpc
+	$(INSTALL) -m 755 upnpc-shared $(DESTDIR)$(INSTALLDIRBIN)/upnpc
 endif
-	$(INSTALL) -m 755 external-ip.sh $(INSTALLDIRBIN)/external-ip
+	$(INSTALL) -m 755 external-ip.sh $(DESTDIR)$(INSTALLDIRBIN)/external-ip
 ifneq ($(OS), AmigaOS)
-	$(INSTALL) -d $(INSTALLDIRMAN)/man3
-	$(INSTALL) man3/miniupnpc.3 $(INSTALLDIRMAN)/man3/miniupnpc.3
+	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRMAN)/man3
+	$(INSTALL) man3/miniupnpc.3 $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
+ifeq ($(OS), Linux)
+	gzip $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
+endif
 endif
 
 
 cleaninstall:
-	$(RM) -r $(INSTALLDIRINC)
-	$(RM) $(INSTALLDIRLIB)/$(LIBRARY)
-	$(RM) $(INSTALLDIRLIB)/$(SHAREDLIBRARY)
+	$(RM) -r $(DESTDIR)$(INSTALLDIRINC)
+	$(RM) $(DESTDIR)$(INSTALLDIRLIB)/$(LIBRARY)
+	$(RM) $(DESTDIR)$(INSTALLDIRLIB)/$(SHAREDLIBRARY)
 
 depend:
 	makedepend -Y -- $(CFLAGS) -- $(SRCS) 2>/dev/null
