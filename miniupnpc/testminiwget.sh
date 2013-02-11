@@ -39,6 +39,7 @@ esac
 
 # launching the test HTTP server
 ./minihttptestserver $SERVERARGS -e $EXPECTEDFILE > $HTTPSERVEROUT &
+SERVERPID=$!
 while [ -z "$PORT" ]; do
 	sleep 1
 	PORT=`cat $HTTPSERVEROUT | sed 's/Listening on port \([0-9]*\)/\1/' `
@@ -77,8 +78,8 @@ else
 fi
 
 # kill the test HTTP server
-kill %1
-wait %1
+kill $SERVERPID
+wait $SERVERPID
 
 # remove temporary files (for success cases)
 if [ $RET -eq 0 ]; then
