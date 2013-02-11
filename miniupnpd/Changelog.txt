@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.330 2013/02/07 12:22:23 nanard Exp $
+$Id: Changelog.txt,v 1.331 2013/02/11 10:37:06 nanard Exp $
+
+2013/02/11:
+  Use $(DESTDIR) in Makefile.linux.
+  see https://github.com/miniupnp/miniupnp/issues/26
 
 2013/02/07:
   Add DATE: header in SSDP packets

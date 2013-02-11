@@ -1,5 +1,11 @@
-$Id: Changelog.txt,v 1.180 2012/10/16 16:49:39 nanard Exp $
+$Id: Changelog.txt,v 1.181 2013/02/11 10:31:17 nanard Exp $
 miniUPnP client Changelog.
+
+2013/02/11:
+  Fix testminiwget.sh for use with dash
+  Use $(DESTDIR) in Makefile
+
+VERSION 1.8 : released 2013/02/06
 
 2012/10/16:
   fix testminiwget with no IPv6 support
