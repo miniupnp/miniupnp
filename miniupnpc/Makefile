@@ -54,7 +54,8 @@ SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
 	   minixmlvalid.c testupnpreplyparse.c minissdpc.c \
 	   upnperrors.c testigddescparse.c testminiwget.c \
-       connecthostport.c portlistingparse.c receivedata.c
+       connecthostport.c portlistingparse.c receivedata.c \
+       listdevices.c
 
 LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
@@ -89,7 +90,7 @@ ifeq ($(JARSUFFIX), win32)
 endif
 endif
 
-EXECUTABLES = upnpc-static
+EXECUTABLES = upnpc-static listdevices
 EXECUTABLES_ADDTESTS = testminixml minixmlvalid testupnpreplyparse \
 			  testigddescparse testminiwget
 
@@ -224,6 +225,9 @@ upnpc-static:	upnpc.o $(LIBRARY) $(LDLIBS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 upnpc-shared:	upnpc.o $(SHAREDLIBRARY) $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+listdevices:	listdevices.o $(LIBRARY) $(LDLIBS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 testminixml:	$(TESTMINIXMLOBJS)
