@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2012 Thomas Bernard
+ * copyright (c) 2005-2013 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #define __EXTENSIONS__ 1
@@ -342,10 +342,13 @@ upnpDiscover(int delay, const char * multicastif,
 		"urn:schemas-upnp-org:device:InternetGatewayDevice:2",
 		"urn:schemas-upnp-org:service:WANIPConnection:2",
 #endif
+#if 0
 		"urn:schemas-upnp-org:device:InternetGatewayDevice:1",
 		"urn:schemas-upnp-org:service:WANIPConnection:1",
 		"urn:schemas-upnp-org:service:WANPPPConnection:1",
+#endif
 		"upnp:rootdevice",
+		"ssdp:all",
 		0
 	};
 	int deviceIndex = 0;
@@ -627,19 +630,22 @@ upnpDiscover(int delay, const char * multicastif,
 #endif /* #ifdef NO_GETADDRINFO */
 	}
 	/* Waiting for SSDP REPLY packet to M-SEARCH */
+	do {
 	n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
 	if (n < 0) {
 		/* error */
 		if(error)
 			*error = UPNPDISCOVER_SOCKET_ERROR;
-		break;
+		goto error;
 	} else if (n == 0) {
 		/* no data or Time Out */
 		if (devlist) {
 			/* no more device type to look for... */
 			if(error)
 				*error = UPNPDISCOVER_SUCCESS;
-			break;
+#if 0
+			goto error;
+#endif
 		}
 		if(ipv6) {
 			if(linklocal) {
@@ -691,7 +697,9 @@ upnpDiscover(int delay, const char * multicastif,
 			devlist = tmp;
 		}
 	}
+	} while(n > 0);
 	}
+error:
 	closesocket(sudp);
 	return devlist;
 }
