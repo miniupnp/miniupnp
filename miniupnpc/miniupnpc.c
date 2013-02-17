@@ -321,10 +321,11 @@ parseMSEARCHReply(const char * reply, int size,
  * It is up to the caller to free the chained list
  * delay is in millisecond (poll) */
 LIBSPEC struct UPNPDev *
-upnpDiscover(int delay, const char * multicastif,
-             const char * minissdpdsock, int sameport,
-             int ipv6,
-             int * error)
+upnpDiscoverDevices(const char * const deviceTypes[],
+                    int delay, const char * multicastif,
+                    const char * minissdpdsock, int sameport,
+                    int ipv6,
+                    int * error)
 {
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = 0;
@@ -337,20 +338,6 @@ upnpDiscover(int delay, const char * multicastif,
 	"MAN: \"ssdp:discover\"\r\n"
 	"MX: %u\r\n"
 	"\r\n";
-	static const char * const deviceList[] = {
-#if 0
-		"urn:schemas-upnp-org:device:InternetGatewayDevice:2",
-		"urn:schemas-upnp-org:service:WANIPConnection:2",
-#endif
-#if 0
-		"urn:schemas-upnp-org:device:InternetGatewayDevice:1",
-		"urn:schemas-upnp-org:service:WANIPConnection:1",
-		"urn:schemas-upnp-org:service:WANPPPConnection:1",
-#endif
-		"upnp:rootdevice",
-		"ssdp:all",
-		0
-	};
 	int deviceIndex = 0;
 	char bufr[1536];	/* reception and emission buffer */
 	int sudp;
@@ -374,11 +361,11 @@ upnpDiscover(int delay, const char * multicastif,
 	/* first try to get infos from minissdpd ! */
 	if(!minissdpdsock)
 		minissdpdsock = "/var/run/minissdpd.sock";
-	while(!devlist && deviceList[deviceIndex]) {
-		devlist = getDevicesFromMiniSSDPD(deviceList[deviceIndex],
+	while(!devlist && deviceTypes[deviceIndex]) {
+		devlist = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
 		                                  minissdpdsock);
 		/* We return what we have found if it was not only a rootdevice */
-		if(devlist && !strstr(deviceList[deviceIndex], "rootdevice")) {
+		if(devlist && !strstr(deviceTypes[deviceIndex], "rootdevice")) {
 			if(error)
 				*error = UPNPDISCOVER_SUCCESS;
 			return devlist;
@@ -549,7 +536,7 @@ upnpDiscover(int delay, const char * multicastif,
 	/* Calculating maximum response time in seconds */
 	mx = ((unsigned int)delay) / 1000u;
 	/* receiving SSDP response packet */
-	for(n = 0; deviceList[deviceIndex]; deviceIndex++)
+	for(n = 0; deviceTypes[deviceIndex]; deviceIndex++)
 	{
 	if(n == 0)
 	{
@@ -559,7 +546,7 @@ upnpDiscover(int delay, const char * multicastif,
 		             ipv6 ?
 		             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
 		             : UPNP_MCAST_ADDR,
-		             deviceList[deviceIndex], mx);
+		             deviceTypes[deviceIndex], mx);
 #ifdef DEBUG
 		printf("Sending %s", bufr);
 #endif
@@ -702,6 +689,29 @@ upnpDiscover(int delay, const char * multicastif,
 error:
 	closesocket(sudp);
 	return devlist;
+}
+
+LIBSPEC struct UPNPDev *
+upnpDiscover(int delay, const char * multicastif,
+             const char * minissdpdsock, int sameport,
+             int ipv6,
+             int * error)
+{
+	static const char * const deviceList[] = {
+#if 0
+		"urn:schemas-upnp-org:device:InternetGatewayDevice:2",
+		"urn:schemas-upnp-org:service:WANIPConnection:2",
+#endif
+		"urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+		"urn:schemas-upnp-org:service:WANIPConnection:1",
+		"urn:schemas-upnp-org:service:WANPPPConnection:1",
+		"upnp:rootdevice",
+		"ssdp:all",
+		0
+	};
+	return upnpDiscoverDevices(deviceList,
+	                           delay, multicastif, minissdpdsock, sameport,
+	                           ipv6, error);
 }
 
 /* freeUPNPDevlist() should be used to
