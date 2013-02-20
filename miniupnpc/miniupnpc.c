@@ -560,6 +560,10 @@ upnpDiscover(int delay, const char * multicastif,
 		*error = UPNPDISCOVER_SUCCESS;
 	/* Calculating maximum response time in seconds */
 	mx = ((unsigned int)delay) / 1000u;
+	if(mx == 0) {
+		mx = 1;
+		delay = 1000;
+	}
 	/* receiving SSDP response packet */
 	for(n = 0; deviceList[deviceIndex]; deviceIndex++)
 	{
