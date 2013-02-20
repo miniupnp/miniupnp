@@ -338,7 +338,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	"MAN: \"ssdp:discover\"\r\n"
 	"MX: %u\r\n"
 	"\r\n";
-	int deviceIndex = 0;
+	int deviceIndex;
 	char bufr[1536];	/* reception and emission buffer */
 	int sudp;
 	int n;
@@ -361,7 +361,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	/* first try to get infos from minissdpd ! */
 	if(!minissdpdsock)
 		minissdpdsock = "/var/run/minissdpd.sock";
-	while(!devlist && deviceTypes[deviceIndex]) {
+	for(deviceIndex = 0; !devlist && deviceTypes[deviceIndex]; deviceIndex++) {
 		devlist = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
 		                                  minissdpdsock);
 		/* We return what we have found if it was not only a rootdevice */
@@ -370,9 +370,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 				*error = UPNPDISCOVER_SUCCESS;
 			return devlist;
 		}
-		deviceIndex++;
 	}
-	deviceIndex = 0;
 #endif
 	/* fallback to direct discovery */
 #ifdef _WIN32
@@ -536,88 +534,86 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	/* Calculating maximum response time in seconds */
 	mx = ((unsigned int)delay) / 1000u;
 	/* receiving SSDP response packet */
-	for(n = 0; deviceTypes[deviceIndex]; deviceIndex++) {
-		if(n == 0) {
-			/* sending the SSDP M-SEARCH packet */
-			n = snprintf(bufr, sizeof(bufr),
-			             MSearchMsgFmt,
-			             ipv6 ?
-			             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
-			             : UPNP_MCAST_ADDR,
-			             deviceTypes[deviceIndex], mx);
+	for(deviceIndex = 0; deviceTypes[deviceIndex]; deviceIndex++) {
+		/* sending the SSDP M-SEARCH packet */
+		n = snprintf(bufr, sizeof(bufr),
+		             MSearchMsgFmt,
+		             ipv6 ?
+		             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
+		             : UPNP_MCAST_ADDR,
+		             deviceTypes[deviceIndex], mx);
 #ifdef DEBUG
-			/*printf("Sending %s", bufr);*/
-			printf("Sending M-SEARCH request to %s with ST: %s\n",
-			       ipv6 ?
-			       (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
-			       : UPNP_MCAST_ADDR,
-			       deviceTypes[deviceIndex]);
+		/*printf("Sending %s", bufr);*/
+		printf("Sending M-SEARCH request to %s with ST: %s\n",
+		       ipv6 ?
+		       (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
+		       : UPNP_MCAST_ADDR,
+		       deviceTypes[deviceIndex]);
 #endif
 #ifdef NO_GETADDRINFO
-			/* the following code is not using getaddrinfo */
-			/* emission */
-			memset(&sockudp_w, 0, sizeof(struct sockaddr_storage));
-			if(ipv6) {
-				struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_w;
-				p->sin6_family = AF_INET6;
-				p->sin6_port = htons(PORT);
-				inet_pton(AF_INET6,
-				          linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR,
-				          &(p->sin6_addr));
-			} else {
-				struct sockaddr_in * p = (struct sockaddr_in *)&sockudp_w;
-				p->sin_family = AF_INET;
-				p->sin_port = htons(PORT);
-				p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
-			}
-			n = sendto(sudp, bufr, n, 0, &sockudp_w,
-			           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
-			if (n < 0) {
-				if(error)
-					*error = UPNPDISCOVER_SOCKET_ERROR;
-				PRINT_SOCKET_ERROR("sendto");
-				break;
-			}
-#else /* #ifdef NO_GETADDRINFO */
-			memset(&hints, 0, sizeof(hints));
-			hints.ai_family = AF_UNSPEC; /* AF_INET6 or AF_INET */
-			hints.ai_socktype = SOCK_DGRAM;
-			/*hints.ai_flags = */
-			if ((rv = getaddrinfo(ipv6
-			                      ? (linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR)
-			                      : UPNP_MCAST_ADDR,
-			                      XSTR(PORT), &hints, &servinfo)) != 0) {
-				if(error)
-					*error = UPNPDISCOVER_SOCKET_ERROR;
-#ifdef _WIN32
-				fprintf(stderr, "getaddrinfo() failed: %d\n", rv);
-#else
-				fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-#endif
-				break;
-			}
-			for(p = servinfo; p; p = p->ai_next) {
-				n = sendto(sudp, bufr, n, 0, p->ai_addr, p->ai_addrlen);
-				if (n < 0) {
-#ifdef DEBUG
-					char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-					if (getnameinfo(p->ai_addr, p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
-					                sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-						fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
-					}
-#endif
-					PRINT_SOCKET_ERROR("sendto");
-					continue;
-				}
-			}
-			freeaddrinfo(servinfo);
-			if(n < 0) {
-				if(error)
-					*error = UPNPDISCOVER_SOCKET_ERROR;
-				break;
-			}
-#endif /* #ifdef NO_GETADDRINFO */
+		/* the following code is not using getaddrinfo */
+		/* emission */
+		memset(&sockudp_w, 0, sizeof(struct sockaddr_storage));
+		if(ipv6) {
+			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_w;
+			p->sin6_family = AF_INET6;
+			p->sin6_port = htons(PORT);
+			inet_pton(AF_INET6,
+			          linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR,
+			          &(p->sin6_addr));
+		} else {
+			struct sockaddr_in * p = (struct sockaddr_in *)&sockudp_w;
+			p->sin_family = AF_INET;
+			p->sin_port = htons(PORT);
+			p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
 		}
+		n = sendto(sudp, bufr, n, 0, &sockudp_w,
+		           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
+		if (n < 0) {
+			if(error)
+				*error = UPNPDISCOVER_SOCKET_ERROR;
+			PRINT_SOCKET_ERROR("sendto");
+			break;
+		}
+#else /* #ifdef NO_GETADDRINFO */
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_UNSPEC; /* AF_INET6 or AF_INET */
+		hints.ai_socktype = SOCK_DGRAM;
+		/*hints.ai_flags = */
+		if ((rv = getaddrinfo(ipv6
+		                      ? (linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR)
+		                      : UPNP_MCAST_ADDR,
+		                      XSTR(PORT), &hints, &servinfo)) != 0) {
+			if(error)
+				*error = UPNPDISCOVER_SOCKET_ERROR;
+#ifdef _WIN32
+			fprintf(stderr, "getaddrinfo() failed: %d\n", rv);
+#else
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+#endif
+			break;
+		}
+		for(p = servinfo; p; p = p->ai_next) {
+			n = sendto(sudp, bufr, n, 0, p->ai_addr, p->ai_addrlen);
+			if (n < 0) {
+#ifdef DEBUG
+				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+				if (getnameinfo(p->ai_addr, p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
+				                sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+					fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
+				}
+#endif
+				PRINT_SOCKET_ERROR("sendto");
+				continue;
+			}
+		}
+		freeaddrinfo(servinfo);
+		if(n < 0) {
+			if(error)
+				*error = UPNPDISCOVER_SOCKET_ERROR;
+			break;
+		}
+#endif /* #ifdef NO_GETADDRINFO */
 		/* Waiting for SSDP REPLY packet to M-SEARCH */
 		do {
 			n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
@@ -629,14 +625,13 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			} else if (n == 0) {
 				/* no data or Time Out */
 				if (devlist) {
-					/* no more device type to look for... */
+					/* found some devices, stop now*/
 					if(error)
 						*error = UPNPDISCOVER_SUCCESS;
-#if 0
 					goto error;
-#endif
 				}
 				if(ipv6) {
+					/* switch linklocal flag */
 					if(linklocal) {
 						linklocal = 0;
 						--deviceIndex;
@@ -649,7 +644,6 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 				int urlsize=0;
 				const char * st=NULL;
 				int stsize=0;
-				/*printf("%d byte(s) :\n%s\n", n, bufr);*/ /* affichage du message */
 				parseMSEARCHReply(bufr, n, &descURL, &urlsize, &st, &stsize);
 				if(st&&descURL) {
 #ifdef DEBUG
@@ -672,7 +666,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 						/* memory allocation error */
 						if(error)
 							*error = UPNPDISCOVER_MEMORY_ERROR;
-						break;
+						goto error;
 					}
 					tmp->pNext = devlist;
 					tmp->descURL = tmp->buffer;
