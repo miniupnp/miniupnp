@@ -707,6 +707,22 @@ upnpDiscover(int delay, const char * multicastif,
 		"urn:schemas-upnp-org:service:WANIPConnection:1",
 		"urn:schemas-upnp-org:service:WANPPPConnection:1",
 		"upnp:rootdevice",
+		/*"ssdp:all",*/
+		0
+	};
+	return upnpDiscoverDevices(deviceList,
+	                           delay, multicastif, minissdpdsock, sameport,
+	                           ipv6, error);
+}
+
+LIBSPEC struct UPNPDev *
+upnpDiscoverAll(int delay, const char * multicastif,
+                const char * minissdpdsock, int sameport,
+                int ipv6,
+                int * error)
+{
+	static const char * const deviceList[] = {
+		/*"upnp:rootdevice",*/
 		"ssdp:all",
 		0
 	};

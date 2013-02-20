@@ -6,6 +6,7 @@
  * LICENCE file provided in this distribution. */
 
 #include <stdio.h>
+#include <string.h>
 #include "miniupnpc.h"
 
 int main(int argc, char * * argv)
@@ -16,8 +17,19 @@ int main(int argc, char * * argv)
 	int error = 0;
 	struct UPNPDev * devlist = 0;
 	struct UPNPDev * dev;
+	int i;
 
-	devlist = upnpDiscover(2000, multicastif, minissdpdpath,
+	for(i = 1; i < argc; i++) {
+		if(strcmp(argv[i], "-6") == 0)
+			ipv6 = 1;
+		else {
+			printf("usage : %s [options]\n", argv[0]);
+			printf("   -6 : use IPv6\n");
+			return 1;
+		}
+	}
+
+	devlist = upnpDiscoverAll(2000, multicastif, minissdpdpath,
 	                             0/*sameport*/, ipv6, &error);
 	if(devlist) {
 		for(dev = devlist; dev != NULL; dev = dev->pNext) {
