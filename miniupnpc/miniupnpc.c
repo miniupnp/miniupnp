@@ -548,7 +548,13 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		             : UPNP_MCAST_ADDR,
 		             deviceTypes[deviceIndex], mx);
 #ifdef DEBUG
-		printf("Sending %s", bufr);
+		/*printf("Sending %s", bufr);*/
+		printf("Sending M-SEARCH request to %s with ST: %s\n",
+		       ipv6 ?
+		       (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
+		       : UPNP_MCAST_ADDR,
+		       deviceTypes[deviceIndex]);
+
 #endif
 #ifdef NO_GETADDRINFO
 		/* the following code is not using getaddrinfo */
@@ -652,7 +658,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		if(st&&descURL)
 		{
 #ifdef DEBUG
-			printf("M-SEARCH Reply:\nST: %.*s\nLocation: %.*s\n",
+			printf("M-SEARCH Reply:\n  ST: %.*s\n  Location: %.*s\n",
 			       stsize, st, urlsize, descURL);
 #endif
 			for(tmp=devlist; tmp; tmp = tmp->pNext) {
