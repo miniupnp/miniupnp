@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.96 2012/06/23 22:30:42 nanard Exp $
+# $Id: Makefile,v 1.102 2013/03/11 10:19:12 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -42,7 +42,12 @@ INSTALL = install
 SH = /bin/sh
 JAVA = java
 # see http://code.google.com/p/jnaerator/
-JNAERATOR = jnaerator-0.9.7.jar
+#JNAERATOR = jnaerator-0.9.7.jar
+#JNAERATOR = jnaerator-0.9.8-shaded.jar
+#JNAERATORARGS = -library miniupnpc
+#JNAERATOR = jnaerator-0.10-shaded.jar
+JNAERATOR = jnaerator-0.11-shaded.jar
+JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
 JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
 #following libs are needed on Solaris
 #LDLIBS=-lsocket -lnsl -lresolv
@@ -239,17 +244,11 @@ testigddescparse:	$(TESTIGDDESCPARSE)
 miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh VERSION
 	$(SH) updateminiupnpcstrings.sh
 
-jnaerator-0.9.8-shaded.jar:
-	wget $(JNAERATORBASEURL)/$@ || curl -o $@ $(JNAERATORBASEURL)/$@
-
-jnaerator-0.9.7.jar:
-	wget $(JNAERATORBASEURL)/$@ || curl -o $@ $(JNAERATORBASEURL)/$@
-
-jnaerator-0.9.3.jar:
+jnaerator-%.jar:
 	wget $(JNAERATORBASEURL)/$@ || curl -o $@ $(JNAERATORBASEURL)/$@
 
 jar: $(SHAREDLIBRARY)  $(JNAERATOR)
-	$(JAVA) -jar $(JNAERATOR) -library miniupnpc \
+	$(JAVA) -jar $(JNAERATOR) $(JNAERATORARGS) \
 	miniupnpc.h declspec.h upnpcommands.h upnpreplyparse.h \
 	igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) \
 	-package fr.free.miniupnp -o . -jar java/miniupnpc_$(JARSUFFIX).jar -v
