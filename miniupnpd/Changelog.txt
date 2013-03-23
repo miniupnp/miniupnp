@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.331 2013/02/11 10:37:06 nanard Exp $
+$Id: Changelog.txt,v 1.332 2013/03/23 10:46:53 nanard Exp $
+
+2013/03/23:
+  autodetect LAN interface netmask instead of defaulting to /24
 
 2013/02/11:
   Use $(DESTDIR) in Makefile.linux.

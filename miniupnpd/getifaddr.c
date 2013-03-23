@@ -1,7 +1,7 @@
-/* $Id: getifaddr.c,v 1.14 2012/02/07 11:05:07 nanard Exp $ */
+/* $Id: getifaddr.c,v 1.16 2013/03/23 10:46:54 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2011 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -26,7 +26,8 @@
 #endif
 
 int
-getifaddr(const char * ifname, char * buf, int len)
+getifaddr(const char * ifname, char * buf, int len,
+          struct in_addr * addr, struct in_addr * mask)
 {
 #ifndef USE_GETIFADDRS
 	/* use ioctl SIOCGIFADDR. Works only for ip v4 */
@@ -34,7 +35,7 @@ getifaddr(const char * ifname, char * buf, int len)
 	int s;
 	struct ifreq ifr;
 	int ifrlen;
-	struct sockaddr_in * addr;
+	struct sockaddr_in * ifaddr;
 	ifrlen = sizeof(ifr);
 
 	if(!ifname || ifname[0]=='\0')
@@ -52,12 +53,24 @@ getifaddr(const char * ifname, char * buf, int len)
 		close(s);
 		return -1;
 	}
-	addr = (struct sockaddr_in *)&ifr.ifr_addr;
-	if(!inet_ntop(AF_INET, &addr->sin_addr, buf, len))
+	ifaddr = (struct sockaddr_in *)&ifr.ifr_addr;
+	if(addr) *addr = ifaddr->sin_addr;
+	if(!inet_ntop(AF_INET, &ifaddr->sin_addr, buf, len))
 	{
 		syslog(LOG_ERR, "inet_ntop(): %m");
 		close(s);
 		return -1;
+	}
+	if(mask)
+	{
+		strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+		if(ioctl(s, SIOCGIFNETMASK, &ifr, &ifrlen) < 0)
+		{
+			syslog(LOG_ERR, "ioctl(s, SIOCGIFNETMASK, ...): %m");
+			close(s);
+			return -1;
+		}
+		*mask = ((struct sockaddr_in *)&ifr.ifr_netmask)->sin_addr;
 	}
 	close(s);
 #else /* ifndef USE_GETIFADDRS */
@@ -85,6 +98,8 @@ getifaddr(const char * ifname, char * buf, int len)
 			inet_ntop(ife->ifa_addr->sa_family,
 			          &((struct sockaddr_in *)ife->ifa_addr)->sin_addr,
 			          buf, len);
+			if(addr) *addr = ((struct sockaddr_in *)ife->ifa_addr)->sin_addr;
+			if(mask) *mask = ((struct sockaddr_in *)ife->ifa_netmask)->sin_addr;
 			break;
 /*
 		case AF_INET6:
