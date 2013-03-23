@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.102 2013/03/11 10:19:12 nanard Exp $
+# $Id: Makefile,v 1.103 2013/03/23 09:05:07 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -85,12 +85,12 @@ ifeq ($(OS), Darwin)
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
   CFLAGS := -DMACOSX -D_DARWIN_C_SOURCE $(CFLAGS)
 else
-ifeq ($(OS), Linux)
-  SHAREDLIBRARY = libminiupnpc.so
-  SONAME = $(SHAREDLIBRARY).$(APIVERSION)
-endif
 ifeq ($(JARSUFFIX), win32)
   SHAREDLIBRARY = miniupnpc.dll
+else
+  # Linux/BSD/etc.
+  SHAREDLIBRARY = libminiupnpc.so
+  SONAME = $(SHAREDLIBRARY).$(APIVERSION)
 endif
 endif
 
@@ -244,8 +244,11 @@ testigddescparse:	$(TESTIGDDESCPARSE)
 miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh VERSION
 	$(SH) updateminiupnpcstrings.sh
 
+# ftp tool supplied with OpenBSD can download files from http.
 jnaerator-%.jar:
-	wget $(JNAERATORBASEURL)/$@ || curl -o $@ $(JNAERATORBASEURL)/$@
+	wget $(JNAERATORBASEURL)/$@ || \
+	curl -o $@ $(JNAERATORBASEURL)/$@ || \
+	ftp $(JNAERATORBASEURL)/$@
 
 jar: $(SHAREDLIBRARY)  $(JNAERATOR)
 	$(JAVA) -jar $(JNAERATOR) $(JNAERATORARGS) \

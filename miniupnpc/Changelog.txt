@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.182 2013/03/11 10:19:11 nanard Exp $
+$Id: Changelog.txt,v 1.183 2013/03/23 09:05:07 nanard Exp $
 miniUPnP client Changelog.
+
+2013/03/23:
+  Fixed Makefile for *BSD
 
 2013/03/11:
   Update Makefile to use JNAerator version 0.11
