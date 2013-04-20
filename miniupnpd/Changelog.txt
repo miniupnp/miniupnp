@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.332 2013/03/23 10:46:53 nanard Exp $
+$Id: Changelog.txt,v 1.333 2013/04/20 09:03:17 nanard Exp $
+
+2013/04/20:
+  use scope in get_lan_for_peer() for IPv6 addresses
 
 2013/03/23:
   autodetect LAN interface netmask instead of defaulting to /24
