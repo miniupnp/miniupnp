@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.333 2013/04/20 09:03:17 nanard Exp $
+$Id: Changelog.txt,v 1.334 2013/04/24 17:03:16 nanard Exp $
+
+2013/04/24:
+  to avoid build race conditions, genconfig.sh now use a temporary file
 
 2013/04/20:
   use scope in get_lan_for_peer() for IPv6 addresses
