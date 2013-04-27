@@ -15,7 +15,12 @@
 # The script was tested and works with ksh, bash
 # It fails to run with dash 0.5.5.1 because of "kill %1"
 
-TMPDIR=`mktemp -d`
+OS=$(uname -s)
+if [ $OS = "Darwin" ]; then
+    TMPDIR=`mktemp -d -t miniupnp`
+else
+    TMPDIR=`mktemp -d`
+fi
 HTTPSERVEROUT="${TMPDIR}/httpserverout"
 EXPECTEDFILE="${TMPDIR}/expectedfile"
 DOWNLOADEDFILE="${TMPDIR}/downloadedfile"
