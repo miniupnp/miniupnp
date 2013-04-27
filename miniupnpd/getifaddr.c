@@ -1,4 +1,4 @@
-/* $Id: getifaddr.c,v 1.16 2013/03/23 10:46:54 nanard Exp $ */
+/* $Id: getifaddr.c,v 1.17 2013/04/27 15:40:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -70,7 +70,11 @@ getifaddr(const char * ifname, char * buf, int len,
 			close(s);
 			return -1;
 		}
+#ifdef ifr_netmask
 		*mask = ((struct sockaddr_in *)&ifr.ifr_netmask)->sin_addr;
+#else
+		*mask = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
+#endif
 	}
 	close(s);
 #else /* ifndef USE_GETIFADDRS */
