@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.183 2013/03/23 09:05:07 nanard Exp $
+$Id: Changelog.txt,v 1.184 2013/04/27 15:47:27 nanard Exp $
 miniUPnP client Changelog.
+
+2013/04/27:
+  Fix testminiwget.sh for BSD
 
 2013/03/23:
   Fixed Makefile for *BSD
