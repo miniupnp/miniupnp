@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.336 2013/04/27 15:40:09 nanard Exp $
+$Id: Changelog.txt,v 1.337 2013/04/29 09:34:13 nanard Exp $
+
+2013/04/29:
+  Add warning message when using IPv4 address for listening_ip with IPv6 enabled
 
 2013/04/27:
   Uses ifr_addr if ifr_netmask is not defined in struct ifreq

@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.174 2013/03/23 10:46:54 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.175 2013/04/29 09:34:14 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -630,6 +630,10 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		if(lan_addr->index == 0)
 			fprintf(stderr, "Cannot get index for network interface %s",
 			        lan_addr->ifname);
+	}
+	else
+	{
+		fprintf(stderr, "Warning: please specify LAN network interface by name instead of IPv4 address\n");
 	}
 #endif
 	return 0;
