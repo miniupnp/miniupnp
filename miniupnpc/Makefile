@@ -49,8 +49,10 @@ JAVA = java
 JNAERATOR = jnaerator-0.11-shaded.jar
 JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
 JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
-#following libs are needed on Solaris
-#LDLIBS=-lsocket -lnsl -lresolv
+
+ifeq (SunOS, $(OS))
+  LDFLAGS=-lsocket -lnsl -lresolv
+endif
 
 # APIVERSION is used to build SONAME
 APIVERSION = 9
@@ -225,10 +227,10 @@ else
 	$(CC) -shared $(LDFLAGS) -Wl,-soname,$(SONAME) -o $@ $^
 endif
 
-upnpc-static:	upnpc.o $(LIBRARY) $(LDLIBS)
+upnpc-static:	upnpc.o $(LIBRARY)
 	$(CC) $(LDFLAGS) -o $@ $^
 
-upnpc-shared:	upnpc.o $(SHAREDLIBRARY) $(LDLIBS)
+upnpc-shared:	upnpc.o $(SHAREDLIBRARY)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 testminixml:	$(TESTMINIXMLOBJS)
