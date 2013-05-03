@@ -24,6 +24,7 @@
 #else /* #ifdef _WIN32 */
 #include <unistd.h>
 #include <sys/param.h>
+#include <sys/select.h>
 #include <errno.h>
 #define closesocket close
 #include <netdb.h>
