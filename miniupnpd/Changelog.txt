@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.337 2013/04/29 09:34:13 nanard Exp $
+$Id: Changelog.txt,v 1.338 2013/05/03 09:30:32 nanard Exp $
+
+2013/05/03:
+  Use pkg-config under linux to find libiptc. Thanks to Olivier Langlois
 
 2013/04/29:
   Add warning message when using IPv4 address for listening_ip with IPv6 enabled
