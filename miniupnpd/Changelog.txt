@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.338 2013/05/03 09:30:32 nanard Exp $
 
+2013/05/14:
+  Update upnpreplyparse to take into account "empty" elements
+
 2013/05/03:
   Use pkg-config under linux to find libiptc. Thanks to Olivier Langlois
 
