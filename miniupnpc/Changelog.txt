@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.184 2013/04/27 15:47:27 nanard Exp $
+$Id: Changelog.txt,v 1.186 2013/05/14 20:37:35 nanard Exp $
 miniUPnP client Changelog.
+
+2013/05/03:
+  Fix Solaris build thanks to Maciej Małecki
 
 2013/04/27:
   Fix testminiwget.sh for BSD
