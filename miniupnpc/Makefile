@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.103 2013/03/23 09:05:07 nanard Exp $
+# $Id: Makefile,v 1.105 2013/05/14 20:37:36 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -139,7 +139,7 @@ all:	$(LIBRARY) $(EXECUTABLES)
 
 test:	check
 
-check:	validateminixml validateminiwget
+check:	validateminixml validateminiwget validateupnpreplyparse
 
 everything:	all $(EXECUTABLES_ADDTESTS)
 
@@ -165,6 +165,11 @@ validateminixml:	minixmlvalid
 validateminiwget:	testminiwget minihttptestserver testminiwget.sh
 	@echo "miniwget validation test"
 	./testminiwget.sh
+	touch $@
+
+validateupnpreplyparse:	testupnpreplyparse testupnpreplyparse.sh
+	@echo "upnpreplyparse validation test"
+	./testupnpreplyparse.sh
 	touch $@
 
 clean:

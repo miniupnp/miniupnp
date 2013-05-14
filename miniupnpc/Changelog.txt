@@ -3,6 +3,7 @@ miniUPnP client Changelog.
 
 2013/05/14:
   Update upnpreplyparse to take into account "empty" elements
+  validate upnpreplyparse.c code with "make check"
 
 2013/05/03:
   Fix Solaris build thanks to Maciej Małecki
