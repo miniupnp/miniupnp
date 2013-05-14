@@ -1,8 +1,8 @@
-/* $Id: testminixml.c,v 1.7 2012/01/21 13:30:33 nanard Exp $
+/* $Id: testminixml.c,v 1.9 2013/05/14 19:50:49 nanard Exp $
  * MiniUPnP project
  * Website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas Bernard.
- * Copyright (c) 2005-2012 Thomas Bernard
+ * Copyright (c) 2005-2013 Thomas Bernard
  *
  * testminixml.c
  * test program for the "minixml" functions.
@@ -17,6 +17,7 @@
 void printeltname1(void * d, const char * name, int l)
 {
 	int i;
+	(void)d;
 	printf("element ");
 	for(i=0;i<l;i++)
 		putchar(name[i]);
@@ -24,6 +25,7 @@ void printeltname1(void * d, const char * name, int l)
 void printeltname2(void * d, const char * name, int l)
 {
 	int i;
+	(void)d;
 	putchar('/');
 	for(i=0;i<l;i++)
 		putchar(name[i]);
@@ -32,6 +34,7 @@ void printeltname2(void * d, const char * name, int l)
 void printdata(void *d, const char * data, int l)
 {
 	int i;
+	(void)d;
 	printf("data : ");
 	for(i=0;i<l;i++)
 		putchar(data[i]);
