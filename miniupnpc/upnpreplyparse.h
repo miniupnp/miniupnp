@@ -48,10 +48,12 @@ char *
 GetValueFromNameValueList(struct NameValueParserData * pdata,
                           const char * Name);
 
+#if 0
 /* GetValueFromNameValueListIgnoreNS() */
 char *
 GetValueFromNameValueListIgnoreNS(struct NameValueParserData * pdata,
                                   const char * Name);
+#endif
 
 /* DisplayNameValueList() */
 #ifdef DEBUG
