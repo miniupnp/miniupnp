@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.339 2013/05/16 10:41:56 nanard Exp $
+$Id: Changelog.txt,v 1.340 2013/05/20 00:12:49 nanard Exp $
+
+2013/05/20:
+  Adding support for IP Filter version 5.x
 
 2013/05/16:
   refuses non integer <NewPortMappingIndex> values
