@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.340 2013/05/20 00:12:49 nanard Exp $
+$Id: Changelog.txt,v 1.341 2013/05/29 21:27:21 nanard Exp $
+
+2013/05/29:
+  Remove namespace from variable name elements in Events "propertyset"
+    to comply with UPNP DeviceArchitecture v1.1.
 
 2013/05/20:
   Adding support for IP Filter version 5.x
