@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.341 2013/05/29 21:27:21 nanard Exp $
+$Id: Changelog.txt,v 1.342 2013/06/05 09:10:46 nanard Exp $
+
+2013/06/05:
+  check Service ID in SetDefaultConnectionService method
 
 2013/05/29:
   Remove namespace from variable name elements in Events "propertyset"

@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.116 2013/05/16 10:41:57 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.117 2013/06/05 09:10:47 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -1038,8 +1038,12 @@ SetDefaultConnectionService(struct upnphttp * h, const char * action)
 		 * 721 InvalidServiceID
 		 * 723 InvalidConnServiceSelection */
 #ifdef UPNP_STRICT
+		char * service;
+		service = strchr(p, ',');
 		if(0 != memcmp(uuidvalue, p, sizeof("uuid:00000000-0000-0000-0000-000000000000") - 1)) {
 			SoapError(h, 720, "InvalidDeviceUUID");
+		} else if(service == NULL || 0 != strcmp(service+1, SERVICE_ID_WANIPC)) {
+			SoapError(h, 721, "InvalidServiceID");
 		} else
 #endif
 		{
