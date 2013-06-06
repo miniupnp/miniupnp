@@ -1,4 +1,4 @@
-/* $Id: upnpreplyparse.c,v 1.14 2013/05/14 19:53:54 nanard Exp $ */
+/* $Id: upnpreplyparse.c,v 1.15 2013/06/06 21:36:40 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -37,11 +37,11 @@ NameValueParserEndElt(void * d, const char * name, int l)
 	if(strcmp(data->curelt, "NewPortListing") != 0)
 	{
 		int l;
-		/* standard case. Limited to 63 chars strings */
+		/* standard case. Limited to n chars strings */
 		l = data->cdatalen;
 	    nv = malloc(sizeof(struct NameValue));
-	    if(l>63)
-	        l = 63;
+	    if(l>=(int)sizeof(nv->value))
+	        l = sizeof(nv->value) - 1;
 	    strncpy(nv->name, data->curelt, 64);
 		nv->name[63] = '\0';
 		if(data->cdata != NULL)

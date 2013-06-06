@@ -1,4 +1,4 @@
-/* $Id: upnpreplyparse.h,v 1.16 2013/05/14 20:37:13 nanard Exp $ */
+/* $Id: upnpreplyparse.h,v 1.17 2013/06/06 21:36:40 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -21,7 +21,7 @@ extern "C" {
 struct NameValue {
     LIST_ENTRY(NameValue) entries;
     char name[64];
-    char value[64];
+    char value[128];
 };
 
 struct NameValueParserData {

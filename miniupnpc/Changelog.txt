@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.186 2013/05/14 20:37:35 nanard Exp $
+$Id: Changelog.txt,v 1.187 2013/06/06 21:36:39 nanard Exp $
 miniUPnP client Changelog.
+
+2013/06/06:
+  update upnpreplyparse to allow larger values (128 chars instead of 64)
 
 2013/05/14:
   Update upnpreplyparse to take into account "empty" elements

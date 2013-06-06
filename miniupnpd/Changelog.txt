@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.343 2013/06/05 09:18:22 nanard Exp $
+$Id: Changelog.txt,v 1.344 2013/06/06 21:39:58 nanard Exp $
+
+2013/06/06:
+  update upnpreplyparse to allow larger values (128 chars instead of 64)
 
 2013/06/05:
   check Service ID in SetDefaultConnectionService method
