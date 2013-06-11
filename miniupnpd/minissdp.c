@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.50 2013/06/05 09:18:23 nanard Exp $ */
+/* $Id: minissdp.c,v 1.51 2013/06/11 18:02:18 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -313,12 +313,17 @@ USN:uuid:upnp-InternetGatewayDevice-1_0-0090a2777777::upnp:rootdevice
 EXT:
  */
 
-/* not really an SSDP "announce" as it is the response
- * to a SSDP "M-SEARCH" */
+/* Responds to a SSDP "M-SEARCH"
+ * s :          socket to use
+ * addr :       peer
+ * st, st_len : ST: header
+ * suffix :     suffix for USN: header
+ * host, port : our HTTP host, port
+ */
 static void
-SendSSDPAnnounce2(int s, const struct sockaddr * addr,
-                  const char * st, int st_len, const char * suffix,
-                  const char * host, unsigned short port)
+SendSSDPResponse(int s, const struct sockaddr * addr,
+                 const char * st, int st_len, const char * suffix,
+                 const char * host, unsigned short port)
 {
 	int l, n;
 	char buf[512];
@@ -371,12 +376,14 @@ SendSSDPAnnounce2(int s, const struct sockaddr * addr,
 		upnp_bootid, upnp_bootid, upnp_configid);
 	if(l<0)
 	{
-		syslog(LOG_ERR, "SendSSDPAnnounce2(): snprintf failed %m");
+		syslog(LOG_ERR, "%s: snprintf failed %m",
+		       "SendSSDPResponse()");
 		return;
 	}
 	else if((unsigned)l>=sizeof(buf))
 	{
-		syslog(LOG_WARNING, "SendSSDPAnnounce2(): truncated output");
+		syslog(LOG_WARNING, "%s: truncated output",
+		       "SendSSDPResponse()");
 		l = sizeof(buf) - 1;
 	}
 	addrlen = (addr->sa_family == AF_INET6)
@@ -742,9 +749,9 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				   )
 				{
 					syslog(LOG_INFO, "Single search found");
-					SendSSDPAnnounce2(s, sender,
-					                  st, st_len, "",
-					                  announced_host, port);
+					SendSSDPResponse(s, sender,
+					                 st, st_len, "",
+					                 announced_host, port);
 					break;
 				}
 			}
@@ -760,21 +767,21 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					else
 						snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 					l = (int)strlen(known_service_types[i].s);
-					SendSSDPAnnounce2(s, sender,
-					                  known_service_types[i].s, l, ver_str,
-					                  announced_host, port);
+					SendSSDPResponse(s, sender,
+					                 known_service_types[i].s, l, ver_str,
+					                 announced_host, port);
 				}
 				/* also answer for uuid */
-				SendSSDPAnnounce2(s, sender, uuidvalue, strlen(uuidvalue), "",
-				                  announced_host, port);
+				SendSSDPResponse(s, sender, uuidvalue, strlen(uuidvalue), "",
+				                 announced_host, port);
 			}
 			/* responds to request by UUID value */
 			l = (int)strlen(uuidvalue);
 			if(l==st_len && (0 == memcmp(st, uuidvalue, l)))
 			{
 				syslog(LOG_INFO, "ssdp:uuid found");
-				SendSSDPAnnounce2(s, sender, st, st_len, "",
-				                  announced_host, port);
+				SendSSDPResponse(s, sender, st, st_len, "",
+				                 announced_host, port);
 			}
 		}
 		else
