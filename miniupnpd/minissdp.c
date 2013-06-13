@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.51 2013/06/11 18:02:18 nanard Exp $ */
+/* $Id: minissdp.c,v 1.52 2013/06/13 13:21:29 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -323,7 +323,7 @@ EXT:
 static void
 SendSSDPResponse(int s, const struct sockaddr * addr,
                  const char * st, int st_len, const char * suffix,
-                 const char * host, unsigned short port)
+                 const char * host, unsigned short port, const char * uuidvalue)
 {
 	int l, n;
 	char buf[512];
@@ -412,27 +412,28 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 static struct {
 	const char * s;
 	const int version;
+	const char * uuid;
 } const known_service_types[] =
 {
-	{"upnp:rootdevice", 0},
-	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", IGD_VER},
-	{"urn:schemas-upnp-org:device:WANConnectionDevice:", 1},
-	{"urn:schemas-upnp-org:device:WANDevice:", 1},
-	{"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:", 1},
-	{"urn:schemas-upnp-org:service:WANIPConnection:", WANIPC_VER},
+	{"upnp:rootdevice", 0, uuidvalue_igd},
+	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", IGD_VER, uuidvalue_igd},
+	{"urn:schemas-upnp-org:device:WANConnectionDevice:", 1, uuidvalue_wcd},
+	{"urn:schemas-upnp-org:device:WANDevice:", 1, uuidvalue_wan},
+	{"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:", 1, uuidvalue_wan},
+	{"urn:schemas-upnp-org:service:WANIPConnection:", WANIPC_VER, uuidvalue_wcd},
 #ifndef UPNP_STRICT
 	/* We use WAN IP Connection, not PPP connection,
 	 * but buggy control points may try to use WanPPPConnection
 	 * anyway */
-	{"urn:schemas-upnp-org:service:WANPPPConnection:", 1},
+	{"urn:schemas-upnp-org:service:WANPPPConnection:", 1, uuidvalue_wcd},
 #endif
 #ifdef ENABLE_L3F_SERVICE
-	{"urn:schemas-upnp-org:service:Layer3Forwarding:", 1},
+	{"urn:schemas-upnp-org:service:Layer3Forwarding:", 1, uuidvalue_igd},
 #endif
 #ifdef ENABLE_6FC_SERVICE
-	{"url:schemas-upnp-org:service:WANIPv6FirewallControl:", 1},
+	{"url:schemas-upnp-org:service:WANIPv6FirewallControl:", 1, uuidvalue_wcd},
 #endif
-	{0, 0}
+	{0, 0, 0}
 };
 
 static void
@@ -533,12 +534,13 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 		SendSSDPNotify(s, (struct sockaddr *)&sockname, host, port,
 		               known_service_types[i].s, ver_str,	/* NT: */
-		               uuidvalue, "::", known_service_types[i].s, /* ver_str,	USN: */
+		               known_service_types[i].uuid, "::",
+		               known_service_types[i].s, /* ver_str,	USN: */
 		               lifetime, ipv6);
 		if(i==0) /* rootdevice */
 			SendSSDPNotify(s, (struct sockaddr *)&sockname, host, port,
-			               uuidvalue, "",	/* NT: */
-			               uuidvalue, "", "", /* ver_str,	USN: */
+			               uuidvalue_igd, "",	/* NT: */
+			               uuidvalue_igd, "", "", /* ver_str,	USN: */
 			               lifetime, ipv6);
 		i++;
 	}
@@ -751,7 +753,8 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					syslog(LOG_INFO, "Single search found");
 					SendSSDPResponse(s, sender,
 					                 st, st_len, "",
-					                 announced_host, port);
+					                 announced_host, port,
+					                 known_service_types[i].uuid);
 					break;
 				}
 			}
@@ -769,19 +772,39 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					l = (int)strlen(known_service_types[i].s);
 					SendSSDPResponse(s, sender,
 					                 known_service_types[i].s, l, ver_str,
-					                 announced_host, port);
+					                 announced_host, port,
+					                 known_service_types[i].uuid);
 				}
 				/* also answer for uuid */
-				SendSSDPResponse(s, sender, uuidvalue, strlen(uuidvalue), "",
-				                 announced_host, port);
+				SendSSDPResponse(s, sender, uuidvalue_igd, strlen(uuidvalue_igd), "",
+				                 announced_host, port, uuidvalue_igd);
+				SendSSDPResponse(s, sender, uuidvalue_wan, strlen(uuidvalue_wan), "",
+				                 announced_host, port, uuidvalue_wan);
+				SendSSDPResponse(s, sender, uuidvalue_wcd, strlen(uuidvalue_wcd), "",
+				                 announced_host, port, uuidvalue_wcd);
 			}
 			/* responds to request by UUID value */
-			l = (int)strlen(uuidvalue);
-			if(l==st_len && (0 == memcmp(st, uuidvalue, l)))
+			l = (int)strlen(uuidvalue_igd);
+			if(l==st_len)
 			{
-				syslog(LOG_INFO, "ssdp:uuid found");
-				SendSSDPResponse(s, sender, st, st_len, "",
-				                 announced_host, port);
+				if(0 == memcmp(st, uuidvalue_igd, l))
+				{
+					syslog(LOG_INFO, "ssdp:uuid (IGD) found");
+					SendSSDPResponse(s, sender, st, st_len, "",
+					                 announced_host, port, uuidvalue_igd);
+				}
+				else if(0 == memcmp(st, uuidvalue_wan, l))
+				{
+					syslog(LOG_INFO, "ssdp:uuid (WAN) found");
+					SendSSDPResponse(s, sender, st, st_len, "",
+					                 announced_host, port, uuidvalue_wan);
+				}
+				else if(0 == memcmp(st, uuidvalue_wcd, l))
+				{
+					syslog(LOG_INFO, "ssdp:uuid (WCD) found");
+					SendSSDPResponse(s, sender, st, st_len, "",
+					                 announced_host, port, uuidvalue_wcd);
+				}
 			}
 		}
 		else
@@ -893,7 +916,8 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 			                      (struct sockaddr *)&sockname,
 #endif
 			                      known_service_types[i].s, ver_str,	/* NT: */
-			                      uuidvalue, "::", known_service_types[i].s, /* ver_str, USN: */
+			                      known_service_types[i].uuid, "::",
+			                      known_service_types[i].s, /* ver_str, USN: */
 			                      ipv6);
 			if(i==0)	/* root device */
 			{
@@ -903,8 +927,8 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 #else
 				                      (struct sockaddr *)&sockname,
 #endif
-				                      uuidvalue, "",	/* NT: */
-				                      uuidvalue, "", "", /* ver_str, USN: */
+				                      uuidvalue_igd, "",	/* NT: */
+				                      uuidvalue_igd, "", "", /* ver_str, USN: */
 				                      ipv6);
 			}
     	}
@@ -954,7 +978,7 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 		else
 			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 		l = snprintf(strbuf, sizeof(strbuf), "%s::%s%s",
-		             uuidvalue, known_service_types[i].s, ver_str);
+		             known_service_types[i].uuid, known_service_types[i].s, ver_str);
 		if(l<0) {
 			syslog(LOG_WARNING, "SubmitServicesToMiniSSDPD: snprintf %m");
 			continue;
