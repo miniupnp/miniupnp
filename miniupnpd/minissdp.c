@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.52 2013/06/13 13:21:29 nanard Exp $ */
+/* $Id: minissdp.c,v 1.53 2013/06/14 16:58:00 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -537,11 +537,14 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 		               known_service_types[i].uuid, "::",
 		               known_service_types[i].s, /* ver_str,	USN: */
 		               lifetime, ipv6);
-		if(i==0) /* rootdevice */
+		if(0==memcmp(known_service_types[i].s,
+		             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1))
+		{
 			SendSSDPNotify(s, (struct sockaddr *)&sockname, host, port,
-			               uuidvalue_igd, "",	/* NT: */
-			               uuidvalue_igd, "", "", /* ver_str,	USN: */
+			               known_service_types[i].uuid, "",	/* NT: */
+			               known_service_types[i].uuid, "", "", /* ver_str,	USN: */
 			               lifetime, ipv6);
+		}
 		i++;
 	}
 }
