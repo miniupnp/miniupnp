@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.53 2013/06/14 16:58:00 nanard Exp $ */
+/* $Id: minissdp.c,v 1.54 2013/06/15 12:50:10 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -922,7 +922,8 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 			                      known_service_types[i].uuid, "::",
 			                      known_service_types[i].s, /* ver_str, USN: */
 			                      ipv6);
-			if(i==0)	/* root device */
+			if(0==memcmp(known_service_types[i].s,
+			             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1))
 			{
 				ret += SendSSDPbyebye(sockets[j],
 #ifdef ENABLE_IPV6
@@ -930,8 +931,8 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 #else
 				                      (struct sockaddr *)&sockname,
 #endif
-				                      uuidvalue_igd, "",	/* NT: */
-				                      uuidvalue_igd, "", "", /* ver_str, USN: */
+				                      known_service_types[i].uuid, "",	/* NT: */
+				                      known_service_types[i].uuid, "", "", /* ver_str, USN: */
 				                      ipv6);
 			}
     	}
