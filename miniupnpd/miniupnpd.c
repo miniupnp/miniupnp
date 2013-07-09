@@ -65,6 +65,11 @@
 #include "upnpevents.h"
 #ifdef ENABLE_NATPMP
 #include "natpmp.h"
+#ifdef ENABLE_PCP
+#include "pcpserver.h"
+#else
+#define PCP_MAX_LEN 32
+#endif
 #endif
 #include "commonrdr.h"
 #include "upnputils.h"
@@ -838,6 +843,20 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					/*enablenatpmp = atoi(ary_options[i].value);*/
 				break;
 #endif
+#ifdef ENABLE_PCP
+			case UPNPPCPMINLIFETIME:
+					min_lifetime = atoi(ary_options[i].value);
+					if (min_lifetime > 120 ) {
+						min_lifetime = 120;
+					}
+				break;
+			case UPNPPCPMAXLIFETIME:
+					max_lifetime = atoi(ary_options[i].value);
+					if (max_lifetime > 86400 ) {
+						max_lifetime = 86400;
+					}
+				break;
+#endif
 #ifdef PF_ENABLE_FILTER_RULES
 			case UPNPQUICKRULES:
 				if(strcmp(ary_options[i].value, "no") == 0)
@@ -864,6 +883,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Unknown option in file %s\n",
 				        optionsfile);
 			}
+		}
+		/* if lifetimes ae inverse*/
+		if (min_lifetime >= max_lifetime) {
+			fprintf(stderr, "Minimum lifetime (%lu) is greater than or equal to maximum lifetime (%lu).\n", min_lifetime, max_lifetime);
+			fprintf(stderr, "Check your configuration file.\n");
+			return 1;
 		}
 	}
 #endif /* DISABLE_CONFIG_FILE */
@@ -1362,7 +1387,11 @@ main(int argc, char * * argv)
 
 	syslog(LOG_INFO, "Starting%s%swith external interface %s",
 #ifdef ENABLE_NATPMP
+#ifdef ENABLE_PCP
+	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP/PCP " : " ",
+#else
 	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP " : " ",
+#endif
 #else
 	       " ",
 #endif
@@ -1443,12 +1472,21 @@ main(int argc, char * * argv)
 	if(GETFLAG(ENABLENATPMPMASK))
 	{
 		if(OpenAndConfNATPMPSockets(snatpmp) < 0)
+#ifdef ENABLE_PCP
+		{
+			syslog(LOG_ERR, "Failed to open sockets for NAT-PMP/PCP.");
+		} else {
+			syslog(LOG_NOTICE, "Listening for NAT-PMP/PCP traffic on port %u",
+			       NATPMP_PORT);
+		}
+#else
 		{
 			syslog(LOG_ERR, "Failed to open sockets for NAT PMP.");
 		} else {
 			syslog(LOG_NOTICE, "Listening for NAT-PMP traffic on port %u",
 			       NATPMP_PORT);
 		}
+#endif
 #if 0
 		ScanNATPMPforExpiration();
 #endif
@@ -1763,7 +1801,26 @@ main(int argc, char * * argv)
 		{
 			if((snatpmp[i] >= 0) && FD_ISSET(snatpmp[i], &readset))
 			{
-				ProcessIncomingNATPMPPacket(snatpmp[i]);
+				unsigned char msg_buff[PCP_MAX_LEN];
+				struct sockaddr_in senderaddr;
+				int len;
+				memset(msg_buff, 0, PCP_MAX_LEN);
+				len = ReceiveNATPMPOrPCPPacket(snatpmp[i], &senderaddr,
+				       msg_buff, sizeof(msg_buff));
+				if (len < 1)
+					continue;
+#ifdef ENABLE_PCP
+				if (msg_buff[0]==0) {  // version equals to 0 -> means NAT-PMP
+					ProcessIncomingNATPMPPacket(snatpmp[i], msg_buff, len,
+							&senderaddr);
+				} else { // everything else can be PCP
+					ProcessIncomingPCPPacket(snatpmp[i], msg_buff, len,
+							&senderaddr);
+				}
+
+#else
+				ProcessIncomingNATPMPPacket(snatpmp[i], msg_buff, len, &senderaddr);
+#endif
 			}
 		}
 #endif

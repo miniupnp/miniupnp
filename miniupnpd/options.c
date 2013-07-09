@@ -14,6 +14,9 @@
 #include "config.h"
 #include "options.h"
 #include "upnppermissions.h"
+#ifdef PCP_SADSCP
+#include "pcplearndscp.h"
+#endif // PCP_SADSPC
 #include "upnpglobalvars.h"
 
 #ifndef DISABLE_CONFIG_FILE
@@ -47,6 +50,10 @@ static const struct {
 #endif
 #ifdef ENABLE_NATPMP
 	{ UPNPENABLENATPMP, "enable_natpmp"},
+#endif
+#ifdef ENABLE_PCP
+	{ UPNPPCPMINLIFETIME, "min_lifetime"},
+	{ UPNPPCPMAXLIFETIME, "max_lifetime"},
 #endif
 	{ UPNPENABLE, "enable_upnp"},
 #ifdef USE_PF
@@ -147,6 +154,33 @@ readoptionsfile(const char * fname)
 			}
 			continue;
 		}
+#ifdef PCP_SADSCP
+		/* check for DSCP values configuration */
+		if(0 == memcmp(name, "set_learn_dscp", sizeof("set_learn_dscp")-1) )
+		{
+			tmp = realloc(dscp_values_list, sizeof(struct dscp_values) * (num_dscp_values+1));
+			if(tmp == NULL)
+			{
+				fprintf(stderr, "memory allocation error. DSCP line in file %s line %d\n",
+				        fname, linenum);
+			}
+			else
+			{
+				dscp_values_list = tmp;
+				/* parse the rule */
+				if(read_learn_dscp_line(dscp_values_list + num_dscp_values, name) >= 0)
+				{
+					num_dscp_values++;
+				}
+				else
+				{
+					fprintf(stderr, "parsing error file %s line %d : %s\n",
+					        fname, linenum, name);
+				}
+			}
+			continue;
+		}
+#endif //PCP_SADSCP
 		if(!(equals = strchr(name, '=')))
 		{
 			fprintf(stderr, "parsing error file %s line %d : %s\n",
@@ -248,6 +282,21 @@ freeoptions(void)
 		upnppermlist = NULL;
 		num_upnpperm = 0;
 	}
+#ifdef PCP_SADSCP
+	if(dscp_values_list)
+	{
+	    unsigned int i;
+		for (i = 0; i < num_dscp_values; i++) {
+			if (dscp_values_list[i].app_name) {
+				free(dscp_values_list[i].app_name);
+				dscp_values_list[i].app_name = NULL;
+			}
+		}
+		free(dscp_values_list);
+		dscp_values_list = NULL;
+		num_dscp_values = 0;
+	}
+#endif //PCP_SADSCP
 }
 
 #endif /* DISABLE_CONFIG_FILE */

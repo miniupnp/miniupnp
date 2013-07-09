@@ -13,8 +13,15 @@ $IPTABLES -t nat -N MINIUPNPD
 #$IPTABLES -t nat -A PREROUTING -d $EXTIP -i $EXTIF -j MINIUPNPD
 $IPTABLES -t nat -A PREROUTING -i $EXTIF -j MINIUPNPD
 
+#adding the MINIUPNPD chain for mangle
+$IPTABLES -t mangle -N MINIUPNPD
+$IPTABLES -t mangle -A PREROUTING -i $EXTIF -j MINIUPNPD
+
 #adding the MINIUPNPD chain for filter
 $IPTABLES -t filter -N MINIUPNPD
 #adding the rule to MINIUPNPD
 $IPTABLES -t filter -A FORWARD -i $EXTIF ! -o $EXTIF -j MINIUPNPD
 
+#adding the MINIUPNPD chain for nat
+$IPTABLES -t nat -N MINIUPNPD-PCP-PEER
+$IPTABLES -t nat -A POSTROUTING -o $EXTIF -j MINIUPNPD-PCP-PEER
