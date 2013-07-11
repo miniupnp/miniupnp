@@ -32,6 +32,8 @@ enum upnpconfigoptions {
 	UPNPCLEANTHRESHOLD,		/* clean_ruleset_threshold */
 	UPNPCLEANINTERVAL,		/* clean_ruleset_interval */
 	UPNPENABLENATPMP,		/* enable_natpmp */
+	UPNPPCPMINLIFETIME,		/* minimum lifetime for PCP mapping */
+	UPNPPCPMAXLIFETIME,		/* maximum lifetime for PCP mapping */
 #ifdef USE_NETFILTER
 	UPNPFORWARDCHAIN,
 	UPNPNATCHAIN,

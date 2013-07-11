@@ -9,6 +9,7 @@
 #define GETIFADDR_H_INCLUDED
 
 struct in_addr;
+struct in6_addr;
 
 /* getifaddr()
  * take a network interface name and write the
@@ -17,6 +18,9 @@ struct in_addr;
 int
 getifaddr(const char * ifname, char * buf, int len,
           struct in_addr * addr, struct in_addr * mask);
+
+int
+getifaddr_in6(const char * ifname, struct in6_addr* addr);
 
 /* find a non link local IP v6 address for the interface.
  * if ifname is NULL, look for all interfaces */
