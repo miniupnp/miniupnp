@@ -32,6 +32,9 @@ unsigned long upstream_bitrate = 0;
 /* startup time */
 time_t startup_time = 0;
 
+unsigned long int min_lifetime = 120;
+unsigned long int max_lifetime = 86400;
+
 int runtime_flags = 0;
 
 const char * pidfilename = "/var/run/miniupnpd.pid";
@@ -61,6 +64,10 @@ unsigned int nextnatpmptoclean_timestamp = 0;
 unsigned short nextnatpmptoclean_eport = 0;
 unsigned short nextnatpmptoclean_proto = 0;
 #endif
+#ifdef PCP_SADSCP
+struct dscp_values* dscp_values_list = 0;
+unsigned int num_dscp_values = 0;
+#endif //PCP_SADSCP
 #endif
 
 /* For automatic removal of expired rules (with LeaseDuration) */
@@ -76,6 +83,7 @@ const char * tag = 0;
 /* chain name to use, both in the nat table
  * and the filter table */
 const char * miniupnpd_nat_chain = "MINIUPNPD";
+const char * miniupnpd_peer_chain = "MINIUPNPD-PCP-PEER";
 const char * miniupnpd_forward_chain = "MINIUPNPD";
 #ifdef ENABLE_6FC_SERVICE
 const char * miniupnpd_v6_filter_chain = "MINIUPNPD";

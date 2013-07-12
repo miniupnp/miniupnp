@@ -12,12 +12,19 @@ case "$argv" in
 	--igd2) IGD2=1 ;;
 	--strict) STRICT=1 ;;
 	--leasefile) LEASEFILE=1 ;;
+	--pcp) PCP=1 ;;
+	--pcp-peer)
+		PCP=1
+		PCP_PEER=1
+		;;
 	--help|-h)
 		echo "Usage : $0 [options]"
 		echo " --ipv6      enable IPv6"
 		echo " --igd2      build an IGDv2 instead of an IGDv1"
 		echo " --strict    be more strict regarding compliance with UPnP specifications"
 		echo " --leasefile enable lease file"
+		echo " --pcp       enable PCP"
+		echo " --pcp-peer  enable PCP PEER operation"
 		exit 1
 		;;
 	*)
@@ -323,6 +330,31 @@ echo "" >> ${CONFIGFILE}
 
 echo "/* Comment the following line to disable NAT-PMP operations */" >> ${CONFIGFILE}
 echo "#define ENABLE_NATPMP" >> ${CONFIGFILE}
+echo "" >> ${CONFIGFILE}
+
+if [ -n "$PCP" ]; then
+echo "/* Comment the following line to disable PCP operations */" >> ${CONFIGFILE}
+echo "#define ENABLE_PCP" >> ${CONFIGFILE}
+echo "" >> ${CONFIGFILE}
+else
+echo "/* Uncomment the following line to enable PCP operations */" >> ${CONFIGFILE}
+echo "/*#define ENABLE_PCP*/" >> ${CONFIGFILE}
+echo "" >> ${CONFIGFILE}
+fi
+
+echo "#ifdef ENABLE_PCP" >> ${CONFIGFILE}
+if [ -n "$PCP_PEER" ]; then
+echo "/* Comment the following line to disable PCP PEER operation */" >> ${CONFIGFILE}
+echo "#define PCP_PEER" >> ${CONFIGFILE}
+else
+echo "/* Uncomment the following line to enable PCP PEER operation */" >> ${CONFIGFILE}
+echo "/*#define PCP_PEER*/" >> ${CONFIGFILE}
+fi
+echo "#ifdef PCP_PEER" >> ${CONFIGFILE}
+echo "/*#define PCP_FLOWP*/" >> ${CONFIGFILE}
+echo "#endif //PCP_PEER" >> ${CONFIGFILE}
+echo "/*#define PCP_SADSCP*/" >> ${CONFIGFILE}
+echo "#endif //ENABLE_PCP" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
 echo "/* Uncomment the following line to enable generation of" >> ${CONFIGFILE}

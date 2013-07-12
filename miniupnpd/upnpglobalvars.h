@@ -32,6 +32,10 @@ extern unsigned long upstream_bitrate;
 /* statup time */
 extern time_t startup_time;
 
+extern unsigned long int min_lifetime;
+extern unsigned long int max_lifetime;
+
+
 /* runtime boolean flags */
 extern int runtime_flags;
 #define LOGPACKETSMASK		0x0001
@@ -81,6 +85,10 @@ extern unsigned int nextnatpmptoclean_timestamp;
 extern unsigned short nextnatpmptoclean_eport;
 extern unsigned short nextnatpmptoclean_proto;
 #endif
+#ifdef PCP_SADSCP
+extern struct dscp_values* dscp_values_list;
+extern unsigned int num_dscp_values;
+#endif
 #endif
 
 /* For automatic removal of expired rules (with LeaseDuration) */
@@ -95,6 +103,7 @@ extern const char * tag;
 
 #ifdef USE_NETFILTER
 extern const char * miniupnpd_nat_chain;
+extern const char * miniupnpd_peer_chain;
 extern const char * miniupnpd_forward_chain;
 #ifdef ENABLE_6FC_SERVICE
 extern const char * miniupnpd_v6_filter_chain;
