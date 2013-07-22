@@ -833,7 +833,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 
 		if(r==0) {
 			if((strncmp(pcp_msg_info->senderaddrstr, iaddr_old,
-                sizeof(iaddr_old))!=0)
+			   sizeof(iaddr_old))!=0)
 			   || (pcp_msg_info->int_port != iport_old)) {
 				/* redirection already existing */
 				if (pcp_msg_info->pfailure_present) {
@@ -850,7 +850,12 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 		}
 	} while (r==0);
 
-	if (pcp_msg_info->ext_port == 0) {
+	if ((pcp_msg_info->ext_port == 0) ||
+	    (IN6_IS_ADDR_V4MAPPED(pcp_msg_info->int_ip) &&
+	      (!check_upnp_rule_against_permissions(upnppermlist,
+	               num_upnpperm, pcp_msg_info->ext_port,
+	               ((struct in_addr*)pcp_msg_info->int_ip->s6_addr)[3],
+	               pcp_msg_info->int_port)))) {
 		pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 		return;
 	}
