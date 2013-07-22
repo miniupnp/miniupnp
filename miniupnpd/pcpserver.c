@@ -843,7 +843,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 			} else {
 				if (_upnp_delete_redir(pcp_msg_info->ext_port,
 						pcp_msg_info->protocol)==0) {
-					return;
+					break;
 				}
 			}
 			pcp_msg_info->ext_port++;
