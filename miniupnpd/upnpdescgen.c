@@ -1260,8 +1260,7 @@ char *
 getVars6FC(int * l)
 {
 	return genEventVars(l,
-	                    &scpd6FC,
-	                    "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1");
+	                    &scpd6FC);
 }
 #endif
 
@@ -1270,8 +1269,7 @@ char *
 getVarsDP(int * l)
 {
 	return genEventVars(l,
-	                    &scpdDP,
-	                    "urn:schemas-upnp-org:service:DeviceProtection:1");
+	                    &scpdDP);
 }
 #endif
 
