@@ -1,36 +1,37 @@
-protocole :
+protocol :
 
-connection à la socket unix.
-envoie d'une requete, retour d'une reponse.
-fermeture de la connexion.
+Connect to the unix socket.
+Sent request, answer response.
+close unix socket connection.
 
-format de requete :
-1 octet : type de la requete
+Request format :
+1st byte : request type
           1 - type
-		  2 - USN (id unique)
-		  3 - tout
-n octets longueur de la chaine : 1 octet si < 128 sinon le bit haut
-indique s'il existe un octet suplementaire, etc...
-n octets = chaine
+		  2 - USN (unique id)
+		  3 - everything
+		  4 - submit service (see below)
+n bytes : string length : 1 byte if < 128 else the upper bit indicate that
+one additional byte should be read, etc. (see codelength.h)
+n bytes = string
 
-format reponse :
-1 octet : nombre de reponses
-pour chaque rep :
+Response format :
+1st byte : number of services/devices
+For each service/device :
 URL :
-  n octets longueur de la chaine
-  n octets = chaine Location
+  n bytes string length
+  n bytes = Location string
 ST:
-  n octets longueur de la chaine
-  n octets = chaine type
+  n bytes string length
+  n bytes = type string
 USN:
-  n octets longueur de la chaine
-  n octets = chaine identifiant
+  n bytes string length
+  n bytes = identifier string
 
-Type de requete 4 = submit service
-1 octet = 4
-(k,n) octets : longueur et chaine "ST" (service type)
-(k,n) octets : longueur et chaine "USN"
-(k,n) octets : longueur et chaine "Server"
-(k,n) octets : longueur et chaine "Location"
-Pas de reponse
+request type 4 = submit service
+1st byte  = 4
+(k,n) bytes : length and string "ST" (service type)
+(k,n) bytes : length and string "USN"
+(k,n) bytes : length and string "Server"
+(k,n) bytes : length and string "Location"
+No answer
 
