@@ -782,6 +782,26 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				strncpy(friendly_name, ary_options[i].value, FRIENDLY_NAME_MAX_LEN);
 				friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
 				break;
+			case UPNPMANUFACTURER_NAME:
+				strncpy(manufacturer_name, ary_options[i].value, MANUFACTURER_NAME_MAX_LEN);
+				manufacturer_name[MANUFACTURER_NAME_MAX_LEN-1] = '\0';
+				break;
+			case UPNPMANUFACTURER_URL:
+				strncpy(manufacturer_url, ary_options[i].value, MANUFACTURER_URL_MAX_LEN);
+				manufacturer_url[MANUFACTURER_URL_MAX_LEN-1] = '\0';
+				break;
+			case UPNPMODEL_NAME:
+				strncpy(model_name, ary_options[i].value, MODEL_NAME_MAX_LEN);
+				model_name[MODEL_NAME_MAX_LEN-1] = '\0';
+				break;
+			case UPNPMODEL_DESCRIPTION:
+				strncpy(model_description, ary_options[i].value, MODEL_DESCRIPTION_MAX_LEN);
+				model_description[MODEL_DESCRIPTION_MAX_LEN-1] = '\0';
+				break;
+			case UPNPMODEL_URL:
+				strncpy(model_url, ary_options[i].value, MODEL_URL_MAX_LEN);
+				model_url[MODEL_URL_MAX_LEN-1] = '\0';
+				break;
 #ifdef USE_NETFILTER
 			case UPNPFORWARDCHAIN:
 				miniupnpd_forward_chain = ary_options[i].value;

@@ -74,6 +74,21 @@ extern char presentationurl[];
 #define FRIENDLY_NAME_MAX_LEN (64)
 extern char friendly_name[];
 
+#define MANUFACTURER_NAME_MAX_LEN (64)
+extern char manufacturer_name[];
+
+#define MANUFACTURER_URL_MAX_LEN (64)
+extern char manufacturer_url[];
+
+#define MODEL_NAME_MAX_LEN (64)
+extern char model_name[];
+
+#define MODEL_DESCRIPTION_MAX_LEN (64)
+extern char model_description[];
+
+#define MODEL_URL_MAX_LEN (64)
+extern char model_url[];
+
 /* UPnP permission rules : */
 extern struct upnpperm * upnppermlist;
 extern unsigned int num_upnpperm;

@@ -16,6 +16,7 @@
 #include "macros.h"
 #include "config.h"
 #include "upnpdescgen.h"
+#include "upnpdescstrings.h"
 
 char uuidvalue_igd[] = "uuid:12345678-0000-0000-0000-000000abcd01";
 char uuidvalue_wan[] = "uuid:12345678-0000-0000-0000-000000abcd02";
@@ -25,6 +26,11 @@ char modelnumber[] = "1";
 char presentationurl[] = "http://192.168.0.1:8080/";
 /*char presentationurl[] = "";*/
 char friendly_name[] = OS_NAME " router";
+char manufacturer_name[] = ROOTDEV_MANUFACTURER;
+char manufacturer_url[] = ROOTDEV_MANUFACTURERURL;
+char model_name[] = ROOTDEV_MODELNAME;
+char model_description[] = ROOTDEV_MODELDESCRIPTION;
+char model_url[] = ROOTDEV_MODELURL;
 
 char * use_ext_ip_addr = NULL;
 const char * ext_if_name = "eth0";

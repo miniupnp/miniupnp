@@ -23,6 +23,11 @@ enum upnpconfigoptions {
 	UPNPBITRATE_DOWN,		/* "bitrate_down" */
 	UPNPPRESENTATIONURL,	/* presentation_url */
 	UPNPFRIENDLY_NAME,		/* "friendly_name" */
+	UPNPMANUFACTURER_NAME,	/* "manufacturer_name" */
+	UPNPMANUFACTURER_URL,	/* "manufacturer_url" */
+	UPNPMODEL_NAME,	/* "model_name" */
+	UPNPMODEL_DESCRIPTION,	/* "model_description" */
+	UPNPMODEL_URL,	/* "model_url" */
 	UPNPNOTIFY_INTERVAL,	/* notify_interval */
 	UPNPSYSTEM_UPTIME,		/* "system_uptime" */
 	UPNPPACKET_LOG,			/* "packet_log" */
