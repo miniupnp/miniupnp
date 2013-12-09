@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.189 2013/10/07 10:04:55 nanard Exp $
 miniUPnP client Changelog.
 
+2013/12/09:
+  --help and -h arguments in upnpc.c
+
 2013/10/07:
   fixed potential buffer overrun in miniwget.c
   Modified UPNP_GetValidIGD() to check for ExternalIpAddress
