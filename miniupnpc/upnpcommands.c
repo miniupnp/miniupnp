@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.c,v 1.40 2012/06/23 22:36:35 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.41 2013/12/09 08:18:23 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2012 Thomas Bernard
@@ -759,7 +759,7 @@ UPNP_GetFirewallStatus(const char * controlURL,
 	char * fe, *ipa, *p;
 	int ret = UPNPCOMMAND_UNKNOWN_ERROR;
 
-	if(!firewallEnabled && !inboundPinholeAllowed)
+	if(!firewallEnabled || !inboundPinholeAllowed)
 		return UPNPCOMMAND_INVALID_ARGS;
 
 	buffer = simpleUPnPcommand(-1, controlURL, servicetype,
