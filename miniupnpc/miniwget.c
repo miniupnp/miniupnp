@@ -162,7 +162,7 @@ getHTTPResponse(int s, int * size)
 							chunked = 1;
 						}
 					}
-					while(header_buf[i]=='\r' || header_buf[i] == '\n')
+					while((i < (int)header_buf_used) && (header_buf[i]=='\r' || header_buf[i] == '\n'))
 						i++;
 					linestart = i;
 					colon = linestart;
