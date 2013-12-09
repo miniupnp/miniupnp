@@ -882,7 +882,7 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
  *         not connected
  *     3 = an UPnP device has been found but was not recognized as an IGD
  *
- * In any non zero return case, the urls and data structures
+ * In any positive non zero return case, the urls and data structures
  * passed as parameters are set. Donc forget to call FreeUPNPUrls(urls) to
  * free allocated memory.
  */
@@ -895,11 +895,14 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	struct xml_desc {
 		char * xml;
 		int size;
+		int is_igd;
 	} * desc = NULL;
 	struct UPNPDev * dev;
 	int ndev = 0;
 	int i;
 	int state = -1; /* state 1 : IGD connected. State 2 : IGD. State 3 : anything */
+	int n_igd = 0;
+	char extIpAddr[16];
 	if(!devlist)
 	{
 #ifdef DEBUG
@@ -907,6 +910,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 #endif
 		return 0;
 	}
+	/* counting total number of devices in the list */
 	for(dev = devlist; dev; dev = dev->pNext)
 		ndev++;
 	if(ndev > 0)
@@ -915,41 +919,58 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 		if(!desc)
 			return -1; /* memory allocation error */
 	}
+	/* Step 1 : downloading descriptions and testing type */
+	for(dev = devlist, i = 0; dev; dev = dev->pNext, i++)
+	{
+		/* we should choose an internet gateway device.
+		 * with st == urn:schemas-upnp-org:device:InternetGatewayDevice:1 */
+		desc[i].xml = miniwget_getaddr(dev->descURL, &(desc[i].size),
+		                               lanaddr, lanaddrlen,
+		                               dev->scope_id);
+#ifdef DEBUG
+		if(!desc[i].xml)
+		{
+			printf("error getting XML description %s\n", dev->descURL);
+		}
+#endif
+		if(desc[i].xml)
+		{
+			memset(data, 0, sizeof(struct IGDdatas));
+			memset(urls, 0, sizeof(struct UPNPUrls));
+			parserootdesc(desc[i].xml, desc[i].size, data);
+			if(0==strcmp(data->CIF.servicetype,
+			   "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1"))
+			{
+				desc[i].is_igd = 1;
+				n_igd++;
+			}
+		}
+	}
+	/* iterate the list to find a device depending on state */
 	for(state = 1; state <= 3; state++)
 	{
 		for(dev = devlist, i = 0; dev; dev = dev->pNext, i++)
 		{
-			/* we should choose an internet gateway device.
-		 	* with st == urn:schemas-upnp-org:device:InternetGatewayDevice:1 */
-			if(state == 1)
-			{
-				desc[i].xml = miniwget_getaddr(dev->descURL, &(desc[i].size),
-				   	                           lanaddr, lanaddrlen,
-				                               dev->scope_id);
-#ifdef DEBUG
-				if(!desc[i].xml)
-				{
-					printf("error getting XML description %s\n", dev->descURL);
-				}
-#endif
-			}
 			if(desc[i].xml)
 			{
 				memset(data, 0, sizeof(struct IGDdatas));
 				memset(urls, 0, sizeof(struct UPNPUrls));
 				parserootdesc(desc[i].xml, desc[i].size, data);
-				if(0==strcmp(data->CIF.servicetype,
-				   "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1")
-				   || state >= 3 )
+				if(desc[i].is_igd || state >= 3 )
 				{
 				  GetUPNPUrls(urls, data, dev->descURL, dev->scope_id);
 
+				  /* in state 2 and 3 we dont test if device is connected ! */
+				  if(state >= 2)
+				    goto free_and_return;
 #ifdef DEBUG
 				  printf("UPNPIGD_IsConnected(%s) = %d\n",
 				     urls->controlURL,
 			         UPNPIGD_IsConnected(urls, data));
 #endif
-				  if((state >= 2) || UPNPIGD_IsConnected(urls, data))
+				  /* checks that status is connected AND there is a external IP address assigned */
+				  if(UPNPIGD_IsConnected(urls, data)
+				     && (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0))
 					goto free_and_return;
 				  FreeUPNPUrls(urls);
 				  if(data->second.servicetype[0] != '\0') {
@@ -967,7 +988,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				       urls->controlURL,
 			           UPNPIGD_IsConnected(urls, data));
 #endif
-				    if((state >= 2) || UPNPIGD_IsConnected(urls, data))
+				    if(UPNPIGD_IsConnected(urls, data)
+				       && (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0))
 					  goto free_and_return;
 				    FreeUPNPUrls(urls);
 				  }
