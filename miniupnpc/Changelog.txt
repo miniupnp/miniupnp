@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.187 2013/06/06 21:36:39 nanard Exp $
 miniUPnP client Changelog.
 
+2013/08/01:
+  define MAXHOSTNAMELEN if not already done
+
 2013/06/06:
   update upnpreplyparse to allow larger values (128 chars instead of 64)
 

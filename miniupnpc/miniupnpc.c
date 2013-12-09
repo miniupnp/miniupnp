@@ -1,8 +1,8 @@
-/* $Id: miniupnpc.c,v 1.111 2012/10/09 17:53:14 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.113 2013/10/07 10:04:56 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2012 Thomas Bernard
+ * copyright (c) 2005-2013 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #define __EXTENSIONS__ 1
@@ -95,6 +95,10 @@ struct ip_mreqn
 #define PRINT_SOCKET_ERROR(x)    printf("Socket error: %s, %d\n", x, WSAGetLastError());
 #else
 #define PRINT_SOCKET_ERROR(x) perror(x)
+#endif
+
+#ifndef MAXHOSTNAMELEN
+#define MAXHOSTNAMELEN 64
 #endif
 
 #define SOAPPREFIX "s"

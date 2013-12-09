@@ -1,8 +1,8 @@
-/* $Id: miniwget.c,v 1.58 2012/08/11 05:52:49 nanard Exp $ */
+/* $Id: miniwget.c,v 1.60 2013/10/07 10:03:16 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2012 Thomas Bernard
+ * Copyright (c) 2005-2013 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -51,6 +51,10 @@
 #include "miniwget.h"
 #include "connecthostport.h"
 #include "receivedata.h"
+
+#ifndef MAXHOSTNAMELEN
+#define MAXHOSTNAMELEN 64
+#endif
 
 /*
  * Read a HTTP response from a socket.
