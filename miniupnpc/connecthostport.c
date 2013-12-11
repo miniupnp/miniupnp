@@ -1,7 +1,7 @@
-/* $Id: connecthostport.c,v 1.9 2012/06/26 00:00:27 nanard Exp $ */
+/* $Id: connecthostport.c,v 1.11 2013/08/01 21:21:25 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2010-2012 Thomas Bernard
+ * Copyright (c) 2010-2013 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -50,6 +50,10 @@
 #endif
 
 #include "connecthostport.h"
+
+#ifndef MAXHOSTNAMELEN
+#define MAXHOSTNAMELEN 64
+#endif
 
 /* connecthostport()
  * return a socket connected (TCP) to the host and port

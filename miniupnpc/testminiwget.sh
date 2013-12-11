@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.9 2013/04/27 15:47:27 nanard Exp $
+# $Id: testminiwget.sh,v 1.10 2013/11/13 15:08:08 nanard Exp $
 # project miniupnp : http://miniupnp.free.fr/
 # (c) 2011-2012 Thomas Bernard
 #
@@ -13,7 +13,7 @@
 #  4 - kills the local HTTP server and exits
 #
 # The script was tested and works with ksh, bash
-# It fails to run with dash 0.5.5.1 because of "kill %1"
+# it should now also run with dash
 
 TMPD=`mktemp -d miniwgetXXXXXXXXXX`
 HTTPSERVEROUT="${TMPD}/httpserverout"

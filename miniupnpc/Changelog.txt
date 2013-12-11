@@ -1,5 +1,15 @@
-$Id: Changelog.txt,v 1.187 2013/06/06 21:36:39 nanard Exp $
+$Id: Changelog.txt,v 1.189 2013/10/07 10:04:55 nanard Exp $
 miniUPnP client Changelog.
+
+2013/12/09:
+  --help and -h arguments in upnpc.c
+
+2013/10/07:
+  fixed potential buffer overrun in miniwget.c
+  Modified UPNP_GetValidIGD() to check for ExternalIpAddress
+
+2013/08/01:
+  define MAXHOSTNAMELEN if not already done
 
 2013/06/06:
   update upnpreplyparse to allow larger values (128 chars instead of 64)
