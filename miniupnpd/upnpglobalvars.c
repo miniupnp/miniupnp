@@ -10,6 +10,7 @@
 
 #include "config.h"
 #include "upnpglobalvars.h"
+#include "upnpdescstrings.h"
 
 /* network interface for internet */
 const char * ext_if_name = 0;
@@ -52,6 +53,21 @@ char presentationurl[PRESENTATIONURL_MAX_LEN];
 
 /* friendly name for root devices in XML description */
 char friendly_name[FRIENDLY_NAME_MAX_LEN] = OS_NAME " router";
+
+/* manufacturer name for root devices in XML description */
+char manufacturer_name[MANUFACTURER_NAME_MAX_LEN] = ROOTDEV_MANUFACTURER;
+
+/* manufacturer url for root devices in XML description */
+char manufacturer_url[MANUFACTURER_URL_MAX_LEN] = ROOTDEV_MANUFACTURERURL;
+
+/* model name for root devices in XML description */
+char model_name[MODEL_NAME_MAX_LEN] = ROOTDEV_MODELNAME;
+
+/* model description for root devices in XML description */
+char model_description[MODEL_DESCRIPTION_MAX_LEN] = ROOTDEV_MODELDESCRIPTION;
+
+/* model url for root devices in XML description */
+char model_url[MODEL_URL_MAX_LEN] = ROOTDEV_MODELURL;
 
 /* UPnP permission rules : */
 struct upnpperm * upnppermlist = 0;
