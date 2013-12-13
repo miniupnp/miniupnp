@@ -71,6 +71,7 @@ extern char modelnumber[];
 #define PRESENTATIONURL_MAX_LEN (64)
 extern char presentationurl[];
 
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 #define FRIENDLY_NAME_MAX_LEN (64)
 extern char friendly_name[];
 
@@ -88,6 +89,7 @@ extern char model_description[];
 
 #define MODEL_URL_MAX_LEN (64)
 extern char model_url[];
+#endif
 
 /* UPnP permission rules : */
 extern struct upnpperm * upnppermlist;

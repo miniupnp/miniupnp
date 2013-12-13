@@ -2,7 +2,7 @@
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -22,12 +22,14 @@ enum upnpconfigoptions {
 	UPNPBITRATE_UP,			/* "bitrate_up" */
 	UPNPBITRATE_DOWN,		/* "bitrate_down" */
 	UPNPPRESENTATIONURL,	/* presentation_url */
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 	UPNPFRIENDLY_NAME,		/* "friendly_name" */
 	UPNPMANUFACTURER_NAME,	/* "manufacturer_name" */
 	UPNPMANUFACTURER_URL,	/* "manufacturer_url" */
 	UPNPMODEL_NAME,	/* "model_name" */
 	UPNPMODEL_DESCRIPTION,	/* "model_description" */
 	UPNPMODEL_URL,	/* "model_url" */
+#endif
 	UPNPNOTIFY_INTERVAL,	/* notify_interval */
 	UPNPSYSTEM_UPTIME,		/* "system_uptime" */
 	UPNPPACKET_LOG,			/* "packet_log" */

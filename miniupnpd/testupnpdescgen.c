@@ -25,12 +25,14 @@ char serialnumber[] = "12345678";
 char modelnumber[] = "1";
 char presentationurl[] = "http://192.168.0.1:8080/";
 /*char presentationurl[] = "";*/
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 char friendly_name[] = OS_NAME " router";
 char manufacturer_name[] = ROOTDEV_MANUFACTURER;
 char manufacturer_url[] = ROOTDEV_MANUFACTURERURL;
 char model_name[] = ROOTDEV_MODELNAME;
 char model_description[] = ROOTDEV_MODELDESCRIPTION;
 char model_url[] = ROOTDEV_MODELURL;
+#endif
 
 char * use_ext_ip_addr = NULL;
 const char * ext_if_name = "eth0";

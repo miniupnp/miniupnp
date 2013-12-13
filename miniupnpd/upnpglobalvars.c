@@ -51,6 +51,7 @@ char modelnumber[MODELNUMBER_MAX_LEN] = "1";
  * http://nnn.nnn.nnn.nnn:ppppp/  => max 30 bytes including terminating 0 */
 char presentationurl[PRESENTATIONURL_MAX_LEN];
 
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 /* friendly name for root devices in XML description */
 char friendly_name[FRIENDLY_NAME_MAX_LEN] = OS_NAME " router";
 
@@ -68,6 +69,7 @@ char model_description[MODEL_DESCRIPTION_MAX_LEN] = ROOTDEV_MODELDESCRIPTION;
 
 /* model url for root devices in XML description */
 char model_url[MODEL_URL_MAX_LEN] = ROOTDEV_MODELURL;
+#endif
 
 /* UPnP permission rules : */
 struct upnpperm * upnppermlist = 0;

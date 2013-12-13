@@ -778,6 +778,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPPRESENTATIONURL:
 				presurl = ary_options[i].value;
 				break;
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 			case UPNPFRIENDLY_NAME:
 				strncpy(friendly_name, ary_options[i].value, FRIENDLY_NAME_MAX_LEN);
 				friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
@@ -802,6 +803,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				strncpy(model_url, ary_options[i].value, MODEL_URL_MAX_LEN);
 				model_url[MODEL_URL_MAX_LEN-1] = '\0';
 				break;
+#endif
 #ifdef USE_NETFILTER
 			case UPNPFORWARDCHAIN:
 				miniupnpd_forward_chain = ary_options[i].value;
@@ -947,6 +949,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			} else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 		case 'z':
 			if(i+1 < argc)
 				strncpy(friendly_name, argv[++i], FRIENDLY_NAME_MAX_LEN);
@@ -954,6 +957,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
 			break;
+#endif
 		case 's':
 			if(i+1 < argc)
 				strncpy(serialnumber, argv[++i], SERIALNUMBER_MAX_LEN);
@@ -1281,7 +1285,10 @@ print_usage:
 			"\n"
 			/*"[-l logfile] " not functionnal */
 			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
-			"\t\t[-t notify_interval] [-P pid_filename] [-z fiendly_name]\n"
+			"\t\t[-t notify_interval] [-P pid_filename] "
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
+			"[-z fiendly_name]\n"
+#endif
 			"\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
 #ifdef USE_PF
                         "\t\t[-q queue] [-T tag]\n"
