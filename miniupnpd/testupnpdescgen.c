@@ -17,6 +17,7 @@
 #include "config.h"
 #include "upnpdescgen.h"
 #include "upnpdescstrings.h"
+#include "getifaddr.h"
 
 char uuidvalue_igd[] = "uuid:12345678-0000-0000-0000-000000abcd01";
 char uuidvalue_wan[] = "uuid:12345678-0000-0000-0000-000000abcd02";
@@ -42,9 +43,11 @@ int ipv6fc_firewall_enabled = 1;
 int ipv6fc_inbound_pinhole_allowed = 1;
 #endif
 
-int getifaddr(const char * ifname, char * buf, int len)
+int getifaddr(const char * ifname, char * buf, int len, struct in_addr * addr, struct in_addr * mask)
 {
 	UNUSED(ifname);
+	UNUSED(addr);
+	UNUSED(mask);
 	strncpy(buf, "1.2.3.4", len);
 	return 0;
 }
