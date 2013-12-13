@@ -45,7 +45,7 @@ MANINSTALLDIR = $(INSTALLPREFIX)/share/man/man8
 BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o \
            upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
-           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o\
+           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
            upnpevents.o upnputils.o getconnstatus.o \
            upnppinhole.o pcplearndscp.o
 
