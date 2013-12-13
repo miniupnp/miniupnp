@@ -506,6 +506,11 @@ int main(int argc, char ** argv)
 	/* command line processing */
 	for(i=1; i<argc; i++)
 	{
+		if(0 == strcmp(argv[i], "--help") || 0 == strcmp(argv[i], "-h"))
+		{
+			command = 0;
+			break;
+		}
 		if(argv[i][0] == '-')
 		{
 			if(argv[i][1] == 'u')

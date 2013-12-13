@@ -20,7 +20,11 @@
 
 int OpenAndConfNATPMPSockets(int * sockets);
 
-void ProcessIncomingNATPMPPacket(int s);
+int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr_in* senderaddr,
+		unsigned char *msg_buff, size_t msg_buff_size);
+
+void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
+	    struct sockaddr_in *senderaddr);
 
 #if 0
 int ScanNATPMPforExpiration(void);

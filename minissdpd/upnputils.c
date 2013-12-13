@@ -1,13 +1,15 @@
-/* $Id: upnputils.c,v 1.5 2012/05/24 16:51:09 nanard Exp $ */
+/* $Id: upnputils.c,v 1.1 2013/09/07 06:45:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
 #include "config.h"
 
 #include <stdio.h>
+#include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
