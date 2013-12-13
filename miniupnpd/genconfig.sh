@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.63 2013/05/03 09:30:10 nanard Exp $
+# $Id: genconfig.sh,v 1.65 2013/12/13 14:07:08 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2013 Thomas Bernard
@@ -352,9 +352,9 @@ echo "/*#define PCP_PEER*/" >> ${CONFIGFILE}
 fi
 echo "#ifdef PCP_PEER" >> ${CONFIGFILE}
 echo "/*#define PCP_FLOWP*/" >> ${CONFIGFILE}
-echo "#endif //PCP_PEER" >> ${CONFIGFILE}
+echo "#endif /*PCP_PEER*/" >> ${CONFIGFILE}
 echo "/*#define PCP_SADSCP*/" >> ${CONFIGFILE}
-echo "#endif //ENABLE_PCP" >> ${CONFIGFILE}
+echo "#endif /*ENABLE_PCP*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
 echo "/* Uncomment the following line to enable generation of" >> ${CONFIGFILE}

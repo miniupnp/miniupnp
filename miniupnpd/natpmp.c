@@ -1,4 +1,4 @@
-/* $Id: natpmp.c,v 1.33 2013/03/23 10:46:55 nanard Exp $ */
+/* $Id: natpmp.c,v 1.35 2013/12/13 14:07:08 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2013 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -156,8 +156,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	unsigned char *req=msg_buff;	/* request udp packet */
 	unsigned char resp[32];	/* response udp packet */
 	int resplen;
-	//struct sockaddr_in senderaddr;
-	//socklen_t senderaddrlen = sizeof(senderaddr);
 	int n = len;
 	char senderaddrstr[16];
 

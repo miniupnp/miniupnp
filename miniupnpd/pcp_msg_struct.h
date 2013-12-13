@@ -1,4 +1,4 @@
-/* $Id: pcp_msg_struct.h $ */
+/* $Id: pcp_msg_struct.h,v 1.2 2013/12/13 15:47:23 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -138,7 +138,7 @@ typedef enum pcp_options  {
 #ifdef WIN32
 #pragma warning (push)
 #pragma warning (disable:4200)
-#endif // WIN32
+#endif /* WIN32 */
 
 #pragma pack(push, 1)
 
@@ -287,4 +287,4 @@ typedef struct pcp_filter_option {
 
 #ifdef WIN32
 #pragma warning (pop)
-#endif // WIN32
+#endif /* WIN32 */

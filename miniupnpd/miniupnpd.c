@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.176 2013/06/13 13:21:29 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.178 2013/12/13 14:10:02 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -1837,10 +1837,10 @@ main(int argc, char * * argv)
 				if (len < 1)
 					continue;
 #ifdef ENABLE_PCP
-				if (msg_buff[0]==0) {  // version equals to 0 -> means NAT-PMP
+				if (msg_buff[0]==0) {  /* version equals to 0 -> means NAT-PMP */
 					ProcessIncomingNATPMPPacket(snatpmp[i], msg_buff, len,
 							&senderaddr);
-				} else { // everything else can be PCP
+				} else { /* everything else can be PCP */
 					ProcessIncomingPCPPacket(snatpmp[i], msg_buff, len,
 							&senderaddr);
 				}

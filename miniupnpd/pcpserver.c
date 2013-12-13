@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c $ */
+/* $Id: pcpserver.c,v 1.2 2013/12/13 15:48:56 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -61,7 +61,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "pcp_msg_struct.h"
 
 #ifdef PCP_PEER
-//TODO make this platform independent
+/* TODO make this platform independent */
 #include "netfilter/iptcrdr.h"
 #endif
 
@@ -104,7 +104,7 @@ typedef struct pcp_info {
 #ifdef PCP_PEER
 	uint16_t    peer_port;
 	const struct in6_addr    *peer_ip; /* Destination IP in network order */
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 	/* SADSCP specific information */
@@ -232,7 +232,7 @@ static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
 	syslog(LOG_DEBUG, "MAP Ext IP: \t\t %s\n", inet_ntop(AF_INET6,
 	       map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
 }
-#endif //DEBUG
+#endif /* DEBUG */
 
 static int parsePCPMAP_version1(pcp_map_v1_t *map_v1, \
 		pcp_info_t *pcp_msg_info)
@@ -303,7 +303,7 @@ static void printPEEROpcodeVersion2(pcp_peer_v2_t *peer_buf)
 	       peer_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "PEER port port: \t\t %d\n", ntohs(peer_buf->peer_port) );
 }
-#endif //DEBUG
+#endif /* DEBUG */
 
 /*
  * Function extracting information from peer_buf to pcp_msg_info
@@ -352,7 +352,7 @@ static int parsePCPPEER_version2(pcp_peer_v2_t *peer_buf, \
 	}
 	return 0;
 }
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 #ifdef DEBUG
@@ -481,7 +481,7 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize
 		break;
 
 	case PCP_OPTION_FILTER:
-		// TODO fully implement filter
+		/* TODO fully implement filter */
 		opt_filter = (pcp_filter_option_t*) (pcp_buf + processed);
 		option_length = ntohs(opt_filter->len);
 
@@ -538,7 +538,7 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize
 		break;
 	}
 
-	// shift processed and remaining values to new values
+	/* shift processed and remaining values to new values */
 	*remainingSize = remain;
 	*processedSize = processed;
 	return pcp_msg_info->result_code;
@@ -675,7 +675,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			return 0;
 		}
 	}
-	//Create Peer Mapping
+	/* Create Peer Mapping */
 	{
 		char desc[64];
 		char peerip_s[INET_ADDRSTRLEN], extip_s[INET_ADDRSTRLEN];
@@ -724,7 +724,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			}
 		}
 #endif
-		//TODO: add upnp function for PI
+		/* TODO: add upnp function for PI */
 		if (add_peer_redirect_rule2(ext_if_name,
 		        peerip_s,
 		        pcp_msg_info->peer_port,
@@ -810,7 +810,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 	}
 }
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
@@ -903,7 +903,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	char desc[64];
 	unsigned int timestamp;
 
-	//iterate through all rules and delete the requested ones
+	/* iterate through all rules and delete the requested ones */
 	while(get_redirect_rule_by_index(index, 0,
 	      &eport2, iaddr2, sizeof(iaddr2),
 	      &iport2, &proto2,
@@ -912,7 +912,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 
 		if(0 == strncmp(iaddr2, pcp_msg_info->senderaddrstr, sizeof(iaddr2))
 		  && (proto2==proto)
-		  && (0 == strncmp(desc, "PCP", 3)) //starts with PCP
+		  && (0 == strncmp(desc, "PCP", 3)) /* starts with PCP */
 		  && ((iport2==iport) || (iport==0))) {
 
 			r = _upnp_delete_redir(eport2, proto2);
@@ -984,26 +984,26 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 #ifdef PCP_SADSCP
 	pcp_sadscp_req_t* sadscp;
 #endif
-	// start with PCP_SUCCESS as result code, if everything is OK value will be unchanged
+	/* start with PCP_SUCCESS as result code, if everything is OK value will be unchanged */
 	pcp_msg_info->result_code = PCP_SUCCESS;
 
 	remainingSize = req_size;
 	processedSize = 0;
 
-	// discard request that exceeds maximal length,
-	// or that is shorter than 3
-	// or that is not the multiple of 4
+	/* discard request that exceeds maximal length,
+	   or that is shorter than 3
+	   or that is not the multiple of 4 */
 	if (req_size < PCP_MIN_LEN)
-		return 0; //ignore msg
+		return 0; /* ignore msg */
 
 	if ( (req_size > PCP_MAX_LEN) || ( (req_size & 3) != 0)) {
 		syslog(LOG_ERR, "PCP: Size of PCP packet(%d) is larger than %d bytes or "
 		       "the size is not multiple of 4.\n", req_size, PCP_MAX_LEN);
 		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
-		return 1; // send response
+		return 1; /* send response */
 	}
 
-	//first print out info from common request header
+	/* first print out info from common request header */
 	common_req = (pcp_request_t*)req;
 
 	if (parseCommonRequestHeader(common_req, pcp_msg_info) ) {
@@ -1027,7 +1027,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			map_v1 = (pcp_map_v1_t*)(req + processedSize);
 #ifdef DEBUG
 			printMAPOpcodeVersion1(map_v1);
-#endif //DEBUG
+#endif /* DEBUG */
 			if ( parsePCPMAP_version1(map_v1, pcp_msg_info) ) {
 				return pcp_msg_info->result_code;
 			}
@@ -1062,7 +1062,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 #ifdef DEBUG
 			printPEEROpcodeVersion1(peer_v1);
-#endif //DEBUG
+#endif /* DEBUG */
 			if ( parsePCPPEER_version1(peer_v1, pcp_msg_info) ) {
 				 return pcp_msg_info->result_code;
 			}
@@ -1085,7 +1085,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 
 			break;
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 		default:
 			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
 			break;
@@ -1106,7 +1106,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 #ifdef DEBUG
 			printMAPOpcodeVersion2(map_v2);
-#endif //DEBUG
+#endif /* DEBUG */
 
 			if (parsePCPMAP_version2(map_v2, pcp_msg_info) ) {
 				return pcp_msg_info->result_code;
@@ -1142,7 +1142,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 #ifdef DEBUG
 			printPEEROpcodeVersion2(peer_v2);
-#endif //DEBUG
+#endif /* DEBUG */
 			parsePCPPEER_version2(peer_v2, pcp_msg_info);
 			processedSize += sizeof(pcp_peer_v2_t);
 
@@ -1165,7 +1165,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			}
 
 		break;
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 		case PCP_OPCODE_SADSCP:
@@ -1225,7 +1225,7 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 	resp->result_code = pcp_msg_info->result_code;
 	resp->epochtime = htonl(time(NULL) - startup_time);
 	switch (pcp_msg_info->result_code) {
-	//long lifetime errors
+	/*long lifetime errors*/
 	case PCP_ERR_UNSUPP_VERSION:
 	case PCP_ERR_NOT_AUTHORIZED:
 	case PCP_ERR_MALFORMED_REQUEST:
@@ -1286,7 +1286,7 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 			               (uint32_t*)pcp_msg_info->ext_ip);
 		}
 	}
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 	else if (resp->r_opcode == 0x83) { /*SADSCP response*/
@@ -1296,10 +1296,10 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 		sadscp_resp->a_r_dscp_value |= (pcp_msg_info->sadscp_dscp & PCP_SADSCP_MASK);
 		memset(sadscp_resp->reserved, 0, sizeof(sadscp_resp->reserved));
 	}
-#endif //PCP_SADSCP
+#endif /* PCP_SADSCP */
 }
 
-int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len, \
+int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
                              struct sockaddr_in *senderaddr)
 {
 	pcp_info_t pcp_msg_info;
@@ -1324,7 +1324,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len, \
 		createPCPResponse(buff, &pcp_msg_info);
 
 		if ((len&0x03)!=0) {
-			len = len+4-(len&0x03); //round up resp. length to multiple of 4
+			len = len+4-(len&0x03); /* round up resp. length to multiple of 4 */
 		}
 
 		len = sendto(s, buff, len, 0,
