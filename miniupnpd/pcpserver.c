@@ -1323,10 +1323,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 		createPCPResponse(buff, &pcp_msg_info);
 
-		if ((len&0x03)!=0) {
-			len = len+4-(len&0x03); /* round up resp. length to multiple of 4 */
-		}
-
+		len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
 		len = sendto(s, buff, len, 0,
 		           (struct sockaddr *)senderaddr, sizeof(struct sockaddr_in));
 		if( len < 0 ) {
