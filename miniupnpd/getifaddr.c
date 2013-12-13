@@ -1,4 +1,4 @@
-/* $Id: getifaddr.c,v 1.17 2013/04/27 15:40:09 nanard Exp $ */
+/* $Id: getifaddr.c,v 1.19 2013/12/13 14:28:40 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -141,20 +141,26 @@ int getifaddr_in6(const char * ifname, struct in6_addr * addr){
 		switch(ife->ifa_addr->sa_family)
 		{
 		case AF_INET:
+#if 0
 			addr->s6_addr32[0]=0;
 			addr->s6_addr32[1]=0;
 			addr->s6_addr32[2]=htonl(0xffff);
 			addr->s6_addr32[3]=((struct sockaddr_in *)ife->ifa_addr)->sin_addr.s_addr;
-			//inet_ntop(ife->ifa_addr->sa_family,
-			//		&((struct sockaddr_in *)ife->ifa_addr)->sin_addr,
-			//		buf, len);
+#endif
+			memset(addr->s6_addr, 0, 10);
+			addr->s6_addr[10] = 0xff;
+			addr->s6_addr[11] = 0xff;
+			memcpy(addr->s6_addr + 12, &(((struct sockaddr_in *)ife->ifa_addr)->sin_addr.s_addr), 4);
+			/*inet_ntop(ife->ifa_addr->sa_family,
+					&((struct sockaddr_in *)ife->ifa_addr)->sin_addr,
+					buf, len);*/
 			found = 1;
 			break;
 
 		case AF_INET6:
-			if(!IN6_IS_ADDR_LOOPBACK(&addr->s6_addr32)
-			   && !IN6_IS_ADDR_LINKLOCAL(&addr->s6_addr32)) {
-				memcpy(addr->s6_addr32, &((struct sockaddr_in6 *)ife->ifa_addr)->sin6_addr, sizeof(addr->s6_addr32));
+			if(!IN6_IS_ADDR_LOOPBACK(addr)
+			   && !IN6_IS_ADDR_LINKLOCAL(addr)) {
+				memcpy(addr->s6_addr, &((struct sockaddr_in6 *)ife->ifa_addr)->sin6_addr, 16);
 				found = 1;
 			}
 			break;
