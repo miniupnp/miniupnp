@@ -17,6 +17,13 @@ add_redirect_rule2(const char * ifname,
                    const char * desc, unsigned int timestamp);
 
 int
+add_peer_redirect_rule2(const char * ifname,
+                   const char * rhost, unsigned short rport,
+                   const char * eaddr, unsigned short eport,
+                   const char * iaddr, unsigned short iport, int proto,
+                   const char * desc, unsigned int timestamp);
+
+int
 add_filter_rule2(const char * ifname,
                  const char * rhost, const char * iaddr,
                  unsigned short eport, unsigned short iport,
@@ -25,6 +32,23 @@ add_filter_rule2(const char * ifname,
 int
 delete_redirect_and_filter_rules(unsigned short eport, int proto);
 
+int
+add_peer_dscp_rule2(const char * ifname,
+                   const char * rhost, unsigned short rport,
+                   unsigned char dscp,
+                   const char * iaddr, unsigned short iport, int proto,
+                   const char * desc, unsigned int timestamp);
+
+int get_nat_ext_addr(struct sockaddr* src, struct sockaddr *dst, uint8_t proto,
+                     struct sockaddr* ret_ext);
+int
+get_peer_rule_by_index(int index,
+                           char * ifname, unsigned short * eport,
+                           char * iaddr, int iaddrlen, unsigned short * iport,
+                           int * proto, char * desc, int desclen,
+                           char * rhost, int rhostlen, unsigned short * rport,
+                           unsigned int * timestamp,
+                           u_int64_t * packets, u_int64_t * bytes);
 int
 get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,

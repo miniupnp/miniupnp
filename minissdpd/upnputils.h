@@ -1,7 +1,7 @@
-/* $Id: upnputils.h,v 1.2 2012/02/06 16:21:24 nanard Exp $ */
+/* $Id: upnputils.h,v 1.1 2013/09/07 06:45:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2011-2012 Thomas Bernard
+ * (c) 2011-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 

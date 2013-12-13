@@ -1,6 +1,6 @@
 /* */
 /* MiniUPnP project
- * (c) 2007-2012 Thomas Bernard
+ * (c) 2007-2013 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -21,6 +21,8 @@
 #include "getifaddr.h"
 #include "portinuse.h"
 
+#include "netfilter/iptcrdr.h"
+
 /* Hardcoded for now.  Ideally would come from .conf file */
 char *chains_to_check[] = { "PREROUTING" , 0 };
 
@@ -30,15 +32,15 @@ int port_in_use(const char *if_name, unsigned eport, int proto, const char *iadd
 	FILE *f;
 	int found = 0;
 	char ip_addr_str[INET_ADDRSTRLEN];
-	struct in_addr ip_addr = { .s_addr = 0 };
+	struct in_addr ip_addr;
 	const char tcpfile[] = "/proc/net/tcp";
 	const char udpfile[] = "/proc/net/udp";
 
 	f = fopen((proto==IPPROTO_TCP)?tcpfile:udpfile, "r");
 	if (!f) return 0;
 
-	if(getifaddr(if_name, ip_addr_str, INET_ADDRSTRLEN) == 0)
-		ip_addr.s_addr = inet_addr(ip_addr_str);
+	if(getifaddr(if_name, ip_addr_str, INET_ADDRSTRLEN, &ip_addr, NULL) < 0)
+		ip_addr.s_addr = 0;
 
 	syslog(LOG_DEBUG, "Check protocol %s for port %d on ext_if %s %s, %8X",
 		(proto==IPPROTO_TCP)?"tcp":"udp", eport, if_name, ip_addr_str, (unsigned)ip_addr.s_addr);

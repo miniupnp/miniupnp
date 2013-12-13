@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <syslog.h>
 
-#include "iptcrdr.h"
+#include "iptcrdr.c"
 #include "../commonrdr.h"
 
 #ifndef PRIu64
@@ -30,13 +30,11 @@ main(int argc, char ** argv)
 	eport = (unsigned short)atoi(argv[1]);
 	iaddr = argv[2];
 	iport = (unsigned short)atoi(argv[3]);
-#if 0
 	printf("trying to redirect port %hu to %s:%hu\n", eport, iaddr, iport);
-	if(addnatrule(IPPROTO_TCP, eport, iaddr, iport) < 0)
+	if(addnatrule(IPPROTO_TCP, eport, iaddr, iport, NULL) < 0)
 		return -1;
-	if(add_filter_rule(IPPROTO_TCP, iaddr, iport) < 0)
+	if(add_filter_rule(IPPROTO_TCP, NULL, iaddr, iport) < 0)
 		return -1;
-#endif
 	/* test */
 	{
 		unsigned short p1, p2;

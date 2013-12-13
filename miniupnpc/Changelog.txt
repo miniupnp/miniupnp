@@ -1,5 +1,40 @@
-$Id: Changelog.txt,v 1.180 2012/10/16 16:49:39 nanard Exp $
+$Id: Changelog.txt,v 1.189 2013/10/07 10:04:55 nanard Exp $
 miniUPnP client Changelog.
+
+2013/12/09:
+  --help and -h arguments in upnpc.c
+
+2013/10/07:
+  fixed potential buffer overrun in miniwget.c
+  Modified UPNP_GetValidIGD() to check for ExternalIpAddress
+
+2013/08/01:
+  define MAXHOSTNAMELEN if not already done
+
+2013/06/06:
+  update upnpreplyparse to allow larger values (128 chars instead of 64)
+
+2013/05/14:
+  Update upnpreplyparse to take into account "empty" elements
+  validate upnpreplyparse.c code with "make check"
+
+2013/05/03:
+  Fix Solaris build thanks to Maciej Małecki
+
+2013/04/27:
+  Fix testminiwget.sh for BSD
+
+2013/03/23:
+  Fixed Makefile for *BSD
+
+2013/03/11:
+  Update Makefile to use JNAerator version 0.11
+
+2013/02/11:
+  Fix testminiwget.sh for use with dash
+  Use $(DESTDIR) in Makefile
+
+VERSION 1.8 : released 2013/02/06
 
 2012/10/16:
   fix testminiwget with no IPv6 support

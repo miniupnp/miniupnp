@@ -1,4 +1,4 @@
-/* $Id: upnpglobalvars.h,v 1.33 2012/04/26 14:01:16 nanard Exp $ */
+/* $Id: upnpglobalvars.h,v 1.35 2013/06/13 13:21:30 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -32,6 +32,10 @@ extern unsigned long upstream_bitrate;
 /* statup time */
 extern time_t startup_time;
 
+extern unsigned long int min_lifetime;
+extern unsigned long int max_lifetime;
+
+
 /* runtime boolean flags */
 extern int runtime_flags;
 #define LOGPACKETSMASK		0x0001
@@ -54,7 +58,9 @@ extern int runtime_flags;
 
 extern const char * pidfilename;
 
-extern char uuidvalue[];
+extern char uuidvalue_igd[];	/* uuid of root device (IGD) */
+extern char uuidvalue_wan[];	/* uuid of WAN Device */
+extern char uuidvalue_wcd[];	/* uuid of WAN Connection Device */
 
 #define SERIALNUMBER_MAX_LEN (10)
 extern char serialnumber[];
@@ -65,8 +71,25 @@ extern char modelnumber[];
 #define PRESENTATIONURL_MAX_LEN (64)
 extern char presentationurl[];
 
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 #define FRIENDLY_NAME_MAX_LEN (64)
 extern char friendly_name[];
+
+#define MANUFACTURER_NAME_MAX_LEN (64)
+extern char manufacturer_name[];
+
+#define MANUFACTURER_URL_MAX_LEN (64)
+extern char manufacturer_url[];
+
+#define MODEL_NAME_MAX_LEN (64)
+extern char model_name[];
+
+#define MODEL_DESCRIPTION_MAX_LEN (64)
+extern char model_description[];
+
+#define MODEL_URL_MAX_LEN (64)
+extern char model_url[];
+#endif
 
 /* UPnP permission rules : */
 extern struct upnpperm * upnppermlist;
@@ -78,6 +101,10 @@ extern unsigned int num_upnpperm;
 extern unsigned int nextnatpmptoclean_timestamp;
 extern unsigned short nextnatpmptoclean_eport;
 extern unsigned short nextnatpmptoclean_proto;
+#endif
+#ifdef PCP_SADSCP
+extern struct dscp_values* dscp_values_list;
+extern unsigned int num_dscp_values;
 #endif
 #endif
 
@@ -93,6 +120,7 @@ extern const char * tag;
 
 #ifdef USE_NETFILTER
 extern const char * miniupnpd_nat_chain;
+extern const char * miniupnpd_peer_chain;
 extern const char * miniupnpd_forward_chain;
 #ifdef ENABLE_6FC_SERVICE
 extern const char * miniupnpd_v6_filter_chain;

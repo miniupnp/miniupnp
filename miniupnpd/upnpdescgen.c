@@ -1,7 +1,7 @@
-/* $Id: upnpdescgen.c,v 1.71 2012/10/04 22:08:08 nanard Exp $ */
+/* $Id: upnpdescgen.c,v 1.74 2013/06/13 13:21:30 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2013 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -145,16 +145,27 @@ static const struct XMLElt rootDesc[] =
 /* 5 */
 	{"/deviceType", DEVICE_TYPE_IGD},
 		/* urn:schemas-upnp-org:device:InternetGatewayDevice:1 or 2 */
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 	{"/friendlyName", friendly_name/*ROOTDEV_FRIENDLYNAME*/},	/* required */
-	{"/manufacturer", ROOTDEV_MANUFACTURER},		/* required */
+	{"/manufacturer", manufacturer_name/*ROOTDEV_MANUFACTURER*/},		/* required */
+/* 8 */
+	{"/manufacturerURL", manufacturer_url/*ROOTDEV_MANUFACTURERURL*/},	/* optional */
+	{"/modelDescription", model_description/*ROOTDEV_MODELDESCRIPTION*/}, /* recommended */
+	{"/modelName", model_name/*ROOTDEV_MODELNAME*/},	/* required */
+	{"/modelNumber", modelnumber},
+	{"/modelURL", model_url/*ROOTDEV_MODELURL*/},
+#else
+	{"/friendlyName", ROOTDEV_FRIENDLYNAME},	/* required */
+	{"/manufacturer", ROOTDEV_MANUFACTURER},	/* required */
 /* 8 */
 	{"/manufacturerURL", ROOTDEV_MANUFACTURERURL},	/* optional */
 	{"/modelDescription", ROOTDEV_MODELDESCRIPTION}, /* recommended */
 	{"/modelName", ROOTDEV_MODELNAME},	/* required */
 	{"/modelNumber", modelnumber},
 	{"/modelURL", ROOTDEV_MODELURL},
+#endif
 	{"/serialNumber", serialnumber},
-	{"/UDN", uuidvalue},	/* required */
+	{"/UDN", uuidvalue_igd},	/* required */
 	/* see if /UPC is needed. */
 #ifdef ENABLE_6FC_SERVICE
 #define SERVICES_OFFSET 63
@@ -201,7 +212,7 @@ static const struct XMLElt rootDesc[] =
 	{"/modelNumber", WANDEV_MODELNUMBER},
 	{"/modelURL", WANDEV_MODELURL},
 	{"/serialNumber", serialnumber},
-	{"/UDN", uuidvalue},
+	{"/UDN", uuidvalue_wan},
 	{"/UPC", WANDEV_UPC},	/* UPC (=12 digit barcode) is optional */
 /* 30 */
 	{"serviceList", INITHELPER(32,1)},
@@ -229,7 +240,7 @@ static const struct XMLElt rootDesc[] =
 	{"/modelNumber", WANCDEV_MODELNUMBER},
 	{"/modelURL", WANCDEV_MODELURL},
 	{"/serialNumber", serialnumber},
-	{"/UDN", uuidvalue},
+	{"/UDN", uuidvalue_wcd},
 	{"/UPC", WANCDEV_UPC},	/* UPC (=12 digit Barcode) is optional */
 #ifdef ENABLE_6FC_SERVICE
 	{"serviceList", INITHELPER(51,2)},
@@ -1134,7 +1145,7 @@ genDP(int * len)
 
 #ifdef ENABLE_EVENTS
 static char *
-genEventVars(int * len, const struct serviceDesc * s, const char * servns)
+genEventVars(int * len, const struct serviceDesc * s)
 {
 	char tmp[16];
 	const struct stateVar * v;
@@ -1146,15 +1157,13 @@ genEventVars(int * len, const struct serviceDesc * s, const char * servns)
 		return NULL;
 	*len = 0;
 	v = s->serviceStateTable;
-	str = strcat_str(str, len, &tmplen, "<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\" xmlns:s=\"");
-	str = strcat_str(str, len, &tmplen, servns);
-	str = strcat_str(str, len, &tmplen, "\">");
+	str = strcat_str(str, len, &tmplen, "<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">");
 	while(v->name) {
 		if(v->itype & 0x80) {
-			str = strcat_str(str, len, &tmplen, "<e:property><s:");
+			str = strcat_str(str, len, &tmplen, "<e:property><");
 			str = strcat_str(str, len, &tmplen, v->name);
 			str = strcat_str(str, len, &tmplen, ">");
-			/*printf("<e:property><s:%s>", v->name);*/
+			/*printf("<e:property><%s>", v->name);*/
 			switch(v->ieventvalue) {
 			case 0:
 				break;
@@ -1198,7 +1207,7 @@ genEventVars(int * len, const struct serviceDesc * s, const char * servns)
 					str = strcat_str(str, len, &tmplen, use_ext_ip_addr);
 				else {
 					char ext_ip_addr[INET_ADDRSTRLEN];
-					if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN) < 0) {
+					if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, NULL, NULL) < 0) {
 						str = strcat_str(str, len, &tmplen, "0.0.0.0");
 					} else {
 						str = strcat_str(str, len, &tmplen, ext_ip_addr);
@@ -1207,7 +1216,7 @@ genEventVars(int * len, const struct serviceDesc * s, const char * servns)
 				break;
 			case DEFAULTCONNECTIONSERVICE_MAGICALVALUE:
 				/* DefaultConnectionService magical value */
-				str = strcat_str(str, len, &tmplen, uuidvalue);
+				str = strcat_str(str, len, &tmplen, uuidvalue_wcd);
 #ifdef IGD_V2
 				str = strcat_str(str, len, &tmplen, ":WANConnectionDevice:2,urn:upnp-org:serviceId:WANIPConn1");
 #else
@@ -1217,10 +1226,10 @@ genEventVars(int * len, const struct serviceDesc * s, const char * servns)
 			default:
 				str = strcat_str(str, len, &tmplen, upnpallowedvalues[v->ieventvalue]);
 			}
-			str = strcat_str(str, len, &tmplen, "</s:");
+			str = strcat_str(str, len, &tmplen, "</");
 			str = strcat_str(str, len, &tmplen, v->name);
 			str = strcat_str(str, len, &tmplen, "></e:property>");
-			/*printf("</s:%s></e:property>\n", v->name);*/
+			/*printf("</%s></e:property>\n", v->name);*/
 		}
 		v++;
 	}
@@ -1238,16 +1247,14 @@ char *
 getVarsWANIPCn(int * l)
 {
 	return genEventVars(l,
-                        &scpdWANIPCn,
-	                    SERVICE_TYPE_WANIPC);
+                        &scpdWANIPCn);
 }
 
 char *
 getVarsWANCfg(int * l)
 {
 	return genEventVars(l,
-	                    &scpdWANCfg,
-	                    "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1");
+	                    &scpdWANCfg);
 }
 
 #ifdef ENABLE_L3F_SERVICE
@@ -1255,8 +1262,7 @@ char *
 getVarsL3F(int * l)
 {
 	return genEventVars(l,
-	                    &scpdL3F,
-	                    "urn:schemas-upnp-org:service:Layer3Forwarding:1");
+	                    &scpdL3F);
 }
 #endif
 
@@ -1265,8 +1271,7 @@ char *
 getVars6FC(int * l)
 {
 	return genEventVars(l,
-	                    &scpd6FC,
-	                    "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1");
+	                    &scpd6FC);
 }
 #endif
 
@@ -1275,8 +1280,7 @@ char *
 getVarsDP(int * l)
 {
 	return genEventVars(l,
-	                    &scpdDP,
-	                    "urn:schemas-upnp-org:service:DeviceProtection:1");
+	                    &scpdDP);
 }
 #endif
 

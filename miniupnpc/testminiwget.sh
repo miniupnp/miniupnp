@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.6 2012/05/29 13:03:40 nanard Exp $
+# $Id: testminiwget.sh,v 1.10 2013/11/13 15:08:08 nanard Exp $
 # project miniupnp : http://miniupnp.free.fr/
 # (c) 2011-2012 Thomas Bernard
 #
@@ -13,12 +13,12 @@
 #  4 - kills the local HTTP server and exits
 #
 # The script was tested and works with ksh, bash
-# It fails to run with dash 0.5.5.1 because of "kill %1"
+# it should now also run with dash
 
-TMPDIR=`mktemp -d`
-HTTPSERVEROUT="${TMPDIR}/httpserverout"
-EXPECTEDFILE="${TMPDIR}/expectedfile"
-DOWNLOADEDFILE="${TMPDIR}/downloadedfile"
+TMPD=`mktemp -d miniwgetXXXXXXXXXX`
+HTTPSERVEROUT="${TMPD}/httpserverout"
+EXPECTEDFILE="${TMPD}/expectedfile"
+DOWNLOADEDFILE="${TMPD}/downloadedfile"
 PORT=
 RET=0
 
@@ -39,6 +39,7 @@ esac
 
 # launching the test HTTP server
 ./minihttptestserver $SERVERARGS -e $EXPECTEDFILE > $HTTPSERVEROUT &
+SERVERPID=$!
 while [ -z "$PORT" ]; do
 	sleep 1
 	PORT=`cat $HTTPSERVEROUT | sed 's/Listening on port \([0-9]*\)/\1/' `
@@ -77,8 +78,8 @@ else
 fi
 
 # kill the test HTTP server
-kill %1
-wait %1
+kill $SERVERPID
+wait $SERVERPID
 
 # remove temporary files (for success cases)
 if [ $RET -eq 0 ]; then
@@ -86,10 +87,10 @@ if [ $RET -eq 0 ]; then
 	rm -f "${DOWNLOADEDFILE}.2"
 	rm -f "${DOWNLOADEDFILE}.3"
 	rm -f $EXPECTEDFILE $HTTPSERVEROUT
-	rmdir ${TMPDIR}
+	rmdir ${TMPD}
 else
 	echo "at least one of the test FAILED"
-	echo "directory ${TMPDIR} is left intact"
+	echo "directory ${TMPD} is left intact"
 fi
 exit $RET
 
