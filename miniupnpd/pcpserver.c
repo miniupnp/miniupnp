@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.2 2013/12/13 15:48:56 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.4 2013/12/16 16:02:19 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -64,19 +64,6 @@ POSSIBILITY OF SUCH DAMAGE.
 /* TODO make this platform independent */
 #include "netfilter/iptcrdr.h"
 #endif
-
-#define IPV6_ADDR_COPY(dest, src)   \
-    do {                            \
-        (dest)[0] = (src)[0];       \
-        (dest)[1] = (src)[1];       \
-        (dest)[2] = (src)[2];       \
-        (dest)[3] = (src)[3];       \
-    } while (0)
-
-	typedef struct options_occur {
-	int third_party_occur;
-	int pfailure_occur;
-} options_occur_t;
 
 /* server specific information */
 struct pcp_server_info {
@@ -191,7 +178,7 @@ static int parseCommonRequestHeader(pcp_request_t *common_req, pcp_info_t *pcp_m
 	pcp_msg_info->version = common_req->ver ;
 	pcp_msg_info->opcode = common_req->r_opcode &0x7f ;
 	pcp_msg_info->lifetime = ntohl(common_req->req_lifetime);
-	pcp_msg_info->int_ip = (struct in6_addr*)common_req->ip;
+	pcp_msg_info->int_ip = &common_req->ip;
 
 
 	if ( (common_req->ver > this_server_info.server_version) ) {
@@ -219,7 +206,7 @@ static void printMAPOpcodeVersion1(pcp_map_v1_t *map_buf)
 	syslog(LOG_DEBUG, "MAP int port: \t\t %d\n", ntohs(map_buf->int_port) );
 	syslog(LOG_DEBUG, "MAP ext port: \t\t %d\n", ntohs(map_buf->ext_port) );
 	syslog(LOG_DEBUG, "MAP Ext IP: \t\t %s\n", inet_ntop(AF_INET6,
-	       map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
+	       &map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
 }
 
 static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
@@ -230,7 +217,7 @@ static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
 	syslog(LOG_DEBUG, "MAP int port: \t\t %d\n", ntohs(map_buf->int_port) );
 	syslog(LOG_DEBUG, "MAP ext port: \t\t %d\n", ntohs(map_buf->ext_port) );
 	syslog(LOG_DEBUG, "MAP Ext IP: \t\t %s\n", inet_ntop(AF_INET6,
-	       map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
+	       &map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
 }
 #endif /* DEBUG */
 
@@ -242,7 +229,7 @@ static int parsePCPMAP_version1(pcp_map_v1_t *map_v1, \
 	pcp_msg_info->int_port = ntohs(map_v1->int_port);
 	pcp_msg_info->ext_port = ntohs(map_v1->ext_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)map_v1->ext_ip;
+	pcp_msg_info->ext_ip = &(map_v1->ext_ip);
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ){
 		syslog(LOG_ERR, "PCP MAP: Protocol was ZERO, but internal port has non-ZERO value.");
@@ -260,7 +247,7 @@ static int parsePCPMAP_version2(pcp_map_v2_t *map_v2, \
 	pcp_msg_info->int_port = ntohs(map_v2->int_port);
 	pcp_msg_info->ext_port = ntohs(map_v2->ext_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)map_v2->ext_ip;
+	pcp_msg_info->ext_ip = &(map_v2->ext_ip);
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ) {
 		syslog(LOG_ERR, "PCP MAP: Protocol was ZERO, but internal port has non-ZERO value.");
@@ -436,7 +423,7 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize
 #ifdef DEBUG
 		syslog(LOG_DEBUG, "PCP OPTION: \t Third party \n");
 		syslog(LOG_DEBUG, "Third PARTY IP: \t %s\n", inet_ntop(AF_INET6,
-		       opt_3rd->ip, third_addr, INET6_ADDRSTRLEN));
+		       &(opt_3rd->ip), third_addr, INET6_ADDRSTRLEN));
 #endif
 		if (pcp_msg_info->thirdp_present != 0 ) {
 
@@ -616,8 +603,7 @@ static void FillSA(struct sockaddr *sa, const struct in6_addr *in6,
 	} else {
 		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 		sa6->sin6_family = AF_INET6;
-		IPV6_ADDR_COPY((uint32_t*)sa6->sin6_addr.s6_addr,
-		               (uint32_t*)in6->s6_addr);
+		sa6->sin6_addr = *in6;
 		sa6->sin6_port = htons(port);
 	}
 }
@@ -1254,15 +1240,13 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 	if (resp->r_opcode == 0x81) { /* MAP response */
 		if (resp->ver == 1 ) {
 			pcp_map_v1_t *mapr = (pcp_map_v1_t *)resp->next_data;
-			IPV6_ADDR_COPY((uint32_t*)mapr->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			mapr->ext_ip = *pcp_msg_info->ext_ip;
 			mapr->ext_port = htons(pcp_msg_info->ext_port);
 			mapr->int_port = htons(pcp_msg_info->int_port);
 		}
 		else if (resp->ver == 2 ) {
 			pcp_map_v2_t *mapr = (pcp_map_v2_t *)resp->next_data;
-			IPV6_ADDR_COPY((uint32_t*)mapr->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			mapr->ext_ip = *pcp_msg_info->ext_ip;
 			mapr->ext_port = htons(pcp_msg_info->ext_port);
 			mapr->int_port = htons(pcp_msg_info->int_port);
 		}

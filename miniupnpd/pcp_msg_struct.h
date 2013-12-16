@@ -1,4 +1,4 @@
-/* $Id: pcp_msg_struct.h,v 1.2 2013/12/13 15:47:23 nanard Exp $ */
+/* $Id: pcp_msg_struct.h,v 1.3 2013/12/16 16:02:19 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -148,7 +148,7 @@ typedef struct pcp_request {
   uint8_t     r_opcode;
   uint16_t    reserved;
   uint32_t    req_lifetime;
-  uint32_t    ip[4]; /* ipv4 will be represented
+  struct in6_addr    ip; /* ipv4 will be represented
                         by the ipv4 mapped ipv6 */
   uint8_t     next_data[0];
 } pcp_request_t;
@@ -182,7 +182,7 @@ typedef struct pcp_map_v2 {
   uint8_t     reserved[3];
   uint16_t    int_port;
   uint16_t    ext_port;
-  uint32_t    ext_ip[4]; /* ipv4 will be represented
+  struct in6_addr ext_ip; /* ipv4 will be represented
                             by the ipv4 mapped ipv6 */
   uint8_t     next_data[0];
 } pcp_map_v2_t;
@@ -193,7 +193,7 @@ typedef struct pcp_map_v1 {
   uint8_t     reserved[3];
   uint16_t    int_port;
   uint16_t    ext_port;
-  uint32_t    ext_ip[4]; /* ipv4 will be represented
+  struct in6_addr ext_ip; /* ipv4 will be represented
                             by the ipv4 mapped ipv6 */
   uint8_t     next_data[0];
 } pcp_map_v1_t;
@@ -204,11 +204,11 @@ typedef struct pcp_peer_v1 {
   uint8_t     reserved[3];
   uint16_t    int_port;
   uint16_t    ext_port;
-  uint32_t    ext_ip[4]; /* ipv4 will be represented
+  struct in6_addr ext_ip; /* ipv4 will be represented
                             by the ipv4 mapped ipv6 */
   uint16_t    peer_port;
   uint16_t    reserved1;
-  uint32_t    peer_ip[4];
+  struct in6_addr peer_ip;
   uint8_t     next_data[0];
 } pcp_peer_v1_t;
 
@@ -219,11 +219,11 @@ typedef struct pcp_peer_v2 {
   uint8_t     reserved[3];
   uint16_t    int_port;
   uint16_t    ext_port;
-  uint32_t    ext_ip[4]; /* ipv4 will be represented
+  struct in6_addr ext_ip; /* ipv4 will be represented
                             by the ipv4 mapped ipv6 */
   uint16_t    peer_port;
   uint16_t    reserved1;
-  uint32_t    peer_ip[4];
+  struct in6_addr peer_ip;
   uint8_t     next_data[0];
 } pcp_peer_v2_t;
 
@@ -254,7 +254,7 @@ typedef struct pcp_3rd_party_option{
    uint8_t  option;
    uint8_t  reserved;
    uint16_t len;
-   uint32_t ip[4];
+   struct in6_addr ip;
    uint8_t  next_data[0];
 } pcp_3rd_party_option_t;
 
@@ -280,7 +280,7 @@ typedef struct pcp_filter_option {
     uint8_t  reserved2;
     uint8_t  prefix_len;
     uint16_t peer_port;
-    uint32_t peer_ip[4];
+    struct in6_addr peer_ip;
 }pcp_filter_option_t;
 
 #pragma pack(pop)
