@@ -71,7 +71,7 @@ struct pcp_server_info {
 };
 
 /* default server settings, highest version supported is the default */
-struct pcp_server_info this_server_info = {2};
+static struct pcp_server_info this_server_info = {2};
 
 /* structure holding information from PCP msg*/
 /* all variables are in host byte order except IP addresses */
@@ -116,7 +116,7 @@ typedef struct pcp_info {
 	int pfailure_present;
 	char senderaddrstr[INET_ADDRSTRLEN];
 
-}pcp_info_t;
+} pcp_info_t;
 
 
 #ifdef PCP_SADSCP
@@ -221,7 +221,7 @@ static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
 }
 #endif /* DEBUG */
 
-static int parsePCPMAP_version1(pcp_map_v1_t *map_v1, \
+static int parsePCPMAP_version1(pcp_map_v1_t *map_v1,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_map_op = 1;
@@ -239,7 +239,7 @@ static int parsePCPMAP_version1(pcp_map_v1_t *map_v1, \
 	return 0;
 }
 
-static int parsePCPMAP_version2(pcp_map_v2_t *map_v2, \
+static int parsePCPMAP_version2(pcp_map_v2_t *map_v2,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_map_op = 1;
@@ -386,8 +386,8 @@ static int parseSADSCP(pcp_sadscp_req_t *sadscp, pcp_info_t *pcp_msg_info) {
 }
 #endif
 
-static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize, \
-	pcp_info_t *pcp_msg_info)
+static int parsePCPOptions(void* pcp_buf, int* remainingSize,
+                           int* processedSize, pcp_info_t *pcp_msg_info)
 {
 	int remain = *remainingSize;
 	int processed = *processedSize;
