@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.346 2013/12/13 13:41:52 nanard Exp $
 
+2013/12/16:
+  Attempt to compile with OS X/pf
+
 2013/12/13:
   Make all manufacturer info configurable thanks to Leo Moll
   Merge PCP support (see https://github.com/miniupnp/miniupnp)

@@ -273,8 +273,15 @@ case $OS_NAME in
 		FW=netfilter
 		;;
 	Darwin)
+		MAJORVER=`echo $OS_VERSION | cut -d. -f1`
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		FW=ipfw
+		# OS X switched to pf since 10.7 Lion (Darwin 11.0)
+		if [ $MAJORVER -ge 11 ] ; then
+			FW=pf
+			echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
+		else
+			FW=ipfw
+		fi
 		OS_URL=http://developer.apple.com/macosx
 		;;
 	*)
