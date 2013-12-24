@@ -12,6 +12,7 @@ case "$argv" in
 	--igd2) IGD2=1 ;;
 	--strict) STRICT=1 ;;
 	--leasefile) LEASEFILE=1 ;;
+	--vendorcfg) VENDORCFG=1 ;;
 	--pcp) PCP=1 ;;
 	--pcp-peer)
 		PCP=1
@@ -23,6 +24,7 @@ case "$argv" in
 		echo " --igd2      build an IGDv2 instead of an IGDv1"
 		echo " --strict    be more strict regarding compliance with UPnP specifications"
 		echo " --leasefile enable lease file"
+		echo " --vendorcfg enable configuration of manufacturer info"
 		echo " --pcp       enable PCP"
 		echo " --pcp-peer  enable PCP PEER operation"
 		exit 1
@@ -467,8 +469,12 @@ echo "/* disable reading and parsing of config file (miniupnpd.conf) */" >> ${CO
 echo "/*#define DISABLE_CONFIG_FILE*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
-echo "/* Unable the ability to configure all manufacturer infos through miniupnpd.conf */" >> ${CONFIGFILE}
-echo "/*#define ENABLE_MANUFACTURER_INFO_CONFIGURATION*/" >> ${CONFIGFILE}
+echo "/* Uncomment the following line to configure all manufacturer infos through miniupnpd.conf */" >> ${CONFIGFILE}
+if [ -n "$VENDORCFG" ] ; then
+	echo "#define ENABLE_MANUFACTURER_INFO_CONFIGURATION" >> ${CONFIGFILE}
+else
+	echo "/*#define ENABLE_MANUFACTURER_INFO_CONFIGURATION*/" >> ${CONFIGFILE}
+fi
 echo "" >> ${CONFIGFILE}
 
 echo "#endif" >> ${CONFIGFILE}
