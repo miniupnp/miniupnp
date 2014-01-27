@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.4 2013/12/16 16:02:19 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.5 2014/01/27 10:06:08 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -267,10 +267,10 @@ static void printPEEROpcodeVersion1(pcp_peer_v1_t *peer_buf)
 	syslog(LOG_DEBUG, "PCP PEER: v1 Opcode specific information. \n");
 	syslog(LOG_DEBUG, "Protocol: \t\t %d\n",peer_buf->protocol );
 	syslog(LOG_DEBUG, "Internal port: \t\t %d\n", ntohs(peer_buf->int_port) );
-	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->ext_ip,
+	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->ext_ip,
 	       ext_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "External port port: \t\t %d\n", ntohs(peer_buf->ext_port) );
-	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->peer_ip,
+	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->peer_ip,
 	       peer_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "PEER port port: \t\t %d\n", ntohs(peer_buf->peer_port) );
 }
@@ -283,10 +283,10 @@ static void printPEEROpcodeVersion2(pcp_peer_v2_t *peer_buf)
 	syslog(LOG_DEBUG, "PCP PEER: v2 Opcode specific information. \n");
 	syslog(LOG_DEBUG, "Protocol: \t\t %d\n",peer_buf->protocol );
 	syslog(LOG_DEBUG, "Internal port: \t\t %d\n", ntohs(peer_buf->int_port) );
-	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->ext_ip,
+	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->ext_ip,
 	       ext_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "External port port: \t\t %d\n", ntohs(peer_buf->ext_port) );
-	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->peer_ip,
+	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->peer_ip,
 	       peer_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "PEER port port: \t\t %d\n", ntohs(peer_buf->peer_port) );
 }
@@ -305,8 +305,8 @@ static int parsePCPPEER_version1(pcp_peer_v1_t *peer_buf, \
 	pcp_msg_info->ext_port = ntohs(peer_buf->ext_port);
 	pcp_msg_info->peer_port = ntohs(peer_buf->peer_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)peer_buf->ext_ip;
-	pcp_msg_info->peer_ip = (struct in6_addr*)peer_buf->peer_ip;
+	pcp_msg_info->ext_ip = &peer_buf->ext_ip;
+	pcp_msg_info->peer_ip = &peer_buf->peer_ip;
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ){
 		syslog(LOG_ERR, "PCP PEER: protocol was ZERO, but internal port has non-ZERO value.");
@@ -329,8 +329,8 @@ static int parsePCPPEER_version2(pcp_peer_v2_t *peer_buf, \
 	pcp_msg_info->ext_port = ntohs(peer_buf->ext_port);
 	pcp_msg_info->peer_port = ntohs(peer_buf->peer_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)peer_buf->ext_ip;
-	pcp_msg_info->peer_ip = (struct in6_addr*)peer_buf->peer_ip;
+	pcp_msg_info->ext_ip = &peer_buf->ext_ip;
+	pcp_msg_info->peer_ip = &peer_buf->peer_ip;
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ){
 		syslog(LOG_ERR, "PCP PEER: protocol was ZERO, but internal port has non-ZERO value.");
@@ -1258,16 +1258,14 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 			peer_resp->ext_port = htons(pcp_msg_info->ext_port);
 			peer_resp->int_port = htons(pcp_msg_info->int_port);
 			peer_resp->peer_port = htons(pcp_msg_info->peer_port);
-			IPV6_ADDR_COPY((uint32_t*)peer_resp->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			peer_resp->ext_ip = *pcp_msg_info->ext_ip;
 		}
 		else if (resp->ver == 2 ){
 			pcp_peer_v2_t* peer_resp = (pcp_peer_v2_t*)resp->next_data;
 			peer_resp->ext_port = htons(pcp_msg_info->ext_port);
 			peer_resp->int_port = htons(pcp_msg_info->int_port);
 			peer_resp->peer_port = htons(pcp_msg_info->peer_port);
-			IPV6_ADDR_COPY((uint32_t*)peer_resp->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			peer_resp->ext_ip = *pcp_msg_info->ext_ip;
 		}
 	}
 #endif /* PCP_PEER */
