@@ -1,7 +1,7 @@
-# $Id: Makefile.mingw,v 1.17 2012/12/02 14:12:45 nanard Exp $
+# $Id: Makefile.mingw,v 1.18 2014/01/17 09:04:01 nanard Exp $
 # Miniupnp project.
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
-# (c) 2005-2011 Thomas Bernard
+# (c) 2005-2014 Thomas Bernard
 # This Makefile is made for MinGW
 #
 CC = gcc
@@ -57,11 +57,12 @@ upnpc.o:
 	$(CC) $(CFLAGS) -DSTATICLIB -c -o $@ $<
 	$(CC) $(CFLAGS) -c -o dll/$@ $<
 
+# --enable-stdcall-fixup
 upnpc-static:	upnpc.o libminiupnpc.a
-	$(CC) -enable-stdcall-fixup -o $@ $^ $(LDLIBS)
+	$(CC) -o $@ $^ $(LDLIBS)
 
 upnpc-shared:	dll/upnpc.o miniupnpc.lib
-	$(CC) -enable-stdcall-fixup -o $@ $^ $(LDLIBS)
+	$(CC) -o $@ $^ $(LDLIBS)
 
 wingenminiupnpcstrings:	wingenminiupnpcstrings.o
 
