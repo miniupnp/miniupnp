@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2013 Thomas Bernard
+ * copyright (c) 2005-2014 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #define __EXTENSIONS__ 1
@@ -330,7 +330,7 @@ parseMSEARCHReply(const char * reply, int size,
 #define UPNP_MCAST_LL_ADDR "FF02::C" /* link-local */
 #define UPNP_MCAST_SL_ADDR "FF05::C" /* site-local */
 
-/* upnpDiscover() :
+/* upnpDiscoverDevices() :
  * return a chained list of all devices found or NULL if
  * no devices was found.
  * It is up to the caller to free the chained list
@@ -705,6 +705,7 @@ error:
 	return devlist;
 }
 
+/* upnpDiscover() Discover IGD device */
 LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
              const char * minissdpdsock, int sameport,
@@ -728,6 +729,7 @@ upnpDiscover(int delay, const char * multicastif,
 	                           ipv6, error);
 }
 
+/* upnpDiscoverAll() Discover all UPnP devices */
 LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
@@ -737,6 +739,22 @@ upnpDiscoverAll(int delay, const char * multicastif,
 	static const char * const deviceList[] = {
 		/*"upnp:rootdevice",*/
 		"ssdp:all",
+		0
+	};
+	return upnpDiscoverDevices(deviceList,
+	                           delay, multicastif, minissdpdsock, sameport,
+	                           ipv6, error);
+}
+
+/* upnpDiscoverDevice() Discover a specific device */
+LIBSPEC struct UPNPDev *
+upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
+                const char * minissdpdsock, int sameport,
+                int ipv6,
+                int * error)
+{
+	const char * const deviceList[] = {
+		device,
 		0
 	};
 	return upnpDiscoverDevices(deviceList,

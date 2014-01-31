@@ -1,7 +1,7 @@
 /* $Id$ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2013 Thomas Bernard
+ * Copyright (c) 2013-2014 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -11,6 +11,7 @@
 
 int main(int argc, char * * argv)
 {
+	const char * searched_device = NULL;
 	const char * multicastif = 0;
 	const char * minissdpdpath = 0;
 	int ipv6 = 0;
@@ -22,15 +23,32 @@ int main(int argc, char * * argv)
 	for(i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "-6") == 0)
 			ipv6 = 1;
-		else {
+		else if(strcmp(argv[i], "-d") == 0) {
+			if(++i >= argc) {
+				fprintf(stderr, "-d option needs one argument\n");
+				return 1;
+			}
+			searched_device = argv[i];
+		} else {
 			printf("usage : %s [options]\n", argv[0]);
+			printf("options :\n");
 			printf("   -6 : use IPv6\n");
+			printf("   -d <device string> : search only for this type of device\n");
+			printf("   -h : this help\n");
 			return 1;
 		}
 	}
 
-	devlist = upnpDiscoverAll(2000, multicastif, minissdpdpath,
-	                             0/*sameport*/, ipv6, &error);
+	if(searched_device) {
+		printf("searching UPnP device type %s\n", searched_device);
+		devlist = upnpDiscoverDevice(searched_device,
+		                             2000, multicastif, minissdpdpath,
+		                             0/*sameport*/, ipv6, &error);
+	} else {
+		printf("searching all UPnP devices\n");
+		devlist = upnpDiscoverAll(2000, multicastif, minissdpdpath,
+		                             0/*sameport*/, ipv6, &error);
+	}
 	if(devlist) {
 		for(dev = devlist; dev != NULL; dev = dev->pNext) {
 			printf("%s\t%s\n", dev->st, dev->descURL);

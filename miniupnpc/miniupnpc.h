@@ -2,7 +2,7 @@
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2012 Thomas Bernard
+ * Copyright (c) 2005-2014 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
 #ifndef MINIUPNPC_H_INCLUDED
@@ -65,6 +65,19 @@ upnpDiscoverAll(int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
                 int ipv6,
                 int * error);
+
+LIBSPEC struct UPNPDev *
+upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
+                const char * minissdpdsock, int sameport,
+                int ipv6,
+                int * error);
+
+LIBSPEC struct UPNPDev *
+upnpDiscoverDevices(const char * const deviceTypes[],
+                    int delay, const char * multicastif,
+                    const char * minissdpdsock, int sameport,
+                    int ipv6,
+                    int * error);
 
 /* freeUPNPDevlist()
  * free list returned by upnpDiscover() */
