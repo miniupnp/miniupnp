@@ -1,8 +1,8 @@
-/* $Id: miniupnpc.c,v 1.113 2013/10/07 10:04:56 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.116 2014/01/31 14:09:03 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2013 Thomas Bernard
+ * copyright (c) 2005-2014 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #define __EXTENSIONS__ 1
@@ -545,7 +545,8 @@ upnpDiscover(int delay, const char * multicastif,
 		}
 	}
 
-	/* Avant d'envoyer le paquet on bind pour recevoir la reponse */
+	/* Before sending the packed, we first "bind" in order to be able
+	 * to receive the response */
     if (bind(sudp, (const struct sockaddr *)&sockudp_r,
 	         ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)) != 0)
 	{
