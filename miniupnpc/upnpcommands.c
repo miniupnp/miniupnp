@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.c,v 1.41 2013/12/09 08:18:23 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.42 2014/01/31 13:18:25 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2012 Thomas Bernard
@@ -578,7 +578,8 @@ LIBSPEC int
 UPNP_GetSpecificPortMappingEntry(const char * controlURL,
                                  const char * servicetype,
                                  const char * extPort,
-							     const char * proto,
+                                 const char * proto,
+                                 const char * remoteHost,
                                  char * intClient,
                                  char * intPort,
                                  char * desc,
@@ -597,7 +598,7 @@ UPNP_GetSpecificPortMappingEntry(const char * controlURL,
 
 	GetPortMappingArgs = calloc(4, sizeof(struct UPNParg));
 	GetPortMappingArgs[0].elt = "NewRemoteHost";
-	/* TODO : add remote host ? */
+	GetPortMappingArgs[0].val = remoteHost;
 	GetPortMappingArgs[1].elt = "NewExternalPort";
 	GetPortMappingArgs[1].val = extPort;
 	GetPortMappingArgs[2].elt = "NewProtocol";

@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.99 2013/02/06 12:56:41 nanard Exp $ */
+/* $Id: upnpc.c,v 1.101 2014/01/31 13:18:25 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2013 Thomas Bernard
@@ -266,7 +266,7 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 
 	r = UPNP_GetSpecificPortMappingEntry(urls->controlURL,
 	                                 data->first.servicetype,
-    	                             eport, proto,
+    	                             eport, proto, NULL/*remoteHost*/,
 									 intClient, intPort, NULL/*desc*/,
 	                                 NULL/*enabled*/, duration);
 	if(r!=UPNPCOMMAND_SUCCESS)
