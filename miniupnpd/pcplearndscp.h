@@ -1,4 +1,4 @@
-/* $Id: pcplearndscp.h $ */
+/* $Id: pcplearndscp.h,v 1.2 2013/12/13 15:47:23 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Miroslav Bagljas
@@ -44,8 +44,8 @@ struct dscp_values {
 
 
 
-// #set_learn_dscp "Webex" 1 1 1 34
+/* #set_learn_dscp "Webex" 1 1 1 34 */
 int
 read_learn_dscp_line(struct dscp_values *dscpvalues, char *p);
 
-#endif // PCPLEARNDSCP_H_INCLUDED
+#endif /* PCPLEARNDSCP_H_INCLUDED */

@@ -1,4 +1,4 @@
-/* $Id: upnpglobalvars.c,v 1.30 2013/06/13 13:21:30 nanard Exp $ */
+/* $Id: upnpglobalvars.c,v 1.32 2013/12/13 14:07:09 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2012 Thomas Bernard
@@ -85,7 +85,7 @@ unsigned short nextnatpmptoclean_proto = 0;
 #ifdef PCP_SADSCP
 struct dscp_values* dscp_values_list = 0;
 unsigned int num_dscp_values = 0;
-#endif //PCP_SADSCP
+#endif /*PCP_SADSCP*/
 #endif
 
 /* For automatic removal of expired rules (with LeaseDuration) */

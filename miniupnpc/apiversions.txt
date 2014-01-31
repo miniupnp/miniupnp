@@ -1,7 +1,17 @@
-$Id: apiversions.txt,v 1.2 2013/03/29 14:45:09 nanard Exp $
+$Id: apiversions.txt,v 1.3 2014/01/31 13:14:32 nanard Exp $
 
 Differences in API between miniUPnPc versions
 
+====================== miniUPnPc version 1.9 ======================
+API version 10
+
+upnpcommands.h:
+  added argument remoteHost to UPNP_GetSpecificPortMappingEntry()
+
+miniupnpc.h:
+  updated macros :
+    #define MINIUPNPC_VERSION      "1.9"
+    #define MINIUPNPC_API_VERSION  10
 
 ====================== miniUPnPc version 1.8 ======================
 API version 9

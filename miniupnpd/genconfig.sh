@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.63 2013/05/03 09:30:10 nanard Exp $
+# $Id: genconfig.sh,v 1.65 2013/12/13 14:07:08 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2013 Thomas Bernard
@@ -12,6 +12,7 @@ case "$argv" in
 	--igd2) IGD2=1 ;;
 	--strict) STRICT=1 ;;
 	--leasefile) LEASEFILE=1 ;;
+	--vendorcfg) VENDORCFG=1 ;;
 	--pcp) PCP=1 ;;
 	--pcp-peer)
 		PCP=1
@@ -23,6 +24,7 @@ case "$argv" in
 		echo " --igd2      build an IGDv2 instead of an IGDv1"
 		echo " --strict    be more strict regarding compliance with UPnP specifications"
 		echo " --leasefile enable lease file"
+		echo " --vendorcfg enable configuration of manufacturer info"
 		echo " --pcp       enable PCP"
 		echo " --pcp-peer  enable PCP PEER operation"
 		exit 1
@@ -273,8 +275,15 @@ case $OS_NAME in
 		FW=netfilter
 		;;
 	Darwin)
+		MAJORVER=`echo $OS_VERSION | cut -d. -f1`
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		FW=ipfw
+		# OS X switched to pf since 10.7 Lion (Darwin 11.0)
+		if [ $MAJORVER -ge 11 ] ; then
+			FW=pf
+			echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
+		else
+			FW=ipfw
+		fi
 		OS_URL=http://developer.apple.com/macosx
 		;;
 	*)
@@ -352,9 +361,9 @@ echo "/*#define PCP_PEER*/" >> ${CONFIGFILE}
 fi
 echo "#ifdef PCP_PEER" >> ${CONFIGFILE}
 echo "/*#define PCP_FLOWP*/" >> ${CONFIGFILE}
-echo "#endif //PCP_PEER" >> ${CONFIGFILE}
+echo "#endif /*PCP_PEER*/" >> ${CONFIGFILE}
 echo "/*#define PCP_SADSCP*/" >> ${CONFIGFILE}
-echo "#endif //ENABLE_PCP" >> ${CONFIGFILE}
+echo "#endif /*ENABLE_PCP*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
 echo "/* Uncomment the following line to enable generation of" >> ${CONFIGFILE}
@@ -460,8 +469,12 @@ echo "/* disable reading and parsing of config file (miniupnpd.conf) */" >> ${CO
 echo "/*#define DISABLE_CONFIG_FILE*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
-echo "/* Unable the ability to configure all manufacturer infos through miniupnpd.conf */" >> ${CONFIGFILE}
-echo "/*#define ENABLE_MANUFACTURER_INFO_CONFIGURATION*/" >> ${CONFIGFILE}
+echo "/* Uncomment the following line to configure all manufacturer infos through miniupnpd.conf */" >> ${CONFIGFILE}
+if [ -n "$VENDORCFG" ] ; then
+	echo "#define ENABLE_MANUFACTURER_INFO_CONFIGURATION" >> ${CONFIGFILE}
+else
+	echo "/*#define ENABLE_MANUFACTURER_INFO_CONFIGURATION*/" >> ${CONFIGFILE}
+fi
 echo "" >> ${CONFIGFILE}
 
 echo "#endif" >> ${CONFIGFILE}

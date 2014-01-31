@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c $ */
+/* $Id: pcpserver.c,v 1.5 2014/01/27 10:06:08 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -61,22 +61,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "pcp_msg_struct.h"
 
 #ifdef PCP_PEER
-//TODO make this platform independent
+/* TODO make this platform independent */
 #include "netfilter/iptcrdr.h"
 #endif
-
-#define IPV6_ADDR_COPY(dest, src)   \
-    do {                            \
-        (dest)[0] = (src)[0];       \
-        (dest)[1] = (src)[1];       \
-        (dest)[2] = (src)[2];       \
-        (dest)[3] = (src)[3];       \
-    } while (0)
-
-	typedef struct options_occur {
-	int third_party_occur;
-	int pfailure_occur;
-} options_occur_t;
 
 /* server specific information */
 struct pcp_server_info {
@@ -84,7 +71,7 @@ struct pcp_server_info {
 };
 
 /* default server settings, highest version supported is the default */
-struct pcp_server_info this_server_info = {2};
+static struct pcp_server_info this_server_info = {2};
 
 /* structure holding information from PCP msg*/
 /* all variables are in host byte order except IP addresses */
@@ -104,7 +91,7 @@ typedef struct pcp_info {
 #ifdef PCP_PEER
 	uint16_t    peer_port;
 	const struct in6_addr    *peer_ip; /* Destination IP in network order */
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 	/* SADSCP specific information */
@@ -129,7 +116,7 @@ typedef struct pcp_info {
 	int pfailure_present;
 	char senderaddrstr[INET_ADDRSTRLEN];
 
-}pcp_info_t;
+} pcp_info_t;
 
 
 #ifdef PCP_SADSCP
@@ -191,7 +178,7 @@ static int parseCommonRequestHeader(pcp_request_t *common_req, pcp_info_t *pcp_m
 	pcp_msg_info->version = common_req->ver ;
 	pcp_msg_info->opcode = common_req->r_opcode &0x7f ;
 	pcp_msg_info->lifetime = ntohl(common_req->req_lifetime);
-	pcp_msg_info->int_ip = (struct in6_addr*)common_req->ip;
+	pcp_msg_info->int_ip = &common_req->ip;
 
 
 	if ( (common_req->ver > this_server_info.server_version) ) {
@@ -219,7 +206,7 @@ static void printMAPOpcodeVersion1(pcp_map_v1_t *map_buf)
 	syslog(LOG_DEBUG, "MAP int port: \t\t %d\n", ntohs(map_buf->int_port) );
 	syslog(LOG_DEBUG, "MAP ext port: \t\t %d\n", ntohs(map_buf->ext_port) );
 	syslog(LOG_DEBUG, "MAP Ext IP: \t\t %s\n", inet_ntop(AF_INET6,
-	       map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
+	       &map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
 }
 
 static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
@@ -230,11 +217,11 @@ static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
 	syslog(LOG_DEBUG, "MAP int port: \t\t %d\n", ntohs(map_buf->int_port) );
 	syslog(LOG_DEBUG, "MAP ext port: \t\t %d\n", ntohs(map_buf->ext_port) );
 	syslog(LOG_DEBUG, "MAP Ext IP: \t\t %s\n", inet_ntop(AF_INET6,
-	       map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
+	       &map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
 }
-#endif //DEBUG
+#endif /* DEBUG */
 
-static int parsePCPMAP_version1(pcp_map_v1_t *map_v1, \
+static int parsePCPMAP_version1(pcp_map_v1_t *map_v1,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_map_op = 1;
@@ -242,7 +229,7 @@ static int parsePCPMAP_version1(pcp_map_v1_t *map_v1, \
 	pcp_msg_info->int_port = ntohs(map_v1->int_port);
 	pcp_msg_info->ext_port = ntohs(map_v1->ext_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)map_v1->ext_ip;
+	pcp_msg_info->ext_ip = &(map_v1->ext_ip);
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ){
 		syslog(LOG_ERR, "PCP MAP: Protocol was ZERO, but internal port has non-ZERO value.");
@@ -252,7 +239,7 @@ static int parsePCPMAP_version1(pcp_map_v1_t *map_v1, \
 	return 0;
 }
 
-static int parsePCPMAP_version2(pcp_map_v2_t *map_v2, \
+static int parsePCPMAP_version2(pcp_map_v2_t *map_v2,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_map_op = 1;
@@ -260,7 +247,7 @@ static int parsePCPMAP_version2(pcp_map_v2_t *map_v2, \
 	pcp_msg_info->int_port = ntohs(map_v2->int_port);
 	pcp_msg_info->ext_port = ntohs(map_v2->ext_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)map_v2->ext_ip;
+	pcp_msg_info->ext_ip = &(map_v2->ext_ip);
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ) {
 		syslog(LOG_ERR, "PCP MAP: Protocol was ZERO, but internal port has non-ZERO value.");
@@ -280,10 +267,10 @@ static void printPEEROpcodeVersion1(pcp_peer_v1_t *peer_buf)
 	syslog(LOG_DEBUG, "PCP PEER: v1 Opcode specific information. \n");
 	syslog(LOG_DEBUG, "Protocol: \t\t %d\n",peer_buf->protocol );
 	syslog(LOG_DEBUG, "Internal port: \t\t %d\n", ntohs(peer_buf->int_port) );
-	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->ext_ip,
+	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->ext_ip,
 	       ext_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "External port port: \t\t %d\n", ntohs(peer_buf->ext_port) );
-	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->peer_ip,
+	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->peer_ip,
 	       peer_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "PEER port port: \t\t %d\n", ntohs(peer_buf->peer_port) );
 }
@@ -296,14 +283,14 @@ static void printPEEROpcodeVersion2(pcp_peer_v2_t *peer_buf)
 	syslog(LOG_DEBUG, "PCP PEER: v2 Opcode specific information. \n");
 	syslog(LOG_DEBUG, "Protocol: \t\t %d\n",peer_buf->protocol );
 	syslog(LOG_DEBUG, "Internal port: \t\t %d\n", ntohs(peer_buf->int_port) );
-	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->ext_ip,
+	syslog(LOG_DEBUG, "External IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->ext_ip,
 	       ext_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "External port port: \t\t %d\n", ntohs(peer_buf->ext_port) );
-	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, peer_buf->peer_ip,
+	syslog(LOG_DEBUG, "PEER IP: \t\t %s\n", inet_ntop(AF_INET6, &peer_buf->peer_ip,
 	       peer_addr,INET6_ADDRSTRLEN));
 	syslog(LOG_DEBUG, "PEER port port: \t\t %d\n", ntohs(peer_buf->peer_port) );
 }
-#endif //DEBUG
+#endif /* DEBUG */
 
 /*
  * Function extracting information from peer_buf to pcp_msg_info
@@ -318,8 +305,8 @@ static int parsePCPPEER_version1(pcp_peer_v1_t *peer_buf, \
 	pcp_msg_info->ext_port = ntohs(peer_buf->ext_port);
 	pcp_msg_info->peer_port = ntohs(peer_buf->peer_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)peer_buf->ext_ip;
-	pcp_msg_info->peer_ip = (struct in6_addr*)peer_buf->peer_ip;
+	pcp_msg_info->ext_ip = &peer_buf->ext_ip;
+	pcp_msg_info->peer_ip = &peer_buf->peer_ip;
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ){
 		syslog(LOG_ERR, "PCP PEER: protocol was ZERO, but internal port has non-ZERO value.");
@@ -342,8 +329,8 @@ static int parsePCPPEER_version2(pcp_peer_v2_t *peer_buf, \
 	pcp_msg_info->ext_port = ntohs(peer_buf->ext_port);
 	pcp_msg_info->peer_port = ntohs(peer_buf->peer_port);
 
-	pcp_msg_info->ext_ip = (struct in6_addr*)peer_buf->ext_ip;
-	pcp_msg_info->peer_ip = (struct in6_addr*)peer_buf->peer_ip;
+	pcp_msg_info->ext_ip = &peer_buf->ext_ip;
+	pcp_msg_info->peer_ip = &peer_buf->peer_ip;
 
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ){
 		syslog(LOG_ERR, "PCP PEER: protocol was ZERO, but internal port has non-ZERO value.");
@@ -352,7 +339,7 @@ static int parsePCPPEER_version2(pcp_peer_v2_t *peer_buf, \
 	}
 	return 0;
 }
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 #ifdef DEBUG
@@ -399,8 +386,8 @@ static int parseSADSCP(pcp_sadscp_req_t *sadscp, pcp_info_t *pcp_msg_info) {
 }
 #endif
 
-static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize, \
-	pcp_info_t *pcp_msg_info)
+static int parsePCPOptions(void* pcp_buf, int* remainingSize,
+                           int* processedSize, pcp_info_t *pcp_msg_info)
 {
 	int remain = *remainingSize;
 	int processed = *processedSize;
@@ -436,7 +423,7 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize
 #ifdef DEBUG
 		syslog(LOG_DEBUG, "PCP OPTION: \t Third party \n");
 		syslog(LOG_DEBUG, "Third PARTY IP: \t %s\n", inet_ntop(AF_INET6,
-		       opt_3rd->ip, third_addr, INET6_ADDRSTRLEN));
+		       &(opt_3rd->ip), third_addr, INET6_ADDRSTRLEN));
 #endif
 		if (pcp_msg_info->thirdp_present != 0 ) {
 
@@ -481,7 +468,7 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize
 		break;
 
 	case PCP_OPTION_FILTER:
-		// TODO fully implement filter
+		/* TODO fully implement filter */
 		opt_filter = (pcp_filter_option_t*) (pcp_buf + processed);
 		option_length = ntohs(opt_filter->len);
 
@@ -538,7 +525,7 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize, int* processedSize
 		break;
 	}
 
-	// shift processed and remaining values to new values
+	/* shift processed and remaining values to new values */
 	*remainingSize = remain;
 	*processedSize = processed;
 	return pcp_msg_info->result_code;
@@ -616,8 +603,7 @@ static void FillSA(struct sockaddr *sa, const struct in6_addr *in6,
 	} else {
 		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 		sa6->sin6_family = AF_INET6;
-		IPV6_ADDR_COPY((uint32_t*)sa6->sin6_addr.s6_addr,
-		               (uint32_t*)in6->s6_addr);
+		sa6->sin6_addr = *in6;
 		sa6->sin6_port = htons(port);
 	}
 }
@@ -675,7 +661,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			return 0;
 		}
 	}
-	//Create Peer Mapping
+	/* Create Peer Mapping */
 	{
 		char desc[64];
 		char peerip_s[INET_ADDRSTRLEN], extip_s[INET_ADDRSTRLEN];
@@ -724,7 +710,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			}
 		}
 #endif
-		//TODO: add upnp function for PI
+		/* TODO: add upnp function for PI */
 		if (add_peer_redirect_rule2(ext_if_name,
 		        peerip_s,
 		        pcp_msg_info->peer_port,
@@ -810,7 +796,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 	}
 }
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
@@ -903,7 +889,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	char desc[64];
 	unsigned int timestamp;
 
-	//iterate through all rules and delete the requested ones
+	/* iterate through all rules and delete the requested ones */
 	while(get_redirect_rule_by_index(index, 0,
 	      &eport2, iaddr2, sizeof(iaddr2),
 	      &iport2, &proto2,
@@ -912,7 +898,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 
 		if(0 == strncmp(iaddr2, pcp_msg_info->senderaddrstr, sizeof(iaddr2))
 		  && (proto2==proto)
-		  && (0 == strncmp(desc, "PCP", 3)) //starts with PCP
+		  && (0 == strncmp(desc, "PCP", 3)) /* starts with PCP */
 		  && ((iport2==iport) || (iport==0))) {
 
 			r = _upnp_delete_redir(eport2, proto2);
@@ -984,26 +970,26 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 #ifdef PCP_SADSCP
 	pcp_sadscp_req_t* sadscp;
 #endif
-	// start with PCP_SUCCESS as result code, if everything is OK value will be unchanged
+	/* start with PCP_SUCCESS as result code, if everything is OK value will be unchanged */
 	pcp_msg_info->result_code = PCP_SUCCESS;
 
 	remainingSize = req_size;
 	processedSize = 0;
 
-	// discard request that exceeds maximal length,
-	// or that is shorter than 3
-	// or that is not the multiple of 4
+	/* discard request that exceeds maximal length,
+	   or that is shorter than 3
+	   or that is not the multiple of 4 */
 	if (req_size < PCP_MIN_LEN)
-		return 0; //ignore msg
+		return 0; /* ignore msg */
 
 	if ( (req_size > PCP_MAX_LEN) || ( (req_size & 3) != 0)) {
 		syslog(LOG_ERR, "PCP: Size of PCP packet(%d) is larger than %d bytes or "
 		       "the size is not multiple of 4.\n", req_size, PCP_MAX_LEN);
 		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
-		return 1; // send response
+		return 1; /* send response */
 	}
 
-	//first print out info from common request header
+	/* first print out info from common request header */
 	common_req = (pcp_request_t*)req;
 
 	if (parseCommonRequestHeader(common_req, pcp_msg_info) ) {
@@ -1027,7 +1013,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			map_v1 = (pcp_map_v1_t*)(req + processedSize);
 #ifdef DEBUG
 			printMAPOpcodeVersion1(map_v1);
-#endif //DEBUG
+#endif /* DEBUG */
 			if ( parsePCPMAP_version1(map_v1, pcp_msg_info) ) {
 				return pcp_msg_info->result_code;
 			}
@@ -1062,7 +1048,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 #ifdef DEBUG
 			printPEEROpcodeVersion1(peer_v1);
-#endif //DEBUG
+#endif /* DEBUG */
 			if ( parsePCPPEER_version1(peer_v1, pcp_msg_info) ) {
 				 return pcp_msg_info->result_code;
 			}
@@ -1085,7 +1071,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 
 			break;
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 		default:
 			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
 			break;
@@ -1106,7 +1092,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 #ifdef DEBUG
 			printMAPOpcodeVersion2(map_v2);
-#endif //DEBUG
+#endif /* DEBUG */
 
 			if (parsePCPMAP_version2(map_v2, pcp_msg_info) ) {
 				return pcp_msg_info->result_code;
@@ -1142,7 +1128,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 #ifdef DEBUG
 			printPEEROpcodeVersion2(peer_v2);
-#endif //DEBUG
+#endif /* DEBUG */
 			parsePCPPEER_version2(peer_v2, pcp_msg_info);
 			processedSize += sizeof(pcp_peer_v2_t);
 
@@ -1165,7 +1151,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			}
 
 		break;
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 		case PCP_OPCODE_SADSCP:
@@ -1225,7 +1211,7 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 	resp->result_code = pcp_msg_info->result_code;
 	resp->epochtime = htonl(time(NULL) - startup_time);
 	switch (pcp_msg_info->result_code) {
-	//long lifetime errors
+	/*long lifetime errors*/
 	case PCP_ERR_UNSUPP_VERSION:
 	case PCP_ERR_NOT_AUTHORIZED:
 	case PCP_ERR_MALFORMED_REQUEST:
@@ -1254,15 +1240,13 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 	if (resp->r_opcode == 0x81) { /* MAP response */
 		if (resp->ver == 1 ) {
 			pcp_map_v1_t *mapr = (pcp_map_v1_t *)resp->next_data;
-			IPV6_ADDR_COPY((uint32_t*)mapr->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			mapr->ext_ip = *pcp_msg_info->ext_ip;
 			mapr->ext_port = htons(pcp_msg_info->ext_port);
 			mapr->int_port = htons(pcp_msg_info->int_port);
 		}
 		else if (resp->ver == 2 ) {
 			pcp_map_v2_t *mapr = (pcp_map_v2_t *)resp->next_data;
-			IPV6_ADDR_COPY((uint32_t*)mapr->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			mapr->ext_ip = *pcp_msg_info->ext_ip;
 			mapr->ext_port = htons(pcp_msg_info->ext_port);
 			mapr->int_port = htons(pcp_msg_info->int_port);
 		}
@@ -1274,19 +1258,17 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 			peer_resp->ext_port = htons(pcp_msg_info->ext_port);
 			peer_resp->int_port = htons(pcp_msg_info->int_port);
 			peer_resp->peer_port = htons(pcp_msg_info->peer_port);
-			IPV6_ADDR_COPY((uint32_t*)peer_resp->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			peer_resp->ext_ip = *pcp_msg_info->ext_ip;
 		}
 		else if (resp->ver == 2 ){
 			pcp_peer_v2_t* peer_resp = (pcp_peer_v2_t*)resp->next_data;
 			peer_resp->ext_port = htons(pcp_msg_info->ext_port);
 			peer_resp->int_port = htons(pcp_msg_info->int_port);
 			peer_resp->peer_port = htons(pcp_msg_info->peer_port);
-			IPV6_ADDR_COPY((uint32_t*)peer_resp->ext_ip,
-			               (uint32_t*)pcp_msg_info->ext_ip);
+			peer_resp->ext_ip = *pcp_msg_info->ext_ip;
 		}
 	}
-#endif //PCP_PEER
+#endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
 	else if (resp->r_opcode == 0x83) { /*SADSCP response*/
@@ -1296,10 +1278,10 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 		sadscp_resp->a_r_dscp_value |= (pcp_msg_info->sadscp_dscp & PCP_SADSCP_MASK);
 		memset(sadscp_resp->reserved, 0, sizeof(sadscp_resp->reserved));
 	}
-#endif //PCP_SADSCP
+#endif /* PCP_SADSCP */
 }
 
-int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len, \
+int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
                              struct sockaddr_in *senderaddr)
 {
 	pcp_info_t pcp_msg_info;
@@ -1323,10 +1305,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len, \
 
 		createPCPResponse(buff, &pcp_msg_info);
 
-		if ((len&0x03)!=0) {
-			len = len+4-(len&0x03); //round up resp. length to multiple of 4
-		}
-
+		len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
 		len = sendto(s, buff, len, 0,
 		           (struct sockaddr *)senderaddr, sizeof(struct sockaddr_in));
 		if( len < 0 ) {

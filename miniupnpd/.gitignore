@@ -9,3 +9,6 @@ testgetifstats
 testupnpdescgen
 testupnppermissions
 testgetroute
+netfilter/testiptcrdr
+netfilter/testiptcrdr_dscp
+netfilter/testiptcrdr_peer
