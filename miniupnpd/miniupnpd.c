@@ -908,12 +908,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				        optionsfile);
 			}
 		}
-		/* if lifetimes ae inverse*/
+#ifdef ENABLE_PCP
+		/* if lifetimes are inverse */
 		if (min_lifetime >= max_lifetime) {
 			fprintf(stderr, "Minimum lifetime (%lu) is greater than or equal to maximum lifetime (%lu).\n", min_lifetime, max_lifetime);
 			fprintf(stderr, "Check your configuration file.\n");
 			return 1;
 		}
+#endif
 	}
 #endif /* DISABLE_CONFIG_FILE */
 
