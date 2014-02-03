@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.348 2014/02/03 09:32:09 nanard Exp $
 
 2014/02/03:
   PCP : Add support for ANNOUNCE requests
+  minixml now handle XML comments
 
 2013/12/16:
   Attempt to compile with OS X/pf
