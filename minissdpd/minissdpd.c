@@ -350,6 +350,12 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 		method = METHOD_MSEARCH;
 	else if(methodlen==6 && 0==memcmp(p, "NOTIFY", 6))
 		method = METHOD_NOTIFY;
+	else if(methodlen==4 && 0==memcmp(p, "HTTP", 4)) {
+		/* answer to a M-SEARCH => process it as a NOTIFY
+		 * with NTS: ssdp:alive */
+		method = METHOD_NOTIFY;
+		nts = NTS_SSDP_ALIVE;
+	}
 	linestart = p;
 	while(linestart < p + n - 2) {
 		/* start parsing the line : detect line end */
@@ -439,6 +445,8 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 			} else if(l==2 && 0==strncasecmp(linestart, "st", 2)) {
 				st = valuestart;
 				st_len = m;
+				if(method == METHOD_NOTIFY)
+					i = HEADER_NT;	/* it was a M-SEARCH response */
 			}
 			if(i>=0) {
 				headers[i].p = valuestart;
@@ -785,6 +793,60 @@ sigterm(int sig)
 	/*errno = save_errno;*/
 }
 
+#define PORT 1900
+#define XSTR(s) STR(s)
+#define STR(s) #s
+#define UPNP_MCAST_ADDR "239.255.255.250"
+/* for IPv6 */
+#define UPNP_MCAST_LL_ADDR "FF02::C" /* link-local */
+#define UPNP_MCAST_SL_ADDR "FF05::C" /* site-local */
+
+/* send the M-SEARCH request for all devices */
+void ssdpDiscoverAll(int s, int ipv6)
+{
+	static const char MSearchMsgFmt[] =
+	"M-SEARCH * HTTP/1.1\r\n"
+	"HOST: %s:" XSTR(PORT) "\r\n"
+	"ST: ssdp:all\r\n"
+	"MAN: \"ssdp:discover\"\r\n"
+	"MX: %u\r\n"
+	"\r\n";
+	char bufr[512];
+	int n;
+	int mx = 3;
+	int linklocal = 1;
+	struct sockaddr_storage sockudp_w;
+
+	{
+		n = snprintf(bufr, sizeof(bufr),
+		             MSearchMsgFmt,
+		             ipv6 ?
+		             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
+		             : UPNP_MCAST_ADDR, mx);
+		memset(&sockudp_w, 0, sizeof(struct sockaddr_storage));
+		if(ipv6) {
+			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_w;
+			p->sin6_family = AF_INET6;
+			p->sin6_port = htons(PORT);
+			inet_pton(AF_INET6,
+			          linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR,
+			          &(p->sin6_addr));
+		} else {
+			struct sockaddr_in * p = (struct sockaddr_in *)&sockudp_w;
+			p->sin_family = AF_INET;
+			p->sin_port = htons(PORT);
+			p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
+		}
+
+		n = sendto(s, bufr, n, 0, (const struct sockaddr *)&sockudp_w,
+		           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
+		if (n < 0) {
+			/* XXX : EINTR EWOULDBLOCK EAGAIN */
+			syslog(LOG_ERR, "sendto: %m");
+		}
+	}
+}
+
 /* main(): program entry point */
 int main(int argc, char * * argv)
 {
@@ -962,6 +1024,11 @@ int main(int argc, char * * argv)
 	}
 
 	writepidfile(pidfilename, pid);
+
+	/* send M-SEARCH ssdp:all Requests */
+	ssdpDiscoverAll(s_ssdp, 0);
+	if(s_ssdp6 >= 0)
+		ssdpDiscoverAll(s_ssdp6, 1);
 
 	/* Main loop */
 	while(!quitting)

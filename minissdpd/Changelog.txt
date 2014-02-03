@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.33 2014/02/03 15:45:07 nanard Exp $
 
 2014/02/03:
 	silently ignore EAGAIN, EWOULDBLOCK, EINTR of recv calls
+	Discover devices on the network at startup
 
 2013/08/19:
 	Translate README in english
