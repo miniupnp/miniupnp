@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2012 Thomas Bernard
+ * copyright (c) 2005-2014 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 /*#include <syslog.h>*/
@@ -72,7 +72,14 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		return NULL;
 	}
 	stsize = strlen(devtype);
-	buffer[0] = 1; /* request type 1 : request devices/services by type */
+	if(stsize == 8 && 0 == memcmp(devtype, "ssdp:all", 8))
+	{
+		buffer[0] = 3;	/* request type 3 : everything */
+	}
+	else
+	{
+		buffer[0] = 1; /* request type 1 : request devices/services by type */
+	}
 	p = buffer + 1;
 	l = stsize;	CODELENGTH(l, p);
 	if(p + stsize > buffer + sizeof(buffer))
