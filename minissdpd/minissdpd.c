@@ -1,6 +1,6 @@
-/* $Id: minissdpd.c,v 1.35 2012/05/21 17:13:11 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.36 2014/02/03 15:45:07 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2012 Thomas Bernard
+ * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -282,8 +282,10 @@ processMSEARCH(int s, const char * st, int st_len,
 		}
 	} else {
 		/* find matching services */
+		/* remove version at the end of the ST string */
 		if(st[st_len-2]==':' && isdigit(st[st_len-1]))
 			st_len -= 2;
+		/* answer for each matching service */
 		for(serv = servicelisthead.lh_first;
 		    serv;
 		    serv = serv->entries.le_next) {
@@ -338,6 +340,7 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 	unsigned int lifetime = 180;	/* 3 minutes by default */
 	const char * st = NULL;
 	int st_len = 0;
+
 	memset(headers, 0, sizeof(headers));
 	for(methodlen = 0;
 	    methodlen < n && (isalpha(p[methodlen]) || p[methodlen]=='-');
@@ -566,9 +569,9 @@ void processRequest(struct reqelem * req)
 	syslog(LOG_INFO, "(s=%d) request type=%d str='%.*s'",
 	       req->socket, type, l, p);
 	switch(type) {
-	case 1:
-	case 2:
-	case 3:
+	case 1:	/* request by type */
+	case 2:	/* request by USN (unique id) */
+	case 3:	/* everything */
 		while(d && (nrep < 255)) {
 			if(d->t < t) {
 				syslog(LOG_INFO, "outdated device");
@@ -633,12 +636,14 @@ void processRequest(struct reqelem * req)
 			}
 		}
 		rbuf[0] = nrep;
+		syslog(LOG_DEBUG, "(s=%d) response : %d device%s",
+		       req->socket, nrep, (nrep > 1) ? "s" : "");
 		if(write(req->socket, rbuf, rp - rbuf) < 0) {
 			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
 			goto error;
 		}
 		break;
-	case 4:
+	case 4:	/* submit service */
 		newserv = malloc(sizeof(struct service));
 		if(!newserv) {
 			syslog(LOG_ERR, "cannot allocate memory");
