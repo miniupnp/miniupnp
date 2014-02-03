@@ -1086,6 +1086,10 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 		/* RFC 6887 PCP support
 		 * http://tools.ietf.org/html/rfc6887 */
 		switch ( common_req->r_opcode & 0x7F) {
+		case PCP_OPCODE_ANNOUNCE:
+			/* should check PCP Client's IP Address in request */
+			/* see http://tools.ietf.org/html/rfc6887#section-14.1 */
+			break;
 		case PCP_OPCODE_MAP:
 
 			remainingSize -= sizeof(pcp_map_v2_t);

@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.346 2013/12/13 13:41:52 nanard Exp $
+$Id: Changelog.txt,v 1.348 2014/02/03 09:32:09 nanard Exp $
+
+2014/02/03:
+  PCP : Add support for ANNOUNCE requests
 
 2013/12/16:
   Attempt to compile with OS X/pf
