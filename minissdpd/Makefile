@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.17 2012/05/02 10:26:50 nanard Exp $
+# $Id: Makefile,v 1.18 2014/02/03 14:32:14 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -58,6 +58,8 @@ minissdpd: $(MINISSDPDOBJS)
 testminissdpd:	$(TESTMINISSDPDOBJS)
 
 testcodelength:	testcodelength.o
+
+listifaces:	listifaces.o upnputils.o
 
 depend:
 	makedepend -f$(MAKEFILE_LIST) -Y \
