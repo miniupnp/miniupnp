@@ -224,6 +224,7 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 	n = sendto(s, buf, l, 0,
 	           sockname, sockname_len );
 	if(n < 0) {
+		/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
 		syslog(LOG_ERR, "sendto(udp): %m");
 	}
 }
@@ -1002,7 +1003,10 @@ int main(int argc, char * * argv)
 			             (struct sockaddr *)&sendername6, &sendername6_len);
 			if(n<0)
 			{
-				syslog(LOG_ERR, "recvfrom: %m");
+				 /* EAGAIN, EWOULDBLOCK, EINTR : silently ignore (try again next time)
+				  * other errors : log to LOG_ERR */
+				if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+					syslog(LOG_ERR, "recvfrom: %m");
 			}
 			else
 			{
@@ -1033,7 +1037,10 @@ int main(int argc, char * * argv)
 			             (struct sockaddr *)&sendername, &sendername_len);
 			if(n<0)
 			{
-				syslog(LOG_ERR, "recvfrom: %m");
+				 /* EAGAIN, EWOULDBLOCK, EINTR : silently ignore (try again next time)
+				  * other errors : log to LOG_ERR */
+				if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+					syslog(LOG_ERR, "recvfrom: %m");
 			}
 			else
 			{
