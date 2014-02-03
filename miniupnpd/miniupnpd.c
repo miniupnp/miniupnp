@@ -586,6 +586,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 			p++;
 		if(*p=='.')
 		{
+			/* parse mask in /255.255.255.0 format */
 			while(*p && (*p=='.' || isdigit(*p)))
 				p++;
 			n = p - q;
@@ -598,6 +599,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		}
 		else
 		{
+			/* it is a /24 format */
 			int nbits = atoi(q);
 			if(nbits > 32 || nbits < 0)
 				goto parselan_error;
