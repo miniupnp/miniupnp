@@ -2,4 +2,5 @@
 minissdpd
 testcodelength
 testminissdpd
+listifaces
 Makefile.bak
