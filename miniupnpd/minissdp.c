@@ -1,7 +1,7 @@
-/* $Id: minissdp.c,v 1.56 2014/02/01 16:35:37 nanard Exp $ */
+/* $Id: minissdp.c,v 1.57 2014/02/06 09:52:03 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2013 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -280,9 +280,16 @@ OpenAndConfSSDPNotifySockets(int * sockets)
 			goto error;
 		i++;
 #ifdef ENABLE_IPV6
-		sockets[i] = OpenAndConfSSDPNotifySocketIPv6(lan_addr->index);
-		if(sockets[i] < 0)
-			goto error;
+		if(ipv6_enabled)
+		{
+			sockets[i] = OpenAndConfSSDPNotifySocketIPv6(lan_addr->index);
+			if(sockets[i] < 0)
+				goto error;
+		}
+		else
+		{
+			sockets[i] = -1;
+		}
 		i++;
 #endif
 	}
@@ -568,8 +575,11 @@ SendSSDPNotifies2(int * sockets,
 		                 lifetime, 0);
 		i++;
 #ifdef ENABLE_IPV6
-		SendSSDPNotifies(sockets[i], ipv6_addr_for_http_with_brackets, port,
-		                 lifetime, 1);
+		if(sockets[i] >= 0)
+		{
+			SendSSDPNotifies(sockets[i], ipv6_addr_for_http_with_brackets, port,
+			                 lifetime, 1);
+		}
 		i++;
 #endif
 	}

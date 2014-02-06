@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.182 2014/02/03 08:37:32 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.183 2014/02/06 09:52:01 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -116,7 +116,8 @@ OpenAndConfHTTPSocket(unsigned short port)
 	int s;
 	int i = 1;
 #ifdef ENABLE_IPV6
-	struct sockaddr_in6 listenname;
+	struct sockaddr_in6 listenname6;
+	struct sockaddr_in listenname4;
 #else
 	struct sockaddr_in listenname;
 #endif
@@ -124,7 +125,7 @@ OpenAndConfHTTPSocket(unsigned short port)
 
 	if( (s = socket(
 #ifdef ENABLE_IPV6
-	                PF_INET6,
+	                ipv6_enabled ? PF_INET6 : PF_INET,
 #else
 	                PF_INET,
 #endif
@@ -153,19 +154,35 @@ OpenAndConfHTTPSocket(unsigned short port)
 	}
 
 #ifdef ENABLE_IPV6
-	memset(&listenname, 0, sizeof(struct sockaddr_in6));
-	listenname.sin6_family = AF_INET6;
-	listenname.sin6_port = htons(port);
-	listenname.sin6_addr = in6addr_any;
-	listenname_len =  sizeof(struct sockaddr_in6);
+	if(ipv6_enabled)
+	{
+		memset(&listenname6, 0, sizeof(struct sockaddr_in6));
+		listenname6.sin6_family = AF_INET6;
+		listenname6.sin6_port = htons(port);
+		listenname6.sin6_addr = in6addr_any;
+		listenname_len =  sizeof(struct sockaddr_in6);
+	} else {
+		memset(&listenname4, 0, sizeof(struct sockaddr_in));
+		listenname4.sin_family = AF_INET;
+		listenname4.sin_port = htons(port);
+		listenname4.sin_addr.s_addr = htonl(INADDR_ANY);
+		listenname_len =  sizeof(struct sockaddr_in);
+	}
 #else
+	memset(&listenname, 0, sizeof(struct sockaddr_in));
 	listenname.sin_family = AF_INET;
 	listenname.sin_port = htons(port);
 	listenname.sin_addr.s_addr = htonl(INADDR_ANY);
 	listenname_len =  sizeof(struct sockaddr_in);
 #endif
 
+#ifdef ENABLE_IPV6
+	if(bind(s,
+	        ipv6_enabled ? (struct sockaddr *)&listenname6 : (struct sockaddr *)&listenname4,
+	        listenname_len) < 0)
+#else
 	if(bind(s, (struct sockaddr *)&listenname, listenname_len) < 0)
+#endif
 	{
 		syslog(LOG_ERR, "bind(http): %m");
 		close(s);
@@ -181,6 +198,7 @@ OpenAndConfHTTPSocket(unsigned short port)
 
 	return s;
 }
+
 #ifdef ENABLE_NFQUEUE
 
 int identify_ip_protocol(char *payload) {
@@ -1347,7 +1365,7 @@ main(int argc, char * * argv)
 	int sudpv6 = -1;	/* IP v6 socket for receiving SSDP */
 #endif
 #ifdef ENABLE_NATPMP
-	int * snatpmp = NULL;
+	int * snatpmp = NULL;	/* also used for PCP */
 #endif
 #ifdef ENABLE_NFQUEUE
 	int nfqh = -1;
@@ -1455,7 +1473,8 @@ main(int argc, char * * argv)
 			       ipv6_addr_for_http_with_brackets);
 		} else {
 			memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
-			syslog(LOG_WARNING, "no HTTP IPv6 address");
+			syslog(LOG_WARNING, "no HTTP IPv6 address, disabling IPv6");
+			ipv6_enabled = 0;
 		}
 #endif
 
@@ -1470,10 +1489,13 @@ main(int argc, char * * argv)
 			}
 		}
 #ifdef ENABLE_IPV6
-		sudpv6 = OpenAndConfSSDPReceiveSocket(1);
-		if(sudpv6 < 0)
+		if(ipv6_enabled)
 		{
-			syslog(LOG_WARNING, "Failed to open socket for receiving SSDP (IP v6).");
+			sudpv6 = OpenAndConfSSDPReceiveSocket(1);
+			if(sudpv6 < 0)
+			{
+				syslog(LOG_WARNING, "Failed to open socket for receiving SSDP (IP v6).");
+			}
 		}
 #endif
 

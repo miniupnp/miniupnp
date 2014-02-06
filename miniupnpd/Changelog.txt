@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.348 2014/02/03 09:32:09 nanard Exp $
+$Id: Changelog.txt,v 1.350 2014/02/06 09:52:03 nanard Exp $
+
+2014/02/06:
+  possibility to disable ipv6 at runtime
 
 2014/02/03:
   PCP : Add support for ANNOUNCE requests
