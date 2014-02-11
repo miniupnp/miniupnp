@@ -827,6 +827,10 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 					return;
 				}
 			} else {
+				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+				       pcp_msg_info->ext_port, (pcp_msg_info->protocol==IPPROTO_TCP)?"tcp":"udp",
+				       iaddr_old, iport_old);
+				/* remove and then add again */
 				if (_upnp_delete_redir(pcp_msg_info->ext_port,
 						pcp_msg_info->protocol)==0) {
 					break;
