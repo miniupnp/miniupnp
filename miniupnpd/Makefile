@@ -148,7 +148,7 @@ clean:
 install:	miniupnpd genuuid
 	$(STRIP) miniupnpd
 	$(INSTALL) -d $(DESTDIR)$(INSTALLBINDIR)
-	$(INSTALL) -m 555 miniupnpd $(DESTDIR)$(INSTALLBINDIR)
+	$(INSTALL) -m 755 miniupnpd $(DESTDIR)$(INSTALLBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLETCDIR)
 	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)
 	# TODO : install man page correctly
