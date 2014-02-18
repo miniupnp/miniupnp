@@ -40,6 +40,9 @@
 #endif /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
 #endif /* #ifndef strncasecmp */
 #define MAXHOSTNAMELEN 64
+#if defined(WINVER) && (WINVER < 0x600)
+#undef IF_NAMESIZE
+#endif
 #else /* #ifdef _WIN32 */
 /* Standard POSIX includes */
 #include <unistd.h>
