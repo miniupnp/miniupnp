@@ -150,7 +150,7 @@ TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl testgetifaddr \
-              testgetroute
+              testgetroute testasyncsendto
 
 .PHONY:	all clean install depend genuuid
 
@@ -161,7 +161,7 @@ clean:
 	$(RM) $(EXECUTABLES)
 	$(RM) testupnpdescgen.o testgetifstats.o
 	$(RM) testupnppermissions.o testgetifaddr.o
-	$(RM) testgetroute.o
+	$(RM) testgetroute.o testasyncsendto.o
 	$(RM) miniupnpdctl.o
 
 install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
@@ -205,6 +205,8 @@ testgetifaddr:	testgetifaddr.o getifaddr.o
 
 testgetroute:	testgetroute.o linux/getroute.o upnputils.o -lnfnetlink
 
+testasyncsendto:	testasyncsendto.o asyncsendto.o upnputils.o
+
 miniupnpdctl:	miniupnpdctl.o
 
 config.h:	genconfig.sh VERSION
@@ -214,7 +216,7 @@ depend:	config.h
 	makedepend -f$(MAKEFILE_LIST) -Y \
 	$(ALLOBJS:.o=.c) $(TESTUPNPDESCGENOBJS:.o=.c) \
 	testgetifstats.c testupnppermissions.c testgetifaddr.c \
-	testgetroute.c miniupnpdctl.c 2>/dev/null
+	testgetroute.c testasyncsendto.c miniupnpdctl.c 2>/dev/null
 
 # DO NOT DELETE
 
