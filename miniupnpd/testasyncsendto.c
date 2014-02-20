@@ -60,6 +60,10 @@ int test(void)
 	syslog(LOG_DEBUG, "sendto_or_schedule : %d", (int)n);
 	n = sendto_schedule(s, "1234", 4, 0,
 	                    (struct sockaddr *)&dest_addr, sizeof(dest_addr),
+	                    4400);
+	syslog(LOG_DEBUG, "sendto_schedule : %d", (int)n);
+	n = sendto_schedule(s, "1234", 4, 0,
+	                    (struct sockaddr *)&dest_addr, sizeof(dest_addr),
 	                    3000);
 	syslog(LOG_DEBUG, "sendto_schedule : %d", (int)n);
 	while ((i = get_next_scheduled_send(&next_send)) > 0) {
@@ -72,10 +76,16 @@ int test(void)
 		FD_ZERO(&writefds);
 		max_fd = 0;
 		gettimeofday(&now, NULL);
+		i = get_sendto_fds(&writefds, &max_fd, &now);
 		if(now.tv_sec > next_send.tv_sec ||
 		   (now.tv_sec == next_send.tv_sec && now.tv_usec >= next_send.tv_usec)) {
-			/* wait 10sec :) */
-			timeout.tv_sec = 10;
+			if(i > 0) {
+				/* dont wait */
+				timeout.tv_sec = 0;
+			} else {
+				/* wait 10sec :) */
+				timeout.tv_sec = 10;
+			}
 			timeout.tv_usec = 0;
 		} else {
 			/* ... */
@@ -86,7 +96,6 @@ int test(void)
 				timeout.tv_sec--;
 			}
 		}
-		i = get_sendto_fds(&writefds, &max_fd, &now);
 		syslog(LOG_DEBUG, "get_sendto_fds() returned %d", i);
 		syslog(LOG_DEBUG, "select(%d, NULL, xx, NULL, %ld.%06ld)",
 		       max_fd, timeout.tv_sec, timeout.tv_usec);

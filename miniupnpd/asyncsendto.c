@@ -16,9 +16,19 @@
 
 #include "asyncsendto.h"
 
+/* state diagram for a packet :
+ *
+ *                     |
+ *                     V
+ * -> ESCHEDULED -> ESENDNOW -> sent
+ *                    ^  |
+ *                    |  V
+ *                EWAITREADY -> sent
+ */
 struct scheduled_send {
 	LIST_ENTRY(scheduled_send) entries;
 	struct timeval ts;
+	enum {ESCHEDULED=1, EWAITREADY=2, ESENDNOW=3} state;
 	int sockfd;
 	const void * buf;
 	size_t len;
@@ -41,6 +51,7 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
                 const struct sockaddr *dest_addr, socklen_t addrlen,
                 unsigned int delay)
 {
+	enum {ESCHEDULED, EWAITREADY, ESENDNOW} state;
 	ssize_t n;
 	struct timeval tv;
 	struct scheduled_send * elt;
@@ -48,9 +59,21 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
 	if(delay == 0) {
 		/* first try to send at once */
 		n = sendto(sockfd, buf, len, flags, dest_addr, addrlen);
-		if((n >= 0) || (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK))
+		if(n >= 0)
 			return n;
+		else if(errno == EAGAIN || errno == EWOULDBLOCK) {
+			/* use select() on this socket */
+			state = EWAITREADY;
+		} else if(errno == EINTR) {
+			state = ESENDNOW;
+		} else {
+			/* uncatched error */
+			return n;
+		}
+	} else {
+		state = ESCHEDULED;
 	}
+
 	/* schedule */
 	if(gettimeofday(&tv, 0) < 0) {
 		return -1;
@@ -62,6 +85,7 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
 		       (unsigned)(sizeof(struct scheduled_send) + len + addrlen));
 		return -1;
 	}
+	elt->state = state;
 	/* time the packet should be sent */
 	elt->ts.tv_sec = tv.tv_sec + (delay / 1000);
 	elt->ts.tv_usec = tv.tv_usec + (delay % 1000) * 1000;
@@ -83,6 +107,7 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
 }
 
 
+/* try to send at once, and queue the packet if needed */
 ssize_t
 sendto_or_schedule(int sockfd, const void *buf, size_t len, int flags,
                    const struct sockaddr *dest_addr, socklen_t addrlen)
@@ -108,23 +133,30 @@ int get_next_scheduled_send(struct timeval * next_send)
 	return n;
 }
 
+/* update writefds for select() call
+ * return the number of packets to try to send at once */
 int get_sendto_fds(fd_set * writefds, int * max_fd, const struct timeval * now)
 {
 	int n = 0;
 	struct scheduled_send * elt;
 	for(elt = send_list.lh_first; elt != NULL; elt = elt->entries.le_next) {
-		if((elt->ts.tv_sec < now->tv_sec) ||
-		   (elt->ts.tv_sec == now->tv_sec && elt->ts.tv_usec <= now->tv_usec)) {
+		if(elt->state == EWAITREADY) {
+			/* last sendto() call returned EAGAIN/EWOULDBLOCK */
 			FD_SET(elt->sockfd, writefds);
 			if(elt->sockfd > *max_fd)
 				*max_fd = elt->sockfd;
 			n++;
+		} else if((elt->ts.tv_sec < now->tv_sec) ||
+		          (elt->ts.tv_sec == now->tv_sec && elt->ts.tv_usec <= now->tv_usec)) {
+			/* we waited long enough, now send ! */
+			elt->state = ESENDNOW;
+			n++;
 		}
 	}
-syslog(LOG_DEBUG, "%x", (int)writefds->fds_bits[0]);
 	return n;
 }
 
+/* executed sendto() when needed */
 int try_sendto(fd_set * writefds)
 {
 	ssize_t n;
@@ -132,17 +164,26 @@ int try_sendto(fd_set * writefds)
 	struct scheduled_send * next;
 	for(elt = send_list.lh_first; elt != NULL; elt = next) {
 		next = elt->entries.le_next;
-syslog(LOG_DEBUG, "s=%d fds=%x", elt->sockfd, (int)writefds->fds_bits[0]);
-		if(FD_ISSET(elt->sockfd, writefds)) {
-			syslog(LOG_DEBUG, "sending %d bytes", (int)elt->len);
+		if((elt->state == ESENDNOW) ||
+		   (elt->state == EWAITREADY && FD_ISSET(elt->sockfd, writefds))) {
+			syslog(LOG_DEBUG, "try_sendto(): %d bytes on socket %d",
+			       (int)elt->len, elt->sockfd);
 			n = sendto(elt->sockfd, elt->buf, elt->len, elt->flags,
 			           elt->dest_addr, elt->addrlen);
 			if(n < 0) {
-				syslog(LOG_DEBUG, "sendto: %m");
-				if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+				if(errno == EINTR) {
+					/* retry at once */
+					elt->state = ESENDNOW;
 					continue;
+				} else if(errno == EAGAIN || errno == EWOULDBLOCK) {
+					/* retry once the socket is ready for writing */
+					elt->state = EWAITREADY;
+					continue;
+				}
+				/* uncatched error */
 				return n;
 			} else {
+				/* remove from the list */
 				LIST_REMOVE(elt, entries);
 				free(elt);
 			}
