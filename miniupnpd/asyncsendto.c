@@ -181,6 +181,9 @@ int try_sendto(fd_set * writefds)
 					continue;
 				}
 				/* uncatched error */
+				/* remove from the list */
+				LIST_REMOVE(elt, entries);
+				free(elt);
 				return n;
 			} else {
 				/* remove from the list */
