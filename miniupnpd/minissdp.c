@@ -24,6 +24,7 @@
 #include "minissdp.h"
 #include "upnputils.h"
 #include "getroute.h"
+#include "asyncsendto.h"
 #include "codelength.h"
 
 /* SSDP ip/port */
@@ -330,11 +331,13 @@ EXT:
  * st, st_len : ST: header
  * suffix :     suffix for USN: header
  * host, port : our HTTP host, port
+ * delay :      in milli-seconds
  */
 static void
 SendSSDPResponse(int s, const struct sockaddr * addr,
                  const char * st, int st_len, const char * suffix,
-                 const char * host, unsigned short port, const char * uuidvalue)
+                 const char * host, unsigned short port, const char * uuidvalue,
+                 unsigned int delay)
 {
 	int l, n;
 	char buf[512];
@@ -399,15 +402,14 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 	}
 	addrlen = (addr->sa_family == AF_INET6)
 	          ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
-	n = sendto(s, buf, l, 0,
-	           addr, addrlen);
+	n = sendto_schedule(s, buf, l, 0,
+	                    addr, addrlen, delay);
 	sockaddr_to_string(addr, addr_str, sizeof(addr_str));
 	syslog(LOG_INFO, "SSDP Announce %d bytes to %s ST: %.*s",n,
        		addr_str,
 		l, buf);
 	if(n < 0)
 	{
-		/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
 		syslog(LOG_ERR, "sendto(udp): %m");
 	}
 }
@@ -488,7 +490,7 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
 		syslog(LOG_WARNING, "SendSSDPNotify(): truncated output");
 		l = sizeof(bufr) - 1;
 	}
-	n = sendto(s, bufr, l, 0, dest,
+	n = sendto_or_schedule(s, bufr, l, 0, dest,
 #ifdef ENABLE_IPV6
 		ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
 #else
@@ -497,7 +499,6 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
 		);
 	if(n < 0)
 	{
-		/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
 		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
 		       host ? host : "NULL");
 	}
@@ -636,6 +637,16 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #endif
 	int mx_value = -1;
 #endif
+	unsigned int delay = 0;
+	/* UPnP Device Architecture v1.1.  1.3.3 Search response :
+	 * Devices responding to a multicast M-SEARCH SHOULD wait a random period
+	 * of time between 0 seconds and the number of seconds specified in the
+	 * MX field value of the search request before responding, in order to
+	 * avoid flooding the requesting control point with search responses
+	 * from multiple devices. If the search request results in the need for
+	 * a multiple part response from the device, those multiple part
+	 * responses SHOULD be spread at random intervals through the time period
+	 * from 0 to the number of seconds specified in the MX header field. */
 
 	/* get the string representation of the sender address */
 	sockaddr_to_string(sender, sender_str, sizeof(sender_str));
@@ -771,7 +782,8 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					SendSSDPResponse(s, sender,
 					                 st, st_len, "",
 					                 announced_host, port,
-					                 known_service_types[i].uuid);
+					                 known_service_types[i].uuid,
+					                 delay);
 					break;
 				}
 			}
@@ -790,15 +802,16 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					SendSSDPResponse(s, sender,
 					                 known_service_types[i].s, l, ver_str,
 					                 announced_host, port,
-					                 known_service_types[i].uuid);
+					                 known_service_types[i].uuid,
+					                 delay);
 				}
 				/* also answer for uuid */
 				SendSSDPResponse(s, sender, uuidvalue_igd, strlen(uuidvalue_igd), "",
-				                 announced_host, port, uuidvalue_igd);
+				                 announced_host, port, uuidvalue_igd, delay);
 				SendSSDPResponse(s, sender, uuidvalue_wan, strlen(uuidvalue_wan), "",
-				                 announced_host, port, uuidvalue_wan);
+				                 announced_host, port, uuidvalue_wan, delay);
 				SendSSDPResponse(s, sender, uuidvalue_wcd, strlen(uuidvalue_wcd), "",
-				                 announced_host, port, uuidvalue_wcd);
+				                 announced_host, port, uuidvalue_wcd, delay);
 			}
 			/* responds to request by UUID value */
 			l = (int)strlen(uuidvalue_igd);
@@ -808,19 +821,22 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				{
 					syslog(LOG_INFO, "ssdp:uuid (IGD) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
-					                 announced_host, port, uuidvalue_igd);
+					                 announced_host, port, uuidvalue_igd,
+					                 delay);
 				}
 				else if(0 == memcmp(st, uuidvalue_wan, l))
 				{
 					syslog(LOG_INFO, "ssdp:uuid (WAN) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
-					                 announced_host, port, uuidvalue_wan);
+					                 announced_host, port, uuidvalue_wan,
+					                 delay);
 				}
 				else if(0 == memcmp(st, uuidvalue_wcd, l))
 				{
 					syslog(LOG_INFO, "ssdp:uuid (WCD) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
-					                 announced_host, port, uuidvalue_wcd);
+					                 announced_host, port, uuidvalue_wcd,
+					                 delay);
 				}
 			}
 		}
@@ -870,7 +886,7 @@ SendSSDPbyebye(int s, const struct sockaddr * dest,
 		syslog(LOG_WARNING, "SendSSDPbyebye(): truncated output");
 		l = sizeof(bufr) - 1;
 	}
-	n = sendto(s, bufr, l, 0, dest,
+	n = sendto_or_schedule(s, bufr, l, 0, dest,
 #ifdef ENABLE_IPV6
 	           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
 #else

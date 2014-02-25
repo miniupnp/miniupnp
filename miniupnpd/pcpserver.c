@@ -58,6 +58,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnpredirect.h"
 #include "commonrdr.h"
 #include "getifaddr.h"
+#include "asyncsendto.h"
 #include "pcp_msg_struct.h"
 
 #ifdef PCP_PEER
@@ -1325,7 +1326,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			len = PCP_MIN_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
-		len = sendto(s, buff, len, 0,
+		len = sendto_or_schedule(s, buff, len, 0,
 		           (struct sockaddr *)senderaddr, sizeof(struct sockaddr_in));
 		if( len < 0 ) {
 			syslog(LOG_ERR, "sendto(pcpserver): %m");
