@@ -2026,6 +2026,21 @@ main(int argc, char * * argv)
 	}	/* end of main loop */
 
 shutdown:
+	/* send good-bye */
+	if (GETFLAG(ENABLEUPNPMASK))
+	{
+#ifndef ENABLE_IPV6
+		if(SendSSDPGoodbye(snotify, addr_count) < 0)
+#else
+		if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
+#endif
+		{
+			syslog(LOG_ERR, "Failed to broadcast good-bye notifications");
+		}
+	}
+	/* try to send pending packets */
+	finalize_sendto();
+
 	/* close out open sockets */
 	while(upnphttphead.lh_first != NULL)
 	{
@@ -2066,14 +2081,6 @@ shutdown:
 	if (GETFLAG(ENABLEUPNPMASK))
 	{
 #ifndef ENABLE_IPV6
-		if(SendSSDPGoodbye(snotify, addr_count) < 0)
-#else
-		if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
-#endif
-		{
-			syslog(LOG_ERR, "Failed to broadcast good-bye notifications");
-		}
-#ifndef ENABLE_IPV6
 		for(i = 0; i < addr_count; i++)
 #else
 		for(i = 0; i < addr_count * 2; i++)
@@ -2081,6 +2088,7 @@ shutdown:
 			close(snotify[i]);
 	}
 
+	/* remove pidfile */
 	if(pidfilename && (unlink(pidfilename) < 0))
 	{
 		syslog(LOG_ERR, "Failed to remove pidfile %s: %m", pidfilename);

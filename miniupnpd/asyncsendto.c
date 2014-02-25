@@ -195,3 +195,25 @@ int try_sendto(fd_set * writefds)
 	return 0;
 }
 
+/* empty the list */
+void finalize_sendto(void)
+{
+	ssize_t n;
+	struct scheduled_send * elt;
+	struct scheduled_send * next;
+	/* TODO : improve with a select() and a short timeout */
+	for(elt = send_list.lh_first; elt != NULL; elt = next) {
+		next = elt->entries.le_next;
+		syslog(LOG_DEBUG, "finalize_sendto(): %d bytes on socket %d",
+		       (int)elt->len, elt->sockfd);
+		n = sendto(elt->sockfd, elt->buf, elt->len, elt->flags,
+		           elt->dest_addr, elt->addrlen);
+		if(n < 0) {
+			syslog(LOG_WARNING, "sendto(): %m");
+		}
+		/* remove from the list */
+		LIST_REMOVE(elt, entries);
+		free(elt);
+	}
+}
+

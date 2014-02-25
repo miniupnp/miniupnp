@@ -32,4 +32,7 @@ int try_sendto(fd_set * writefds);
 /* set writefds before select() */
 int get_sendto_fds(fd_set * writefds, int * max_fd, const struct timeval * now);
 
+/* empty the list */
+void finalize_sendto(void);
+
 #endif
