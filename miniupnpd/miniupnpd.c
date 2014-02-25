@@ -63,6 +63,7 @@
 #include "miniupnpdtypes.h"
 #include "daemonize.h"
 #include "upnpevents.h"
+#include "asyncsendto.h"
 #ifdef ENABLE_NATPMP
 #include "natpmp.h"
 #ifdef ENABLE_PCP
@@ -1756,6 +1757,38 @@ main(int argc, char * * argv)
 		upnpevents_selectfds(&readset, &writeset, &max_fd);
 #endif
 
+		/* queued "sendto" */
+		{
+			struct timeval next_send;
+			i = get_next_scheduled_send(&next_send);
+			if(i > 0) {
+#ifdef DEBUG
+				syslog(LOG_DEBUG, "%d queued sendto", i);
+#endif
+				i = get_sendto_fds(&writeset, &max_fd, &timeofday);
+				if(timeofday.tv_sec > next_send.tv_sec ||
+				   (timeofday.tv_sec == next_send.tv_sec && timeofday.tv_usec >= next_send.tv_usec)) {
+					if(i > 0) {
+						timeout.tv_sec = 0;
+						timeout.tv_usec = 0;
+					}
+				} else {
+					struct timeval tmp_timeout;
+					tmp_timeout.tv_sec = (next_send.tv_sec - timeofday.tv_sec);
+					tmp_timeout.tv_usec = (next_send.tv_usec - timeofday.tv_usec);
+					if(tmp_timeout.tv_usec < 0) {
+						tmp_timeout.tv_usec += 1000000;
+						tmp_timeout.tv_sec--;
+					}
+					if(timeout.tv_sec > tmp_timeout.tv_sec
+					   || (timeout.tv_sec == tmp_timeout.tv_sec && timeout.tv_usec > tmp_timeout.tv_usec)) {
+						timeout.tv_sec = tmp_timeout.tv_sec;
+						timeout.tv_usec = tmp_timeout.tv_usec;
+					}
+				}
+			}
+		}
+
 		if(select(max_fd+1, &readset, &writeset, 0, &timeout) < 0)
 		{
 			if(quitting) goto shutdown;
@@ -1763,6 +1796,9 @@ main(int argc, char * * argv)
 			syslog(LOG_ERR, "select(all): %m");
 			syslog(LOG_ERR, "Failed to select open sockets. EXITING");
 			return 1;	/* very serious cause of error */
+		}
+		if(try_sendto(&writeset) < 0) {
+			syslog(LOG_ERR, "try_sendto: %m");
 		}
 #ifdef USE_MINIUPNPDCTL
 		for(ectl = ctllisthead.lh_first; ectl;)
