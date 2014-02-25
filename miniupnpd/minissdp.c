@@ -506,6 +506,22 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
 	{
 		syslog(LOG_NOTICE, "sendto() sent %d out of %d bytes", n, l);
 	}
+	/* Due to the unreliable nature of UDP, devices SHOULD send the entire
+	 * set of discovery messages more than once with some delay between
+	 * sets e.g. a few hundred milliseconds. To avoid network congestion
+	 * discovery messages SHOULD NOT be sent more than three times. */
+	n = sendto_schedule(s, bufr, l, 0, dest,
+#ifdef ENABLE_IPV6
+		ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in),
+#else
+		sizeof(struct sockaddr_in),
+#endif
+		250);
+	if(n < 0)
+	{
+		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
+		       host ? host : "NULL");
+	}
 }
 
 static void
