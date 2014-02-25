@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.65 2013/12/13 14:07:08 nanard Exp $
+# $Id: genconfig.sh,v 1.69 2014/02/24 18:41:25 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2013 Thomas Bernard
@@ -455,6 +455,12 @@ if [ -n "$STRICT" ] ; then
 else
 	echo "/*#define UPNP_STRICT*/" >> ${CONFIGFILE}
 fi
+echo "" >> ${CONFIGFILE}
+
+echo "/* If SSDP_RESPOND_SAME_VERSION is defined, the M-SEARCH response" >> ${CONFIGFILE}
+echo " * include the same device version as was contained in the search" >> ${CONFIGFILE}
+echo " * request. It conforms to UPnP DA v1.1 */" >> ${CONFIGFILE}
+echo "#define SSDP_RESPOND_SAME_VERSION" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
 echo "/* Add the optional Date: header in all HTTP responses */" >> ${CONFIGFILE}
