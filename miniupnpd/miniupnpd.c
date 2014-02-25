@@ -705,7 +705,9 @@ void complete_uuidvalues(void)
  * 5) check and write pid file
  * 6) set startup time stamp
  * 7) compute presentation URL
- * 8) set signal handlers */
+ * 8) set signal handlers
+ * 10) init redirection engine
+ * 11) reload mapping from leasefile */
 static int
 init(int argc, char * * argv, struct runtime_vars * v)
 {
@@ -1263,6 +1265,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		syslog(LOG_NOTICE, "Failed to set %s handler", "SIGUSR1");
 	}
 
+	/* initialize redirection engine (and pinholes) */
 	if(init_redirect() < 0)
 	{
 		syslog(LOG_ERR, "Failed to init redirection engine. EXITING");
