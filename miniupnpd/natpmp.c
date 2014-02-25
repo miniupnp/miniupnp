@@ -1,6 +1,6 @@
 /* $Id: natpmp.c,v 1.36 2014/02/01 17:17:35 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2013 Thomas Bernard
+ * (c) 2007-2014 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -23,6 +23,7 @@
 #include "upnpredirect.h"
 #include "commonrdr.h"
 #include "upnputils.h"
+#include "asyncsendto.h"
 
 #ifdef ENABLE_NATPMP
 
@@ -324,7 +325,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	default:
 		resp[3] = 5;	/* Unsupported OPCODE */
 	}
-	n = sendto(s, resp, resplen, 0,
+	n = sendto_or_schedule(s, resp, resplen, 0,
 	           (struct sockaddr *)senderaddr, sizeof(*senderaddr));
 	if(n<0) {
 		syslog(LOG_ERR, "sendto(natpmp): %m");
@@ -378,7 +379,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 #endif
 		/* Port to use in 2006 version of the NAT-PMP specification */
     	sockname.sin_port = htons(NATPMP_PORT);
-		n = sendto(sockets[j], notif, 12, 0,
+		n = sendto_or_schedule(sockets[j], notif, 12, 0,
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{
@@ -388,7 +389,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		}
 		/* Port to use in 2008 version of the NAT-PMP specification */
     	sockname.sin_port = htons(NATPMP_NOTIF_PORT);
-		n = sendto(sockets[j], notif, 12, 0,
+		n = sendto_or_schedule(sockets[j], notif, 12, 0,
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{

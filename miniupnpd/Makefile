@@ -80,7 +80,7 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
           upnpevents.o upnputils.o getconnstatus.o \
-          upnppinhole.o
+          upnppinhole.o asyncsendto.o
 BSDOBJS = bsd/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
 SUNOSOBJS = solaris/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
 MACOBJS = mac/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
@@ -116,10 +116,11 @@ TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 TESTUPNPPERMISSIONSOBJS = testupnppermissions.o upnppermissions.o
 TESTGETIFADDROBJS = testgetifaddr.o getifaddr.o
 MINIUPNPDCTLOBJS = miniupnpdctl.o
+TESTASYNCSENDTOOBJS = testasyncsendto.o asyncsendto.o upnputils.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
-              testgetifaddr testgetroute
+              testgetifaddr testgetroute testasyncsendto
 .if $(OSNAME) == "Darwin"
 LIBS =
 .else
@@ -142,7 +143,7 @@ clean:
 	$(RM) $(STDOBJS) $(BSDOBJS) $(SUNOSOBJS) $(MACOBJS) $(EXECUTABLES) \
 	testupnpdescgen.o \
 	$(MISCOBJS) config.h testgetifstats.o testupnppermissions.o \
-	miniupnpdctl.o testgetifaddr.o testgetroute.o \
+	miniupnpdctl.o testgetifaddr.o testgetroute.o testasyncsendto.o \
 	$(PFOBJS) $(IPFOBJS) $(IPFWOBJS)
 
 install:	miniupnpd genuuid
@@ -198,6 +199,9 @@ testupnppermissions:	config.h $(TESTUPNPPERMISSIONSOBJS)
 
 testgetroute:	config.h $(TESTGETROUTEOBJS)
 	$(CC) $(CFLAGS) -o $@ $(TESTGETROUTEOBJS)
+
+testasyncsendto:	config.h $(TESTASYNCSENDTOOBJS)
+	$(CC) $(CFLAGS) -o $@ $(TESTASYNCSENDTOOBJS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^

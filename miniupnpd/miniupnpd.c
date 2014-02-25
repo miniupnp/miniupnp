@@ -63,6 +63,7 @@
 #include "miniupnpdtypes.h"
 #include "daemonize.h"
 #include "upnpevents.h"
+#include "asyncsendto.h"
 #ifdef ENABLE_NATPMP
 #include "natpmp.h"
 #ifdef ENABLE_PCP
@@ -705,7 +706,10 @@ void complete_uuidvalues(void)
  * 5) check and write pid file
  * 6) set startup time stamp
  * 7) compute presentation URL
- * 8) set signal handlers */
+ * 8) set signal handlers
+ * 9) init random generator (srandom())
+ * 10) init redirection engine
+ * 11) reload mapping from leasefile */
 static int
 init(int argc, char * * argv, struct runtime_vars * v)
 {
@@ -1263,6 +1267,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		syslog(LOG_NOTICE, "Failed to set %s handler", "SIGUSR1");
 	}
 
+	/* initialize random number generator */
+	srandom((unsigned int)time(NULL));
+
+	/* initialize redirection engine (and pinholes) */
 	if(init_redirect() < 0)
 	{
 		syslog(LOG_ERR, "Failed to init redirection engine. EXITING");
@@ -1749,6 +1757,38 @@ main(int argc, char * * argv)
 		upnpevents_selectfds(&readset, &writeset, &max_fd);
 #endif
 
+		/* queued "sendto" */
+		{
+			struct timeval next_send;
+			i = get_next_scheduled_send(&next_send);
+			if(i > 0) {
+#ifdef DEBUG
+				syslog(LOG_DEBUG, "%d queued sendto", i);
+#endif
+				i = get_sendto_fds(&writeset, &max_fd, &timeofday);
+				if(timeofday.tv_sec > next_send.tv_sec ||
+				   (timeofday.tv_sec == next_send.tv_sec && timeofday.tv_usec >= next_send.tv_usec)) {
+					if(i > 0) {
+						timeout.tv_sec = 0;
+						timeout.tv_usec = 0;
+					}
+				} else {
+					struct timeval tmp_timeout;
+					tmp_timeout.tv_sec = (next_send.tv_sec - timeofday.tv_sec);
+					tmp_timeout.tv_usec = (next_send.tv_usec - timeofday.tv_usec);
+					if(tmp_timeout.tv_usec < 0) {
+						tmp_timeout.tv_usec += 1000000;
+						tmp_timeout.tv_sec--;
+					}
+					if(timeout.tv_sec > tmp_timeout.tv_sec
+					   || (timeout.tv_sec == tmp_timeout.tv_sec && timeout.tv_usec > tmp_timeout.tv_usec)) {
+						timeout.tv_sec = tmp_timeout.tv_sec;
+						timeout.tv_usec = tmp_timeout.tv_usec;
+					}
+				}
+			}
+		}
+
 		if(select(max_fd+1, &readset, &writeset, 0, &timeout) < 0)
 		{
 			if(quitting) goto shutdown;
@@ -1756,6 +1796,9 @@ main(int argc, char * * argv)
 			syslog(LOG_ERR, "select(all): %m");
 			syslog(LOG_ERR, "Failed to select open sockets. EXITING");
 			return 1;	/* very serious cause of error */
+		}
+		if(try_sendto(&writeset) < 0) {
+			syslog(LOG_ERR, "try_sendto: %m");
 		}
 #ifdef USE_MINIUPNPDCTL
 		for(ectl = ctllisthead.lh_first; ectl;)
@@ -1983,6 +2026,21 @@ main(int argc, char * * argv)
 	}	/* end of main loop */
 
 shutdown:
+	/* send good-bye */
+	if (GETFLAG(ENABLEUPNPMASK))
+	{
+#ifndef ENABLE_IPV6
+		if(SendSSDPGoodbye(snotify, addr_count) < 0)
+#else
+		if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
+#endif
+		{
+			syslog(LOG_ERR, "Failed to broadcast good-bye notifications");
+		}
+	}
+	/* try to send pending packets */
+	finalize_sendto();
+
 	/* close out open sockets */
 	while(upnphttphead.lh_first != NULL)
 	{
@@ -2023,14 +2081,6 @@ shutdown:
 	if (GETFLAG(ENABLEUPNPMASK))
 	{
 #ifndef ENABLE_IPV6
-		if(SendSSDPGoodbye(snotify, addr_count) < 0)
-#else
-		if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
-#endif
-		{
-			syslog(LOG_ERR, "Failed to broadcast good-bye notifications");
-		}
-#ifndef ENABLE_IPV6
 		for(i = 0; i < addr_count; i++)
 #else
 		for(i = 0; i < addr_count * 2; i++)
@@ -2038,6 +2088,7 @@ shutdown:
 			close(snotify[i]);
 	}
 
+	/* remove pidfile */
 	if(pidfilename && (unlink(pidfilename) < 0))
 	{
 		syslog(LOG_ERR, "Failed to remove pidfile %s: %m", pidfilename);
