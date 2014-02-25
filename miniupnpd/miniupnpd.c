@@ -706,6 +706,7 @@ void complete_uuidvalues(void)
  * 6) set startup time stamp
  * 7) compute presentation URL
  * 8) set signal handlers
+ * 9) init random generator (srandom())
  * 10) init redirection engine
  * 11) reload mapping from leasefile */
 static int
@@ -1264,6 +1265,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	{
 		syslog(LOG_NOTICE, "Failed to set %s handler", "SIGUSR1");
 	}
+
+	/* initialize random number generator */
+	srandom((unsigned int)time(NULL));
 
 	/* initialize redirection engine (and pinholes) */
 	if(init_redirect() < 0)
