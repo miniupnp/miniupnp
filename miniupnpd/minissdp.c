@@ -635,6 +635,8 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #ifdef ENABLE_IPV6
 	char announced_host_buf[64];
 #endif
+#endif
+#if defined(UPNP_STRICT) || defined(DELAY_MSEARCH_RESPONSE)
 	int mx_value = -1;
 #endif
 	unsigned int delay = 0;
@@ -689,7 +691,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				/*while(bufr[i+j]!='\r') j++;*/
 				/*syslog(LOG_INFO, "%.*s", j, bufr+i);*/
 			}
-#ifdef UPNP_STRICT
+#if defined(UPNP_STRICT) || defined(DELAY_MSEARCH_RESPONSE)
 			else if((i < n - 3) && (strncasecmp(bufr+i, "mx:", 3) == 0))
 			{
 				const char * mx;
@@ -707,16 +709,32 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #endif
 		}
 #ifdef UPNP_STRICT
+		/* For multicast M-SEARCH requests, if the search request does
+		 * not contain an MX header field, the device MUST silently
+		 * discard and ignore the search request. */
 		if(mx_value < 0) {
 			syslog(LOG_INFO, "ignoring SSDP packet missing MX: header");
 			return;
+		} else if(mx_value > 5) {
+			/* If the MX header field specifies a field value greater
+			 * than 5, the device SHOULD assume that it contained the
+			 * value 5 or less. */
+			mx_value = 5;
+		}
+#elif defined(DELAY_MSEARCH_RESPONSE)
+		if(mx_value < 0) {
+			mx_value = 1;
+		} else if(mx_value > 5) {
+			/* If the MX header field specifies a field value greater
+			 * than 5, the device SHOULD assume that it contained the
+			 * value 5 or less. */
+			mx_value = 5;
 		}
 #endif
 		/*syslog(LOG_INFO, "SSDP M-SEARCH packet received from %s",
 	           sender_str );*/
 		if(st && (st_len > 0))
 		{
-			/* TODO : doesnt answer at once but wait for a random time */
 			syslog(LOG_INFO, "SSDP M-SEARCH from %s ST: %.*s",
 			       sender_str, st_len, st);
 			/* find in which sub network the client is */
@@ -779,6 +797,12 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				   )
 				{
 					syslog(LOG_INFO, "Single search found");
+#ifdef DELAY_MSEARCH_RESPONSE
+					delay = random() / (1 + RAND_MAX / (1000 * mx_value));
+#ifdef DEBUG
+					syslog(LOG_DEBUG, "mx=%dsec delay=%ums", mx_value, delay);
+#endif
+#endif
 					SendSSDPResponse(s, sender,
 					                 st, st_len, "",
 					                 announced_host, port,
@@ -791,9 +815,15 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			/* strlen("ssdp:all") == 8 */
 			if(st_len==8 && (0 == memcmp(st, "ssdp:all", 8)))
 			{
+#ifdef DELAY_MSEARCH_RESPONSE
+				unsigned int delay_increment = (mx_value * 1000) / 15;
+#endif
 				syslog(LOG_INFO, "ssdp:all found");
 				for(i=0; known_service_types[i].s; i++)
 				{
+#ifdef DELAY_MSEARCH_RESPONSE
+					delay += delay_increment;
+#endif
 					if(i==0)
 						ver_str[0] = '\0';
 					else
@@ -806,10 +836,19 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					                 delay);
 				}
 				/* also answer for uuid */
+#ifdef DELAY_MSEARCH_RESPONSE
+					delay += delay_increment;
+#endif
 				SendSSDPResponse(s, sender, uuidvalue_igd, strlen(uuidvalue_igd), "",
 				                 announced_host, port, uuidvalue_igd, delay);
+#ifdef DELAY_MSEARCH_RESPONSE
+					delay += delay_increment;
+#endif
 				SendSSDPResponse(s, sender, uuidvalue_wan, strlen(uuidvalue_wan), "",
 				                 announced_host, port, uuidvalue_wan, delay);
+#ifdef DELAY_MSEARCH_RESPONSE
+					delay += delay_increment;
+#endif
 				SendSSDPResponse(s, sender, uuidvalue_wcd, strlen(uuidvalue_wcd), "",
 				                 announced_host, port, uuidvalue_wcd, delay);
 			}
@@ -817,6 +856,9 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			l = (int)strlen(uuidvalue_igd);
 			if(l==st_len)
 			{
+#ifdef DELAY_MSEARCH_RESPONSE
+				delay = random() / (1 + RAND_MAX / (1000 * mx_value));
+#endif
 				if(0 == memcmp(st, uuidvalue_igd, l))
 				{
 					syslog(LOG_INFO, "ssdp:uuid (IGD) found");
