@@ -1126,6 +1126,8 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 		while(n > 0) {
 			l = write(s, p, n);
 			if (l < 0) {
+				if(errno == EINTR)
+					continue;
 				syslog(LOG_ERR, "write(): %m");
 				close(s);
 				return -1;
