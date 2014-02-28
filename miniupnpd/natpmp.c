@@ -205,7 +205,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			int proto;
 			char iaddr_old[16];
 			unsigned short iport_old;
-			unsigned short eport_first;
 			unsigned int timestamp;
 
 			iport = ntohs(*((uint16_t *)(req+4)));
@@ -268,12 +267,14 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			   || !check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
 				resp[3] = 2;	/* Not Authorized/Refused */
 			} else {
+				unsigned short eport_first;
+				char desc[64];
 				eport_first = eport;
 				do {
 					r = get_redirect_rule(ext_if_name, eport, proto,
-				        		      iaddr_old, sizeof(iaddr_old),
-				                	      &iport_old, 0, 0, 0, 0,
-							      &timestamp, 0, 0);
+					                      iaddr_old, sizeof(iaddr_old),
+					                      &iport_old, 0, 0, 0, 0,
+					                      &timestamp, 0, 0);
 					if(r==0) {
 						if(strcmp(senderaddrstr, iaddr_old)==0
 						    && iport==iport_old) {
@@ -288,42 +289,40 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						} else {
 							eport++;
 							if(eport == eport_first) { /* no external port available */
-	                                                        syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
-        	                                                       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
+								syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
+								       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
 								resp[3] = 3;  /* Failure */
 								break;
 							}
 							continue;
 						}
 					}
-					{ /* do the redirection */
-						char desc[64];
+					/* do the redirection */
 #if 0
-						timestamp = (unsigned)(time(NULL) - startup_time)
-						                      + lifetime;
-						snprintf(desc, sizeof(desc), "NAT-PMP %u", timestamp);
+					timestamp = (unsigned)(time(NULL) - startup_time)
+					                      + lifetime;
+					snprintf(desc, sizeof(desc), "NAT-PMP %u", timestamp);
 #else
-						timestamp = time(NULL) + lifetime;
-						snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
-						         eport, (proto==IPPROTO_TCP)?"tcp":"udp");
+					timestamp = time(NULL) + lifetime;
+					snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
+					         eport, (proto==IPPROTO_TCP)?"tcp":"udp");
 #endif
-						/* TODO : check return code */
-						if(upnp_redirect_internal(NULL, eport, senderaddrstr,
-					        	                  iport, proto, desc,
-					                	          timestamp) < 0) {
-							syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
-							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport, desc);
-							resp[3] = 3;  /* Failure */
+					/* TODO : check return code */
+					if(upnp_redirect_internal(NULL, eport, senderaddrstr,
+					                          iport, proto, desc,
+					                          timestamp) < 0) {
+						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
+						       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport, desc);
+						resp[3] = 3;  /* Failure */
 #if 0
-						} else if( !nextnatpmptoclean_eport
-						         || timestamp < nextnatpmptoclean_timestamp) {
-							nextnatpmptoclean_timestamp = timestamp;
-							nextnatpmptoclean_eport = eport;
-							nextnatpmptoclean_proto = proto;
+					} else if( !nextnatpmptoclean_eport
+					         || timestamp < nextnatpmptoclean_timestamp) {
+						nextnatpmptoclean_timestamp = timestamp;
+						nextnatpmptoclean_eport = eport;
+						nextnatpmptoclean_proto = proto;
 #endif
-						}
-						break;
 					}
+					break;
 				} while(r==0);
 			}
 			*((uint16_t *)(resp+8)) = htons(iport);	/* private port */
