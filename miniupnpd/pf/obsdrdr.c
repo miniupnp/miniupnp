@@ -1,7 +1,7 @@
-/* $Id: obsdrdr.c,v 1.74 2012/05/01 09:20:43 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.78 2014/02/28 20:18:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -9,15 +9,19 @@
  * pf rules created (with ext_if = xl1)
  * - OpenBSD up to version 4.6 :
  *     rdr pass on xl1 inet proto udp from any to any port = 54321 \
- *            label "test label" -> 192.168.0.141 port 12345
- *   or a rdr rule + a pass rule
+ *         keep state label "test label" -> 192.168.0.42 port 12345
+ *   or a rdr rule + a pass rule :
+ *     rdr quick on xl1 inet proto udp from any to any port = 54321 \
+ *         keep state label "test label" -> 192.168.0.42 port 12345
+ *     pass in quick on xl1 inet proto udp from any to any port = 12345 \
+ *          flags S/SA keep state label "test label"
  *
  * - OpenBSD starting from version 4.7
  *     match in on xl1 inet proto udp from any to any port 54321 \
- *            label "test label" rdr-to 192.168.0.141 port 12345
+ *            label "test label" rdr-to 192.168.0.42 port 12345
  *   or
  *     pass in quick on xl1 inet proto udp from any to any port 54321 \
- *            label "test label" rdr-to 192.168.0.141 port 12345
+ *            label "test label" rdr-to 192.168.0.42 port 12345
  *
  *
  *
