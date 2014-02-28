@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.9 2014/02/11 09:35:53 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.12 2014/02/28 17:50:22 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -43,6 +43,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <time.h>
