@@ -353,6 +353,10 @@ add_filter_rule2(const char * ifname,
 	struct pfioc_pooladdr pp;
 	struct pf_pooladdr *a;
 #endif
+#ifndef USE_IFNAME_IN_RULES
+	UNUSED(ifname);
+#endif
+	UNUSED(eport);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -663,6 +667,7 @@ priv_delete_filter_rule(const char * ifname, unsigned short iport,
 #else
 	int i, n;
 	struct pfioc_rule pr;
+	UNUSED(ifname);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
