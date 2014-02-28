@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.183 2014/02/06 09:52:01 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.185 2014/02/28 12:14:26 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -2026,6 +2026,7 @@ main(int argc, char * * argv)
 	}	/* end of main loop */
 
 shutdown:
+	syslog(LOG_NOTICE, "shutting down MiniUPnPd");
 	/* send good-bye */
 	if (GETFLAG(ENABLEUPNPMASK))
 	{
