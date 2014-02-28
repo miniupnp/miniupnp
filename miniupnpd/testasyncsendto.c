@@ -1,4 +1,4 @@
-/* $Id: $ */
+/* $Id: testasyncsendto.c,v 1.2 2014/02/25 11:00:14 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -46,7 +46,7 @@ int test(void)
 	memset(&addr, 0, sizeof(struct sockaddr_in));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
-	if(bind(s, &addr, sizeof(addr)) < 0) {
+	if(bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		syslog(LOG_ERR, "bind(): %m");
 		close(s);
 		return 1;
