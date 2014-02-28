@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.36 2014/02/03 15:45:07 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.37 2014/02/28 18:39:11 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -571,7 +571,7 @@ void processRequest(struct reqelem * req)
 		syslog(LOG_WARNING, "bad request (length encoding)");
 		goto error;
 	}
-	if(l == 0) {
+	if(l == 0 && type != 3) {
 		syslog(LOG_WARNING, "bad request (length=0)");
 		goto error;
 	}
