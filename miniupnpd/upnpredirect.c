@@ -420,8 +420,22 @@ _upnp_delete_redir(unsigned short eport, int proto)
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(eport, proto);
 #else
+	char iaddr[INET6_ADDRSTRLEN];
+	unsigned short iport;
+	char desc[64];
+	char rhost[64];
+	unsigned int timestamp;
+	u_int64_t packets;
+	u_int64_t bytes;
+	int r2 = get_redirect_rule(ext_if_name, eport, proto,
+				   &iaddr, sizeof(iaddr), &iport,
+				   &desc, sizeof(desc),
+				   &rhost, sizeof(rhost),
+				   &timestamp,
+				   &packets, &bytes);
 	r = delete_redirect_rule(ext_if_name, eport, proto);
-	delete_filter_rule(ext_if_name, eport, proto);
+	if (r2==0)
+		delete_filter_rule(ext_if_name, iport, proto);
 #endif
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove( eport, proto);

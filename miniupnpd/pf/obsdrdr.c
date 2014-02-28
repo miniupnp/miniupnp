@@ -374,7 +374,7 @@ add_filter_rule2(const char * ifname,
 #endif
 
 		pcr.rule.dst.port_op = PF_OP_EQ;
-		pcr.rule.dst.port[0] = htons(eport);
+		pcr.rule.dst.port[0] = htons(iport);
 		pcr.rule.direction = PF_IN;
 		pcr.rule.action = PF_PASS;
 		pcr.rule.af = AF_INET;
@@ -408,7 +408,7 @@ add_filter_rule2(const char * ifname,
 			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
 		}
 #ifndef PF_NEWSTYLE
-		pcr.rule.rpool.proxy_port[0] = eport;
+		pcr.rule.rpool.proxy_port[0] = iport;
 		a = calloc(1, sizeof(struct pf_pooladdr));
 		inet_pton(AF_INET, iaddr, &a->addr.v.a.addr.v4.s_addr);
 		a->addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
@@ -636,10 +636,10 @@ error:
 }
 
 int
-delete_filter_rule(const char * ifname, unsigned short eport, int proto)
+delete_filter_rule(const char * ifname, unsigned short iport, int proto)
 {
 #ifndef PF_ENABLE_FILTER_RULES
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(ifname); UNUSED(iport); UNUSED(proto);
 	return 0;
 #else
 	int i, n;
@@ -665,7 +665,7 @@ delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			goto error;
 		}
-		if( (eport == ntohs(pr.rule.dst.port[0]))
+		if( (iport == ntohs(pr.rule.dst.port[0]))
 		  && (pr.rule.proto == proto) )
 		{
 			pr.action = PF_CHANGE_GET_TICKET;
