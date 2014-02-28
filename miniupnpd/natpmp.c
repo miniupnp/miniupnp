@@ -266,29 +266,38 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else if(iport==0
 			   || !check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
 				resp[3] = 2;	/* Not Authorized/Refused */
-			} else do {
-				r = get_redirect_rule(ext_if_name, eport, proto,
-				                      iaddr_old, sizeof(iaddr_old),
-				                      &iport_old, 0, 0, 0, 0,
-				                      &timestamp, 0, 0);
-				if(r==0) {
-					if(strcmp(senderaddrstr, iaddr_old)==0
-				       && iport==iport_old) {
-						/* redirection allready existing */
-						syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
-						       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
-						/* remove and then add again */
-						if(_upnp_delete_redir(eport, proto) < 0) {
-							syslog(LOG_ERR, "failed to remove port mapping");
-							break;
+			} else {
+				unsigned short eport_first;
+				char desc[64];
+				eport_first = eport;
+				do {
+					r = get_redirect_rule(ext_if_name, eport, proto,
+					                      iaddr_old, sizeof(iaddr_old),
+					                      &iport_old, 0, 0, 0, 0,
+					                      &timestamp, 0, 0);
+					if(r==0) {
+						if(strcmp(senderaddrstr, iaddr_old)==0
+						    && iport==iport_old) {
+							/* redirection allready existing */
+							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
+							/* remove and then add again */
+							if(_upnp_delete_redir(eport, proto) < 0) {
+								syslog(LOG_ERR, "failed to remove port mapping");
+								break;
+							}
+						} else {
+							eport++;
+							if(eport == eport_first) { /* no external port available */
+								syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
+								       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
+								resp[3] = 3;  /* Failure */
+								break;
+							}
+							continue;
 						}
-					} else {
-						eport++;
-						continue;
 					}
-				}
-				{ /* do the redirection */
-					char desc[64];
+					/* do the redirection */
 #if 0
 					timestamp = (unsigned)(time(NULL) - startup_time)
 					                      + lifetime;
@@ -314,8 +323,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 #endif
 					}
 					break;
-				}
-			} while(r==0);
+				} while(r==0);
+			}
 			*((uint16_t *)(resp+8)) = htons(iport);	/* private port */
 			*((uint16_t *)(resp+10)) = htons(eport);	/* public port */
 			*((uint32_t *)(resp+12)) = htonl(lifetime);	/* Port Mapping lifetime */

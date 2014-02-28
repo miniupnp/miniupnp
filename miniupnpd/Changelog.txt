@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.354 2014/02/28 12:14:29 nanard Exp $
 
 2014/02/28:
   log message when shutting down
+  natpmp : avoid hang when all external ports in use
 
 2014/02/25:
   add implementation of scheduled sendto (asyncsendto) in order
