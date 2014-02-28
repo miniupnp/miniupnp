@@ -195,25 +195,79 @@ int try_sendto(fd_set * writefds)
 	return 0;
 }
 
+/* maximum execution time for finalize_sendto() in milliseconds */
+#define FINALIZE_SENDTO_DELAY	(500)
+
 /* empty the list */
 void finalize_sendto(void)
 {
 	ssize_t n;
 	struct scheduled_send * elt;
 	struct scheduled_send * next;
-	/* TODO : improve with a select() and a short timeout */
-	for(elt = send_list.lh_first; elt != NULL; elt = next) {
-		next = elt->entries.le_next;
-		syslog(LOG_DEBUG, "finalize_sendto(): %d bytes on socket %d",
-		       (int)elt->len, elt->sockfd);
-		n = sendto(elt->sockfd, elt->buf, elt->len, elt->flags,
-		           elt->dest_addr, elt->addrlen);
-		if(n < 0) {
-			syslog(LOG_WARNING, "sendto(): %m");
+	fd_set writefds;
+	struct timeval deadline;
+	struct timeval now;
+	struct timeval timeout;
+	int max_fd;
+
+	if(gettimeofday(&deadline, NULL) < 0) {
+		syslog(LOG_ERR, "gettimeofday: %m");
+		return;
+	}
+	deadline.tv_usec += FINALIZE_SENDTO_DELAY*1000;
+	if(deadline.tv_usec > 1000000) {
+		deadline.tv_sec++;
+		deadline.tv_usec -= 1000000;
+	}
+	while(send_list.lh_first) {
+		FD_ZERO(&writefds);
+		max_fd = -1;
+		for(elt = send_list.lh_first; elt != NULL; elt = next) {
+			next = elt->entries.le_next;
+			syslog(LOG_DEBUG, "finalize_sendto(): %d bytes on socket %d",
+			       (int)elt->len, elt->sockfd);
+			n = sendto(elt->sockfd, elt->buf, elt->len, elt->flags,
+			           elt->dest_addr, elt->addrlen);
+			if(n < 0) {
+				if(errno==EAGAIN || errno==EWOULDBLOCK) {
+					FD_SET(elt->sockfd, &writefds);
+					if(elt->sockfd > max_fd)
+						max_fd = elt->sockfd;
+					continue;
+				}
+				syslog(LOG_WARNING, "finalize_sendto(): socket=%d sendto: %m", elt->sockfd);
+			}
+			/* remove from the list */
+			LIST_REMOVE(elt, entries);
+			free(elt);
 		}
-		/* remove from the list */
-		LIST_REMOVE(elt, entries);
-		free(elt);
+		/* check deadline */
+		if(gettimeofday(&now, NULL) < 0) {
+			syslog(LOG_ERR, "gettimeofday: %m");
+			return;
+		}
+		if(now.tv_sec > deadline.tv_sec ||
+		   (now.tv_sec == deadline.tv_sec && now.tv_usec > deadline.tv_usec)) {
+			/* deadline ! */
+			while((elt = send_list.lh_first) != NULL) {
+				LIST_REMOVE(elt, entries);
+				free(elt);
+			}
+			return;
+		}
+		/* compute timeout value */
+		timeout.tv_sec = deadline.tv_sec - now.tv_sec;
+		timeout.tv_usec = deadline.tv_usec - now.tv_usec;
+		if(timeout.tv_usec < 0) {
+			timeout.tv_sec--;
+			timeout.tv_usec += 1000000;
+		}
+		if(max_fd >= 0) {
+			if(select(max_fd + 1, NULL, &writefds, NULL, &timeout) < 0) {
+				syslog(LOG_ERR, "select: %m");
+				return;
+			}
+		}
 	}
 }
 
