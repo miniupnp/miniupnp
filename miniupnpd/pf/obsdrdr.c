@@ -579,8 +579,9 @@ error:
 	return -1;
 }
 
-int
-delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
+static int
+priv_delete_redirect_rule(const char * ifname, unsigned short eport,
+                          int proto, unsigned short * iport)
 {
 	int i, n;
 	struct pfioc_rule pr;
@@ -618,6 +619,12 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 #endif
 		  && (pr.rule.proto == proto) )
 		{
+			/* retrieve iport in order to remove filter rule */
+#ifndef PF_NEWSTYLE
+			if(iport) *iport = pr.rule.rpool.proxy_port[0];
+#else
+			if(iport) *iport = pr.rule.rdr.proxy_port[0];
+#endif
 			pr.action = PF_CHANGE_GET_TICKET;
         	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
 			{
@@ -640,7 +647,15 @@ error:
 }
 
 int
-delete_filter_rule(const char * ifname, unsigned short iport, int proto)
+delete_redirect_rule(const char * ifname, unsigned short eport,
+                    int proto)
+{
+	return priv_delete_redirect_rule(ifname, eport, proto, NULL);
+}
+
+static int
+priv_delete_filter_rule(const char * ifname, unsigned short iport,
+                        int proto)
 {
 #ifndef PF_ENABLE_FILTER_RULES
 	UNUSED(ifname); UNUSED(iport); UNUSED(proto);
@@ -691,6 +706,20 @@ delete_filter_rule(const char * ifname, unsigned short iport, int proto)
 error:
 	return -1;
 #endif
+}
+
+int
+delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
+                                 int proto)
+{
+	int r;
+	unsigned short iport;
+	r = priv_delete_redirect_rule(ifname, eport, proto, &iport);
+	if(r == 0)
+	{
+		priv_delete_filter_rule(ifname, iport, proto);
+	}
+	return r;
 }
 
 int
