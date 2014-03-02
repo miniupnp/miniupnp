@@ -18,7 +18,7 @@
 
 /* read_permission_line()
  * parse the a permission line which format is :
- * (deny|allow) [0-9]+(-[0-9]+) ip/mask [0-9]+(-[0-9]+)
+ * (allow|deny|busy) [0-9]+(-[0-9]+) ip/mask [0-9]+(-[0-9]+)
  * ip/mask is either 192.168.1.1/24 or 192.168.1.1/255.255.255.0
  */
 int
@@ -29,7 +29,7 @@ read_permission_line(struct upnpperm * perm,
 	int n_bits;
 	int i;
 
-	/* first token: (allow|deny) */
+	/* first token: (allow|deny|busy) */
 	while(isspace(*p))
 		p++;
 	if(0 == memcmp(p, "allow", 5))
@@ -40,6 +40,11 @@ read_permission_line(struct upnpperm * perm,
 	else if(0 == memcmp(p, "deny", 4))
 	{
 		perm->type = UPNPPERM_DENY;
+		p += 4;
+	}
+	else if(0 == memcmp(p, "busy", 4))
+	{
+		perm->type = UPNPPERM_BUSY;
 		p += 4;
 	}
 	else
@@ -174,7 +179,7 @@ read_permission_line(struct upnpperm * perm,
 	}
 #ifdef DEBUG
 	printf("perm rule added : %s %hu-%hu %08x/%08x %hu-%hu\n",
-	       (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
+	       (perm->type==UPNPPERM_ALLOW)?"allow":(perm->type==UPNPPERM_DENY)?"deny":"busy",
 	       perm->eport_min, perm->eport_max, ntohl(perm->address.s_addr),
 	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max);
 #endif
@@ -196,7 +201,7 @@ write_permlist(int fd, const struct upnpperm * permary,
 		perm = permary + i;
 		l = snprintf(buf, sizeof(buf), "%02d %s %hu-%hu %08x/%08x %hu-%hu\n",
 	       i,
-    	   (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
+    	   (perm->type==UPNPPERM_ALLOW)?"allow":(perm->type==UPNPPERM_DENY)?"deny":"busy",
 	       perm->eport_min, perm->eport_max, ntohl(perm->address.s_addr),
 	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max);
 		if(l<0)
@@ -243,5 +248,27 @@ check_upnp_rule_against_permissions(const struct upnpperm * permary,
 	}
 	syslog(LOG_DEBUG, "no permission rule matched : accept by default (n_perms=%d)", n_perms);
 	return 1;	/* Default : accept */
+}
+
+int
+get_permission_type_for_upnp_rule(const struct upnpperm * permary,
+                                  int n_perms,
+                                  u_short eport, struct in_addr address,
+                                  u_short iport)
+{
+	int i;
+	for(i=0; i<n_perms; i++)
+	{
+		if(match_permission(permary + i, eport, address, iport))
+		{
+			syslog(LOG_DEBUG,
+			       "UPnP permission rule %d matched : port mapping %s",
+			       i, (permary[i].type == UPNPPERM_ALLOW)?"allowed":(permary[i].type == UPNPPERM_DENY)?"denied":"marked as busy"
+			       );
+			return permary[i].type;
+		}
+	}
+	syslog(LOG_DEBUG, "no permission rule matched : accept by default (n_perms=%d)", n_perms);
+	return UPNPPERM_ALLOW;	/* Default : accept */
 }
 

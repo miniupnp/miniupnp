@@ -1352,10 +1352,11 @@ print_usage:
 			"\t-n sets the name of the interface(s) that packets will arrive on.\n"
 #endif
 			"\t-A use following syntax for permission rules :\n"
-			"\t  (allow|deny) (external port range) ip/mask (internal port range)\n"
+			"\t  (allow|deny|busy) (external port range) ip/mask (internal port range)\n"
 			"\texamples :\n"
 			"\t  \"allow 1024-65535 192.168.1.0/24 1024-65535\"\n"
 			"\t  \"deny 0-65535 0.0.0.0/0 0-65535\"\n"
+			"\t  \"busy 22 0.0.0.0/0\"\n"
 			"\t-h prints this help and quits.\n"
 	        "", argv[0], pidfilename, DEFAULT_CONFIG);
 	return 1;
