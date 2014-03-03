@@ -284,7 +284,7 @@ upnpdescgen.o: miniupnpdpath.h upnpglobalvars.h upnppermissions.h
 upnpdescgen.o: miniupnpdtypes.h upnpdescstrings.h upnpurns.h getconnstatus.h
 testgetifstats.o: getifstats.h
 testupnppermissions.o: upnppermissions.h config.h
-testgetifaddr.o: getifaddr.h
+testgetifaddr.o: config.h getifaddr.h
 testgetroute.o: getroute.h upnputils.h upnpglobalvars.h upnppermissions.h
 testgetroute.o: config.h miniupnpdtypes.h
 testasyncsendto.o: miniupnpdtypes.h config.h upnputils.h asyncsendto.h
