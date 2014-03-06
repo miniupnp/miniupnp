@@ -602,7 +602,8 @@ error:
 
 static int
 priv_delete_redirect_rule(const char * ifname, unsigned short eport,
-                          int proto, unsigned short * iport)
+                          int proto, unsigned short * iport,
+                          in_addr_t * iaddr)
 {
 	int i, n;
 	struct pfioc_rule pr;
@@ -643,8 +644,40 @@ priv_delete_redirect_rule(const char * ifname, unsigned short eport,
 			/* retrieve iport in order to remove filter rule */
 #ifndef PF_NEWSTYLE
 			if(iport) *iport = pr.rule.rpool.proxy_port[0];
+			if(iaddr)
+			{
+				/* retrieve internal address */
+				struct pfioc_pooladdr pp;
+				memset(&pp, 0, sizeof(pp));
+				strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
+				pp.r_action = PF_RDR;
+				pp.r_num = i;
+				pp.ticket = pr.ticket;
+				if(ioctl(dev, DIOCGETADDRS, &pp) < 0)
+				{
+					syslog(LOG_ERR, "ioctl(dev, DIOCGETADDRS, ...): %m");
+					goto error;
+				}
+				if(pp.nr != 1)
+				{
+					syslog(LOG_NOTICE, "No address associated with pf rule");
+					goto error;
+				}
+				pp.nr = 0;	/* first */
+				if(ioctl(dev, DIOCGETADDR, &pp) < 0)
+				{
+					syslog(LOG_ERR, "ioctl(dev, DIOCGETADDR, ...): %m");
+					goto error;
+				}
+				*iaddr = pp.addr.addr.v.a.addr.v4.s_addr;
+			}
 #else
 			if(iport) *iport = pr.rule.rdr.proxy_port[0];
+			if(iaddr)
+			{
+				/* retrieve internal address */
+				*iaddr = pr.rule.rdr.addr.v.a.addr.v4.s_addr;
+			}
 #endif
 			pr.action = PF_CHANGE_GET_TICKET;
         	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
@@ -671,12 +704,12 @@ int
 delete_redirect_rule(const char * ifname, unsigned short eport,
                     int proto)
 {
-	return priv_delete_redirect_rule(ifname, eport, proto, NULL);
+	return priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL);
 }
 
 static int
 priv_delete_filter_rule(const char * ifname, unsigned short iport,
-                        int proto)
+                        int proto, in_addr_t iaddr)
 {
 #ifndef PF_ENABLE_FILTER_RULES
 	UNUSED(ifname); UNUSED(iport); UNUSED(proto);
@@ -706,8 +739,16 @@ priv_delete_filter_rule(const char * ifname, unsigned short iport,
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			goto error;
 		}
+#ifdef TEST
+syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
+       i, ntohs(pr.rule.dst.port[0]), pr.rule.proto,
+       pr.rule.dst.addr.v.a.addr.v4.s_addr);
+/*pr.rule.dst.addr.v.a.mask.v4.s_addr*/
+#endif
 		if( (iport == ntohs(pr.rule.dst.port[0]))
-		  && (pr.rule.proto == proto) )
+		  && (pr.rule.proto == proto) &&
+		   (iaddr == pr.rule.dst.addr.v.a.addr.v4.s_addr)
+		  )
 		{
 			pr.action = PF_CHANGE_GET_TICKET;
         	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
@@ -736,10 +777,11 @@ delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
 {
 	int r;
 	unsigned short iport;
-	r = priv_delete_redirect_rule(ifname, eport, proto, &iport);
+	in_addr_t iaddr;
+	r = priv_delete_redirect_rule(ifname, eport, proto, &iport, &iaddr);
 	if(r == 0)
 	{
-		priv_delete_filter_rule(ifname, iport, proto);
+		r = priv_delete_filter_rule(ifname, iport, proto, iaddr);
 	}
 	return r;
 }
