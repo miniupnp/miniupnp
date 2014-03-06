@@ -96,12 +96,15 @@ main(int argc, char * * argv)
 	add_redirect_rule("ep0", 12123, "192.168.1.23", 1234);
 	add_redirect_rule2("ep0", 12155, "192.168.1.155", 1255, IPPROTO_TCP);
 #endif
-	add_redirect_rule2("ep0", "8.8.8.8", 12123, "192.168.1.125", 1234,
-	                   IPPROTO_UDP, "test description", 0);
-#if 0
-	add_redirect_rule2("em0", 12123, "127.1.2.3", 1234,
-	                   IPPROTO_TCP, "test description tcp");
-#endif
+	if(add_redirect_rule2("ep0", "8.8.8.8", 12123, "192.168.1.125", 1234,
+	                   IPPROTO_UDP, "test description", 0) < 0)
+		printf("add_redirect_rule2() #3 failed\n");
+	if(add_redirect_rule2("em0", NULL, 12123, "127.1.2.3", 1234,
+	                   IPPROTO_TCP, "test description tcp", 0) < 0)
+		printf("add_redirect_rule2() #4 failed\n");
+	if(add_filter_rule2("em0", NULL, "127.1.2.3", 12123, 1234, IPPROTO_TCP,
+	                 "test description tcp") < 0)
+		printf("add_filter_rule2() #1 failed\n");
 
 	list_rules();
 	list_eports_tcp();
@@ -121,13 +124,12 @@ main(int argc, char * * argv)
 
 	if(delete_redirect_rule("ep0", 12123, IPPROTO_UDP) < 0)
 		printf("delete_redirect_rule() failed\n");
-	else
-		printf("delete_redirect_rule() succeded\n");
 
 	if(delete_redirect_rule("ep0", 12123, IPPROTO_UDP) < 0)
 		printf("delete_redirect_rule() failed\n");
-	else
-		printf("delete_redirect_rule() succeded\n");
+
+	if(delete_redirect_and_filter_rules("em0", 12123, IPPROTO_TCP) < 0)
+		printf("delete_redirect_and_filter_rules() failed\n");
 
 	test_index();
 
