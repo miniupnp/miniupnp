@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.c,v 1.78 2014/02/28 20:18:41 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.80 2014/03/06 13:02:46 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -13,7 +13,7 @@
  *   or a rdr rule + a pass rule :
  *     rdr quick on xl1 inet proto udp from any to any port = 54321 \
  *         keep state label "test label" -> 192.168.0.42 port 12345
- *     pass in quick on xl1 inet proto udp from any to any port = 12345 \
+ *     pass in quick on xl1 inet proto udp from any to 192.168.0.42 port = 12345 \
  *          flags S/SA keep state label "test label"
  *
  * - OpenBSD starting from version 4.7
@@ -390,7 +390,6 @@ add_filter_rule2(const char * ifname,
 	struct pfioc_rule pcr;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
-	struct pf_pooladdr *a;
 #endif
 #ifndef USE_IFNAME_IN_RULES
 	UNUSED(ifname);
@@ -419,7 +418,6 @@ add_filter_rule2(const char * ifname,
 	if(1)
 	{
 #endif
-
 		pcr.rule.dst.port_op = PF_OP_EQ;
 		pcr.rule.dst.port[0] = htons(iport);
 		pcr.rule.direction = PF_IN;
@@ -454,33 +452,16 @@ add_filter_rule2(const char * ifname,
 			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4.s_addr);
 			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
 		}
+		/* we want any - iaddr port = # keep state label */
+		inet_pton(AF_INET, iaddr, &pcr.rule.dst.addr.v.a.addr.v4.s_addr);
+		pcr.rule.dst.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
 #ifndef PF_NEWSTYLE
 		pcr.rule.rpool.proxy_port[0] = iport;
-		a = calloc(1, sizeof(struct pf_pooladdr));
-		inet_pton(AF_INET, iaddr, &a->addr.v.a.addr.v4.s_addr);
-		a->addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
-		memcpy(&pp.addr, a, sizeof(struct pf_pooladdr));
+		pcr.rule.rpool.proxy_port[1] = iport;
 		TAILQ_INIT(&pcr.rule.rpool.list);
-		inet_pton(AF_INET, iaddr, &a->addr.v.a.addr.v4.s_addr);
-		TAILQ_INSERT_TAIL(&pcr.rule.rpool.list, a, entries);
-
-		/* we have any - any port = # keep state label */
-		/* we want any - iaddr port = # keep state label */
-		/* memcpy(&pcr.rule.dst, a, sizeof(struct pf_pooladdr)); */
-
-		memcpy(&pp.addr, a, sizeof(struct pf_pooladdr));
-		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);
-		if(ioctl(dev, DIOCADDADDR, &pp) < 0)
-		{
-			syslog(LOG_ERR, "ioctl(dev, DIOCADDADDR, ...): %m");
-			r = -1;
-		}
-		else
-		{
-#else
+#endif
 		if(1)
 		{
-#endif
 			pcr.action = PF_CHANGE_GET_TICKET;
         	if(ioctl(dev, DIOCCHANGERULE, &pcr) < 0)
 			{
@@ -497,9 +478,6 @@ add_filter_rule2(const char * ifname,
 				}
 			}
 		}
-#ifndef PF_NEWSTYLE
-		free(a);
-#endif
 	}
 	return r;
 #endif
