@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.h,v 1.22 2014/02/28 20:18:41 nanard Exp $ */
+/* $Id: obsdrdr.h,v 1.23 2014/03/06 12:24:33 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -58,8 +58,12 @@ int
 delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
                                  int proto);
 
+#ifdef TEST
 int
 clear_redirect_rules(void);
+int
+clear_filter_rules(void);
+#endif
 
 #endif
 

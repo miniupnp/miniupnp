@@ -180,6 +180,45 @@ clear_redirect_rules(void)
 error:
 	return -1;
 }
+
+int
+clear_filter_rules(void)
+{
+#ifndef PF_ENABLE_FILTER_RULES
+	return 0;
+#else
+	struct pfioc_trans io;
+	struct pfioc_trans_e ioe;
+	if(dev<0) {
+		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	memset(&ioe, 0, sizeof(ioe));
+	io.size = 1;
+	io.esize = sizeof(ioe);
+	io.array = &ioe;
+#ifndef PF_NEWSTYLE
+	ioe.rs_num = PF_RULESET_FILTER;
+#else
+	/* ? */
+	ioe.type = PF_TRANS_RULESET;
+#endif
+	strlcpy(ioe.anchor, anchor_name, MAXPATHLEN);
+	if(ioctl(dev, DIOCXBEGIN, &io) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCXBEGIN, ...): %m");
+		goto error;
+	}
+	if(ioctl(dev, DIOCXCOMMIT, &io) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCXCOMMIT, ...): %m");
+		goto error;
+	}
+	return 0;
+error:
+	return -1;
+#endif
+}
 #endif
 
 /* add_redirect_rule2() :
