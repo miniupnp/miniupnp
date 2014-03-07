@@ -285,7 +285,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
 							resp[3] = 4;  /* Out of resources  */
-							break;
 						}
 						continue;
 					}
@@ -310,7 +309,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
 								       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
 								resp[3] = 4;  /* Out of resources */
-								break;
 							}
 							continue;
 						}
