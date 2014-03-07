@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.354 2014/02/28 12:14:29 nanard Exp $
+$Id: Changelog.txt,v 1.357 2014/03/07 10:43:29 nanard Exp $
+
+2014/04/07:
+  NAT-PMP search an allowed eport instead of returning an error
+    if the original eport is not allowed.
 
 2014/02/28:
   log message when shutting down

@@ -1,4 +1,4 @@
-/* $Id: natpmp.c,v 1.36 2014/02/01 17:17:35 nanard Exp $ */
+/* $Id: natpmp.c,v 1.39 2014/03/07 10:43:30 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -263,14 +263,32 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					}
 				}
 				eport = 0; /* to indicate correct removing of port mapping */
-			} else if(iport==0
-			   || !check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
+			} else if(iport==0) {
 				resp[3] = 2;	/* Not Authorized/Refused */
-			} else {
+			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first;
 				char desc[64];
+				if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
+					/* if the mapping is forbidden because of eport only
+					 * (ie iaddr/iport are ok with another eport)
+					 * change eport value ! */
+					if(!find_allowed_eport(upnppermlist, num_upnpperm, senderaddr->sin_addr, iport, &eport)) {
+						/* no rule allow a mapping with this iaddr/iport */
+						resp[3] = 2;	/* Not Authorized/Refused */
+					}
+				}
 				eport_first = eport;
-				do {
+				while(resp[3] == 0) {
+					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
+						eport++;
+						if(eport == eport_first) { /* no external port available */
+							syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
+							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
+							resp[3] = 4;  /* Out of resources  */
+							break;
+						}
+						continue;
+					}
 					r = get_redirect_rule(ext_if_name, eport, proto,
 					                      iaddr_old, sizeof(iaddr_old),
 					                      &iport_old, 0, 0, 0, 0,
@@ -314,16 +332,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
 						       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport, desc);
 						resp[3] = 3;  /* Failure */
-#if 0
-					} else if( !nextnatpmptoclean_eport
-					         || timestamp < nextnatpmptoclean_timestamp) {
-						nextnatpmptoclean_timestamp = timestamp;
-						nextnatpmptoclean_eport = eport;
-						nextnatpmptoclean_proto = proto;
-#endif
 					}
 					break;
-				} while(r==0);
+				}
 			}
 			*((uint16_t *)(resp+8)) = htons(iport);	/* private port */
 			*((uint16_t *)(resp+10)) = htons(eport);	/* public port */
