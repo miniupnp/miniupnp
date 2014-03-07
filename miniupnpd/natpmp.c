@@ -281,6 +281,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				while(resp[3] == 0) {
 					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
 						eport++;
+                                                if(eport == 0) eport++; /* skip port zero */
 						if(eport == eport_first) { /* no external port available */
 							syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
@@ -306,6 +307,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							}
 						} else {
 							eport++;
+                                                        if(eport == 0) eport++; /* skip port zero */
 							if(eport == eport_first) { /* no external port available */
 								syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
 								       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
