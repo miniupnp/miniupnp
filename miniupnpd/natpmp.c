@@ -264,13 +264,23 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				}
 				eport = 0; /* to indicate correct removing of port mapping */
 			} else if(iport==0
-			   || !check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
+			   || (get_permission_type_for_upnp_rule(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport) == UPNPPERM_DENY)) {
 				resp[3] = 2;	/* Not Authorized/Refused */
 			} else {
 				unsigned short eport_first;
 				char desc[64];
 				eport_first = eport;
 				do {
+					if(get_permission_type_for_upnp_rule(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport) == UPNPPERM_BUSY) {
+						eport++;
+						if(eport == eport_first) { /* no external port available */
+                                                        syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
+       	                                                       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
+							resp[3] = 4;  /* Out of resources */
+							break;
+						}
+						continue;
+					}
 					r = get_redirect_rule(ext_if_name, eport, proto,
 					                      iaddr_old, sizeof(iaddr_old),
 					                      &iport_old, 0, 0, 0, 0,

@@ -23,6 +23,9 @@ print_upnpperm(const struct upnpperm * p)
 	case UPNPPERM_DENY:
 		printf("deny ");
 		break;
+	case UPNPPERM_BUSY:
+		printf("busy ");
+		break;
 	default:
 		printf("error ! ");
 	}

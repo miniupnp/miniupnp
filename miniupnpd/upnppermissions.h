@@ -17,7 +17,7 @@
  * allow 1024-65535 192.168.3.0/24 1024-65535
  * deny 0-65535 192.168.1.125/32 0-65535 */
 struct upnpperm {
-	enum {UPNPPERM_ALLOW=1, UPNPPERM_DENY=2 } type;
+	enum {UPNPPERM_ALLOW=1, UPNPPERM_DENY=2, UPNPPERM_BUSY=3 } type;
 				/* is it an allow or deny permission rule ? */
 	u_short eport_min, eport_max;	/* external port range */
 	struct in_addr address, mask;	/* ip/mask */
@@ -44,6 +44,15 @@ check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     int n_perms,
                                     u_short eport, struct in_addr address,
                                     u_short iport);
+
+/* get_permission_type_for_upnp_rule()
+ * returns: permission type (UPNPPERM_ALLOW|UPNPPERM_DENY|UPNPPERM_BUSY) if a permission matching the upnp rule exists,
+ *          UPNPPERM_ALLOW if no matching permission exists */
+int
+get_permission_type_for_upnp_rule(const struct upnpperm * permary,
+                                  int n_perms,
+                                  u_short eport, struct in_addr address,
+                                  u_short iport);
 
 #ifdef USE_MINIUPNPDCTL
 void
