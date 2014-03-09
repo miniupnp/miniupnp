@@ -1,7 +1,7 @@
-/* $Id: obsdrdr.c,v 1.74 2012/05/01 09:20:43 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.78 2014/02/28 20:18:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -9,15 +9,19 @@
  * pf rules created (with ext_if = xl1)
  * - OpenBSD up to version 4.6 :
  *     rdr pass on xl1 inet proto udp from any to any port = 54321 \
- *            label "test label" -> 192.168.0.141 port 12345
- *   or a rdr rule + a pass rule
+ *         keep state label "test label" -> 192.168.0.42 port 12345
+ *   or a rdr rule + a pass rule :
+ *     rdr quick on xl1 inet proto udp from any to any port = 54321 \
+ *         keep state label "test label" -> 192.168.0.42 port 12345
+ *     pass in quick on xl1 inet proto udp from any to any port = 12345 \
+ *          flags S/SA keep state label "test label"
  *
  * - OpenBSD starting from version 4.7
  *     match in on xl1 inet proto udp from any to any port 54321 \
- *            label "test label" rdr-to 192.168.0.141 port 12345
+ *            label "test label" rdr-to 192.168.0.42 port 12345
  *   or
  *     pass in quick on xl1 inet proto udp from any to any port 54321 \
- *            label "test label" rdr-to 192.168.0.141 port 12345
+ *            label "test label" rdr-to 192.168.0.42 port 12345
  *
  *
  *
@@ -349,6 +353,10 @@ add_filter_rule2(const char * ifname,
 	struct pfioc_pooladdr pp;
 	struct pf_pooladdr *a;
 #endif
+#ifndef USE_IFNAME_IN_RULES
+	UNUSED(ifname);
+#endif
+	UNUSED(eport);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -374,7 +382,7 @@ add_filter_rule2(const char * ifname,
 #endif
 
 		pcr.rule.dst.port_op = PF_OP_EQ;
-		pcr.rule.dst.port[0] = htons(eport);
+		pcr.rule.dst.port[0] = htons(iport);
 		pcr.rule.direction = PF_IN;
 		pcr.rule.action = PF_PASS;
 		pcr.rule.af = AF_INET;
@@ -408,7 +416,7 @@ add_filter_rule2(const char * ifname,
 			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
 		}
 #ifndef PF_NEWSTYLE
-		pcr.rule.rpool.proxy_port[0] = eport;
+		pcr.rule.rpool.proxy_port[0] = iport;
 		a = calloc(1, sizeof(struct pf_pooladdr));
 		inet_pton(AF_INET, iaddr, &a->addr.v.a.addr.v4.s_addr);
 		a->addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
@@ -575,8 +583,9 @@ error:
 	return -1;
 }
 
-int
-delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
+static int
+priv_delete_redirect_rule(const char * ifname, unsigned short eport,
+                          int proto, unsigned short * iport)
 {
 	int i, n;
 	struct pfioc_rule pr;
@@ -614,6 +623,12 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 #endif
 		  && (pr.rule.proto == proto) )
 		{
+			/* retrieve iport in order to remove filter rule */
+#ifndef PF_NEWSTYLE
+			if(iport) *iport = pr.rule.rpool.proxy_port[0];
+#else
+			if(iport) *iport = pr.rule.rdr.proxy_port[0];
+#endif
 			pr.action = PF_CHANGE_GET_TICKET;
         	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
 			{
@@ -636,14 +651,23 @@ error:
 }
 
 int
-delete_filter_rule(const char * ifname, unsigned short eport, int proto)
+delete_redirect_rule(const char * ifname, unsigned short eport,
+                    int proto)
+{
+	return priv_delete_redirect_rule(ifname, eport, proto, NULL);
+}
+
+static int
+priv_delete_filter_rule(const char * ifname, unsigned short iport,
+                        int proto)
 {
 #ifndef PF_ENABLE_FILTER_RULES
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(ifname); UNUSED(iport); UNUSED(proto);
 	return 0;
 #else
 	int i, n;
 	struct pfioc_rule pr;
+	UNUSED(ifname);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -665,7 +689,7 @@ delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			goto error;
 		}
-		if( (eport == ntohs(pr.rule.dst.port[0]))
+		if( (iport == ntohs(pr.rule.dst.port[0]))
 		  && (pr.rule.proto == proto) )
 		{
 			pr.action = PF_CHANGE_GET_TICKET;
@@ -687,6 +711,20 @@ delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 error:
 	return -1;
 #endif
+}
+
+int
+delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
+                                 int proto)
+{
+	int r;
+	unsigned short iport;
+	r = priv_delete_redirect_rule(ifname, eport, proto, &iport);
+	if(r == 0)
+	{
+		priv_delete_filter_rule(ifname, iport, proto);
+	}
+	return r;
 }
 
 int

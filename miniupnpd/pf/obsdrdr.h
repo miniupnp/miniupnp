@@ -1,7 +1,7 @@
-/* $Id: obsdrdr.h,v 1.20 2012/03/05 20:36:20 nanard Exp $ */
+/* $Id: obsdrdr.h,v 1.22 2014/02/28 20:18:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -52,10 +52,11 @@ get_redirect_rule_by_index(int index,
 int
 delete_redirect_rule(const char * ifname, unsigned short eport, int proto);
 
-/* delete_filter_rule()
+/* delete_redirect_and_filter_rules()
  */
 int
-delete_filter_rule(const char * ifname, unsigned short eport, int proto);
+delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
+                                 int proto);
 
 int
 clear_redirect_rules(void);
