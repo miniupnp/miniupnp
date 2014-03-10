@@ -266,29 +266,30 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else if(iport==0) {
 				resp[3] = 2;	/* Not Authorized/Refused */
 			} else { /* iport > 0 && lifetime > 0 */
-				unsigned short eport_first;
+				unsigned short eport_first = 0;
+                                int any_eport_allowed = 0;
 				char desc[64];
-				if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
-					/* if the mapping is forbidden because of eport only
-					 * (ie iaddr/iport are ok with another eport)
-					 * change eport value ! */
-					if(!find_allowed_eport(upnppermlist, num_upnpperm, senderaddr->sin_addr, iport, &eport)) {
-						/* no rule allow a mapping with this iaddr/iport */
-						resp[3] = 2;	/* Not Authorized/Refused */
-					}
-				}
-				eport_first = eport;
 				while(resp[3] == 0) {
-					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
-						eport++;
-                                                if(eport == 0) eport++; /* skip port zero */
-						if(eport == eport_first) { /* no external port available */
+					if(eport_first == 0) { /* first time in loop */
+						eport_first = eport;
+					} else if(eport == eport_first) { /* no eport available */
+						if(any_eport_allowed == 0) { /* all eports rejected by permissions */
+							syslog(LOG_ERR, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
+							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
+							resp[3] = 2;	/* Not Authorized/Refused */
+						} else { /* at least one eport allowed (but none available) */
 							syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
-							resp[3] = 4;  /* Out of resources  */
+							resp[3] = 4;	/* Out of resources  */
 						}
+						break;
+					}
+					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport)) {
+						eport++;
+						if(eport == 0) eport++; /* skip port zero */
 						continue;
 					}
+					any_eport_allowed = 1;
 					r = get_redirect_rule(ext_if_name, eport, proto,
 					                      iaddr_old, sizeof(iaddr_old),
 					                      &iport_old, 0, 0, 0, 0,
@@ -306,12 +307,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							}
 						} else {
 							eport++;
-                                                        if(eport == 0) eport++; /* skip port zero */
-							if(eport == eport_first) { /* no external port available */
-								syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
-								       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
-								resp[3] = 4;  /* Out of resources */
-							}
+							if(eport == 0) eport++; /* skip port zero */
 							continue;
 						}
 					}

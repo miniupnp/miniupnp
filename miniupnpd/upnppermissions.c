@@ -260,21 +260,3 @@ check_upnp_rule_against_permissions(const struct upnpperm * permary,
 	return 1;	/* Default : accept */
 }
 
-int
-find_allowed_eport(const struct upnpperm * permary,
-                   int n_perms,
-                   struct in_addr address, u_short iport,
-                   u_short *allowed_eport)
-{
-	int i;
-	for(i=0; i<n_perms; i++)
-	{
-		if(permary[i].type == UPNPPERM_ALLOW
-		  && match_permission_internal(permary + i, address, iport)) {
-			*allowed_eport = permary[i].eport_min;
-			return 1;
-		}
-	}
-	return 0;	/* no eport found */
-}
-
