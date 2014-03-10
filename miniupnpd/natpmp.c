@@ -269,7 +269,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				unsigned short eport_first = 0;
                                 int any_eport_allowed = 0;
 				char desc[64];
-				eport_first = eport;
 				while(resp[3] == 0) {
 					if(eport_first == 0) { /* first time in loop */
 						eport_first = eport;
