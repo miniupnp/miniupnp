@@ -805,6 +805,8 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 	char desc[64];
 	char iaddr_old[INET_ADDRSTRLEN];
 	uint16_t iport_old;
+	uint16_t eport_first = 0;
+	int any_eport_allowed = 0;
 	unsigned int timestamp;
 	int r=0;
 
@@ -812,6 +814,32 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
 	}
 	do {
+		if (eport_first == 0) { /* first time in loop */
+			eport_first = pcp_msg_info->ext_port;
+		} else if (pcp_msg_info->ext_port == eport_first) { /* no eport available */
+			if (any_eport_allowed == 0) { /* all eports rejected by permissions */
+				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+			} else { /* at least one eport allowed (but none available) */
+				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+			}
+			return;
+		}
+		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->int_ip) &&
+		      (!check_upnp_rule_against_permissions(upnppermlist,
+		               num_upnpperm, pcp_msg_info->ext_port,
+	                       ((struct in_addr*)pcp_msg_info->int_ip->s6_addr)[3],
+		               pcp_msg_info->int_port)))) {
+			if (pcp_msg_info->pfailure_present) {
+				pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+				return;
+			}
+			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
+			continue;
+		}
+		any_eport_allowed = 1;
 		r = get_redirect_rule(ext_if_name,
 		                  pcp_msg_info->ext_port,
 		                  pcp_msg_info->protocol,
@@ -836,23 +864,19 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 				if (_upnp_delete_redir(pcp_msg_info->ext_port,
 						pcp_msg_info->protocol)==0) {
 					break;
+				} else if (pcp_msg_info->pfailure_present) {
+					pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+					return;
 				}
 			}
 			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
 		}
 	} while (r==0);
 
 	timestamp = time(NULL) + pcp_msg_info->lifetime;
-
-	if ((pcp_msg_info->ext_port == 0) ||
-	    (IN6_IS_ADDR_V4MAPPED(pcp_msg_info->int_ip) &&
-	      (!check_upnp_rule_against_permissions(upnppermlist,
-	               num_upnpperm, pcp_msg_info->ext_port,
-	               ((struct in_addr*)pcp_msg_info->int_ip->s6_addr)[3],
-	               pcp_msg_info->int_port)))) {
-		pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
-		return;
-	}
 
 	snprintf(desc, sizeof(desc), "PCP %hu %s",
 	     pcp_msg_info->ext_port,
