@@ -897,6 +897,8 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 		        pcp_msg_info->int_port,
 		        desc);
 
+		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+
 	} else {
 		syslog(LOG_INFO, "PCP MAP: added mapping %s %hu->%s:%hu '%s'",
 		        (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
