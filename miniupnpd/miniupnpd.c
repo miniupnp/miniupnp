@@ -1676,7 +1676,7 @@ main(int argc, char * * argv)
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
 		{
-			syslog(LOG_DEBUG, "should send external iface address change notification(s)");
+			syslog(LOG_INFO, "should send external iface address change notification(s)");
 #ifdef ENABLE_NATPMP
 			if(GETFLAG(ENABLENATPMPMASK))
 				SendNATPMPPublicAddressChangeNotification(snatpmp, addr_count);
