@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.185 2014/02/28 12:14:26 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.189 2014/03/10 11:04:52 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -1579,7 +1579,7 @@ main(int argc, char * * argv)
 		} else {
 			memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
 			syslog(LOG_WARNING, "no HTTP IPv6 address, disabling IPv6");
-			ipv6_enabled = 0;
+			SETFLAG(IPV6DISABLEDMASK);
 		}
 #endif
 
@@ -1594,7 +1594,7 @@ main(int argc, char * * argv)
 			}
 		}
 #ifdef ENABLE_IPV6
-		if(ipv6_enabled)
+		if(!GETFLAG(IPV6DISABLEDMASK))
 		{
 			sudpv6 = OpenAndConfSSDPReceiveSocket(1);
 			if(sudpv6 < 0)
