@@ -1,8 +1,9 @@
-$Id: Changelog.txt,v 1.362 2014/03/13 10:20:57 nanard Exp $
+$Id: Changelog.txt,v 1.363 2014/03/13 10:53:40 nanard Exp $
 
 2014/03/13:
   fix getifaddr_in6() (used for PCP)
   implement permissions with PCP Map
+  fix upnp_event_notify_connect() when ENABLE_IPV6 is set
 
 2014/03/10:
   Enable PCP by default.
