@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.362 2014/03/13 10:20:57 nanard Exp $
 
 2014/03/10:
   Enable PCP by default.
+  Work in IPv6 on system where PF_INET6 are restricted to IPv6 only
 
 2014/03/09:
   IPv6 support in testgetifaddr

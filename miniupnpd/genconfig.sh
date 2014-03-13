@@ -115,6 +115,7 @@ case $OS_NAME in
 		FW=pf
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		OS_URL=http://www.openbsd.org/
+		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only`
 		;;
 	FreeBSD)
 		VER=`grep '#define __FreeBSD_version' /usr/include/sys/param.h | awk '{print $3}'`
@@ -145,12 +146,14 @@ case $OS_NAME in
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		OS_URL=http://www.freebsd.org/
+		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only`
 		;;
 	pfSense)
 		# we need to detect if PFRULE_INOUT_COUNTS macro is needed
 		FW=pf
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		OS_URL=http://www.pfsense.com/
+		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only`
 		;;
 	NetBSD)
 		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
@@ -308,6 +311,11 @@ case $FW in
 		;;
 esac
 
+# set V6SOCKETS_ARE_V6ONLY to 0 if it was not set above
+if [ -z "$V6SOCKETS_ARE_V6ONLY" ] ; then
+	V6SOCKETS_ARE_V6ONLY=0
+fi
+
 echo "Configuring compilation for [$OS_NAME] [$OS_VERSION] with [$FW] firewall software."
 echo "Please edit config.h for more compilation options."
 
@@ -400,6 +408,15 @@ if [ -n "$IPV6" ]; then
 	echo "#define ENABLE_IPV6" >> ${CONFIGFILE}
 else
 	echo "/*#define ENABLE_IPV6*/" >> ${CONFIGFILE}
+fi
+echo "" >> ${CONFIGFILE}
+
+echo "/* Define V6SOCKETS_ARE_V6ONLY if AF_INET6 sockets are restricted" >> ${CONFIGFILE}
+echo " * to IPv6 communications only. */" >> ${CONFIGFILE}
+if [ $V6SOCKETS_ARE_V6ONLY -eq 1 ] ; then
+	echo "#define V6SOCKETS_ARE_V6ONLY" >> ${CONFIGFILE}
+else
+	echo "/*#define V6SOCKETS_ARE_V6ONLY*/" >> ${CONFIGFILE}
 fi
 echo "" >> ${CONFIGFILE}
 
