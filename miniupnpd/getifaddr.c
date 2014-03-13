@@ -119,6 +119,8 @@ getifaddr(const char * ifname, char * buf, int len,
 }
 
 #ifdef ENABLE_PCP
+/* XXX I don't know if this function should return
+ * IPv4 or IPv6 if both are enabled... */
 int getifaddr_in6(const char * ifname, struct in6_addr * addr){
 	struct ifaddrs * ifap;
 	struct ifaddrs * ife;
@@ -157,6 +159,7 @@ int getifaddr_in6(const char * ifname, struct in6_addr * addr){
 			found = 1;
 			break;
 
+#ifdef ENABLE_IPV6
 		case AF_INET6:
 			if(!IN6_IS_ADDR_LOOPBACK(addr)
 			   && !IN6_IS_ADDR_LINKLOCAL(addr)) {
@@ -164,12 +167,13 @@ int getifaddr_in6(const char * ifname, struct in6_addr * addr){
 				found = 1;
 			}
 			break;
+#endif /* ENABLE_IPV6 */
 		}
 	}
 	freeifaddrs(ifap);
 	return (found ? 0 : -1);
 }
-#endif
+#endif /* ENABLE_PCP */
 
 #ifdef ENABLE_IPV6
 int
