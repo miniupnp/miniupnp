@@ -37,11 +37,13 @@ port_in_use(const char *if_name,
             unsigned eport, int proto,
             const char *iaddr, unsigned iport)
 {
-	char line[256];
-	FILE *f;
 	int found = 0;
 	char ip_addr_str[INET_ADDRSTRLEN];
 	struct in_addr ip_addr;
+#ifdef __linux__
+	/* linux code */
+	char line[256];
+	FILE *f;
 	const char * tcpfile = "/proc/net/tcp";
 	const char * udpfile = "/proc/net/udp";
 
@@ -80,6 +82,7 @@ port_in_use(const char *if_name,
 		}
 	}
 	fclose(f);
+#endif /* __linux__ */
 
 #if defined(USE_NETFILTER)
 	if (!found) {
