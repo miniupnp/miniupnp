@@ -1,4 +1,4 @@
-/* $Id: options.c,v 1.26 2012/06/29 19:26:09 nanard Exp $ */
+/* $Id: options.c,v 1.28 2013/12/13 14:07:08 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
@@ -16,7 +16,7 @@
 #include "upnppermissions.h"
 #ifdef PCP_SADSCP
 #include "pcplearndscp.h"
-#endif // PCP_SADSPC
+#endif /* PCP_SADSPC */
 #include "upnpglobalvars.h"
 
 #ifndef DISABLE_CONFIG_FILE
@@ -187,7 +187,7 @@ readoptionsfile(const char * fname)
 			}
 			continue;
 		}
-#endif //PCP_SADSCP
+#endif /* PCP_SADSCP */
 		if(!(equals = strchr(name, '=')))
 		{
 			fprintf(stderr, "parsing error file %s line %d : %s\n",
@@ -303,7 +303,7 @@ freeoptions(void)
 		dscp_values_list = NULL;
 		num_dscp_values = 0;
 	}
-#endif //PCP_SADSCP
+#endif /* PCP_SADSCP */
 }
 
 #endif /* DISABLE_CONFIG_FILE */

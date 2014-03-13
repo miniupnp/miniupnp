@@ -72,7 +72,7 @@ public class JavaBridgeTest {
                     System.out.println("AddPortMapping() failed with code " + ret);
                 ret = miniupnpc.UPNP_GetSpecificPortMappingEntry(
                         urls.controlURL.getString(0), new String(data.first.servicetype),
-                        args[0], args[1], intClient, intPort,
+                        args[0], args[1], null, intClient, intPort,
                         desc, enabled, leaseDuration);
                 if (ret != MiniupnpcLibrary.UPNPCOMMAND_SUCCESS)
                     System.out.println("GetSpecificPortMappingEntry() failed with code " + ret);

@@ -1,6 +1,6 @@
-/* $Id: minissdpd.c,v 1.35 2012/05/21 17:13:11 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.37 2014/02/28 18:39:11 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2012 Thomas Bernard
+ * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -224,6 +224,7 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 	n = sendto(s, buf, l, 0,
 	           sockname, sockname_len );
 	if(n < 0) {
+		/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
 		syslog(LOG_ERR, "sendto(udp): %m");
 	}
 }
@@ -282,8 +283,10 @@ processMSEARCH(int s, const char * st, int st_len,
 		}
 	} else {
 		/* find matching services */
+		/* remove version at the end of the ST string */
 		if(st[st_len-2]==':' && isdigit(st[st_len-1]))
 			st_len -= 2;
+		/* answer for each matching service */
 		for(serv = servicelisthead.lh_first;
 		    serv;
 		    serv = serv->entries.le_next) {
@@ -338,6 +341,7 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 	unsigned int lifetime = 180;	/* 3 minutes by default */
 	const char * st = NULL;
 	int st_len = 0;
+
 	memset(headers, 0, sizeof(headers));
 	for(methodlen = 0;
 	    methodlen < n && (isalpha(p[methodlen]) || p[methodlen]=='-');
@@ -346,6 +350,12 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 		method = METHOD_MSEARCH;
 	else if(methodlen==6 && 0==memcmp(p, "NOTIFY", 6))
 		method = METHOD_NOTIFY;
+	else if(methodlen==4 && 0==memcmp(p, "HTTP", 4)) {
+		/* answer to a M-SEARCH => process it as a NOTIFY
+		 * with NTS: ssdp:alive */
+		method = METHOD_NOTIFY;
+		nts = NTS_SSDP_ALIVE;
+	}
 	linestart = p;
 	while(linestart < p + n - 2) {
 		/* start parsing the line : detect line end */
@@ -435,6 +445,8 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 			} else if(l==2 && 0==strncasecmp(linestart, "st", 2)) {
 				st = valuestart;
 				st_len = m;
+				if(method == METHOD_NOTIFY)
+					i = HEADER_NT;	/* it was a M-SEARCH response */
 			}
 			if(i>=0) {
 				headers[i].p = valuestart;
@@ -559,16 +571,16 @@ void processRequest(struct reqelem * req)
 		syslog(LOG_WARNING, "bad request (length encoding)");
 		goto error;
 	}
-	if(l == 0) {
+	if(l == 0 && type != 3) {
 		syslog(LOG_WARNING, "bad request (length=0)");
 		goto error;
 	}
 	syslog(LOG_INFO, "(s=%d) request type=%d str='%.*s'",
 	       req->socket, type, l, p);
 	switch(type) {
-	case 1:
-	case 2:
-	case 3:
+	case 1:	/* request by type */
+	case 2:	/* request by USN (unique id) */
+	case 3:	/* everything */
 		while(d && (nrep < 255)) {
 			if(d->t < t) {
 				syslog(LOG_INFO, "outdated device");
@@ -633,12 +645,14 @@ void processRequest(struct reqelem * req)
 			}
 		}
 		rbuf[0] = nrep;
+		syslog(LOG_DEBUG, "(s=%d) response : %d device%s",
+		       req->socket, nrep, (nrep > 1) ? "s" : "");
 		if(write(req->socket, rbuf, rp - rbuf) < 0) {
 			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
 			goto error;
 		}
 		break;
-	case 4:
+	case 4:	/* submit service */
 		newserv = malloc(sizeof(struct service));
 		if(!newserv) {
 			syslog(LOG_ERR, "cannot allocate memory");
@@ -777,6 +791,60 @@ sigterm(int sig)
 #endif
 	quitting = 1;
 	/*errno = save_errno;*/
+}
+
+#define PORT 1900
+#define XSTR(s) STR(s)
+#define STR(s) #s
+#define UPNP_MCAST_ADDR "239.255.255.250"
+/* for IPv6 */
+#define UPNP_MCAST_LL_ADDR "FF02::C" /* link-local */
+#define UPNP_MCAST_SL_ADDR "FF05::C" /* site-local */
+
+/* send the M-SEARCH request for all devices */
+void ssdpDiscoverAll(int s, int ipv6)
+{
+	static const char MSearchMsgFmt[] =
+	"M-SEARCH * HTTP/1.1\r\n"
+	"HOST: %s:" XSTR(PORT) "\r\n"
+	"ST: ssdp:all\r\n"
+	"MAN: \"ssdp:discover\"\r\n"
+	"MX: %u\r\n"
+	"\r\n";
+	char bufr[512];
+	int n;
+	int mx = 3;
+	int linklocal = 1;
+	struct sockaddr_storage sockudp_w;
+
+	{
+		n = snprintf(bufr, sizeof(bufr),
+		             MSearchMsgFmt,
+		             ipv6 ?
+		             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
+		             : UPNP_MCAST_ADDR, mx);
+		memset(&sockudp_w, 0, sizeof(struct sockaddr_storage));
+		if(ipv6) {
+			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_w;
+			p->sin6_family = AF_INET6;
+			p->sin6_port = htons(PORT);
+			inet_pton(AF_INET6,
+			          linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR,
+			          &(p->sin6_addr));
+		} else {
+			struct sockaddr_in * p = (struct sockaddr_in *)&sockudp_w;
+			p->sin_family = AF_INET;
+			p->sin_port = htons(PORT);
+			p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
+		}
+
+		n = sendto(s, bufr, n, 0, (const struct sockaddr *)&sockudp_w,
+		           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
+		if (n < 0) {
+			/* XXX : EINTR EWOULDBLOCK EAGAIN */
+			syslog(LOG_ERR, "sendto: %m");
+		}
+	}
 }
 
 /* main(): program entry point */
@@ -957,6 +1025,11 @@ int main(int argc, char * * argv)
 
 	writepidfile(pidfilename, pid);
 
+	/* send M-SEARCH ssdp:all Requests */
+	ssdpDiscoverAll(s_ssdp, 0);
+	if(s_ssdp6 >= 0)
+		ssdpDiscoverAll(s_ssdp6, 1);
+
 	/* Main loop */
 	while(!quitting)
 	{
@@ -997,7 +1070,10 @@ int main(int argc, char * * argv)
 			             (struct sockaddr *)&sendername6, &sendername6_len);
 			if(n<0)
 			{
-				syslog(LOG_ERR, "recvfrom: %m");
+				 /* EAGAIN, EWOULDBLOCK, EINTR : silently ignore (try again next time)
+				  * other errors : log to LOG_ERR */
+				if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+					syslog(LOG_ERR, "recvfrom: %m");
 			}
 			else
 			{
@@ -1028,7 +1104,10 @@ int main(int argc, char * * argv)
 			             (struct sockaddr *)&sendername, &sendername_len);
 			if(n<0)
 			{
-				syslog(LOG_ERR, "recvfrom: %m");
+				 /* EAGAIN, EWOULDBLOCK, EINTR : silently ignore (try again next time)
+				  * other errors : log to LOG_ERR */
+				if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+					syslog(LOG_ERR, "recvfrom: %m");
 			}
 			else
 			{

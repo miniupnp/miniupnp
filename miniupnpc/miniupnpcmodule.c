@@ -1,8 +1,8 @@
-/* $Id: miniupnpcmodule.c,v 1.19 2012/01/21 13:30:32 nanard Exp $*/
+/* $Id: miniupnpcmodule.c,v 1.22 2014/01/31 13:18:25 nanard Exp $*/
 /* Project : miniupnp
  * Author : Thomas BERNARD
  * website : http://miniupnp.tuxfamily.org/
- * copyright (c) 2007-2012 Thomas Bernard
+ * copyright (c) 2007-2014 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <Python.h>
@@ -310,7 +310,7 @@ Py_END_ALLOW_THREADS
 	}
 }
 
-/* GetSpecificPortMapping(ePort, proto)
+/* GetSpecificPortMapping(ePort, proto, remoteHost='')
  * proto = 'UDP' or 'TCP' */
 static PyObject *
 UPnP_getspecificportmapping(UPnPObject *self, PyObject *args)
@@ -318,13 +318,14 @@ UPnP_getspecificportmapping(UPnPObject *self, PyObject *args)
 	char extPort[6];
 	unsigned short ePort;
 	const char * proto;
+	const char * remoteHost = "";
 	char intClient[40];
 	char intPort[6];
 	unsigned short iPort;
 	char desc[80];
 	char enabled[4];
 	char leaseDuration[16];
-	if(!PyArg_ParseTuple(args, "Hs", &ePort, &proto))
+	if(!PyArg_ParseTuple(args, "Hs|z", &ePort, &proto, &remoteHost))
 		return NULL;
 	extPort[0] = '\0'; intClient[0] = '\0'; intPort[0] = '\0';
 	desc[0] = '\0'; enabled[0] = '\0'; leaseDuration[0] = '\0';
@@ -332,7 +333,7 @@ Py_BEGIN_ALLOW_THREADS
 	sprintf(extPort, "%hu", ePort);
 	UPNP_GetSpecificPortMappingEntry(self->urls.controlURL,
 	                                 self->data.first.servicetype,
-									 extPort, proto,
+									 extPort, proto, remoteHost,
 									 intClient, intPort,
 	                                 desc, enabled, leaseDuration);
 Py_END_ALLOW_THREADS

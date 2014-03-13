@@ -1,7 +1,7 @@
-/* $Id: upnpc.c,v 1.99 2013/02/06 12:56:41 nanard Exp $ */
+/* $Id: upnpc.c,v 1.102 2014/02/05 17:27:14 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2013 Thomas Bernard
+ * Copyright (c) 2005-2014 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -266,7 +266,7 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 
 	r = UPNP_GetSpecificPortMappingEntry(urls->controlURL,
 	                                 data->first.servicetype,
-    	                             eport, proto,
+    	                             eport, proto, NULL/*remoteHost*/,
 									 intClient, intPort, NULL/*desc*/,
 	                                 NULL/*enabled*/, duration);
 	if(r!=UPNPCOMMAND_SUCCESS)
@@ -500,7 +500,7 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 #endif
-    printf("upnpc : miniupnpc library test client. (c) 2005-2013 Thomas Bernard\n");
+    printf("upnpc : miniupnpc library test client. (c) 2005-2014 Thomas Bernard\n");
     printf("Go to http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/\n"
 	       "for more information.\n");
 	/* command line processing */

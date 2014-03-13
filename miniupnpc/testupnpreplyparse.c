@@ -1,7 +1,7 @@
-/* $Id: testupnpreplyparse.c,v 1.3 2013/05/14 20:37:36 nanard Exp $ */
+/* $Id: testupnpreplyparse.c,v 1.4 2014/01/27 11:45:19 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2013 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include <stdio.h>
@@ -74,7 +74,7 @@ int main(int argc, char * * argv)
 	fclose(f);
 	f = NULL;
 	buffer[l] = '\0';
-	if(argc >= 2)
+	if(argc > 2)
 	{
 		f = fopen(argv[2], "r");
 		if(!f)

@@ -1,8 +1,8 @@
-/* $Id: miniwget.c,v 1.60 2013/10/07 10:03:16 nanard Exp $ */
+/* $Id: miniwget.c,v 1.61 2014/02/05 17:27:48 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2013 Thomas Bernard
+ * Copyright (c) 2005-2014 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -39,9 +39,6 @@
 #include <net/if.h>
 #include <netdb.h>
 #define closesocket close
-/* defining MINIUPNPC_IGNORE_EINTR enable the ignore of interruptions
- * during the connect() call */
-#define MINIUPNPC_IGNORE_EINTR
 #endif /* #else _WIN32 */
 #if defined(__sun) || defined(sun)
 #define MIN(x,y) (((x)<(y))?(x):(y))

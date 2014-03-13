@@ -1,4 +1,7 @@
-/* $Id: listifaces.c,v 1.4 2007/09/23 16:59:02 nanard Exp $ */
+/* $Id: listifaces.c,v 1.6 2014/02/03 14:32:14 nanard Exp $ */
+/* (c) 2006-2014 Thomas BERNARD
+ * http://miniupnp.free.fr/ http://miniupnp.tuxfamily.org/
+ */
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -8,7 +11,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "upnputils.h"
 
+/* hexdump */
 void printhex(const unsigned char * p, int n)
 {
 	int i;
@@ -27,20 +32,28 @@ void printhex(const unsigned char * p, int n)
 	}
 }
 
-void listifaces()
+/* List network interfaces */
+void listifaces(void)
 {
 	struct ifconf ifc;
-	char * buf = 0;
-	int buflen = sizeof(struct ifreq)*20;
-	/*[sizeof(struct ifreq)*8];*/
+	char * buf = NULL;
+	int buflen;
 	int s, i;
 	int j;
 	char saddr[256/*INET_ADDRSTRLEN*/];
+#ifdef __linux__
+	buflen = sizeof(struct ifreq)*10;
+#else
+	buflen = 0;
+#endif
 	/*s = socket(PF_INET, SOCK_DGRAM, 0);*/
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	do {
+#ifdef __linux__
 		buflen += buflen;
-		buf = realloc(buf, buflen);
+#endif
+		if(buflen > 0)
+			buf = realloc(buf, buflen);
 		ifc.ifc_len = buflen;
 		ifc.ifc_buf = (caddr_t)buf;
 		if(ioctl(s, SIOCGIFCONF, &ifc) < 0)
@@ -50,22 +63,39 @@ void listifaces()
 			free(buf);
 			return;
 		}
-		printf("%d - %d - %d\n", buflen, ifc.ifc_len, (int)sizeof(struct ifreq));
-		printf(" %d\n", IFNAMSIZ);
-		printf(" %d %d\n", (int)sizeof(struct sockaddr), (int)sizeof(struct sockaddr_in) );
-	} while(buflen == ifc.ifc_len);
+		printf("buffer length=%d - buffer used=%d - sizeof(struct ifreq)=%d\n",
+		       buflen, ifc.ifc_len, (int)sizeof(struct ifreq));
+		printf("IFNAMSIZ=%d  ", IFNAMSIZ);
+		printf("sizeof(struct sockaddr)=%d   sizeof(struct sockaddr_in)=%d\n",
+		       (int)sizeof(struct sockaddr), (int)sizeof(struct sockaddr_in) );
+#ifndef __linux__
+		if(buflen == 0)
+			buflen = ifc.ifc_len;
+		else
+			break;
+	} while(1);
+#else
+	} while(buflen <= ifc.ifc_len);
+#endif
 	printhex((const unsigned char *)ifc.ifc_buf, ifc.ifc_len);
-	j = 0;
-	for(i=0; i<ifc.ifc_len; /*i += sizeof(struct ifreq)*/)
+	printf("off index fam name             address\n");
+	for(i = 0, j = 0; i<ifc.ifc_len; j++)
 	{
-		//const struct ifreq * ifrp = &(ifc.ifc_req[j]);
+		/*const struct ifreq * ifrp = &(ifc.ifc_req[j]);*/
 		const struct ifreq * ifrp = (const struct ifreq *)(buf + i);
-		i += sizeof(ifrp->ifr_name) + 16;//ifrp->ifr_addr.sa_len;
 		/*inet_ntop(AF_INET, &(((struct sockaddr_in *)&(ifrp->ifr_addr))->sin_addr), saddr, sizeof(saddr));*/
 		saddr[0] = '\0';
-		inet_ntop(ifrp->ifr_addr.sa_family, &(ifrp->ifr_addr.sa_data[2]), saddr, sizeof(saddr));
-		printf("%2d %d %d %s %s\n", j, ifrp->ifr_addr.sa_family, -1/*ifrp->ifr_addr.sa_len*/, ifrp->ifr_name, saddr);
-		j++;
+		/* inet_ntop(ifrp->ifr_addr.sa_family, &(ifrp->ifr_addr.sa_data[2]), saddr, sizeof(saddr)); */
+		sockaddr_to_string(&ifrp->ifr_addr, saddr, sizeof(saddr));
+		printf("0x%03x %2d   %2d %-16s %s\n", i, j, ifrp->ifr_addr.sa_family, ifrp->ifr_name, saddr);
+		/*ifrp->ifr_addr.sa_len is only available on BSD */
+#ifdef __linux__
+		i += sizeof(struct ifreq);
+#else
+		if(ifrp->ifr_addr.sa_len == 0)
+			break;
+		i += IFNAMSIZ + ifrp->ifr_addr.sa_len;
+#endif
 	}
 	free(buf);
 	close(s);
@@ -73,6 +103,8 @@ void listifaces()
 
 int main(int argc, char * * argv)
 {
+	(void)argc;
+	(void)argv;
 	listifaces();
 	return 0;
 }
