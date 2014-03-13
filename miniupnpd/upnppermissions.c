@@ -223,6 +223,7 @@ match_permission(const struct upnpperm * perm,
 	return 1;
 }
 
+#if 0
 /* match_permission_internal()
  * returns: 1 if address, iport matches the permission rule
  *          0 if no match */
@@ -237,6 +238,7 @@ match_permission_internal(const struct upnpperm * perm,
 		return 0;
 	return 1;
 }
+#endif
 
 int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,
