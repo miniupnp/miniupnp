@@ -1,6 +1,6 @@
-/* */
+/* $Id $ */
 /* MiniUPnP project
- * (c) 2007-2013 Thomas Bernard
+ * (c) 2007-2014 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -21,10 +21,16 @@
 #include "getifaddr.h"
 #include "portinuse.h"
 
+#if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
+#endif
 
+#ifdef CHECK_PORTINUSE
+
+#if defined(USE_NETFILTER)
 /* Hardcoded for now.  Ideally would come from .conf file */
 char *chains_to_check[] = { "PREROUTING" , 0 };
+#endif
 
 int port_in_use(const char *if_name, unsigned eport, int proto, const char *iaddr, unsigned iport)
 {
@@ -72,13 +78,14 @@ int port_in_use(const char *if_name, unsigned eport, int proto, const char *iadd
 	}
 	fclose(f);
 
+#if defined(USE_NETFILTER)
 	if (!found) {
 		char iaddr_old[16];
 		unsigned short iport_old;
 		int i = 0;
 		while (chains_to_check[i]) {
 			if (get_nat_redirect_rule(chains_to_check[i], if_name, eport, proto,
-					iaddr_old, sizeof(iaddr_old),&iport_old,
+					iaddr_old, sizeof(iaddr_old), &iport_old,
 					0, 0, 0, 0, 0, 0, 0) == 0)
 			{
 				syslog(LOG_DEBUG, "port_in_use check port %d on nat chain %s redirected to %s port %d", eport,
@@ -92,6 +99,7 @@ int port_in_use(const char *if_name, unsigned eport, int proto, const char *iadd
 			i++;
 		}
 	}
+#endif /* USE_NETFILTER */
 	return found;
 }
-
+#endif /* CHECK_PORTINUSE */

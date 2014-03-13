@@ -292,12 +292,14 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 					any_eport_allowed = 1;	/* at lease one eport is allowed */
+#ifdef CHECK_PORTINUSE
 					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport)) {
 						syslog(LOG_INFO, "port %hu protocol %s already in use", eport, (proto==IPPROTO_TCP)?"tcp":"udp");
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
 						continue;
 					}
+#endif
 					r = get_redirect_rule(ext_if_name, eport, proto,
 					                      iaddr_old, sizeof(iaddr_old),
 					                      &iport_old, 0, 0, 0, 0,
