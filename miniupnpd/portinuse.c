@@ -32,15 +32,18 @@
 char *chains_to_check[] = { "PREROUTING" , 0 };
 #endif
 
-int port_in_use(const char *if_name, unsigned eport, int proto, const char *iaddr, unsigned iport)
+int
+port_in_use(const char *if_name,
+            unsigned eport, int proto,
+            const char *iaddr, unsigned iport)
 {
 	char line[256];
 	FILE *f;
 	int found = 0;
 	char ip_addr_str[INET_ADDRSTRLEN];
 	struct in_addr ip_addr;
-	const char tcpfile[] = "/proc/net/tcp";
-	const char udpfile[] = "/proc/net/udp";
+	const char * tcpfile = "/proc/net/tcp";
+	const char * udpfile = "/proc/net/udp";
 
 	f = fopen((proto==IPPROTO_TCP)?tcpfile:udpfile, "r");
 	if (!f) return 0;

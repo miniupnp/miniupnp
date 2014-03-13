@@ -285,8 +285,12 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   unsigned int * timestamp,
                   u_int64_t * packets, u_int64_t * bytes)
 {
-	return get_nat_redirect_rule(miniupnpd_nat_chain, ifname, eport, proto, iaddr, iaddrlen, iport,
-				 desc, desclen, rhost, rhostlen,timestamp, packets, bytes);
+	return get_nat_redirect_rule(miniupnpd_nat_chain,
+	                             ifname, eport, proto,
+	                             iaddr, iaddrlen, iport,
+	                             desc, desclen,
+	                             rhost, rhostlen,
+	                             timestamp, packets, bytes);
 }
 
 int
