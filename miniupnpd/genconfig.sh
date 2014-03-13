@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.69 2014/02/24 18:41:25 nanard Exp $
+# $Id: genconfig.sh,v 1.72 2014/03/10 10:17:17 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2014 Thomas Bernard
@@ -13,11 +13,7 @@ case "$argv" in
 	--strict) STRICT=1 ;;
 	--leasefile) LEASEFILE=1 ;;
 	--vendorcfg) VENDORCFG=1 ;;
-	--pcp) PCP=1 ;;
-	--pcp-peer)
-		PCP=1
-		PCP_PEER=1
-		;;
+	--pcp-peer) PCP_PEER=1 ;;
 	--help|-h)
 		echo "Usage : $0 [options]"
 		echo " --ipv6      enable IPv6"
@@ -25,7 +21,6 @@ case "$argv" in
 		echo " --strict    be more strict regarding compliance with UPnP specifications"
 		echo " --leasefile enable lease file"
 		echo " --vendorcfg enable configuration of manufacturer info"
-		echo " --pcp       enable PCP"
 		echo " --pcp-peer  enable PCP PEER operation"
 		exit 1
 		;;
@@ -341,15 +336,9 @@ echo "/* Comment the following line to disable NAT-PMP operations */" >> ${CONFI
 echo "#define ENABLE_NATPMP" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
-if [ -n "$PCP" ]; then
 echo "/* Comment the following line to disable PCP operations */" >> ${CONFIGFILE}
 echo "#define ENABLE_PCP" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
-else
-echo "/* Uncomment the following line to enable PCP operations */" >> ${CONFIGFILE}
-echo "/*#define ENABLE_PCP*/" >> ${CONFIGFILE}
-echo "" >> ${CONFIGFILE}
-fi
 
 echo "#ifdef ENABLE_PCP" >> ${CONFIGFILE}
 if [ -n "$PCP_PEER" ]; then
