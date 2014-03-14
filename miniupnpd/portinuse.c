@@ -14,6 +14,25 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#if defined(__OpenBSD__)
+#include <sys/queue.h>
+#include <kvm.h>
+#include <fcntl.h>
+#include <nlist.h>
+#include <limits.h>
+#include <net/route.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/in_pcb.h>
+/*
+#include <netinet/tcp.h>
+#include <netinet/tcpip.h>
+#include <netinet/tcp_seq.h>
+#include <netinet/tcp_var.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
+*/
+#endif
 
 #include "macros.h"
 #include "config.h"
@@ -46,15 +65,20 @@ port_in_use(const char *if_name,
 	FILE *f;
 	const char * tcpfile = "/proc/net/tcp";
 	const char * udpfile = "/proc/net/udp";
-
-	f = fopen((proto==IPPROTO_TCP)?tcpfile:udpfile, "r");
-	if (!f) return 0;
+#endif
 
 	if(getifaddr(if_name, ip_addr_str, INET_ADDRSTRLEN, &ip_addr, NULL) < 0)
 		ip_addr.s_addr = 0;
 
-	syslog(LOG_DEBUG, "Check protocol %s for port %d on ext_if %s %s, %8X",
+	syslog(LOG_DEBUG, "Check protocol %s for port %d on ext_if %s %s, %08X",
 		(proto==IPPROTO_TCP)?"tcp":"udp", eport, if_name, ip_addr_str, (unsigned)ip_addr.s_addr);
+
+#ifdef __linux__
+	f = fopen((proto==IPPROTO_TCP)?tcpfile:udpfile, "r");
+	if (!f) {
+		syslog(LOG_ERR, "cannot open %s", (proto==IPPROTO_TCP)?tcpfile:udpfile);
+		return 0;
+	}
 
 	while (fgets(line, 255, f)) {
 		char eaddr[68];
@@ -84,12 +108,72 @@ port_in_use(const char *if_name,
 	fclose(f);
 #endif /* __linux__ */
 
+#if defined(__OpenBSD__)
+static struct nlist list[] = {
+#if 0
+        {"_tcpstat", 0, 0, 0, 0},
+        {"_udpstat", 0, 0, 0, 0},
+        {"_tcbinfo", 0, 0, 0, 0},
+        {"_udbinfo", 0, 0, 0, 0},
+#endif
+		{"_tcbtable", 0, 0, 0, 0},
+		{"_udbtable", 0, 0, 0, 0},
+        {NULL,0, 0, 0, 0}
+};
+	char errstr[_POSIX2_LINE_MAX];
+	kvm_t *kd;
+	ssize_t n;
+	struct inpcbtable table;
+	struct inpcb *next;
+	struct inpcb inpcb;
+	kd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, errstr);
+	if(!kd) {
+		syslog(LOG_ERR, "portinuse(): kvm_openfiles(): %s", errstr);
+		return -1;
+	}
+	if(kvm_nlist(kd, list) < 0) {
+		syslog(LOG_ERR, "portinuse(): kvm_nlist(): %s", kvm_geterr(kd));
+		kvm_close(kd);
+		return -1;
+	}
+	n = kvm_read(kd, list[(proto==IPPROTO_TCP)?0:1].n_value, &table, sizeof(table));
+	if(n < 0) {
+		syslog(LOG_ERR, "kvm_read(): %s", kvm_geterr(kd));
+		kvm_close(kd);
+		return -1;
+	}
+	next = CIRCLEQ_FIRST(&table.inpt_queue);	/*TAILQ_FIRST(&table.inpt_queue);*/
+	while(next != NULL) {
+		/* syslog(LOG_DEBUG, "next=0x%08lx", (u_long)next); */
+		if(((u_long)next & 3) != 0) break;
+		n = kvm_read(kd, (u_long)next, &inpcb, sizeof(inpcb));
+		if(n < 0) {
+			syslog(LOG_ERR, "kvm_read(): %s", kvm_geterr(kd));
+			break;
+		}
+		next = CIRCLEQ_NEXT(&inpcb, inp_queue);	/*TAILQ_NEXT(&inpcb, inp_queue);*/
+		if((inpcb.inp_flags & INP_IPV6) != 0)
+			continue;
+		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu",
+		       (u_long)inpcb.inp_laddr.s_addr, ntohs(inpcb.inp_lport),
+		       (u_long)inpcb.inp_faddr.s_addr, ntohs(inpcb.inp_fport));
+		if(eport == (unsigned)ntohs(inpcb.inp_lport)) {
+			if(inpcb.inp_laddr.s_addr == INADDR_ANY || inpcb.inp_laddr.s_addr == ip_addr.s_addr) {
+				found++;
+				break;  /* don't care how many, just that we found at least one */
+			}
+		}
+	}
+	kvm_close(kd);
+#endif
+
+
 #if defined(USE_NETFILTER)
 	if (!found) {
 		char iaddr_old[16];
 		unsigned short iport_old;
-		int i = 0;
-		while (chains_to_check[i]) {
+		int i;
+		for (i = 0; chains_to_check[i]; i++) {
 			if (get_nat_redirect_rule(chains_to_check[i], if_name, eport, proto,
 					iaddr_old, sizeof(iaddr_old), &iport_old,
 					0, 0, 0, 0, 0, 0, 0) == 0)
@@ -102,9 +186,10 @@ port_in_use(const char *if_name,
 					break;  /* don't care how many, just that we found at least one */
 				}
 			}
-			i++;
 		}
 	}
+#else /* USE_NETFILTER */
+	UNUSED(iport); UNUSED(iaddr);
 #endif /* USE_NETFILTER */
 	return found;
 }
