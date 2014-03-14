@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.76 2014/03/10 10:26:15 nanard Exp $
+# $Id: Makefile,v 1.76.2.2 2014/03/14 10:49:08 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -117,10 +117,13 @@ TESTUPNPPERMISSIONSOBJS = testupnppermissions.o upnppermissions.o
 TESTGETIFADDROBJS = testgetifaddr.o getifaddr.o
 MINIUPNPDCTLOBJS = miniupnpdctl.o
 TESTASYNCSENDTOOBJS = testasyncsendto.o asyncsendto.o upnputils.o bsd/getroute.o
+TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
-              testgetifaddr testgetroute testasyncsendto
+              testgetifaddr testgetroute testasyncsendto \
+              testportinuse
+
 .if $(OSNAME) == "Darwin"
 LIBS =
 .else
@@ -144,6 +147,7 @@ clean:
 	testupnpdescgen.o \
 	$(MISCOBJS) config.h testgetifstats.o testupnppermissions.o \
 	miniupnpdctl.o testgetifaddr.o testgetroute.o testasyncsendto.o \
+	testportinuse.o \
 	$(PFOBJS) $(IPFOBJS) $(IPFWOBJS)
 
 install:	miniupnpd genuuid
@@ -174,7 +178,7 @@ genuuid:
 depend:	config.h
 	mkdep $(ALLOBJS:.o=.c) testupnpdescgen.c testgetifstats.c \
     testupnppermissions.c miniupnpdctl.c testgetifaddr.c \
-	testgetroute.c
+	testgetroute.c testportinuse.c testasyncsendto.c
 
 miniupnpd: config.h $(ALLOBJS)
 	$(CC) $(CFLAGS) -o $@ $(ALLOBJS) $(LIBS)
@@ -202,6 +206,9 @@ testgetroute:	config.h $(TESTGETROUTEOBJS)
 
 testasyncsendto:	config.h $(TESTASYNCSENDTOOBJS)
 	$(CC) $(CFLAGS) -o $@ $(TESTASYNCSENDTOOBJS)
+
+testportinuse:	config.h $(TESTPORTINUSEOBJS)
+	$(CC) $(CFLAGS) -o $@ $(TESTPORTINUSEOBJS) -lkvm
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^
