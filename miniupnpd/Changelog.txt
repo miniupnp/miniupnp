@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.363 2014/03/13 10:53:40 nanard Exp $
+$Id: Changelog.txt,v 1.365 2014/03/14 21:26:34 nanard Exp $
+
+2014/03/14:
+  reject renewal of subscribtion that already timeouted
 
 2014/03/13:
   fix getifaddr_in6() (used for PCP)

@@ -1,7 +1,7 @@
-/* $Id: upnpevents.c,v 1.28 2014/03/13 10:53:40 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.30 2014/03/14 22:26:07 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2008-2013 Thomas Bernard
+ * (c) 2008-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -149,6 +149,11 @@ renewSubscription(const char * sid, int sidlen, int timeout)
 	struct subscriber * sub;
 	for(sub = subscriberlist.lh_first; sub != NULL; sub = sub->entries.le_next) {
 		if((sidlen == 41) && (memcmp(sid, sub->uuid, 41) == 0)) {
+#ifdef UPNP_STRICT
+			/* check if the subscription already timeouted */
+			if(sub->timeout && time(NULL) > sub->timeout)
+				continue;
+#endif
 			sub->timeout = (timeout ? time(NULL) + timeout : 0);
 			return 0;
 		}
@@ -542,6 +547,8 @@ void upnpevents_processfds(fd_set *readset, fd_set *writeset)
 	for(sub = subscriberlist.lh_first; sub != NULL; ) {
 		subnext = sub->entries.le_next;
 		if(sub->timeout && curtime > sub->timeout && sub->notify == NULL) {
+			syslog(LOG_INFO, "subscriber timeouted : %u > %u SID=%s",
+			       (unsigned)curtime, (unsigned)sub->timeout, sub->uuid);
 			LIST_REMOVE(sub, entries);
 			free(sub);
 		}
