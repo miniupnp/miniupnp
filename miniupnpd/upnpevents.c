@@ -197,6 +197,7 @@ static void
 upnp_event_create_notify(struct subscriber * sub)
 {
 	struct upnp_event_notify * obj;
+	/*struct timeval sock_timeout;*/
 
 	obj = calloc(1, sizeof(struct upnp_event_notify));
 	if(!obj) {
@@ -215,6 +216,22 @@ upnp_event_create_notify(struct subscriber * sub)
 		syslog(LOG_ERR, "%s: socket(): %m", "upnp_event_create_notify");
 		goto error;
 	}
+#if 0 /* does not work for non blocking connect() */
+	/* set timeout to 3 seconds */
+	sock_timeout.tv_sec = 3;
+	sock_timeout.tv_usec = 0;
+	if(setsockopt(obj->s, SOL_SOCKET, SO_RCVTIMEO, &sock_timeout, sizeof(struct timeval)) < 0) {
+		syslog(LOG_WARNING, "%s: setsockopt(SO_RCVTIMEO): %m",
+		       "upnp_event_create_notify");
+	}
+	sock_timeout.tv_sec = 3;
+	sock_timeout.tv_usec = 0;
+	if(setsockopt(obj->s, SOL_SOCKET, SO_SNDTIMEO, &sock_timeout, sizeof(struct timeval)) < 0) {
+		syslog(LOG_WARNING, "%s: setsockopt(SO_SNDTIMEO): %m",
+		       "upnp_event_create_notify");
+	}
+#endif
+	/* set socket non blocking */
 	if(!set_non_blocking(obj->s)) {
 		syslog(LOG_ERR, "%s: set_non_blocking(): %m",
 		       "upnp_event_create_notify");
@@ -243,6 +260,7 @@ upnp_event_notify_connect(struct upnp_event_notify * obj)
 	struct sockaddr_in addr;
 	socklen_t addrlen;
 #endif
+
 	if(!obj)
 		return;
 	memset(&addr, 0, sizeof(addr));
@@ -389,7 +407,7 @@ static void upnp_event_send(struct upnp_event_notify * obj)
 {
 	int i;
 
-	syslog(LOG_DEBUG, "%s: sending event notify message to %s:%s",
+	syslog(LOG_DEBUG, "%s: sending event notify message to %s%s",
 	       "upnp_event_send", obj->addrstr, obj->portstr);
 	syslog(LOG_DEBUG, "%s: msg: %s",
 	       "upnp_event_send", obj->buffer + obj->sent);
@@ -451,7 +469,9 @@ upnp_event_process_notify(struct upnp_event_notify * obj)
 		}
 		if(err != 0) {
 			errno = err;
-			syslog(LOG_WARNING, "%s: connect failed: %m", "upnp_event_process_notify");
+			syslog(LOG_WARNING, "%s: connect(%s%s): %m",
+			       "upnp_event_process_notify",
+			       obj->addrstr, obj->portstr);
 			obj->state = EError;
 			break;
 		}
