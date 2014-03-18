@@ -57,7 +57,7 @@ FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
 
 .if $(OSNAME) == "DragonFly"
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
-          if chechyesno ipfilter; then \
+          if checkyesno ipfilter; then \
           echo "ipf"; else echo "pf"; fi
 .endif
 .endif
