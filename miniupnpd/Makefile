@@ -42,7 +42,7 @@ FWNAME = ipf
 .endif
 
 # better way to find if we are using ipf or pf
-.if defined(/etc/rc.subr) && defined(/etc/rc.conf)
+.if exists(/etc/rc.subr) && exists(/etc/rc.conf)
 .if $(OSNAME) == "FreeBSD"
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
           if checkyesno ipfilter_enable; then \
