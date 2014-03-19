@@ -39,7 +39,6 @@ FWNAME = pf
 .else
 FWNAME = ipf
 .endif
-.endif
 
 # better way to find if we are using ipf or pf
 .if exists(/etc/rc.subr) && exists(/etc/rc.conf)
@@ -66,6 +65,8 @@ FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
 # Firewall is ipfw up to OS X 10.6 Snow Leopard
 # and pf since OS X 10.7 Lion (Darwin 11.0)
 FWNAME != [ `uname -r | cut -d. -f1` -ge 11  ] && echo "pf" || echo "ipfw"
+.endif
+
 .endif
 
 # Solaris specific CFLAGS
