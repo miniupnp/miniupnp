@@ -198,20 +198,23 @@ static struct nlist list[] = {
 		varname = "net.inet.udp.pcblist";
 		break;
 	default:
-		abort();
+		syslog(LOG_ERR, "port_in_use() unknown proto=%d", proto);
+		return -1;
 	}
 
-	if (sysctlbyname(varname, NULL, &len, NULL, 0)) {
-		if (errno == ENOENT)
-			goto out;
-		err(1, "fetching %s", varname);
+	if (sysctlbyname(varname, NULL, &len, NULL, 0) < 0) {
+		syslog(LOG_ERR, "sysctlbyname(%s, NULL, ...): %m", varname);
+		return -1;
 	}
-	if ((buf = malloc(len)) == NULL)
-		err(1, "malloc()");
-	if (sysctlbyname(varname, buf, &len, NULL, 0)) {
-		if (errno == ENOENT)
-			goto out;
-		err(1, "fetching %s", varname);
+	buf = malloc(len);
+	if (buf == NULL) {
+		syslog(LOG_ERR, "malloc(%u) failed", (unsigned)len);
+		return -1;
+	}
+	if (sysctlbyname(varname, buf, &len, NULL, 0) < 0) {
+		syslog(LOG_ERR, "sysctlbyname(%s, buf, ...): %m", varname);
+		free(buf);
+		return -1;
 	}
 
 	so_begin = buf;
@@ -224,16 +227,20 @@ static struct nlist list[] = {
 		case IPPROTO_TCP:
 			xtp = (struct xtcpcb *)so_begin;
 			if (xtp->xt_len != sizeof *xtp) {
-				warnx("struct xtcpcb size mismatch; %ld vs %ld", xtp->xt_len, sizeof *xtp);
-				goto out;
+				syslog(LOG_WARNING, "struct xtcpcb size mismatch; %ld vs %ld",
+				       (long)xtp->xt_len, sizeof *xtp);
+				free(buf);
+				return -1;
 			}
 			inp = &xtp->xt_inp;
 			break;
 		case IPPROTO_UDP:
 			xip = (struct xinpcb *)so_begin;
 			if (xip->xi_len != sizeof *xip) {
-				warnx("struct xinpcb size mismatch");
-				goto out;
+				syslog(LOG_WARNING, "struct xinpcb size mismatch : %ld vs %ld",
+				       (long)xip->xi_len, sizeof *xip);
+				free(buf);
+				return -1;
 			}
 			inp = &xip->xi_inp;
 			break;
@@ -255,11 +262,9 @@ static struct nlist list[] = {
 			}
 		}
 	}
-	errno = 0;
-out:
-	if (errno) {
+	if(buf) {
 		free(buf);
-		return -1;
+		buf = NULL;
 	}
 #endif
 
