@@ -1,4 +1,4 @@
-/* $Id $ */
+/* $Id: $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -83,13 +83,14 @@ port_in_use(const char *if_name,
 		ip_addr.s_addr = 0;
 
 	syslog(LOG_DEBUG, "Check protocol %s for port %d on ext_if %s %s, %08X",
-		(proto==IPPROTO_TCP)?"tcp":"udp", eport, if_name, ip_addr_str, (unsigned)ip_addr.s_addr);
+	    (proto==IPPROTO_TCP)?"tcp":"udp", eport, if_name,
+	    ip_addr_str, (unsigned)ip_addr.s_addr);
 
 #ifdef __linux__
 	f = fopen((proto==IPPROTO_TCP)?tcpfile:udpfile, "r");
 	if (!f) {
 		syslog(LOG_ERR, "cannot open %s", (proto==IPPROTO_TCP)?tcpfile:udpfile);
-		return 0;
+		return -1;
 	}
 
 	while (fgets(line, 255, f)) {

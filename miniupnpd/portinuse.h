@@ -1,4 +1,4 @@
-/* $Id $ */
+/* $Id: $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -12,7 +12,8 @@
 /* portinuse()
  * determine wether a port is already in use
  * on a given interface.
- * returns: 0 not in use, 1 in use */
+ * returns: 0 not in use, > 0 in use
+ *         -1 in case of error */
 int
 port_in_use(const char *if_name,
             unsigned port, int proto,

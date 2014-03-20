@@ -293,8 +293,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					}
 					any_eport_allowed = 1;	/* at lease one eport is allowed */
 #ifdef CHECK_PORTINUSE
-					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport)) {
-						syslog(LOG_INFO, "port %hu protocol %s already in use", eport, (proto==IPPROTO_TCP)?"tcp":"udp");
+					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
+						syslog(LOG_INFO, "port %hu protocol %s already in use",
+						       eport, (proto==IPPROTO_TCP)?"tcp":"udp");
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
 						continue;

@@ -296,8 +296,9 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			return -2;
 		}
 #ifdef CHECK_PORTINUSE
-	} else if (port_in_use(ext_if_name, eport, proto, iaddr, iport)) {
-		syslog(LOG_INFO, "port %hu protocol %s already in use", eport, protocol);
+	} else if (port_in_use(ext_if_name, eport, proto, iaddr, iport) > 0) {
+		syslog(LOG_INFO, "port %hu protocol %s already in use",
+		       eport, protocol);
 		return -2;
 #endif /* CHECK_PORTINUSE */
 	} else {
