@@ -4,6 +4,10 @@
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
+#if defined(__DragonFly__)
+#include <err.h>
+#include <stdlib.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -32,6 +36,14 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 */
+#endif
+
+#if defined(__DragonFly__)
+#include <sys/socketvar.h>
+#include <sys/sysctl.h>
+/* sys/socketvar.h must be included above the following headers */
+#include <netinet/in_pcb.h>
+#include <netinet/tcp_var.h>
 #endif
 
 #include "macros.h"
@@ -167,6 +179,88 @@ static struct nlist list[] = {
 	kvm_close(kd);
 #endif
 
+#if defined(__DragonFly__)
+	const char *varname;
+	struct xinpcb *xip;
+	struct xtcpcb *xtp;
+	struct inpcb *inp;
+	void *buf = NULL;
+	void *so_begin, *so_end;
+
+	size_t len;
+
+	switch (proto) {
+	case IPPROTO_TCP:
+		varname = "net.inet.tcp.pcblist";
+		break;
+	case IPPROTO_UDP:
+		varname = "net.inet.udp.pcblist";
+		break;
+	default:
+		abort();
+	}
+
+	if (sysctlbyname(varname, NULL, &len, NULL, 0)) {
+		if (errno == ENOENT)
+			goto out;
+		err(1, "fetching %s", varname);
+	}
+	if ((buf = malloc(len)) == NULL)
+		err(1, "malloc()");
+	if (sysctlbyname(varname, buf, &len, NULL, 0)) {
+		if (errno == ENOENT)
+			goto out;
+		err(1, "fetching %s", varname);
+	}
+
+	so_begin = buf;
+	so_end = (uint8_t *)buf + len;
+	for (so_begin = buf, so_end = (uint8_t *)so_begin + len;
+	     (uint8_t *)so_begin + sizeof(size_t) < (uint8_t *)so_end &&
+	     (uint8_t *)so_begin + *(size_t *)so_begin <= (uint8_t *)so_end;
+	     so_begin = (uint8_t *)so_begin + *(size_t *)so_begin) {
+		switch (proto) {
+		case IPPROTO_TCP:
+			xtp = (struct xtcpcb *)so_begin;
+			if (xtp->xt_len != sizeof *xtp) {
+				warnx("struct xtcpcb size mismatch; %ld vs %ld", xtp->xt_len, sizeof *xtp);
+				goto out;
+			}
+			inp = &xtp->xt_inp;
+			break;
+		case IPPROTO_UDP:
+			xip = (struct xinpcb *)so_begin;
+			if (xip->xi_len != sizeof *xip) {
+				warnx("struct xinpcb size mismatch");
+				goto out;
+			}
+			inp = &xip->xi_inp;
+			break;
+		default:
+			abort();
+		}
+		/* no support for IPv6 */
+		if ((inp->inp_vflag & INP_IPV6) != 0)
+			continue;
+		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu <=> %hu %08lx:%hu",
+		       (u_long)inp->inp_laddr.s_addr, ntohs(inp->inp_lport),
+		       (u_long)inp->inp_faddr.s_addr, ntohs(inp->inp_fport),
+		       eport, (u_long)ip_addr.s_addr, iport
+		);
+		if (eport == (unsigned)ntohs(inp->inp_lport)) {
+			if (inp->inp_laddr.s_addr == INADDR_ANY || inp->inp_laddr.s_addr == ip_addr.s_addr) {
+				found++;
+				break;  /* don't care how many, just that we found at least one */
+			}
+		}
+	}
+	errno = 0;
+out:
+	if (errno) {
+		free(buf);
+		return -1;
+	}
+#endif
 
 #if defined(USE_NETFILTER)
 	if (!found) {
