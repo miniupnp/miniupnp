@@ -176,10 +176,10 @@ int get_dscp_value(pcp_info_t *pcp_msg_info) {
  *          result code is assigned to pcp_msg_info->result_code to indicate
  *          what kind of error occurred
  */
-static int parseCommonRequestHeader(pcp_request_t *common_req, pcp_info_t *pcp_msg_info)
+static int parseCommonRequestHeader(const pcp_request_t *common_req, pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->version = common_req->ver ;
-	pcp_msg_info->opcode = common_req->r_opcode &0x7f ;
+	pcp_msg_info->opcode = common_req->r_opcode & 0x7f;
 	pcp_msg_info->lifetime = ntohl(common_req->req_lifetime);
 	pcp_msg_info->int_ip = &common_req->ip;
 
@@ -201,7 +201,7 @@ static int parseCommonRequestHeader(pcp_request_t *common_req, pcp_info_t *pcp_m
 }
 
 #ifdef DEBUG
-static void printMAPOpcodeVersion1(pcp_map_v1_t *map_buf)
+static void printMAPOpcodeVersion1(const pcp_map_v1_t *map_buf)
 {
 	char map_addr[INET6_ADDRSTRLEN];
 	syslog(LOG_DEBUG, "PCP MAP: v1 Opcode specific information. \n");
@@ -212,7 +212,7 @@ static void printMAPOpcodeVersion1(pcp_map_v1_t *map_buf)
 	       &map_buf->ext_ip, map_addr, INET6_ADDRSTRLEN));
 }
 
-static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
+static void printMAPOpcodeVersion2(const pcp_map_v2_t *map_buf)
 {
 	char map_addr[INET6_ADDRSTRLEN];
 	syslog(LOG_DEBUG, "PCP MAP: v2 Opcode specific information.");
@@ -226,7 +226,7 @@ static void printMAPOpcodeVersion2(pcp_map_v2_t *map_buf)
 }
 #endif /* DEBUG */
 
-static int parsePCPMAP_version1(pcp_map_v1_t *map_v1,
+static int parsePCPMAP_version1(const pcp_map_v1_t *map_v1,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_map_op = 1;
@@ -1002,9 +1002,8 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 	int remainingSize;
 	int processedSize;
 
-	pcp_request_t* common_req;
-	pcp_map_v1_t* map_v1;
-	pcp_map_v2_t* map_v2;
+	const pcp_map_v1_t* map_v1;
+	const pcp_map_v2_t* map_v2;
 #ifdef PCP_PEER
 	pcp_peer_v1_t* peer_v1;
 	pcp_peer_v2_t* peer_v2;
@@ -1037,19 +1036,17 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 		return 1; /* send response */
 	}
 
-	/* first print out info from common request header */
-	common_req = (pcp_request_t*)req;
-
-	if (parseCommonRequestHeader(common_req, pcp_msg_info) ) {
+	/* first parse request header */
+	if (parseCommonRequestHeader((pcp_request_t*)req, pcp_msg_info) ) {
 		return 1;
 	}
 
 	remainingSize -= sizeof(pcp_request_t);
 	processedSize += sizeof(pcp_request_t);
 
-	if (common_req->ver == 1) {
+	if (pcp_msg_info->version == 1) {
 		/* legacy PCP version 1 support */
-		switch ( common_req->r_opcode & 0x7F ) {
+		switch (pcp_msg_info->opcode) {
 		case PCP_OPCODE_MAP:
 
 			remainingSize -= sizeof(pcp_map_v1_t);
@@ -1125,10 +1122,10 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			break;
 		}
 
-	} else if (common_req->ver == 2) {
+	} else if (pcp_msg_info->version == 2) {
 		/* RFC 6887 PCP support
 		 * http://tools.ietf.org/html/rfc6887 */
-		switch ( common_req->r_opcode & 0x7F) {
+		switch (pcp_msg_info->opcode) {
 		case PCP_OPCODE_ANNOUNCE:
 			/* should check PCP Client's IP Address in request */
 			/* see http://tools.ietf.org/html/rfc6887#section-14.1 */
