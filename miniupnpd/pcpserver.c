@@ -675,6 +675,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 	/* Create Peer Mapping */
 	{
 		char desc[64];
+		char proto_str[8];
 		char peerip_s[INET_ADDRSTRLEN], extip_s[INET_ADDRSTRLEN];
 		time_t timestamp = time(NULL) + pcp_msg_info->lifetime;
 
@@ -682,8 +683,19 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			eport = pcp_msg_info->int_port;
 		}
 
-		snprintf(desc, sizeof(desc), "PCP %hu %s",
-		    eport, (proto==IPPROTO_TCP)?"tcp":"udp");
+		switch(proto) {
+		case IPPROTO_TCP:
+			snprintf(proto_str, sizeof(proto_str), "TCP");
+			break;
+		case IPPROTO_UDP:
+			snprintf(proto_str, sizeof(proto_str), "UDP");
+			break;
+		default:
+			snprintf(proto_str, sizeof(proto_str), "%d", proto);
+		}
+		snprintf(desc, sizeof(desc), "PCP %hu %s %08x%08x%08x",
+		    eport, proto_str,
+		    pcp_msg_info->nonce[0], pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
 
 		inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 		inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
@@ -695,7 +707,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			        pcp_msg_info->senderaddrstr, pcp_msg_info->int_port,
 			        proto, desc, timestamp) < 0 ) {
 				syslog(LOG_ERR, "PCP: failed to add flowp upstream mapping %s %s:%hu->%s:%hu '%s'",
-				        (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
+				        proto_str,
 				        pcp_msg_info->senderaddrstr,
 				        pcp_msg_info->int_port,
 				        peerip_s,
@@ -711,7 +723,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			        peerip_s, pcp_msg_info->peer_port, proto, desc, timestamp)
 			          < 0 ) {
 				syslog(LOG_ERR, "PCP: failed to add flowp downstream mapping %s %s:%hu->%s:%hu '%s'",
-				        (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
+				        proto_str,
 				        pcp_msg_info->senderaddrstr,
 				        pcp_msg_info->int_port,
 				        peerip_s,
@@ -812,6 +824,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
 	char desc[64];
+	char proto_str[8];
 	char iaddr_old[INET_ADDRSTRLEN];
 	uint16_t iport_old;
 	uint16_t eport_first = 0;
@@ -887,9 +900,20 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 
 	timestamp = time(NULL) + pcp_msg_info->lifetime;
 
-	snprintf(desc, sizeof(desc), "PCP %hu %s",
+	switch(pcp_msg_info->protocol) {
+	case IPPROTO_TCP:
+		snprintf(proto_str, sizeof(proto_str), "TCP");
+		break;
+	case IPPROTO_UDP:
+		snprintf(proto_str, sizeof(proto_str), "UDP");
+		break;
+	default:
+		snprintf(proto_str, sizeof(proto_str), "%d", pcp_msg_info->protocol);
+	}
+	snprintf(desc, sizeof(desc), "PCP %hu %s %08x%08x%08x",
 	     pcp_msg_info->ext_port,
-	     (pcp_msg_info->protocol==IPPROTO_TCP)?"tcp":"udp");
+	     proto_str,
+	     pcp_msg_info->nonce[0], pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
 
 	if(upnp_redirect_internal(NULL,
 	        pcp_msg_info->ext_port,
@@ -900,7 +924,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 	        timestamp) < 0) {
 
 		syslog(LOG_ERR, "PCP MAP: Failed to add mapping %s %hu->%s:%hu '%s'",
-		        (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
+		        proto_str,
 		        pcp_msg_info->ext_port,
 		        pcp_msg_info->senderaddrstr,
 		        pcp_msg_info->int_port,
@@ -910,7 +934,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 
 	} else {
 		syslog(LOG_INFO, "PCP MAP: added mapping %s %hu->%s:%hu '%s'",
-		        (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
+		        proto_str,
 		        pcp_msg_info->ext_port,
 		        pcp_msg_info->senderaddrstr,
 		        pcp_msg_info->int_port,
