@@ -821,6 +821,34 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 }
 #endif /* PCP_PEER */
 
+/*                internal  external  PCP remote peer  actual remote peer
+ *                --------  -------   ---------------  ------------------
+ * IPv4 firewall   IPv4      IPv4         IPv4              IPv4
+ * IPv6 firewall   IPv6      IPv6         IPv6              IPv6
+ *         NAT44   IPv4      IPv4         IPv4              IPv4
+ *         NAT46   IPv4      IPv6         IPv4              IPv6
+ *         NAT64   IPv6      IPv4         IPv6              IPv4
+ *         NPTv6   IPv6      IPv6         IPv6              IPv6
+ *
+ *             Address Families with MAP and PEER
+ *
+ * The 'internal' address is implicitly the same as the source IP
+ * address of the PCP request, except when the THIRD_PARTY option is
+ * used.
+ *
+ * The 'external' address is the Suggested External Address field of the
+ * MAP or PEER request, and its address family is usually the same as
+ * the 'internal' address family, except when technologies like NAT64
+ * are used.
+ *
+ * The 'remote peer' address is the remote peer IP address of the PEER
+ * request or the FILTER option of the MAP request, and is always the
+ * same address family as the 'internal' address, even when NAT64 is
+ * used.  In NAT64, the IPv6 PCP client is not necessarily aware of the
+ * NAT64 or aware of the actual IPv4 address of the remote peer, so it
+ * expresses the IPv6 address from its perspective.     */
+
+/* TODO : support more scenarios than just NAT44 */
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
 	char desc[64];
@@ -993,7 +1021,8 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 		return 0;
 	}
 
-	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ){
+	/* protocol zero means 'all protocols' : internal port MUST be zero */
+	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port != 0) {
 		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 		return 0;
 	}
