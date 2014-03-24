@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.25 2014/03/24 11:13:04 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.26 2014/03/24 13:08:52 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -1390,9 +1390,8 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
                              const struct sockaddr * senderaddr)
 {
 	pcp_info_t pcp_msg_info;
-#ifdef DEBUG
+	struct lan_addr_s * lan_addr;
 	char addr_str[64];
-#endif
 
 	memset(&pcp_msg_info, 0, sizeof(pcp_info_t));
 
@@ -1405,14 +1404,19 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
 		}
 	}
-#ifdef DEBUG
 	if(sockaddr_to_string(senderaddr, addr_str, sizeof(addr_str)))
 		syslog(LOG_DEBUG, "PCP request received from %s %dbytes",
 		       addr_str, len);
-#endif
 
 	if(buff[1] & 128) {
 		/* discarding PCP responses silently */
+		return 0;
+	}
+
+	lan_addr = get_lan_for_peer(senderaddr);
+	if(lan_addr == NULL) {
+		syslog(LOG_WARNING, "SSDP packet sender %s not from a LAN, ignoring",
+		       addr_str);
 		return 0;
 	}
 
