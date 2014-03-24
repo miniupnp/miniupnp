@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.365 2014/03/14 21:26:34 nanard Exp $
+$Id: Changelog.txt,v 1.366 2014/03/24 11:03:50 nanard Exp $
+
+2014/03/24:
+  start work to enable IPv6 PCP operations
 
 2014/03/14:
   reject renewal of subscribtion that already timeouted

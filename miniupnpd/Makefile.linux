@@ -1,4 +1,4 @@
-# $Id: Makefile.linux,v 1.81 2014/01/27 10:06:58 nanard Exp $
+# $Id: Makefile.linux,v 1.84 2014/03/24 10:43:25 nanard Exp $
 # MiniUPnP project
 # (c) 2006-2014 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -253,9 +253,10 @@ minissdp.o: upnputils.h getroute.h asyncsendto.h codelength.h
 natpmp.o: macros.h config.h natpmp.h upnpglobalvars.h upnppermissions.h
 natpmp.o: miniupnpdtypes.h getifaddr.h upnpredirect.h commonrdr.h upnputils.h
 natpmp.o: asyncsendto.h
-pcpserver.o: config.h pcpserver.h macros.h upnpglobalvars.h upnppermissions.h
-pcpserver.o: miniupnpdtypes.h pcplearndscp.h upnpredirect.h commonrdr.h
-pcpserver.o: getifaddr.h asyncsendto.h pcp_msg_struct.h
+pcpserver.o: config.h pcpserver.h natpmp.h macros.h upnpglobalvars.h
+pcpserver.o: upnppermissions.h miniupnpdtypes.h pcplearndscp.h upnpredirect.h
+pcpserver.o: commonrdr.h getifaddr.h asyncsendto.h upnputils.h
+pcpserver.o: pcp_msg_struct.h netfilter/iptcrdr.h commonrdr.h
 upnpevents.o: config.h upnpevents.h miniupnpdpath.h upnpglobalvars.h
 upnpevents.o: upnppermissions.h miniupnpdtypes.h upnpdescgen.h upnputils.h
 upnputils.o: config.h upnputils.h upnpglobalvars.h upnppermissions.h

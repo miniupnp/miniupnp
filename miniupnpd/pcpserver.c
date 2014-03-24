@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.20 2014/03/22 12:06:15 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.24 2014/03/24 11:03:52 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -53,6 +53,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <syslog.h>
 
 #include "pcpserver.h"
+#include "natpmp.h"
 #include "macros.h"
 #include "upnpglobalvars.h"
 #include "pcplearndscp.h"
@@ -60,6 +61,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "commonrdr.h"
 #include "getifaddr.h"
 #include "asyncsendto.h"
+#include "upnputils.h"
 #include "pcp_msg_struct.h"
 
 #ifdef PCP_PEER
@@ -117,7 +119,7 @@ typedef struct pcp_info {
 	uint8_t is_peer_op;
 	int thirdp_present; /* indicate presence of the options */
 	int pfailure_present;
-	char senderaddrstr[INET_ADDRSTRLEN];
+	char senderaddrstr[INET_ADDRSTRLEN]; /* only if IPv4 sender */
 
 } pcp_info_t;
 
@@ -1385,19 +1387,29 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 }
 
 int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
-                             struct sockaddr_in *senderaddr)
+                             const struct sockaddr * senderaddr)
 {
 	pcp_info_t pcp_msg_info;
+#ifdef DEBUG
+	char addr_str[64];
+#endif
 
 	memset(&pcp_msg_info, 0, sizeof(pcp_info_t));
 
-	if(!inet_ntop(AF_INET, &senderaddr->sin_addr,
-	              pcp_msg_info.senderaddrstr,
-	              sizeof(pcp_msg_info.senderaddrstr))) {
-		syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
+	if(senderaddr->sa_family == AF_INET) {
+		const struct sockaddr_in * senderaddr_v4;
+		senderaddr_v4 = (const struct sockaddr_in *)senderaddr;
+		if(!inet_ntop(AF_INET, &senderaddr_v4->sin_addr,
+		              pcp_msg_info.senderaddrstr,
+		              sizeof(pcp_msg_info.senderaddrstr))) {
+			syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
+		}
 	}
-	syslog(LOG_DEBUG, "PCP request received from %s:%hu %dbytes",
-	       pcp_msg_info.senderaddrstr, ntohs(senderaddr->sin_port), len);
+#ifdef DEBUG
+	if(sockaddr_to_string(senderaddr, addr_str, sizeof(addr_str)))
+		syslog(LOG_DEBUG, "PCP request received from %s %dbytes",
+		       addr_str, len);
+#endif
 
 	if(buff[1] & 128) {
 		/* discarding PCP responses silently */
@@ -1421,4 +1433,44 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 	return 0;
 }
+
+#ifdef ENABLE_IPV6
+int OpenAndConfPCPv6Socket(void)
+{
+	int s;
+	int i = 1;
+	struct sockaddr_in6 addr;
+	s = socket(PF_INET6, SOCK_DGRAM, 0/*IPPROTO_UDP*/);
+	if(s < 0) {
+		syslog(LOG_ERR, "%s: socket(): %m", "OpenAndConfPCPv6Socket");
+		return -1;
+	}
+	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i)) < 0) {
+		syslog(LOG_WARNING, "%s: setsockopt(SO_REUSEADDR): %m",
+		       "OpenAndConfPCPv6Socket");
+	}
+#ifdef IPV6_V6ONLY
+	/* force IPV6 only for IPV6 socket.
+	 * see http://www.ietf.org/rfc/rfc3493.txt section 5.3 */
+	if(setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &i, sizeof(i)) < 0) {
+		syslog(LOG_WARNING, "%s: setsockopt(IPV6_V6ONLY): %m",
+		       "OpenAndConfPCPv6Socket");
+	}
+#endif
+	if(!set_non_blocking(s)) {
+		syslog(LOG_WARNING, "%s: set_non_blocking(): %m",
+		       "OpenAndConfPCPv6Socket");
+	}
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	addr.sin6_port = htons(NATPMP_PORT);
+	addr.sin6_addr = in6addr_any;
+	if(bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		syslog(LOG_ERR, "%s: bind(): %m", "OpenAndConfPCPv6Socket");
+		close(s);
+		return -1;
+	}
+	return s;
+}
+#endif /*ENABLE_IPV6*/
 #endif /*ENABLE_PCP*/
