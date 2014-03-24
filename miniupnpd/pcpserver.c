@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.24 2014/03/24 11:03:52 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.25 2014/03/24 11:13:04 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -1424,8 +1424,10 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			len = PCP_MIN_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
-		len = sendto_or_schedule(s, buff, len, 0,
-		           (struct sockaddr *)senderaddr, sizeof(struct sockaddr_in));
+		len = sendto_or_schedule(s, buff, len, 0, senderaddr,
+		           (senderaddr->sa_family == AF_INET) ?
+		                  sizeof(struct sockaddr_in) :
+		                  sizeof(struct sockaddr_in6) );
 		if( len < 0 ) {
 			syslog(LOG_ERR, "sendto(pcpserver): %m");
 		}
