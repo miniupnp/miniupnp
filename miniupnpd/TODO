@@ -33,3 +33,4 @@ use non blocking sockets everywhere :
  - NAT-PMP => OK
  - not needed for miniupnpdctl
 
+implement port_in_use() for NetBSD and FreeBSD

@@ -1,4 +1,4 @@
-/* $Id $ */
+/* $Id: testportinuse.c,v 1.1.2.5 2014/03/14 11:12:08 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2014 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/

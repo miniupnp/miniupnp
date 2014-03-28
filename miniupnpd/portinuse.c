@@ -28,14 +28,6 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
-/*
-#include <netinet/tcp.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-*/
 #endif
 
 #if defined(__DragonFly__)
@@ -86,7 +78,8 @@ port_in_use(const char *if_name,
 	    (proto==IPPROTO_TCP)?"tcp":"udp", eport, if_name,
 	    ip_addr_str, (unsigned)ip_addr.s_addr);
 
-#ifdef __linux__
+	/* Phase 1 : check for local sockets (would be listed by netstat) */
+#if defined(__linux__)
 	f = fopen((proto==IPPROTO_TCP)?tcpfile:udpfile, "r");
 	if (!f) {
 		syslog(LOG_ERR, "cannot open %s", (proto==IPPROTO_TCP)?tcpfile:udpfile);
@@ -102,7 +95,9 @@ port_in_use(const char *if_name,
 		) {
 			/* TODO add IPV6 support if enabled
 			 * Presently assumes IPV4 */
-			// syslog(LOG_DEBUG, "port_in_use check port %d and address %s", tmp_port, eaddr);
+#ifdef DEBUG
+			syslog(LOG_DEBUG, "port_in_use check port %d and address %s", tmp_port, eaddr);
+#endif
 			if (tmp_port == eport) {
 				char tmp_addr[4];
 				struct in_addr *tmp_ip_addr = (struct in_addr *)tmp_addr;
@@ -119,9 +114,8 @@ port_in_use(const char *if_name,
 		}
 	}
 	fclose(f);
-#endif /* __linux__ */
 
-#if defined(__OpenBSD__)
+#elif defined(__OpenBSD__)
 static struct nlist list[] = {
 #if 0
         {"_tcpstat", 0, 0, 0, 0},
@@ -141,23 +135,25 @@ static struct nlist list[] = {
 	struct inpcb inpcb;
 	kd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, errstr);
 	if(!kd) {
-		syslog(LOG_ERR, "portinuse(): kvm_openfiles(): %s", errstr);
+		syslog(LOG_ERR, "%s: kvm_openfiles(): %s",
+		       "portinuse()", errstr);
 		return -1;
 	}
 	if(kvm_nlist(kd, list) < 0) {
-		syslog(LOG_ERR, "portinuse(): kvm_nlist(): %s", kvm_geterr(kd));
+		syslog(LOG_ERR, "%s: kvm_nlist(): %s",
+		       "portinuse()", kvm_geterr(kd));
 		kvm_close(kd);
 		return -1;
 	}
 	n = kvm_read(kd, list[(proto==IPPROTO_TCP)?0:1].n_value, &table, sizeof(table));
 	if(n < 0) {
-		syslog(LOG_ERR, "kvm_read(): %s", kvm_geterr(kd));
+		syslog(LOG_ERR, "%s: kvm_read(): %s",
+		       "portinuse()", kvm_geterr(kd));
 		kvm_close(kd);
 		return -1;
 	}
-	next = CIRCLEQ_FIRST(&table.inpt_queue);	/*TAILQ_FIRST(&table.inpt_queue);*/
+	next = CIRCLEQ_FIRST(&table.inpt_queue); /*TAILQ_FIRST(&table.inpt_queue);*/
 	while(next != NULL) {
-		/* syslog(LOG_DEBUG, "next=0x%08lx", (u_long)next); */
 		if(((u_long)next & 3) != 0) break;
 		n = kvm_read(kd, (u_long)next, &inpcb, sizeof(inpcb));
 		if(n < 0) {
@@ -165,11 +161,14 @@ static struct nlist list[] = {
 			break;
 		}
 		next = CIRCLEQ_NEXT(&inpcb, inp_queue);	/*TAILQ_NEXT(&inpcb, inp_queue);*/
+		/* skip IPv6 sockets */
 		if((inpcb.inp_flags & INP_IPV6) != 0)
 			continue;
+#ifdef DEBUG
 		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu",
 		       (u_long)inpcb.inp_laddr.s_addr, ntohs(inpcb.inp_lport),
 		       (u_long)inpcb.inp_faddr.s_addr, ntohs(inpcb.inp_fport));
+#endif
 		if(eport == (unsigned)ntohs(inpcb.inp_lport)) {
 			if(inpcb.inp_laddr.s_addr == INADDR_ANY || inpcb.inp_laddr.s_addr == ip_addr.s_addr) {
 				found++;
@@ -178,9 +177,8 @@ static struct nlist list[] = {
 		}
 	}
 	kvm_close(kd);
-#endif
 
-#if defined(__DragonFly__)
+#elif defined(__DragonFly__)
 	const char *varname;
 	struct xinpcb *xip;
 	struct xtcpcb *xtp;
@@ -266,8 +264,15 @@ static struct nlist list[] = {
 		free(buf);
 		buf = NULL;
 	}
+/* #elif __NetBSD__ */
+/* #elif __FreeBSD__ */
+/* TODO : FreeBSD / NetBSD / Darwin (OS X) / Solaris code */
+#else
+#error "No port_in_use() implementation available for this OS"
 #endif
 
+	/* Phase 2 : check existing mappings
+	 * TODO : implement for pf/ipfw/etc. */
 #if defined(USE_NETFILTER)
 	if (!found) {
 		char iaddr_old[16];
