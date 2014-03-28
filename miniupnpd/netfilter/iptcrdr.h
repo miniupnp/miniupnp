@@ -49,6 +49,13 @@ get_peer_rule_by_index(int index,
                            char * rhost, int rhostlen, unsigned short * rport,
                            unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes);
+int
+get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned short eport, int proto,
+                  char * iaddr, int iaddrlen, unsigned short * iport,
+                  char * desc, int desclen,
+                  char * rhost, int rhostlen,
+                  unsigned int * timestamp,
+                  u_int64_t * packets, u_int64_t * bytes);
 
 /* for debug */
 int

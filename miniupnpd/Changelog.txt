@@ -185,6 +185,9 @@ VERSION 1.8 : released on 2013/02/06
 2012/07/14:
   Add -z command line option to change friendly name (thanks to Shawn Fisher)
 
+2012/07/10:
+  Detect port in use - patch by David Kerr
+
 2012/06/29:
   added DISABLE_CONFIG_FILE in options.h to disable miniupnpd.conf parsing
   Add command line parsing for clean_ruleset_interval option
