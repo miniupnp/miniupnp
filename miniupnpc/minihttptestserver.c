@@ -1,7 +1,7 @@
-/* $Id: minihttptestserver.c,v 1.13 2012/05/29 13:03:07 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.14 2014/04/01 14:42:21 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
- * Copyright (c) 2011-2012 Thomas Bernard
+ * Copyright (c) 2011-2014 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -35,13 +35,11 @@ void handle_signal_chld(int sig)
 /**
  * signal handler for SIGINT (CRTL C)
  */
-#if 0
 void handle_signal_int(int sig)
 {
 	printf("handle_signal_int(%d)\n", sig);
 	quit = 1;
 }
-#endif
 
 /**
  * build a text/plain content of the specified length
@@ -338,6 +336,7 @@ int main(int argc, char * * argv) {
 	int child = 0;
 	int status;
 	const char * expected_file_name = NULL;
+	struct sigaction sa;
 
 	for(i = 1; i < argc; i++) {
 		if(argv[i][0] == '-') {
@@ -364,10 +363,21 @@ int main(int argc, char * * argv) {
 	}
 
 	srand(time(NULL));
-	signal(SIGCHLD, handle_signal_chld);
-#if 0
-	signal(SIGINT, handle_signal_int);
-#endif
+
+	memset(&sa, 0, sizeof(struct sigaction));
+
+	/*signal(SIGCHLD, handle_signal_chld);*/
+	sa.sa_handler = handle_signal_chld;
+	if(sigaction(SIGCHLD, &sa, NULL) < 0) {
+		perror("sigaction");
+		return 1;
+	}
+	/*signal(SIGINT, handle_signal_int);*/
+	sa.sa_handler = handle_signal_int;
+	if(sigaction(SIGINT, &sa, NULL) < 0) {
+		perror("sigaction");
+		return 1;
+	}
 
 	s = socket(ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
 	if(s < 0) {
@@ -442,12 +452,12 @@ int main(int argc, char * * argv) {
 			}
 			--child_to_wait_for;
 		}
-		/* TODO : add a select() call in order to handle the case
-		 * when a signal is caught */
 		client_addrlen = sizeof(struct sockaddr_storage);
 		c = accept(s, (struct sockaddr *)&client_addr,
 		           &client_addrlen);
 		if(c < 0) {
+			if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+				continue;
 			perror("accept");
 			return 1;
 		}
