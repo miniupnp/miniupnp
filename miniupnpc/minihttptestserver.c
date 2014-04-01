@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.14 2014/04/01 14:42:21 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.16 2014/04/01 15:08:28 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011-2014 Thomas Bernard
@@ -28,7 +28,8 @@ volatile sig_atomic_t child_to_wait_for = 0;
  */
 void handle_signal_chld(int sig)
 {
-	printf("handle_signal_chld(%d)\n", sig);
+	(void)sig;
+	/* printf("handle_signal_chld(%d)\n", sig); */
 	++child_to_wait_for;
 }
 
@@ -37,7 +38,8 @@ void handle_signal_chld(int sig)
  */
 void handle_signal_int(int sig)
 {
-	printf("handle_signal_int(%d)\n", sig);
+	(void)sig;
+	/* printf("handle_signal_int(%d)\n", sig); */
 	quit = 1;
 }
 
@@ -309,6 +311,8 @@ void handle_http_connection(int c)
 		         request_buffer + request_len,
 		         sizeof(request_buffer) - request_len);
 		if(n < 0) {
+			if(errno == EINTR)
+				continue;
 			perror("read");
 			return;
 		} else if(n==0) {
@@ -327,6 +331,7 @@ void handle_http_connection(int c)
 	}
 	if(!headers_found) {
 		/* error */
+		printf("no HTTP header found in the request\n");
 		return;
 	}
 	printf("headers :\n%.*s", request_len, request_buffer);
