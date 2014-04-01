@@ -193,19 +193,19 @@ miniupnpdctl:	config.h $(MINIUPNPDCTLOBJS)
 	$(CC) $(CFLAGS) -o $@ $(MINIUPNPDCTLOBJS)
 
 testupnpdescgen:	config.h $(TESTUPNPDESCGENOBJS)
-	$(CC) $(CFLAGS) -o $@ $(TESTUPNPDESCGENOBJS)
+	$(CC) $(CFLAGS) -o $@ $(TESTUPNPDESCGENOBJS) $(LIBS)
 
 testgetifstats:	config.h $(TESTGETIFSTATSOBJS)
 	$(CC) $(CFLAGS) -o $@ $(TESTGETIFSTATSOBJS) $(LIBS)
 
 testgetifaddr:	config.h $(TESTGETIFADDROBJS)
-	$(CC) $(CFLAGS) -o $@ $(TESTGETIFADDROBJS)
+	$(CC) $(CFLAGS) -o $@ $(TESTGETIFADDROBJS) $(LIBS)
 
 testupnppermissions:	config.h $(TESTUPNPPERMISSIONSOBJS)
-	$(CC) $(CFLAGS) -o $@ $(TESTUPNPPERMISSIONSOBJS)
+	$(CC) $(CFLAGS) -o $@ $(TESTUPNPPERMISSIONSOBJS) $(LIBS)
 
 testgetroute:	config.h $(TESTGETROUTEOBJS)
-	$(CC) $(CFLAGS) -o $@ $(TESTGETROUTEOBJS)
+	$(CC) $(CFLAGS) -o $@ $(TESTGETROUTEOBJS) $(LIBS)
 
 testasyncsendto:	config.h $(TESTASYNCSENDTOOBJS)
 	$(CC) $(CFLAGS) -o $@ $(TESTASYNCSENDTOOBJS)
