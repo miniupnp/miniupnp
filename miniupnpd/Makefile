@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.76.2.2 2014/03/14 10:49:08 nanard Exp $
+# $Id: Makefile,v 1.79 2014/03/31 12:21:23 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -17,7 +17,7 @@
 
 CFLAGS ?= -pipe -Os
 #CFLAGS = -pipe -O -g -DDEBUG
-CFLAGS += -ansi
+#CFLAGS += -ansi
 CFLAGS += -Wall
 CFLAGS += -W
 CFLAGS += -Wstrict-prototypes
