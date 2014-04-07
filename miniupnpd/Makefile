@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.79 2014/03/31 12:21:23 nanard Exp $
+# $Id: Makefile,v 1.80 2014/04/07 10:32:20 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -45,7 +45,8 @@ FWNAME = ipf
 .if $(OSNAME) == "FreeBSD"
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
           if checkyesno ipfilter_enable; then \
-          echo "ipf"; else echo "pf"; fi
+          echo "ipf"; elif checkyesno pf_enable; then \
+          echo "pf"; else echo "ipfw"; fi
 .endif
 
 .if $(OSNAME) == "NetBSD"
@@ -57,7 +58,8 @@ FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
 .if $(OSNAME) == "DragonFly"
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
           if checkyesno ipfilter; then \
-          echo "ipf"; else echo "pf"; fi
+          echo "ipf"; elif checkyesno pf_enable; then \
+          echo "pf"; else echo "ipfw"; fi
 .endif
 .endif
 
