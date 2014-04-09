@@ -1572,7 +1572,6 @@ main(int argc, char * * argv)
 
 	if(GETFLAG(ENABLEUPNPMASK))
 	{
-
 		/* open socket for HTTP connections. Listen on the 1st LAN address */
 #ifdef ENABLE_IPV6
 		shttpl = OpenAndConfHTTPSocket((v.port > 0) ? v.port : 0, 1);
