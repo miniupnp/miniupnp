@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.192 2014/04/09 11:07:36 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.193 2014/04/09 14:08:11 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -2324,6 +2324,9 @@ shutdown:
 		free(lan_addr);
 	}
 
+#ifdef ENABLE_HTTPS
+	free_ssl();
+#endif
 #ifdef ENABLE_NATPMP
 	free(snatpmp);
 #endif

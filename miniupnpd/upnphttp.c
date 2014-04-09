@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.90 2014/04/09 13:15:43 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.91 2014/04/09 14:08:12 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -31,6 +31,8 @@
 
 #ifdef ENABLE_HTTPS
 #include <openssl/err.h>
+#include <openssl/engine.h>
+#include <openssl/conf.h>
 static SSL_CTX *ssl_ctx = NULL;
 
 #ifndef HTTPS_CERTFILE
@@ -86,6 +88,21 @@ int init_ssl(void)
 		return -1;
 	}
 	return 0;
+}
+
+void free_ssl(void)
+{
+	/* free context */
+	if(ssl_ctx != NULL) {
+		SSL_CTX_free(ssl_ctx);
+		ssl_ctx = NULL;
+	}
+	ERR_remove_state(0);
+	ENGINE_cleanup();
+	CONF_modules_unload(1);
+	ERR_free_strings();
+	EVP_cleanup();
+	CRYPTO_cleanup_all_ex_data();
 }
 #endif /* ENABLE_HTTPS */
 

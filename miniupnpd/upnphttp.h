@@ -1,4 +1,4 @@
-/* $Id: upnphttp.h,v 1.37 2014/04/09 13:15:45 nanard Exp $ */
+/* $Id: upnphttp.h,v 1.38 2014/04/09 14:08:13 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -110,6 +110,7 @@ struct upnphttp {
 
 #ifdef ENABLE_HTTPS
 int init_ssl(void);
+void free_ssl(void);
 #endif /* ENABLE_HTTPS */
 
 /* New_upnphttp() */
