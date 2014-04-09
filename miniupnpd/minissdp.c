@@ -33,6 +33,14 @@
 #define LL_SSDP_MCAST_ADDR "FF02::C"
 #define SL_SSDP_MCAST_ADDR "FF05::C"
 
+/* maximum lenght of SSDP packets we are generating
+ * (reception is done in a 1500byte buffer) */
+#ifdef ENABLE_HTTPS
+#define SSDP_PACKET_MAX_LEN 768
+#else
+#define SSDP_PACKET_MAX_LEN 512
+#endif
+
 /* AddMulticastMembership()
  * param s		socket
  * param ifaddr	ip v4 address
@@ -343,7 +351,7 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
                  const char * uuidvalue, unsigned int delay)
 {
 	int l, n;
-	char buf[512];
+	char buf[SSDP_PACKET_MAX_LEN];
 	char addr_str[64];
 	socklen_t addrlen;
 	int st_is_uuid;
@@ -405,8 +413,8 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 	}
 	else if((unsigned)l>=sizeof(buf))
 	{
-		syslog(LOG_WARNING, "%s: truncated output",
-		       "SendSSDPResponse()");
+		syslog(LOG_WARNING, "%s: truncated output (%u>=%u)",
+		       "SendSSDPResponse()", (unsigned)l, (unsigned)sizeof(buf));
 		l = sizeof(buf) - 1;
 	}
 	addrlen = (addr->sa_family == AF_INET6)
@@ -469,7 +477,7 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
                const char * usn1, const char * usn2, const char * usn3,
                unsigned int lifetime, int ipv6)
 {
-	char bufr[512];
+	char bufr[SSDP_PACKET_MAX_LEN];
 	int n, l;
 
 	l = snprintf(bufr, sizeof(bufr),
@@ -506,7 +514,8 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
 	}
 	else if((unsigned int)l >= sizeof(bufr))
 	{
-		syslog(LOG_WARNING, "SendSSDPNotify(): truncated output");
+		syslog(LOG_WARNING, "%s: truncated output (%u>=%u)",
+		       "SendSSDPNotify()", (unsigned)l, (unsigned)sizeof(bufr));
 		l = sizeof(bufr) - 1;
 	}
 	n = sendto_or_schedule(s, bufr, l, 0, dest,
@@ -1020,7 +1029,7 @@ SendSSDPbyebye(int s, const struct sockaddr * dest,
                int ipv6)
 {
 	int n, l;
-	char bufr[512];
+	char bufr[SSDP_PACKET_MAX_LEN];
 
 	l = snprintf(bufr, sizeof(bufr),
 	             "NOTIFY * HTTP/1.1\r\n"
@@ -1040,12 +1049,13 @@ SendSSDPbyebye(int s, const struct sockaddr * dest,
 	             upnp_bootid, upnp_bootid, upnp_configid);
 	if(l<0)
 	{
-		syslog(LOG_ERR, "SendSSDPbyebye() snprintf error");
+		syslog(LOG_ERR, "%s: snprintf error", "SendSSDPbyebye()");
 		return -1;
 	}
 	else if((unsigned int)l >= sizeof(bufr))
 	{
-		syslog(LOG_WARNING, "SendSSDPbyebye(): truncated output");
+		syslog(LOG_WARNING, "%s: truncated output (%u>=%u)",
+		       "SendSSDPbyebye()", (unsigned)l, (unsigned)sizeof(bufr));
 		l = sizeof(bufr) - 1;
 	}
 	n = sendto_or_schedule(s, bufr, l, 0, dest,
