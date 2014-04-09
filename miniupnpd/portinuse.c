@@ -1,4 +1,4 @@
-/* $Id: $ */
+/* $Id: portinuse.c,v 1.3 2014/04/01 12:52:50 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -71,8 +71,10 @@ port_in_use(const char *if_name,
 	const char * udpfile = "/proc/net/udp";
 #endif
 
-	if(getifaddr(if_name, ip_addr_str, INET_ADDRSTRLEN, &ip_addr, NULL) < 0)
+	if(getifaddr(if_name, ip_addr_str, INET_ADDRSTRLEN, &ip_addr, NULL) < 0) {
 		ip_addr.s_addr = 0;
+		ip_addr_str[0] = '\0';
+	}
 
 	syslog(LOG_DEBUG, "Check protocol %s for port %d on ext_if %s %s, %08X",
 	    (proto==IPPROTO_TCP)?"tcp":"udp", eport, if_name,
