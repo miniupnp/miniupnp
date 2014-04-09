@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.80 2014/04/07 10:32:20 nanard Exp $
+# $Id: Makefile,v 1.81 2014/04/09 10:30:08 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -137,6 +137,8 @@ LIBS = -lkvm
 .if $(OSNAME) == "SunOS"
 LIBS += -lsocket -lnsl -lkstat -lresolv
 .endif
+
+LIBS += -lssl -lcrypto
 
 # set PREFIX variable to install in the wanted place
 

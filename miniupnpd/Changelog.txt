@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.366 2014/03/24 11:03:50 nanard Exp $
+$Id: Changelog.txt,v 1.368 2014/04/09 12:39:53 nanard Exp $
+
+2014/04/09:
+  Add HTTPS support and skeleton of DeviceProtection implementation
 
 2014/03/24:
   start work to enable IPv6 PCP operations
