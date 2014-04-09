@@ -1905,12 +1905,16 @@ GetAssignedRoles(struct upnphttp * h, const char * action)
 		"</u:%sResponse>";
 	char body[1024];
 	int bodylen;
-	const char * RoleList;
+	const char * RoleList; /* list of roles separated by spaces */
 
+#ifdef ENABLE_HTTPS
 	if(h->ssl != NULL)
 		RoleList = "Admin Basic";
 	else
 		RoleList = "Public";
+#else
+	RoleList = "Public";
+#endif
 
 	bodylen = snprintf(body, sizeof(body), resp,
 	                   action, "urn:schemas-upnp-org:service:DeviceProtection:1",
