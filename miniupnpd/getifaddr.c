@@ -47,6 +47,19 @@ getifaddr(const char * ifname, char * buf, int len,
 		return -1;
 	}
 	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	if(ioctl(s, SIOCGIFFLAGS, &ifr, &ifrlen) < 0)
+	{
+		syslog(LOG_DEBUG, "ioctl(s, SIOCGIFFLAGS, ...): %m");
+		close(s);
+		return -1;
+	}
+	if ((ifr.ifr_flags & IFF_UP) == 0)
+	{
+		syslog(LOG_DEBUG, "network interface %s is down", ifname);
+		close(s);
+		return -1;
+	}
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
 	if(ioctl(s, SIOCGIFADDR, &ifr, &ifrlen) < 0)
 	{
 		syslog(LOG_ERR, "ioctl(s, SIOCGIFADDR, ...): %m");
