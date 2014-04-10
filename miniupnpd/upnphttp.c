@@ -52,6 +52,12 @@ syslogsslerr(void)
 	}
 }
 
+static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
+{
+	syslog(LOG_DEBUG, "verify_callback(%d, %p)", preverify_ok, ctx);
+	return preverify_ok;
+}
+
 int init_ssl(void)
 {
 	SSL_METHOD *method;
@@ -87,6 +93,9 @@ int init_ssl(void)
 		syslogsslerr();
 		return -1;
 	}
+	/*SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER|SSL_VERIFY_CLIENT_ONCE, verify_callback);*/
+	SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_NONE, verify_callback);
+	/*SSL_CTX_set_verify_depth(depth);*/
 	return 0;
 }
 
