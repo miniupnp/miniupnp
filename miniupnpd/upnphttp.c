@@ -96,6 +96,7 @@ int init_ssl(void)
 	/*SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER|SSL_VERIFY_CLIENT_ONCE, verify_callback);*/
 	SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_NONE, verify_callback);
 	/*SSL_CTX_set_verify_depth(depth);*/
+	syslog(LOG_INFO, "using %s", SSLeay_version(SSLEAY_VERSION));
 	return 0;
 }
 
