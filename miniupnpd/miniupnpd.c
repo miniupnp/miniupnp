@@ -1914,8 +1914,9 @@ main(int argc, char * * argv)
 			syslog(LOG_ERR, "Failed to select open sockets. EXITING");
 			return 1;	/* very serious cause of error */
 		}
-		if(try_sendto(&writeset) < 0) {
-			syslog(LOG_ERR, "try_sendto: %m");
+		i = try_sendto(&writeset);
+		if(i < 0) {
+			syslog(LOG_ERR, "try_sendto failed to send %d packets", -i);
 		}
 #ifdef USE_MINIUPNPDCTL
 		for(ectl = ctllisthead.lh_first; ectl;)
