@@ -30,19 +30,34 @@ void printresponse(const unsigned char * resp, int n)
 	nresp = resp[0];
 	p = resp + 1;
 	for(i = 0; i < (int)nresp; i++) {
+		if(p >= resp + n)
+			goto error;
 		/*l = *(p++);*/
 		DECODELENGTH(l, p);
+		if(p + l > resp + n)
+			goto error;
 		printf("%d - %.*s\n", i, l, p);
 		p += l;
+		if(p >= resp + n)
+			goto error;
 		/*l = *(p++);*/
 		DECODELENGTH(l, p);
+		if(p + l > resp + n)
+			goto error;
 		printf("    %.*s\n", l, p);
 		p += l;
+		if(p >= resp + n)
+			goto error;
 		/*l = *(p++);*/
 		DECODELENGTH(l, p);
+		if(p + l > resp + n)
+			goto error;
 		printf("    %.*s\n", l, p);
 		p += l;
 	}
+	return;
+error:
+	printf("*** WARNING : TRUNCATED RESPONSE ***\n");
 }
 
 #define SENDCOMMAND(command, size) write(s, command, size); \
