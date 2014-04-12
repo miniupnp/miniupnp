@@ -658,6 +658,7 @@ void processRequest(struct reqelem * req)
 			syslog(LOG_ERR, "cannot allocate memory");
 			goto error;
 		}
+		memset(newserv, 0, sizeof(struct service));	/* set pointers to NULL */
 		if(containsForbiddenChars(p, l)) {
 			syslog(LOG_ERR, "bad request (st contains forbidden chars)");
 			goto error;
