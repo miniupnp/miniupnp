@@ -92,7 +92,7 @@ main(int argc, char * * argv)
 	char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	int s;
 	int i;
-	unsigned char buf[2048];
+	unsigned char buf[16*1024];
 	ssize_t n;
 	const char * sockpath = "/var/run/minissdpd.sock";
 
