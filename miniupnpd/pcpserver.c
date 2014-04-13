@@ -62,6 +62,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "getifaddr.h"
 #include "asyncsendto.h"
 #include "upnputils.h"
+#include "portinuse.h"
 #include "pcp_msg_struct.h"
 
 #ifdef PCP_PEER
@@ -892,6 +893,19 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 			continue;
 		}
 		any_eport_allowed = 1;
+#ifdef CHECK_PORTINUSE
+		if (port_in_use(ext_if_name, pcp_msg_info->ext_port, pcp_msg_info->protocol,
+		    pcp_msg_info->senderaddrstr, pcp_msg_info->int_port) > 0) {
+			syslog(LOG_INFO, "port %hu protocol %s already in use",
+			       pcp_msg_info->ext_port,
+			       (pcp_msg_info->protocol==IPPROTO_TCP)?"tcp":"udp");
+			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
+			continue;
+		}
+#endif
 		r = get_redirect_rule(ext_if_name,
 		                  pcp_msg_info->ext_port,
 		                  pcp_msg_info->protocol,
