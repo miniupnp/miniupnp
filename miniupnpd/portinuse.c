@@ -281,8 +281,8 @@ static struct nlist list[] = {
 	case IPPROTO_TCP:
 		varname = "net.inet.tcp.pcblist";
 		break;
-        case IPPROTO_UDP:
-	        varname = "net.inet.udp.pcblist";
+	case IPPROTO_UDP:
+		varname = "net.inet.udp.pcblist";
 		break;
 	default:
 		syslog(LOG_ERR, "port_in_use() unknown proto=%d", proto);
@@ -302,8 +302,8 @@ static struct nlist list[] = {
 		syslog(LOG_ERR, "sysctlbyname(%s, buf, ...): %m", varname);
 		free(buf);
 		return -1;
-	}       
-         
+	}
+
 	xig = (struct xinpgen *)buf;
 	exig = (struct xinpgen *)(void *)((char *)buf + len - sizeof *exig);
 	if (xig->xig_len != sizeof *xig) {
@@ -318,8 +318,8 @@ static struct nlist list[] = {
 		free(buf);
 		return -1;
 	}
-	
-        while (1) {
+
+	while (1) {
 		xig = (struct xinpgen *)(void *)((char *)xig + xig->xig_len);
 		if (xig >= exig)
 			break;
@@ -333,7 +333,7 @@ static struct nlist list[] = {
 				return -1;
 			}
 			inp = &xtp->xt_inp;
-                        break;
+			break;
 		case IPPROTO_UDP:
 			xip = (struct xinpcb *)xig;
 			if (xip->xi_len != sizeof *xip) {
@@ -362,7 +362,7 @@ static struct nlist list[] = {
 			}
 		}
 	}
-	if(buf) {
+	if (buf) {
 		free(buf);
 		buf = NULL;
 	}
