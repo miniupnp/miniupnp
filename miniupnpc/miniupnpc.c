@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.113 2013/10/07 10:04:56 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.116 2014/01/31 14:09:03 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -533,7 +533,8 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		}
 	}
 
-	/* Avant d'envoyer le paquet on bind pour recevoir la reponse */
+	/* Before sending the packed, we first "bind" in order to be able
+	 * to receive the response */
 	if (bind(sudp, (const struct sockaddr *)&sockudp_r,
 	         ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)) != 0)
 	{

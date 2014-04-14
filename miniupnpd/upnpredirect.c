@@ -1,7 +1,7 @@
-/* $Id: upnpredirect.c,v 1.80 2012/05/01 20:08:22 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.82 2014/02/28 20:18:35 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -23,6 +23,7 @@
 #include "upnpredirect.h"
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
+#include "portinuse.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
 #endif
@@ -294,6 +295,12 @@ upnp_redirect(const char * rhost, unsigned short eport,
 				eport, protocol, iaddr_old, iport_old);
 			return -2;
 		}
+#ifdef CHECK_PORTINUSE
+	} else if (port_in_use(ext_if_name, eport, proto, iaddr, iport) > 0) {
+		syslog(LOG_INFO, "port %hu protocol %s already in use",
+		       eport, protocol);
+		return -2;
+#endif /* CHECK_PORTINUSE */
 	} else {
 		timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
 		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
@@ -419,6 +426,8 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	int r;
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(eport, proto);
+#elif defined(USE_PF)
+	r = delete_redirect_and_filter_rules(ext_if_name, eport, proto);
 #else
 	r = delete_redirect_rule(ext_if_name, eport, proto);
 	delete_filter_rule(ext_if_name, eport, proto);

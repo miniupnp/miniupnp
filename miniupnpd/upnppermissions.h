@@ -1,7 +1,7 @@
-/* $Id: upnppermissions.h,v 1.7 2007/02/28 18:13:18 nanard Exp $ */
+/* $Id: upnppermissions.h,v 1.10 2014/03/07 10:43:29 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 

@@ -1,7 +1,7 @@
 /* $Id: getifaddr.c,v 1.19 2013/12/13 14:28:40 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2013 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -47,6 +47,19 @@ getifaddr(const char * ifname, char * buf, int len,
 		return -1;
 	}
 	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	if(ioctl(s, SIOCGIFFLAGS, &ifr, &ifrlen) < 0)
+	{
+		syslog(LOG_DEBUG, "ioctl(s, SIOCGIFFLAGS, ...): %m");
+		close(s);
+		return -1;
+	}
+	if ((ifr.ifr_flags & IFF_UP) == 0)
+	{
+		syslog(LOG_DEBUG, "network interface %s is down", ifname);
+		close(s);
+		return -1;
+	}
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
 	if(ioctl(s, SIOCGIFADDR, &ifr, &ifrlen) < 0)
 	{
 		syslog(LOG_ERR, "ioctl(s, SIOCGIFADDR, ...): %m");
@@ -55,11 +68,14 @@ getifaddr(const char * ifname, char * buf, int len,
 	}
 	ifaddr = (struct sockaddr_in *)&ifr.ifr_addr;
 	if(addr) *addr = ifaddr->sin_addr;
-	if(!inet_ntop(AF_INET, &ifaddr->sin_addr, buf, len))
+	if(buf)
 	{
-		syslog(LOG_ERR, "inet_ntop(): %m");
-		close(s);
-		return -1;
+		if(!inet_ntop(AF_INET, &ifaddr->sin_addr, buf, len))
+		{
+			syslog(LOG_ERR, "inet_ntop(): %m");
+			close(s);
+			return -1;
+		}
 	}
 	if(mask)
 	{
@@ -99,9 +115,12 @@ getifaddr(const char * ifname, char * buf, int len,
 		switch(ife->ifa_addr->sa_family)
 		{
 		case AF_INET:
-			inet_ntop(ife->ifa_addr->sa_family,
-			          &((struct sockaddr_in *)ife->ifa_addr)->sin_addr,
-			          buf, len);
+			if(buf)
+			{
+				inet_ntop(ife->ifa_addr->sa_family,
+				          &((struct sockaddr_in *)ife->ifa_addr)->sin_addr,
+				          buf, len);
+			}
 			if(addr) *addr = ((struct sockaddr_in *)ife->ifa_addr)->sin_addr;
 			if(mask) *mask = ((struct sockaddr_in *)ife->ifa_netmask)->sin_addr;
 			break;
@@ -119,9 +138,17 @@ getifaddr(const char * ifname, char * buf, int len,
 }
 
 #ifdef ENABLE_PCP
-int getifaddr_in6(const char * ifname, struct in6_addr * addr){
+/* XXX I don't know if this function should return
+ * IPv4 or IPv6 if both are enabled... */
+int getifaddr_in6(const char * ifname, struct in6_addr * addr)
+{
+#if defined(ENABLE_IPV6) || defined(USE_GETIFADDRS)
 	struct ifaddrs * ifap;
 	struct ifaddrs * ife;
+#ifdef ENABLE_IPV6
+	const struct sockaddr_in6 * tmpaddr;
+#endif /* ENABLE_IPV6 */
+	int found = 0;
 
 	if(!ifname || ifname[0]=='\0')
 		return -1;
@@ -130,9 +157,8 @@ int getifaddr_in6(const char * ifname, struct in6_addr * addr){
 		syslog(LOG_ERR, "getifaddrs: %m");
 		return -1;
 	}
-	for(ife = ifap; ife; ife = ife->ifa_next)
+	for(ife = ifap; ife && !found; ife = ife->ifa_next)
 	{
-		int found = 0;
 		/* skip other interfaces if one was specified */
 		if(ifname && (0 != strcmp(ifname, ife->ifa_name)))
 			continue;
@@ -141,38 +167,47 @@ int getifaddr_in6(const char * ifname, struct in6_addr * addr){
 		switch(ife->ifa_addr->sa_family)
 		{
 		case AF_INET:
-#if 0
-			addr->s6_addr32[0]=0;
-			addr->s6_addr32[1]=0;
-			addr->s6_addr32[2]=htonl(0xffff);
-			addr->s6_addr32[3]=((struct sockaddr_in *)ife->ifa_addr)->sin_addr.s_addr;
-#endif
+			/* IPv4-mapped IPv6 address ::ffff:1.2.3.4 */
 			memset(addr->s6_addr, 0, 10);
 			addr->s6_addr[10] = 0xff;
 			addr->s6_addr[11] = 0xff;
-			memcpy(addr->s6_addr + 12, &(((struct sockaddr_in *)ife->ifa_addr)->sin_addr.s_addr), 4);
-			/*inet_ntop(ife->ifa_addr->sa_family,
-					&((struct sockaddr_in *)ife->ifa_addr)->sin_addr,
-					buf, len);*/
+			memcpy(addr->s6_addr + 12,
+			       &(((struct sockaddr_in *)ife->ifa_addr)->sin_addr.s_addr),
+			       4);
 			found = 1;
 			break;
 
+#ifdef ENABLE_IPV6
 		case AF_INET6:
-			if(!IN6_IS_ADDR_LOOPBACK(addr)
-			   && !IN6_IS_ADDR_LINKLOCAL(addr)) {
-				memcpy(addr->s6_addr, &((struct sockaddr_in6 *)ife->ifa_addr)->sin6_addr, 16);
+			tmpaddr = (const struct sockaddr_in6 *)ife->ifa_addr;
+			if(!IN6_IS_ADDR_LOOPBACK(&tmpaddr->sin6_addr)
+			   && !IN6_IS_ADDR_LINKLOCAL(&tmpaddr->sin6_addr))
+			{
+				memcpy(addr->s6_addr,
+				       &tmpaddr->sin6_addr,
+				       16);
 				found = 1;
 			}
 			break;
-		}
-		if (found) {
-			break;
+#endif /* ENABLE_IPV6 */
 		}
 	}
 	freeifaddrs(ifap);
+	return (found ? 0 : -1);
+#else /* defined(ENABLE_IPV6) || defined(USE_GETIFADDRS) */
+	/* IPv4 only */
+	struct in_addr addr4;
+	if(getifaddr(ifname, NULL, 0, &addr4, NULL) < 0)
+		return -1;
+	/* IPv4-mapped IPv6 address ::ffff:1.2.3.4 */
+	memset(addr->s6_addr, 0, 10);
+	addr->s6_addr[10] = 0xff;
+	addr->s6_addr[11] = 0xff;
+	memcpy(addr->s6_addr + 12, &addr4.s_addr, 4);
 	return 0;
-}
 #endif
+}
+#endif /* ENABLE_PCP */
 
 #ifdef ENABLE_IPV6
 int

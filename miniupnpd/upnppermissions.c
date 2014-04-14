@@ -1,7 +1,7 @@
-/* $Id: upnppermissions.c,v 1.17 2012/02/15 22:43:34 nanard Exp $ */
+/* $Id: upnppermissions.c,v 1.18 2014/03/07 10:43:29 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -222,6 +222,23 @@ match_permission(const struct upnpperm * perm,
 		return 0;
 	return 1;
 }
+
+#if 0
+/* match_permission_internal()
+ * returns: 1 if address, iport matches the permission rule
+ *          0 if no match */
+static int
+match_permission_internal(const struct upnpperm * perm,
+                          struct in_addr address, u_short iport)
+{
+	if( (iport < perm->iport_min) || (perm->iport_max < iport))
+		return 0;
+	if( (address.s_addr & perm->mask.s_addr)
+	   != (perm->address.s_addr & perm->mask.s_addr) )
+		return 0;
+	return 1;
+}
+#endif
 
 int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,

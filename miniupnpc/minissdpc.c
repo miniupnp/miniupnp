@@ -46,7 +46,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 {
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = NULL;
-	unsigned char buffer[2048];
+	unsigned char buffer[4*1024];	/* is that enough ? */
 	ssize_t n;
 	unsigned char * p;
 	unsigned char * url;

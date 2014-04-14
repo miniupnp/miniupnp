@@ -3,7 +3,7 @@
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2013 Thomas Bernard
+# (c) 2005-2014 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -176,7 +176,8 @@ validateupnpreplyparse:	testupnpreplyparse testupnpreplyparse.sh
 clean:
 	$(RM) $(LIBRARY) $(SHAREDLIBRARY) $(EXECUTABLES) $(OBJS) miniupnpcstrings.h
 	# clean python stuff
-	$(RM) pythonmodule pythonmodule3 validateminixml validateminiwget
+	$(RM) pythonmodule pythonmodule3
+	$(RM) validateminixml validateminiwget validateupnpreplyparse
 	$(RM) -r build/ dist/
 	#python setup.py clean
 	# clean jnaerator stuff
