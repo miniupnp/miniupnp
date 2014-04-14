@@ -263,11 +263,10 @@ static struct nlist list[] = {
 			}
 		}
 	}
-	if(buf) {
+	if (buf) {
 		free(buf);
 		buf = NULL;
 	}
-/* #elif __NetBSD__ */
 #elif defined(__FreeBSD__)
 	const char *varname;
 	struct xinpgen *xig, *exig;
@@ -366,6 +365,7 @@ static struct nlist list[] = {
 		free(buf);
 		buf = NULL;
 	}
+/* #elif __NetBSD__ */
 #else
 /* TODO : NetBSD / Darwin (OS X) / Solaris code */
 #error "No port_in_use() implementation available for this OS"
