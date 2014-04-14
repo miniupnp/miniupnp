@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $Id: $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2013-2014 Thomas Bernard
@@ -51,7 +51,7 @@ int main(int argc, char * * argv)
 	}
 	if(devlist) {
 		for(dev = devlist; dev != NULL; dev = dev->pNext) {
-			printf("%s\t%s\n", dev->st, dev->descURL);
+			printf("%-48s\t%s\n", dev->st, dev->descURL);
 		}
 		freeUPNPDevlist(devlist);
 	} else {
