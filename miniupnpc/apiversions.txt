@@ -2,6 +2,11 @@ $Id: apiversions.txt,v 1.3 2014/01/31 13:14:32 nanard Exp $
 
 Differences in API between miniUPnPc versions
 
+API version 11
+
+add upnpDiscoverAll() / upnpDiscoverDevice() / upnpDiscoverDevices()
+functions
+
 ====================== miniUPnPc version 1.9 ======================
 API version 10
 

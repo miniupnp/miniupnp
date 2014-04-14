@@ -19,7 +19,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"1.9"
-#define MINIUPNPC_API_VERSION	10
+#define MINIUPNPC_API_VERSION	11
 
 #ifdef __cplusplus
 extern "C" {
