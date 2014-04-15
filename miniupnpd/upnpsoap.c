@@ -1905,15 +1905,18 @@ GetAssignedRoles(struct upnphttp * h, const char * action)
 		"</u:%sResponse>";
 	char body[1024];
 	int bodylen;
-	const char * RoleList; /* list of roles separated by spaces */
+	const char * RoleList = "Public"; /* list of roles separated by spaces */
 
 #ifdef ENABLE_HTTPS
-	if(h->ssl != NULL)
-		RoleList = "Admin Basic";
-	else
-		RoleList = "Public";
-#else
-	RoleList = "Public";
+	if(h->ssl != NULL) {
+		/* we should get the Roles of the session (based on client certificate) */
+		X509 * peercert;
+		peercert = SSL_get_peer_certificate(h->ssl);
+		if(peercert != NULL) {
+			RoleList = "Admin Basic";
+			X509_free(peercert);
+		}
+	}
 #endif
 
 	bodylen = snprintf(body, sizeof(body), resp,
