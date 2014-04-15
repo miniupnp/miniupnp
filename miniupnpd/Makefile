@@ -213,7 +213,7 @@ testasyncsendto:	config.h $(TESTASYNCSENDTOOBJS)
 	$(CC) $(CFLAGS) -o $@ $(TESTASYNCSENDTOOBJS)
 
 testportinuse:	config.h $(TESTPORTINUSEOBJS)
-	$(CC) $(CFLAGS) -o $@ $(TESTPORTINUSEOBJS) -lkvm
+	$(CC) $(CFLAGS) -o $@ $(TESTPORTINUSEOBJS) $(LIBS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^
