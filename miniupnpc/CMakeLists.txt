@@ -165,6 +165,8 @@ install (FILES
   igd_desc_parse.h
   upnpreplyparse.h
   upnperrors.h
+  miniupnpctypes.h
+  portlistingparse.h
   declspec.h
   DESTINATION include/miniupnpc
 )
