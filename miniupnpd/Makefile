@@ -34,11 +34,11 @@ STRIP = strip
 OSNAME != uname -s
 ARCH != uname -m
 .ifndef FWNAME
-.if exists(/usr/include/net/pfvar.h)
-FWNAME = pf
-.else
-FWNAME = ipf
-.endif
+#.if exists(/usr/include/net/pfvar.h)
+#FWNAME = pf
+#.else
+#FWNAME = ipf
+#.endif
 
 # better way to find if we are using ipf or pf
 .if exists(/etc/rc.subr) && exists(/etc/rc.conf)
