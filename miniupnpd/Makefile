@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.80 2014/04/07 10:32:20 nanard Exp $
+# $Id: Makefile,v 1.83 2014/04/18 08:24:41 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -39,6 +39,10 @@ ARCH != uname -m
 #.else
 #FWNAME = ipf
 #.endif
+
+.if $(OSNAME) == "OpenBSD"
+FWNAME = pf
+.endif
 
 # better way to find if we are using ipf or pf
 .if exists(/etc/rc.subr) && exists(/etc/rc.conf)
