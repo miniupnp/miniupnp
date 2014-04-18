@@ -1,4 +1,4 @@
-/* $Id: ifacewatcher.c,v 1.7 2014/04/14 11:48:47 nanard Exp $ */
+/* $Id: ifacewatcher.c,v 1.8 2014/04/18 08:23:51 nanard Exp $ */
 /* Project MiniUPnP
  * web : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2011 Thomas BERNARD
@@ -72,6 +72,15 @@ ProcessInterfaceWatchNotify(int s)
 		ifm = (struct if_msghdr *)buf;
 		syslog(LOG_DEBUG, " RTM_IFINFO: addrs=%x flags=%x index=%hu",
 		       ifm->ifm_addrs, ifm->ifm_flags, ifm->ifm_index);
+		break;
+	case RTM_ADD:	/* Add Route */
+		syslog(LOG_DEBUG, " RTM_ADD");
+		break;
+	case RTM_DELETE:	/* Delete Route */
+		syslog(LOG_DEBUG, " RTM_DELETE");
+		break;
+	case RTM_CHANGE:	/* Change Metrics or flags */
+		syslog(LOG_DEBUG, " RTM_CHANGE");
 		break;
 	case RTM_GET:	/* Report Metrics */
 		syslog(LOG_DEBUG, " RTM_GET");
