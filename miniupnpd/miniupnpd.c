@@ -881,6 +881,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPPORT:
 				v->port = atoi(ary_options[i].value);
 				break;
+#ifdef ENABLE_HTTPS
+			case UPNPHTTPSPORT:
+				v->https_port = atoi(ary_options[i].value);
+				break;
+#endif
 			case UPNPBITRATE_UP:
 				upstream_bitrate = strtoul(ary_options[i].value, 0, 0);
 				break;

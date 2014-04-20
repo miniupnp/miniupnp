@@ -2,7 +2,7 @@
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2013 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -32,6 +32,10 @@ static const struct {
 	{ UPNPEXT_IP,	"ext_ip" },
 	{ UPNPLISTENING_IP, "listening_ip" },
 	{ UPNPPORT, "port" },
+	{ UPNPPORT, "http_port" },	/* "port" and "http_port" are synonims */
+#ifdef ENABLE_HTTPS
+	{ UPNPHTTPSPORT, "https_port" },
+#endif /* ENABLE_HTTPS */
 	{ UPNPBITRATE_UP, "bitrate_up" },
 	{ UPNPBITRATE_DOWN, "bitrate_down" },
 	{ UPNPPRESENTATIONURL, "presentation_url" },
@@ -307,4 +311,3 @@ freeoptions(void)
 }
 
 #endif /* DISABLE_CONFIG_FILE */
-
