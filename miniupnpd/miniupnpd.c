@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.193 2014/04/09 14:08:11 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.194 2014/04/14 11:42:36 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -205,7 +205,7 @@ OpenAndConfHTTPSocket(unsigned short port)
 }
 
 static struct upnphttp *
-ProcessIncomingHTTP(int shttpl)
+ProcessIncomingHTTP(int shttpl, const char * protocol)
 {
 	int shttp;
 	socklen_t clientnamelen;
@@ -229,13 +229,13 @@ ProcessIncomingHTTP(int shttpl)
 		char addr_str[64];
 
 		sockaddr_to_string((struct sockaddr *)&clientname, addr_str, sizeof(addr_str));
-		syslog(LOG_INFO, "HTTP connection from %s", addr_str);
+		syslog(LOG_INFO, "%s connection from %s", protocol, addr_str);
 		if(get_lan_for_peer((struct sockaddr *)&clientname) == NULL)
 		{
 			/* The peer is not a LAN ! */
 			syslog(LOG_WARNING,
-			       "HTTP peer %s is not from a LAN, closing the connection",
-			       addr_str);
+			       "%s peer %s is not from a LAN, closing the connection",
+			       protocol, addr_str);
 			close(shttp);
 		}
 		else
@@ -2179,7 +2179,7 @@ main(int argc, char * * argv)
 		if(shttpl >= 0 && FD_ISSET(shttpl, &readset))
 		{
 			struct upnphttp * tmp;
-			tmp = ProcessIncomingHTTP(shttpl);
+			tmp = ProcessIncomingHTTP(shttpl, "HTTP");
 			if(tmp)
 			{
 				LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
@@ -2189,7 +2189,7 @@ main(int argc, char * * argv)
 		if(shttpl_v4 >= 0 && FD_ISSET(shttpl_v4, &readset))
 		{
 			struct upnphttp * tmp;
-			tmp = ProcessIncomingHTTP(shttpl_v4);
+			tmp = ProcessIncomingHTTP(shttpl_v4, "HTTP");
 			if(tmp)
 			{
 				LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
@@ -2200,7 +2200,7 @@ main(int argc, char * * argv)
 		if(shttpsl >= 0 && FD_ISSET(shttpsl, &readset))
 		{
 			struct upnphttp * tmp;
-			tmp = ProcessIncomingHTTP(shttpsl);
+			tmp = ProcessIncomingHTTP(shttpsl, "HTTPS");
 			if(tmp)
 			{
 				InitSSL_upnphttp(tmp);
@@ -2211,7 +2211,7 @@ main(int argc, char * * argv)
 		if(shttpsl_v4 >= 0 && FD_ISSET(shttpsl_v4, &readset))
 		{
 			struct upnphttp * tmp;
-			tmp = ProcessIncomingHTTP(shttpsl_v4);
+			tmp = ProcessIncomingHTTP(shttpsl_v4, "HTTPS");
 			if(tmp)
 			{
 				InitSSL_upnphttp(tmp);
