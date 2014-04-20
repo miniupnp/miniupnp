@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.64 2014/04/09 11:14:16 nanard Exp $ */
+/* $Id: minissdp.c,v 1.66 2014/04/20 16:34:26 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -464,6 +464,9 @@ static struct {
 #ifdef ENABLE_6FC_SERVICE
 	{"url:schemas-upnp-org:service:WANIPv6FirewallControl:", 1, uuidvalue_wcd},
 #endif
+/* we might want to support urn:schemas-wifialliance-org:device:WFADevice:1
+ * urn:schemas-wifialliance-org:device:WFADevice:1
+ * in the future */
 	{0, 0, 0}
 };
 
