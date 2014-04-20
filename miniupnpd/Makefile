@@ -142,6 +142,8 @@ LIBS = -lkvm
 LIBS += -lsocket -lnsl -lkstat -lresolv
 .endif
 
+LIBS += -lssl -lcrypto
+
 # set PREFIX variable to install in the wanted place
 
 INSTALLBINDIR = $(PREFIX)/sbin
