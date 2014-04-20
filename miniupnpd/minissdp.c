@@ -344,7 +344,7 @@ EXT:
 static void
 SendSSDPResponse(int s, const struct sockaddr * addr,
                  const char * st, int st_len, const char * suffix,
-                 const char * host, unsigned short port,
+                 const char * host, unsigned short http_port,
 #ifdef ENABLE_HTTPS
                  unsigned short https_port,
 #endif
@@ -400,7 +400,7 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 		st_len, st, suffix,
 		uuidvalue, st_is_uuid ? "" : "::",
 		st_is_uuid ? 0 : st_len, st, suffix,
-		host, (unsigned int)port,
+		host, (unsigned int)http_port,
 #ifdef ENABLE_HTTPS
 		host, (unsigned int)https_port,
 #endif
@@ -469,7 +469,7 @@ static struct {
 
 static void
 SendSSDPNotify(int s, const struct sockaddr * dest,
-               const char * host, unsigned short port,
+               const char * host, unsigned short http_port,
 #ifdef ENABLE_HTTPS
                unsigned short https_port,
 #endif
@@ -500,7 +500,7 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
 		ipv6 ? "[" LL_SSDP_MCAST_ADDR "]" : SSDP_MCAST_ADDR,
 		SSDP_PORT,
 		lifetime,
-		host, (unsigned int)port,
+		host, (unsigned int)http_port,
 #ifdef ENABLE_HTTPS
 		host, (unsigned int)https_port,
 #endif
@@ -552,12 +552,16 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
 	}
 }
 
-static void
-SendSSDPNotifies(int s, const char * host, unsigned short port,
 #ifdef ENABLE_HTTPS
+static void
+SendSSDPNotifies(int s, const char * host, unsigned short http_port,
                  unsigned short https_port,
-#endif
                  unsigned int lifetime, int ipv6)
+#else
+static void
+SendSSDPNotifies(int s, const char * host, unsigned short http_port,
+                 unsigned int lifetime, int ipv6)
+#endif
 {
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
@@ -591,7 +595,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 			ver_str[0] = '\0';
 		else
 			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
-		SendSSDPNotify(s, (struct sockaddr *)&sockname, host, port,
+		SendSSDPNotify(s, (struct sockaddr *)&sockname, host, http_port,
 #ifdef ENABLE_HTTPS
 		               https_port,
 #endif
@@ -602,7 +606,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 		if(0==memcmp(known_service_types[i].s,
 		             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1))
 		{
-			SendSSDPNotify(s, (struct sockaddr *)&sockname, host, port,
+			SendSSDPNotify(s, (struct sockaddr *)&sockname, host, http_port,
 #ifdef ENABLE_HTTPS
 			               https_port,
 #endif
@@ -616,7 +620,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 
 void
 SendSSDPNotifies2(int * sockets,
-                  unsigned short port,
+                  unsigned short http_port,
 #ifdef ENABLE_HTTPS
                   unsigned short https_port,
 #endif
@@ -628,7 +632,7 @@ SendSSDPNotifies2(int * sockets,
 	    lan_addr != NULL;
 	    lan_addr = lan_addr->list.le_next)
 	{
-		SendSSDPNotifies(sockets[i], lan_addr->str, port,
+		SendSSDPNotifies(sockets[i], lan_addr->str, http_port,
 #ifdef ENABLE_HTTPS
 		                 https_port,
 #endif
@@ -637,7 +641,7 @@ SendSSDPNotifies2(int * sockets,
 #ifdef ENABLE_IPV6
 		if(sockets[i] >= 0)
 		{
-			SendSSDPNotifies(sockets[i], ipv6_addr_for_http_with_brackets, port,
+			SendSSDPNotifies(sockets[i], ipv6_addr_for_http_with_brackets, http_port,
 #ifdef ENABLE_HTTPS
 			                 https_port,
 #endif
@@ -652,9 +656,9 @@ SendSSDPNotifies2(int * sockets,
  * process SSDP M-SEARCH requests and responds to them */
 void
 #ifdef ENABLE_HTTPS
-ProcessSSDPRequest(int s, unsigned short port, unsigned short https_port)
+ProcessSSDPRequest(int s, unsigned short http_port, unsigned short https_port)
 #else
-ProcessSSDPRequest(int s, unsigned short port)
+ProcessSSDPRequest(int s, unsigned short http_port)
 #endif
 {
 	int n;
@@ -682,22 +686,26 @@ ProcessSSDPRequest(int s, unsigned short port)
 		}
 		return;
 	}
-	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername,
 #ifdef ENABLE_HTTPS
-	                port, https_port);
+	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername,
+	                http_port, https_port);
 #else
-	                port);
+	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername,
+	                http_port);
 #endif
 
 }
 
+#ifdef ENABLE_HTTPS
 void
 ProcessSSDPData(int s, const char *bufr, int n,
                 const struct sockaddr * sender,
-#ifdef ENABLE_HTTPS
-                unsigned short port, unsigned short https_port)
+                unsigned short http_port, unsigned short https_port)
 #else
-                unsigned short port)
+void
+ProcessSSDPData(int s, const char *bufr, int n,
+                const struct sockaddr * sender,
+                unsigned short http_port)
 #endif
 {
 	int i, l;
@@ -907,7 +915,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #else
 					                 known_service_types[i].s, l, ver_str,
 #endif
-					                 announced_host, port,
+					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
 #endif
@@ -936,7 +944,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					l = (int)strlen(known_service_types[i].s);
 					SendSSDPResponse(s, sender,
 					                 known_service_types[i].s, l, ver_str,
-					                 announced_host, port,
+					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
 #endif
@@ -948,7 +956,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					delay += delay_increment;
 #endif
 				SendSSDPResponse(s, sender, uuidvalue_igd, strlen(uuidvalue_igd), "",
-				                 announced_host, port,
+				                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 				                 https_port,
 #endif
@@ -957,7 +965,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					delay += delay_increment;
 #endif
 				SendSSDPResponse(s, sender, uuidvalue_wan, strlen(uuidvalue_wan), "",
-				                 announced_host, port,
+				                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 				                 https_port,
 #endif
@@ -966,7 +974,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					delay += delay_increment;
 #endif
 				SendSSDPResponse(s, sender, uuidvalue_wcd, strlen(uuidvalue_wcd), "",
-				                 announced_host, port,
+				                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 				                 https_port,
 #endif
@@ -983,7 +991,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				{
 					syslog(LOG_INFO, "ssdp:uuid (IGD) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
-					                 announced_host, port,
+					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
 #endif
@@ -993,7 +1001,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				{
 					syslog(LOG_INFO, "ssdp:uuid (WAN) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
-					                 announced_host, port,
+					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
 #endif
@@ -1003,7 +1011,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				{
 					syslog(LOG_INFO, "ssdp:uuid (WCD) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
-					                 announced_host, port,
+					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
 #endif
