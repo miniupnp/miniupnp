@@ -582,10 +582,12 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 		}
 	}
 
-	if (pcp_msg_info->ext_ip == NULL || IN6_IS_ADDR_UNSPECIFIED(pcp_msg_info->ext_ip)) {
-
+	if (pcp_msg_info->ext_ip == NULL ||
+	    IN6_IS_ADDR_UNSPECIFIED(pcp_msg_info->ext_ip) ||
+	    (IN6_IS_ADDR_V4MAPPED(pcp_msg_info->ext_ip)
+	      && ((uint32_t *)pcp_msg_info->ext_ip->s6_addr)[3] == INADDR_ANY)) {
+		/* no suggested external address : use real external address */
 		pcp_msg_info->ext_ip = &external_addr;
-
 		return 0;
 	}
 
