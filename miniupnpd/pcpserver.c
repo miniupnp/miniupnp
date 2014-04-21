@@ -544,11 +544,21 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 }
 
 
+/* CheckExternalAddress()
+ * Check that suggested external address in request match a real external
+ * IP address.
+ * Suggested address can also be 0 IPv4 or IPv6 address.
+ *  (see http://tools.ietf.org/html/rfc6887#section-10 )
+ * return values :
+ *   0 : check is OK
+ *  -1 : check failed */
 static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 {
 	/* can contain a IPv4-mapped IPv6 address */
 	static struct in6_addr external_addr;
 
+	/* TODO : 1) be able to handle case with multiple external addresses
+	 *        2) handle correctly both IPv4 and IPv6 */
 	if(use_ext_ip_addr) {
 		if (inet_pton(AF_INET, use_ext_ip_addr,
 		              ((uint32_t*)external_addr.s6_addr)+3) == 1) {
