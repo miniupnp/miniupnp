@@ -34,6 +34,7 @@ CC ?= gcc
 RM = rm -f
 INSTALL = install
 STRIP ?= strip
+PKG_CONFIG ?= pkg-config
 CP = cp
 
 
@@ -54,11 +55,11 @@ NETFILTEROBJS = netfilter/iptcrdr.o netfilter/iptpinhole.o netfilter/nfct_get.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
-PCFILE_FOUND := $(shell pkg-config --exists libiptc; echo $$?)
+PCFILE_FOUND := $(shell $(PKG_CONFIG) --exists libiptc; echo $$?)
 
 ifeq (${PCFILE_FOUND},0)
 
-IPTABLESVERSION := $(shell pkg-config --modversion libiptc)
+IPTABLESVERSION := $(shell $(PKG_CONFIG) --modversion libiptc)
 IPTABLESVERSION1 := $(shell echo $(IPTABLESVERSION) | cut -d. -f1 )
 IPTABLESVERSION2 := $(shell echo $(IPTABLESVERSION) | cut -d. -f2 )
 IPTABLESVERSION3 := $(shell echo $(IPTABLESVERSION) | cut -d. -f3 )
@@ -68,10 +69,10 @@ ifeq ($(TEST), 1)
 CFLAGS += -DIPTABLES_143
 endif
 
-CFLAGS  += $(shell pkg-config --cflags libiptc)
-LIBS    += $(shell pkg-config --static --libs-only-l libiptc)
-LDFLAGS += $(shell pkg-config --libs-only-L libiptc)
-LDFLAGS += $(shell pkg-config --libs-only-other libiptc)
+CFLAGS  += $(shell $(PKG_CONFIG) --cflags libiptc)
+LIBS    += $(shell $(PKG_CONFIG) --static --libs-only-l libiptc)
+LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libiptc)
+LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other libiptc)
 else
 
 ifeq "$(wildcard /etc/gentoo-release )" ""
@@ -139,14 +140,14 @@ endif # ifdef PCFILE_FOUND
 
 LIBS += -lnfnetlink
 
-TEST := $(shell pkg-config --atleast-version=1.0.2 libnetfilter_conntrack && pkg-config --atleast-version=1.0.3 libmnl && echo 1)
+TEST := $(shell $(PKG_CONFIG) --atleast-version=1.0.2 libnetfilter_conntrack && $(PKG_CONFIG) --atleast-version=1.0.3 libmnl && echo 1)
 ifeq ($(TEST),1)
 CFLAGS += -DUSE_NFCT
-LIBS += $(shell pkg-config --static --libs-only-l libmnl)
-LIBS += $(shell pkg-config --static --libs-only-l libnetfilter_conntrack)
+LIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libmnl)
+LIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libnetfilter_conntrack)
 endif # ($(TEST),1)
 
-LIBS += $(shell pkg-config --static --libs-only-l libssl)
+LIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libssl)
 
 TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
