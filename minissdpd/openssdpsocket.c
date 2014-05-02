@@ -1,7 +1,7 @@
-/* $Id: openssdpsocket.c,v 1.12 2012/05/21 17:13:11 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.13 2014/05/01 21:05:14 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -115,10 +115,10 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 	else
 	{
 #endif
-	    /* setting up imr structure */
-	    imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
-	    /*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
-	    /*imr.imr_interface.s_addr = inet_addr(ifaddr);*/
+		/* setting up imr structure */
+		imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
+		/*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
+		/*imr.imr_interface.s_addr = inet_addr(ifaddr);*/
 		imr.imr_interface.s_addr = GetIfAddrIPv4(ifaddr);
 		if(imr.imr_interface.s_addr == INADDR_NONE)
 		{
@@ -130,11 +130,11 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 		if (setsockopt(s, IPPROTO_IP, drop ? IP_DROP_MEMBERSHIP : IP_ADD_MEMBERSHIP,
 		    (void *)&imr, sizeof(struct ip_mreq)) < 0)
 		{
-	        syslog(LOG_ERR, "setsockopt(udp, %s)(%s): %m",
+			syslog(LOG_ERR, "setsockopt(udp, %s)(%s): %m",
 			       drop ? "IP_DROP_MEMBERSHIP" : "IP_ADD_MEMBERSHIP",
 			       ifaddr);
 			return -1;
-	    }
+		}
 #ifdef ENABLE_IPV6
 	}
 #endif
@@ -182,17 +182,17 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 		}
 #endif
 		struct sockaddr_in6 * sa = (struct sockaddr_in6 *)&sockname;
-    	sa->sin6_family = AF_INET6;
-    	sa->sin6_port = htons(SSDP_PORT);
+		sa->sin6_family = AF_INET6;
+		sa->sin6_port = htons(SSDP_PORT);
 		sa->sin6_addr = in6addr_any;
 		sockname_len = sizeof(struct sockaddr_in6);
 	}
 	else
 	{
 		struct sockaddr_in * sa = (struct sockaddr_in *)&sockname;
-    	sa->sin_family = AF_INET;
-    	sa->sin_port = htons(SSDP_PORT);
-    	sa->sin_addr.s_addr = htonl(INADDR_ANY);
+		sa->sin_family = AF_INET;
+		sa->sin_port = htons(SSDP_PORT);
+		sa->sin_addr.s_addr = htonl(INADDR_ANY);
 		sockname_len = sizeof(struct sockaddr_in);
 	}
 #else
