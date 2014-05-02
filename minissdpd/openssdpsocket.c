@@ -192,7 +192,19 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 		struct sockaddr_in * sa = (struct sockaddr_in *)&sockname;
 		sa->sin_family = AF_INET;
 		sa->sin_port = htons(SSDP_PORT);
-		sa->sin_addr.s_addr = htonl(INADDR_ANY);
+		if(n_listen_addr == 1)
+		{
+			sa->sin_addr.s_addr = GetIfAddrIPv4(listen_addr[0]);
+			if(sa->sin_addr.s_addr == INADDR_NONE)
+			{
+				syslog(LOG_ERR, "no IPv4 address for interface %s",
+				       listen_addr[0]);
+				close(s);
+				return -1;
+			}
+		}
+		else
+			sa->sin_addr.s_addr = htonl(INADDR_ANY);
 		sockname_len = sizeof(struct sockaddr_in);
 	}
 #else
