@@ -118,7 +118,7 @@ typedef struct pcp_info {
 #endif
 	uint8_t is_map_op;
 	uint8_t is_peer_op;
-	int thirdp_present; /* indicate presence of the options */
+	const struct in6_addr *thirdp_ip;
 	int pfailure_present;
 	char senderaddrstr[INET_ADDRSTRLEN]; /* only if IPv4 sender */
 
@@ -437,13 +437,13 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 		syslog(LOG_DEBUG, "Third PARTY IP: \t %s\n", inet_ntop(AF_INET6,
 		       &(opt_3rd->ip), third_addr, INET6_ADDRSTRLEN));
 #endif
-		if (pcp_msg_info->thirdp_present != 0 ) {
+		if (pcp_msg_info->thirdp_ip ) {
 
 			syslog(LOG_ERR, "PCP: THIRD PARTY OPTION was already present. \n");
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 		}
 		else {
-			pcp_msg_info->thirdp_present = 1;
+			pcp_msg_info->thirdp_ip = &opt_3rd -> ip;
 		}
 
 		processed += sizeof(pcp_3rd_party_option_t);

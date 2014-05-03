@@ -34,6 +34,7 @@ time_t startup_time = 0;
 /* for PCP */
 unsigned long int min_lifetime = 120;
 unsigned long int max_lifetime = 86400;
+int allow_thirdparty = 0;
 #endif
 
 int runtime_flags = 0;

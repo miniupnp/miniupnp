@@ -65,6 +65,7 @@ static const struct {
 #ifdef ENABLE_PCP
 	{ UPNPPCPMINLIFETIME, "min_lifetime"},
 	{ UPNPPCPMAXLIFETIME, "max_lifetime"},
+	{ UPNPPCPALLOWTHIRDPARTY, "allow_thirdparty"},
 #endif
 	{ UPNPENABLE, "enable_upnp"},
 #ifdef USE_PF

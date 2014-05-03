@@ -995,6 +995,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 						max_lifetime = 86400;
 					}
 				break;
+			case UPNPPCPALLOWTHIRDPARTY:
+				allow_thirdparty = true;
+				break;
 #endif
 #ifdef PF_ENABLE_FILTER_RULES
 			case UPNPQUICKRULES:

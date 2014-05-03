@@ -34,7 +34,7 @@ extern time_t startup_time;
 
 extern unsigned long int min_lifetime;
 extern unsigned long int max_lifetime;
-
+extern int allow_thirdparty;
 
 /* runtime boolean flags */
 extern int runtime_flags;
