@@ -30,6 +30,19 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 */
 
+/* Current assumptions:
+   - IPv4 is always NATted (internal -> external)
+   - IPv6 is always firewalled (this may need some work, NAT6* do exist)
+
+   - we make the judgement based on suggested external address (if
+     available), and falling back to internal client address if
+     external address is not available for some reason (but it should
+     be, always, even if just in unset IPv6 or IPv4 address form in
+     modern PCP messages at least).
+
+     TODO : handle NAT46, NAT64, NPT66..
+*/
+
 #include "config.h"
 
 #ifdef ENABLE_PCP
@@ -122,6 +135,7 @@ typedef struct pcp_info {
 	int pfailure_present;
 	char senderaddrstr[48];	/* can be either IPv4 or IPv6 */
 	struct in6_addr sender_ip;
+	int is_fw; /* is this firewall operation? if not, nat. */
 } pcp_info_t;
 
 
@@ -398,11 +412,8 @@ static int parseSADSCP(pcp_sadscp_req_t *sadscp, pcp_info_t *pcp_msg_info) {
 }
 #endif
 
-static int parsePCPOptions(void* pcp_buf, int* remainingSize,
-                           int* processedSize, pcp_info_t *pcp_msg_info)
+static int parsePCPOption(void* pcp_buf, int remain, pcp_info_t *pcp_msg_info)
 {
-	int remain = *remainingSize;
-	int processed = *processedSize;
 #ifdef DEBUG
 	char third_addr[INET6_ADDRSTRLEN];
 #endif
@@ -416,21 +427,30 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 	pcp_prefer_fail_option_t* opt_prefail;
 	pcp_options_hdr_t* opt_hdr;
 
-	opt_hdr = (pcp_options_hdr_t*)(pcp_buf + processed);
-	option_length = 0;
+	opt_hdr = (pcp_options_hdr_t*)pcp_buf;
 
-	switch (opt_hdr->code){
+	/* Do centralized option sanity checks here. */
+
+	if (remain < (int)sizeof(*opt_hdr)) {
+		pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+		return 0;
+	}
+
+	option_length = ntohs(opt_hdr->len) + 4;
+
+	if (remain < option_length) {
+		pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+		return 0;
+	}
+
+	switch (opt_hdr->code) {
 
 	case PCP_OPTION_3RD_PARTY:
 
-		opt_3rd = (pcp_3rd_party_option_t*) (pcp_buf + processed);
-		option_length = ntohs(opt_3rd->len);
-
-		if (option_length != (sizeof(pcp_3rd_party_option_t) - sizeof(pcp_options_hdr_t)) ||
-		    (int)sizeof(pcp_3rd_party_option_t) > remain) {
+		opt_3rd = (pcp_3rd_party_option_t*)pcp_buf;
+		if ( option_length != sizeof(*opt_3rd) ) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
-			remain = 0;
-			break;
+			return 0;
 		}
 #ifdef DEBUG
 		syslog(LOG_DEBUG, "PCP OPTION: \t Third party \n");
@@ -438,28 +458,22 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 		       &(opt_3rd->ip), third_addr, INET6_ADDRSTRLEN));
 #endif
 		if (pcp_msg_info->thirdp_ip ) {
-
 			syslog(LOG_ERR, "PCP: THIRD PARTY OPTION was already present. \n");
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+			return 0;
 		}
 		else {
 			pcp_msg_info->thirdp_ip = &opt_3rd -> ip;
 		}
-
-		processed += sizeof(pcp_3rd_party_option_t);
-		remain -= sizeof(pcp_3rd_party_option_t);
 		break;
 
 	case PCP_OPTION_PREF_FAIL:
 
-		opt_prefail = (pcp_prefer_fail_option_t*)(pcp_buf+processed);
-		option_length = ntohs(opt_prefail->len);
+		opt_prefail = (pcp_prefer_fail_option_t*)pcp_buf;
 
-		if ( option_length != ( sizeof(pcp_prefer_fail_option_t) - sizeof(pcp_options_hdr_t)) ||
-		    (int)sizeof(pcp_prefer_fail_option_t) > remain) {
+		if ( option_length != sizeof(*opt_prefail) ) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
-			remain = 0;
-			break;
+			return 0;
 		}
 #ifdef DEBUG
 		syslog(LOG_DEBUG, "PCP OPTION: \t Prefer failure \n");
@@ -474,21 +488,16 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 		}
 		else {
 			pcp_msg_info->pfailure_present = 1;
-			processed += sizeof(pcp_prefer_fail_option_t);
-			remain -= sizeof(pcp_prefer_fail_option_t);
 		}
 		break;
 
 	case PCP_OPTION_FILTER:
 		/* TODO fully implement filter */
-		opt_filter = (pcp_filter_option_t*) (pcp_buf + processed);
-		option_length = ntohs(opt_filter->len);
+		opt_filter = (pcp_filter_option_t*)pcp_buf;
 
-		if ( option_length != ( sizeof(pcp_filter_option_t) - sizeof(pcp_options_hdr_t)) ||
-		     (int)sizeof(pcp_filter_option_t) > remain) {
+		if ( option_length != sizeof(*opt_filter) ) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
-			remain = 0;
-			break;
+			return 0;
 		}
 #ifdef DEBUG
 		syslog(LOG_DEBUG, "PCP OPTION: \t Filter\n");
@@ -496,9 +505,8 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 		if (pcp_msg_info->opcode != PCP_OPCODE_MAP) {
 			syslog(LOG_ERR, "PCP: Unsupported OPTION for given OPCODE.\n");
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
+			return 0;
 		}
-		processed += sizeof(pcp_filter_option_t);
-		remain -= sizeof(pcp_filter_option_t);
 		break;
 
 #ifdef PCP_FLOWP
@@ -507,16 +515,13 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 #ifdef DEBUG
 		syslog(LOG_DEBUG, "PCP OPTION: \t Flow priority\n");
 #endif
-		opt_flp = (pcp_flow_priority_option_t*) (pcp_buf + processed);
-		option_length = ntohs(opt_flp->len);
+		opt_flp = (pcp_flow_priority_option_t*)pcp_buf;
 
-		if ( option_length != ( sizeof(pcp_flow_priority_option_t) - sizeof(pcp_options_hdr_t)) ||
-		    ((int)sizeof(pcp_flow_priority_option_t) > remain) ) {
+		if ( option_length != sizeof (*flp) ) {
 			syslog(LOG_ERR, "PCP: Error processing DSCP. sizeof %d and remaining %d . flow len %d \n",
 			       (int)sizeof(pcp_flow_priority_option_t), remain, opt_flp->len);
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
-			remain = 0;
-			break;
+			return 0;
 		}
 
 #ifdef DEBUG
@@ -527,20 +532,34 @@ static int parsePCPOptions(void* pcp_buf, int* remainingSize,
 		pcp_msg_info->dscp_down = opt_flp->dscp_down;
 		pcp_msg_info->flowp_present = 1;
 
-		processed += sizeof(pcp_flow_priority_option_t);
-		remain -= sizeof(pcp_flow_priority_option_t);
 		break;
 #endif
 	default:
-		syslog(LOG_ERR, "PCP: Unrecognized PCP OPTION: %d \n", opt_hdr->code);
-		remain = 0;
+		if (opt_hdr->code < 128) {
+			syslog(LOG_ERR, "PCP: Unrecognized mandatory PCP OPTION: %d \n", opt_hdr->code);
+			/* Mandatory to understand */
+			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
+			remain = 0;
+			break;
+		}
+		/* TODO - log optional not understood options? */
 		break;
 	}
+	return option_length;
+}
 
-	/* shift processed and remaining values to new values */
-	*remainingSize = remain;
-	*processedSize = processed;
-	return pcp_msg_info->result_code;
+
+static void parsePCPOptions(void* pcp_buf, int remain, pcp_info_t *pcp_msg_info)
+{
+	int option_length;
+
+	while (remain > 0) {
+		option_length = parsePCPOption(pcp_buf, remain, pcp_msg_info);
+		if (!option_length)
+			break;
+		remain -= option_length;
+		pcp_buf += option_length;
+	}
 }
 
 
@@ -556,32 +575,40 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 {
 	/* can contain a IPv4-mapped IPv6 address */
 	static struct in6_addr external_addr;
+	int af;
 
-	/* TODO : 1) be able to handle case with multiple external addresses
-	 *        2) handle correctly both IPv4 and IPv6 */
-	if(use_ext_ip_addr) {
-		if (inet_pton(AF_INET, use_ext_ip_addr,
-		              ((uint32_t*)external_addr.s6_addr)+3) == 1) {
-			((uint32_t*)external_addr.s6_addr)[0] = 0;
-			((uint32_t*)external_addr.s6_addr)[1] = 0;
-			((uint32_t*)external_addr.s6_addr)[2] = htonl(0xFFFF);
-		} else if (inet_pton(AF_INET6, use_ext_ip_addr, external_addr.s6_addr)
-		        != 1) {
-			pcp_msg_info->result_code = PCP_ERR_NETWORK_FAILURE;
-			return -1;
-		}
+	af = IN6_IS_ADDR_V4MAPPED(pcp_msg_info->int_ip)
+		? AF_INET : AF_INET6;
+
+	pcp_msg_info->is_fw = af == AF_INET6;
+
+	if (pcp_msg_info->is_fw) {
+		external_addr = *pcp_msg_info->int_ip;
 	} else {
-		if(!ext_if_name || ext_if_name[0]=='\0') {
-			pcp_msg_info->result_code = PCP_ERR_NETWORK_FAILURE;
-			return -1;
-		}
-		/* how do we know which address we need ? IPv6 or IPv4 ? */
-		if(getifaddr_in6(ext_if_name, &external_addr) < 0) {
-			pcp_msg_info->result_code = PCP_ERR_NETWORK_FAILURE;
-			return -1;
+		/* TODO : be able to handle case with multiple
+		 * external addresses */
+		if(use_ext_ip_addr) {
+			if (inet_pton(AF_INET, use_ext_ip_addr,
+				      ((uint32_t*)external_addr.s6_addr)+3) == 1) {
+				((uint32_t*)external_addr.s6_addr)[0] = 0;
+				((uint32_t*)external_addr.s6_addr)[1] = 0;
+				((uint32_t*)external_addr.s6_addr)[2] = htonl(0xFFFF);
+			} else if (inet_pton(AF_INET6, use_ext_ip_addr, external_addr.s6_addr)
+				   != 1) {
+				pcp_msg_info->result_code = PCP_ERR_NETWORK_FAILURE;
+				return -1;
+			}
+		} else {
+			if(!ext_if_name || ext_if_name[0]=='\0') {
+				pcp_msg_info->result_code = PCP_ERR_NETWORK_FAILURE;
+				return -1;
+			}
+			if(getifaddr_in6(ext_if_name, af, &external_addr) < 0) {
+				pcp_msg_info->result_code = PCP_ERR_NETWORK_FAILURE;
+				return -1;
+			}
 		}
 	}
-
 	if (pcp_msg_info->ext_ip == NULL ||
 	    IN6_IS_ADDR_UNSPECIFIED(pcp_msg_info->ext_ip) ||
 	    (IN6_IS_ADDR_V4MAPPED(pcp_msg_info->ext_ip)
@@ -593,7 +620,7 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 
 	if (!IN6_ARE_ADDR_EQUAL(pcp_msg_info->ext_ip, &external_addr)) {
 		syslog(LOG_ERR,
-		        "PCP: External IP in request didn't match interface IP \n");
+		       "PCP: External IP in request didn't match interface IP \n");
 #ifdef DEBUG
 		{
 			char s[INET6_ADDRSTRLEN];
@@ -1106,7 +1133,6 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 {
 	int remainingSize;
-	int processedSize;
 
 	const pcp_map_v1_t* map_v1;
 	const pcp_map_v2_t* map_v2;
@@ -1122,7 +1148,6 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 	pcp_msg_info->result_code = PCP_SUCCESS;
 
 	remainingSize = req_size;
-	processedSize = 0;
 
 	/* discard request that exceeds maximal length,
 	   or that is shorter than PCP_MIN_LEN (=24)
@@ -1148,7 +1173,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 	}
 
 	remainingSize -= sizeof(pcp_request_t);
-	processedSize += sizeof(pcp_request_t);
+	req += sizeof(pcp_request_t);
 
 	if (pcp_msg_info->version == 1) {
 		/* legacy PCP version 1 support */
@@ -1161,7 +1186,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				return pcp_msg_info->result_code;
 			}
 
-			map_v1 = (pcp_map_v1_t*)(req + processedSize);
+			map_v1 = (pcp_map_v1_t*)req;
 #ifdef DEBUG
 			printMAPOpcodeVersion1(map_v1);
 #endif /* DEBUG */
@@ -1169,11 +1194,9 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				return pcp_msg_info->result_code;
 			}
 
-			processedSize += sizeof(pcp_map_v1_t);
+			req += sizeof(pcp_map_v1_t);
 
-			while (remainingSize > 0) {
-				parsePCPOptions(req, &remainingSize, &processedSize, pcp_msg_info);
-			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 			if (ValidatePCPMsg(pcp_msg_info)) {
 				if (pcp_msg_info->lifetime == 0) {
 					DeletePCPMap(pcp_msg_info);
@@ -1204,11 +1227,9 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				 return pcp_msg_info->result_code;
 			}
 
-			processedSize += sizeof(pcp_peer_v1_t);
+			req += sizeof(pcp_peer_v1_t);
 
-			while (remainingSize > 0) {
-				parsePCPOptions(req, &remainingSize, &processedSize, pcp_msg_info);
-			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 
 			if (ValidatePCPMsg(pcp_msg_info)) {
 				if (pcp_msg_info->lifetime == 0) {
@@ -1244,7 +1265,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				return pcp_msg_info->result_code;
 			}
 
-			map_v2 = (pcp_map_v2_t*)(req + processedSize);
+			map_v2 = (pcp_map_v2_t*)req;
 
 #ifdef DEBUG
 			printMAPOpcodeVersion2(map_v2);
@@ -1253,11 +1274,9 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			if (parsePCPMAP_version2(map_v2, pcp_msg_info) ) {
 				return pcp_msg_info->result_code;
 			}
-			processedSize += sizeof(pcp_map_v2_t);
+			req += sizeof(pcp_map_v2_t);
 
-			while (remainingSize > 0) {
-				parsePCPOptions(req, &remainingSize, &processedSize, pcp_msg_info);
-			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 
 			if (ValidatePCPMsg(pcp_msg_info)) {
 				if (pcp_msg_info->lifetime == 0) {
@@ -1280,21 +1299,19 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 				return pcp_msg_info->result_code;
 			}
-			peer_v2 = (pcp_peer_v2_t*)(req + processedSize);
+			peer_v2 = (pcp_peer_v2_t*)req;
 
 #ifdef DEBUG
 			printPEEROpcodeVersion2(peer_v2);
 #endif /* DEBUG */
 			parsePCPPEER_version2(peer_v2, pcp_msg_info);
-			processedSize += sizeof(pcp_peer_v2_t);
+			req += sizeof(pcp_peer_v2_t);
 
 			if (pcp_msg_info->result_code != 0) {
 				return pcp_msg_info->result_code;
 			}
 
-			while (remainingSize > 0) {
-				parsePCPOptions(req, &remainingSize, &processedSize, pcp_msg_info);
-			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 
 			if (ValidatePCPMsg(pcp_msg_info)) {
 				if (pcp_msg_info->lifetime == 0) {
@@ -1317,7 +1334,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				return pcp_msg_info->result_code;
 			}
 
-			sadscp = (pcp_sadscp_req_t*)(req + processedSize);
+			sadscp = (pcp_sadscp_req_t*)req;
 
 			if (sadscp->app_name_length > remainingSize) {
 				pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
