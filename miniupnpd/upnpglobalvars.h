@@ -34,7 +34,6 @@ extern time_t startup_time;
 
 extern unsigned long int min_lifetime;
 extern unsigned long int max_lifetime;
-extern int allow_thirdparty;
 
 /* runtime boolean flags */
 extern int runtime_flags;
@@ -57,6 +56,9 @@ extern int runtime_flags;
 #ifdef ENABLE_6FC_SERVICE
 #define IPV6FCFWDISABLEDMASK		0x0100
 #define IPV6FCINBOUNDDISALLOWEDMASK	0x0200
+#endif
+#ifdef ENABLE_PCP
+#define PCP_ALLOWTHIRDPARTYMASK	0x0400
 #endif
 
 #define SETFLAG(mask)	runtime_flags |= mask

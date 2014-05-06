@@ -996,7 +996,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					}
 				break;
 			case UPNPPCPALLOWTHIRDPARTY:
-				allow_thirdparty = true;
+				if(strcmp(ary_options[i].value, "yes") == 0)
+					SETFLAG(PCP_ALLOWTHIRDPARTYMASK);
 				break;
 #endif
 #ifdef PF_ENABLE_FILTER_RULES
