@@ -34,11 +34,9 @@ POSSIBILITY OF SUCH DAMAGE.
    - IPv4 is always NATted (internal -> external)
    - IPv6 is always firewalled (this may need some work, NAT6* do exist)
 
-   - we make the judgement based on suggested external address (if
-     available), and falling back to internal client address if
-     external address is not available for some reason (but it should
-     be, always, even if just in unset IPv6 or IPv4 address form in
-     modern PCP messages at least).
+   - we make the judgement based on (in order, picking first one available):
+     - third party adress
+     - internal client address
 
      TODO : handle NAT46, NAT64, NPT66..
 */
@@ -132,12 +130,13 @@ typedef struct pcp_info {
 	uint8_t is_map_op;
 	uint8_t is_peer_op;
 	const struct in6_addr *thirdp_ip;
+	const struct in6_addr *mapped_ip;
 	int pfailure_present;
 	char senderaddrstr[48];	/* can be either IPv4 or IPv6 */
 	struct in6_addr sender_ip;
 	int is_fw; /* is this firewall operation? if not, nat. */
+	char desc[64];
 } pcp_info_t;
-
 
 #ifdef PCP_SADSCP
 int get_dscp_value(pcp_info_t *pcp_msg_info) {
@@ -147,7 +146,7 @@ int get_dscp_value(pcp_info_t *pcp_msg_info) {
 	for (ind = 0; ind < num_dscp_values; ind++) {
 
 		if ((dscp_values_list[ind].app_name) &&
-		    (!strncmp( dscp_values_list[ind].app_name,
+		    (!strncmp(dscp_values_list[ind].app_name,
 		               pcp_msg_info->app_name, pcp_msg_info->app_name_len)) &&
 		    (pcp_msg_info->delay_tolerance == dscp_values_list[ind].delay) &&
 		    (pcp_msg_info->loss_tolerance == dscp_values_list[ind].loss) &&
@@ -199,6 +198,7 @@ static int parseCommonRequestHeader(const pcp_request_t *common_req, pcp_info_t 
 	pcp_msg_info->opcode = common_req->r_opcode & 0x7f;
 	pcp_msg_info->lifetime = ntohl(common_req->req_lifetime);
 	pcp_msg_info->int_ip = &common_req->ip;
+	pcp_msg_info->mapped_ip = &common_req->ip;
 
 
 	if ( (common_req->ver > this_server_info.server_version) ) {
@@ -463,7 +463,8 @@ static int parsePCPOption(void* pcp_buf, int remain, pcp_info_t *pcp_msg_info)
 			return 0;
 		}
 		else {
-			pcp_msg_info->thirdp_ip = &opt_3rd -> ip;
+			pcp_msg_info->thirdp_ip = &opt_3rd->ip;
+			pcp_msg_info->mapped_ip = &opt_3rd->ip;
 		}
 		break;
 
@@ -577,13 +578,13 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 	static struct in6_addr external_addr;
 	int af;
 
-	af = IN6_IS_ADDR_V4MAPPED(pcp_msg_info->int_ip)
+	af = IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip)
 		? AF_INET : AF_INET6;
 
 	pcp_msg_info->is_fw = af == AF_INET6;
 
 	if (pcp_msg_info->is_fw) {
-		external_addr = *pcp_msg_info->int_ip;
+		external_addr = *pcp_msg_info->mapped_ip;
 	} else {
 		/* TODO : be able to handle case with multiple
 		 * external addresses */
@@ -690,7 +691,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
 
-	FillSA((struct sockaddr*)&intip, pcp_msg_info->int_ip,
+	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	    pcp_msg_info->int_port);
 	FillSA((struct sockaddr*)&peerip, pcp_msg_info->peer_ip,
 	    pcp_msg_info->peer_port);
@@ -716,28 +717,12 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 	}
 	/* Create Peer Mapping */
 	{
-		char desc[64];
-		char proto_str[8];
 		char peerip_s[INET_ADDRSTRLEN], extip_s[INET_ADDRSTRLEN];
 		time_t timestamp = time(NULL) + pcp_msg_info->lifetime;
 
 		if (eport == 0) {
 			eport = pcp_msg_info->int_port;
 		}
-
-		switch(proto) {
-		case IPPROTO_TCP:
-			snprintf(proto_str, sizeof(proto_str), "TCP");
-			break;
-		case IPPROTO_UDP:
-			snprintf(proto_str, sizeof(proto_str), "UDP");
-			break;
-		default:
-			snprintf(proto_str, sizeof(proto_str), "%d", proto);
-		}
-		snprintf(desc, sizeof(desc), "PCP %hu %s %08x%08x%08x",
-		    eport, proto_str,
-		    pcp_msg_info->nonce[0], pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
 
 		inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 		inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
@@ -747,14 +732,13 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			if (add_peer_dscp_rule2(ext_if_name, peerip_s,
 			        pcp_msg_info->peer_port, pcp_msg_info->dscp_up,
 			        pcp_msg_info->senderaddrstr, pcp_msg_info->int_port,
-			        proto, desc, timestamp) < 0 ) {
-				syslog(LOG_ERR, "PCP: failed to add flowp upstream mapping %s %s:%hu->%s:%hu '%s'",
-				        proto_str,
+			        proto, pcp_msg_info->desc, timestamp) < 0 ) {
+				syslog(LOG_ERR, "PCP: failed to add flowp upstream mapping %s:%hu->%s:%hu '%s'",
 				        pcp_msg_info->senderaddrstr,
 				        pcp_msg_info->int_port,
 				        peerip_s,
 				        pcp_msg_info->peer_port,
-				        desc);
+				        pcp_msg_info->desc);
 				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 			}
 		}
@@ -762,15 +746,14 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 		if (pcp_msg_info->flowp_present && pcp_msg_info->dscp_down) {
 			if (add_peer_dscp_rule2(ext_if_name,  pcp_msg_info->senderaddrstr,
 			        pcp_msg_info->int_port, pcp_msg_info->dscp_down,
-			        peerip_s, pcp_msg_info->peer_port, proto, desc, timestamp)
+			        peerip_s, pcp_msg_info->peer_port, proto, pcp_msg_info->desc, timestamp)
 			          < 0 ) {
-				syslog(LOG_ERR, "PCP: failed to add flowp downstream mapping %s %s:%hu->%s:%hu '%s'",
-				        proto_str,
+				syslog(LOG_ERR, "PCP: failed to add flowp downstream mapping %s:%hu->%s:%hu '%s'",
 				        pcp_msg_info->senderaddrstr,
 				        pcp_msg_info->int_port,
 				        peerip_s,
 				        pcp_msg_info->peer_port,
-				        desc);
+				        pcp_msg_info->desc);
 				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 			}
 		}
@@ -784,7 +767,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 		        pcp_msg_info->senderaddrstr,
 		        pcp_msg_info->int_port,
 		        pcp_msg_info->protocol,
-		        desc,
+		        pcp_msg_info->desc,
 		        timestamp) < 0 ) {
 
 			syslog(LOG_ERR, "PCP PEER: failed to add peer mapping %s %s:%hu(%hu)->%s:%hu '%s'",
@@ -794,7 +777,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			        eport,
 			        peerip_s,
 			        pcp_msg_info->peer_port,
-			        desc);
+			        pcp_msg_info->desc);
 
 			pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 
@@ -808,7 +791,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 				        eport,
 				        peerip_s,
 				        pcp_msg_info->peer_port,
-				        desc);
+				        pcp_msg_info->desc);
 		}
 	}
 
@@ -841,7 +824,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		if((0 == strncmp(iaddr2, pcp_msg_info->senderaddrstr, sizeof(iaddr2)))
 		  && (0 == strncmp(rhost2, rhost, sizeof(rhost2)))
 		  && (proto2==proto)
-		  && (0 == strncmp(desc, "PCP", sizeof("PCP")-1))
+		  && 0 == strcmp(desc, pcp_msg_info->desc)
 		  && (iport2==iport) && (rport2==rport)) {
 			r = _upnp_delete_redir(eport2, proto2);
 			if(r<0) {
@@ -893,8 +876,6 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 /* TODO : support more scenarios than just NAT44 */
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
-	char desc[64];
-	char proto_str[8];
 	char iaddr_old[INET_ADDRSTRLEN];
 	uint16_t iport_old;
 	uint16_t eport_first = 0;
@@ -916,10 +897,10 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 			}
 			return;
 		}
-		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->int_ip) &&
+		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
 		      (!check_upnp_rule_against_permissions(upnppermlist,
 		               num_upnpperm, pcp_msg_info->ext_port,
-	                       ((struct in_addr*)pcp_msg_info->int_ip->s6_addr)[3],
+	                       ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
 		               pcp_msg_info->int_port)))) {
 			if (pcp_msg_info->pfailure_present) {
 				pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
@@ -983,45 +964,28 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 
 	timestamp = time(NULL) + pcp_msg_info->lifetime;
 
-	switch(pcp_msg_info->protocol) {
-	case IPPROTO_TCP:
-		snprintf(proto_str, sizeof(proto_str), "TCP");
-		break;
-	case IPPROTO_UDP:
-		snprintf(proto_str, sizeof(proto_str), "UDP");
-		break;
-	default:
-		snprintf(proto_str, sizeof(proto_str), "%d", pcp_msg_info->protocol);
-	}
-	snprintf(desc, sizeof(desc), "PCP %hu %s %08x%08x%08x",
-	     pcp_msg_info->ext_port,
-	     proto_str,
-	     pcp_msg_info->nonce[0], pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
-
 	if(upnp_redirect_internal(NULL,
 	        pcp_msg_info->ext_port,
 	        pcp_msg_info->senderaddrstr,
 	        pcp_msg_info->int_port,
 	        pcp_msg_info->protocol,
-	        desc,
+	        pcp_msg_info->desc,
 	        timestamp) < 0) {
 
-		syslog(LOG_ERR, "PCP MAP: Failed to add mapping %s %hu->%s:%hu '%s'",
-		        proto_str,
+		syslog(LOG_ERR, "PCP MAP: Failed to add mapping %hu->%s:%hu '%s'",
 		        pcp_msg_info->ext_port,
 		        pcp_msg_info->senderaddrstr,
 		        pcp_msg_info->int_port,
-		        desc);
+		        pcp_msg_info->desc);
 
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 
 	} else {
-		syslog(LOG_INFO, "PCP MAP: added mapping %s %hu->%s:%hu '%s'",
-		        proto_str,
+		syslog(LOG_INFO, "PCP MAP: added mapping %hu->%s:%hu '%s'",
 		        pcp_msg_info->ext_port,
 		        pcp_msg_info->senderaddrstr,
 		        pcp_msg_info->int_port,
-		        desc);
+		        pcp_msg_info->desc);
 	}
 }
 
@@ -1048,7 +1012,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 
 		if(0 == strncmp(iaddr2, pcp_msg_info->senderaddrstr, sizeof(iaddr2))
 		  && (proto2==proto)
-		  && (0 == strncmp(desc, "PCP", 3)) /* starts with PCP */
+		  && 0 == strcmp(desc, pcp_msg_info->desc)
 		  && ((iport2==iport) || (iport==0))) {
 
 			r = _upnp_delete_redir(eport2, proto2);
@@ -1123,6 +1087,19 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 		return 0;
 	}
 
+	/* Fill in the desc that describes uniquely what flow we're
+	 * dealing with (same code used in both create + delete of
+	 * MAP/PEER) */
+	switch (pcp_msg_info->opcode) {
+	case PCP_OPCODE_MAP:
+	case PCP_OPCODE_PEER:
+		snprintf(pcp_msg_info->desc, sizeof(pcp_msg_info->desc),
+			 "PCP %s %08x%08x%08x",
+			 pcp_msg_info->opcode == PCP_OPCODE_MAP ? "MAP":"PEER",
+			 pcp_msg_info->nonce[0],
+			 pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
+		break;
+	}
 	return 1;
 }
 
