@@ -93,6 +93,7 @@ struct pcp_server_info {
 /* default server settings, highest version supported is the default */
 static struct pcp_server_info this_server_info = {2};
 
+
 /* structure holding information from PCP msg*/
 /* all variables are in host byte order except IP addresses */
 typedef struct pcp_info {
@@ -135,7 +136,7 @@ typedef struct pcp_info {
 	uint8_t is_peer_op;
 	const struct in6_addr *thirdp_ip;
 	const struct in6_addr *mapped_ip;
-	char mapped_str[INET_ADDRSTRLEN];
+	char mapped_str[INET6_ADDRSTRLEN];
 	int pfailure_present;
 	struct in6_addr sender_ip;
 	int is_fw; /* is this firewall operation? if not, nat. */
@@ -150,8 +151,8 @@ int get_dscp_value(pcp_info_t *pcp_msg_info) {
 	for (ind = 0; ind < num_dscp_values; ind++) {
 
 		if ((dscp_values_list[ind].app_name) &&
-		    (!strncmp(dscp_values_list[ind].app_name,
-		               pcp_msg_info->app_name, pcp_msg_info->app_name_len)) &&
+		    (!strcmp(dscp_values_list[ind].app_name,
+			     pcp_msg_info->app_name)) &&
 		    (pcp_msg_info->delay_tolerance == dscp_values_list[ind].delay) &&
 		    (pcp_msg_info->loss_tolerance == dscp_values_list[ind].loss) &&
 		    (pcp_msg_info->jitter_tolerance == dscp_values_list[ind].jitter)
@@ -649,6 +650,15 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 }
 
 
+static const char* inet_n46top(struct in6_addr* in, char* buf, size_t buf_len)
+{
+	if (IN6_IS_ADDR_V4MAPPED(in)) {
+		return inet_ntop(AF_INET, ((uint32_t*)(in->s6_addr))+3, buf, buf_len);
+	} else {
+		return inet_ntop(AF_INET6, in, buf, buf_len);
+	}
+}
+
 #ifdef PCP_PEER
 static void FillSA(struct sockaddr *sa, const struct in6_addr *in6,
 		uint16_t port)
@@ -675,16 +685,7 @@ static const char* inet_satop(struct sockaddr* sa, char* buf, size_t buf_len)
 	}
 }
 
-static const char* inet_n46top(struct in6_addr* in, char* buf, size_t buf_len)
-{
-	if (IN6_IS_ADDR_V4MAPPED(in)) {
-		return inet_ntop(AF_INET, ((uint32_t*)(in->s6_addr))+3, buf, buf_len);
-	} else {
-		return inet_ntop(AF_INET6, in, buf, buf_len);
-	}
-}
-
-static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
+static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 {
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
@@ -695,8 +696,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
 
-	char peerip_s[INET_ADDRSTRLEN], extip_s[INET_ADDRSTRLEN];
-	time_t timestamp = time(NULL) + pcp_msg_info->lifetime;
+	char peerip_s[INET6_ADDRSTRLEN], extip_s[INET6_ADDRSTRLEN];
 	int r = -1;
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
@@ -710,17 +710,24 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
 
 	if (pcp_msg_info->is_fw) {
+#if 0
+		/* Someday, something like this is available.. and we're ready! */
 #ifdef ENABLE_UPNPPINHOLE
 		eport = pcp_msg_info->int_port;
-		r = upnp_add_inboundpinhole(peerip_s,
-					    pcp_msg_info->peer_port,
-					    pcp_msg_info->mapped_str,
-					    eport,
-					    proto,
-					    pcp_msg_info->desc,
-					    0, NULL);
+		r = upnp_add_outbound_pinhole(peerip_s,
+					      pcp_msg_info->peer_port,
+					      pcp_msg_info->mapped_str,
+					      eport,
+					      proto,
+					      pcp_msg_info->desc,
+					      pcp_msg_info->lifetime, NULL);
 #endif /* ENABLE_UPNPPINHOLE */
+#else
+		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
+		return;
+#endif /* 0 */
 	} else {
+		time_t timestamp = time(NULL) + pcp_msg_info->lifetime;
 
 		/* check if connection with given peer exists, if it was */
 		/* already established use this external port */
@@ -736,7 +743,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 				eport = ret_eport;
 			} else {
 				pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
-				return 0;
+				return;
 			}
 		}
 		/* Create Peer Mapping */
@@ -757,7 +764,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 				       pcp_msg_info->peer_port,
 				       pcp_msg_info->desc);
 				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
-				return 0;
+				return;
 			}
 		}
 
@@ -773,7 +780,7 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 				       pcp_msg_info->peer_port,
 				       pcp_msg_info->desc);
 				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
-				return 0;
+				return;
 			}
 		}
 #endif
@@ -801,8 +808,6 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 		       pcp_msg_info->desc);
 
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
-
-		return 0;
 	} else {
 		pcp_msg_info->ext_port = eport;
 		syslog(LOG_INFO, "PCP PEER: added mapping %s %s:%hu(%hu)->%s:%hu '%s'",
@@ -814,8 +819,6 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 		       pcp_msg_info->peer_port,
 		       pcp_msg_info->desc);
 	}
-
-	return 1;
 }
 
 static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
@@ -824,7 +827,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 	uint16_t rport = pcp_msg_info->peer_port;  /* private port */
 	uint8_t  proto = pcp_msg_info->protocol;
 	char rhost[INET6_ADDRSTRLEN];
-	int r=-1;
+	int r = -1;
 
 	/* remove requested mappings for this client */
 	int index = 0;
@@ -833,7 +836,14 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 	int proto2;
 	char desc[64];
 	unsigned int timestamp;
+#if 0
 	int uid;
+#endif /* 0 */
+
+	if (pcp_msg_info->is_fw) {
+		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
+		return;
+	}
 
 	inet_n46top((struct in6_addr*)pcp_msg_info->peer_ip, rhost, sizeof(rhost));
 
@@ -845,24 +855,30 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 				     desc, sizeof(desc),
 				     rhost2, sizeof(rhost2), &rport2,
 				     &timestamp, 0, 0) >= 0)
-		||
-	     (pcp_msg_info->is_fw &&
-	      (uid=upnp_get_pinhole_uid_by_index(index))>=0 &&
-	      upnp_get_pinhole_info((unsigned short)uid,
-				    rhost2, sizeof(rhost2), &rport2,
-				    iaddr2, sizeof(iaddr2), &iport2,
-				    &proto2, desc, sizeof(desc),
-				    &timestamp, NULL) > 0) ;
-	     index++) {
-		if((0 == strncmp(iaddr2, pcp_msg_info->mapped_str, sizeof(iaddr2)))
-		   && (0 == strncmp(rhost2, rhost, sizeof(rhost2)))
+#if 0
+		     /* Some day if outbound pinholes are supported.. */
+		     ||
+		     (pcp_msg_info->is_fw &&
+		      (uid=upnp_get_pinhole_uid_by_index(index))>=0 &&
+		      upnp_get_pinhole_info((unsigned short)uid,
+					    rhost2, sizeof(rhost2), &rport2,
+					    iaddr2, sizeof(iaddr2), &iport2,
+					    &proto2, desc, sizeof(desc),
+					    &timestamp, NULL) > 0)
+#endif /* 0 */
+		     ;
+	     index++)
+		if((0 == strcmp(iaddr2, pcp_msg_info->mapped_str))
+		   && (0 == strcmp(rhost2, rhost))
 		   && (proto2==proto)
 		   && 0 == strcmp(desc, pcp_msg_info->desc)
 		   && (iport2==iport) && (rport2==rport)) {
 			if (!pcp_msg_info->is_fw)
 				r = _upnp_delete_redir(eport2, proto2);
+#if 0
 			else
-				r = upnp_delete_inboundpinhole(uid);
+				r = upnp_delete_outboundpinhole(uid);
+#endif /* 0 */
 			if(r<0) {
 				syslog(LOG_ERR, "PCP PEER: failed to remove peer mapping");
 			} else {
@@ -871,7 +887,6 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 			}
 			return;
 		}
-	}
 	if (r==-1) {
 		syslog(LOG_ERR, "PCP PEER: Failed to find PCP mapping internal port %hu, protocol %s",
 		       iport, (pcp_msg_info->protocol == IPPROTO_TCP)?"TCP":"UDP");
@@ -910,7 +925,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 /* TODO : support more scenarios than just NAT44 */
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
-	char iaddr_old[INET_ADDRSTRLEN];
+	char iaddr_old[INET6_ADDRSTRLEN];
 	uint16_t iport_old;
 	uint16_t eport_first = 0;
 	int any_eport_allowed = 0;
@@ -924,7 +939,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 					    pcp_msg_info->int_port,
 					    pcp_msg_info->protocol,
 					    pcp_msg_info->desc,
-					    timestamp,
+					    pcp_msg_info->lifetime,
 					    NULL);
 #endif /* ENABLE_UPNPPINHOLE */
 	} else {
@@ -979,8 +994,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 					      &timestamp, 0, 0);
 
 			if(r==0) {
-				if((strncmp(pcp_msg_info->mapped_str, iaddr_old,
-					    sizeof(iaddr_old))!=0)
+				if((strcmp(pcp_msg_info->mapped_str, iaddr_old)!=0)
 				   || (pcp_msg_info->int_port != iport_old)) {
 					/* redirection already existing */
 					if (pcp_msg_info->pfailure_present) {
@@ -1041,38 +1055,53 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	int r=-1;
 	/* remove the mapping */
 	/* remove all the mappings for this client */
-	int index = 0;
+	int index;
 	unsigned short eport2, iport2;
 	char iaddr2[16];
 	int proto2;
 	char desc[64];
 	unsigned int timestamp;
+#ifdef ENABLE_UPNPPINHOLE
+	int uid = -1;
+#endif /* ENABLE_UPNPPINHOLE */
 
 	/* iterate through all rules and delete the requested ones */
-	while(get_redirect_rule_by_index(index, 0,
-	      &eport2, iaddr2, sizeof(iaddr2),
-	      &iport2, &proto2,
-	      desc, sizeof(desc),
-	      0, 0, &timestamp, 0, 0) >= 0) {
-
-		if(0 == strncmp(iaddr2, pcp_msg_info->mapped_str, sizeof(iaddr2))
-		  && (proto2==proto)
-		  && 0 == strcmp(desc, pcp_msg_info->desc)
-		  && ((iport2==iport) || (iport==0))) {
-
-			r = _upnp_delete_redir(eport2, proto2);
-			if(r<0) {
-				syslog(LOG_ERR, "PCP: failed to remove port mapping");
-				index++;
+	for (index = 0 ;
+	     (!pcp_msg_info->is_fw &&
+	      get_redirect_rule_by_index(index, 0,
+					 &eport2, iaddr2, sizeof(iaddr2),
+					 &iport2, &proto2,
+					 desc, sizeof(desc),
+					 0, 0, &timestamp, 0, 0) >= 0)
+#ifdef ENABLE_UPNPPINHOLE
+	       ||
+	     (pcp_msg_info->is_fw &&
+	      (uid=upnp_get_pinhole_uid_by_index(index))>=0 &&
+	      upnp_get_pinhole_info((unsigned short)uid,
+				    NULL, 0, NULL,
+				    iaddr2, sizeof(iaddr2), &iport2,
+				    &proto2, desc, sizeof(desc),
+				    &timestamp, NULL) > 0)
+#endif /* ENABLE_UPNPPINHOLE */
+		     ;
+	     index++)
+		if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
+		   && (proto2==proto)
+		   && 0 == strcmp(desc, pcp_msg_info->desc)
+		   && ((iport2==iport) || (iport==0))) {
+			if (!pcp_msg_info->is_fw) {
+				r = _upnp_delete_redir(eport2, proto2);
 			} else {
-				syslog(LOG_INFO, "PCP: %s port %hu mapping removed",
-				       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
+#ifdef ENABLE_UPNPPINHOLE
+				r = upnp_delete_inboundpinhole(uid);
+#endif /* ENABLE_UPNPPINHOLE */
 			}
-		} else {
-			index++;
+			break;
 		}
-	}
-	if (r==-1) {
+	if (r >= 0) {
+		syslog(LOG_INFO, "PCP: %s port %hu mapping removed",
+		       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
+	} else {
 		syslog(LOG_ERR, "Failed to remove PCP mapping internal port %hu, protocol %s",
 		       iport, (pcp_msg_info->protocol == IPPROTO_TCP)?"TCP":"UDP");
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
@@ -1111,17 +1140,8 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	}
 
 	/* Produce mapped_str for future use. */
-	if (IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip)) {
-		if (!inet_ntop(AF_INET,
-			       &((uint32_t *)pcp_msg_info->mapped_ip)[3],
-			       pcp_msg_info->mapped_str,
-			       sizeof(pcp_msg_info->mapped_str))) {
-			syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
-			return 0;
-		}
-	} else if(!inet_ntop(AF_INET6, pcp_msg_info->mapped_ip,
-			     pcp_msg_info->mapped_str,
-			     sizeof(pcp_msg_info->mapped_str))) {
+	if (!inet_n46top(pcp_msg_info->mapped_ip, pcp_msg_info->mapped_str,
+		         sizeof(pcp_msg_info->mapped_str))) {
 		syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
 		return 0;
 	}
@@ -1373,6 +1393,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			}
 
 			sadscp = (pcp_sadscp_req_t*)req;
+			req += sizeof(pcp_sadscp_req_t);
 
 			if (sadscp->app_name_length > remainingSize) {
 				pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
@@ -1387,7 +1408,6 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 
 			get_dscp_value(pcp_msg_info);
 
-			processedSize += sizeof(pcp_sadscp_req_t);
 
 			break;
 #endif

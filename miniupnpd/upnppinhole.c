@@ -128,15 +128,13 @@ upnp_add_inboundpinhole(const char * raddr,
 	}
 	else
 #endif
-	{
 #if defined(USE_PF) || defined(USE_NETFILTER)
-		*uid = add_pinhole (0/*ext_if_name*/, raddr, rport,
-		                    iaddr, iport, proto, desc, timestamp);
-		return 1;
+	*uid = add_pinhole (0/*ext_if_name*/, raddr, rport,
+	                    iaddr, iport, proto, desc, timestamp);
+	return 1;
 #else
-		return -42;	/* not implemented */
+	return -42;	/* not implemented */
 #endif
-	}
 }
 
 #if 0
@@ -234,8 +232,8 @@ upnp_get_pinhole_info(unsigned short uid,
 	/*u_int64_t bytes_tmp;*/
 
 	r = get_pinhole_info(uid, raddr, raddrlen, rport,
-	                     iaddr, iaddrlen, iport, proto,
-	                     desc, desclen,
+	                     iaddr, iaddrlen, iport,
+	                     proto, desc, desclen,
 	                     leasetime ? &timestamp : NULL,
 	                     packets ? &packets_tmp : NULL,
 	                     NULL/*&bytes_tmp*/);
@@ -266,8 +264,7 @@ int
 upnp_get_pinhole_uid_by_index(int index)
 {
 #if defined (USE_NETFILTER)
-
-	return -1;
+	return get_pinhole_uid_by_index(index);
 #else
 	UNUSED(index);
 	return -42;
