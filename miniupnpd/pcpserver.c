@@ -75,6 +75,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnputils.h"
 #include "portinuse.h"
 #include "pcp_msg_struct.h"
+#ifdef ENABLE_UPNPPINHOLE
+#include "upnppinhole.h"
+#endif /* ENABLE_UPNPPINHOLE */
+
 
 #ifdef PCP_PEER
 /* TODO make this platform independent */
@@ -131,8 +135,8 @@ typedef struct pcp_info {
 	uint8_t is_peer_op;
 	const struct in6_addr *thirdp_ip;
 	const struct in6_addr *mapped_ip;
+	char mapped_str[INET_ADDRSTRLEN];
 	int pfailure_present;
-	char senderaddrstr[48];	/* can be either IPv4 or IPv6 */
 	struct in6_addr sender_ip;
 	int is_fw; /* is this firewall operation? if not, nat. */
 	char desc[64];
@@ -691,108 +695,124 @@ static int CreatePCPPeer(pcp_info_t *pcp_msg_info)
 
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
 
+	char peerip_s[INET_ADDRSTRLEN], extip_s[INET_ADDRSTRLEN];
+	time_t timestamp = time(NULL) + pcp_msg_info->lifetime;
+	int r = -1;
+
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
-	    pcp_msg_info->int_port);
+	       pcp_msg_info->int_port);
 	FillSA((struct sockaddr*)&peerip, pcp_msg_info->peer_ip,
-	    pcp_msg_info->peer_port);
+	       pcp_msg_info->peer_port);
 	FillSA((struct sockaddr*)&extip, pcp_msg_info->ext_ip,
-	    eport);
+	       eport);
 
-	/* check if connection with given peer exists, if it was */
-	/* already established use this external port */
-	if (get_nat_ext_addr( (struct sockaddr*)&intip, (struct sockaddr*)&peerip,
-	    proto, (struct sockaddr*)&ret_extip) == 1) {
-		if (ret_extip.ss_family == AF_INET) {
-			struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
-			uint16_t ret_eport = ntohs(ret_ext4->sin_port);
-			eport = ret_eport;
-		} else if (ret_extip.ss_family == AF_INET6) {
-			struct sockaddr_in6* ret_ext6 = (struct sockaddr_in6*)&ret_extip;
-			uint16_t ret_eport = ntohs(ret_ext6->sin6_port);
-			eport = ret_eport;
-		} else {
-			pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
-			return 0;
+	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
+	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
+
+	if (pcp_msg_info->is_fw) {
+#ifdef ENABLE_UPNPPINHOLE
+		eport = pcp_msg_info->int_port;
+		r = upnp_add_inboundpinhole(peerip_s,
+					    pcp_msg_info->peer_port,
+					    pcp_msg_info->mapped_str,
+					    eport,
+					    proto,
+					    pcp_msg_info->desc,
+					    0, NULL);
+#endif /* ENABLE_UPNPPINHOLE */
+	} else {
+
+		/* check if connection with given peer exists, if it was */
+		/* already established use this external port */
+		if (get_nat_ext_addr( (struct sockaddr*)&intip, (struct sockaddr*)&peerip,
+				      proto, (struct sockaddr*)&ret_extip) == 1) {
+			if (ret_extip.ss_family == AF_INET) {
+				struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
+				uint16_t ret_eport = ntohs(ret_ext4->sin_port);
+				eport = ret_eport;
+			} else if (ret_extip.ss_family == AF_INET6) {
+				struct sockaddr_in6* ret_ext6 = (struct sockaddr_in6*)&ret_extip;
+				uint16_t ret_eport = ntohs(ret_ext6->sin6_port);
+				eport = ret_eport;
+			} else {
+				pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+				return 0;
+			}
 		}
-	}
-	/* Create Peer Mapping */
-	{
-		char peerip_s[INET_ADDRSTRLEN], extip_s[INET_ADDRSTRLEN];
-		time_t timestamp = time(NULL) + pcp_msg_info->lifetime;
-
+		/* Create Peer Mapping */
 		if (eport == 0) {
 			eport = pcp_msg_info->int_port;
 		}
 
-		inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
-		inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
-
 #ifdef PCP_FLOWP
 		if (pcp_msg_info->flowp_present && pcp_msg_info->dscp_up) {
 			if (add_peer_dscp_rule2(ext_if_name, peerip_s,
-			        pcp_msg_info->peer_port, pcp_msg_info->dscp_up,
-			        pcp_msg_info->senderaddrstr, pcp_msg_info->int_port,
-			        proto, pcp_msg_info->desc, timestamp) < 0 ) {
+						pcp_msg_info->peer_port, pcp_msg_info->dscp_up,
+						pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+						proto, pcp_msg_info->desc, timestamp) < 0 ) {
 				syslog(LOG_ERR, "PCP: failed to add flowp upstream mapping %s:%hu->%s:%hu '%s'",
-				        pcp_msg_info->senderaddrstr,
-				        pcp_msg_info->int_port,
-				        peerip_s,
-				        pcp_msg_info->peer_port,
-				        pcp_msg_info->desc);
+				       pcp_msg_info->mapped_str,
+				       pcp_msg_info->int_port,
+				       peerip_s,
+				       pcp_msg_info->peer_port,
+				       pcp_msg_info->desc);
 				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+				return 0;
 			}
 		}
 
 		if (pcp_msg_info->flowp_present && pcp_msg_info->dscp_down) {
-			if (add_peer_dscp_rule2(ext_if_name,  pcp_msg_info->senderaddrstr,
-			        pcp_msg_info->int_port, pcp_msg_info->dscp_down,
-			        peerip_s, pcp_msg_info->peer_port, proto, pcp_msg_info->desc, timestamp)
-			          < 0 ) {
+			if (add_peer_dscp_rule2(ext_if_name,  pcp_msg_info->mapped_str,
+						pcp_msg_info->int_port, pcp_msg_info->dscp_down,
+						peerip_s, pcp_msg_info->peer_port, proto, pcp_msg_info->desc, timestamp)
+			    < 0 ) {
 				syslog(LOG_ERR, "PCP: failed to add flowp downstream mapping %s:%hu->%s:%hu '%s'",
-				        pcp_msg_info->senderaddrstr,
-				        pcp_msg_info->int_port,
-				        peerip_s,
-				        pcp_msg_info->peer_port,
-				        pcp_msg_info->desc);
+				       pcp_msg_info->mapped_str,
+				       pcp_msg_info->int_port,
+				       peerip_s,
+				       pcp_msg_info->peer_port,
+				       pcp_msg_info->desc);
 				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+				return 0;
 			}
 		}
 #endif
-		/* TODO: add upnp function for PI */
-		if (add_peer_redirect_rule2(ext_if_name,
-		        peerip_s,
-		        pcp_msg_info->peer_port,
-		        extip_s,
-		        eport,
-		        pcp_msg_info->senderaddrstr,
-		        pcp_msg_info->int_port,
-		        pcp_msg_info->protocol,
-		        pcp_msg_info->desc,
-		        timestamp) < 0 ) {
 
-			syslog(LOG_ERR, "PCP PEER: failed to add peer mapping %s %s:%hu(%hu)->%s:%hu '%s'",
-			        (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
-			        pcp_msg_info->senderaddrstr,
-			        pcp_msg_info->int_port,
-			        eport,
-			        peerip_s,
-			        pcp_msg_info->peer_port,
-			        pcp_msg_info->desc);
+		r = add_peer_redirect_rule2(ext_if_name,
+					    peerip_s,
+					    pcp_msg_info->peer_port,
+					    extip_s,
+					    eport,
+					    pcp_msg_info->mapped_str,
+					    pcp_msg_info->int_port,
+					    pcp_msg_info->protocol,
+					    pcp_msg_info->desc,
+					    timestamp);
+	}
+	/* TODO: add upnp function for PI */
+	if (r < 0 ) {
+		syslog(LOG_ERR, "PCP PEER: failed to add peer mapping %s %s:%hu(%hu)->%s:%hu '%s'",
+		       (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
+		       pcp_msg_info->mapped_str,
+		       pcp_msg_info->int_port,
+		       eport,
+		       peerip_s,
+		       pcp_msg_info->peer_port,
+		       pcp_msg_info->desc);
 
-			pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 
-			return 0;
-		} else {
-			pcp_msg_info->ext_port = eport;
-			syslog(LOG_INFO, "PCP PEER: added mapping %s %s:%hu(%hu)->%s:%hu '%s'",
-				        (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
-				        pcp_msg_info->senderaddrstr,
-				        pcp_msg_info->int_port,
-				        eport,
-				        peerip_s,
-				        pcp_msg_info->peer_port,
-				        pcp_msg_info->desc);
-		}
+		return 0;
+	} else {
+		pcp_msg_info->ext_port = eport;
+		syslog(LOG_INFO, "PCP PEER: added mapping %s %s:%hu(%hu)->%s:%hu '%s'",
+		       (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
+		       pcp_msg_info->mapped_str,
+		       pcp_msg_info->int_port,
+		       eport,
+		       peerip_s,
+		       pcp_msg_info->peer_port,
+		       pcp_msg_info->desc);
 	}
 
 	return 1;
@@ -813,33 +833,47 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 	int proto2;
 	char desc[64];
 	unsigned int timestamp;
+	int uid;
 
 	inet_n46top((struct in6_addr*)pcp_msg_info->peer_ip, rhost, sizeof(rhost));
 
-	while(get_peer_rule_by_index(index, 0,
-		  &eport2, iaddr2, sizeof(iaddr2),
-		  &iport2, &proto2,
-		  desc, sizeof(desc),
-		  rhost2, sizeof(rhost2), &rport2, &timestamp, 0, 0) >= 0) {
-		if((0 == strncmp(iaddr2, pcp_msg_info->senderaddrstr, sizeof(iaddr2)))
-		  && (0 == strncmp(rhost2, rhost, sizeof(rhost2)))
-		  && (proto2==proto)
-		  && 0 == strcmp(desc, pcp_msg_info->desc)
-		  && (iport2==iport) && (rport2==rport)) {
-			r = _upnp_delete_redir(eport2, proto2);
+	for (index = 0 ;
+	     (!pcp_msg_info->is_fw &&
+	      get_peer_rule_by_index(index, 0,
+				     &eport2, iaddr2, sizeof(iaddr2),
+				     &iport2, &proto2,
+				     desc, sizeof(desc),
+				     rhost2, sizeof(rhost2), &rport2,
+				     &timestamp, 0, 0) >= 0)
+		||
+	     (pcp_msg_info->is_fw &&
+	      (uid=upnp_get_pinhole_uid_by_index(index))>=0 &&
+	      upnp_get_pinhole_info((unsigned short)uid,
+				    rhost2, sizeof(rhost2), &rport2,
+				    iaddr2, sizeof(iaddr2), &iport2,
+				    &proto2, desc, sizeof(desc),
+				    &timestamp, NULL) > 0) ;
+	     index++) {
+		if((0 == strncmp(iaddr2, pcp_msg_info->mapped_str, sizeof(iaddr2)))
+		   && (0 == strncmp(rhost2, rhost, sizeof(rhost2)))
+		   && (proto2==proto)
+		   && 0 == strcmp(desc, pcp_msg_info->desc)
+		   && (iport2==iport) && (rport2==rport)) {
+			if (!pcp_msg_info->is_fw)
+				r = _upnp_delete_redir(eport2, proto2);
+			else
+				r = upnp_delete_inboundpinhole(uid);
 			if(r<0) {
 				syslog(LOG_ERR, "PCP PEER: failed to remove peer mapping");
-				index++;
 			} else {
 				syslog(LOG_INFO, "PCP PEER: %s port %hu peer mapping removed",
 				       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
 			}
-		} else {
-			index++;
+			return;
 		}
 	}
 	if (r==-1) {
-		syslog(LOG_ERR, "PCP PEER: Failed to remove PCP mapping internal port %hu, protocol %s",
+		syslog(LOG_ERR, "PCP PEER: Failed to find PCP mapping internal port %hu, protocol %s",
 		       iport, (pcp_msg_info->protocol == IPPROTO_TCP)?"TCP":"UDP");
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 	}
@@ -880,112 +914,123 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 	uint16_t iport_old;
 	uint16_t eport_first = 0;
 	int any_eport_allowed = 0;
-	unsigned int timestamp;
-	int r=0;
+	unsigned int timestamp = time(NULL) + pcp_msg_info->lifetime;
+	int r=-1;
 
-	if (pcp_msg_info->ext_port == 0) {
-		pcp_msg_info->ext_port = pcp_msg_info->int_port;
-	}
-	do {
-		if (eport_first == 0) { /* first time in loop */
-			eport_first = pcp_msg_info->ext_port;
-		} else if (pcp_msg_info->ext_port == eport_first) { /* no eport available */
-			if (any_eport_allowed == 0) { /* all eports rejected by permissions */
-				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-			} else { /* at least one eport allowed (but none available) */
-				pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
-			}
-			return;
+	if (pcp_msg_info->is_fw) {
+#ifdef ENABLE_UPNPPINHOLE
+		r = upnp_add_inboundpinhole(NULL, 0,
+					    pcp_msg_info->mapped_str,
+					    pcp_msg_info->int_port,
+					    pcp_msg_info->protocol,
+					    pcp_msg_info->desc,
+					    timestamp,
+					    NULL);
+#endif /* ENABLE_UPNPPINHOLE */
+	} else {
+		if (pcp_msg_info->ext_port == 0) {
+			pcp_msg_info->ext_port = pcp_msg_info->int_port;
 		}
-		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
-		      (!check_upnp_rule_against_permissions(upnppermlist,
-		               num_upnpperm, pcp_msg_info->ext_port,
-	                       ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
-		               pcp_msg_info->int_port)))) {
-			if (pcp_msg_info->pfailure_present) {
-				pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+		do {
+			if (eport_first == 0) { /* first time in loop */
+				eport_first = pcp_msg_info->ext_port;
+			} else if (pcp_msg_info->ext_port == eport_first) { /* no eport available */
+				if (any_eport_allowed == 0) { /* all eports rejected by permissions */
+					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+				} else { /* at least one eport allowed (but none available) */
+					pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+				}
 				return;
 			}
-			pcp_msg_info->ext_port++;
-			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
-				pcp_msg_info->ext_port++;
-			}
-			continue;
-		}
-		any_eport_allowed = 1;
-#ifdef CHECK_PORTINUSE
-		if (port_in_use(ext_if_name, pcp_msg_info->ext_port, pcp_msg_info->protocol,
-		    pcp_msg_info->senderaddrstr, pcp_msg_info->int_port) > 0) {
-			syslog(LOG_INFO, "port %hu protocol %s already in use",
-			       pcp_msg_info->ext_port,
-			       (pcp_msg_info->protocol==IPPROTO_TCP)?"tcp":"udp");
-			pcp_msg_info->ext_port++;
-			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
-				pcp_msg_info->ext_port++;
-			}
-			continue;
-		}
-#endif
-		r = get_redirect_rule(ext_if_name,
-		                  pcp_msg_info->ext_port,
-		                  pcp_msg_info->protocol,
-		                  iaddr_old, sizeof(iaddr_old),
-		                  &iport_old, 0, 0, 0, 0,
-		                  &timestamp, 0, 0);
-
-		if(r==0) {
-			if((strncmp(pcp_msg_info->senderaddrstr, iaddr_old,
-			   sizeof(iaddr_old))!=0)
-			   || (pcp_msg_info->int_port != iport_old)) {
-				/* redirection already existing */
+			if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
+			     (!check_upnp_rule_against_permissions(upnppermlist,
+								   num_upnpperm, pcp_msg_info->ext_port,
+								   ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
+								   pcp_msg_info->int_port)))) {
 				if (pcp_msg_info->pfailure_present) {
 					pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 					return;
 				}
-			} else {
-				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
-				       pcp_msg_info->ext_port, (pcp_msg_info->protocol==IPPROTO_TCP)?"tcp":"udp",
-				       iaddr_old, iport_old);
-				/* remove and then add again */
-				if (_upnp_delete_redir(pcp_msg_info->ext_port,
-						pcp_msg_info->protocol)==0) {
-					break;
-				} else if (pcp_msg_info->pfailure_present) {
-					pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
-					return;
+				pcp_msg_info->ext_port++;
+				if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+					pcp_msg_info->ext_port++;
+				}
+				continue;
+			}
+			any_eport_allowed = 1;
+#ifdef CHECK_PORTINUSE
+			if (port_in_use(ext_if_name, pcp_msg_info->ext_port, pcp_msg_info->protocol,
+					pcp_msg_info->mapped_str, pcp_msg_info->int_port) > 0) {
+				syslog(LOG_INFO, "port %hu protocol %s already in use",
+				       pcp_msg_info->ext_port,
+				       (pcp_msg_info->protocol==IPPROTO_TCP)?"tcp":"udp");
+				pcp_msg_info->ext_port++;
+				if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+					pcp_msg_info->ext_port++;
+				}
+				continue;
+			}
+#endif
+			r = get_redirect_rule(ext_if_name,
+					      pcp_msg_info->ext_port,
+					      pcp_msg_info->protocol,
+					      iaddr_old, sizeof(iaddr_old),
+					      &iport_old, 0, 0, 0, 0,
+					      &timestamp, 0, 0);
+
+			if(r==0) {
+				if((strncmp(pcp_msg_info->mapped_str, iaddr_old,
+					    sizeof(iaddr_old))!=0)
+				   || (pcp_msg_info->int_port != iport_old)) {
+					/* redirection already existing */
+					if (pcp_msg_info->pfailure_present) {
+						pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+						return;
+					}
+				} else {
+					syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+					       pcp_msg_info->ext_port, (pcp_msg_info->protocol==IPPROTO_TCP)?"tcp":"udp",
+					       iaddr_old, iport_old);
+					/* remove and then add again */
+					if (_upnp_delete_redir(pcp_msg_info->ext_port,
+							       pcp_msg_info->protocol)==0) {
+						break;
+					} else if (pcp_msg_info->pfailure_present) {
+						pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+						return;
+					}
+				}
+				pcp_msg_info->ext_port++;
+				if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+					pcp_msg_info->ext_port++;
 				}
 			}
-			pcp_msg_info->ext_port++;
-			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
-				pcp_msg_info->ext_port++;
-			}
-		}
-	} while (r==0);
+		} while (r==0);
 
-	timestamp = time(NULL) + pcp_msg_info->lifetime;
-
-	if(upnp_redirect_internal(NULL,
-	        pcp_msg_info->ext_port,
-	        pcp_msg_info->senderaddrstr,
-	        pcp_msg_info->int_port,
-	        pcp_msg_info->protocol,
-	        pcp_msg_info->desc,
-	        timestamp) < 0) {
+		r = upnp_redirect_internal(NULL,
+					   pcp_msg_info->ext_port,
+					   pcp_msg_info->mapped_str,
+					   pcp_msg_info->int_port,
+					   pcp_msg_info->protocol,
+					   pcp_msg_info->desc,
+					   timestamp);
+	}
+	if(r < 0) {
 
 		syslog(LOG_ERR, "PCP MAP: Failed to add mapping %hu->%s:%hu '%s'",
-		        pcp_msg_info->ext_port,
-		        pcp_msg_info->senderaddrstr,
-		        pcp_msg_info->int_port,
-		        pcp_msg_info->desc);
+		       pcp_msg_info->ext_port,
+		       pcp_msg_info->mapped_str,
+		       pcp_msg_info->int_port,
+		       pcp_msg_info->desc);
 
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 
 	} else {
 		syslog(LOG_INFO, "PCP MAP: added mapping %hu->%s:%hu '%s'",
-		        pcp_msg_info->ext_port,
-		        pcp_msg_info->senderaddrstr,
-		        pcp_msg_info->int_port,
-		        pcp_msg_info->desc);
+		       pcp_msg_info->ext_port,
+		       pcp_msg_info->mapped_str,
+		       pcp_msg_info->int_port,
+		       pcp_msg_info->desc);
 	}
 }
 
@@ -1010,7 +1055,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	      desc, sizeof(desc),
 	      0, 0, &timestamp, 0, 0) >= 0) {
 
-		if(0 == strncmp(iaddr2, pcp_msg_info->senderaddrstr, sizeof(iaddr2))
+		if(0 == strncmp(iaddr2, pcp_msg_info->mapped_str, sizeof(iaddr2))
 		  && (proto2==proto)
 		  && 0 == strcmp(desc, pcp_msg_info->desc)
 		  && ((iport2==iport) || (iport==0))) {
@@ -1063,6 +1108,22 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 			pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
 			return 0;
 		}
+	}
+
+	/* Produce mapped_str for future use. */
+	if (IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip)) {
+		if (!inet_ntop(AF_INET,
+			       &((uint32_t *)pcp_msg_info->mapped_ip)[3],
+			       pcp_msg_info->mapped_str,
+			       sizeof(pcp_msg_info->mapped_str))) {
+			syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
+			return 0;
+		}
+	} else if(!inet_ntop(AF_INET6, pcp_msg_info->mapped_ip,
+			     pcp_msg_info->mapped_str,
+			     sizeof(pcp_msg_info->mapped_str))) {
+		syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
+		return 0;
 	}
 
 	/* protocol zero means 'all protocols' : internal port MUST be zero */
@@ -1441,25 +1502,15 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 	memset(&pcp_msg_info, 0, sizeof(pcp_info_t));
 
 	if(senderaddr->sa_family == AF_INET) {
-		const struct sockaddr_in * senderaddr_v4;
-		senderaddr_v4 = (const struct sockaddr_in *)senderaddr;
-		if(!inet_ntop(AF_INET, &senderaddr_v4->sin_addr,
-		              pcp_msg_info.senderaddrstr,
-		              sizeof(pcp_msg_info.senderaddrstr))) {
-			syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
-		}
+		const struct sockaddr_in * senderaddr_v4 =
+			(const struct sockaddr_in *)senderaddr;
 		pcp_msg_info.sender_ip.s6_addr[11] = 0xff;
 		pcp_msg_info.sender_ip.s6_addr[10] = 0xff;
 		memcpy(pcp_msg_info.sender_ip.s6_addr+12,
 		       &senderaddr_v4->sin_addr, 4);
 	} else if(senderaddr->sa_family == AF_INET6) {
-		const struct sockaddr_in6 * senderaddr_v6;
-		senderaddr_v6 = (const struct sockaddr_in6 *)senderaddr;
-		if(!inet_ntop(AF_INET6, &senderaddr_v6->sin6_addr,
-			      pcp_msg_info.senderaddrstr,
-			      sizeof(pcp_msg_info.senderaddrstr))) {
-			syslog(LOG_ERR, "inet_ntop(pcpserver): %m");
-		}
+		const struct sockaddr_in6 * senderaddr_v6 =
+			(const struct sockaddr_in6 *)senderaddr;
 		pcp_msg_info.sender_ip = senderaddr_v6->sin6_addr;
 	} else {
 		syslog(LOG_WARNING, "unknown PCP packet sender address family %d",

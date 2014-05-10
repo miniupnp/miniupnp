@@ -27,8 +27,9 @@ upnp_check_outbound_pinhole(int proto, int * timeout);
  * .. = error */
 int
 upnp_add_inboundpinhole(const char * raddr, unsigned short rport,
-              const char * iaddr, unsigned short iport,
-              int proto, unsigned int leasetime, int * uid);
+                        const char * iaddr, unsigned short iport,
+                        int proto, char * desc,
+                        unsigned int leasetime, int * uid);
 
 /*
  * return values :

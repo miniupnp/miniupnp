@@ -100,6 +100,7 @@ upnp_add_inboundpinhole(const char * raddr,
                         const char * iaddr,
                         unsigned short iport,
                         int proto,
+                        char * desc,
                         unsigned int leasetime,
                         int * uid)
 {
@@ -130,7 +131,7 @@ upnp_add_inboundpinhole(const char * raddr,
 	{
 #if defined(USE_PF) || defined(USE_NETFILTER)
 		*uid = add_pinhole (0/*ext_if_name*/, raddr, rport,
-		                    iaddr, iport, proto, ""/*desc*/, timestamp);
+		                    iaddr, iport, proto, desc, timestamp);
 		return 1;
 #else
 		return -42;	/* not implemented */
