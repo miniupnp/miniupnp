@@ -305,7 +305,7 @@ static void printPEEROpcodeVersion2(pcp_peer_v2_t *peer_buf)
 
 	syslog(LOG_DEBUG, "PCP PEER: v2 Opcode specific information.");
 	syslog(LOG_DEBUG, "nonce:        \t%08x%08x%08x",
-	       map_buf->nonce[0], map_buf->nonce[1], map_buf->nonce[2]);
+	       peer_buf->nonce[0], peer_buf->nonce[1], peer_buf->nonce[2]);
 	syslog(LOG_DEBUG, "Protocol:     \t%d",peer_buf->protocol );
 	syslog(LOG_DEBUG, "Internal port:\t%d", ntohs(peer_buf->int_port) );
 	syslog(LOG_DEBUG, "External IP:  \t%s", inet_ntop(AF_INET6, &peer_buf->ext_ip,
