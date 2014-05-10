@@ -95,7 +95,7 @@ const char * tag = 0;
 const char * miniupnpd_nat_chain = "MINIUPNPD";
 const char * miniupnpd_peer_chain = "MINIUPNPD-PCP-PEER";
 const char * miniupnpd_forward_chain = "MINIUPNPD";
-#ifdef ENABLE_6FC_SERVICE
+#ifdef ENABLE_UPNPPINHOLE
 const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
 #endif
 

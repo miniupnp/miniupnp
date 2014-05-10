@@ -15,6 +15,9 @@
 #ifdef __DragonFly__
 #include <net/pf/pfvar.h>
 #else
+#ifdef MACOSX
+#define PRIVATE 1
+#endif
 #include <net/pfvar.h>
 #endif
 #include <fcntl.h>
@@ -39,7 +42,8 @@
  * with the label "pinhole-$uid ts-$timestamp"
  */
 
-#ifdef ENABLE_6FC_SERVICE
+#ifdef ENABLE_UPNPPINHOLE
+
 /* /dev/pf when opened */
 extern int dev;
 
@@ -50,7 +54,7 @@ static int next_uid = 1;
 int add_pinhole(const char * ifname,
                 const char * rem_host, unsigned short rem_port,
                 const char * int_client, unsigned short int_port,
-                int proto, unsigned int timestamp)
+                int proto, const char * desc, unsigned int timestamp)
 {
 	int uid;
 	struct pfioc_rule pcr;
@@ -206,7 +210,8 @@ int
 get_pinhole_info(unsigned short uid,
                  char * rem_host, int rem_hostlen, unsigned short * rem_port,
                  char * int_client, int int_clientlen, unsigned short * int_port,
-                 int * proto, unsigned int * timestamp,
+                 int * proto, char * desc, int desclen,
+                 unsigned int * timestamp,
                  u_int64_t * packets, u_int64_t * bytes)
 {
 	int i, n;
@@ -219,6 +224,7 @@ get_pinhole_info(unsigned short uid,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
+	if (desc) *desc = 0; /* XXX - use label for storing it? */
 	snprintf(label_start, sizeof(label_start),
 	         "pinhole-%hu", uid);
 	memset(&pr, 0, sizeof(pr));
@@ -363,5 +369,4 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 	return n;	/* number of rules removed */
 }
 
-#endif /* ENABLE_IPV6 */
-
+#endif /* ENABLE_UPNPPINHOLE */

@@ -77,7 +77,7 @@
 #ifdef USE_IFACEWATCHER
 #include "ifacewatcher.h"
 #endif
-#ifdef ENABLE_6FC_SERVICE
+#ifdef ENABLE_UPNPPINHOLE
 #ifdef USE_NETFILTER
 void init_iptpinhole(void);
 #endif
@@ -1381,7 +1381,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		syslog(LOG_ERR, "Failed to init redirection engine. EXITING");
 		return 1;
 	}
-#ifdef ENABLE_6FC_SERVICE
+#ifdef ENABLE_UPNPPINHOLE
 #ifdef USE_NETFILTER
 	init_iptpinhole();
 #endif
@@ -1522,7 +1522,7 @@ main(int argc, char * * argv)
 	struct rule_state * rule_list = 0;
 	struct timeval checktime = {0, 0};
 	struct lan_addr_s * lan_addr;
-#ifdef ENABLE_6FC_SERVICE
+#ifdef ENABLE_UPNPPINHOLE
 	unsigned int next_pinhole_ts;
 #endif
 
@@ -1853,7 +1853,7 @@ main(int argc, char * * argv)
 			syslog(LOG_DEBUG, "setting timeout to %u sec",
 			       (unsigned)timeout.tv_sec);
 		}
-#ifdef ENABLE_6FC_SERVICE
+#ifdef ENABLE_UPNPPINHOLE
 		/* Clean up expired IPv6 PinHoles */
 		next_pinhole_ts = 0;
 		upnp_clean_expired_pinholes(&next_pinhole_ts);
@@ -1862,7 +1862,7 @@ main(int argc, char * * argv)
 			timeout.tv_sec = next_pinhole_ts - timeofday.tv_sec;
 			timeout.tv_usec = 0;
 		}
-#endif
+#endif /* ENABLE_UPNPPINHOLE */
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
 		FD_ZERO(&readset);
