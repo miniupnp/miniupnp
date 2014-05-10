@@ -384,6 +384,16 @@ get_pinhole_info(unsigned short uid,
 	return 0;
 }
 
+int get_pinhole_uid_by_index(int index)
+{
+	struct pinhole_t * p;
+
+	for(p = pinhole_list.lh_first; p != NULL; p = p->entries.le_next)
+		if (!index--)
+			return p->uid;
+	return -1;
+}
+
 int
 clean_pinhole_list(unsigned int * next_timestamp)
 {
