@@ -223,13 +223,13 @@ static void NewListRedirections(struct UPNPUrls * urls,
  * 3 - Add port mapping
  * 4 - get this port mapping from the IGD */
 static void SetRedirectAndTest(struct UPNPUrls * urls,
-                               struct IGDdatas * data,
-							   const char * iaddr,
-							   const char * iport,
-							   const char * eport,
-                               const char * proto,
-                               const char * leaseDuration,
-                               const char * description)
+			       struct IGDdatas * data,
+			       const char * iaddr,
+			       const char * iport,
+			       const char * eport,
+			       const char * proto,
+			       const char * leaseDuration,
+			       const char * description,
 {
 	char externalIPAddress[40];
 	char intClient[40];
@@ -265,10 +265,10 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 		       eport, iport, iaddr, r, strupnperror(r));
 
 	r = UPNP_GetSpecificPortMappingEntry(urls->controlURL,
-	                                 data->first.servicetype,
-    	                             eport, proto, NULL/*remoteHost*/,
-									 intClient, intPort, NULL/*desc*/,
-	                                 NULL/*enabled*/, duration);
+					     data->first.servicetype,
+					     eport, proto, NULL/*remoteHost*/,
+					     intClient, intPort, NULL/*desc*/,
+					     NULL/*enabled*/, duration);
 	if(r!=UPNPCOMMAND_SUCCESS)
 		printf("GetSpecificPortMappingEntry() failed with code %d (%s)\n",
 		       r, strupnperror(r));
@@ -283,8 +283,8 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 static void
 RemoveRedirect(struct UPNPUrls * urls,
                struct IGDdatas * data,
-			   const char * eport,
-			   const char * proto)
+	       const char * eport,
+	       const char * proto)
 {
 	int r;
 	if(!proto || !eport)
@@ -549,7 +549,7 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "       \t%s [options] -d external_port protocol [port2 protocol2] [...]\n\t\tDelete port redirection\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -s\n\t\tGet Connection status\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -l\n\t\tList redirections\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -L\n\t\tList redirections (using GetListOfPortMappings, IGD v2)\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -L\n\t\tList redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -r port1 protocol1 [port2 protocol2] [...]\n\t\tAdd all redirections to the current host\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n\t\tAdd Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -U uniqueID new_lease_time\n\t\tUpdate Pinhole (for IGD:2 only)\n", argv[0]);

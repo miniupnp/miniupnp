@@ -335,13 +335,13 @@ UPNP_GetExternalIPAddress(const char * controlURL,
 
 LIBSPEC int
 UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
-                    const char * extPort,
-					const char * inPort,
-					const char * inClient,
-					const char * desc,
-					const char * proto,
-                    const char * remoteHost,
-                    const char * leaseDuration)
+		    const char * extPort,
+		    const char * inPort,
+		    const char * inClient,
+		    const char * desc,
+		    const char * proto,
+		    const char * remoteHost,
+		    const char * leaseDuration)
 {
 	struct UPNParg * AddPortMappingArgs;
 	char * buffer;

@@ -123,13 +123,13 @@ UPNP_GetLinkLayerMaxBitRates(const char* controlURL,
  */
 LIBSPEC int
 UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
-                    const char * extPort,
-				    const char * inPort,
-					const char * inClient,
-					const char * desc,
-                    const char * proto,
-                    const char * remoteHost,
-                    const char * leaseDuration);
+		    const char * extPort,
+		    const char * inPort,
+		    const char * inClient,
+		    const char * desc,
+		    const char * proto,
+		    const char * remoteHost,
+		    const char * leaseDuration);
 
 /* UPNP_DeletePortMapping()
  * Use same argument values as what was used for AddPortMapping().
@@ -145,8 +145,8 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
  * 714 NoSuchEntryInArray - The specified value does not exist in the array */
 LIBSPEC int
 UPNP_DeletePortMapping(const char * controlURL, const char * servicetype,
-                       const char * extPort, const char * proto,
-                       const char * remoteHost);
+		       const char * extPort, const char * proto,
+		       const char * remoteHost);
 
 /* UPNP_GetPortMappingNumberOfEntries()
  * not supported by all routers */
