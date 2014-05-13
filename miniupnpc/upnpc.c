@@ -251,13 +251,13 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 		return;
 	}
 
-	UPNP_GetExternalIPAddress(urls->controlURL,
-	                          data->first.servicetype,
-							  externalIPAddress);
-	if(externalIPAddress[0])
-		printf("ExternalIPAddress = %s\n", externalIPAddress);
-	else
+	r = UPNP_GetExternalIPAddress(urls->controlURL,
+				      data->first.servicetype,
+				      externalIPAddress);
+	if(r!=UPNPCOMMAND_SUCCESS)
 		printf("GetExternalIPAddress failed.\n");
+	else
+		printf("ExternalIPAddress = %s\n", externalIPAddress);
 
 	if (addAny) {
 		r = UPNP_AddAnyPortMapping(urls->controlURL, data->first.servicetype,
@@ -285,8 +285,7 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 	if(r!=UPNPCOMMAND_SUCCESS)
 		printf("GetSpecificPortMappingEntry() failed with code %d (%s)\n",
 		       r, strupnperror(r));
-
-	if(intClient[0]) {
+	else {
 		printf("InternalIP:Port = %s:%s\n", intClient, intPort);
 		printf("external %s:%s %s is redirected to internal %s:%s (duration=%s)\n",
 		       externalIPAddress, eport, proto, intClient, intPort, duration);
