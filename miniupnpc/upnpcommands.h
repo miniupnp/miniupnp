@@ -17,6 +17,7 @@
 #define UPNPCOMMAND_UNKNOWN_ERROR (-1)
 #define UPNPCOMMAND_INVALID_ARGS (-2)
 #define UPNPCOMMAND_HTTP_ERROR (-3)
+#define UPNPCOMMAND_INVALID_RESPONSE (-4)
 
 #ifdef __cplusplus
 extern "C" {
@@ -131,6 +132,40 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
 		    const char * remoteHost,
 		    const char * leaseDuration);
 
+/* UPNP_AddAnyPortMapping()
+ * if desc is NULL, it will be defaulted to "libminiupnpc"
+ * remoteHost is usually NULL because IGD don't support it.
+ *
+ * Return values :
+ * 0 : SUCCESS
+ * NON ZERO : ERROR. Either an UPnP error code or an unknown error.
+ *
+ * List of possible UPnP errors for AddPortMapping :
+ * errorCode errorDescription (short) - Description (long)
+ * 402 Invalid Args - See UPnP Device Architecture section on Control.
+ * 501 Action Failed - See UPnP Device Architecture section on Control.
+ * 606 Action not authorized - The action requested REQUIRES authorization and
+ *                             the sender was not authorized.
+ * 715 WildCardNotPermittedInSrcIP - The source IP address cannot be
+ *                                   wild-carded
+ * 716 WildCardNotPermittedInExtPort - The external port cannot be wild-carded
+ * 728 NoPortMapsAvailable - There are not enough free ports available to
+ *                           complete port mapping.
+ * 729 ConflictWithOtherMechanisms - Attempted port mapping is not allowed
+ *                                   due to conflict with other mechanisms.
+ * 732 WildCardNotPermittedInIntPort - The internal port cannot be wild-carded
+ */
+LIBSPEC int
+UPNP_AddAnyPortMapping(const char * controlURL, const char * servicetype,
+		       const char * extPort,
+		       const char * inPort,
+		       const char * inClient,
+		       const char * desc,
+		       const char * proto,
+		       const char * remoteHost,
+		       const char * leaseDuration,
+		       char * reservedPort);
+
 /* UPNP_DeletePortMapping()
  * Use same argument values as what was used for AddPortMapping().
  * remoteHost is usually NULL because IGD don't support it.
@@ -147,6 +182,25 @@ LIBSPEC int
 UPNP_DeletePortMapping(const char * controlURL, const char * servicetype,
 		       const char * extPort, const char * proto,
 		       const char * remoteHost);
+
+/* UPNP_DeletePortRangeMapping()
+ * Use same argument values as what was used for AddPortMapping().
+ * remoteHost is usually NULL because IGD don't support it.
+ * Return Values :
+ * 0 : SUCCESS
+ * NON ZERO : error. Either an UPnP error code or an undefined error.
+ *
+ * List of possible UPnP errors for DeletePortMapping :
+ * 606 Action not authorized - The action requested REQUIRES authorization
+ *                             and the sender was not authorized.
+ * 730 PortMappingNotFound - This error message is returned if no port
+ *			     mapping is found in the specified range.
+ * 733 InconsistentParameters - NewStartPort and NewEndPort values are not consistent. */
+LIBSPEC int
+UPNP_DeletePortMappingRange(const char * controlURL, const char * servicetype,
+        		    const char * extPortStart, const char * extPortEnd,
+        		    const char * proto,
+        		    const char * manage);
 
 /* UPNP_GetPortMappingNumberOfEntries()
  * not supported by all routers */
