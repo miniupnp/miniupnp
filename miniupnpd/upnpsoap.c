@@ -2014,6 +2014,11 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 		while(soapMethods[i].methodName)
 		{
 			len = strlen(soapMethods[i].methodName);
+			if(len != methodlen)
+			{
+				i++;
+				continue;
+			}
 			if(strncmp(p, soapMethods[i].methodName, len) == 0)
 			{
 #ifdef DEBUG
