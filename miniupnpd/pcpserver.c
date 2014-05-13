@@ -1568,11 +1568,15 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		return 0;
 	}
 
-	lan_addr = get_lan_for_peer(senderaddr);
-	if(lan_addr == NULL) {
-		syslog(LOG_WARNING, "PCP packet sender %s not from a LAN, ignoring",
-		       addr_str);
-		return 0;
+	/* If we're in allow third party-mode, we probably don't care
+	 * about locality either. Let's hope firewall is ok. */
+	if (!GETFLAG(PCP_ALLOWTHIRDPARTYMASK)) {
+		lan_addr = get_lan_for_peer(senderaddr);
+		if(lan_addr == NULL) {
+			syslog(LOG_WARNING, "PCP packet sender %s not from a LAN, ignoring",
+			       addr_str);
+			return 0;
+		}
 	}
 
 	if (processPCPRequest(buff, len, &pcp_msg_info) ) {
