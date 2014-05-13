@@ -41,6 +41,10 @@ POSSIBILITY OF SUCH DAMAGE.
    TODO : handle NAT46, NAT64, NPT66. In addition, beyond FW/NAT
    choice, should also add for proxy (=as much as possible transparent
    pass-through to one or more servers).
+
+   TODO: IPv6 permission handling (for the time being, we just assume
+   anyone on IPv6 is a good guy, but fixing that would include
+   upnppermissions rewrite to be AF neutral).
 */
 
 #include "config.h"
