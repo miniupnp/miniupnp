@@ -8,6 +8,8 @@
 #ifndef UPNPUTILS_H_INCLUDED
 #define UPNPUTILS_H_INCLUDED
 
+#include <netinet/in.h>
+
 /**
  * convert a struct sockaddr to a human readable string.
  * [ipv6]:port or ipv4:port
@@ -33,8 +35,7 @@ get_lan_for_peer(const struct sockaddr * peer);
 /**
  * define portability macros
  */
-#if defined(__sun)
-static size_t _sa_len(const struct sockaddr *addr)
+static inline size_t _sa_len(const struct sockaddr *addr)
 {
         if (addr->sa_family == AF_INET)
                 return (sizeof(struct sockaddr_in));
@@ -43,6 +44,8 @@ static size_t _sa_len(const struct sockaddr *addr)
         else
                 return (sizeof(struct sockaddr));
 }
+
+#if defined(__sun) || defined(__linux__)
 # define SA_LEN(sa) (_sa_len(sa))
 #else
 #if !defined(SA_LEN)

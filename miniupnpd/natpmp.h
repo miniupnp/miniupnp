@@ -20,8 +20,9 @@
 
 int OpenAndConfNATPMPSockets(int * sockets);
 
-int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
-                             socklen_t * senderaddrlen,
+int ReceiveNATPMPOrPCPPacket(int s,
+                             struct sockaddr_storage * senderaddr,
+                             struct sockaddr_storage * receiveraddr,
                              unsigned char * msg_buff, size_t msg_buff_size);
 
 void ProcessIncomingNATPMPPacket(int s, unsigned char * msg_buff, int len,

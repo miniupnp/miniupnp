@@ -42,7 +42,8 @@ struct sockaddr;
  * returns 0 upon success 1 otherwise
  */
 int ProcessIncomingPCPPacket(int s, unsigned char *msg_buff, int len,
-                             const struct sockaddr *senderaddr);
+                             const struct sockaddr *senderaddr,
+                             const struct sockaddr *receiveraddr);
 
 /*
  * returns the socket

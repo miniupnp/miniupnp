@@ -23,12 +23,6 @@ struct lan_addr_list lan_addrs;
 
 #define DEST_IP "239.255.255.250"
 #define DEST_PORT 1900
-/*
-ssize_t
-sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
-                const struct sockaddr *dest_addr, socklen_t addrlen,
-                unsigned int delay)
-*/
 
 int test(void)
 {
@@ -55,17 +49,17 @@ int test(void)
 	dest_addr.sin_family = AF_INET;
 	dest_addr.sin_addr.s_addr = inet_addr(DEST_IP);
 	dest_addr.sin_port =  htons(DEST_PORT);
-	n = sendto_or_schedule(s, "1234", 4, 0,
-	                       (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-	syslog(LOG_DEBUG, "sendto_or_schedule : %d", (int)n);
-	n = sendto_schedule(s, "1234", 4, 0,
-	                    (struct sockaddr *)&dest_addr, sizeof(dest_addr),
-	                    4400);
-	syslog(LOG_DEBUG, "sendto_schedule : %d", (int)n);
-	n = sendto_schedule(s, "1234", 4, 0,
-	                    (struct sockaddr *)&dest_addr, sizeof(dest_addr),
-	                    3000);
-	syslog(LOG_DEBUG, "sendto_schedule : %d", (int)n);
+	n = send_or_schedule(s, "1234", 4, 0, NULL,
+                             (struct sockaddr *)&dest_addr);
+	syslog(LOG_DEBUG, "send_or_schedule : %d", (int)n);
+	n = send_schedule(s, "1234", 4, 0, NULL,
+			  (struct sockaddr *)&dest_addr,
+			  4400);
+	syslog(LOG_DEBUG, "send_schedule : %d", (int)n);
+	n = send_schedule(s, "1234", 4, 0, NULL,
+			  (struct sockaddr *)&dest_addr,
+			  3000);
+	syslog(LOG_DEBUG, "send_schedule : %d", (int)n);
 	while ((i = get_next_scheduled_send(&next_send)) > 0) {
 		fd_set writefds;
 		int max_fd;
@@ -76,7 +70,7 @@ int test(void)
 		FD_ZERO(&writefds);
 		max_fd = 0;
 		gettimeofday(&now, NULL);
-		i = get_sendto_fds(&writefds, &max_fd, &now);
+		i = get_send_fds(&writefds, &max_fd, &now);
 		if(now.tv_sec > next_send.tv_sec ||
 		   (now.tv_sec == next_send.tv_sec && now.tv_usec >= next_send.tv_usec)) {
 			if(i > 0) {
@@ -96,7 +90,7 @@ int test(void)
 				timeout.tv_sec--;
 			}
 		}
-		syslog(LOG_DEBUG, "get_sendto_fds() returned %d", i);
+		syslog(LOG_DEBUG, "get_send_fds() returned %d", i);
 		syslog(LOG_DEBUG, "select(%d, NULL, xx, NULL, %ld.%06ld)",
 		       max_fd, (long)timeout.tv_sec, (long)timeout.tv_usec);
 		i = select(max_fd, NULL, &writefds, NULL, &timeout);
@@ -104,8 +98,8 @@ int test(void)
 			syslog(LOG_ERR, "select: %m");
 			if(errno != EINTR)
 				break;
-		} else if(try_sendto(&writefds) < 0) {
-			syslog(LOG_ERR, "try_sendto: %m");
+		} else if(try_send(&writefds) < 0) {
+			syslog(LOG_ERR, "try_send: %m");
 			break;
 		}
 	}

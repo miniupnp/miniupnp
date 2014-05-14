@@ -12,7 +12,11 @@
 # or :
 # $ make -f Makefile.macosx install
 #
-CFLAGS = -Wall -O -g3 -DDEBUG
+
+# Got to love advanced IPv6 socket API being disabled by default (at
+# least 2014/05 on OS X 10.9.. RFC3542 being just 11 years old)
+
+CFLAGS = -Wall -O -g3 -DDEBUG -D__APPLE_USE_RFC_3542
 #CFLAGS = -Wall -Os
 #CC = gcc  #better use clang !
 RM = rm -f

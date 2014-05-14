@@ -353,7 +353,6 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 	int l, n;
 	char buf[SSDP_PACKET_MAX_LEN];
 	char addr_str[64];
-	socklen_t addrlen;
 	int st_is_uuid;
 #ifdef ENABLE_HTTP_DATE
 	char http_date[64];
@@ -417,17 +416,14 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 		       "SendSSDPResponse()", (unsigned)l, (unsigned)sizeof(buf));
 		l = sizeof(buf) - 1;
 	}
-	addrlen = (addr->sa_family == AF_INET6)
-	          ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
-	n = sendto_schedule(s, buf, l, 0,
-	                    addr, addrlen, delay);
+	n = send_schedule(s, buf, l, 0, NULL, addr, delay);
 	sockaddr_to_string(addr, addr_str, sizeof(addr_str));
 	syslog(LOG_DEBUG, "%s: %d bytes to %s ST: %.*s",
 	       "SendSSDPResponse()",
 	       n, addr_str, l, buf);
 	if(n < 0)
 	{
-		syslog(LOG_ERR, "%s: sendto(udp): %m",
+		syslog(LOG_ERR, "%s: send_schedule(udp): %m",
 		       "SendSSDPResponse()");
 	}
 }
@@ -521,36 +517,24 @@ SendSSDPNotify(int s, const struct sockaddr * dest,
 		       "SendSSDPNotify()", (unsigned)l, (unsigned)sizeof(bufr));
 		l = sizeof(bufr) - 1;
 	}
-	n = sendto_or_schedule(s, bufr, l, 0, dest,
-#ifdef ENABLE_IPV6
-		ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
-#else
-		sizeof(struct sockaddr_in)
-#endif
-		);
+	n = send_or_schedule(s, bufr, l, 0, NULL, dest);
 	if(n < 0)
 	{
-		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
+		syslog(LOG_ERR, "send_or_schedule(udp_notify=%d, %s): %m", s,
 		       host ? host : "NULL");
 	}
 	else if(n != l)
 	{
-		syslog(LOG_NOTICE, "sendto() sent %d out of %d bytes", n, l);
+		syslog(LOG_NOTICE, "send_or_schedule() sent %d out of %d bytes", n, l);
 	}
 	/* Due to the unreliable nature of UDP, devices SHOULD send the entire
 	 * set of discovery messages more than once with some delay between
 	 * sets e.g. a few hundred milliseconds. To avoid network congestion
 	 * discovery messages SHOULD NOT be sent more than three times. */
-	n = sendto_schedule(s, bufr, l, 0, dest,
-#ifdef ENABLE_IPV6
-		ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in),
-#else
-		sizeof(struct sockaddr_in),
-#endif
-		250);
+	n = send_schedule(s, bufr, l, 0, NULL, dest, 250);
 	if(n < 0)
 	{
-		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
+		syslog(LOG_ERR, "send_or_schedule(udp_notify=%d, %s): %m", s,
 		       host ? host : "NULL");
 	}
 }
@@ -1069,21 +1053,15 @@ SendSSDPbyebye(int s, const struct sockaddr * dest,
 		       "SendSSDPbyebye()", (unsigned)l, (unsigned)sizeof(bufr));
 		l = sizeof(bufr) - 1;
 	}
-	n = sendto_or_schedule(s, bufr, l, 0, dest,
-#ifdef ENABLE_IPV6
-	           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
-#else
-	           sizeof(struct sockaddr_in)
-#endif
-	          );
+	n = send_or_schedule(s, bufr, l, 0, NULL, dest);
 	if(n < 0)
 	{
-		syslog(LOG_ERR, "sendto(udp_shutdown=%d): %m", s);
+		syslog(LOG_ERR, "send_or_schedule(udp_shutdown=%d): %m", s);
 		return -1;
 	}
 	else if(n != l)
 	{
-		syslog(LOG_NOTICE, "sendto() sent %d out of %d bytes", n, l);
+		syslog(LOG_NOTICE, "send_or_schedule() sent %d out of %d bytes", n, l);
 		return -1;
 	}
 	return 0;
