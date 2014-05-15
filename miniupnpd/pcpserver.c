@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.26 2014/03/24 13:08:52 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.32 2014/05/15 10:27:36 nanard Exp $ */
 /* MiniUPnP project
  * Website : http://miniupnp.free.fr/
  * Author : Peter Tatrai
@@ -88,8 +88,12 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #ifdef PCP_PEER
 /* TODO make this platform independent */
+#ifdef USE_NETFILTER
 #include "netfilter/iptcrdr.h"
-#endif
+#else
+#error "PCP Peer is only supported with NETFILTER"
+#endif /* USE_NETFILTER */
+#endif /* PCP_PEER */
 
 /* server specific information */
 struct pcp_server_info {
