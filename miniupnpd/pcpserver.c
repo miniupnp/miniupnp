@@ -1195,7 +1195,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 				return pcp_msg_info->result_code;
 			}
-			peer_v1 = (pcp_peer_v1_t*)(req + processedSize);
+			peer_v1 = (pcp_peer_v1_t*)req;
 
 #ifdef DEBUG
 			printPEEROpcodeVersion1(peer_v1);
