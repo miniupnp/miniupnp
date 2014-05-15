@@ -1505,7 +1505,7 @@ AddPinhole(struct upnphttp * h, const char * action)
 	 * InternalClient and Protocol are the same than an existing pinhole,
 	 * but LeaseTime is different, the device MUST extend the existing
 	 * pinhole's lease time and return the UniqueID of the existing pinhole. */
-	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, proto, ltime, &uid);
+	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, proto, "IGD2 pinhole", ltime, &uid);
 
 	switch(r)
 	{
@@ -1570,7 +1570,9 @@ UpdatePinhole(struct upnphttp * h, const char * action)
 	 * it doesn't have access to, because of its public access */
 	n = upnp_get_pinhole_info(uid, NULL, 0, NULL,
 	                          iaddr, sizeof(iaddr), &iport,
-	                          NULL, NULL, NULL);
+	                          NULL, /* proto */
+	                          NULL, 0, /* desc, desclen */
+	                          NULL, NULL);
 	if (n >= 0)
 	{
 		if(PinholeVerification(h, iaddr, iport) <= 0)
@@ -1692,7 +1694,9 @@ DeletePinhole(struct upnphttp * h, const char * action)
 	 * it doesn't have access to, because of its public access */
 	n = upnp_get_pinhole_info(uid, NULL, 0, NULL,
 	                          iaddr, sizeof(iaddr), &iport,
-	                          &proto, &leasetime, NULL);
+	                          &proto,
+	                          NULL, 0, /* desc, desclen */
+	                          &leasetime, NULL);
 	if (n >= 0)
 	{
 		if(PinholeVerification(h, iaddr, iport) <= 0)
@@ -1759,7 +1763,9 @@ CheckPinholeWorking(struct upnphttp * h, const char * action)
 	r = upnp_get_pinhole_info(uid,
 	                          NULL, 0, NULL,
 	                          iaddr, sizeof(iaddr), &iport,
-	                          NULL, NULL, &packets);
+	                          NULL, /* proto */
+	                          NULL, 0, /* desc, desclen */
+	                          NULL, &packets);
 	if (r >= 0)
 	{
 		if(PinholeVerification(h, iaddr, iport) <= 0)
@@ -1818,7 +1824,9 @@ GetPinholePackets(struct upnphttp * h, const char * action)
 	 * it doesn't have access to, because of its public access */
 	n = upnp_get_pinhole_info(uid, NULL, 0, NULL,
 	                          iaddr, sizeof(iaddr), &iport,
-	                          &proto, &leasetime, &packets);
+	                          &proto,
+	                          NULL, 0, /* desc, desclen */
+	                          &leasetime, &packets);
 	if (n >= 0)
 	{
 		if(PinholeVerification(h, iaddr, iport)<=0)
