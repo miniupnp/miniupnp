@@ -772,12 +772,23 @@ DeletePortMappingRange(struct upnphttp * h, const char * action)
 		return;
 	}
 
+	syslog(LOG_INFO, "%s: deleting external ports: %hu-%hu, protocol: %s",
+	       action, startport, endport, protocol);
+
 	port_list = upnp_get_portmappings_in_range(startport, endport,
 	                                           protocol, &number);
+	if(number == 0)
+	{
+		SoapError(h, 730, "PortMappingNotFound");
+		ClearNameValueList(&data);
+		return;
+	}
+
 	for(i = 0; i < number; i++)
 	{
 		r = upnp_delete_redirection(port_list[i], protocol);
-		/* TODO : check return value for errors */
+		syslog(LOG_INFO, "%s: deleting external port: %hu, protocol: %s: %s",
+		       action, port_list[i], protocol, r < 0 ? "failed" : "ok");
 	}
 	free(port_list);
 	BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
@@ -2014,6 +2025,11 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 		while(soapMethods[i].methodName)
 		{
 			len = strlen(soapMethods[i].methodName);
+			if(len != methodlen)
+			{
+				i++;
+				continue;
+			}
 			if(strncmp(p, soapMethods[i].methodName, len) == 0)
 			{
 #ifdef DEBUG
