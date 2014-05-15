@@ -123,7 +123,7 @@ extern const char * tag;
 extern const char * miniupnpd_nat_chain;
 extern const char * miniupnpd_peer_chain;
 extern const char * miniupnpd_forward_chain;
-#ifdef ENABLE_6FC_SERVICE
+#ifdef ENABLE_UPNPPINHOLE
 extern const char * miniupnpd_v6_filter_chain;
 #endif
 #endif

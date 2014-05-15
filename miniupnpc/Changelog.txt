@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.193 2014/02/05 17:26:45 nanard Exp $
+$Id: Changelog.txt,v 1.194 2014/05/15 08:41:44 nanard Exp $
 miniUPnP client Changelog.
+
+2014/05/15:
+  Add support for IGD2 AddAnyPortMapping and DeletePortMappingRange
 
 2014/02/05:
   handle EINPROGRESS after connect()

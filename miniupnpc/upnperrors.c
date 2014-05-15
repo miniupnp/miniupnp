@@ -24,6 +24,9 @@ const char * strupnperror(int err)
 	case UPNPCOMMAND_INVALID_ARGS:
 		s = "Miniupnpc Invalid Arguments";
 		break;
+	case UPNPCOMMAND_INVALID_RESPONSE:
+		s = "Miniupnpc Invalid response";
+		break;
 	case UPNPDISCOVER_SOCKET_ERROR:
 		s = "Miniupnpc Socket error";
 		break;

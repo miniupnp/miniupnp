@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.369 2014/04/22 08:48:02 nanard Exp $
 
+2014/05/15:
+  Fix deletePortMappingRange()
+
 2014/04/21:
   Fix PCP when request contain 0 IPv4 external address
   Remove pointer casting in natpmp.c

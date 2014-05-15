@@ -335,13 +335,13 @@ UPNP_GetExternalIPAddress(const char * controlURL,
 
 LIBSPEC int
 UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
-                    const char * extPort,
-					const char * inPort,
-					const char * inClient,
-					const char * desc,
-					const char * proto,
-                    const char * remoteHost,
-                    const char * leaseDuration)
+		    const char * extPort,
+		    const char * inPort,
+		    const char * inClient,
+		    const char * desc,
+		    const char * proto,
+		    const char * remoteHost,
+		    const char * leaseDuration)
 {
 	struct UPNParg * AddPortMappingArgs;
 	char * buffer;
@@ -395,6 +395,73 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
 }
 
 LIBSPEC int
+UPNP_AddAnyPortMapping(const char * controlURL, const char * servicetype,
+		       const char * extPort,
+		       const char * inPort,
+		       const char * inClient,
+		       const char * desc,
+		       const char * proto,
+		       const char * remoteHost,
+		       const char * leaseDuration,
+		       char * reservedPort)
+{
+	struct UPNParg * AddPortMappingArgs;
+	char * buffer;
+	int bufsize;
+	struct NameValueParserData pdata;
+	const char * resVal;
+	int ret;
+
+	if(!inPort || !inClient || !proto || !extPort)
+		return UPNPCOMMAND_INVALID_ARGS;
+
+	AddPortMappingArgs = calloc(9, sizeof(struct UPNParg));
+	AddPortMappingArgs[0].elt = "NewRemoteHost";
+	AddPortMappingArgs[0].val = remoteHost;
+	AddPortMappingArgs[1].elt = "NewExternalPort";
+	AddPortMappingArgs[1].val = extPort;
+	AddPortMappingArgs[2].elt = "NewProtocol";
+	AddPortMappingArgs[2].val = proto;
+	AddPortMappingArgs[3].elt = "NewInternalPort";
+	AddPortMappingArgs[3].val = inPort;
+	AddPortMappingArgs[4].elt = "NewInternalClient";
+	AddPortMappingArgs[4].val = inClient;
+	AddPortMappingArgs[5].elt = "NewEnabled";
+	AddPortMappingArgs[5].val = "1";
+	AddPortMappingArgs[6].elt = "NewPortMappingDescription";
+	AddPortMappingArgs[6].val = desc?desc:"libminiupnpc";
+	AddPortMappingArgs[7].elt = "NewLeaseDuration";
+	AddPortMappingArgs[7].val = leaseDuration?leaseDuration:"0";
+	if(!(buffer = simpleUPnPcommand(-1, controlURL, servicetype,
+	                                "AddAnyPortMapping", AddPortMappingArgs,
+	                                &bufsize))) {
+		free(AddPortMappingArgs);
+		return UPNPCOMMAND_HTTP_ERROR;
+	}
+	ParseNameValue(buffer, bufsize, &pdata);
+	free(buffer); buffer = NULL;
+	resVal = GetValueFromNameValueList(&pdata, "errorCode");
+	if(resVal) {
+		ret = UPNPCOMMAND_UNKNOWN_ERROR;
+		sscanf(resVal, "%d", &ret);
+	} else {
+		char *p;
+
+		p = GetValueFromNameValueList(&pdata, "NewReservedPort");
+		if(p) {
+			strncpy(reservedPort, p, 6);
+			reservedPort[5] = '\0';
+			ret = UPNPCOMMAND_SUCCESS;
+		} else {
+			ret = UPNPCOMMAND_INVALID_RESPONSE;
+		}
+	}
+	ClearNameValueList(&pdata);
+	free(AddPortMappingArgs);
+	return ret;
+}
+
+LIBSPEC int
 UPNP_DeletePortMapping(const char * controlURL, const char * servicetype,
                        const char * extPort, const char * proto,
                        const char * remoteHost)
@@ -424,6 +491,52 @@ UPNP_DeletePortMapping(const char * controlURL, const char * servicetype,
 		return UPNPCOMMAND_HTTP_ERROR;
 	}
 	/*DisplayNameValueList(buffer, bufsize);*/
+	ParseNameValue(buffer, bufsize, &pdata);
+	free(buffer); buffer = NULL;
+	resVal = GetValueFromNameValueList(&pdata, "errorCode");
+	if(resVal) {
+		ret = UPNPCOMMAND_UNKNOWN_ERROR;
+		sscanf(resVal, "%d", &ret);
+	} else {
+		ret = UPNPCOMMAND_SUCCESS;
+	}
+	ClearNameValueList(&pdata);
+	free(DeletePortMappingArgs);
+	return ret;
+}
+
+LIBSPEC int
+UPNP_DeletePortMappingRange(const char * controlURL, const char * servicetype,
+        		    const char * extPortStart, const char * extPortEnd,
+        		    const char * proto,
+			    const char * manage)
+{
+	struct UPNParg * DeletePortMappingArgs;
+	char * buffer;
+	int bufsize;
+	struct NameValueParserData pdata;
+	const char * resVal;
+	int ret;
+
+	if(!extPortStart || !extPortEnd || !proto || !manage)
+		return UPNPCOMMAND_INVALID_ARGS;
+
+	DeletePortMappingArgs = calloc(5, sizeof(struct UPNParg));
+	DeletePortMappingArgs[0].elt = "NewStartPort";
+	DeletePortMappingArgs[0].val = extPortStart;
+	DeletePortMappingArgs[1].elt = "NewEndPort";
+	DeletePortMappingArgs[1].val = extPortEnd;
+	DeletePortMappingArgs[2].elt = "NewProtocol";
+	DeletePortMappingArgs[2].val = proto;
+	DeletePortMappingArgs[3].elt = "NewManage";
+	DeletePortMappingArgs[3].val = manage;
+
+	if(!(buffer = simpleUPnPcommand(-1, controlURL, servicetype,
+	                                "DeletePortMappingRange",
+	                                DeletePortMappingArgs, &bufsize))) {
+		free(DeletePortMappingArgs);
+		return UPNPCOMMAND_HTTP_ERROR;
+	}
 	ParseNameValue(buffer, bufsize, &pdata);
 	free(buffer); buffer = NULL;
 	resVal = GetValueFromNameValueList(&pdata, "errorCode");
