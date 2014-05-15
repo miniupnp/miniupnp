@@ -1977,15 +1977,15 @@ main(int argc, char * * argv)
 		upnpevents_selectfds(&readset, &writeset, &max_fd);
 #endif
 
-		/* queued "sendto" */
+		/* queued "send" */
 		{
 			struct timeval next_send;
 			i = get_next_scheduled_send(&next_send);
 			if(i > 0) {
 #ifdef DEBUG
-				syslog(LOG_DEBUG, "%d queued sendto", i);
+				syslog(LOG_DEBUG, "%d queued send", i);
 #endif
-				i = get_sendto_fds(&writeset, &max_fd, &timeofday);
+				i = get_send_fds(&writeset, &max_fd, &timeofday);
 				if(timeofday.tv_sec > next_send.tv_sec ||
 				   (timeofday.tv_sec == next_send.tv_sec && timeofday.tv_usec >= next_send.tv_usec)) {
 					if(i > 0) {
@@ -2017,9 +2017,9 @@ main(int argc, char * * argv)
 			syslog(LOG_ERR, "Failed to select open sockets. EXITING");
 			return 1;	/* very serious cause of error */
 		}
-		i = try_sendto(&writeset);
+		i = try_send(&writeset);
 		if(i < 0) {
-			syslog(LOG_ERR, "try_sendto failed to send %d packets", -i);
+			syslog(LOG_ERR, "try_send failed to send %d packets", -i);
 		}
 #ifdef USE_MINIUPNPDCTL
 		for(ectl = ctllisthead.lh_first; ectl;)
@@ -2094,24 +2094,22 @@ main(int argc, char * * argv)
 			if((snatpmp[i] >= 0) && FD_ISSET(snatpmp[i], &readset))
 			{
 				unsigned char msg_buff[PCP_MAX_LEN];
-				struct sockaddr_in senderaddr;
-				socklen_t senderaddrlen;
+				struct sockaddr_storage senderaddr;
 				int len;
 				memset(msg_buff, 0, PCP_MAX_LEN);
-				senderaddrlen = sizeof(senderaddr);
 				len = ReceiveNATPMPOrPCPPacket(snatpmp[i],
-				                               (struct sockaddr *)&senderaddr,
-				                               &senderaddrlen,
+				                               &senderaddr,
+                                                               NULL,
 				                               msg_buff, sizeof(msg_buff));
 				if (len < 1)
 					continue;
 #ifdef ENABLE_PCP
 				if (msg_buff[0]==0) {  /* version equals to 0 -> means NAT-PMP */
 					ProcessIncomingNATPMPPacket(snatpmp[i], msg_buff, len,
-					                            &senderaddr);
+					                            (struct sockaddr_in *)&senderaddr);
 				} else { /* everything else can be PCP */
 					ProcessIncomingPCPPacket(snatpmp[i], msg_buff, len,
-					                         (struct sockaddr *)&senderaddr);
+					                         (struct sockaddr *)&senderaddr, NULL);
 				}
 
 #else
@@ -2125,18 +2123,18 @@ main(int argc, char * * argv)
 		if(spcp_v6 >= 0 && FD_ISSET(spcp_v6, &readset))
 		{
 			unsigned char msg_buff[PCP_MAX_LEN];
-			struct sockaddr_in6 senderaddr;
-			socklen_t senderaddrlen;
+			struct sockaddr_storage senderaddr;
+			struct sockaddr_storage receiveraddr;
 			int len;
 			memset(msg_buff, 0, PCP_MAX_LEN);
-			senderaddrlen = sizeof(senderaddr);
 			len = ReceiveNATPMPOrPCPPacket(spcp_v6,
-			                               (struct sockaddr *)&senderaddr,
-			                               &senderaddrlen,
+			                               &senderaddr,
+			                               &receiveraddr,
 			                               msg_buff, sizeof(msg_buff));
 			if(len >= 1)
 				ProcessIncomingPCPPacket(spcp_v6, msg_buff, len,
-				                         (struct sockaddr *)&senderaddr);
+				                         (struct sockaddr *)&senderaddr,
+                                                         (struct sockaddr *)&receiveraddr);
 		}
 #endif
 		/* process SSDP packets */
@@ -2261,7 +2259,7 @@ shutdown:
 		}
 	}
 	/* try to send pending packets */
-	finalize_sendto();
+	finalize_send();
 
 	/* close out open sockets */
 	while(upnphttphead.lh_first != NULL)

@@ -1538,7 +1538,8 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 }
 
 int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
-                             const struct sockaddr * senderaddr)
+                             const struct sockaddr * senderaddr,
+                             const struct sockaddr * receiveraddr)
 {
 	pcp_info_t pcp_msg_info;
 	struct lan_addr_s * lan_addr;
@@ -1583,6 +1584,9 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		}
 	}
 
+	if (receiveraddr && receiveraddr->sa_family != AF_INET6)
+		receiveraddr = NULL;
+
 	if (processPCPRequest(buff, len, &pcp_msg_info) ) {
 
 		createPCPResponse(buff, &pcp_msg_info);
@@ -1591,12 +1595,10 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			len = PCP_MIN_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
-		len = sendto_or_schedule(s, buff, len, 0, senderaddr,
-		           (senderaddr->sa_family == AF_INET) ?
-		                  sizeof(struct sockaddr_in) :
-		                  sizeof(struct sockaddr_in6) );
+		len = send_or_schedule(s, buff, len, 0,
+				       receiveraddr, senderaddr);
 		if( len < 0 ) {
-			syslog(LOG_ERR, "sendto(pcpserver): %m");
+			syslog(LOG_ERR, "send_or_schedule(pcpserver): %m");
 		}
 	}
 
@@ -1626,6 +1628,12 @@ int OpenAndConfPCPv6Socket(void)
 		       "OpenAndConfPCPv6Socket");
 	}
 #endif
+#ifdef IPV6_RECVPKTINFO
+	if(setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &i, sizeof(i)) < 0) {
+		syslog(LOG_WARNING, "%s: setsockopt(IPV6_RECVPKTINFO): %m",
+		       "OpenAndConfPCPv6Socket");
+	}
+#endif /* IPV6_RECVPKTINFO */
 	if(!set_non_blocking(s)) {
 		syslog(LOG_WARNING, "%s: set_non_blocking(): %m",
 		       "OpenAndConfPCPv6Socket");

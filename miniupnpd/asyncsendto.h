@@ -8,31 +8,33 @@
 #ifndef ASYNCSENDTO_H_INCLUDED
 #define ASYNCSENDTO_H_INCLUDED
 
-/* sendto_schedule() : see sendto(2)
- * schedule sendto() call after delay (milliseconds) */
+/* send_schedule() : sendmsg(2), but with convenience arguments
+ * schedule sendmsg() call after delay (milliseconds) */
 ssize_t
-sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
-                const struct sockaddr *dest_addr, socklen_t addrlen,
-                unsigned int delay);
+send_schedule(int sockfd, const void *buf, size_t len, int flags,
+              const struct sockaddr *src_addr,
+              const struct sockaddr *dest_addr,
+              unsigned int delay);
 
-/* sendto_schedule() : see sendto(2)
- * try sendto() at once and schedule if EINTR/EAGAIN/EWOULDBLOCK */
+/* send_or_schedule() : sendmsg(2), but with convenience arguments
+ * try sendmsg() at once and schedule if EINTR/EAGAIN/EWOULDBLOCK */
 ssize_t
-sendto_or_schedule(int sockfd, const void *buf, size_t len, int flags,
-                   const struct sockaddr *dest_addr, socklen_t addrlen);
+send_or_schedule(int sockfd, const void *buf, size_t len, int flags,
+                 const struct sockaddr *src_addr,
+                 const struct sockaddr *dest_addr);
 
 /* get_next_scheduled_send()
- * return number of scheduled sendto
+ * return number of scheduled sends
  * set next_send to timestamp to send next packet */
 int get_next_scheduled_send(struct timeval * next_send);
 
-/* execute sendto() for needed packets */
-int try_sendto(fd_set * writefds);
+/* execute sendmsg() for needed packets */
+int try_send(fd_set * writefds);
 
 /* set writefds before select() */
-int get_sendto_fds(fd_set * writefds, int * max_fd, const struct timeval * now);
+int get_send_fds(fd_set * writefds, int * max_fd, const struct timeval * now);
 
 /* empty the list */
-void finalize_sendto(void);
+void finalize_send(void);
 
 #endif

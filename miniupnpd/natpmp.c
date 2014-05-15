@@ -12,7 +12,6 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 
 #include "macros.h"
@@ -159,16 +158,31 @@ static void FillPublicAddressResponse(unsigned char * resp, in_addr_t senderaddr
  * The sender information is stored in senderaddr.
  * Returns number of bytes recevied, even if number is negative.
  */
-int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
-                             socklen_t * senderaddrlen,
+int ReceiveNATPMPOrPCPPacket(int s,
+                             struct sockaddr_storage * senderaddr,
+                             struct sockaddr_storage * receiveraddr,
                              unsigned char * msg_buff, size_t msg_buff_size)
 {
 
+	struct iovec iov;
+	uint8_t c[1000];
+	struct msghdr msg;
 	int n;
+	struct cmsghdr *h;
 
-	n = recvfrom(s, msg_buff, msg_buff_size, 0,
-	             senderaddr, senderaddrlen);
+	iov.iov_base = msg_buff;
+	iov.iov_len = msg_buff_size;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_name = senderaddr;
+	msg.msg_namelen = sizeof(*senderaddr);
+	msg.msg_control = c;
+	msg.msg_controllen = sizeof(c);
 
+	if (receiveraddr)
+		memset(receiveraddr, 0, sizeof(*receiveraddr));
+	n = recvmsg(s, &msg, 0);
 	if(n<0) {
 		/* EAGAIN, EWOULDBLOCK and EINTR : silently ignore (retry next time)
 		 * other errors : log to LOG_ERR */
@@ -179,7 +193,24 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 		}
 		return n;
 	}
-
+	for (h = CMSG_FIRSTHDR(&msg); h;
+	     h = CMSG_NXTHDR(&msg, h))
+		if (h->cmsg_level == IPPROTO_IPV6
+		    && h->cmsg_type == IPV6_PKTINFO) {
+			struct in6_pktinfo *ipi6 =
+				(struct in6_pktinfo *)CMSG_DATA(h);
+			if (receiveraddr) {
+				struct sockaddr_in6 *sin6 =
+					(struct sockaddr_in6 *)receiveraddr;
+				sin6->sin6_addr = ipi6->ipi6_addr;
+				sin6->sin6_scope_id = ipi6->ipi6_ifindex;
+				sin6->sin6_family = AF_INET6;
+				/* TODO - ok to leave port blank?
+				 * We're probably just populating
+				 * another in6_pktinfo with this, and
+				 * it won't have port anyway*/
+			}
+		}
 	return n;
 }
 
@@ -385,12 +416,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	default:
 		resp[3] = 5;	/* Unsupported OPCODE */
 	}
-	n = sendto_or_schedule(s, resp, resplen, 0,
-	           (struct sockaddr *)senderaddr, sizeof(*senderaddr));
+	n = send_or_schedule(s, resp, resplen, 0,
+                             NULL, (struct sockaddr *)senderaddr);
 	if(n<0) {
-		syslog(LOG_ERR, "sendto(natpmp): %m");
+		syslog(LOG_ERR, "send_or_schedule(natpmp): %m");
 	} else if(n<resplen) {
-		syslog(LOG_ERR, "sendto(natpmp): sent only %d bytes out of %d",
+		syslog(LOG_ERR, "send_or_schedule(natpmp): sent only %d bytes out of %d",
 		       n, resplen);
 	}
 }
@@ -439,21 +470,21 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 #endif
 		/* Port to use in 2006 version of the NAT-PMP specification */
     	sockname.sin_port = htons(NATPMP_PORT);
-		n = sendto_or_schedule(sockets[j], notif, 12, 0,
-		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
+		n = send_or_schedule(sockets[j], notif, 12, 0,
+                                     NULL, (struct sockaddr *)&sockname);
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d): %m",
+			syslog(LOG_ERR, "%s: send_or_schedule(s_udp=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j]);
 			return;
 		}
 		/* Port to use in 2008 version of the NAT-PMP specification */
     	sockname.sin_port = htons(NATPMP_NOTIF_PORT);
-		n = sendto_or_schedule(sockets[j], notif, 12, 0,
-		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
+		n = send_or_schedule(sockets[j], notif, 12, 0,
+                                     NULL, (struct sockaddr *)&sockname);
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d): %m",
+			syslog(LOG_ERR, "%s: send_or_schedule(s_udp=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j]);
 			return;
 		}

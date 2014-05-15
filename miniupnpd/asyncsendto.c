@@ -31,26 +31,63 @@ struct scheduled_send {
 	struct timeval ts;
 	enum {ESCHEDULED=1, EWAITREADY=2, ESENDNOW=3} state;
 	int sockfd;
-	const void * buf;
 	size_t len;
 	int flags;
-	const struct sockaddr *dest_addr;
-	socklen_t addrlen;
-	char data[];
+	struct sockaddr_storage src_addr;
+	struct sockaddr_storage dest_addr;
+	char buf[];
 };
 
 static LIST_HEAD(listhead, scheduled_send) send_list = { NULL };
 
-/*
- * ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
- *                const struct sockaddr *dest_addr, socklen_t addrlen);
- */
+/* TODO: Consider if this _sa_len fallback is good. In practise, many
+ * APIs do not care about sa_len being set so perhaps this 'be nice in
+ * what we receive' is good behavior. */
+#define SA_OR_NULL_LEN(sa) ((sa) ? SA_LEN(sa) ? SA_LEN(sa) : _sa_len(sa) : 0)
+
+static size_t send_from_to(int sockfd, const void *buf, size_t len, int flags,
+			   const struct sockaddr *src_addr,
+			   const struct sockaddr *dest_addr)
+{
+	struct iovec iov;
+	struct in6_pktinfo ipi6;
+	uint8_t c[CMSG_SPACE(sizeof(ipi6))];
+	struct msghdr msg;
+
+	iov.iov_base = (void *)buf; /* sendmsg won't write here anyway */
+	iov.iov_len = len;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	if (src_addr && src_addr->sa_family == AF_INET) {
+		/* TODO - write when needed, but as long as sockets
+		 * are bound per IP, there's no need.  */
+	} else if (src_addr && src_addr->sa_family == AF_INET6) {
+		struct cmsghdr* cmsg;
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)src_addr;
+
+		ipi6.ipi6_addr = sin6->sin6_addr;
+		ipi6.ipi6_ifindex = sin6->sin6_scope_id;
+		msg.msg_control = c;
+		msg.msg_controllen = sizeof(c);
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = IPPROTO_IPV6;
+		cmsg->cmsg_type = IPV6_PKTINFO;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(ipi6));
+		*((struct in6_pktinfo *)CMSG_DATA(cmsg)) = ipi6;
+	} else {
+	}
+	msg.msg_name = (void *)dest_addr;/* sendmsg won't write here anyway */
+	msg.msg_namelen = SA_OR_NULL_LEN(dest_addr);
+	return sendmsg(sockfd, &msg, flags);
+}
+
 
 /* delay = milli seconds */
 ssize_t
-sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
-                const struct sockaddr *dest_addr, socklen_t addrlen,
-                unsigned int delay)
+send_schedule(int sockfd, const void *buf, size_t len, int flags,
+	      const struct sockaddr *src_addr, const struct sockaddr *dest_addr,
+	      unsigned int delay)
 {
 	enum {ESCHEDULED, EWAITREADY, ESENDNOW} state;
 	ssize_t n;
@@ -59,7 +96,7 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
 
 	if(delay == 0) {
 		/* first try to send at once */
-		n = sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+		n = send_from_to(sockfd, buf, len, flags, src_addr, dest_addr);
 		if(n >= 0)
 			return n;
 		else if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -80,10 +117,10 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
 		return -1;
 	}
 	/* allocate enough space for structure + buffers */
-	elt = malloc(sizeof(struct scheduled_send) + len + addrlen);
+	elt = malloc(sizeof(struct scheduled_send) + len);
 	if(elt == NULL) {
 		syslog(LOG_ERR, "malloc failed to allocate %u bytes",
-		       (unsigned)(sizeof(struct scheduled_send) + len + addrlen));
+		       (unsigned)(sizeof(struct scheduled_send) + len));
 		return -1;
 	}
 	elt->state = state;
@@ -96,11 +133,11 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
 	}
 	elt->sockfd = sockfd;
 	elt->flags = flags;
-	memcpy(elt->data, dest_addr, addrlen);
-	elt->dest_addr = (struct sockaddr *)elt->data;
-	elt->addrlen = addrlen;
-	memcpy(elt->data + addrlen, buf, len);
-	elt->buf = (void *)(elt->data + addrlen);
+	memset(&elt->src_addr, 0, sizeof(elt->src_addr));
+	memcpy(&elt->src_addr, src_addr, SA_OR_NULL_LEN(src_addr));
+	memset(&elt->dest_addr, 0, sizeof(elt->dest_addr));
+	memcpy(&elt->dest_addr, dest_addr, SA_OR_NULL_LEN(dest_addr));
+	memcpy(elt->buf, buf, len);
 	elt->len = len;
 	/* insert */
 	LIST_INSERT_HEAD( &send_list, elt, entries);
@@ -110,10 +147,11 @@ sendto_schedule(int sockfd, const void *buf, size_t len, int flags,
 
 /* try to send at once, and queue the packet if needed */
 ssize_t
-sendto_or_schedule(int sockfd, const void *buf, size_t len, int flags,
-                   const struct sockaddr *dest_addr, socklen_t addrlen)
+send_or_schedule(int sockfd, const void *buf, size_t len, int flags,
+		 const struct sockaddr *src_addr,
+		 const struct sockaddr *dest_addr)
 {
-	return sendto_schedule(sockfd, buf, len, flags, dest_addr, addrlen, 0);
+	return send_schedule(sockfd, buf, len, flags, src_addr, dest_addr, 0);
 }
 
 /* get_next_scheduled_send() return number of scheduled send in list */
@@ -136,13 +174,13 @@ int get_next_scheduled_send(struct timeval * next_send)
 
 /* update writefds for select() call
  * return the number of packets to try to send at once */
-int get_sendto_fds(fd_set * writefds, int * max_fd, const struct timeval * now)
+int get_send_fds(fd_set * writefds, int * max_fd, const struct timeval * now)
 {
 	int n = 0;
 	struct scheduled_send * elt;
 	for(elt = send_list.lh_first; elt != NULL; elt = elt->entries.le_next) {
 		if(elt->state == EWAITREADY) {
-			/* last sendto() call returned EAGAIN/EWOULDBLOCK */
+			/* last sendmsg() call returned EAGAIN/EWOULDBLOCK */
 			FD_SET(elt->sockfd, writefds);
 			if(elt->sockfd > *max_fd)
 				*max_fd = elt->sockfd;
@@ -157,8 +195,8 @@ int get_sendto_fds(fd_set * writefds, int * max_fd, const struct timeval * now)
 	return n;
 }
 
-/* executed sendto() when needed */
-int try_sendto(fd_set * writefds)
+/* executed sendmsg() when needed */
+int try_send(fd_set * writefds)
 {
 	int ret = 0;
 	ssize_t n;
@@ -169,9 +207,11 @@ int try_sendto(fd_set * writefds)
 		if((elt->state == ESENDNOW) ||
 		   (elt->state == EWAITREADY && FD_ISSET(elt->sockfd, writefds))) {
 			syslog(LOG_DEBUG, "%s: %d bytes on socket %d",
-			       "try_sendto", (int)elt->len, elt->sockfd);
-			n = sendto(elt->sockfd, elt->buf, elt->len, elt->flags,
-			           elt->dest_addr, elt->addrlen);
+			       "try_send", (int)elt->len, elt->sockfd);
+			n = send_from_to(elt->sockfd, elt->buf, elt->len,
+					 elt->flags,
+					 (struct sockaddr *)&elt->src_addr,
+					 (struct sockaddr *)&elt->dest_addr);
 			if(n < 0) {
 				if(errno == EINTR) {
 					/* retry at once */
@@ -184,16 +224,16 @@ int try_sendto(fd_set * writefds)
 				} else {
 					char addr_str[64];
 					/* uncatched error */
-					if(sockaddr_to_string(elt->dest_addr, addr_str, sizeof(addr_str)) <= 0)
+					if(sockaddr_to_string((struct sockaddr *)&elt->dest_addr, addr_str, sizeof(addr_str)) <= 0)
 						addr_str[0] = '\0';
-					syslog(LOG_ERR, "%s(sock=%d, len=%u, dest=%s): sendto: %m",
-					       "try_sendto", elt->sockfd, (unsigned)elt->len,
+					syslog(LOG_ERR, "%s(sock=%d, len=%u, dest=%s): sendmsg: %m",
+					       "try_send", elt->sockfd, (unsigned)elt->len,
 					       addr_str);
 					ret--;
 				}
 			} else if((int)n != (int)elt->len) {
 				syslog(LOG_WARNING, "%s: %d bytes sent out of %d",
-				       "try_sendto", (int)n, (int)elt->len);
+				       "try_send", (int)n, (int)elt->len);
 			}
 			/* remove from the list */
 			LIST_REMOVE(elt, entries);
@@ -203,11 +243,11 @@ int try_sendto(fd_set * writefds)
 	return ret;
 }
 
-/* maximum execution time for finalize_sendto() in milliseconds */
-#define FINALIZE_SENDTO_DELAY	(500)
+/* maximum execution time for finalize_send() in milliseconds */
+#define FINALIZE_SEND_DELAY	(500)
 
 /* empty the list */
-void finalize_sendto(void)
+void finalize_send(void)
 {
 	ssize_t n;
 	struct scheduled_send * elt;
@@ -222,7 +262,7 @@ void finalize_sendto(void)
 		syslog(LOG_ERR, "gettimeofday: %m");
 		return;
 	}
-	deadline.tv_usec += FINALIZE_SENDTO_DELAY*1000;
+	deadline.tv_usec += FINALIZE_SEND_DELAY*1000;
 	if(deadline.tv_usec > 1000000) {
 		deadline.tv_sec++;
 		deadline.tv_usec -= 1000000;
@@ -232,10 +272,12 @@ void finalize_sendto(void)
 		max_fd = -1;
 		for(elt = send_list.lh_first; elt != NULL; elt = next) {
 			next = elt->entries.le_next;
-			syslog(LOG_DEBUG, "finalize_sendto(): %d bytes on socket %d",
+			syslog(LOG_DEBUG, "finalize_send(): %d bytes on socket %d",
 			       (int)elt->len, elt->sockfd);
-			n = sendto(elt->sockfd, elt->buf, elt->len, elt->flags,
-			           elt->dest_addr, elt->addrlen);
+			n = send_from_to(elt->sockfd, elt->buf, elt->len,
+					 elt->flags,
+					 (struct sockaddr *)&elt->src_addr,
+					 (struct sockaddr *)&elt->dest_addr);
 			if(n < 0) {
 				if(errno==EAGAIN || errno==EWOULDBLOCK) {
 					FD_SET(elt->sockfd, &writefds);
@@ -243,7 +285,7 @@ void finalize_sendto(void)
 						max_fd = elt->sockfd;
 					continue;
 				}
-				syslog(LOG_WARNING, "finalize_sendto(): socket=%d sendto: %m", elt->sockfd);
+				syslog(LOG_WARNING, "finalize_send(): socket=%d sendmsg: %m", elt->sockfd);
 			}
 			/* remove from the list */
 			LIST_REMOVE(elt, entries);
