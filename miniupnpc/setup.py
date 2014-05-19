@@ -1,6 +1,6 @@
 #! /usr/bin/python
 # $Id: setup.py,v 1.9 2012/05/23 08:50:10 nanard Exp $
-# the MiniUPnP Project (c) 2007-2012 Thomas Bernard
+# the MiniUPnP Project (c) 2007-2014 Thomas Bernard
 # http://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/
 #
 # python script to build the miniupnpc module under unix
