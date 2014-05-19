@@ -1592,11 +1592,11 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			len = PCP_MIN_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
-		/* TODO : send using receiveraddr as source address */
-		len = sendto_or_schedule(s, buff, len, 0, senderaddr,
+		len = sendto_or_schedule2(s, buff, len, 0, senderaddr,
 		           (senderaddr->sa_family == AF_INET) ?
 		                  sizeof(struct sockaddr_in) :
-		                  sizeof(struct sockaddr_in6) );
+		                  sizeof(struct sockaddr_in6),
+		           receiveraddr);
 		if( len < 0 ) {
 			syslog(LOG_ERR, "sendto(pcpserver): %m");
 		}

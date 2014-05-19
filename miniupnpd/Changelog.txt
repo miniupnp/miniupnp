@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.369 2014/04/22 08:48:02 nanard Exp $
+$Id: Changelog.txt,v 1.371 2014/05/19 14:21:12 nanard Exp $
+
+2014/05/19:
+  set source address for IPV6 packets sendto_schedule2() etc.
 
 2014/05/15:
   Fix deletePortMappingRange()
