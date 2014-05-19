@@ -1538,7 +1538,8 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 }
 
 int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
-                             const struct sockaddr * senderaddr)
+                             const struct sockaddr *senderaddr,
+                             const struct sockaddr_in6 *receiveraddr)
 {
 	pcp_info_t pcp_msg_info;
 	struct lan_addr_s * lan_addr;
@@ -1591,6 +1592,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			len = PCP_MIN_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
+		/* TODO : send using receiveraddr as source address */
 		len = sendto_or_schedule(s, buff, len, 0, senderaddr,
 		           (senderaddr->sa_family == AF_INET) ?
 		                  sizeof(struct sockaddr_in) :
@@ -1623,6 +1625,13 @@ int OpenAndConfPCPv6Socket(void)
 	 * see http://www.ietf.org/rfc/rfc3493.txt section 5.3 */
 	if(setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &i, sizeof(i)) < 0) {
 		syslog(LOG_WARNING, "%s: setsockopt(IPV6_V6ONLY): %m",
+		       "OpenAndConfPCPv6Socket");
+	}
+#endif
+#ifdef IPV6_RECVPKTINFO
+	/* see RFC3542 */
+	if(setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &i, sizeof(i)) < 0) {
+		syslog(LOG_WARNING, "%s: setsockopt(IPV6_RECVPKTINFO): %m",
 		       "OpenAndConfPCPv6Socket");
 	}
 #endif

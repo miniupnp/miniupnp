@@ -2102,6 +2102,7 @@ main(int argc, char * * argv)
 				len = ReceiveNATPMPOrPCPPacket(snatpmp[i],
 				                               (struct sockaddr *)&senderaddr,
 				                               &senderaddrlen,
+				                               NULL,
 				                               msg_buff, sizeof(msg_buff));
 				if (len < 1)
 					continue;
@@ -2111,7 +2112,7 @@ main(int argc, char * * argv)
 					                            &senderaddr);
 				} else { /* everything else can be PCP */
 					ProcessIncomingPCPPacket(snatpmp[i], msg_buff, len,
-					                         (struct sockaddr *)&senderaddr);
+					                         (struct sockaddr *)&senderaddr, NULL);
 				}
 
 #else
@@ -2127,16 +2128,19 @@ main(int argc, char * * argv)
 			unsigned char msg_buff[PCP_MAX_LEN];
 			struct sockaddr_in6 senderaddr;
 			socklen_t senderaddrlen;
+			struct sockaddr_in6 receiveraddr;
 			int len;
 			memset(msg_buff, 0, PCP_MAX_LEN);
 			senderaddrlen = sizeof(senderaddr);
 			len = ReceiveNATPMPOrPCPPacket(spcp_v6,
 			                               (struct sockaddr *)&senderaddr,
 			                               &senderaddrlen,
+			                               &receiveraddr,
 			                               msg_buff, sizeof(msg_buff));
 			if(len >= 1)
 				ProcessIncomingPCPPacket(spcp_v6, msg_buff, len,
-				                         (struct sockaddr *)&senderaddr);
+				                         (struct sockaddr *)&senderaddr,
+				                         &receiveraddr);
 		}
 #endif
 		/* process SSDP packets */
