@@ -1139,6 +1139,15 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 		return 0;
 	}
 
+	/* RFC 6887, section 8.2: MUST return address mismatch if NAT
+	 * in middle. */
+	if (memcmp(pcp_msg_info->int_ip,
+		   &pcp_msg_info->sender_ip,
+		   sizeof(pcp_msg_info->sender_ip)) != 0) {
+		pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
+		return 0;
+	}
+
 	if (pcp_msg_info->thirdp_ip) {
 		if (!GETFLAG(PCP_ALLOWTHIRDPARTYMASK)) {
 			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
@@ -1151,15 +1160,6 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 			   &pcp_msg_info->sender_ip,
 			   sizeof(pcp_msg_info->sender_ip)) == 0) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
-			return 0;
-		}
-	} else {
-		/* RFC 6887, section 8.2: MUST return address mismatch if NAT
-		 * in middle. */
-		if (memcmp(pcp_msg_info->int_ip,
-			   &pcp_msg_info->sender_ip,
-			   sizeof(pcp_msg_info->sender_ip)) != 0) {
-			pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
 			return 0;
 		}
 	}
