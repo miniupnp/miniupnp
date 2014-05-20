@@ -140,6 +140,10 @@ extern struct lan_addr_list lan_addrs;
 #ifdef ENABLE_IPV6
 /* ipv6 address used for HTTP */
 extern char ipv6_addr_for_http_with_brackets[64];
+
+/* address used to bind local services */
+extern struct in6_addr ipv6_bind_addr;
+
 #endif
 
 extern const char * minissdpdsocketpath;

@@ -31,6 +31,9 @@ static const struct {
 	{ UPNPEXT_IFNAME, "ext_ifname" },
 	{ UPNPEXT_IP,	"ext_ip" },
 	{ UPNPLISTENING_IP, "listening_ip" },
+#ifdef ENABLE_IPV6
+	{ UPNPIPV6_LISTENING_IP, "ipv6_listening_ip" },
+#endif /* ENABLE_IPV6 */
 	{ UPNPPORT, "port" },
 	{ UPNPPORT, "http_port" },	/* "port" and "http_port" are synonims */
 #ifdef ENABLE_HTTPS
