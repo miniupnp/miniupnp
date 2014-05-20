@@ -1642,7 +1642,7 @@ int OpenAndConfPCPv6Socket(void)
 	memset(&addr, 0, sizeof(addr));
 	addr.sin6_family = AF_INET6;
 	addr.sin6_port = htons(NATPMP_PORT);
-	addr.sin6_addr = in6addr_any;
+	addr.sin6_addr = ipv6_bind_addr;
 	if(bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		syslog(LOG_ERR, "%s: bind(): %m", "OpenAndConfPCPv6Socket");
 		close(s);

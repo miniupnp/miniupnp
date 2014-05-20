@@ -164,7 +164,7 @@ OpenAndConfHTTPSocket(unsigned short port)
 		memset(&listenname6, 0, sizeof(struct sockaddr_in6));
 		listenname6.sin6_family = AF_INET6;
 		listenname6.sin6_port = htons(port);
-		listenname6.sin6_addr = in6addr_any;
+		listenname6.sin6_addr = ipv6_bind_addr;
 		listenname_len =  sizeof(struct sockaddr_in6);
 	} else {
 		memset(&listenname4, 0, sizeof(struct sockaddr_in));
@@ -833,6 +833,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 
 	/* set initial values */
 	SETFLAG(ENABLEUPNPMASK);	/* UPnP is enabled by default */
+#ifdef ENABLE_IPV6
+	ipv6_bind_addr = in6addr_any;
+#endif /* ENABLE_IPV6 */
 
 	LIST_INIT(&lan_addrs);
 	v->port = -1;
@@ -878,6 +881,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				}
 				LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
 				break;
+#ifdef ENABLE_IPV6
+			case UPNPIPV6_LISTENING_IP:
+				if (inet_pton(AF_INET6, ary_options[i].value, &ipv6_bind_addr) < 1)
+				{
+					fprintf(stderr, "can't parse \"%s\" as valid IPv6 listening address", ary_options[i].value);
+				}
+				break;
+#endif /* ENABLE_IPV6 */
 			case UPNPPORT:
 				v->port = atoi(ary_options[i].value);
 				break;
