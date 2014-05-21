@@ -32,6 +32,7 @@
 #define SSDP_MCAST_ADDR ("239.255.255.250")
 #define LL_SSDP_MCAST_ADDR "FF02::C"
 #define SL_SSDP_MCAST_ADDR "FF05::C"
+#define GL_SSDP_MCAST_ADDR "FF0E::C"
 
 /* maximum lenght of SSDP packets we are generating
  * (reception is done in a 1500byte buffer) */
@@ -87,6 +88,12 @@ AddMulticastMembershipIPv6(int s)
 		return -1;
 	}
 	inet_pton(AF_INET6, SL_SSDP_MCAST_ADDR, &mr.ipv6mr_multiaddr);
+	if(setsockopt(s, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mr, sizeof(struct ipv6_mreq)) < 0)
+	{
+		syslog(LOG_ERR, "setsockopt(udp, IPV6_ADD_MEMBERSHIP): %m");
+		return -1;
+	}
+	inet_pton(AF_INET6, GL_SSDP_MCAST_ADDR, &mr.ipv6mr_multiaddr);
 	if(setsockopt(s, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mr, sizeof(struct ipv6_mreq)) < 0)
 	{
 		syslog(LOG_ERR, "setsockopt(udp, IPV6_ADD_MEMBERSHIP): %m");
@@ -587,6 +594,15 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 		p->sin6_family = AF_INET6;
 		p->sin6_port = htons(SSDP_PORT);
 		inet_pton(AF_INET6, LL_SSDP_MCAST_ADDR, &(p->sin6_addr));
+		/* TODO : also send to SL_SSDP_MCAST_ADDR and GL_SSDP_MCAST_ADDR ? */
+		/* UPnP Device Architecture 1.1 :
+		 * Devices MUST multicast SSDP messages for each of the UPnP-enabled
+		 * interfaces. The scope of multicast SSDP messages MUST be
+		 * link local FF02::C if the message is sent from a link local address.
+		 * If the message is sent from a global address it MUST be multicast
+		 * using either global scope FF0E::C or site local scope FF05::C.
+		 * In networks with complex topologies and overlapping sites, use of
+		 * global scope is RECOMMENDED. */
 	}
 	else
 #endif
