@@ -113,9 +113,9 @@ volatile sig_atomic_t should_send_public_address_change_notif = 0;
  * setup the socket used to handle incoming HTTP connections. */
 static int
 #ifdef ENABLE_IPV6
-OpenAndConfHTTPSocket(unsigned short port, int ipv6)
+OpenAndConfHTTPSocket(unsigned short * port, int ipv6)
 #else
-OpenAndConfHTTPSocket(unsigned short port)
+OpenAndConfHTTPSocket(unsigned short * port)
 #endif
 {
 	int s;
@@ -128,13 +128,24 @@ OpenAndConfHTTPSocket(unsigned short port)
 #endif
 	socklen_t listenname_len;
 
-	if( (s = socket(
+	s = socket(
 #ifdef ENABLE_IPV6
-	                ipv6 ? PF_INET6 : PF_INET,
+	           ipv6 ? PF_INET6 : PF_INET,
 #else
-	                PF_INET,
+	           PF_INET,
 #endif
-	                SOCK_STREAM, 0)) < 0)
+	           SOCK_STREAM, 0);
+#ifdef ENABLE_IPV6
+	if(s < 0 && ipv6 && errno == EAFNOSUPPORT)
+	{
+		/* the system doesn't support IPV6 */
+		syslog(LOG_WARNING, "socket(PF_INET6, ...) failed with EAFNOSUPPORT, disabling IPv6");
+		SETFLAG(IPV6DISABLEDMASK);
+		ipv6 = 0;
+		s = socket(PF_INET, SOCK_STREAM, 0);
+	}
+#endif
+	if(s < 0)
 	{
 		syslog(LOG_ERR, "socket(http): %m");
 		return -1;
@@ -163,20 +174,20 @@ OpenAndConfHTTPSocket(unsigned short port)
 	{
 		memset(&listenname6, 0, sizeof(struct sockaddr_in6));
 		listenname6.sin6_family = AF_INET6;
-		listenname6.sin6_port = htons(port);
+		listenname6.sin6_port = htons(*port);
 		listenname6.sin6_addr = ipv6_bind_addr;
 		listenname_len =  sizeof(struct sockaddr_in6);
 	} else {
 		memset(&listenname4, 0, sizeof(struct sockaddr_in));
 		listenname4.sin_family = AF_INET;
-		listenname4.sin_port = htons(port);
+		listenname4.sin_port = htons(*port);
 		listenname4.sin_addr.s_addr = htonl(INADDR_ANY);
 		listenname_len =  sizeof(struct sockaddr_in);
 	}
 #else
 	memset(&listenname, 0, sizeof(struct sockaddr_in));
 	listenname.sin_family = AF_INET;
-	listenname.sin_port = htons(port);
+	listenname.sin_port = htons(*port);
 	listenname.sin_addr.s_addr = htonl(INADDR_ANY);
 	listenname_len =  sizeof(struct sockaddr_in);
 #endif
@@ -201,6 +212,29 @@ OpenAndConfHTTPSocket(unsigned short port)
 		return -1;
 	}
 
+	if(*port == 0) {
+#ifdef ENABLE_IPV6
+		if(ipv6) {
+			struct sockaddr_in6 sockinfo;
+			socklen_t len = sizeof(struct sockaddr_in6);
+			if (getsockname(s, (struct sockaddr *)&sockinfo, &len) < 0) {
+				syslog(LOG_ERR, "getsockname(): %m");
+			} else {
+				*port = ntohs(sockinfo.sin6_port);
+			}
+		} else {
+#endif /* ENABLE_IPV6 */
+			struct sockaddr_in sockinfo;
+			socklen_t len = sizeof(struct sockaddr_in);
+			if (getsockname(s, (struct sockaddr *)&sockinfo, &len) < 0) {
+				syslog(LOG_ERR, "getsockname(): %m");
+			} else {
+				*port = ntohs(sockinfo.sin_port);
+			}
+#ifdef ENABLE_IPV6
+		}
+#endif /* ENABLE_IPV6 */
+	}
 	return s;
 }
 
@@ -1592,79 +1626,49 @@ main(int argc, char * * argv)
 
 	if(GETFLAG(ENABLEUPNPMASK))
 	{
+		unsigned short listen_port;
+		listen_port = (v.port > 0) ? v.port : 0;
 		/* open socket for HTTP connections. Listen on the 1st LAN address */
 #ifdef ENABLE_IPV6
-		shttpl = OpenAndConfHTTPSocket((v.port > 0) ? v.port : 0, 1);
+		shttpl = OpenAndConfHTTPSocket(&listen_port, 1);
 #else /* ENABLE_IPV6 */
-		shttpl = OpenAndConfHTTPSocket((v.port > 0) ? v.port : 0);
+		shttpl = OpenAndConfHTTPSocket(&listen_port);
 #endif /* ENABLE_IPV6 */
 		if(shttpl < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTP. EXITING");
 			return 1;
 		}
-		if(v.port <= 0) {
-#ifdef ENABLE_IPV6
-			struct sockaddr_in6 sockinfo;
-			socklen_t len = sizeof(struct sockaddr_in6);
-			if (getsockname(shttpl, (struct sockaddr *)&sockinfo, &len) < 0) {
-				syslog(LOG_ERR, "getsockname(): %m");
-				return 1;
-			}
-			v.port = ntohs(sockinfo.sin6_port);
-#else /* ENABLE_IPV6 */
-			struct sockaddr_in sockinfo;
-			socklen_t len = sizeof(struct sockaddr_in);
-			if (getsockname(shttpl, (struct sockaddr *)&sockinfo, &len) < 0) {
-				syslog(LOG_ERR, "getsockname(): %m");
-				return 1;
-			}
-			v.port = ntohs(sockinfo.sin_port);
-#endif /* ENABLE_IPV6 */
-		}
+		v.port = listen_port;
 		syslog(LOG_NOTICE, "HTTP listening on port %d", v.port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
-		shttpl_v4 =  OpenAndConfHTTPSocket(v.port, 0);
-		if(shttpl_v4 < 0)
+		if(!GETFLAG(IPV6DISABLEDMASK))
 		{
-			syslog(LOG_ERR, "Failed to open socket for HTTP on port %hu (IPv4). EXITING", v.port);
-			return 1;
+			shttpl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
+			if(shttpl_v4 < 0)
+			{
+				syslog(LOG_ERR, "Failed to open socket for HTTP on port %hu (IPv4). EXITING", v.port);
+				return 1;
+			}
 		}
 #endif /* V6SOCKETS_ARE_V6ONLY */
 #ifdef ENABLE_HTTPS
 		/* https */
+		listen_port = (v.https_port > 0) ? v.https_port : 0;
 #ifdef ENABLE_IPV6
-		shttpsl = OpenAndConfHTTPSocket((v.https_port > 0) ? v.https_port : 0, 1);
+		shttpsl = OpenAndConfHTTPSocket(&listen_port, 1);
 #else /* ENABLE_IPV6 */
-		shttpsl = OpenAndConfHTTPSocket((v.https_port > 0) ? v.https_port : 0);
+		shttpsl = OpenAndConfHTTPSocket(&listen_port);
 #endif /* ENABLE_IPV6 */
 		if(shttpl < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTPS. EXITING");
 			return 1;
 		}
-		if(v.https_port <= 0) {
-#ifdef ENABLE_IPV6
-			struct sockaddr_in6 sockinfo;
-			socklen_t len = sizeof(struct sockaddr_in6);
-			if (getsockname(shttpsl, (struct sockaddr *)&sockinfo, &len) < 0) {
-				syslog(LOG_ERR, "getsockname(): %m");
-				return 1;
-			}
-			v.https_port = ntohs(sockinfo.sin6_port);
-#else /* ENABLE_IPV6 */
-			struct sockaddr_in sockinfo;
-			socklen_t len = sizeof(struct sockaddr_in);
-			if (getsockname(shttpsl, (struct sockaddr *)&sockinfo, &len) < 0) {
-				syslog(LOG_ERR, "getsockname(): %m");
-				return 1;
-			}
-			v.https_port = ntohs(sockinfo.sin_port);
-#endif /* ENABLE_IPV6 */
-		}
+		v.https_port = listen_port;
 		syslog(LOG_NOTICE, "HTTPS listening on port %d", v.https_port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
-		shttpsl_v4 =  OpenAndConfHTTPSocket(v.https_port, 0);
+		shttpsl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
 		if(shttpsl_v4 < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTPS on port %hu (IPv4). EXITING", v.https_port);
