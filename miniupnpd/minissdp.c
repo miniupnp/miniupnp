@@ -67,17 +67,15 @@ AddMulticastMembership(int s, in_addr_t ifaddr)
 
 /* AddMulticastMembershipIPv6()
  * param s	socket (IPv6)
- * To be improved to target specific network interfaces */
+ * param ifindex : interface index (0 : All interfaces) */
 #ifdef ENABLE_IPV6
 static int
-AddMulticastMembershipIPv6(int s)
+AddMulticastMembershipIPv6(int s, unsigned int ifindex)
 {
 	struct ipv6_mreq mr;
-	/*unsigned int ifindex;*/
 
 	memset(&mr, 0, sizeof(mr));
-	/*mr.ipv6mr_interface = ifindex;*/
-	mr.ipv6mr_interface = 0; /* 0 : all interfaces */
+	mr.ipv6mr_interface = ifindex;	/* 0 : all interfaces */
 #ifndef IPV6_ADD_MEMBERSHIP
 #define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
 #endif
@@ -167,7 +165,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 #ifdef ENABLE_IPV6
 	if(ipv6)
 	{
-		if(AddMulticastMembershipIPv6(s) < 0)
+		if(AddMulticastMembershipIPv6(s, 0) < 0)
 		{
 			syslog(LOG_WARNING,
 			        "Failed to add IPv6 multicast membership");
