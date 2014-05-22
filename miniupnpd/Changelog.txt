@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.372 2014/05/19 23:14:27 nanard Exp $
+$Id: Changelog.txt,v 1.374 2014/05/22 07:56:32 nanard Exp $
+
+2014/05/22:
+  Add ipv6_bind_address (option "ipv6_listening_ip")
+  disable IPv6 when socket(PF_INTET6, ...) errors with EAFNOSUPPORT
 
 2014/05/20:
   be more strict when parsing LAN addresses / interface names
