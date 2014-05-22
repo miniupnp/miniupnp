@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.371 2014/05/19 14:21:12 nanard Exp $
+$Id: Changelog.txt,v 1.372 2014/05/19 23:14:27 nanard Exp $
+
+2014/05/20:
+  be more strict when parsing LAN addresses / interface names
 
 2014/05/19:
   set source address for IPV6 packets sendto_schedule2() etc.

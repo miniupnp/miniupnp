@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.194 2014/04/14 11:42:36 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.199 2014/05/19 23:14:25 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -707,6 +707,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		if(getifaddr(lan_addr->ifname, lan_addr->str, sizeof(lan_addr->str),
 		             &lan_addr->addr, &lan_addr->mask) < 0)
 			goto parselan_error;
+		/*printf("%s => %s\n", lan_addr->ifname, lan_addr->str);*/
 	}
 	else
 	{
@@ -778,7 +779,10 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 	}
 	else
 	{
-		fprintf(stderr, "Warning: please specify LAN network interface by name instead of IPv4 address\n");
+		fprintf(stderr,
+		        "Error: please specify LAN network interface by name instead of IPv4 address : %s\n",
+		        str);
+		return -1;
 	}
 #endif
 	return 0;
@@ -909,7 +913,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				}
 				if(parselanaddr(lan_addr, ary_options[i].value) != 0)
 				{
-					fprintf(stderr, "can't parse \"%s\" as valid lan address\n", ary_options[i].value);
+					fprintf(stderr, "can't parse \"%s\" as a valid "
+#ifndef ENABLE_IPV6
+					        "LAN address or "
+#endif
+					        "interface name\n", ary_options[i].value);
 					free(lan_addr);
 					break;
 				}
@@ -1255,7 +1263,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				}
 				if(parselanaddr(lan_addr, argv[i]) != 0)
 				{
-					fprintf(stderr, "can't parse \"%s\" as valid lan address\n", argv[i]);
+					fprintf(stderr, "can't parse \"%s\" as a valid "
+#ifndef ENABLE_IPV6
+					        "LAN address or "
+#endif
+					        "interface name\n", argv[i]);
 					free(lan_addr);
 					break;
 				}
@@ -1290,7 +1302,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				}
 				if(parselanaddr(lan_addr, val) != 0)
 				{
-					fprintf(stderr, "can't parse \"%s\" as valid lan address\n", val);
+					fprintf(stderr, "can't parse \"%s\" as a valid LAN address or interface name\n", val);
 					free(lan_addr);
 					free(val);
 					break;
