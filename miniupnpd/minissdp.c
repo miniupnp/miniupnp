@@ -165,10 +165,14 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 #ifdef ENABLE_IPV6
 	if(ipv6)
 	{
-		if(AddMulticastMembershipIPv6(s, 0) < 0)
+		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next)
 		{
-			syslog(LOG_WARNING,
-			        "Failed to add IPv6 multicast membership");
+			if(AddMulticastMembershipIPv6(s, lan_addr->index) < 0)
+			{
+				syslog(LOG_WARNING,
+				       "Failed to add IPv6 multicast membership for interface %s",
+				       lan_addr->str ? lan_addr->str : "NULL");
+			}
 		}
 	}
 	else
