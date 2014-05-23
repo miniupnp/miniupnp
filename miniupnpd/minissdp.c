@@ -585,6 +585,12 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 {
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
+	static const struct { const char * p1, * p2; } const mcast_addrs[] =
+		{ { LL_SSDP_MCAST_ADDR, "[" LL_SSDP_MCAST_ADDR "]" },
+		  { SL_SSDP_MCAST_ADDR, "[" SL_SSDP_MCAST_ADDR "]" },
+		  { GL_SSDP_MCAST_ADDR, "[" GL_SSDP_MCAST_ADDR "]" },
+		  { NULL, NULL } };
+	int j;
 #else
 	struct sockaddr_in sockname;
 #endif
@@ -595,15 +601,15 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 
 	memset(&sockname, 0, sizeof(sockname));
 #ifdef ENABLE_IPV6
+	for(j = 0; (mcast_addrs[j].p1 != 0 && ipv6) || j < 1; j++) {
 	if(ipv6)
 	{
 		struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockname;
 		sockname_len = sizeof(struct sockaddr_in6);
 		p->sin6_family = AF_INET6;
 		p->sin6_port = htons(SSDP_PORT);
-		inet_pton(AF_INET6, LL_SSDP_MCAST_ADDR, &(p->sin6_addr));
-		dest_str = "[" LL_SSDP_MCAST_ADDR "]";
-		/* TODO : also send to SL_SSDP_MCAST_ADDR and GL_SSDP_MCAST_ADDR ? */
+		inet_pton(AF_INET6, mcast_addrs[j].p1, &(p->sin6_addr));
+		dest_str = mcast_addrs[j].p2;
 		/* UPnP Device Architecture 1.1 :
 		 * Devices MUST multicast SSDP messages for each of the UPnP-enabled
 		 * interfaces. The scope of multicast SSDP messages MUST be
@@ -653,6 +659,9 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 		}
 		i++;
 	}
+#ifdef ENABLE_IPV6
+	}
+#endif
 }
 
 void
