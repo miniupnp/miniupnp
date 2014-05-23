@@ -1055,10 +1055,10 @@ ProcessSSDPData(int s, const char *bufr, int n,
 }
 
 static int
-SendSSDPbyebye(int s, const struct sockaddr * dest,
+SendSSDPbyebye(int s, const struct sockaddr * dest, socklen_t destlen,
+               const char * dest_str,
                const char * nt, const char * suffix,
-               const char * usn1, const char * usn2, const char * usn3,
-               int ipv6)
+               const char * usn1, const char * usn2, const char * usn3)
 {
 	int n, l;
 	char bufr[SSDP_PACKET_MAX_LEN];
@@ -1074,9 +1074,8 @@ SendSSDPbyebye(int s, const struct sockaddr * dest,
 	             "BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 	             "CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 	             "\r\n",
-	             ipv6 ? "[" LL_SSDP_MCAST_ADDR "]" : SSDP_MCAST_ADDR,
-	             SSDP_PORT,
-	             nt, suffix,	/* NT: */
+	             dest_str, SSDP_PORT,		/* HOST : */
+	             nt, suffix,				/* NT: */
 	             usn1, usn2, usn3, suffix,	/* USN: */
 	             upnp_bootid, upnp_bootid, upnp_configid);
 	if(l<0)
@@ -1090,13 +1089,7 @@ SendSSDPbyebye(int s, const struct sockaddr * dest,
 		       "SendSSDPbyebye()", (unsigned)l, (unsigned)sizeof(bufr));
 		l = sizeof(bufr) - 1;
 	}
-	n = sendto_or_schedule(s, bufr, l, 0, dest,
-#ifdef ENABLE_IPV6
-	           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)
-#else
-	           sizeof(struct sockaddr_in)
-#endif
-	          );
+	n = sendto_or_schedule(s, bufr, l, 0, dest, destlen);
 	if(n < 0)
 	{
 		syslog(LOG_ERR, "sendto(udp_shutdown=%d): %m", s);
@@ -1115,30 +1108,44 @@ SendSSDPbyebye(int s, const struct sockaddr * dest,
 int
 SendSSDPGoodbye(int * sockets, int n_sockets)
 {
-	struct sockaddr_in sockname;
+	struct sockaddr_in sockname4;
 #ifdef ENABLE_IPV6
 	struct sockaddr_in6 sockname6;
+	struct sockaddr * sockname;
+	socklen_t socknamelen;
 #endif
 	int i, j;
 	char ver_str[4];
 	int ret = 0;
 	int ipv6 = 0;
+	const char * dest_str;
 
-    memset(&sockname, 0, sizeof(struct sockaddr_in));
-    sockname.sin_family = AF_INET;
-    sockname.sin_port = htons(SSDP_PORT);
-    sockname.sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
+    memset(&sockname4, 0, sizeof(struct sockaddr_in));
+    sockname4.sin_family = AF_INET;
+    sockname4.sin_port = htons(SSDP_PORT);
+    sockname4.sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
 #ifdef ENABLE_IPV6
 	memset(&sockname6, 0, sizeof(struct sockaddr_in6));
 	sockname6.sin6_family = AF_INET6;
 	sockname6.sin6_port = htons(SSDP_PORT);
 	inet_pton(AF_INET6, LL_SSDP_MCAST_ADDR, &(sockname6.sin6_addr));
+#else
+	dest_str = SSDP_MCAST_ADDR;
 #endif
 
 	for(j=0; j<n_sockets; j++)
 	{
 #ifdef ENABLE_IPV6
 		ipv6 = j & 1;
+		if(ipv6) {
+			dest_str = "[" LL_SSDP_MCAST_ADDR "]";
+			sockname = (struct sockaddr *)&sockname6;
+			socknamelen = sizeof(struct sockaddr_in6);
+		} else {
+			dest_str = SSDP_MCAST_ADDR;
+			sockname = (struct sockaddr *)&sockname4;
+			socknamelen = sizeof(struct sockaddr_in);
+		}
 #endif
 	    for(i=0; known_service_types[i].s; i++)
 	    {
@@ -1148,26 +1155,26 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 				snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 			ret += SendSSDPbyebye(sockets[j],
 #ifdef ENABLE_IPV6
-			                      ipv6 ? (struct sockaddr *)&sockname6 : (struct sockaddr *)&sockname,
+			                      sockname, socknamelen,
 #else
-			                      (struct sockaddr *)&sockname,
+			                      (struct sockaddr *)&sockname4, sizeof(struct sockaddr_in),
 #endif
+			                      dest_str,
 			                      known_service_types[i].s, ver_str,	/* NT: */
 			                      known_service_types[i].uuid, "::",
-			                      known_service_types[i].s, /* ver_str, USN: */
-			                      ipv6);
+			                      known_service_types[i].s); /* ver_str, USN: */
 			if(0==memcmp(known_service_types[i].s,
 			             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1))
 			{
 				ret += SendSSDPbyebye(sockets[j],
 #ifdef ENABLE_IPV6
-				                      ipv6 ? (struct sockaddr *)&sockname6 : (struct sockaddr *)&sockname,
+				                      sockname, socknamelen,
 #else
-				                      (struct sockaddr *)&sockname,
+				                      (struct sockaddr *)&sockname4, sizeof(struct sockaddr_in),
 #endif
+				                      dest_str,
 				                      known_service_types[i].uuid, "",	/* NT: */
-				                      known_service_types[i].uuid, "", "", /* ver_str, USN: */
-				                      ipv6);
+				                      known_service_types[i].uuid, "", ""); /* ver_str, USN: */
 			}
     	}
 	}
