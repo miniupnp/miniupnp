@@ -263,6 +263,7 @@ OpenAndConfSSDPNotifySocketIPv6(unsigned int if_index)
 {
 	int s;
 	unsigned int loop = 0;
+	struct sockaddr_in6 sockname;
 
 	s = socket(PF_INET6, SOCK_DGRAM, 0);
 	if(s < 0)
@@ -282,6 +283,18 @@ OpenAndConfSSDPNotifySocketIPv6(unsigned int if_index)
 		close(s);
 		return -1;
 	}
+
+	memset(&sockname, 0, sizeof(sockname));
+	sockname.sin6_family = AF_INET6;
+	sockname.sin6_addr = in6addr_any;
+	/*sockname.sin6_scope_id = if_index;*/
+	if(bind(s, (struct sockaddr *)&sockname, sizeof(sockname)) < 0)
+	{
+		syslog(LOG_ERR, "bind(udp_notify IPv6): %m");
+		close(s);
+		return -1;
+	}
+
 	return s;
 }
 #endif
