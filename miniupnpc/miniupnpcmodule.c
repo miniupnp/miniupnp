@@ -6,7 +6,7 @@
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <Python.h>
-#define STATICLIB
+#define MINIUPNP_STATICLIB
 #include "structmember.h"
 #include "miniupnpc.h"
 #include "upnpcommands.h"
