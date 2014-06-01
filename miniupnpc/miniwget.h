@@ -14,11 +14,11 @@
 extern "C" {
 #endif
 
-LIBSPEC void * getHTTPResponse(int s, int * size);
+MINIUPNP_LIBSPEC void * getHTTPResponse(int s, int * size);
 
-LIBSPEC void * miniwget(const char *, int *, unsigned int);
+MINIUPNP_LIBSPEC void * miniwget(const char *, int *, unsigned int);
 
-LIBSPEC void * miniwget_getaddr(const char *, int *, char *, int, unsigned int);
+MINIUPNP_LIBSPEC void * miniwget_getaddr(const char *, int *, char *, int, unsigned int);
 
 int parseURL(const char *, char *, unsigned short *, char * *, unsigned int *);
 

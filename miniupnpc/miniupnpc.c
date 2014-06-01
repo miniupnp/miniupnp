@@ -106,7 +106,7 @@ struct ip_mreqn
 #define SERVICEPREFIX2 'u'
 
 /* root description parsing */
-LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
+MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
 {
 	struct xmlparser parser;
 	/* xmlparser object */
@@ -335,7 +335,7 @@ parseMSEARCHReply(const char * reply, int size,
  * no devices was found.
  * It is up to the caller to free the chained list
  * delay is in millisecond (poll) */
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
              const char * minissdpdsock, int sameport,
              int ipv6,
@@ -718,7 +718,7 @@ upnpDiscover(int delay, const char * multicastif,
 
 /* freeUPNPDevlist() should be used to
  * free the chained list returned by upnpDiscover() */
-LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist)
+MINIUPNP_LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist)
 {
 	struct UPNPDev * next;
 	while(devlist)
@@ -754,7 +754,7 @@ url_cpy_or_cat(char * dst, const char * src, int n)
 
 /* Prepare the Urls for usage...
  */
-LIBSPEC void
+MINIUPNP_LIBSPEC void
 GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
             const char * descURL, unsigned int scope_id)
 {
@@ -844,7 +844,7 @@ GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
 #endif
 }
 
-LIBSPEC void
+MINIUPNP_LIBSPEC void
 FreeUPNPUrls(struct UPNPUrls * urls)
 {
 	if(!urls)
@@ -891,7 +891,7 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
  * passed as parameters are set. Donc forget to call FreeUPNPUrls(urls) to
  * free allocated memory.
  */
-LIBSPEC int
+MINIUPNP_LIBSPEC int
 UPNP_GetValidIGD(struct UPNPDev * devlist,
                  struct UPNPUrls * urls,
 				 struct IGDdatas * data,
