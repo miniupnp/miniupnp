@@ -43,6 +43,9 @@
 #if defined(__sun) || defined(sun)
 #define MIN(x,y) (((x)<(y))?(x):(y))
 #endif
+#ifdef __GNU__
+#define MAXHOSTNAMELEN 64
+#endif
 
 #include "miniupnpcstrings.h"
 #include "miniwget.h"

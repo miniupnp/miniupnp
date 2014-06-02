@@ -17,7 +17,7 @@
 #endif
 #endif
 
-#if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(MACOSX) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun)
+#if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(MACOSX) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun) && !defined(__GNU__) && !defined(__FreeBSD_kernel__)
 #define HAS_IP_MREQN
 #endif
 
@@ -69,6 +69,9 @@
 #if defined(__amigaos__) || defined(__amigaos4__)
 /* Amiga OS specific stuff */
 #define TIMEVAL struct timeval
+#endif
+#ifdef __GNU__
+#define MAXHOSTNAMELEN 64
 #endif
 
 
