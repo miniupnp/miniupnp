@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.105 2013/05/14 20:37:36 nanard Exp $
+# $Id: Makefile,v 1.108 2014/06/10 09:51:33 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -174,6 +174,7 @@ validateupnpreplyparse:	testupnpreplyparse testupnpreplyparse.sh
 
 clean:
 	$(RM) $(LIBRARY) $(SHAREDLIBRARY) $(EXECUTABLES) $(OBJS) miniupnpcstrings.h
+	$(RM) $(EXECUTABLES_ADDTESTS)
 	# clean python stuff
 	$(RM) pythonmodule pythonmodule3
 	$(RM) validateminixml validateminiwget validateupnpreplyparse
