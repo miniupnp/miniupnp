@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.18 2014/02/03 14:32:14 nanard Exp $
+# $Id: Makefile,v 1.19 2014/06/10 10:00:18 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -53,7 +53,11 @@ ifneq ($(OS), Darwin)
 endif
 
 minissdpd: $(MINISSDPDOBJS)
-	$(CC) $(CFLAGS) -o $@ $(MINISSDPDOBJS)
+	if [ "$(DEB_BUILD_ARCH_OS)" = "kfreebsd" ] ; then \
+		$(CC) $(CFLAGS) -lfreebsd-glue -o $@ $(MINISSDPDOBJS) ; \
+	else \
+		$(CC) $(CFLAGS) -o $@ $(MINISSDPDOBJS) ; \
+	fi
 
 testminissdpd:	$(TESTMINISSDPDOBJS)
 
