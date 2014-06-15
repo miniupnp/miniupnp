@@ -85,7 +85,7 @@ LIBRARY = libminiupnpc.a
 ifeq ($(OS), Darwin)
   SHAREDLIBRARY = libminiupnpc.dylib
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
-  CFLAGS := -DMACOSX -D_DARWIN_C_SOURCE $(CFLAGS)
+  CFLAGS := -D_DARWIN_C_SOURCE $(CFLAGS)
 else
 ifeq ($(JARSUFFIX), win32)
   SHAREDLIBRARY = miniupnpc.dll
