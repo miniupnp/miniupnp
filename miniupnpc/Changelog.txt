@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.196 2014/07/01 13:01:17 nanard Exp $
 miniUPnP client Changelog.
 
+2014/07/01:
+  Fix parsing of IGD2 root descriptions
+
 2014/06/10:
   rename LIBSPEC to MINIUPNP_LIBSPEC
 
