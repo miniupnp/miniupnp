@@ -599,7 +599,7 @@ initminiupnpc(void)
     UPnPType.tp_new = PyType_GenericNew;
 #endif
     if (PyType_Ready(&UPnPType) < 0)
-        return;
+        return 0;
 
 #if PY_MAJOR_VERSION >= 3
     m = PyModule_Create(&moduledef);
@@ -610,7 +610,7 @@ initminiupnpc(void)
 
     Py_INCREF(&UPnPType);
     PyModule_AddObject(m, "UPnP", (PyObject *)&UPnPType);
-    
+
 #if PY_MAJOR_VERSION >= 3
     return m;
 #endif
