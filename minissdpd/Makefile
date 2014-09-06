@@ -54,9 +54,9 @@ endif
 
 minissdpd: $(MINISSDPDOBJS)
 	if [ "$(DEB_BUILD_ARCH_OS)" = "kfreebsd" ] ; then \
-		$(CC) $(CFLAGS) -lfreebsd-glue -o $@ $(MINISSDPDOBJS) ; \
+		$(CC) $(CFLAGS) $(LDFLAGS) -lfreebsd-glue -o $@ $(MINISSDPDOBJS) ; \
 	else \
-		$(CC) $(CFLAGS) -o $@ $(MINISSDPDOBJS) ; \
+		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(MINISSDPDOBJS) ; \
 	fi
 
 testminissdpd:	$(TESTMINISSDPDOBJS)
