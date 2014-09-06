@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.108 2014/06/10 09:51:33 nanard Exp $
+# $Id: Makefile,v 1.110 2014/09/06 08:24:12 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -178,6 +178,7 @@ clean:
 	# clean python stuff
 	$(RM) pythonmodule pythonmodule3
 	$(RM) validateminixml validateminiwget validateupnpreplyparse
+	$(RM) minihttptestserver minihttptestserver.o
 	$(RM) -r build/ dist/
 	#python setup.py clean
 	# clean jnaerator stuff
