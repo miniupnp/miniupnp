@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.197 2014/09/06 08:31:39 nanard Exp $
+$Id: Changelog.txt,v 1.198 2014/09/11 14:13:31 nanard Exp $
 miniUPnP client Changelog.
+
+2014/09/11:
+  use remoteHost arg of DeletePortMapping
 
 2014/09/06:
   Fix python3 build
