@@ -6,6 +6,8 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <net/if.h>
 #include <errno.h>
 #include <ifaddrs.h>
