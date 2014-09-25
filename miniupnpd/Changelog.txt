@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.376 2014/09/06 08:30:11 nanard Exp $
+$Id: Changelog.txt,v 1.377 2014/09/25 09:02:26 nanard Exp $
+
+2014/09/25:
+  DeletePortMapping now checks for client IP in Securemode
 
 2014/06/xx:
   Various fixes :
