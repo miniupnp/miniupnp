@@ -261,6 +261,7 @@ processMSEARCH(int s, const char * st, int st_len,
 	       ntohs(((const struct sockaddr_in *)addr)->sin_port),
 	       st_len, st);
 #endif
+	/* TODO : ignore packet if not coming from a LAN */
 	if(st_len==8 && (0==memcmp(st, "ssdp:all", 8))) {
 		/* send a response for all services */
 		for(serv = servicelisthead.lh_first;
