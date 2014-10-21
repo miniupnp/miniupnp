@@ -39,7 +39,7 @@
 #include <sys/param.h>
 #if defined(sun)
 #include <kstat.h>
-#else
+#elif !defined(__linux__)
 /* for BSD's sysctl */
 #include <sys/sysctl.h>
 #endif
