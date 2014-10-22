@@ -1,4 +1,10 @@
-$Id: Changelog.txt,v 1.377 2014/09/25 09:02:26 nanard Exp $
+$Id: Changelog.txt,v 1.379 2014/10/22 08:52:17 nanard Exp $
+
+2014/10/21:
+  small modifications to compile with exotic C libraries
+
+2014/10/14:
+  add comments in miniupnpd.conf regarding security
 
 2014/09/25:
   DeletePortMapping now checks for client IP in Securemode
