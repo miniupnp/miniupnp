@@ -606,7 +606,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 #endif
 	socklen_t sockname_len;
 	const char * dest_str;
-	int i=0;
+	int i;
 	char ver_str[4];
 #ifndef ENABLE_IPV6
 	UNUSED(ipv6);
@@ -615,66 +615,65 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 	memset(&sockname, 0, sizeof(sockname));
 #ifdef ENABLE_IPV6
 	for(j = 0; (mcast_addrs[j].p1 != 0 && ipv6) || j < 1; j++) {
-	if(ipv6)
-	{
-		struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockname;
-		sockname_len = sizeof(struct sockaddr_in6);
-		p->sin6_family = AF_INET6;
-		p->sin6_port = htons(SSDP_PORT);
-		inet_pton(AF_INET6, mcast_addrs[j].p1, &(p->sin6_addr));
-		dest_str = mcast_addrs[j].p2;
-		/* UPnP Device Architecture 1.1 :
-		 * Devices MUST multicast SSDP messages for each of the UPnP-enabled
-		 * interfaces. The scope of multicast SSDP messages MUST be
-		 * link local FF02::C if the message is sent from a link local address.
-		 * If the message is sent from a global address it MUST be multicast
-		 * using either global scope FF0E::C or site local scope FF05::C.
-		 * In networks with complex topologies and overlapping sites, use of
-		 * global scope is RECOMMENDED. */
-	}
-	else
-#endif
-	{
-		struct sockaddr_in *p = (struct sockaddr_in *)&sockname;
-		sockname_len = sizeof(struct sockaddr_in);
-		p->sin_family = AF_INET;
-		p->sin_port = htons(SSDP_PORT);
-		p->sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
-		dest_str = SSDP_MCAST_ADDR;
-	}
-
-	while(known_service_types[i].s)
-	{
-		if(i==0)
-			ver_str[0] = '\0';
-		else
-			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
-		SendSSDPNotify(s, (struct sockaddr *)&sockname, sockname_len, dest_str,
-		               host, http_port,
-#ifdef ENABLE_HTTPS
-		               https_port,
-#endif
-		               known_service_types[i].s, ver_str,	/* NT: */
-		               known_service_types[i].uuid, "::",
-		               known_service_types[i].s, /* ver_str,	USN: */
-		               lifetime);
-		if(0==memcmp(known_service_types[i].s,
-		             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1))
+		if(ipv6) {
+			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockname;
+			sockname_len = sizeof(struct sockaddr_in6);
+			p->sin6_family = AF_INET6;
+			p->sin6_port = htons(SSDP_PORT);
+			inet_pton(AF_INET6, mcast_addrs[j].p1, &(p->sin6_addr));
+			dest_str = mcast_addrs[j].p2;
+			/* UPnP Device Architecture 1.1 :
+			 * Devices MUST multicast SSDP messages for each of the UPnP-enabled
+			 * interfaces. The scope of multicast SSDP messages MUST be
+			 * link local FF02::C if the message is sent from a link local address.
+			 * If the message is sent from a global address it MUST be multicast
+			 * using either global scope FF0E::C or site local scope FF05::C.
+			 * In networks with complex topologies and overlapping sites, use of
+			 * global scope is RECOMMENDED. */
+		} else {
+#else /* ENABLE_IPV6 */
 		{
+#endif /* ENABLE_IPV6 */
+			/* IPv4 */
+			struct sockaddr_in *p = (struct sockaddr_in *)&sockname;
+			sockname_len = sizeof(struct sockaddr_in);
+			p->sin_family = AF_INET;
+			p->sin_port = htons(SSDP_PORT);
+			p->sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
+			dest_str = SSDP_MCAST_ADDR;
+		}
+
+		/* iterate all services / devices */
+		for(i = 0; known_service_types[i].s; i++) {
+			if(i==0)
+				ver_str[0] = '\0';
+			else
+				snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 			SendSSDPNotify(s, (struct sockaddr *)&sockname, sockname_len, dest_str,
 			               host, http_port,
 #ifdef ENABLE_HTTPS
 			               https_port,
 #endif
-			               known_service_types[i].uuid, "",	/* NT: */
-			               known_service_types[i].uuid, "", "", /* ver_str,	USN: */
+			               known_service_types[i].s, ver_str,	/* NT: */
+			               known_service_types[i].uuid, "::",
+			               known_service_types[i].s, /* ver_str,	USN: */
 			               lifetime);
-		}
-		i++;
-	}
-#ifdef ENABLE_IPV6
-	}
+			/* for devices, also send NOTIFY on the uuid */
+			if(0==memcmp(known_service_types[i].s,
+			             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1)) {
+				SendSSDPNotify(s, (struct sockaddr *)&sockname, sockname_len, dest_str,
+				               host, http_port,
+#ifdef ENABLE_HTTPS
+				               https_port,
 #endif
+				               known_service_types[i].uuid, "",	/* NT: */
+				               known_service_types[i].uuid, "", "", /* ver_str,	USN: */
+				               lifetime);
+			}
+		} /* for(i = 0; known_service_types[i].s; i++) */
+#ifdef ENABLE_IPV6
+	} /* for(j = 0; (mcast_addrs[j].p1 != 0 && ipv6) || j < 1; j++) */
+#endif /* ENABLE_IPV6 */
 }
 
 void
