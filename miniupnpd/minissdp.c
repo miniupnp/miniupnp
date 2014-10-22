@@ -507,6 +507,8 @@ static struct {
 	{0, 0, 0}
 };
 
+/* SendSSDPNotify() sends the SSDP NOTIFY to a specific
+ * destination, for a specific UPnP service or device */
 static void
 SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
                const char * dest_str,
@@ -549,25 +551,19 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 		upnp_bootid,					/* 01-NLS: */
 		upnp_bootid,					/* BOOTID.UPNP.ORG: */
 		upnp_configid );				/* CONFIGID.UPNP.ORG: */
-	if(l<0)
-	{
+	if(l<0) {
 		syslog(LOG_ERR, "%s: snprintf error", "SendSSDPNotify()");
 		return;
-	}
-	else if((unsigned int)l >= sizeof(bufr))
-	{
+	} else if((unsigned int)l >= sizeof(bufr)) {
 		syslog(LOG_WARNING, "%s: truncated output (%u>=%u)",
 		       "SendSSDPNotify()", (unsigned)l, (unsigned)sizeof(bufr));
 		l = sizeof(bufr) - 1;
 	}
 	n = sendto_or_schedule(s, bufr, l, 0, dest, dest_len);
-	if(n < 0)
-	{
+	if(n < 0) {
 		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
 		       host ? host : "NULL");
-	}
-	else if(n != l)
-	{
+	} else if(n != l) {
 		syslog(LOG_NOTICE, "sendto() sent %d out of %d bytes", n, l);
 	}
 	/* Due to the unreliable nature of UDP, devices SHOULD send the entire
@@ -575,13 +571,14 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 	 * sets e.g. a few hundred milliseconds. To avoid network congestion
 	 * discovery messages SHOULD NOT be sent more than three times. */
 	n = sendto_schedule(s, bufr, l, 0, dest, dest_len, 250);
-	if(n < 0)
-	{
+	if(n < 0) {
 		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
 		       host ? host : "NULL");
 	}
 }
 
+/* SendSSDPNotifies() send SSPD NOTIFY for a specific
+ * LAN (network interface) for all devices / services */
 #ifdef ENABLE_HTTPS
 static void
 SendSSDPNotifies(int s, const char * host, unsigned short http_port,
@@ -596,9 +593,9 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
 	static const struct { const char * p1, * p2; } const mcast_addrs[] =
-		{ { LL_SSDP_MCAST_ADDR, "[" LL_SSDP_MCAST_ADDR "]" },
-		  { SL_SSDP_MCAST_ADDR, "[" SL_SSDP_MCAST_ADDR "]" },
-		  { GL_SSDP_MCAST_ADDR, "[" GL_SSDP_MCAST_ADDR "]" },
+		{ { LL_SSDP_MCAST_ADDR, "[" LL_SSDP_MCAST_ADDR "]" },	/* Link Local */
+		  { SL_SSDP_MCAST_ADDR, "[" SL_SSDP_MCAST_ADDR "]" },	/* Site Local */
+		  { GL_SSDP_MCAST_ADDR, "[" GL_SSDP_MCAST_ADDR "]" },	/* Global */
 		  { NULL, NULL } };
 	int j;
 #else
@@ -610,10 +607,11 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 	char ver_str[4];
 #ifndef ENABLE_IPV6
 	UNUSED(ipv6);
-#endif
+#endif /* ENABLE_IPV6 */
 
 	memset(&sockname, 0, sizeof(sockname));
 #ifdef ENABLE_IPV6
+	/* first iterate destinations for this LAN interface (only 1 for IPv4) */
 	for(j = 0; (mcast_addrs[j].p1 != 0 && ipv6) || j < 1; j++) {
 		if(ipv6) {
 			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockname;
@@ -676,6 +674,8 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 #endif /* ENABLE_IPV6 */
 }
 
+/* SendSSDPNotifies2() sends SSDP NOTIFY packets on all interfaces
+ * for all destinations, all devices / services */
 void
 SendSSDPNotifies2(int * sockets,
                   unsigned short http_port,
@@ -686,10 +686,9 @@ SendSSDPNotifies2(int * sockets,
 {
 	int i;
 	struct lan_addr_s * lan_addr;
-	for(i=0, lan_addr = lan_addrs.lh_first;
+	for(i = 0, lan_addr = lan_addrs.lh_first;
 	    lan_addr != NULL;
-	    lan_addr = lan_addr->list.le_next)
-	{
+	    lan_addr = lan_addr->list.le_next) {
 		SendSSDPNotifies(sockets[i], lan_addr->str, http_port,
 #ifdef ENABLE_HTTPS
 		                 https_port,
@@ -697,8 +696,7 @@ SendSSDPNotifies2(int * sockets,
 		                 lifetime, 0);
 		i++;
 #ifdef ENABLE_IPV6
-		if(sockets[i] >= 0)
-		{
+		if(sockets[i] >= 0) {
 			SendSSDPNotifies(sockets[i], ipv6_addr_for_http_with_brackets, http_port,
 #ifdef ENABLE_HTTPS
 			                 https_port,
@@ -706,7 +704,7 @@ SendSSDPNotifies2(int * sockets,
 			                 lifetime, 1);
 		}
 		i++;
-#endif
+#endif	/* ENABLE_IPV6 */
 	}
 }
 
