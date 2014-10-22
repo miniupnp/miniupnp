@@ -57,11 +57,11 @@ struct PortMappingParserData {
 	portMappingElt curelt;
 };
 
-LIBSPEC void
+MINIUPNP_LIBSPEC void
 ParsePortListing(const char * buffer, int bufsize,
                  struct PortMappingParserData * pdata);
 
-LIBSPEC void
+MINIUPNP_LIBSPEC void
 FreePortListing(struct PortMappingParserData * pdata);
 
 #ifdef __cplusplus
