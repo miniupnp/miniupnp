@@ -241,6 +241,10 @@ OpenAndConfSSDPNotifySocket(in_addr_t addr)
 		return -1;
 	}
 
+	/* bind() socket before using sendto() is not mandatory
+	 * (sendto() will implicitly bind the socket when called on
+	 * an unbound socket)
+	 * here it is used to se a specific sending address */
 	memset(&sockname, 0, sizeof(struct sockaddr_in));
     sockname.sin_family = AF_INET;
     sockname.sin_addr.s_addr = addr;	/*inet_addr(addr);*/
@@ -284,9 +288,14 @@ OpenAndConfSSDPNotifySocketIPv6(unsigned int if_index)
 		return -1;
 	}
 
+	/* bind() socket before using sendto() is not mandatory
+	 * (sendto() will implicitly bind the socket when called on
+	 * an unbound socket)
+	 * but explicit bind permits to set port/scope_id/etc. */
 	memset(&sockname, 0, sizeof(sockname));
 	sockname.sin6_family = AF_INET6;
 	sockname.sin6_addr = in6addr_any;
+	/*sockname.sin6_port = htons(port);*/
 	/*sockname.sin6_scope_id = if_index;*/
 	if(bind(s, (struct sockaddr *)&sockname, sizeof(sockname)) < 0)
 	{
