@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.69 2014/09/06 08:17:01 nanard Exp $ */
+/* $Id: minissdp.c,v 1.72 2014/10/22 11:54:45 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -592,15 +592,15 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 {
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
-	static const struct { const char * p1, * p2; } const mcast_addrs[] =
+	static struct { const char * p1, * p2; } const mcast_addrs[] =
 		{ { LL_SSDP_MCAST_ADDR, "[" LL_SSDP_MCAST_ADDR "]" },	/* Link Local */
 		  { SL_SSDP_MCAST_ADDR, "[" SL_SSDP_MCAST_ADDR "]" },	/* Site Local */
 		  { GL_SSDP_MCAST_ADDR, "[" GL_SSDP_MCAST_ADDR "]" },	/* Global */
 		  { NULL, NULL } };
 	int j;
-#else
+#else /* ENABLE_IPV6 */
 	struct sockaddr_in sockname;
-#endif
+#endif /* ENABLE_IPV6 */
 	socklen_t sockname_len;
 	const char * dest_str;
 	int i;
