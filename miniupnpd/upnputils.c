@@ -93,7 +93,9 @@ struct lan_addr_s *
 get_lan_for_peer(const struct sockaddr * peer)
 {
 	struct lan_addr_s * lan_addr = NULL;
+#ifdef DEBUG
 	char dbg_str[64];
+#endif /* DEBUG */
 
 #ifdef ENABLE_IPV6
 	if(peer->sa_family == AF_INET6)
@@ -141,7 +143,7 @@ get_lan_for_peer(const struct sockaddr * peer)
 	}
 	else if(peer->sa_family == AF_INET)
 	{
-#endif
+#endif /* ENABLE_IPV6 */
 		for(lan_addr = lan_addrs.lh_first;
 		    lan_addr != NULL;
 		    lan_addr = lan_addr->list.le_next)
@@ -152,8 +154,9 @@ get_lan_for_peer(const struct sockaddr * peer)
 		}
 #ifdef ENABLE_IPV6
 	}
-#endif
+#endif /* ENABLE_IPV6 */
 
+#ifdef DEBUG
 	sockaddr_to_string(peer, dbg_str, sizeof(dbg_str));
 	if(lan_addr) {
 		syslog(LOG_DEBUG, "%s: %s found in LAN %s %s",
@@ -163,6 +166,7 @@ get_lan_for_peer(const struct sockaddr * peer)
 		syslog(LOG_DEBUG, "%s: %s not found !", "get_lan_for_peer()",
 		       dbg_str);
 	}
+#endif /* DEBUG */
 	return lan_addr;
 }
 
