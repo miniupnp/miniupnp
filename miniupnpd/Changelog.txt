@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.379 2014/10/22 08:52:17 nanard Exp $
 
+2014/10/23:
+  Properly implements NAT-PMP mapping removal according to RCF6886
+
 2014/10/22:
   Discard NAT-PMP packets coming from the WAN
   Send SSDP announces to IPv6 link-local, site-local
