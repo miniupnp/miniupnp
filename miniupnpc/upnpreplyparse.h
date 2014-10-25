@@ -8,11 +8,7 @@
 #ifndef UPNPREPLYPARSE_H_INCLUDED
 #define UPNPREPLYPARSE_H_INCLUDED
 
-#if defined(NO_SYS_QUEUE_H) || defined(_WIN32) || defined(__HAIKU__)
 #include "bsdqueue.h"
-#else
-#include <sys/queue.h>
-#endif
 
 #ifdef __cplusplus
 extern "C" {
