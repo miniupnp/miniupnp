@@ -209,9 +209,9 @@ endif
 	$(INSTALL) -m 755 external-ip.sh $(DESTDIR)$(INSTALLDIRBIN)/external-ip
 ifneq ($(OS), AmigaOS)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRMAN)/man3
-	$(INSTALL) man3/miniupnpc.3 $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
+	$(INSTALL) -m 644 man3/miniupnpc.3 $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
 ifeq ($(OS), Linux)
-	gzip $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
+	gzip -f $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
 endif
 endif
 
