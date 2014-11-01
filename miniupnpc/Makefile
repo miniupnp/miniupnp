@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.112 2014/11/01 10:14:42 nanard Exp $
+# $Id: Makefile,v 1.113 2014/11/01 10:37:32 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -55,13 +55,15 @@ ifeq (SunOS, $(OS))
 endif
 
 # APIVERSION is used to build SONAME
-APIVERSION = 10
+APIVERSION = 11
 
 SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
-	   minixmlvalid.c testupnpreplyparse.c minissdpc.c \
-	   upnperrors.c testigddescparse.c testminiwget.c \
-       connecthostport.c portlistingparse.c receivedata.c
+       minixmlvalid.c testupnpreplyparse.c minissdpc.c \
+       upnperrors.c testigddescparse.c testminiwget.c \
+       connecthostport.c portlistingparse.c receivedata.c \
+       testportlistingparse.c miniupnpcmodule.c \
+       minihttptestserver.c
 
 LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
@@ -98,7 +100,7 @@ endif
 
 EXECUTABLES = upnpc-static
 EXECUTABLES_ADDTESTS = testminixml minixmlvalid testupnpreplyparse \
-			  testigddescparse testminiwget
+			  testigddescparse testminiwget testportlistingparse
 
 TESTMINIXMLOBJS = minixml.o igd_desc_parse.o testminixml.o
 
@@ -186,7 +188,7 @@ clean:
 	# clean python stuff
 	$(RM) pythonmodule pythonmodule3
 	$(RM) validateminixml validateminiwget validateupnpreplyparse
-	$(RM) minihttptestserver minihttptestserver.o
+	$(RM) minihttptestserver
 	$(RM) -r build/ dist/
 	#python setup.py clean
 	# clean jnaerator stuff
@@ -328,4 +330,9 @@ upnperrors.o: igd_desc_parse.h
 testigddescparse.o: igd_desc_parse.h minixml.h miniupnpc.h declspec.h
 testminiwget.o: miniwget.h declspec.h
 connecthostport.o: connecthostport.h
+portlistingparse.o: portlistingparse.h declspec.h miniupnpctypes.h minixml.h
 receivedata.o: receivedata.h
+testportlistingparse.o: portlistingparse.h declspec.h miniupnpctypes.h
+miniupnpcmodule.o: miniupnpc.h declspec.h igd_desc_parse.h upnpcommands.h
+miniupnpcmodule.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
+miniupnpcmodule.o: upnperrors.h
