@@ -1,4 +1,4 @@
-/* $Id: testportlistingparse.c,v 1.1 2014/11/01 10:14:42 nanard Exp $ */
+/* $Id: testportlistingparse.c,v 1.2 2014/11/01 10:37:32 nanard Exp $ */
 /* Project : miniupnp
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas Bernard
@@ -33,9 +33,9 @@ int test(const char * portListingXml, int portListingXmlLen,
 
 	memset(&data, 0, sizeof(data));
 	ParsePortListing(portListingXml, portListingXmlLen, &data);
-	for(i = 0, pm = data.head.lh_first;
+	for(i = 0, pm = data.l_head;
 	    (pm != NULL) && (i < count);
-	    i++, pm = pm->entries.le_next) {
+	    i++, pm = pm->l_next) {
 		printf("%2d %s %5hu->%s:%-5hu '%s' '%s' %u\n",
 		       i, pm->protocol, pm->externalPort, pm->internalClient,
 		       pm->internalPort,

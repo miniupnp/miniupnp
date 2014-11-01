@@ -80,7 +80,7 @@ OBJS = $(patsubst %.c,%.o,$(SRCS))
 HEADERS = miniupnpc.h miniwget.h upnpcommands.h igd_desc_parse.h \
           upnpreplyparse.h upnperrors.h miniupnpctypes.h \
           portlistingparse.h \
-          declspec.h bsdqueue.h
+          declspec.h
 
 # library names
 LIBRARY = libminiupnpc.a

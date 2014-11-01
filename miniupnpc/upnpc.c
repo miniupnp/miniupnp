@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.104 2014/09/11 14:13:30 nanard Exp $ */
+/* $Id: upnpc.c,v 1.105 2014/11/01 10:37:32 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2014 Thomas Bernard
@@ -174,7 +174,7 @@ static void NewListRedirections(struct UPNPUrls * urls,
 	if(r == UPNPCOMMAND_SUCCESS)
 	{
 		printf(" i protocol exPort->inAddr:inPort description remoteHost leaseTime\n");
-		for(pm = pdata.head.lh_first; pm != NULL; pm = pm->entries.le_next)
+		for(pm = pdata.l_head; pm != NULL; pm = pm->l_next)
 		{
 			printf("%2d %s %5hu->%s:%-5hu '%s' '%s' %u\n",
 			       i, pm->protocol, pm->externalPort, pm->internalClient,
@@ -199,7 +199,7 @@ static void NewListRedirections(struct UPNPUrls * urls,
 	                               &pdata);
 	if(r == UPNPCOMMAND_SUCCESS)
 	{
-		for(pm = pdata.head.lh_first; pm != NULL; pm = pm->entries.le_next)
+		for(pm = pdata.l_head; pm != NULL; pm = pm->l_next)
 		{
 			printf("%2d %s %5hu->%s:%-5hu '%s' '%s' %u\n",
 			       i, pm->protocol, pm->externalPort, pm->internalClient,

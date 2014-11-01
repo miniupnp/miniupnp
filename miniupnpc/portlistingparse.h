@@ -1,4 +1,4 @@
-/* $Id: portlistingparse.h,v 1.5 2012/01/21 13:30:33 nanard Exp $ */
+/* $Id: portlistingparse.h,v 1.10 2014/11/01 10:37:32 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2011-2012 Thomas Bernard
@@ -10,8 +10,6 @@
 #include "declspec.h"
 /* for the definition of UNSIGNED_INTEGER */
 #include "miniupnpctypes.h"
-
-#include "bsdqueue.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,7 +35,7 @@ typedef enum { PortMappingEltNone,
        NewLeaseTime } portMappingElt;
 
 struct PortMapping {
-	LIST_ENTRY(PortMapping) entries;
+	struct PortMapping * l_next;	/* list next element */
 	UNSIGNED_INTEGER leaseTime;
 	unsigned short externalPort;
 	unsigned short internalPort;
@@ -49,7 +47,7 @@ struct PortMapping {
 };
 
 struct PortMappingParserData {
-	LIST_HEAD(portmappinglisthead, PortMapping) head;
+	struct PortMapping * l_head;	/* list head */
 	portMappingElt curelt;
 };
 
