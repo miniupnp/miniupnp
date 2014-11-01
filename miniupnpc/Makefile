@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.110 2014/09/06 08:24:12 nanard Exp $
+# $Id: Makefile,v 1.112 2014/11/01 10:14:42 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -106,6 +106,8 @@ TESTMINIWGETOBJS = miniwget.o testminiwget.o connecthostport.o receivedata.o
 
 TESTUPNPREPLYPARSE = testupnpreplyparse.o minixml.o upnpreplyparse.o
 
+TESTPORTLISTINGPARSE = testportlistingparse.o minixml.o portlistingparse.o
+
 TESTIGDDESCPARSE = testigddescparse.o igd_desc_parse.o minixml.o \
                    miniupnpc.o miniwget.o upnpcommands.o upnpreplyparse.o \
                    minisoap.o connecthostport.o receivedata.o \
@@ -139,7 +141,8 @@ all:	$(LIBRARY) $(EXECUTABLES)
 
 test:	check
 
-check:	validateminixml validateminiwget validateupnpreplyparse
+check:	validateminixml validateminiwget validateupnpreplyparse \
+	validateportlistingparse
 
 everything:	all $(EXECUTABLES_ADDTESTS)
 
@@ -170,6 +173,11 @@ validateminiwget:	testminiwget minihttptestserver testminiwget.sh
 validateupnpreplyparse:	testupnpreplyparse testupnpreplyparse.sh
 	@echo "upnpreplyparse validation test"
 	./testupnpreplyparse.sh
+	touch $@
+
+validateportlistingparse:	testportlistingparse
+	@echo "portlistingparse validation test"
+	./testportlistingparse
 	touch $@
 
 clean:
@@ -250,6 +258,8 @@ minixmlvalid:	minixml.o minixmlvalid.o
 testupnpreplyparse:	$(TESTUPNPREPLYPARSE)
 
 testigddescparse:	$(TESTIGDDESCPARSE)
+
+testportlistingparse:	$(TESTPORTLISTINGPARSE)
 
 miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh VERSION
 	$(SH) updateminiupnpcstrings.sh

@@ -23,3 +23,5 @@ jnaerator-*.jar
 miniupnpc.h.bak
 testupnpreplyparse
 validateupnpreplyparse
+testportlistingparse
+validateportlistingparse
