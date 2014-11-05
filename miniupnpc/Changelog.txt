@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.198 2014/09/11 14:13:31 nanard Exp $
+$Id: Changelog.txt,v 1.199 2014/11/05 06:06:37 nanard Exp $
 miniUPnP client Changelog.
+
+2014/11/05:
+  simplified function GetUPNPUrls()
 
 2014/09/11:
   use remoteHost arg of DeletePortMapping
