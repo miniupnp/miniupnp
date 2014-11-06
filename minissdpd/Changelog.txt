@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.35 2014/09/06 08:32:58 nanard Exp $
+$Id: Changelog.txt,v 1.36 2014/11/06 10:13:36 nanard Exp $
+
+2014/11/06:
+	listen on only 1 IPv4 if only 1 interface is specified
+	also when ENABLE_IPV6 is not defined
 
 2014/09/06:
 	freebsd-glue for Debian/kFreeBSD

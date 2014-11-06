@@ -1,4 +1,4 @@
-/* $Id: openssdpsocket.c,v 1.13 2014/05/01 21:05:14 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.14 2014/11/06 10:13:36 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -81,7 +81,9 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 #ifdef ENABLE_IPV6
 	struct ipv6_mreq mr;
 	unsigned int ifindex;
-#endif
+#else	/* ENABLE_IPV6 */
+	(void)ipv6;
+#endif	/* ENABLE_IPV6 */
 
 	if(s <= 0)
 		return -1;	/* nothing to do */
@@ -211,10 +213,19 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	memset(&sockname, 0, sizeof(struct sockaddr_in));
     sockname.sin_family = AF_INET;
     sockname.sin_port = htons(SSDP_PORT);
-	/* NOTE : it seems it doesnt work when binding on the specific address */
-    /*sockname.sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);*/
-    sockname.sin_addr.s_addr = htonl(INADDR_ANY);
-    /*sockname.sin_addr.s_addr = inet_addr(ifaddr);*/
+	if(n_listen_addr == 1)
+	{
+		sockname.sin_addr.s_addr = GetIfAddrIPv4(listen_addr[0]);
+		if(sockname.sin_addr.s_addr == INADDR_NONE)
+		{
+			syslog(LOG_ERR, "no IPv4 address for interface %s",
+			       listen_addr[0]);
+			close(s);
+			return -1;
+		}
+	}
+	else
+	    sockname.sin_addr.s_addr = htonl(INADDR_ANY);
 	sockname_len = sizeof(struct sockaddr_in);
 #endif
 
