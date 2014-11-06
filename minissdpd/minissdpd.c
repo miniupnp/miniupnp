@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.37 2014/02/28 18:39:11 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.39 2014/11/06 10:13:06 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -876,7 +876,9 @@ int main(int argc, char * * argv)
 	const char * sockpath = "/var/run/minissdpd.sock";
 	const char * pidfilename = "/var/run/minissdpd.pid";
 	int debug_flag = 0;
+#ifdef ENABLE_IPV6
 	int ipv6 = 0;
+#endif /* ENABLE_IPV6 */
 	int deltadev = 0;
 	struct sockaddr_in sendername;
 	socklen_t sendername_len;
@@ -910,8 +912,12 @@ int main(int argc, char * * argv)
 	if(n_if_addr < 1)
 	{
 		fprintf(stderr,
-		        "Usage: %s [-d] [-6] [-s socket] [-p pidfile] "
-				"-i <interface> [-i <interface2>] ...\n",
+		        "Usage: %s [-d] "
+#ifdef ENABLE_IPV6
+		        "[-6] "
+#endif
+		        "[-s socket] [-p pidfile] "
+		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
 		        "\n  <interface> is either an IPv4 address such as 192.168.1.42, or an\ninterface name such as eth0.\n");
