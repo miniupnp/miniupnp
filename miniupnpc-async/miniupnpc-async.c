@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-async.c,v 1.18 2014/11/07 11:25:52 nanard Exp $ */
+/* $Id: miniupnpc-async.c,v 1.19 2014/11/07 12:05:40 nanard Exp $ */
 /* miniupnpc-async
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -490,7 +490,7 @@ static int upnpc_parse_headers(upnpc_t * p)
 			} else if(p->http_response[i + 1] == '\r' ||
 			          p->http_response[i + 1] == '\n') {
 				if(colon > linestart && valuestart > colon) {
-					printf("header='%.*s', value='%.*s'\n",
+					debug_printf("header='%.*s', value='%.*s'\n",
 					       colon-linestart, p->http_response+linestart,
 					       i+1-valuestart, p->http_response+valuestart);
 					if(0==strncasecmp(p->http_response+linestart, "content-length", colon-linestart)) {

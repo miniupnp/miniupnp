@@ -1,4 +1,4 @@
-/* $Id: testasync.c,v 1.13 2014/11/07 11:25:52 nanard Exp $ */
+/* $Id: testasync.c,v 1.14 2014/11/07 12:07:38 nanard Exp $ */
 /* miniupnpc-async
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -61,13 +61,19 @@ int main(int argc, char * * argv)
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 0;
 #endif
+#if DEBUG
 		printf("select(%d, ...);\n", nfds+1);
+#endif /* DEBUG */
 		if(select(nfds+1, &readfds, &writefds, NULL, NULL/*&timeout*/) < 0) {
 			perror("select");
 			return 1;
 		}
 		r = upnpc_process(&upnp);
+#if DEBUG
 		printf("upnpc_process returned %d\n", r);
+#endif /* DEBUG */
+		if(r < 0)
+			break;
 		if(upnp.state == EReady) {
 			char * p;
 			printf("Process UPnP IGD Method results : HTTP %d\n", upnp.http_response_code);
