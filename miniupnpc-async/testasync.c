@@ -109,6 +109,7 @@ int main(int argc, char * * argv)
 				printf("GetCommonLinkProperties\n");
 				upnpc_get_link_layer_max_rate(&upnp);
 				next_method_to_call = EAddPortMapping;
+				break;
 			case EAddPortMapping:
 				printf("AddPortMapping\n");
 				upnpc_add_port_mapping(&upnp,
