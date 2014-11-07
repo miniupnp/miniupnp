@@ -91,6 +91,8 @@ int main(int argc, char * * argv)
 					printf("UpStream MaxBitRate = %s\n", p);
 					break;
 				case EAddPortMapping:
+					printf("OK\n");
+					break;
 				case ENothing:
 					break;
 				}
