@@ -1,0 +1,7 @@
+miniupnpc-libevent :
+
+UPnP IGD control point (ie client) using libevent
+
+http://libevent.org
+https://github.com/libevent/libevent
+
