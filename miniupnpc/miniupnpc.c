@@ -710,7 +710,7 @@ error:
 }
 
 /* upnpDiscover() Discover IGD device */
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
              const char * minissdpdsock, int sameport,
              int ipv6,
@@ -734,7 +734,7 @@ upnpDiscover(int delay, const char * multicastif,
 }
 
 /* upnpDiscoverAll() Discover all UPnP devices */
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
                 int ipv6,
@@ -751,7 +751,7 @@ upnpDiscoverAll(int delay, const char * multicastif,
 }
 
 /* upnpDiscoverDevice() Discover a specific device */
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
                 int ipv6,

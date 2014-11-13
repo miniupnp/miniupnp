@@ -60,19 +60,19 @@ upnpDiscover(int delay, const char * multicastif,
              int ipv6,
              int * error);
 
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
                 int ipv6,
                 int * error);
 
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
                 int ipv6,
                 int * error);
 
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
                     const char * minissdpdsock, int sameport,
