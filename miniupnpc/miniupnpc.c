@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.116 2014/01/31 14:09:03 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.120 2014/11/05 06:06:38 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -6,7 +6,7 @@
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #define __EXTENSIONS__ 1
-#if !defined(MACOSX) && !defined(__sun)
+#if !defined(__APPLE__) && !defined(__sun)
 #if !defined(_XOPEN_SOURCE) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 #ifndef __cplusplus
 #define _XOPEN_SOURCE 600
@@ -17,7 +17,7 @@
 #endif
 #endif
 
-#if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(MACOSX) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun)
+#if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__APPLE__) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun) && !defined(__GNU__) && !defined(__FreeBSD_kernel__)
 #define HAS_IP_MREQN
 #endif
 
@@ -70,6 +70,9 @@
 /* Amiga OS specific stuff */
 #define TIMEVAL struct timeval
 #endif
+#ifdef __GNU__
+#define MAXHOSTNAMELEN 64
+#endif
 
 
 #if defined(HAS_IP_MREQN) && defined(NEED_STRUCT_IP_MREQN)
@@ -106,7 +109,7 @@ struct ip_mreqn
 #define SERVICEPREFIX2 'u'
 
 /* root description parsing */
-LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
+MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
 {
 	struct xmlparser parser;
 	/* xmlparser object */
@@ -335,7 +338,7 @@ parseMSEARCHReply(const char * reply, int size,
  * no devices was found.
  * It is up to the caller to free the chained list
  * delay is in millisecond (poll) */
-LIBSPEC struct UPNPDev *
+MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
                     const char * minissdpdsock, int sameport,
@@ -765,7 +768,7 @@ upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
 
 /* freeUPNPDevlist() should be used to
  * free the chained list returned by upnpDiscover() */
-LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist)
+MINIUPNP_LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist)
 {
 	struct UPNPDev * next;
 	while(devlist)
@@ -776,122 +779,106 @@ LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist)
 	}
 }
 
-static void
-url_cpy_or_cat(char * dst, const char * src, int n)
+static char *
+build_absolute_url(const char * baseurl, const char * descURL,
+                   const char * url, unsigned int scope_id)
 {
-	if(  (src[0] == 'h')
-	   &&(src[1] == 't')
-	   &&(src[2] == 't')
-	   &&(src[3] == 'p')
-	   &&(src[4] == ':')
-	   &&(src[5] == '/')
-	   &&(src[6] == '/'))
-	{
-		strncpy(dst, src, n);
-	}
-	else
-	{
-		int l = strlen(dst);
-		if(src[0] != '/')
-			dst[l++] = '/';
-		if(l<=n)
-			strncpy(dst + l, src, n - l);
-	}
-}
-
-/* Prepare the Urls for usage...
- */
-LIBSPEC void
-GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
-            const char * descURL, unsigned int scope_id)
-{
+	int l, n;
+	char * s;
+	const char * base;
 	char * p;
-	int n1, n2, n3, n4;
 #ifdef IF_NAMESIZE
 	char ifname[IF_NAMESIZE];
 #else
 	char scope_str[8];
 #endif
 
-	n1 = strlen(data->urlbase);
-	if(n1==0)
-		n1 = strlen(descURL);
+	if(  (url[0] == 'h')
+	   &&(url[1] == 't')
+	   &&(url[2] == 't')
+	   &&(url[3] == 'p')
+	   &&(url[4] == ':')
+	   &&(url[5] == '/')
+	   &&(url[6] == '/'))
+		return strdup(url);
+	base = (baseurl[0] == '\0') ? descURL : baseurl;
+	n = strlen(base);
+	if(n > 7) {
+		p = strchr(base + 7, '/');
+		if(p)
+			n = p - base;
+	}
+	l = n + strlen(url) + 1;
+	if(url[0] != '/')
+		l++;
 	if(scope_id != 0) {
 #ifdef IF_NAMESIZE
 		if(if_indextoname(scope_id, ifname)) {
-			n1 += 3 + strlen(ifname);	/* 3 == strlen(%25) */
+			l += 3 + strlen(ifname);	/* 3 == strlen(%25) */
 		}
 #else
-	/* under windows, scope is numerical */
-	snprintf(scope_str, sizeof(scope_str), "%u", scope_id);
+		/* under windows, scope is numerical */
+		l += 3 + snprintf(scope_str, sizeof(scope_str), "%u", scope_id);
 #endif
 	}
-	n1 += 2;	/* 1 byte more for Null terminator, 1 byte for '/' if needed */
-	n2 = n1; n3 = n1; n4 = n1;
-	n1 += strlen(data->first.scpdurl);
-	n2 += strlen(data->first.controlurl);
-	n3 += strlen(data->CIF.controlurl);
-	n4 += strlen(data->IPv6FC.controlurl);
-
-	/* allocate memory to store URLs */
-	urls->ipcondescURL = (char *)malloc(n1);
-	urls->controlURL = (char *)malloc(n2);
-	urls->controlURL_CIF = (char *)malloc(n3);
-	urls->controlURL_6FC = (char *)malloc(n4);
-
-	/* strdup descURL */
-	urls->rootdescURL = strdup(descURL);
-
-	/* get description of WANIPConnection */
-	if(data->urlbase[0] != '\0')
-		strncpy(urls->ipcondescURL, data->urlbase, n1);
-	else
-		strncpy(urls->ipcondescURL, descURL, n1);
-	p = strchr(urls->ipcondescURL+7, '/');
-	if(p) p[0] = '\0';
+	s = malloc(l);
+	if(s == NULL) return NULL;
+	memcpy(s, base, n);
 	if(scope_id != 0) {
-		if(0 == memcmp(urls->ipcondescURL, "http://[fe80:", 13)) {
+		s[n] = '\0';
+		if(0 == memcmp(s, "http://[fe80:", 13)) {
 			/* this is a linklocal IPv6 address */
-			p = strchr(urls->ipcondescURL, ']');
+			p = strchr(s, ']');
 			if(p) {
 				/* insert %25<scope> into URL */
 #ifdef IF_NAMESIZE
 				memmove(p + 3 + strlen(ifname), p, strlen(p) + 1);
 				memcpy(p, "%25", 3);
 				memcpy(p + 3, ifname, strlen(ifname));
+				n += 3 + strlen(ifname);
 #else
 				memmove(p + 3 + strlen(scope_str), p, strlen(p) + 1);
 				memcpy(p, "%25", 3);
 				memcpy(p + 3, scope_str, strlen(scope_str));
+				n += 3 + strlen(scope_str);
 #endif
 			}
 		}
 	}
-	strncpy(urls->controlURL, urls->ipcondescURL, n2);
-	strncpy(urls->controlURL_CIF, urls->ipcondescURL, n3);
-	strncpy(urls->controlURL_6FC, urls->ipcondescURL, n4);
+	if(url[0] != '/')
+		s[n++] = '/';
+	memcpy(s + n, url, l - n);
+	return s;
+}
 
-	url_cpy_or_cat(urls->ipcondescURL, data->first.scpdurl, n1);
+/* Prepare the Urls for usage...
+ */
+MINIUPNP_LIBSPEC void
+GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
+            const char * descURL, unsigned int scope_id)
+{
+	/* strdup descURL */
+	urls->rootdescURL = strdup(descURL);
 
-	url_cpy_or_cat(urls->controlURL, data->first.controlurl, n2);
-
-	url_cpy_or_cat(urls->controlURL_CIF, data->CIF.controlurl, n3);
-
-	url_cpy_or_cat(urls->controlURL_6FC, data->IPv6FC.controlurl, n4);
+	/* get description of WANIPConnection */
+	urls->ipcondescURL = build_absolute_url(data->urlbase, descURL,
+	                                        data->first.scpdurl, scope_id);
+	urls->controlURL = build_absolute_url(data->urlbase, descURL,
+	                                      data->first.controlurl, scope_id);
+	urls->controlURL_CIF = build_absolute_url(data->urlbase, descURL,
+	                                          data->CIF.controlurl, scope_id);
+	urls->controlURL_6FC = build_absolute_url(data->urlbase, descURL,
+	                                          data->IPv6FC.controlurl, scope_id);
 
 #ifdef DEBUG
-	printf("urls->ipcondescURL='%s' %u n1=%d\n", urls->ipcondescURL,
-	       (unsigned)strlen(urls->ipcondescURL), n1);
-	printf("urls->controlURL='%s' %u n2=%d\n", urls->controlURL,
-	       (unsigned)strlen(urls->controlURL), n2);
-	printf("urls->controlURL_CIF='%s' %u n3=%d\n", urls->controlURL_CIF,
-	       (unsigned)strlen(urls->controlURL_CIF), n3);
-	printf("urls->controlURL_6FC='%s' %u n4=%d\n", urls->controlURL_6FC,
-	       (unsigned)strlen(urls->controlURL_6FC), n4);
+	printf("urls->ipcondescURL='%s'\n", urls->ipcondescURL);
+	printf("urls->controlURL='%s'\n", urls->controlURL);
+	printf("urls->controlURL_CIF='%s'\n", urls->controlURL_CIF);
+	printf("urls->controlURL_6FC='%s'\n", urls->controlURL_6FC);
 #endif
 }
 
-LIBSPEC void
+MINIUPNP_LIBSPEC void
 FreeUPNPUrls(struct UPNPUrls * urls)
 {
 	if(!urls)
@@ -938,7 +925,7 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
  * passed as parameters are set. Donc forget to call FreeUPNPUrls(urls) to
  * free allocated memory.
  */
-LIBSPEC int
+MINIUPNP_LIBSPEC int
 UPNP_GetValidIGD(struct UPNPDev * devlist,
                  struct UPNPUrls * urls,
 				 struct IGDdatas * data,

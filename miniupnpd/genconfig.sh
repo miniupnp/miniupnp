@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.72 2014/03/10 10:17:17 nanard Exp $
+# $Id: genconfig.sh,v 1.74 2014/04/09 07:21:00 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2014 Thomas Bernard
@@ -443,6 +443,9 @@ echo "" >> ${CONFIGFILE}
 echo "#ifdef IGD_V2" >> ${CONFIGFILE}
 echo "/* Enable DeviceProtection service (IGDv2) */" >> ${CONFIGFILE}
 echo "#define ENABLE_DP_SERVICE" >> ${CONFIGFILE}
+echo "/*#define ENABLE_HTTPS*/" >> ${CONFIGFILE}
+echo "/*#define HTTPS_CERTFILE \"/path/to/certificate.pem\"*/" >> ${CONFIGFILE}
+echo "/*#define HTTPS_KEYFILE \"/path/to/private.key\"*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 echo "/* Enable WANIPv6FirewallControl service (IGDv2). needs IPv6 */" >> ${CONFIGFILE}
 echo "#ifdef ENABLE_IPV6" >> ${CONFIGFILE}
@@ -506,6 +509,13 @@ else
 	echo "/*#define ENABLE_MANUFACTURER_INFO_CONFIGURATION*/" >> ${CONFIGFILE}
 fi
 echo "" >> ${CONFIGFILE}
+
+cat >> ${CONFIGFILE} <<EOF
+#if defined(ENABLE_6FC_SERVICE) || (defined(ENABLE_PCP) && defined(ENABLE_IPV6))
+#define ENABLE_UPNPPINHOLE
+#endif
+
+EOF
 
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}
 

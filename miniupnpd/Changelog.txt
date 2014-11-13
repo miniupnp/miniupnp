@@ -1,4 +1,60 @@
-$Id: Changelog.txt,v 1.366 2014/03/24 11:03:50 nanard Exp $
+$Id: Changelog.txt,v 1.383 2014/11/07 11:53:37 nanard Exp $
+
+2014/11/07:
+  sockaddr_to_string() includes scope in IPv6 addresses
+
+VERSION 1.9 : released on 2014/10/27
+
+2014/10/23:
+  Properly implements NAT-PMP mapping removal according to RCF6886
+
+2014/10/22:
+  Discard NAT-PMP packets coming from the WAN
+  Send SSDP announces to IPv6 link-local, site-local
+    and global multicast addresses
+
+2014/10/21:
+  small modifications to compile with exotic C libraries
+
+2014/10/14:
+  add comments in miniupnpd.conf regarding security
+
+2014/09/25:
+  DeletePortMapping now checks for client IP in Securemode
+
+2014/06/xx:
+  Various fixes :
+    e->ipv6.flags |= IP6T_F_PROTO; (netfilter)
+    fix natpmp.c byte order conversion 
+    add small delay before SSDP response to prevent flooding
+
+2014/05/22:
+  Add ipv6_bind_address (option "ipv6_listening_ip")
+  disable IPv6 when socket(PF_INTET6, ...) errors with EAFNOSUPPORT
+  Add IPV6 multicast membership only on selected "LAN" interfaces
+
+2014/05/20:
+  be more strict when parsing LAN addresses / interface names
+
+2014/05/19:
+  set source address for IPV6 packets sendto_schedule2() etc.
+
+2014/05/15:
+  Fix deletePortMappingRange()
+
+2014/04/21:
+  Fix PCP when request contain 0 IPv4 external address
+  Remove pointer casting in natpmp.c
+
+2014/04/15:
+  rewrite iptables_*.sh scripts
+
+2014/04/12:
+  Add FreeBSD support for CHECK_PORTINUSE
+  Add PCP support for CHECK_PORTINUSE
+
+2014/04/09:
+  Add HTTPS support and skeleton of DeviceProtection implementation
 
 2014/03/24:
   start work to enable IPv6 PCP operations

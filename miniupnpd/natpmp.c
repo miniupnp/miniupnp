@@ -1,4 +1,4 @@
-/* $Id: natpmp.c,v 1.43 2014/03/24 10:49:45 nanard Exp $ */
+/* $Id: natpmp.c,v 1.47 2014/05/19 12:51:52 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/uio.h>
 
 #include "macros.h"
 #include "config.h"
@@ -28,6 +29,35 @@
 
 #ifdef ENABLE_NATPMP
 
+#define INLINE static inline
+/* theses macros are designed to read/write unsigned short/long int
+ * from an unsigned char array in network order (big endian).
+ * Avoid pointer casting, so avoid accessing unaligned memory, which
+ * can crash with some cpu's */
+INLINE uint32_t readnu32(const uint8_t * p)
+{
+	return (p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]);
+}
+#define READNU32(p) readnu32(p)
+INLINE uint16_t readnu16(const uint8_t * p)
+{
+	return (p[0] << 8 | p[1]);
+}
+#define READNU16(p) readnu16(p)
+INLINE void writenu32(uint8_t * p, uint32_t n)
+{
+	p[0] = (n & 0xff000000) >> 24;
+	p[1] = (n & 0xff0000) >> 16;
+	p[2] = (n & 0xff00) >> 8;
+	p[3] = n & 0xff;
+}
+#define WRITENU32(p, n) writenu32(p, n)
+INLINE void writenu16(uint8_t * p, uint16_t n)
+{
+	p[0] = (n & 0xff00) >> 8;
+	p[1] = n & 0xff;
+}
+#define WRITENU16(p, n) writenu16(p, n)
 
 int OpenAndConfNATPMPSocket(in_addr_t addr)
 {
@@ -132,9 +162,63 @@ static void FillPublicAddressResponse(unsigned char * resp, in_addr_t senderaddr
  */
 int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
                              socklen_t * senderaddrlen,
+                             struct sockaddr_in6 * receiveraddr,
                              unsigned char * msg_buff, size_t msg_buff_size)
 {
+#if IPV6_PKTINFO
+	struct iovec iov;
+	uint8_t c[1000];
+	struct msghdr msg;
+	int n;
+	struct cmsghdr *h;
 
+	iov.iov_base = msg_buff;
+	iov.iov_len = msg_buff_size;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_name = senderaddr;
+	msg.msg_namelen = *senderaddrlen;
+	msg.msg_control = c;
+	msg.msg_controllen = sizeof(c);
+
+	n = recvmsg(s, &msg, 0);
+	if(n < 0) {
+		/* EAGAIN, EWOULDBLOCK and EINTR : silently ignore (retry next time)
+		 * other errors : log to LOG_ERR */
+		if(errno != EAGAIN &&
+		   errno != EWOULDBLOCK &&
+		   errno != EINTR) {
+			syslog(LOG_ERR, "recvmsg(natpmp): %m");
+		}
+		return n;
+	}
+
+	if(receiveraddr) {
+		memset(receiveraddr, 0, sizeof(struct sockaddr_in6));
+	}
+	if ((msg.msg_flags & MSG_TRUNC) || (msg.msg_flags & MSG_CTRUNC)) {
+		syslog(LOG_WARNING, "%s: truncated message",
+		       "ReceiveNATPMPOrPCPPacket");
+	}
+	for(h = CMSG_FIRSTHDR(&msg); h;
+	    h = CMSG_NXTHDR(&msg, h)) {
+		if(h->cmsg_level == IPPROTO_IPV6 && h->cmsg_type == IPV6_PKTINFO) {
+			char tmp[INET6_ADDRSTRLEN];
+			struct in6_pktinfo *ipi6 = (struct in6_pktinfo *)CMSG_DATA(h);
+			syslog(LOG_DEBUG, "%s: packet destination: %s scope_id=%u",
+			       "ReceiveNATPMPOrPCPPacket",
+			       inet_ntop(AF_INET6, &ipi6->ipi6_addr, tmp, sizeof(tmp)),
+			       ipi6->ipi6_ifindex);
+			if(receiveraddr) {
+				receiveraddr->sin6_addr = ipi6->ipi6_addr;
+				receiveraddr->sin6_scope_id = ipi6->ipi6_ifindex;
+				receiveraddr->sin6_family = AF_INET6;
+				receiveraddr->sin6_port = htons(NATPMP_PORT);
+			}
+		}
+	}
+#else
 	int n;
 
 	n = recvfrom(s, msg_buff, msg_buff_size, 0,
@@ -150,6 +234,7 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 		}
 		return n;
 	}
+#endif
 
 	return n;
 }
@@ -189,7 +274,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	/* setting response TIME STAMP :
 	 * time elapsed since its port mapping table was initialized on
 	 * startup or reset for any other reason */
-	*((uint32_t *)(resp+4)) = htonl(time(NULL) - startup_time);
+	WRITENU32(resp+4, time(NULL) - startup_time);
 	if(req[0] > 0) {
 		/* invalid version */
 		syslog(LOG_WARNING, "unsupported NAT-PMP version : %u",
@@ -213,68 +298,65 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			unsigned short iport_old;
 			unsigned int timestamp;
 
-			iport = ntohs(*((uint16_t *)(req+4)));
-			eport = ntohs(*((uint16_t *)(req+6)));
-			lifetime = ntohl(*((uint32_t *)(req+8)));
+			iport = READNU16(req+4);
+			eport = READNU16(req+6);
+			lifetime = READNU32(req+8);
 			proto = (req[1]==1)?IPPROTO_UDP:IPPROTO_TCP;
 			syslog(LOG_INFO, "NAT-PMP port mapping request : "
 			                 "%hu->%s:%hu %s lifetime=%us",
 			                 eport, senderaddrstr, iport,
 			                 (req[1]==1)?"udp":"tcp", lifetime);
-			if(eport==0)
-				eport = iport;
 			/* TODO: accept port mapping if iport ok but eport not ok
 			 * (and set eport correctly) */
 			if(lifetime == 0) {
 				/* remove the mapping */
-				if(iport == 0) {
-					/* remove all the mappings for this client */
-					int index = 0;
-					unsigned short eport2, iport2;
-					char iaddr2[16];
-					int proto2;
-					char desc[64];
-					while(get_redirect_rule_by_index(index, 0,
-					          &eport2, iaddr2, sizeof(iaddr2),
-							  &iport2, &proto2,
-							  desc, sizeof(desc),
-					          0, 0, &timestamp, 0, 0) >= 0) {
-						syslog(LOG_DEBUG, "%d %d %hu->'%s':%hu '%s'",
-						       index, proto2, eport2, iaddr2, iport2, desc);
-						if(0 == strcmp(iaddr2, senderaddrstr)
-						  && 0 == memcmp(desc, "NAT-PMP", 7)) {
+				/* RFC6886 :
+				 * A client MAY also send an explicit packet to request deletion of a
+				 * mapping that is no longer needed. A client requests explicit
+				 * deletion of a mapping by sending a message to the NAT gateway
+				 * requesting the mapping, with the Requested Lifetime in Seconds set to
+				 * zero. The Suggested External Port MUST be set to zero by the client
+				 * on sending, and MUST be ignored by the gateway on reception. */
+				int index = 0;
+				unsigned short eport2, iport2;
+				char iaddr2[16];
+				int proto2;
+				char desc[64];
+				eport = 0; /* to indicate correct removing of port mapping */
+				while(get_redirect_rule_by_index(index, 0,
+				          &eport2, iaddr2, sizeof(iaddr2),
+						  &iport2, &proto2,
+						  desc, sizeof(desc),
+				          0, 0, &timestamp, 0, 0) >= 0) {
+					syslog(LOG_DEBUG, "%d %d %hu->'%s':%hu '%s'",
+					       index, proto2, eport2, iaddr2, iport2, desc);
+					if(0 == strcmp(iaddr2, senderaddrstr)
+					  && 0 == memcmp(desc, "NAT-PMP", 7)) {
+						/* (iport == 0) => remove all the mappings for this client */
+						if((iport == 0) || ((iport == iport2) && (proto == proto2))) {
 							r = _upnp_delete_redir(eport2, proto2);
-							/* TODO : check return value */
-							if(r<0) {
-								syslog(LOG_ERR, "failed to remove port mapping");
-								index++;
+							if(r < 0) {
+								syslog(LOG_ERR, "Failed to remove NAT-PMP mapping eport %hu, protocol %s",
+								       eport2, (proto2==IPPROTO_TCP)?"TCP":"UDP");
+								resp[3] = 2;	/* Not Authorized/Refused */
+								break;
 							} else {
 								syslog(LOG_INFO, "NAT-PMP %s port %hu mapping removed",
 								       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
+								index--;
 							}
-						} else {
-							index++;
 						}
 					}
-				} else {
-					/* To improve the interworking between nat-pmp and
-					 * UPnP, we should check that we remove only NAT-PMP
-					 * mappings */
-					r = _upnp_delete_redir(eport, proto);
-					/*syslog(LOG_DEBUG, "%hu %d r=%d", eport, proto, r);*/
-					if(r<0) {
-						syslog(LOG_ERR, "Failed to remove NAT-PMP mapping eport %hu, protocol %s",
-						       eport, (proto==IPPROTO_TCP)?"TCP":"UDP");
-						resp[3] = 2;	/* Not Authorized/Refused */
-					}
+					index++;
 				}
-				eport = 0; /* to indicate correct removing of port mapping */
 			} else if(iport==0) {
 				resp[3] = 2;	/* Not Authorized/Refused */
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
 				char desc[64];
+				if(eport==0)	/* if no suggested external port, use same a internal port */
+					eport = iport;
 				while(resp[3] == 0) {
 					if(eport_first == 0) { /* first time in loop */
 						eport_first = eport;
@@ -347,9 +429,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					break;
 				}
 			}
-			*((uint16_t *)(resp+8)) = htons(iport);	/* private port */
-			*((uint16_t *)(resp+10)) = htons(eport);	/* public port */
-			*((uint32_t *)(resp+12)) = htonl(lifetime);	/* Port Mapping lifetime */
+			WRITENU16(resp+8, iport);	/* private port */
+			WRITENU16(resp+10, eport);	/* public port */
+			WRITENU32(resp+12, lifetime);	/* Port Mapping lifetime */
 		}
 		resplen = 16;
 		break;
@@ -381,7 +463,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 	/* seconds since "start of epoch" :
 	 * time elapsed since the port mapping table was initialized on
 	 * startup or reset for any other reason */
-	*((uint32_t *)(notif+4)) = htonl(time(NULL) - startup_time);
+	WRITENU32(notif+4, time(NULL) - startup_time);
 #ifndef MULTIPLE_EXTERNAL_IP
 	FillPublicAddressResponse(notif, 0);
 	if(notif[3])

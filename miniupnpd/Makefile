@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.80 2014/04/07 10:32:20 nanard Exp $
+# $Id: Makefile,v 1.83 2014/04/18 08:24:41 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -34,32 +34,48 @@ STRIP = strip
 OSNAME != uname -s
 ARCH != uname -m
 .ifndef FWNAME
-.if exists(/usr/include/net/pfvar.h)
+#.if exists(/usr/include/net/pfvar.h)
+#FWNAME = pf
+#.else
+#FWNAME = ipf
+#.endif
+
+.if $(OSNAME) == "OpenBSD"
 FWNAME = pf
-.else
-FWNAME = ipf
 .endif
 
 # better way to find if we are using ipf or pf
-.if exists(/etc/rc.subr) && exists(/etc/rc.conf)
 .if $(OSNAME) == "FreeBSD"
+.if exists(/etc/rc.subr) && exists(/etc/rc.conf)
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
           if checkyesno ipfilter_enable; then \
           echo "ipf"; elif checkyesno pf_enable; then \
-          echo "pf"; else echo "ipfw"; fi
+          echo "pf"; elif checkyesno firewall_enable; then \
+          echo "ipfw"; else echo "pf"; fi
+.else
+FWNAME = pf
+.endif
 .endif
 
 .if $(OSNAME) == "NetBSD"
+.if exists(/etc/rc.subr) && exists(/etc/rc.conf)
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
-          if checkyesno ipfilter; then \
+          if checkyesno pf; then \
+          echo "pf"; elif checkyesno ipfilter; then \
           echo "ipf"; else echo "pf"; fi
+.else
+FWNAME = pf
+.endif
 .endif
 
 .if $(OSNAME) == "DragonFly"
+.if exists(/etc/rc.subr) && exists(/etc/rc.conf)
 FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
-          if checkyesno ipfilter; then \
-          echo "ipf"; elif checkyesno pf_enable; then \
-          echo "pf"; else echo "ipfw"; fi
+          if checkyesno pf; then \
+          echo "pf"; elif checkyesno ipfilter; then \
+          echo "ipf"; else echo "pf"; fi
+.else
+FWNAME = pf
 .endif
 .endif
 
@@ -138,6 +154,8 @@ LIBS = -lkvm
 LIBS += -lsocket -lnsl -lkstat -lresolv
 .endif
 
+LIBS += -lssl -lcrypto
+
 # set PREFIX variable to install in the wanted place
 
 INSTALLBINDIR = $(PREFIX)/sbin
@@ -213,7 +231,7 @@ testasyncsendto:	config.h $(TESTASYNCSENDTOOBJS)
 	$(CC) $(CFLAGS) -o $@ $(TESTASYNCSENDTOOBJS)
 
 testportinuse:	config.h $(TESTPORTINUSEOBJS)
-	$(CC) $(CFLAGS) -o $@ $(TESTPORTINUSEOBJS) -lkvm
+	$(CC) $(CFLAGS) -o $@ $(TESTPORTINUSEOBJS) $(LIBS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^

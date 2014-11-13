@@ -138,9 +138,8 @@ getifaddr(const char * ifname, char * buf, int len,
 }
 
 #ifdef ENABLE_PCP
-/* XXX I don't know if this function should return
- * IPv4 or IPv6 if both are enabled... */
-int getifaddr_in6(const char * ifname, struct in6_addr * addr)
+
+int getifaddr_in6(const char * ifname, int af, struct in6_addr * addr)
 {
 #if defined(ENABLE_IPV6) || defined(USE_GETIFADDRS)
 	struct ifaddrs * ifap;
@@ -163,6 +162,8 @@ int getifaddr_in6(const char * ifname, struct in6_addr * addr)
 		if(ifname && (0 != strcmp(ifname, ife->ifa_name)))
 			continue;
 		if(ife->ifa_addr == NULL)
+			continue;
+		if (ife->ifa_addr->sa_family != af)
 			continue;
 		switch(ife->ifa_addr->sa_family)
 		{
@@ -197,6 +198,8 @@ int getifaddr_in6(const char * ifname, struct in6_addr * addr)
 #else /* defined(ENABLE_IPV6) || defined(USE_GETIFADDRS) */
 	/* IPv4 only */
 	struct in_addr addr4;
+	if(af != AF_INET)
+		return -1;
 	if(getifaddr(ifname, NULL, 0, &addr4, NULL) < 0)
 		return -1;
 	/* IPv4-mapped IPv6 address ::ffff:1.2.3.4 */

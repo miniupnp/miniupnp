@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.c,v 1.80 2014/03/06 13:02:46 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.82 2014/04/15 23:15:25 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -49,7 +49,7 @@
 #ifdef __DragonFly__
 #include <net/pf/pfvar.h>
 #else
-#ifdef MACOSX
+#ifdef __APPLE__
 #define PRIVATE 1
 #endif
 #include <net/pfvar.h>
@@ -66,6 +66,10 @@
 #include "../config.h"
 #include "obsdrdr.h"
 #include "../upnpglobalvars.h"
+
+#ifndef USE_PF
+#error "USE_PF macro is undefined, check consistency between config.h and Makefile"
+#else
 
 /* list too keep timestamps for port mappings having a lease duration */
 struct timestamp_entry {
@@ -265,7 +269,7 @@ add_redirect_rule2(const char * ifname,
 		pcr.rule.rdr.addr.type = PF_ADDR_ADDRMASK;
 #endif
 
-#ifdef MACOSX
+#ifdef __APPLE__
 		pcr.rule.dst.xport.range.op = PF_OP_EQ;
 		pcr.rule.dst.xport.range.port[0] = htons(eport);
 		pcr.rule.dst.xport.range.port[1] = htons(eport);
@@ -524,7 +528,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			goto error;
 		}
-#ifdef MACOSX
+#ifdef __APPLE__
 		if( (eport == ntohs(pr.rule.dst.xport.range.port[0]))
 		  && (eport == ntohs(pr.rule.dst.xport.range.port[1]))
 #else
@@ -632,7 +636,7 @@ priv_delete_redirect_rule(const char * ifname, unsigned short eport,
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			goto error;
 		}
-#ifdef MACOSX
+#ifdef __APPLE__
 		if( (eport == ntohs(pr.rule.dst.xport.range.port[0]))
 		  && (eport == ntohs(pr.rule.dst.xport.range.port[1]))
 #else
@@ -712,7 +716,7 @@ priv_delete_filter_rule(const char * ifname, unsigned short iport,
                         int proto, in_addr_t iaddr)
 {
 #ifndef PF_ENABLE_FILTER_RULES
-	UNUSED(ifname); UNUSED(iport); UNUSED(proto);
+	UNUSED(ifname); UNUSED(iport); UNUSED(proto); UNUSED(iaddr);
 	return 0;
 #else
 	int i, n;
@@ -826,7 +830,7 @@ get_redirect_rule_by_index(int index,
 		goto error;
 	}
 	*proto = pr.rule.proto;
-#ifdef MACOSX
+#ifdef __APPLE__
 	*eport = ntohs(pr.rule.dst.xport.range.port[0]);
 #else
 	*eport = ntohs(pr.rule.dst.port[0]);
@@ -942,7 +946,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			continue;
 		}
-#ifdef MACOSX
+#ifdef __APPLE__
 		eport = ntohs(pr.rule.dst.xport.range.port[0]);
 		if( (eport == ntohs(pr.rule.dst.xport.range.port[1]))
 #else
@@ -1044,5 +1048,6 @@ list_rules(void)
 #endif
 	}
 }
-#endif
+#endif /* TEST */
 
+#endif /* USE_PF */

@@ -8,6 +8,7 @@ build/
 Makefile.bak
 miniupnpcstrings.h
 pythonmodule
+pythonmodule3
 upnpc-shared
 upnpc-static
 minihttptestserver
@@ -22,4 +23,6 @@ jnaerator-*.jar
 miniupnpc.h.bak
 testupnpreplyparse
 validateupnpreplyparse
+testportlistingparse
+validateportlistingparse
 listdevices

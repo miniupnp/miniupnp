@@ -2,7 +2,7 @@
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2013 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -31,7 +31,14 @@ static const struct {
 	{ UPNPEXT_IFNAME, "ext_ifname" },
 	{ UPNPEXT_IP,	"ext_ip" },
 	{ UPNPLISTENING_IP, "listening_ip" },
+#ifdef ENABLE_IPV6
+	{ UPNPIPV6_LISTENING_IP, "ipv6_listening_ip" },
+#endif /* ENABLE_IPV6 */
 	{ UPNPPORT, "port" },
+	{ UPNPPORT, "http_port" },	/* "port" and "http_port" are synonims */
+#ifdef ENABLE_HTTPS
+	{ UPNPHTTPSPORT, "https_port" },
+#endif /* ENABLE_HTTPS */
 	{ UPNPBITRATE_UP, "bitrate_up" },
 	{ UPNPBITRATE_DOWN, "bitrate_down" },
 	{ UPNPPRESENTATIONURL, "presentation_url" },
@@ -61,6 +68,7 @@ static const struct {
 #ifdef ENABLE_PCP
 	{ UPNPPCPMINLIFETIME, "min_lifetime"},
 	{ UPNPPCPMAXLIFETIME, "max_lifetime"},
+	{ UPNPPCPALLOWTHIRDPARTY, "pcp_allow_thirdparty"},
 #endif
 	{ UPNPENABLE, "enable_upnp"},
 #ifdef USE_PF
@@ -136,8 +144,10 @@ readoptionsfile(const char * fname)
 		/* check for comments or empty lines */
 		if(name[0] == '#' || name[0] == '\0') continue;
 
+		len = strlen(name); /* length of the whole line excluding leading
+		                     * and ending white spaces */
 		/* check for UPnP permissions rule */
-		if(0 == memcmp(name, "allow", 5) || 0 == memcmp(name, "deny", 4))
+		if((len > 6) && (0 == memcmp(name, "allow", 5) || 0 == memcmp(name, "deny", 4)))
 		{
 			tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
 			if(tmp == NULL)
@@ -163,7 +173,7 @@ readoptionsfile(const char * fname)
 		}
 #ifdef PCP_SADSCP
 		/* check for DSCP values configuration */
-		if(0 == memcmp(name, "set_learn_dscp", sizeof("set_learn_dscp")-1) )
+		if((len > 15) && 0 == memcmp(name, "set_learn_dscp", sizeof("set_learn_dscp")-1) )
 		{
 			tmp = realloc(dscp_values_list, sizeof(struct dscp_values) * (num_dscp_values+1));
 			if(tmp == NULL)
@@ -307,4 +317,3 @@ freeoptions(void)
 }
 
 #endif /* DISABLE_CONFIG_FILE */
-
