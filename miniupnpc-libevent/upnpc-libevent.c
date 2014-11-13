@@ -1,4 +1,4 @@
-/* $Id: upnpc-libevent.c,v 1.3 2014/11/12 14:10:52 nanard Exp $ */
+/* $Id: upnpc-libevent.c,v 1.5 2014/11/13 09:46:12 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -25,10 +25,12 @@ static struct event_base *base = NULL;
 
 static void sighandler(int signal)
 {
-	printf("signal %d\n", signal);
+	(void)signal;
+	/*printf("signal %d\n", signal);*/
 	event_base_loopbreak(base);
 }
 
+/* ready callback */
 static void ready(int code, void * data)
 {
 	upnpc_t * p = (upnpc_t *)data;
@@ -39,6 +41,7 @@ static void ready(int code, void * data)
 
 static enum { EGetExtIp = 0, EGetMaxRate, EAddPortMapping, EFinished } state = EGetExtIp;
 
+/* soap callback */
 static void soap(int code, void * data)
 {
 	upnpc_t * p = (upnpc_t *)data;
@@ -58,6 +61,7 @@ static void soap(int code, void * data)
 			break;
 		case EAddPortMapping:
 			printf("OK!\n");
+			state = EFinished;
 		default:
 			event_base_loopbreak(base);
 		}
@@ -70,6 +74,9 @@ static void soap(int code, void * data)
 		event_base_loopbreak(base);
 	}
 }
+
+
+/* program entry point */
 
 int main(int argc, char * * argv)
 {
@@ -88,10 +95,10 @@ int main(int argc, char * * argv)
 	}
 #ifdef DEBUG
 	event_enable_debug_mode();
-#endif /* DEBUG */
 #if LIBEVENT_VERSION_NUMBER >= 0x02010100
 	event_enable_debug_logging(EVENT_DBG_ALL);	/* Libevent 2.1.1 */
-#endif
+#endif /* LIBEVENT_VERSION_NUMBER >= 0x02010100 */
+#endif /* DEBUG */
 	printf("Using libevent %s\n", event_get_version());
 	if(LIBEVENT_VERSION_NUMBER != event_get_version_number()) {
 		fprintf(stderr, "WARNING build using libevent %s", LIBEVENT_VERSION);
