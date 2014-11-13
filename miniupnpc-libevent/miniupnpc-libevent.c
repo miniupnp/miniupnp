@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.7 2014/11/12 14:10:52 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.8 2014/11/13 09:15:23 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -43,7 +43,6 @@
 #endif
 #include "miniupnpc-libevent.h"
 #include "parsessdpreply.h"
-/*#include "upnputils.h"*/
 #include "minixml.h"
 #include "igd_desc_parse.h"
 #include "upnpreplyparse.h"
@@ -399,176 +398,6 @@ static int upnpc_get_desc(upnpc_t * p, const char * url)
 	return 0;
 }
 
-#if 0
-static int upnpc_complete_connect(upnpc_t * p)
-{
-	socklen_t len;
-	int err;
-	len = sizeof(err);
-	if(getsockopt(p->http_socket, SOL_SOCKET, SO_ERROR, &err, &len) < 0) {
-		PRINT_SOCKET_ERROR("getsockopt");
-		p->state = EError;
-		return -1;
-	}
-	if(err != 0) {
-		debug_printf("connect failed %d\n", err);
-		p->state = EError;
-		return -1;
-	}
-	if(p->state == EGetDescConnect)
-		p->state = EGetDescRequest;
-	else
-		p->state = ESoapRequest;
-	upnpc_send_request(p);
-	return 0;
-}
-#endif
-
-#if 0
-static int upnpc_send_request(upnpc_t * p)
-{
-	ssize_t n;
-	static const char reqfmt[] = "GET %s HTTP/1.1\r\n"
-		"Host: %s:%hu\r\n"
-		"Connection: Close\r\n"
-		"User-Agent: MiniUPnPc-async\r\n"
-		"\r\n";
-	if(p->http_request == NULL) {
-		char hostname[MAXHOSTNAMELEN+1];
-		unsigned short port;
-		char * path;
-		unsigned int scope_id;
-		int len;
-		if(!parseURL(p->root_desc_location, hostname, &port,
-	    	         &path, &scope_id)) {
-			p->state = EError;
-			return -1;
-		}
-		len = snprintf(NULL, 0, reqfmt, path, hostname, port);
-		p->http_request = malloc(len + 1);
-		if(p->http_request == NULL) {
-			p->state = EError;
-			return -1;
-		}
-		p->http_request_len = snprintf(p->http_request, len + 1,
-		                               reqfmt, path, hostname, port);
-		p->http_request_sent = 0;
-	}
-	n = send(p->http_socket, p->http_request + p->http_request_sent,
-	         p->http_request_len - p->http_request_sent, 0/* flags */);
-	if(n < 0) {
-		PRINT_SOCKET_ERROR("send");
-		p->state = EError;
-		return -1;
-	} else {
-		debug_printf("sent %d bytes\n", (int)n);
-		/*if(n == 0) {
-			p->state = EError;
-			return -1;
-		}*/
-		p->http_request_sent += n;
-		if(p->http_request_sent >= p->http_request_len) {
-			/* all bytes sent */
-#if 0
-			shutdown(p->http_socket, SHUT_WR);	/* some routers don't like that */
-#endif
-			free(p->http_request);
-			p->http_request = NULL;
-			p->http_request_len = 0;
-			if(p->state == EGetDescRequest)
-				p->state = EGetDescResponse;
-			else
-				p->state = ESoapResponse;
-			free(p->http_response);
-			p->http_response = NULL;
-			p->http_response_received = 0;
-			p->http_response_end_of_headers = 0;
-			/* get response */
-		}
-	}
-	return 0;
-}
-
-static int upnpc_parse_headers(upnpc_t * p)
-{
-	/* search for CR LF CR LF (end of headers)
-	 * recognize also LF LF */
-	int i = 0;
-	while(i < (p->http_response_received-1) &&
-	      p->http_response_end_of_headers == 0) {
-		if(p->http_response[i] == '\r') {
-			i++;
-			if(p->http_response[i] == '\n') {
-				i++;
-				if(i < p->http_response_received && p->http_response[i] == '\r') {
-					i++;
-					if(i < p->http_response_received && p->http_response[i] == '\n') {
-						p->http_response_end_of_headers = i + 1;
-					}
-				}
-			}
-		} else if(p->http_response[i] == '\n') {
-			i++;
-			if(p->http_response[i] == '\n') {
-				p->http_response_end_of_headers = i + 1;
-			}
-		}
-		i++;
-	}
-	if(p->http_response_end_of_headers != 0) {
-		int colon = 0;
-		int linestart = 0;
-		int valuestart = 0;
-		p->http_response_code = -1;
-		for(i = 0; i < p->http_response_end_of_headers - 1; i++) {
-			if(linestart == 0) {
-				/* reading HTTP response code on the 1st line */
-				if(p->http_response[i] == ' ' && p->http_response_code < 0)
-					p->http_response_code = 0;
-				else if(p->http_response[i] >= '0' && p->http_response[i] <= '9') {
-					p->http_response_code = p->http_response_code * 10 + (p->http_response[i] - '0');
-				} else if(p->http_response[i] == ' ')
-					linestart = 1;
-			}
-			if(colon <= linestart && p->http_response[i] == ':') {
-				colon = i;
-				while(i < p->http_response_end_of_headers - 1 &&
-				      (p->http_response[i+1] == ' ' || p->http_response[i+1] == '\t'))
-					i++;
-				valuestart = i + 1;
-			} else if(p->http_response[i + 1] == '\r' ||
-			          p->http_response[i + 1] == '\n') {
-				if(colon > linestart && valuestart > colon) {
-					debug_printf("header='%.*s', value='%.*s'\n",
-					       colon-linestart, p->http_response+linestart,
-					       i+1-valuestart, p->http_response+valuestart);
-					if(0==strncasecmp(p->http_response+linestart, "content-length", colon-linestart)) {
-						p->http_response_content_length = atoi(p->http_response + valuestart);
-						debug_printf("Content-Length: %d\n", p->http_response_content_length);
-						if(p->http_response_content_length < 0) {
-							debug_printf("Content-Length overflow ? setting to 0\n");
-							p->http_response_content_length = 0;
-						}
-					} else if(0==strncasecmp(p->http_response+linestart, "transfer-encoding", colon-linestart)
-						   && 0==strncasecmp(p->http_response+valuestart, "chunked", 7)) {
-						debug_printf("Chunked transfer-encoding !\n");
-						p->http_response_chunked = 1;
-					}
-				}
-				/* find next line */
-				while((i < p->http_response_received) &&
-				      (p->http_response[i]=='\r' || p->http_response[i] == '\n'))
-					i++;
-				linestart = i;
-				colon = linestart;
-				valuestart = 0;
-			}
-		}
-	}
-	return 0;
-}
-#endif
-
 static char * build_url_string(const char * urlbase, const char * root_desc_url, const char * controlurl)
 {
 	int l, n;
@@ -597,100 +426,6 @@ static char * build_url_string(const char * urlbase, const char * root_desc_url,
 	return s;
 }
 
-#if 0
-static int upnpc_get_response(upnpc_t * p)
-{
-	ssize_t n;
-	ssize_t count;
-	char buffer[2048];
-	if(p->http_response_content_length > 0) {
-		count = p->http_response_content_length
-		      + p->http_response_end_of_headers
-		      - p->http_response_received;
-		if(count > (ssize_t)sizeof(buffer)) count = sizeof(buffer);
-	} else {
-		count = sizeof(buffer);
-	}
-	debug_printf("recv(..., %d)\n", (int)count);
-	n = recv(p->http_socket, buffer, count, 0/* flags */);
-	if(n < 0) {
-		if(errno == EINTR || WOULDBLOCK(errno))
-			return 0;	/* try again later */
-		PRINT_SOCKET_ERROR("read");
-		p->state = EError;
-		return -1;
-	} else if(n == 0) {
-		/* receiving finished */
-		debug_printf("%.*s\n", p->http_response_received, p->http_response);
-		close(p->http_socket);
-		p->http_socket = -1;
-		/* parse */
-		if(p->http_response_end_of_headers == 0) {
-			upnpc_parse_headers(p);
-		}
-		/* TODO : decode chunked transfer-encoding */
-		/* parse xml */
-		if(p->state == EGetDescResponse) {
-			struct IGDdatas igd;
-			struct xmlparser parser;
-			memset(&igd, 0, sizeof(struct IGDdatas));
-			memset(&parser, 0, sizeof(struct xmlparser));
-			parser.xmlstart = p->http_response + p->http_response_end_of_headers;
-			parser.xmlsize = p->http_response_received - p->http_response_end_of_headers;
-			parser.data = &igd;
-			parser.starteltfunc = IGDstartelt;
-			parser.endeltfunc = IGDendelt;
-			parser.datafunc = IGDdata;
-			parsexml(&parser);
-#ifdef DEBUG
-			printIGD(&igd);
-#endif /* DEBUG */
-			p->control_conn_url = build_url_string(igd.urlbase, p->root_desc_location, igd.first.controlurl);
-			p->control_cif_url = build_url_string(igd.urlbase, p->root_desc_location, igd.CIF.controlurl);
-			debug_printf("control_conn_url='%s'\n", p->control_conn_url);
-			debug_printf("control_cif_url='%s'\n", p->control_cif_url);
-		} else {
-			ClearNameValueList(&p->soap_response_data);
-			ParseNameValue(p->http_response + p->http_response_end_of_headers,
-			               p->http_response_received - p->http_response_end_of_headers,
-			               &p->soap_response_data);
-		}
-		free(p->http_response);
-		p->http_response = NULL;
-		p->http_response_received = 0;
-		p->http_response_end_of_headers = 0;
-		p->state = EReady;
-	} else {
-		/* receiving in progress */
-		debug_printf("received %d bytes:\n%.*s\n", (int)n, (int)n, buffer);
-		if(p->http_response == NULL) {
-			p->http_response = malloc(n);
-			if(p->http_response == NULL) {
-				debug_printf("failed to malloc %d bytes\n", (int)n);
-				p->state = EError;
-				return -1;
-			}
-			p->http_response_received = n;
-			memcpy(p->http_response, buffer, n);
-		} else {
-			char * tmp = realloc(p->http_response, p->http_response_received + n);
-			if(tmp == NULL) {
-				debug_printf("failed to realloc %d bytes\n", (int)(p->http_response_received + n));
-				p->state = EError;
-				return -1;
-			}
-			p->http_response = tmp;
-			memcpy(p->http_response + p->http_response_received, buffer, n);
-			p->http_response_received += n;
-		}
-		if(p->http_response_end_of_headers == 0) {
-			upnpc_parse_headers(p);
-		}
-	}
-	return 0;
-}
-#endif
-
 #define SOAPPREFIX "s"
 #define SERVICEPREFIX "u"
 #define SERVICEPREFIX2 'u'
@@ -714,20 +449,6 @@ static int upnpc_send_soap_request(upnpc_t * p, const char * url,
 		"</" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>"
 		"\r\n";
 	int body_len;
-#if 0
-	const char fmt_http[] =
-		"POST %s HTTP/1.1\r\n"
-		"Host: %s%s\r\n"
-		"User-Agent: MiniUPnPc-async\r\n"
-		"Content-Length: %d\r\n"
-		"Content-Type: text/xml\r\n"
-		"SOAPAction: \"%s#%s\"\r\n"
-		"Connection: Close\r\n"
-		"Cache-Control: no-cache\r\n"	/* ??? */
-		"Pragma: no-cache\r\n"
-		"\r\n"
-		"%s";
-#endif
 	char hostname[MAXHOSTNAMELEN+1];
 	unsigned short port;
 	char * path;
@@ -889,12 +610,6 @@ int upnpc_finalize(upnpc_t * p)
 		evhttp_connection_free(p->soap_conn);
 		p->soap_conn = NULL;
 	}
-#if 0
-	if(p->http_socket >= 0) {
-		close(p->http_socket);
-		p->http_socket = -1;
-	}
-#endif
 	ClearNameValueList(&p->soap_response_data);
 	return UPNPC_OK;
 }
