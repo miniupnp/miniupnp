@@ -81,6 +81,7 @@ receivedata(int socket,
     }
 #endif	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
 #if MINIUPNPC_GET_SRC_ADDR
+	memset(&src_addr, 0, sizeof(src_addr));
 	n = recvfrom(socket, data, length, 0,
 	             (struct sockaddr *)&src_addr, &src_addr_len);
 #else	/* MINIUPNPC_GET_SRC_ADDR */
