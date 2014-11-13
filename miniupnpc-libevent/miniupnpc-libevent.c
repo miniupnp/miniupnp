@@ -256,7 +256,7 @@ parseURL(const char * url,
 			if(*scope_id == 0) {
 				*scope_id = (unsigned int)strtoul(tmp, NULL, 10);
 			}
-#else
+#else /* IF_NAMESIZE */
 			/* under windows, scope is numerical */
 			char tmp[8];
 			int l;
@@ -270,7 +270,7 @@ parseURL(const char * url,
 			memcpy(tmp, scope, l);
 			tmp[l] = '\0';
 			*scope_id = (unsigned int)strtoul(tmp, NULL, 10);
-#endif
+#endif /* IF_NAMESIZE */
 		}
 		p3 = strchr(p1, '/');
 		if(p2 && p3) {
@@ -389,11 +389,12 @@ static int upnpc_get_desc(upnpc_t * p, const char * url)
 		p->desc_conn = evhttp_connection_base_new(p->base, NULL, hostname, port);
 	}
 	evhttp_connection_set_closecb(p->desc_conn, upnpc_conn_close_cb, p);
+	/*evhttp_connection_set_timeout(p->desc_conn, 600);*/
 	req = evhttp_request_new(upnpc_desc_received/*callback*/, p);
 	headers = evhttp_request_get_output_headers(req);
 	evhttp_add_header(headers, "Host", hostname);
 	evhttp_add_header(headers, "Connection", "close");
-	/*evhttp_connection_set_timeout(req->evcon, 600);*/
+	/*evhttp_add_header(headers, "User-Agent", "***");*/
 	evhttp_make_request(p->desc_conn, req, EVHTTP_REQ_GET, path);
 	return 0;
 }
@@ -504,6 +505,9 @@ static int upnpc_send_soap_request(upnpc_t * p, const char * url,
 	evhttp_add_header(headers, "Host", hostname);
 	evhttp_add_header(headers, "SOAPAction", action);
 	evhttp_add_header(headers, "Content-Type", "text/xml");
+	/*evhttp_add_header(headers, "User-Agent", "***");*/
+	/*evhttp_add_header(headers, "Cache-Control", "no-cache");*/
+	/*evhttp_add_header(headers, "Pragma", "no-cache");*/
 	evbuffer_add(buffer, body, body_len);
 	evhttp_make_request(p->soap_conn, req, EVHTTP_REQ_POST, path);
 	free(body);
@@ -533,9 +537,9 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 	/* set REUSEADDR */
 #ifdef WIN32
 	if(setsockopt(p->ssdp_socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt)) < 0) {
-#else
+#else /* WIN32 */
 	if(setsockopt(p->ssdp_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-#endif
+#endif /* WIN32 */
 		/* non fatal error ! */
 	}
 	if(evutil_make_socket_nonblocking(p->ssdp_socket) < 0) {
@@ -657,7 +661,7 @@ int upnpc_add_port_mapping(upnpc_t * p,
 	args[5].elt = "NewEnabled";
 	args[5].val = "1";
 	args[6].elt = "NewPortMappingDescription";
-	args[6].val = description?description:"miniupnpc-async";
+	args[6].val = description?description:"miniupnpc-libevent";
 	args[7].elt = "NewLeaseDuration";
 	args[7].val = lease_duration_str;
 	return upnpc_send_soap_request(p, p->control_conn_url,
