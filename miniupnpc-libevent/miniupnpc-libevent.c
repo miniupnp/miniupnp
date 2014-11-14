@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.8 2014/11/13 09:15:23 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.10 2014/11/14 11:37:45 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -630,6 +630,28 @@ int upnpc_get_link_layer_max_rate(upnpc_t * p)
 	return upnpc_send_soap_request(p, p->control_cif_url,
 	                         "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1",
 	                         "GetCommonLinkProperties", NULL, 0);
+}
+
+int upnpc_delete_port_mapping(upnpc_t * p,
+                              const char * remote_host, unsigned short ext_port,
+                              const char * proto)
+{
+	struct upnp_args args[3];
+	char ext_port_str[8];
+
+	if(proto == NULL || ext_port == 0)
+		return UPNPC_ERR_INVALID_ARGS;
+	snprintf(ext_port_str, sizeof(ext_port_str), "%hu", ext_port);
+	args[0].elt = "NewRemoteHost";
+	args[0].val = remote_host?remote_host:"";
+	args[1].elt = "NewExternalPort";
+	args[1].val = ext_port_str;
+	args[2].elt = "NewProtocol";
+	args[2].val = proto;
+	return upnpc_send_soap_request(p, p->control_conn_url,
+	                         "urn:schemas-upnp-org:service:WANIPConnection:1",
+	                         "DeletePortMapping",
+	                         args, 3);
 }
 
 int upnpc_add_port_mapping(upnpc_t * p,

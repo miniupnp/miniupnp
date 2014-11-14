@@ -39,7 +39,13 @@ static void ready(int code, void * data)
 	upnpc_get_external_ip_address(p);
 }
 
-static enum { EGetExtIp = 0, EGetMaxRate, EAddPortMapping, EFinished } state = EGetExtIp;
+static enum {
+	EGetExtIp = 0,
+	EGetMaxRate,
+	EAddPortMapping,
+	EDeletePortMapping,
+	EFinished
+	} state = EGetExtIp;
 
 /* soap callback */
 static void soap(int code, void * data)
@@ -60,6 +66,11 @@ static void soap(int code, void * data)
 			state = EAddPortMapping;
 			break;
 		case EAddPortMapping:
+			printf("OK!\n");
+			upnpc_delete_port_mapping(p, NULL, 60001, "TCP");
+			state = EDeletePortMapping;
+			break;
+		case EDeletePortMapping:
 			printf("OK!\n");
 			state = EFinished;
 		default:
