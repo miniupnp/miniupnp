@@ -1,4 +1,4 @@
-/* $Id: upnpc-libevent.c,v 1.5 2014/11/13 09:46:12 nanard Exp $ */
+/* $Id: upnpc-libevent.c,v 1.7 2014/11/14 11:37:45 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -18,16 +18,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "miniupnpc-libevent.h"
 
 static struct event_base *base = NULL;
+static char local_address[32];
 
 static void sighandler(int signal)
 {
 	(void)signal;
 	/*printf("signal %d\n", signal);*/
-	event_base_loopbreak(base);
+	if(base != NULL)
+		event_base_loopbreak(base);
 }
 
 /* ready callback */
@@ -61,7 +67,7 @@ static void soap(int code, void * data)
 			break;
 		case EGetMaxRate:
 			printf("DownStream MaxBitRate = %s\t", GetValueFromNameValueList(&p->soap_response_data, "NewLayer1DownstreamMaxBitRate"));
-			upnpc_add_port_mapping(p, NULL, 60001, 60002, "192.168.0.42", "TCP", "test port mapping", 0);
+			upnpc_add_port_mapping(p, NULL, 60001, 60002, local_address, "TCP", "test port mapping", 0);
 			printf("UpStream MaxBitRate = %s\n", GetValueFromNameValueList(&p->soap_response_data, "NewLayer1UpstreamMaxBitRate"));
 			state = EAddPortMapping;
 			break;
@@ -86,6 +92,51 @@ static void soap(int code, void * data)
 	}
 }
 
+/* use a UDP "connection" to 8.8.8.8
+ * to retrieve local address */
+int find_local_address(void)
+{
+	int s;
+	struct sockaddr_in local, remote;
+	socklen_t len;
+
+	s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if(s < 0) {
+		perror("socket");
+		return -1;
+	}
+
+	memset(&local, 0, sizeof(local));
+	memset(&remote, 0, sizeof(remote));
+	/* bind to local port 4567 */
+	local.sin_family = AF_INET;
+	local.sin_port = htons(4567);
+	local.sin_addr.s_addr = htonl(INADDR_ANY);
+	if(bind(s, (struct sockaddr *)&local, sizeof(local)) < 0) {
+		perror("bind");
+		return -1;
+	}
+	/* "connect" google's DNS server at 8.8.8.8 port 4567 */
+	remote.sin_family = AF_INET;
+	remote.sin_port = htons(4567);
+	remote.sin_addr.s_addr = inet_addr("8.8.8.8");
+	if(connect(s, (struct sockaddr *)&remote, sizeof(remote)) < 0) {
+		perror("connect");
+		return -1;
+	}
+	len = sizeof(local);
+	if(getsockname(s, (struct sockaddr *)&local, &len) < 0) {
+		perror("getsockname");
+		return -1;
+	}
+	if(inet_ntop(AF_INET, &(local.sin_addr), local_address, sizeof(local_address)) == NULL) {
+		perror("inet_ntop");
+		return -1;
+	}
+	printf("local address : %s\n", local_address);
+	close(s);
+	return 0;
+}
 
 /* program entry point */
 
@@ -103,6 +154,11 @@ int main(int argc, char * * argv)
 	sa.sa_handler = sighandler;
 	if(sigaction(SIGINT, &sa, NULL) < 0) {
 		perror("sigaction");
+	}
+
+	if(find_local_address() < 0) {
+		fprintf(stderr, "failed to get local address\n");
+		return 1;
 	}
 #ifdef DEBUG
 	event_enable_debug_mode();
