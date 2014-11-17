@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.113 2014/11/01 10:37:32 nanard Exp $
+# $Id: Makefile,v 1.117 2014/11/17 17:15:33 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -145,7 +145,7 @@ all:	$(LIBRARY) $(EXECUTABLES)
 test:	check
 
 check:	validateminixml validateminiwget validateupnpreplyparse \
-	validateportlistingparse
+	validateportlistingparse validateigddescparse
 
 everything:	all $(EXECUTABLES_ADDTESTS)
 
@@ -183,12 +183,18 @@ validateportlistingparse:	testportlistingparse
 	./testportlistingparse
 	touch $@
 
+validateigddescparse:	testigddescparse
+	@echo "igd desc parse validation test"
+	./testigddescparse testdesc/new_LiveBox_desc.xml testdesc/new_LiveBox_desc.values
+	touch $@
+
 clean:
 	$(RM) $(LIBRARY) $(SHAREDLIBRARY) $(EXECUTABLES) $(OBJS) miniupnpcstrings.h
 	$(RM) $(EXECUTABLES_ADDTESTS)
 	# clean python stuff
 	$(RM) pythonmodule pythonmodule3
 	$(RM) validateminixml validateminiwget validateupnpreplyparse
+	$(RM) validateigddescparse
 	$(RM) minihttptestserver
 	$(RM) -r build/ dist/
 	#python setup.py clean
@@ -340,3 +346,4 @@ testportlistingparse.o: portlistingparse.h declspec.h miniupnpctypes.h
 miniupnpcmodule.o: miniupnpc.h declspec.h igd_desc_parse.h upnpcommands.h
 miniupnpcmodule.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
 miniupnpcmodule.o: upnperrors.h
+listdevices.o: miniupnpc.h declspec.h igd_desc_parse.h
