@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.13 2014/11/17 16:12:58 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.14 2014/11/17 19:20:45 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -26,21 +26,21 @@
 #include <event2/buffer.h>
 /*#include <event2/bufferevent.h>*/
 #include <event2/http.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <io.h>
 #define PRINT_SOCKET_ERROR printf
 #define SOCKET_ERROR GetWSALastError()
 #define WOULDBLOCK(err) (err == WSAEWOULDBLOCK)
-#else
+#else /* _WIN32 */
 #include <unistd.h>
 #include <errno.h>
 #define closesocket close
 #define PRINT_SOCKET_ERROR perror
 #define SOCKET_ERROR errno
 #define WOULDBLOCK(err) (err == EAGAIN || err == EWOULDBLOCK)
-#endif
+#endif /* _WIN32 */
 #include "miniupnpc-libevent.h"
 #include "minixml.h"
 #include "igd_desc_parse.h"
@@ -549,11 +549,11 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 		return UPNPC_ERR_SOCKET_FAILED;
 	}
 	/* set REUSEADDR */
-#ifdef WIN32
+#ifdef _WIN32
 	if(setsockopt(p->ssdp_socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt)) < 0) {
-#else /* WIN32 */
+#else /* _WIN32 */
 	if(setsockopt(p->ssdp_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-#endif /* WIN32 */
+#endif /* _WIN32 */
 		/* non fatal error ! */
 	}
 	if(evutil_make_socket_nonblocking(p->ssdp_socket) < 0) {
