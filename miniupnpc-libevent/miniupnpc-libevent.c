@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.11 2014/11/17 09:17:38 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.12 2014/11/17 10:14:15 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -159,7 +159,7 @@ static void upnpc_send_ssdp_msearch(evutil_socket_t s, short events, upnpc_t * p
     addr.sin_port = htons(SSDP_PORT);
     addr.sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
 	n = snprintf(bufr, sizeof(bufr),
-	             MSearchMsgFmt, devices_to_search[0], mx);
+	             MSearchMsgFmt, devices_to_search[p->device_index++], mx);
 	debug_printf("upnpc_send_ssdp_msearch: %s", bufr);
 	n = sendto(s, bufr, n, 0,
 	           (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
@@ -172,7 +172,7 @@ static int upnpc_set_root_desc_location(upnpc_t * p, const char * location, int 
 {
 	char * tmp;
 	tmp = realloc(p->root_desc_location, locationsize + 1);
-	if(tmp == 0) {
+	if(tmp == NULL) {
 		return -1;
 	}
 	memcpy(tmp, location, locationsize);
@@ -189,6 +189,17 @@ static void upnpc_receive_and_parse_ssdp(evutil_socket_t s, short events, upnpc_
 	if(events == EV_TIMEOUT) {
 		/* nothing received ... */
 		debug_printf("upnpc_receive_and_parse_ssdp() TIMEOUT\n");
+		if(p->root_desc_location != NULL) {
+			/* we already have found a device */
+		} else if(!devices_to_search[p->device_index]) {
+			debug_printf("*** NO MORE DEVICES TO SEARCH ***\n");
+			/* no device found : set error */
+		} else {
+			/* send another SSDP M-SEARCH packet */
+			if(event_add(p->ev_ssdp_writable, NULL)) {
+				debug_printf("event_add FAILED\n");
+			}
+		}
 		return;
 	}
 	len = recv(s, bufr, sizeof(bufr), 0);
@@ -592,6 +603,7 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 int upnpc_finalize(upnpc_t * p)
 {
 	if(!p) return UPNPC_ERR_INVALID_ARGS;
+	p->device_index = 0;
 	free(p->root_desc_location);
 	p->root_desc_location = NULL;
 	free(p->control_cif_url);

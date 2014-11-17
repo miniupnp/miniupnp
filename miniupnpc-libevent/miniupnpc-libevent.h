@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.h,v 1.6 2014/11/17 09:17:38 nanard Exp $ */
+/* $Id: miniupnpc-libevent.h,v 1.7 2014/11/17 10:14:16 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -39,6 +39,7 @@ typedef struct {
 	evutil_socket_t ssdp_socket;
 	struct event * ev_ssdp_recv;
 	struct event * ev_ssdp_writable;
+	int device_index;
 	char * root_desc_location;
 	struct evhttp_connection * desc_conn;
 	char * control_cif_url;
