@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.h,v 1.5 2014/11/14 10:55:37 nanard Exp $ */
+/* $Id: miniupnpc-libevent.h,v 1.6 2014/11/17 09:17:38 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -42,7 +42,9 @@ typedef struct {
 	char * root_desc_location;
 	struct evhttp_connection * desc_conn;
 	char * control_cif_url;
+	char * cif_service_type;
 	char * control_conn_url;
+	char * conn_service_type;
 	struct evhttp_connection * soap_conn;
 	struct NameValueParserData soap_response_data;
 	upnpc_callback_fn ready_cb;
