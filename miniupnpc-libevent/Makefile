@@ -1,4 +1,6 @@
-# $Id: Makefile,v 1.2 2014/11/08 17:12:15 nanard Exp $
+# $Id: Makefile,v 1.5 2014/11/17 16:27:35 nanard Exp $
+
+OS = $(shell uname -s)
 
 CFLAGS = -O0 -g -DDEBUG
 # libevent debug
@@ -11,6 +13,12 @@ CFLAGS += -D_BSD_SOURCE
 CFLAGS += -D_POSIX_C_SOURCE=1
 
 LDFLAGS = -levent
+
+ifeq ($(OS), Darwin)
+CFLAGS += -D_DARWIN_C_SOURCE
+CFLAGS += -I/opt/local/include
+LDFLAGS += -L/opt/local/lib
+endif
 
 LIB = libminiupnpc-ev.a
 
