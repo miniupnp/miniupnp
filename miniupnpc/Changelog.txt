@@ -1,6 +1,15 @@
 $Id: Changelog.txt,v 1.199 2014/11/05 06:06:37 nanard Exp $
 miniUPnP client Changelog.
 
+2014/11/17:
+  search all :
+    upnpDiscoverDevices() / upnpDiscoverAll() functions
+    listdevices executable
+  increment API_VERSION to 12
+
+2014/11/13:
+  increment API_VERSION to 11
+
 2014/11/05:
   simplified function GetUPNPUrls()
 

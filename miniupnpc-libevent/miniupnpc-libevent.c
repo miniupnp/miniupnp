@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.8 2014/11/13 09:15:23 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.11 2014/11/17 09:17:38 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -342,9 +342,13 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	printIGD(&igd);
 #endif /* DEBUG */
 	p->control_conn_url = build_url_string(igd.urlbase, p->root_desc_location, igd.first.controlurl);
+	p->conn_service_type = strdup(igd.first.servicetype);
 	p->control_cif_url = build_url_string(igd.urlbase, p->root_desc_location, igd.CIF.controlurl);
-	debug_printf("control_conn_url='%s'\n", p->control_conn_url);
-	debug_printf("control_cif_url='%s'\n", p->control_cif_url);
+	p->cif_service_type = strdup(igd.CIF.servicetype);
+	debug_printf("control_conn_url='%s'\n  (service_type='%s')\n",
+	             p->control_conn_url, p->conn_service_type);
+	debug_printf("control_cif_url='%s'\n  (service_type='%s')\n",
+	             p->control_cif_url, p->cif_service_type);
 	p->ready_cb(evhttp_request_get_response_code(req), p->cb_data);
 }
 
@@ -592,8 +596,12 @@ int upnpc_finalize(upnpc_t * p)
 	p->root_desc_location = NULL;
 	free(p->control_cif_url);
 	p->control_cif_url = NULL;
+	free(p->cif_service_type);
+	p->cif_service_type = NULL;
 	free(p->control_conn_url);
 	p->control_conn_url = NULL;
+	free(p->conn_service_type);
+	p->conn_service_type = NULL;
 	if(p->ssdp_socket >= 0) {
 		close(p->ssdp_socket);
 		p->ssdp_socket = -1;
@@ -621,15 +629,37 @@ int upnpc_finalize(upnpc_t * p)
 int upnpc_get_external_ip_address(upnpc_t * p)
 {
 	return upnpc_send_soap_request(p, p->control_conn_url,
-	                         "urn:schemas-upnp-org:service:WANIPConnection:1",
+	                         p->conn_service_type/*"urn:schemas-upnp-org:service:WANIPConnection:1"*/,
 	                         "GetExternalIPAddress", NULL, 0);
 }
 
 int upnpc_get_link_layer_max_rate(upnpc_t * p)
 {
 	return upnpc_send_soap_request(p, p->control_cif_url,
-	                         "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1",
+	                         p->cif_service_type/*"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1"*/,
 	                         "GetCommonLinkProperties", NULL, 0);
+}
+
+int upnpc_delete_port_mapping(upnpc_t * p,
+                              const char * remote_host, unsigned short ext_port,
+                              const char * proto)
+{
+	struct upnp_args args[3];
+	char ext_port_str[8];
+
+	if(proto == NULL || ext_port == 0)
+		return UPNPC_ERR_INVALID_ARGS;
+	snprintf(ext_port_str, sizeof(ext_port_str), "%hu", ext_port);
+	args[0].elt = "NewRemoteHost";
+	args[0].val = remote_host?remote_host:"";
+	args[1].elt = "NewExternalPort";
+	args[1].val = ext_port_str;
+	args[2].elt = "NewProtocol";
+	args[2].val = proto;
+	return upnpc_send_soap_request(p, p->control_conn_url,
+	                         p->conn_service_type,/*"urn:schemas-upnp-org:service:WANIPConnection:1",*/
+	                         "DeletePortMapping",
+	                         args, 3);
 }
 
 int upnpc_add_port_mapping(upnpc_t * p,
@@ -665,7 +695,7 @@ int upnpc_add_port_mapping(upnpc_t * p,
 	args[7].elt = "NewLeaseDuration";
 	args[7].val = lease_duration_str;
 	return upnpc_send_soap_request(p, p->control_conn_url,
-	                         "urn:schemas-upnp-org:service:WANIPConnection:1",
+	                         p->conn_service_type/*"urn:schemas-upnp-org:service:WANIPConnection:1"*/,
 	                         "AddPortMapping",
 	                         args, 8);
 }
