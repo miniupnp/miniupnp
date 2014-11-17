@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.120 2014/11/05 06:06:38 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.122 2014/11/17 22:59:54 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -93,6 +93,9 @@ struct ip_mreqn
 #include "upnpcommands.h"
 #include "connecthostport.h"
 #include "receivedata.h"
+
+/* compare the begining of a string with a constant string */
+#define COMPARE(str, cstr) (0==memcmp(str, cstr, sizeof(cstr) - 1))
 
 #ifdef _WIN32
 #define PRINT_SOCKET_ERROR(x)    printf("Socket error: %s, %d\n", x, WSAGetLastError());
@@ -977,8 +980,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 			memset(data, 0, sizeof(struct IGDdatas));
 			memset(urls, 0, sizeof(struct UPNPUrls));
 			parserootdesc(desc[i].xml, desc[i].size, data);
-			if(0==strcmp(data->CIF.servicetype,
-			   "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1"))
+			if(COMPARE(data->CIF.servicetype,
+			           "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:"))
 			{
 				desc[i].is_igd = 1;
 				n_igd++;
