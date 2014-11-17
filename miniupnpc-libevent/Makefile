@@ -43,7 +43,7 @@ depend:
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 miniupnpc-libevent.o: miniupnpc-libevent.h declspec.h upnpreplyparse.h
-miniupnpc-libevent.o: parsessdpreply.h minixml.h igd_desc_parse.h
+miniupnpc-libevent.o: minixml.h igd_desc_parse.h
 minixml.o: minixml.h
 igd_desc_parse.o: igd_desc_parse.h
 upnpreplyparse.o: upnpreplyparse.h minixml.h

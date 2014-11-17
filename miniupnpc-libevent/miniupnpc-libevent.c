@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.12 2014/11/17 10:14:15 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.13 2014/11/17 16:12:58 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -42,7 +42,6 @@
 #define WOULDBLOCK(err) (err == EAGAIN || err == EWOULDBLOCK)
 #endif
 #include "miniupnpc-libevent.h"
-#include "parsessdpreply.h"
 #include "minixml.h"
 #include "igd_desc_parse.h"
 #include "upnpreplyparse.h"
