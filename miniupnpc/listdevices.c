@@ -1,4 +1,4 @@
-/* $Id: $ */
+/* $Id: listdevices.c,v 1.2 2014/11/17 09:50:56 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2013-2014 Thomas Bernard
@@ -29,11 +29,18 @@ int main(int argc, char * * argv)
 				return 1;
 			}
 			searched_device = argv[i];
+		} else if(strcmp(argv[i], "-m") == 0) {
+			if(++i >= argc) {
+				fprintf(stderr, "-m option needs one argument\n");
+				return 1;
+			}
+			multicastif = argv[i];
 		} else {
 			printf("usage : %s [options]\n", argv[0]);
 			printf("options :\n");
 			printf("   -6 : use IPv6\n");
 			printf("   -d <device string> : search only for this type of device\n");
+			printf("   -m address/ifname : network interface to use for multicast\n");
 			printf("   -h : this help\n");
 			return 1;
 		}
