@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.14 2014/11/17 19:20:45 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.15 2014/11/18 09:10:16 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -711,3 +711,9 @@ int upnpc_add_port_mapping(upnpc_t * p,
 	                         args, 8);
 }
 
+int upnpc_get_status_info(upnpc_t * p)
+{
+	return upnpc_send_soap_request(p, p->control_conn_url,
+	                         p->conn_service_type/*"urn:schemas-upnp-org:service:WANIPConnection:1"*/,
+	                         "GetStatusInfo", NULL, 0);
+}

@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.h,v 1.7 2014/11/17 10:14:16 nanard Exp $ */
+/* $Id: miniupnpc-libevent.h,v 1.8 2014/11/18 09:10:16 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -71,6 +71,8 @@ int upnpc_add_port_mapping(upnpc_t * p,
 int upnpc_delete_port_mapping(upnpc_t * p,
                               const char * remote_host, unsigned short ext_port,
                               const char * proto);
+
+int upnpc_get_status_info(upnpc_t * p);
 
 #ifdef UPNPC_USE_SELECT
 int upnpc_select_fds(upnpc_t * p, int * nfds, fd_set * readfds, fd_set * writefds);

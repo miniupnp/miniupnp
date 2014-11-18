@@ -1,4 +1,4 @@
-/* $Id: upnpc-libevent.c,v 1.7 2014/11/14 11:37:45 nanard Exp $ */
+/* $Id: upnpc-libevent.c,v 1.8 2014/11/18 09:10:16 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -42,16 +42,17 @@ static void ready(int code, void * data)
 	upnpc_t * p = (upnpc_t *)data;
 	printf("READY ! %d %p\n", code, data);
 	/* 1st request */
-	upnpc_get_external_ip_address(p);
+	upnpc_get_status_info(p);
 }
 
 static enum {
-	EGetExtIp = 0,
+	EGetStatusInfo = 0,
+	EGetExtIp,
 	EGetMaxRate,
 	EAddPortMapping,
 	EDeletePortMapping,
 	EFinished
-	} state = EGetExtIp;
+	} state = EGetStatusInfo;
 
 /* soap callback */
 static void soap(int code, void * data)
@@ -60,8 +61,15 @@ static void soap(int code, void * data)
 	printf("SOAP ! %d\n", code);
 	if(code == 200) {
 		switch(state) {
+		case EGetStatusInfo:
+			printf("ConnectionStatus=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewConnectionStatus"));
+			printf("LastConnectionError=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewLastConnectionError"));
+			printf("Uptime=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewUptime"));
+			upnpc_get_external_ip_address(p);
+			state = EGetExtIp;
+			break;
 		case EGetExtIp:
-			printf("ExternalIpAddres=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewExternalIPAddress"));
+			printf("ExternalIpAddress=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewExternalIPAddress"));
 			upnpc_get_link_layer_max_rate(p);
 			state = EGetMaxRate;
 			break;
