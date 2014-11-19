@@ -38,6 +38,7 @@
 #include <net/if.h>
 #include <netdb.h>
 #define closesocket close
+#include <strings.h>
 #endif /* #else _WIN32 */
 #ifdef __GNU__
 #define MAXHOSTNAMELEN 64
