@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.15 2014/11/18 09:10:16 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.16 2014/11/25 22:49:18 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -86,11 +86,13 @@ static const char * devices_to_search[] = {
 	0
 };
 
+#ifdef DEBUG
 static void upnpc_conn_close_cb(struct evhttp_connection * conn, void * data)
 {
 	upnpc_t * p = (upnpc_t *)data;
 	debug_printf("upnpc_get_desc_conn_close_cb %p %p\n", conn, p);
 }
+#endif /* DEBUG */
 
 /* parse_msearch_reply()
  * the last 4 arguments are filled during the parsing :
@@ -402,7 +404,9 @@ static int upnpc_get_desc(upnpc_t * p, const char * url)
 	if(p->desc_conn == NULL) {
 		p->desc_conn = evhttp_connection_base_new(p->base, NULL, hostname, port);
 	}
+#ifdef DEBUG
 	evhttp_connection_set_closecb(p->desc_conn, upnpc_conn_close_cb, p);
+#endif /* DEBUG */
 	/*evhttp_connection_set_timeout(p->desc_conn, 600);*/
 	req = evhttp_request_new(upnpc_desc_received/*callback*/, p);
 	headers = evhttp_request_get_output_headers(req);
