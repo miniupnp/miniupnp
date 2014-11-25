@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.h,v 1.8 2014/11/18 09:10:16 nanard Exp $ */
+/* $Id: miniupnpc-libevent.h,v 1.9 2014/11/25 22:49:19 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -30,7 +30,9 @@ extern "C" {
 #define UPNPC_ERR_INVALID_ARGS (-1)
 #define UPNPC_ERR_SOCKET_FAILED (-2)
 #define UPNPC_ERR_BIND_FAILED (-3)
-#define UPNPC_ERR_UNKNOWN_STATE (-4)
+
+#define UPNPC_ERR_NO_DEVICE_FOUND (-100)
+#define UPNPC_ERR_ROOT_DESC_ERROR (-101)
 
 typedef void(* upnpc_callback_fn)(int, void *);
 

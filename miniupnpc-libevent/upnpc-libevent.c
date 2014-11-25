@@ -1,4 +1,4 @@
-/* $Id: upnpc-libevent.c,v 1.8 2014/11/18 09:10:16 nanard Exp $ */
+/* $Id: upnpc-libevent.c,v 1.9 2014/11/25 22:49:19 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -40,9 +40,26 @@ static void sighandler(int signal)
 static void ready(int code, void * data)
 {
 	upnpc_t * p = (upnpc_t *)data;
-	printf("READY ! %d %p\n", code, data);
-	/* 1st request */
-	upnpc_get_status_info(p);
+	if(code == 200) {
+		printf("READY ! %d\n", code);
+		/* 1st request */
+		upnpc_get_status_info(p);
+	} else {
+		printf("DISCOVER ERROR : %d\n", code);
+		switch(code) {
+		case UPNPC_ERR_NO_DEVICE_FOUND:
+			printf("UPNPC_ERR_NO_DEVICE_FOUND\n");
+			break;
+		case UPNPC_ERR_ROOT_DESC_ERROR:
+			printf("UPNPC_ERR_ROOT_DESC_ERROR\n");
+			break;
+		case 404:
+			printf("Root desc not found (404)\n");
+			break;
+		default:
+			printf("unknown error\n");
+		}
+	}
 }
 
 static enum {
@@ -87,8 +104,8 @@ static void soap(int code, void * data)
 		case EDeletePortMapping:
 			printf("OK!\n");
 			state = EFinished;
-		default:
-			event_base_loopbreak(base);
+		/*default:
+			event_base_loopbreak(base);*/
 		}
 	} else {
 		printf("SOAP error :\n");

@@ -194,7 +194,9 @@ static void upnpc_receive_and_parse_ssdp(evutil_socket_t s, short events, upnpc_
 			/* we already have found a device */
 		} else if(!devices_to_search[p->device_index]) {
 			debug_printf("*** NO MORE DEVICES TO SEARCH ***\n");
-			/* no device found : set error */
+			event_del(p->ev_ssdp_recv);
+			/* no device found : report error */
+			p->ready_cb(UPNPC_ERR_NO_DEVICE_FOUND, p->cb_data);
 		} else {
 			/* send another SSDP M-SEARCH packet */
 			if(event_add(p->ev_ssdp_writable, NULL)) {
@@ -223,8 +225,10 @@ static void upnpc_receive_and_parse_ssdp(evutil_socket_t s, short events, upnpc_
 				return;
 			}
 			upnpc_get_desc(p, p->root_desc_location);
+			event_del(p->ev_ssdp_recv);	/* stop receiving SSDP responses */
 		} else {
 			/* or do nothing ? */
+			debug_printf("no location\n");
 		}
 	}
 }
@@ -337,9 +341,15 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	len = evbuffer_get_length(input_buffer);
 	data = evbuffer_pullup(input_buffer, len);
 	debug_printf("upnpc_desc_received %d (%d bytes)\n", evhttp_request_get_response_code(req), (int)len);
-	debug_printf("%.*s\n", (int)len, (char *)data);
-	if(data == NULL)
+	if(evhttp_request_get_response_code(req) != HTTP_OK) {
+		p->ready_cb(evhttp_request_get_response_code(req), p->cb_data);
 		return;
+	}
+	if(data == NULL) {
+		p->ready_cb(UPNPC_ERR_ROOT_DESC_ERROR, p->cb_data);
+		return;
+	}
+	debug_printf("%.*s\n", (int)len, (char *)data);
 
 	memset(&igd, 0, sizeof(struct IGDdatas));
 	memset(&parser, 0, sizeof(struct xmlparser));
@@ -559,6 +569,7 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 	if(setsockopt(p->ssdp_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
 #endif /* _WIN32 */
 		/* non fatal error ! */
+		debug_printf("setsockopt(%d, SOL_SOCKET, SO_REUSEADDR, ...) FAILED\n", p->ssdp_socket);
 	}
 	if(evutil_make_socket_nonblocking(p->ssdp_socket) < 0) {
 		debug_printf("evutil_make_socket_nonblocking FAILED\n");
