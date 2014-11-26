@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.117 2014/11/17 17:15:33 nanard Exp $
+# $Id: Makefile,v 1.119 2014/11/26 10:42:03 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -186,6 +186,7 @@ validateportlistingparse:	testportlistingparse
 validateigddescparse:	testigddescparse
 	@echo "igd desc parse validation test"
 	./testigddescparse testdesc/new_LiveBox_desc.xml testdesc/new_LiveBox_desc.values
+	./testigddescparse testdesc/linksys_WAG200G_desc.xml testdesc/linksys_WAG200G_desc.values
 	touch $@
 
 clean:
