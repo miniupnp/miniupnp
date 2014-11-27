@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.128 2014/09/25 09:02:25 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.129 2014/11/27 12:24:52 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -170,8 +170,7 @@ GetCommonLinkProperties(struct upnphttp * h, const char * action)
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
-		/*"<NewWANAccessType>DSL</NewWANAccessType>"*/
-		"<NewWANAccessType>Cable</NewWANAccessType>"
+		"<NewWANAccessType>%s</NewWANAccessType>"
 		"<NewLayer1UpstreamMaxBitRate>%lu</NewLayer1UpstreamMaxBitRate>"
 		"<NewLayer1DownstreamMaxBitRate>%lu</NewLayer1DownstreamMaxBitRate>"
 		"<NewPhysicalLinkStatus>%s</NewPhysicalLinkStatus>"
@@ -182,6 +181,7 @@ GetCommonLinkProperties(struct upnphttp * h, const char * action)
 	struct ifdata data;
 	const char * status = "Up";	/* Up, Down (Required),
 	                             * Initializing, Unavailable (Optional) */
+	const char * wan_access_type = "Cable"; /* DSL, POTS, Cable, Ethernet */
 	char ext_ip_addr[INET_ADDRSTRLEN];
 
 	if((downstream_bitrate == 0) || (upstream_bitrate == 0))
@@ -197,7 +197,8 @@ GetCommonLinkProperties(struct upnphttp * h, const char * action)
 	}
 	bodylen = snprintf(body, sizeof(body), resp,
 	    action, "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1",
-		upstream_bitrate, downstream_bitrate,
+	    wan_access_type,
+	    upstream_bitrate, downstream_bitrate,
 	    status, action);
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
