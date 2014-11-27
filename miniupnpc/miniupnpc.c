@@ -790,11 +790,11 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	char * s;
 	const char * base;
 	char * p;
-#ifdef IF_NAMESIZE
+#if defined(IF_NAMESIZE) && !defined(_WIN32)
 	char ifname[IF_NAMESIZE];
-#else
+#else /* defined(IF_NAMESIZE) && !defined(_WIN32) */
 	char scope_str[8];
-#endif
+#endif	/* defined(IF_NAMESIZE) && !defined(_WIN32) */
 
 	if(  (url[0] == 'h')
 	   &&(url[1] == 't')
@@ -815,14 +815,14 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	if(url[0] != '/')
 		l++;
 	if(scope_id != 0) {
-#ifdef IF_NAMESIZE
+#if defined(IF_NAMESIZE) && !defined(_WIN32)
 		if(if_indextoname(scope_id, ifname)) {
 			l += 3 + strlen(ifname);	/* 3 == strlen(%25) */
 		}
-#else
+#else /* defined(IF_NAMESIZE) && !defined(_WIN32) */
 		/* under windows, scope is numerical */
 		l += 3 + snprintf(scope_str, sizeof(scope_str), "%u", scope_id);
-#endif
+#endif /* defined(IF_NAMESIZE) && !defined(_WIN32) */
 	}
 	s = malloc(l);
 	if(s == NULL) return NULL;
