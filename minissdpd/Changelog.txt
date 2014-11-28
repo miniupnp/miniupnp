@@ -1,5 +1,9 @@
 $Id: Changelog.txt,v 1.36 2014/11/06 10:13:36 nanard Exp $
 
+2014/11/28:
+	revert "listen on only 1 IPv4 if only 1 interface is specified"
+	because it prevents broadcast messages to be received
+
 2014/11/06:
 	listen on only 1 IPv4 if only 1 interface is specified
 	also when ENABLE_IPV6 is not defined

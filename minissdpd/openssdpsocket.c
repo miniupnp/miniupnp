@@ -195,6 +195,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 		struct sockaddr_in * sa = (struct sockaddr_in *)&sockname;
 		sa->sin_family = AF_INET;
 		sa->sin_port = htons(SSDP_PORT);
+#ifdef SSDP_LISTEN_ON_SPECIFIC_ADDR
 		if(n_listen_addr == 1)
 		{
 			sa->sin_addr.s_addr = GetIfAddrIPv4(listen_addr[0]);
@@ -207,6 +208,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 			}
 		}
 		else
+#endif /* SSDP_LISTEN_ON_SPECIFIC_ADDR */
 			sa->sin_addr.s_addr = htonl(INADDR_ANY);
 		sockname_len = sizeof(struct sockaddr_in);
 	}
@@ -214,6 +216,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	memset(&sockname, 0, sizeof(struct sockaddr_in));
     sockname.sin_family = AF_INET;
     sockname.sin_port = htons(SSDP_PORT);
+#ifdef SSDP_LISTEN_ON_SPECIFIC_ADDR
 	if(n_listen_addr == 1)
 	{
 		sockname.sin_addr.s_addr = GetIfAddrIPv4(listen_addr[0]);
@@ -226,6 +229,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 		}
 	}
 	else
+#endif /* SSDP_LISTEN_ON_SPECIFIC_ADDR */
 	    sockname.sin_addr.s_addr = htonl(INADDR_ANY);
 	sockname_len = sizeof(struct sockaddr_in);
 #endif /* ENABLE_IPV6 */

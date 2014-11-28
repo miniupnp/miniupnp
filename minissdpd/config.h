@@ -1,4 +1,4 @@
-/* $Id: config.h,v 1.4 2011/05/23 12:22:29 nanard Exp $ */
+/* $Id: config.h,v 1.6 2012/09/27 15:40:29 nanard Exp $ */
 /*  MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2011 Thomas Bernard
@@ -18,5 +18,11 @@
 
 /* Maximum number of network interface we can listen on */
 #define MAX_IF_ADDR 8
+
+/* Uncomment the following line in order to make minissdpd
+ * listen on 1.2.3.4:1900 instead of *:1900
+ * Note : it prevents broadcast packets to be received,
+ *        at least with linux */
+/*#define SSDP_LISTEN_ON_SPECIFIC_ADDR*/
 
 #endif
