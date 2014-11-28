@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.129 2014/11/27 12:24:52 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.130 2014/11/28 13:18:57 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -2043,34 +2043,32 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 	char * p2;
 	int i, len, methodlen;
 
-	i = 0;
+	/* SoapAction example :
+	 * urn:schemas-upnp-org:service:WANIPConnection:1#GetStatusInfo */
 	p = strchr(action, '#');
-
-	if(p)
-	{
+	if(p && (p - action) < n) {
 		p++;
 		p2 = strchr(p, '"');
-		if(p2)
+		if(p2 && (p2 - action) <= n)
 			methodlen = p2 - p;
 		else
 			methodlen = n - (p - action);
-		/*syslog(LOG_DEBUG, "SoapMethod: %.*s", methodlen, p);*/
-		while(soapMethods[i].methodName)
-		{
+		/*syslog(LOG_DEBUG, "SoapMethod: %.*s %d %d %p %p %d",
+		       methodlen, p, methodlen, n, action, p, (int)(p - action));*/
+		for(i = 0; soapMethods[i].methodName; i++) {
 			len = strlen(soapMethods[i].methodName);
-			if((len == methodlen) && memcmp(p, soapMethods[i].methodName, len) == 0)
-			{
+			if((len == methodlen) && memcmp(p, soapMethods[i].methodName, len) == 0) {
 #ifdef DEBUG
 				syslog(LOG_DEBUG, "Remote Call of SoapMethod '%s'\n",
 				       soapMethods[i].methodName);
-#endif
+#endif /* DEBUG */
 				soapMethods[i].methodImpl(h, soapMethods[i].methodName);
 				return;
 			}
-			i++;
 		}
-
 		syslog(LOG_NOTICE, "SoapMethod: Unknown: %.*s", methodlen, p);
+	} else {
+		syslog(LOG_NOTICE, "cannot parse SoapAction");
 	}
 
 	SoapError(h, 401, "Invalid Action");
