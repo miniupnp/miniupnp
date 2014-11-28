@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.5 2014/11/17 16:27:35 nanard Exp $
+# $Id: Makefile,v 1.7 2014/11/28 13:14:19 nanard Exp $
 
 OS = $(shell uname -s)
 
 CFLAGS = -O0 -g -DDEBUG
-# libevent debug
+# libevent debug
 CFLAGS += -DUSE_DEBUG
 
 CFLAGS += -fPIC
@@ -11,8 +11,10 @@ CFLAGS += -ansi
 CFLAGS += -Wall -W
 CFLAGS += -D_BSD_SOURCE
 CFLAGS += -D_POSIX_C_SOURCE=200112L
+CFLAGS += -I/usr/local/include
 
 LDFLAGS = -levent
+LDFLAGS += -L/usr/local/lib
 
 ifeq ($(OS), Darwin)
 CFLAGS += -D_DARWIN_C_SOURCE
