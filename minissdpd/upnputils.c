@@ -1,7 +1,7 @@
-/* $Id: upnputils.c,v 1.1 2013/09/07 06:45:39 nanard Exp $ */
+/* $Id: upnputils.c,v 1.2 2014/11/28 16:20:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2013 Thomas Bernard
+ * (c) 2006-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -21,6 +21,10 @@
 #endif
 
 #include "upnputils.h"
+#include "getroute.h"
+#include "minissdpdtypes.h"
+
+extern struct lan_addr_list lan_addrs;
 
 int
 sockaddr_to_string(const struct sockaddr * addr, char * str, size_t size)
@@ -83,5 +87,86 @@ set_non_blocking(int fd)
 	if(fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
 		return 0;
 	return 1;
+}
+
+struct lan_addr_s *
+get_lan_for_peer(const struct sockaddr * peer)
+{
+	struct lan_addr_s * lan_addr = NULL;
+#ifdef DEBUG
+	char dbg_str[64];
+#endif /* DEBUG */
+
+#ifdef ENABLE_IPV6
+	if(peer->sa_family == AF_INET6)
+	{
+		struct sockaddr_in6 * peer6 = (struct sockaddr_in6 *)peer;
+		if(IN6_IS_ADDR_V4MAPPED(&peer6->sin6_addr))
+		{
+			struct in_addr peer_addr;
+			memcpy(&peer_addr, &peer6->sin6_addr.s6_addr[12], 4);
+			for(lan_addr = lan_addrs.lh_first;
+			    lan_addr != NULL;
+			    lan_addr = lan_addr->list.le_next)
+			{
+				if( (peer_addr.s_addr & lan_addr->mask.s_addr)
+				   == (lan_addr->addr.s_addr & lan_addr->mask.s_addr))
+					break;
+			}
+		}
+		else
+		{
+			int index = -1;
+			if(peer6->sin6_scope_id > 0)
+				index = (int)peer6->sin6_scope_id;
+			else
+			{
+				if(get_src_for_route_to(peer, NULL, NULL, &index) < 0)
+					return NULL;
+			}
+			syslog(LOG_DEBUG, "%s looking for LAN interface index=%d",
+			       "get_lan_for_peer()", index);
+			for(lan_addr = lan_addrs.lh_first;
+			    lan_addr != NULL;
+			    lan_addr = lan_addr->list.le_next)
+			{
+				syslog(LOG_DEBUG,
+				       "ifname=%s index=%u str=%s addr=%08x mask=%08x",
+				       lan_addr->ifname, lan_addr->index,
+				       lan_addr->str,
+				       ntohl(lan_addr->addr.s_addr),
+				       ntohl(lan_addr->mask.s_addr));
+				if(index == (int)lan_addr->index)
+					break;
+			}
+		}
+	}
+	else if(peer->sa_family == AF_INET)
+	{
+#endif /* ENABLE_IPV6 */
+		for(lan_addr = lan_addrs.lh_first;
+		    lan_addr != NULL;
+		    lan_addr = lan_addr->list.le_next)
+		{
+			if( (((const struct sockaddr_in *)peer)->sin_addr.s_addr & lan_addr->mask.s_addr)
+			   == (lan_addr->addr.s_addr & lan_addr->mask.s_addr))
+				break;
+		}
+#ifdef ENABLE_IPV6
+	}
+#endif /* ENABLE_IPV6 */
+
+#ifdef DEBUG
+	sockaddr_to_string(peer, dbg_str, sizeof(dbg_str));
+	if(lan_addr) {
+		syslog(LOG_DEBUG, "%s: %s found in LAN %s %s",
+		       "get_lan_for_peer()", dbg_str,
+		       lan_addr->ifname, lan_addr->str);
+	} else {
+		syslog(LOG_DEBUG, "%s: %s not found !", "get_lan_for_peer()",
+		       dbg_str);
+	}
+#endif /* DEBUG */
+	return lan_addr;
 }
 

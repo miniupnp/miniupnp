@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.40 2014/11/28 14:31:44 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.41 2014/11/28 16:20:57 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -30,11 +30,13 @@
 #include <pwd.h>
 #include <grp.h>
 
+#include "getifaddr.h"
 #include "upnputils.h"
 #include "openssdpsocket.h"
 #include "daemonize.h"
 #include "codelength.h"
 #include "ifacewatch.h"
+#include "minissdpdtypes.h"
 
 /* current request management stucture */
 struct reqelem {
@@ -42,7 +44,7 @@ struct reqelem {
 	LIST_ENTRY(reqelem) entries;
 };
 
-/* divice data structures */
+/* device data structures */
 struct header {
 	const char * p; /* string pointer */
 	int l;          /* string length */
@@ -69,6 +71,95 @@ struct device * devlist = 0;
 /* bootid and configid */
 unsigned int upnp_bootid = 1;
 unsigned int upnp_configid = 1337;
+
+/* LAN interfaces/addresses */
+struct lan_addr_list lan_addrs;
+
+
+/* functions */
+
+/* parselanaddr()
+ * parse address with mask
+ * ex: 192.168.1.1/24 or 192.168.1.1/255.255.255.0
+ *
+ * Can also use the interface name (ie eth0)
+ *
+ * return value :
+ *    0 : ok
+ *   -1 : error */
+static int
+parselanaddr(struct lan_addr_s * lan_addr, const char * str)
+{
+	const char * p;
+	int n;
+	char tmp[16];
+
+	memset(lan_addr, 0, sizeof(struct lan_addr_s));
+	p = str;
+	while(*p && *p != '/' && !isspace(*p))
+		p++;
+	n = p - str;
+	if(!isdigit(str[0]) && n < (int)sizeof(lan_addr->ifname)) {
+		/* not starting with a digit : suppose it is an interface name */
+		memcpy(lan_addr->ifname, str, n);
+		lan_addr->ifname[n] = '\0';
+		if(getifaddr(lan_addr->ifname, lan_addr->str, sizeof(lan_addr->str),
+		             &lan_addr->addr, &lan_addr->mask) < 0)
+			goto parselan_error;
+		/*printf("%s => %s\n", lan_addr->ifname, lan_addr->str);*/
+	} else {
+		if(n>15)
+			goto parselan_error;
+		memcpy(lan_addr->str, str, n);
+		lan_addr->str[n] = '\0';
+		if(!inet_aton(lan_addr->str, &lan_addr->addr))
+			goto parselan_error;
+	}
+	if(*p == '/') {
+		const char * q = ++p;
+		while(*p && isdigit(*p))
+			p++;
+		if(*p=='.') {
+			/* parse mask in /255.255.255.0 format */
+			while(*p && (*p=='.' || isdigit(*p)))
+				p++;
+			n = p - q;
+			if(n>15)
+				goto parselan_error;
+			memcpy(tmp, q, n);
+			tmp[n] = '\0';
+			if(!inet_aton(tmp, &lan_addr->mask))
+				goto parselan_error;
+		} else {
+			/* it is a /24 format */
+			int nbits = atoi(q);
+			if(nbits > 32 || nbits < 0)
+				goto parselan_error;
+			lan_addr->mask.s_addr = htonl(nbits ? (0xffffffffu << (32 - nbits)) : 0);
+		}
+	} else if(lan_addr->mask.s_addr == 0) {
+		/* by default, networks are /24 */
+		lan_addr->mask.s_addr = htonl(0xffffff00u);
+	}
+#ifdef ENABLE_IPV6
+	if(lan_addr->ifname[0] != '\0') {
+		lan_addr->index = if_nametoindex(lan_addr->ifname);
+		if(lan_addr->index == 0)
+			fprintf(stderr, "Cannot get index for network interface %s",
+			        lan_addr->ifname);
+	} else {
+		fprintf(stderr,
+		        "Error: please specify LAN network interface by name instead of IPv4 address : %s\n",
+		        str);
+		return -1;
+	}
+#endif /* ENABLE_IPV6 */
+	return 0;
+parselan_error:
+	fprintf(stderr, "Error parsing address/mask (or interface name) : %s\n",
+	        str);
+	return -1;
+}
 
 static const char *
 nts_to_str(int nts)
@@ -260,8 +351,7 @@ processMSEARCH(int s, const char * st, int st_len,
 	       inet_ntoa(((const struct sockaddr_in *)addr)->sin_addr),
 	       ntohs(((const struct sockaddr_in *)addr)->sin_port),
 	       st_len, st);
-#endif
-	/* TODO : ignore packet if not coming from a LAN */
+#endif	/* ENABLE_IPV6 */
 	if(st_len==8 && (0==memcmp(st, "ssdp:all", 8))) {
 		/* send a response for all services */
 		for(serv = servicelisthead.lh_first;
@@ -343,6 +433,16 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 	const char * st = NULL;
 	int st_len = 0;
 
+	/* first check from what subnet is the sender */
+	if(get_lan_for_peer(addr) == NULL) {
+		char addr_str[64];
+		sockaddr_to_string(addr, addr_str, sizeof(addr_str));
+		syslog(LOG_WARNING, "peer %s is not from a LAN",
+		       addr_str);
+		return 0;
+	}
+
+	/* do the parsing */
 	memset(headers, 0, sizeof(headers));
 	for(methodlen = 0;
 	    methodlen < n && (isalpha(p[methodlen]) || p[methodlen]=='-');
@@ -870,8 +970,7 @@ int main(int argc, char * * argv)
 	struct reqelem * req;
 	struct reqelem * reqnext;
 	fd_set readfds;
-	const char * if_addr[MAX_IF_ADDR];
-	int n_if_addr = 0;
+	struct lan_addr_s * lan_addr;
 	int i;
 	const char * sockpath = "/var/run/minissdpd.sock";
 	const char * pidfilename = "/var/run/minissdpd.pid";
@@ -889,15 +988,22 @@ int main(int argc, char * * argv)
 
 	LIST_INIT(&reqlisthead);
 	LIST_INIT(&servicelisthead);
+	LIST_INIT(&lan_addrs);
 	/* process command line */
 	for(i=1; i<argc; i++)
 	{
 		if(0==strcmp(argv[i], "-i")) {
-			if(n_if_addr < MAX_IF_ADDR)
-				if_addr[n_if_addr++] = argv[++i];
-			else
-				syslog(LOG_WARNING, "Max number of interface address set to %d, "
-				       "ignoring %s", MAX_IF_ADDR, argv[++i]);
+			lan_addr = malloc(sizeof(struct lan_addr_s));
+			if(lan_addr == NULL) {
+				fprintf(stderr, "malloc(%d) FAILED\n", (int)sizeof(struct lan_addr_s));
+				break;
+			}
+			if(parselanaddr(lan_addr, argv[++i]) != 0) {
+				fprintf(stderr, "can't parse \"%s\" as a valid address or interface name\n", argv[i]);
+				free(lan_addr);
+			} else {
+				LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
+			}
 		} else if(0==strcmp(argv[i], "-d"))
 			debug_flag = 1;
 		else if(0==strcmp(argv[i], "-s"))
@@ -909,7 +1015,7 @@ int main(int argc, char * * argv)
 			ipv6 = 1;
 #endif	/* ENABLE_IPV6 */
 	}
-	if(n_if_addr < 1)
+	if(lan_addrs.lh_first == NULL)
 	{
 		fprintf(stderr,
 		        "Usage: %s [-d] "
@@ -920,7 +1026,8 @@ int main(int argc, char * * argv)
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
-		        "\n  <interface> is either an IPv4 address such as 192.168.1.42, or an\ninterface name such as eth0.\n");
+		        "\n  <interface> is either an IPv4 address with mask such as\n"
+		        "  192.168.1.42/255.255.255.0, or an interface name such as eth0.\n");
 		fprintf(stderr,
 		        "\n  By default, socket will be open as %s\n"
 		        "and pid written to file %s\n",
@@ -959,7 +1066,7 @@ int main(int argc, char * * argv)
 	/* open route/interface config changes socket */
 	s_ifacewatch = OpenAndConfInterfaceWatchSocket();
 	/* open UDP socket(s) for receiving SSDP packets */
-	s_ssdp = OpenAndConfSSDPReceiveSocket(n_if_addr, if_addr, 0);
+	s_ssdp = OpenAndConfSSDPReceiveSocket(0);
 	if(s_ssdp < 0)
 	{
 		syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages, exiting");
@@ -968,7 +1075,7 @@ int main(int argc, char * * argv)
 	}
 #ifdef ENABLE_IPV6
 	if(ipv6) {
-		s_ssdp6 = OpenAndConfSSDPReceiveSocket(n_if_addr, if_addr, 1);
+		s_ssdp6 = OpenAndConfSSDPReceiveSocket(1);
 		if(s_ssdp6 < 0)
 		{
 			syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages (IPv6), exiting");
@@ -1183,9 +1290,10 @@ int main(int argc, char * * argv)
 		}
 		/* processing route/network interface config changes */
 		if((s_ifacewatch >= 0) && FD_ISSET(s_ifacewatch, &readfds)) {
-			ProcessInterfaceWatch(s_ifacewatch, s_ssdp, s_ssdp6, n_if_addr, if_addr);
+			ProcessInterfaceWatch(s_ifacewatch, s_ssdp, s_ssdp6);
 		}
 	}
+	syslog(LOG_DEBUG, "quitting...");
 
 	/* closing and cleaning everything */
 quit:
@@ -1208,6 +1316,18 @@ quit:
 	if(s_ifacewatch >= 0) {
 		close(s_ifacewatch);
 		s_ifacewatch = -1;
+	}
+	/* empty LAN interface/address list */
+	while(lan_addrs.lh_first != NULL) {
+		lan_addr = lan_addrs.lh_first;
+		LIST_REMOVE(lan_addrs.lh_first, list);
+		free(lan_addr);
+	}
+	/* empty device list */
+	while(devlist != NULL) {
+		struct device * next = devlist->next;
+		free(devlist);
+		devlist = next;
 	}
 	if(unlink(pidfilename) < 0)
 		syslog(LOG_ERR, "unlink(%s): %m", pidfilename);

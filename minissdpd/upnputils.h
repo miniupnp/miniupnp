@@ -1,7 +1,7 @@
-/* $Id: upnputils.h,v 1.1 2013/09/07 06:45:39 nanard Exp $ */
+/* $Id: upnputils.h,v 1.2 2014/11/28 16:20:07 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2011-2013 Thomas Bernard
+ * (c) 2011-2014 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -22,6 +22,12 @@ sockaddr_to_string(const struct sockaddr * addr, char * str, size_t size);
  */
 int
 set_non_blocking(int fd);
+
+/**
+ * get the LAN which the peer belongs to
+ */
+struct lan_addr_s *
+get_lan_for_peer(const struct sockaddr * peer);
 
 #endif
 

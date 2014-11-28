@@ -1,8 +1,10 @@
-$Id: Changelog.txt,v 1.36 2014/11/06 10:13:36 nanard Exp $
+$Id: Changelog.txt,v 1.37 2014/11/28 16:20:57 nanard Exp $
 
 2014/11/28:
 	revert "listen on only 1 IPv4 if only 1 interface is specified"
 	because it prevents broadcast messages to be received
+	Change the list of LAN addresses/interfaces (code taken from miniupnpd)
+	Check that the peer is from a LAN for each SSDP packet
 
 2014/11/06:
 	listen on only 1 IPv4 if only 1 interface is specified

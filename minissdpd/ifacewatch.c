@@ -1,4 +1,4 @@
-/* $Id: ifacewatch.c,v 1.13 2012/05/21 17:13:11 nanard Exp $ */
+/* $Id: ifacewatch.c,v 1.15 2014/11/28 16:30:37 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2011-2012 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -28,6 +28,9 @@
 
 #include "openssdpsocket.h"
 #include "upnputils.h"
+#include "minissdpdtypes.h"
+
+extern struct lan_addr_list lan_addrs;
 
 #ifndef __linux__
 #if defined(__OpenBSD__) || defined(__FreeBSD__)
@@ -81,11 +84,10 @@ OpenAndConfInterfaceWatchSocket(void)
  * Process the message and add/drop multicast membership if needed
  */
 int
-ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6,
-                      int n_if_addr, const char * * if_addr)
+ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6)
 {
+	struct lan_addr_s * lan_addr;
 	ssize_t len;
-	int i;
 	char buffer[4096];
 #ifdef __linux__
 	struct iovec iov;
@@ -166,14 +168,14 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6,
 			syslog(LOG_INFO, "%s: %s/%d %s",
 			       is_del ? "RTM_DELADDR" : "RTM_NEWADDR",
 			       address, ifa->ifa_prefixlen, ifname);
-			for(i = 0; i < n_if_addr; i++) {
-				if((0 == strcmp(address, if_addr[i])) ||
-				   (0 == strcmp(ifname, if_addr[i])) ||
-				   (ifa->ifa_index == if_nametoindex(if_addr[i]))) {
-					if(ifa->ifa_family == AF_INET && address[0] != '\0')
-						AddDropMulticastMembership(s_ssdp, address, 0, is_del);
+			for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next) {
+				if((0 == strcmp(address, lan_addr->str)) ||
+				   (0 == strcmp(ifname, lan_addr->ifname)) ||
+				   (ifa->ifa_index == lan_addr->index)) {
+					if(ifa->ifa_family == AF_INET)
+						AddDropMulticastMembership(s_ssdp, lan_addr, 0, is_del);
 					else if(ifa->ifa_family == AF_INET6)
-						AddDropMulticastMembership(s_ssdp6, if_addr[i], 1, is_del);
+						AddDropMulticastMembership(s_ssdp6, lan_addr, 1, is_del);
 					break;
 				}
 			}
@@ -299,14 +301,14 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6,
 		syslog(LOG_INFO, "%s: %s/%d %s",
 		       is_del ? "RTM_DELADDR" : "RTM_NEWADDR",
 		       address, prefixlen, ifname);
-		for(i = 0; i < n_if_addr; i++) {
-			if(0 == strcmp(address, if_addr[i]) ||
-			   0 == strcmp(ifname, if_addr[i]) ||
-			   ifam->ifam_index == if_nametoindex(if_addr[i])) {
-				if(family == AF_INET && address[0] != '\0')
-					AddDropMulticastMembership(s_ssdp, address, 0, is_del);
+		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next) {
+			if((0 == strcmp(address, lan_addr->str)) ||
+			   (0 == strcmp(ifname, lan_addr->ifname)) ||
+			   (ifam->ifam_index == lan_addr->index)) {
+				if(family == AF_INET)
+					AddDropMulticastMembership(s_ssdp, lan_addr, 0, is_del);
 				else if(family == AF_INET6)
-					AddDropMulticastMembership(s_ssdp6, if_addr[i], 1, is_del);
+					AddDropMulticastMembership(s_ssdp6, lan_addr, 1, is_del);
 				break;
 			}
 		}

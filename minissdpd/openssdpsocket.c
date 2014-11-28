@@ -1,4 +1,4 @@
-/* $Id: openssdpsocket.c,v 1.14 2014/11/06 10:13:36 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.15 2014/11/28 16:20:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -18,6 +18,9 @@
 
 #include "openssdpsocket.h"
 #include "upnputils.h"
+#include "minissdpdtypes.h"
+
+extern struct lan_addr_list lan_addrs;
 
 /* SSDP ip/port */
 #define SSDP_PORT (1900)
@@ -27,56 +30,17 @@
 #define SL_SSDP_MCAST_ADDR ("FF05::C")
 
 /**
- * Get the IPv4 address from a string
- * representing the address or the interface name
- */
-static in_addr_t
-GetIfAddrIPv4(const char * ifaddr)
-{
-	in_addr_t addr;
-	int s;
-	struct ifreq ifr;
-	int ifrlen;
-
-	/* let's suppose ifaddr is a IPv4 address
-	 * such as 192.168.1.1 */
-	addr = inet_addr(ifaddr);
-	if(addr != INADDR_NONE)
-		return addr;
-	/* let's suppose the ifaddr was in fact an interface name
-	 * such as eth0 */
-	s = socket(PF_INET, SOCK_DGRAM, 0);
-	if(s < 0) {
-		syslog(LOG_ERR, "socket(PF_INET, SOCK_DGRAM): %m");
-		return INADDR_NONE;
-	}
-	memset(&ifr, 0, sizeof(struct ifreq));
-	strncpy(ifr.ifr_name, ifaddr, IFNAMSIZ);
-	if(ioctl(s, SIOCGIFADDR, &ifr, &ifrlen) < 0) {
-		syslog(LOG_ERR, "ioctl(s, SIOCGIFADDR, ...): %m");
-		close(s);
-		return INADDR_NONE;
-	}
-	syslog(LOG_DEBUG, "GetIfAddrIPv4(%s) = %s", ifaddr,
-	       inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-	addr = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr;
-	close(s);
-	return addr;
-}
-
-/**
  * Add the multicast membership for SSDP on the interface
  * @param s	the socket
  * @param ifaddr	the IPv4 address or interface name
  * @param ipv6	IPv6 or IPv4
  * return -1 on error, 0 on success */
 int
-AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
+AddDropMulticastMembership(int s, struct lan_addr_s * lan_addr, int ipv6, int drop)
 {
 	struct ip_mreq imr;	/* Ip multicast membership */
 #ifdef ENABLE_IPV6
 	struct ipv6_mreq mr;
-	unsigned int ifindex;
 #else	/* ENABLE_IPV6 */
 	(void)ipv6;
 #endif	/* ENABLE_IPV6 */
@@ -86,17 +50,16 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 #ifdef ENABLE_IPV6
 	if(ipv6)
 	{
-		ifindex = if_nametoindex(ifaddr);
 		memset(&mr, 0, sizeof(mr));
 		inet_pton(AF_INET6, LL_SSDP_MCAST_ADDR, &mr.ipv6mr_multiaddr);
-		mr.ipv6mr_interface = ifindex;
+		mr.ipv6mr_interface = lan_addr->index;
 		if(setsockopt(s, IPPROTO_IPV6, drop ? IPV6_LEAVE_GROUP : IPV6_JOIN_GROUP,
 		   &mr, sizeof(struct ipv6_mreq)) < 0)
 		{
 			syslog(LOG_ERR, "setsockopt(udp, %s)(%s, %s): %m",
 			       drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
 			       LL_SSDP_MCAST_ADDR,
-			       ifaddr);
+			       lan_addr->ifname);
 			return -1;
 		}
 		inet_pton(AF_INET6, SL_SSDP_MCAST_ADDR, &mr.ipv6mr_multiaddr);
@@ -106,7 +69,7 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 			syslog(LOG_ERR, "setsockopt(udp, %s)(%s, %s): %m",
 			       drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
 			       SL_SSDP_MCAST_ADDR,
-			       ifaddr);
+			       lan_addr->ifname);
 			return -1;
 		}
 	}
@@ -115,11 +78,11 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 #endif /* ENABLE_IPV6 */
 		/* setting up imr structure */
 		imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
-		imr.imr_interface.s_addr = GetIfAddrIPv4(ifaddr);
+		imr.imr_interface.s_addr = lan_addr->addr.s_addr;
 		if(imr.imr_interface.s_addr == INADDR_NONE)
 		{
 			syslog(LOG_ERR, "no IPv4 address for interface %s",
-			       ifaddr);
+			       lan_addr->ifname);
 			return -1;
 		}
 
@@ -128,7 +91,7 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 		{
 			syslog(LOG_ERR, "setsockopt(udp, %s)(%s): %m",
 			       drop ? "IP_DROP_MEMBERSHIP" : "IP_ADD_MEMBERSHIP",
-			       ifaddr);
+			       lan_addr->ifname);
 			return -1;
 		}
 #ifdef ENABLE_IPV6
@@ -139,9 +102,7 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 }
 
 int
-OpenAndConfSSDPReceiveSocket(int n_listen_addr,
-							 const char * * listen_addr,
-                             int ipv6)
+OpenAndConfSSDPReceiveSocket(int ipv6)
 {
 	int s;
 	int opt = 1;
@@ -151,6 +112,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	struct sockaddr_in sockname;
 #endif /* ENABLE_IPV6 */
 	socklen_t sockname_len;
+	struct lan_addr_s * lan_addr;
 
 #ifndef ENABLE_IPV6
 	if(ipv6) {
@@ -246,14 +208,13 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 		return -1;
     }
 
-	while(n_listen_addr>0)
+	for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next)
 	{
-		n_listen_addr--;
-		if(AddDropMulticastMembership(s, listen_addr[n_listen_addr], ipv6, 0) < 0)
+		if(AddDropMulticastMembership(s, lan_addr, ipv6, 0) < 0)
 		{
 			syslog(LOG_WARNING, "Failed to add IPv%d multicast membership for interface %s.",
 			       ipv6 ? 6 : 4,
-			       listen_addr[n_listen_addr] );
+			       lan_addr->ifname);
 		}
 	}
 
