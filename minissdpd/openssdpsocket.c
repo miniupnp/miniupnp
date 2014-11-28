@@ -42,21 +42,17 @@ GetIfAddrIPv4(const char * ifaddr)
 	 * such as 192.168.1.1 */
 	addr = inet_addr(ifaddr);
 	if(addr != INADDR_NONE)
-	{
 		return addr;
-	}
 	/* let's suppose the ifaddr was in fact an interface name
 	 * such as eth0 */
 	s = socket(PF_INET, SOCK_DGRAM, 0);
-	if(s < 0)
-	{
+	if(s < 0) {
 		syslog(LOG_ERR, "socket(PF_INET, SOCK_DGRAM): %m");
 		return INADDR_NONE;
 	}
 	memset(&ifr, 0, sizeof(struct ifreq));
 	strncpy(ifr.ifr_name, ifaddr, IFNAMSIZ);
-	if(ioctl(s, SIOCGIFADDR, &ifr, &ifrlen) < 0)
-	{
+	if(ioctl(s, SIOCGIFADDR, &ifr, &ifrlen) < 0) {
 		syslog(LOG_ERR, "ioctl(s, SIOCGIFADDR, ...): %m");
 		close(s);
 		return INADDR_NONE;
@@ -116,11 +112,9 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 	}
 	else
 	{
-#endif
+#endif /* ENABLE_IPV6 */
 		/* setting up imr structure */
 		imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
-		/*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
-		/*imr.imr_interface.s_addr = inet_addr(ifaddr);*/
 		imr.imr_interface.s_addr = GetIfAddrIPv4(ifaddr);
 		if(imr.imr_interface.s_addr == INADDR_NONE)
 		{
@@ -139,7 +133,7 @@ AddDropMulticastMembership(int s, const char * ifaddr, int ipv6, int drop)
 		}
 #ifdef ENABLE_IPV6
 	}
-#endif
+#endif /* ENABLE_IPV6 */
 
 	return 0;
 }
@@ -153,16 +147,23 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	int opt = 1;
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
-#else
+#else /* ENABLE_IPV6 */
 	struct sockaddr_in sockname;
-#endif
+#endif /* ENABLE_IPV6 */
 	socklen_t sockname_len;
+
+#ifndef ENABLE_IPV6
+	if(ipv6) {
+		syslog(LOG_ERR, "%s: please compile with ENABLE_IPV6 to allow ipv6=1", __func__);
+		return -1;
+	}
+#endif /* ENABLE_IPV6 */
 
 #ifdef ENABLE_IPV6
 	if( (s = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0)) < 0)
-#else
+#else /* ENABLE_IPV6 */
 	if( (s = socket(PF_INET, SOCK_DGRAM, 0)) < 0)
-#endif
+#endif /* ENABLE_IPV6 */
 	{
 		syslog(LOG_ERR, "socket(udp): %m");
 		return -1;
@@ -182,7 +183,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 		{
 			syslog(LOG_WARNING, "setsockopt(IPV6_V6ONLY): %m");
 		}
-#endif
+#endif /* IPV6_V6ONLY */
 		struct sockaddr_in6 * sa = (struct sockaddr_in6 *)&sockname;
 		sa->sin6_family = AF_INET6;
 		sa->sin6_port = htons(SSDP_PORT);
@@ -209,7 +210,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 			sa->sin_addr.s_addr = htonl(INADDR_ANY);
 		sockname_len = sizeof(struct sockaddr_in);
 	}
-#else
+#else /* ENABLE_IPV6 */
 	memset(&sockname, 0, sizeof(struct sockaddr_in));
     sockname.sin_family = AF_INET;
     sockname.sin_port = htons(SSDP_PORT);
@@ -227,7 +228,7 @@ OpenAndConfSSDPReceiveSocket(int n_listen_addr,
 	else
 	    sockname.sin_addr.s_addr = htonl(INADDR_ANY);
 	sockname_len = sizeof(struct sockaddr_in);
-#endif
+#endif /* ENABLE_IPV6 */
 
 	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 	{

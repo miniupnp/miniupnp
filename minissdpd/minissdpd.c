@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.39 2014/11/06 10:13:06 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.40 2014/11/28 14:31:44 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -218,9 +218,9 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 	sockname_len = (sockname->sa_family == PF_INET6)
 	             ? sizeof(struct sockaddr_in6)
 	             : sizeof(struct sockaddr_in);
-#else
+#else	/* ENABLE_IPV6 */
 	sockname_len = sizeof(struct sockaddr_in);
-#endif
+#endif	/* ENABLE_IPV6 */
 	n = sendto(s, buf, l, 0,
 	           sockname, sockname_len );
 	if(n < 0) {
@@ -247,7 +247,7 @@ processMSEARCH(int s, const char * st, int st_len,
 	struct service * serv;
 #ifdef ENABLE_IPV6
 	char buf[64];
-#endif
+#endif /* ENABLE_IPV6 */
 
 	if(!st || st_len==0)
 		return;
@@ -255,7 +255,7 @@ processMSEARCH(int s, const char * st, int st_len,
 	sockaddr_to_string(addr, buf, sizeof(buf));
 	syslog(LOG_INFO, "SSDP M-SEARCH from %s ST:%.*s",
 	       buf, st_len, st);
-#else
+#else	/* ENABLE_IPV6 */
 	syslog(LOG_INFO, "SSDP M-SEARCH from %s:%d ST: %.*s",
 	       inet_ntoa(((const struct sockaddr_in *)addr)->sin_addr),
 	       ntohs(((const struct sockaddr_in *)addr)->sin_port),
@@ -860,9 +860,9 @@ int main(int argc, char * * argv)
 	int s_ssdp = -1;	/* udp socket receiving ssdp packets */
 #ifdef ENABLE_IPV6
 	int s_ssdp6 = -1;	/* udp socket receiving ssdp packets IPv6*/
-#else
+#else	/* ENABLE_IPV6 */
 #define s_ssdp6 (-1)
-#endif
+#endif	/* ENABLE_IPV6 */
 	int s_unix = -1;	/* unix socket communicating with clients */
 	int s_ifacewatch = -1;	/* socket to receive Route / network interface config changes */
 	int s;
@@ -885,7 +885,7 @@ int main(int argc, char * * argv)
 #ifdef ENABLE_IPV6
 	struct sockaddr_in6 sendername6;
 	socklen_t sendername6_len;
-#endif
+#endif	/* ENABLE_IPV6 */
 
 	LIST_INIT(&reqlisthead);
 	LIST_INIT(&servicelisthead);
@@ -907,7 +907,7 @@ int main(int argc, char * * argv)
 #ifdef ENABLE_IPV6
 		else if(0==strcmp(argv[i], "-6"))
 			ipv6 = 1;
-#endif
+#endif	/* ENABLE_IPV6 */
 	}
 	if(n_if_addr < 1)
 	{
@@ -915,7 +915,7 @@ int main(int argc, char * * argv)
 		        "Usage: %s [-d] "
 #ifdef ENABLE_IPV6
 		        "[-6] "
-#endif
+#endif /* ENABLE_IPV6 */
 		        "[-s socket] [-p pidfile] "
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
@@ -976,7 +976,7 @@ int main(int argc, char * * argv)
 			goto quit;
 		}
 	}
-#endif
+#endif	/* ENABLE_IPV6 */
 	/* Open Unix socket to communicate with other programs on
 	 * the same machine */
 	s_unix = OpenUnixSocket(sockpath);
@@ -1034,7 +1034,8 @@ int main(int argc, char * * argv)
 	writepidfile(pidfilename, pid);
 
 	/* send M-SEARCH ssdp:all Requests */
-	ssdpDiscoverAll(s_ssdp, 0);
+	if(s_ssdp >= 0)
+		ssdpDiscoverAll(s_ssdp, 0);
 	if(s_ssdp6 >= 0)
 		ssdpDiscoverAll(s_ssdp6, 1);
 
@@ -1050,7 +1051,7 @@ int main(int argc, char * * argv)
 		if(s_ssdp6 >= 0) {
 			FD_SET(s_ssdp6, &readfds);
 		}
-#endif
+#endif /* ENABLE_IPV6 */
 		if(s_ifacewatch >= 0) {
 			FD_SET(s_ifacewatch, &readfds);
 		}
@@ -1104,8 +1105,8 @@ int main(int argc, char * * argv)
 				}
 			}
 		}
-#endif
-		if(FD_ISSET(s_ssdp, &readfds))
+#endif	/* ENABLE_IPV6 */
+		if((s_ssdp >= 0) && FD_ISSET(s_ssdp, &readfds))
 		{
 			sendername_len = sizeof(struct sockaddr_in);
 			n = recvfrom(s_ssdp, buf, sizeof(buf), 0,
@@ -1197,7 +1198,7 @@ quit:
 		close(s_ssdp6);
 		s_ssdp6 = -1;
 	}
-#endif
+#endif	/* ENABLE_IPV6 */
 	if(s_unix >= 0) {
 		close(s_unix);
 		s_unix = -1;
