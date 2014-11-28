@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.16 2014/11/25 22:49:18 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.17 2014/11/28 13:21:25 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -523,7 +523,7 @@ static int upnpc_send_soap_request(upnpc_t * p, const char * url,
 		snprintf(portstr, sizeof(portstr), ":%hu", port);
 	else
 		portstr[0] = '\0';
-	snprintf(action, sizeof(action), "%s#%s", service, method);
+	snprintf(action, sizeof(action), "\"%s#%s\"", service, method);
 	if(p->soap_conn == NULL) {
 		p->soap_conn = evhttp_connection_base_new(p->base, NULL, hostname, port);
 	}
