@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.105 2014/11/01 10:37:32 nanard Exp $ */
+/* $Id: upnpc.c,v 1.106 2014/12/01 09:24:31 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2014 Thomas Bernard
@@ -768,6 +768,12 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "No IGD UPnP Device found on the network !\n");
 		retcode = 1;
 	}
+#ifdef _WIN32
+	nResult = WSACleanup();
+	if(nResult != NO_ERROR) {
+		fprintf(stderr, "WSACleanup() failed.\n");
+	}
+#endif /* _WIN32 */
 	return retcode;
 }
 
