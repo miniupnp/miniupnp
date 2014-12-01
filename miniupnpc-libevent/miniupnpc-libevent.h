@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.h,v 1.9 2014/11/25 22:49:19 nanard Exp $ */
+/* $Id: miniupnpc-libevent.h,v 1.10 2014/12/01 17:41:11 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -33,15 +33,23 @@ extern "C" {
 
 #define UPNPC_ERR_NO_DEVICE_FOUND (-100)
 #define UPNPC_ERR_ROOT_DESC_ERROR (-101)
+#define UPNPC_ERR_NOT_IGD         (-102)
+#define UPNPC_ERR_NOT_CONNECTED   (-103)
 
-typedef void(* upnpc_callback_fn)(int, void *);
+/* device->state masks */
+#define UPNPC_DEVICE_SOAP_REQ  (0x0001)
+#define UPNPC_DEVICE_GETSTATUS (0x0002)
+#define UPNPC_DEVICE_CONNECTED (0x4000)
+#define UPNPC_DEVICE_READY     (0x8000)
 
-typedef struct {
-	struct event_base * base;
-	evutil_socket_t ssdp_socket;
-	struct event * ev_ssdp_recv;
-	struct event * ev_ssdp_writable;
-	int device_index;
+typedef struct upnpc_device upnpc_device_t;
+typedef struct upnpc upnpc_t;
+
+typedef void(* upnpc_callback_fn)(int, upnpc_t *, upnpc_device_t *, void *);
+
+struct upnpc_device {
+	upnpc_t * parent;
+	upnpc_device_t * next;
 	char * root_desc_location;
 	struct evhttp_connection * desc_conn;
 	char * control_cif_url;
@@ -50,31 +58,41 @@ typedef struct {
 	char * conn_service_type;
 	struct evhttp_connection * soap_conn;
 	struct NameValueParserData soap_response_data;
+	unsigned int state;
+};
+
+struct upnpc {
+	struct event_base * base;
+	evutil_socket_t ssdp_socket;
+	struct event * ev_ssdp_recv;
+	struct event * ev_ssdp_writable;
+	int discover_device_index;
+	upnpc_device_t * devices;
 	upnpc_callback_fn ready_cb;
 	upnpc_callback_fn soap_cb;
 	void * cb_data;
-} upnpc_t;
+};
 
 int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
                upnpc_callback_fn ready_cb, upnpc_callback_fn soap_cb, void * cb_data);
 
 int upnpc_finalize(upnpc_t * p);
 
-int upnpc_get_external_ip_address(upnpc_t * p);
+int upnpc_get_external_ip_address(upnpc_device_t * p);
 
-int upnpc_get_link_layer_max_rate(upnpc_t * p);
+int upnpc_get_link_layer_max_rate(upnpc_device_t * p);
 
-int upnpc_add_port_mapping(upnpc_t * p,
+int upnpc_add_port_mapping(upnpc_device_t * p,
                            const char * remote_host, unsigned short ext_port,
                            unsigned short int_port, const char * int_client,
                            const char * proto, const char * description,
                            unsigned int lease_duration);
 
-int upnpc_delete_port_mapping(upnpc_t * p,
+int upnpc_delete_port_mapping(upnpc_device_t * p,
                               const char * remote_host, unsigned short ext_port,
                               const char * proto);
 
-int upnpc_get_status_info(upnpc_t * p);
+int upnpc_get_status_info(upnpc_device_t * p);
 
 #ifdef UPNPC_USE_SELECT
 int upnpc_select_fds(upnpc_t * p, int * nfds, fd_set * readfds, fd_set * writefds);

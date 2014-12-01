@@ -1,4 +1,4 @@
-/* $Id: upnpc-libevent.c,v 1.9 2014/11/25 22:49:19 nanard Exp $ */
+/* $Id: upnpc-libevent.c,v 1.10 2014/12/01 17:41:11 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -37,13 +37,14 @@ static void sighandler(int signal)
 }
 
 /* ready callback */
-static void ready(int code, void * data)
+static void ready(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 {
-	upnpc_t * p = (upnpc_t *)data;
+	(void)data; (void)p;
+
 	if(code == 200) {
 		printf("READY ! %d\n", code);
 		/* 1st request */
-		upnpc_get_status_info(p);
+		upnpc_get_status_info(d);
 	} else {
 		printf("DISCOVER ERROR : %d\n", code);
 		switch(code) {
@@ -72,47 +73,50 @@ static enum {
 	} state = EGetStatusInfo;
 
 /* soap callback */
-static void soap(int code, void * data)
+static void soap(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 {
-	upnpc_t * p = (upnpc_t *)data;
+	(void)data; (void)p;
+
 	printf("SOAP ! %d\n", code);
 	if(code == 200) {
 		switch(state) {
 		case EGetStatusInfo:
-			printf("ConnectionStatus=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewConnectionStatus"));
-			printf("LastConnectionError=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewLastConnectionError"));
-			printf("Uptime=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewUptime"));
-			upnpc_get_external_ip_address(p);
+			printf("ConnectionStatus=%s\n", GetValueFromNameValueList(&d->soap_response_data, "NewConnectionStatus"));
+			printf("LastConnectionError=%s\n", GetValueFromNameValueList(&d->soap_response_data, "NewLastConnectionError"));
+			printf("Uptime=%s\n", GetValueFromNameValueList(&d->soap_response_data, "NewUptime"));
+			upnpc_get_external_ip_address(d);
 			state = EGetExtIp;
 			break;
 		case EGetExtIp:
-			printf("ExternalIpAddress=%s\n", GetValueFromNameValueList(&p->soap_response_data, "NewExternalIPAddress"));
-			upnpc_get_link_layer_max_rate(p);
+			printf("ExternalIpAddress=%s\n", GetValueFromNameValueList(&d->soap_response_data, "NewExternalIPAddress"));
+			upnpc_get_link_layer_max_rate(d);
 			state = EGetMaxRate;
 			break;
 		case EGetMaxRate:
-			printf("DownStream MaxBitRate = %s\t", GetValueFromNameValueList(&p->soap_response_data, "NewLayer1DownstreamMaxBitRate"));
-			upnpc_add_port_mapping(p, NULL, 60001, 60002, local_address, "TCP", "test port mapping", 0);
-			printf("UpStream MaxBitRate = %s\n", GetValueFromNameValueList(&p->soap_response_data, "NewLayer1UpstreamMaxBitRate"));
+			printf("DownStream MaxBitRate = %s\t", GetValueFromNameValueList(&d->soap_response_data, "NewLayer1DownstreamMaxBitRate"));
+			upnpc_add_port_mapping(d, NULL, 60001, 60002, local_address, "TCP", "test port mapping", 0);
+			printf("UpStream MaxBitRate = %s\n", GetValueFromNameValueList(&d->soap_response_data, "NewLayer1UpstreamMaxBitRate"));
 			state = EAddPortMapping;
 			break;
 		case EAddPortMapping:
 			printf("OK!\n");
-			upnpc_delete_port_mapping(p, NULL, 60001, "TCP");
+			upnpc_delete_port_mapping(d, NULL, 60001, "TCP");
 			state = EDeletePortMapping;
 			break;
 		case EDeletePortMapping:
 			printf("OK!\n");
 			state = EFinished;
-		/*default:
-			event_base_loopbreak(base);*/
+			break;
+		default:
+			printf("EFinished : breaking\n");
+			event_base_loopbreak(base);
 		}
 	} else {
 		printf("SOAP error :\n");
-		printf("  faultcode='%s'\n", GetValueFromNameValueList(&p->soap_response_data, "faultcode"));
-		printf("  faultstring='%s'\n", GetValueFromNameValueList(&p->soap_response_data, "faultstring"));
-		printf("  errorCode=%s\n", GetValueFromNameValueList(&p->soap_response_data, "errorCode"));
-		printf("  errorDescription='%s'\n", GetValueFromNameValueList(&p->soap_response_data, "errorDescription"));
+		printf("  faultcode='%s'\n", GetValueFromNameValueList(&d->soap_response_data, "faultcode"));
+		printf("  faultstring='%s'\n", GetValueFromNameValueList(&d->soap_response_data, "faultstring"));
+		printf("  errorCode=%s\n", GetValueFromNameValueList(&d->soap_response_data, "errorCode"));
+		printf("  errorDescription='%s'\n", GetValueFromNameValueList(&d->soap_response_data, "errorDescription"));
 		event_base_loopbreak(base);
 	}
 }
