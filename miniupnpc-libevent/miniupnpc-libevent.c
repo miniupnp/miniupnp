@@ -589,6 +589,7 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	evbuffer_add(buffer, body, body_len);
 	evhttp_make_request(p->soap_conn, req, EVHTTP_REQ_POST, path);
 	free(body);
+	p->state |= UPNPC_DEVICE_SOAP_REQ;
 	return 0;
 }
 
