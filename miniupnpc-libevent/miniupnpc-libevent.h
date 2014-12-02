@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.h,v 1.10 2014/12/01 17:41:11 nanard Exp $ */
+/* $Id: miniupnpc-libevent.h,v 1.11 2014/12/02 13:33:42 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -25,6 +25,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define MINIUPNPC_LIBEVENT_API_VERSION 1
 
 #define UPNPC_OK 0
 #define UPNPC_ERR_INVALID_ARGS (-1)
