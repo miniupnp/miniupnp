@@ -1,4 +1,4 @@
-/* $Id: upnpc-libevent.c,v 1.10 2014/12/01 17:41:11 nanard Exp $ */
+/* $Id: upnpc-libevent.c,v 1.11 2014/12/02 13:33:42 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -43,6 +43,7 @@ static void ready(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 
 	if(code == 200) {
 		printf("READY ! %d\n", code);
+		printf("  root_desc_location='%s'\n", d->root_desc_location);
 		/* 1st request */
 		upnpc_get_status_info(d);
 	} else {
@@ -99,12 +100,12 @@ static void soap(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 			state = EAddPortMapping;
 			break;
 		case EAddPortMapping:
-			printf("OK!\n");
+			printf("AddPortMapping OK!\n");
 			upnpc_delete_port_mapping(d, NULL, 60001, "TCP");
 			state = EDeletePortMapping;
 			break;
 		case EDeletePortMapping:
-			printf("OK!\n");
+			printf("DeletePortMapping OK!\n");
 			state = EFinished;
 			break;
 		default:
