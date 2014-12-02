@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.18 2014/12/01 17:41:11 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.21 2014/12/02 13:33:41 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -122,7 +122,7 @@ parse_msearch_reply(const char * reply, int size,
 		case '\x0d':
 			if(b!=0) {
 				/* skip the colon and white spaces */
-				do { b++; } while(reply[b]==' ' && b<size);
+				do { b++; } while(reply[b]==' ' && b<i);
 				if(0==strncasecmp(reply+a, "location", 8)) {
 					*location = reply+b;
 					*locationsize = i-b;
@@ -226,9 +226,9 @@ static void upnpc_receive_and_parse_ssdp(evutil_socket_t s, short events, upnpc_
 		debug_printf("SSDP socket closed ?\n");
 	} else {
 		const char * location = NULL;
-		int locationsize;
+		int locationsize = 0;
 		const char * st = NULL;
-		int stsize;
+		int stsize = 0;
 		debug_printf("%.*s", (int)len, bufr);
 		parse_msearch_reply(bufr, len, &location, &locationsize, &st, &stsize);
 		debug_printf("location = '%.*s'\n", locationsize, location);
