@@ -1,5 +1,9 @@
 $Id: Changelog.txt,v 1.37 2014/11/28 16:20:57 nanard Exp $
 
+2014/12/04:
+	Fixes removing of devices on ssdp:byebye
+	handle ssdp:update messages
+
 2014/11/28:
 	revert "listen on only 1 IPv4 if only 1 interface is specified"
 	because it prevents broadcast messages to be received

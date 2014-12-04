@@ -572,12 +572,20 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 	       (method==METHOD_NOTIFY)?headers[HEADER_NT].p:st);
 	switch(method) {
 	case METHOD_NOTIFY:
-		if(headers[HEADER_NT].p && headers[HEADER_USN].p && headers[HEADER_LOCATION].p) {
-			if(nts==NTS_SSDP_ALIVE) {
+		if(nts==NTS_SSDP_ALIVE || nts==NTS_SSDP_UPDATE) {
+			if(headers[HEADER_NT].p && headers[HEADER_USN].p && headers[HEADER_LOCATION].p) {
 				r = updateDevice(headers, time(NULL) + lifetime);
+			} else {
+				syslog(LOG_WARNING, "missing header nt=%p usn=%p location=%p",
+				       headers[HEADER_NT].p, headers[HEADER_USN].p,
+				       headers[HEADER_LOCATION].p);
 			}
-			else if(nts==NTS_SSDP_BYEBYE) {
+		} else if(nts==NTS_SSDP_BYEBYE) {
+			if(headers[HEADER_NT].p && headers[HEADER_USN].p) {
 				r = removeDevice(headers);
+			} else {
+				syslog(LOG_WARNING, "missing header nt=%p usn=%p",
+				       headers[HEADER_NT].p, headers[HEADER_USN].p);
 			}
 		}
 		break;
