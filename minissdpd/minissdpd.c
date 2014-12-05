@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.41 2014/11/28 16:20:57 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.43 2014/12/05 13:43:00 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -37,6 +37,9 @@
 #include "codelength.h"
 #include "ifacewatch.h"
 #include "minissdpdtypes.h"
+#include "asyncsendto.h"
+
+#define SET_MAX(max, x)	if((x) > (max)) (max) = (x)
 
 /* current request management stucture */
 struct reqelem {
@@ -312,11 +315,9 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 #else	/* ENABLE_IPV6 */
 	sockname_len = sizeof(struct sockaddr_in);
 #endif	/* ENABLE_IPV6 */
-	n = sendto(s, buf, l, 0,
-	           sockname, sockname_len );
+	n = sendto_or_schedule(s, buf, l, 0, sockname, sockname_len);
 	if(n < 0) {
-		/* XXX handle EINTR, EAGAIN, EWOULDBLOCK */
-		syslog(LOG_ERR, "sendto(udp): %m");
+		syslog(LOG_ERR, "%s: sendto(udp): %m", __func__);
 	}
 }
 
@@ -948,11 +949,10 @@ void ssdpDiscoverAll(int s, int ipv6)
 			p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
 		}
 
-		n = sendto(s, bufr, n, 0, (const struct sockaddr *)&sockudp_w,
-		           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
+		n = sendto_or_schedule(s, bufr, n, 0, (const struct sockaddr *)&sockudp_w,
+		                       ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
 		if (n < 0) {
-			/* XXX : EINTR EWOULDBLOCK EAGAIN */
-			syslog(LOG_ERR, "sendto: %m");
+			syslog(LOG_ERR, "%s: sendto: %m", __func__);
 		}
 	}
 }
@@ -973,11 +973,13 @@ int main(int argc, char * * argv)
 #endif	/* ENABLE_IPV6 */
 	int s_unix = -1;	/* unix socket communicating with clients */
 	int s_ifacewatch = -1;	/* socket to receive Route / network interface config changes */
-	int s;
 	LIST_HEAD(reqstructhead, reqelem) reqlisthead;
 	struct reqelem * req;
 	struct reqelem * reqnext;
 	fd_set readfds;
+	fd_set writefds;
+	struct timeval now;
+	int max_fd;
 	struct lan_addr_s * lan_addr;
 	int i;
 	const char * sockpath = "/var/run/minissdpd.sock";
@@ -1038,7 +1040,7 @@ int main(int argc, char * * argv)
 		        "  192.168.1.42/255.255.255.0, or an interface name such as eth0.\n");
 		fprintf(stderr,
 		        "\n  By default, socket will be open as %s\n"
-		        "and pid written to file %s\n",
+		        "  and pid written to file %s\n",
 		        sockpath, pidfilename);
 		return 1;
 	}
@@ -1141,9 +1143,9 @@ int main(int argc, char * * argv)
 		if(daemon(0, 0) < 0)
 			perror("daemon()");
 		pid = getpid();
-#else
+#else  /* USE_DAEMON */
 		pid = daemonize();
-#endif
+#endif /* USE_DAEMON */
 	}
 
 	writepidfile(pidfilename, pid);
@@ -1155,36 +1157,46 @@ int main(int argc, char * * argv)
 		ssdpDiscoverAll(s_ssdp6, 1);
 
 	/* Main loop */
-	while(!quitting)
-	{
+	while(!quitting) {
 		/* fill readfds fd_set */
 		FD_ZERO(&readfds);
+		FD_ZERO(&writefds);
+
+		FD_SET(s_unix, &readfds);
+		max_fd = s_unix;
 		if(s_ssdp >= 0) {
 			FD_SET(s_ssdp, &readfds);
+			SET_MAX(max_fd, s_ssdp);
 		}
 #ifdef ENABLE_IPV6
 		if(s_ssdp6 >= 0) {
 			FD_SET(s_ssdp6, &readfds);
+			SET_MAX(max_fd, s_ssdp6);
 		}
 #endif /* ENABLE_IPV6 */
 		if(s_ifacewatch >= 0) {
 			FD_SET(s_ifacewatch, &readfds);
+			SET_MAX(max_fd, s_ifacewatch);
 		}
-		FD_SET(s_unix, &readfds);
-		for(req = reqlisthead.lh_first; req; req = req->entries.le_next)
-		{
-			if(req->socket >= 0)
+		for(req = reqlisthead.lh_first; req; req = req->entries.le_next) {
+			if(req->socket >= 0) {
 				FD_SET(req->socket, &readfds);
+				SET_MAX(max_fd, req->socket);
+			}
 		}
+		gettimeofday(&now, NULL);
+		i = get_sendto_fds(&writefds, &max_fd, &now);
 		/* select call */
-		if(select(FD_SETSIZE, &readfds, 0, 0, 0) < 0)
-		{
-			if(errno != EINTR)
-			{
+		if(select(max_fd + 1, &readfds, &writefds, 0, 0) < 0) {
+			if(errno != EINTR) {
 				syslog(LOG_ERR, "select: %m");
 				break;	/* quit */
 			}
 			continue;	/* try again */
+		}
+		if(try_sendto(&writefds) < 0) {
+			syslog(LOG_ERR, "try_sendto: %m");
+			break;
 		}
 #ifdef ENABLE_IPV6
 		if((s_ssdp6 >= 0) && FD_ISSET(s_ssdp6, &readfds))
@@ -1273,7 +1285,7 @@ int main(int argc, char * * argv)
 		if(FD_ISSET(s_unix, &readfds))
 		{
 			struct reqelem * tmp;
-			s = accept(s_unix, NULL, NULL);
+			int s = accept(s_unix, NULL, NULL);
 			if(s<0)
 			{
 				syslog(LOG_ERR, "accept(s_unix): %m");
@@ -1302,6 +1314,7 @@ int main(int argc, char * * argv)
 		}
 	}
 	syslog(LOG_DEBUG, "quitting...");
+	finalize_sendto();
 
 	/* closing and cleaning everything */
 quit:

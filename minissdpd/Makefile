@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.21 2014/11/28 16:20:57 nanard Exp $
+# $Id: Makefile,v 1.22 2014/12/05 13:42:59 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -33,7 +33,7 @@ endif
 #EXECUTABLES = minissdpd testminissdpd listifaces
 EXECUTABLES = minissdpd testminissdpd testcodelength
 MINISSDPDOBJS = minissdpd.o openssdpsocket.o daemonize.o upnputils.o \
-                ifacewatch.o getroute.o getifaddr.o
+                ifacewatch.o getroute.o getifaddr.o asyncsendto.o
 TESTMINISSDPDOBJS = testminissdpd.o
 
 ALLOBJS = $(MINISSDPDOBJS) $(TESTMINISSDPDOBJS) testcodelength.o

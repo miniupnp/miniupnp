@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.37 2014/11/28 16:20:57 nanard Exp $
+$Id: Changelog.txt,v 1.39 2014/12/05 13:42:59 nanard Exp $
+
+2014/12/05:
+	clean up select call()
+	fix non blocking write to sockets
 
 2014/12/04:
 	Fixes removing of devices on ssdp:byebye
