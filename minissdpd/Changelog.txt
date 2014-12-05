@@ -1,5 +1,7 @@
 $Id: Changelog.txt,v 1.39 2014/12/05 13:42:59 nanard Exp $
 
+VERSION 1.3:
+
 2014/12/05:
 	clean up select call()
 	fix non blocking write to sockets
