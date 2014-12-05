@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.43 2014/12/05 13:43:00 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.44 2014/12/05 17:31:46 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2014 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -45,6 +45,9 @@
 struct reqelem {
 	int socket;
 	LIST_ENTRY(reqelem) entries;
+	unsigned char * output_buffer;
+	int output_buffer_offset;
+	int output_buffer_len;
 };
 
 /* device data structures */
@@ -162,6 +165,70 @@ parselan_error:
 	fprintf(stderr, "Error parsing address/mask (or interface name) : %s\n",
 	        str);
 	return -1;
+}
+
+static int
+write_buffer(struct reqelem * req)
+{
+	if(req->output_buffer && req->output_buffer_len > 0) {
+		int n = write(req->socket,
+		              req->output_buffer + req->output_buffer_offset,
+		              req->output_buffer_len);
+		if(n >= 0) {
+			req->output_buffer_offset += n;
+			req->output_buffer_len -= n;
+		} else if(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN) {
+			return 0;
+		}
+		return n;
+	} else {
+		return 0;
+	}
+}
+
+static int
+add_to_buffer(struct reqelem * req, const unsigned char * data, int len)
+{
+	unsigned char * tmp;
+	if(req->output_buffer_offset > 0) {
+		memmove(req->output_buffer, req->output_buffer + req->output_buffer_offset, req->output_buffer_len);
+		req->output_buffer_offset = 0;
+	}
+	tmp = realloc(req->output_buffer, req->output_buffer_len + len);
+	if(tmp == NULL) {
+		syslog(LOG_ERR, "%s: failed to allocate %d bytes", __func__, req->output_buffer_len + len);
+		return -1;
+	}
+	req->output_buffer = tmp;
+	memcpy(req->output_buffer + req->output_buffer_len, data, len);
+	req->output_buffer_len += len;
+	return len;
+}
+
+static int
+write_or_buffer(struct reqelem * req, const unsigned char * data, int len)
+{
+	if(write_buffer(req) < 0)
+		return -1;
+	if(req->output_buffer && req->output_buffer_len > 0) {
+		return add_to_buffer(req, data, len);
+	} else {
+		int n = write(req->socket, data, len);
+		if(n == len)
+			return len;
+		if(n < 0) {
+			if(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN) {
+				n = add_to_buffer(req, data, len);
+				if(n < 0) return n;
+			} else {
+				return n;
+			}
+		} else {
+			n = add_to_buffer(req, data + n, len - n);
+			if(n < 0) return n;
+		}
+	}
+	return len;
 }
 
 static const char *
@@ -757,7 +824,7 @@ void processRequest(struct reqelem * req)
 		rbuf[0] = nrep;
 		syslog(LOG_DEBUG, "(s=%d) response : %d device%s",
 		       req->socket, nrep, (nrep > 1) ? "s" : "");
-		if(write(req->socket, rbuf, rp - rbuf) < 0) {
+		if(write_or_buffer(req, rbuf, rp - rbuf) < 0) {
 			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
 			goto error;
 		}
@@ -859,15 +926,11 @@ void processRequest(struct reqelem * req)
 		/* Inserting new service */
 		LIST_INSERT_HEAD(&servicelisthead, newserv, entries);
 		newserv = NULL;
-		/*rbuf[0] = '\0';
-		if(write(req->socket, rbuf, 1) < 0)
-			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
-		*/
 		break;
 	default:
 		syslog(LOG_WARNING, "Unknown request type %d", type);
 		rbuf[0] = '\0';
-		if(write(req->socket, rbuf, 1) < 0) {
+		if(write_or_buffer(req, rbuf, 1) < 0) {
 			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
 			goto error;
 		}
@@ -1183,6 +1246,10 @@ int main(int argc, char * * argv)
 				FD_SET(req->socket, &readfds);
 				SET_MAX(max_fd, req->socket);
 			}
+			if(req->output_buffer_len > 0) {
+				FD_SET(req->socket, &writefds);
+				SET_MAX(max_fd, req->socket);
+			}
 		}
 		gettimeofday(&now, NULL);
 		i = get_sendto_fds(&writefds, &max_fd, &now);
@@ -1267,16 +1334,17 @@ int main(int argc, char * * argv)
 			}
 		}
 		/* processing unix socket requests */
-		for(req = reqlisthead.lh_first; req;)
-		{
+		for(req = reqlisthead.lh_first; req;) {
 			reqnext = req->entries.le_next;
-			if((req->socket >= 0) && FD_ISSET(req->socket, &readfds))
-			{
+			if((req->socket >= 0) && FD_ISSET(req->socket, &readfds)) {
 				processRequest(req);
 			}
-			if(req->socket < 0)
-			{
+			if((req->socket >= 0) && FD_ISSET(req->socket, &writefds)) {
+				write_buffer(req);
+			}
+			if(req->socket < 0) {
 				LIST_REMOVE(req, entries);
+				free(req->output_buffer);
 				free(req);
 			}
 			req = reqnext;
@@ -1286,23 +1354,18 @@ int main(int argc, char * * argv)
 		{
 			struct reqelem * tmp;
 			int s = accept(s_unix, NULL, NULL);
-			if(s<0)
-			{
+			if(s < 0) {
 				syslog(LOG_ERR, "accept(s_unix): %m");
-			}
-			else
-			{
+			} else {
 				syslog(LOG_INFO, "(s=%d) new request connection", s);
 				if(!set_non_blocking(s))
 					syslog(LOG_WARNING, "Failed to set new socket non blocking : %m");
 				tmp = malloc(sizeof(struct reqelem));
-				if(!tmp)
-				{
+				if(!tmp) {
 					syslog(LOG_ERR, "cannot allocate memory for request");
 					close(s);
-				}
-				else
-				{
+				} else {
+					memset(tmp, 0, sizeof(struct reqelem));
 					tmp->socket = s;
 					LIST_INSERT_HEAD(&reqlisthead, tmp, entries);
 				}
