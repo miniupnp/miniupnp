@@ -1350,6 +1350,16 @@ quit:
 		free(devlist);
 		devlist = next;
 	}
+	/* empty service list */
+	while(servicelisthead.lh_first != NULL) {
+		struct service * serv = servicelisthead.lh_first;
+		LIST_REMOVE(servicelisthead.lh_first, entries);
+		free(serv->st);
+		free(serv->usn);
+		free(serv->server);
+		free(serv->location);
+		free(serv);
+	}
 	if(unlink(pidfilename) < 0)
 		syslog(LOG_ERR, "unlink(%s): %m", pidfilename);
 	closelog();
