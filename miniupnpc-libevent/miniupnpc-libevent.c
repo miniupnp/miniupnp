@@ -93,7 +93,7 @@ static const char * devices_to_search[] = {
 static void upnpc_conn_close_cb(struct evhttp_connection * conn, void * data)
 {
 	upnpc_device_t * d = (upnpc_device_t *)data;
-	debug_printf("upnpc_get_desc_conn_close_cb %p %p\n", conn, d);
+	debug_printf("%s %p %p\n", __func__, conn, d);
 }
 #endif /* DEBUG */
 
@@ -164,7 +164,7 @@ static void upnpc_send_ssdp_msearch(evutil_socket_t s, short events, upnpc_t * p
     addr.sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
 	n = snprintf(bufr, sizeof(bufr),
 	             MSearchMsgFmt, devices_to_search[p->discover_device_index++], mx);
-	debug_printf("upnpc_send_ssdp_msearch: %s", bufr);
+	debug_printf("%s: %s", __func__, bufr);
 	n = sendto(s, bufr, n, 0,
 	           (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
 	if (n < 0) {
@@ -204,7 +204,7 @@ static void upnpc_receive_and_parse_ssdp(evutil_socket_t s, short events, upnpc_
 
 	if(events == EV_TIMEOUT) {
 		/* nothing received ... */
-		debug_printf("upnpc_receive_and_parse_ssdp() TIMEOUT\n");
+		debug_printf("%s() TIMEOUT\n", __func__);
 		if(!devices_to_search[p->discover_device_index]) {
 			debug_printf("*** NO MORE DEVICES TO SEARCH ***\n");
 			event_del(p->ev_ssdp_recv);
@@ -366,7 +366,7 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
 	data = evbuffer_pullup(input_buffer, len);
-	debug_printf("upnpc_desc_received %d (%d bytes)\n", evhttp_request_get_response_code(req), (int)len);
+	debug_printf("%s %d (%d bytes)\n", __func__, evhttp_request_get_response_code(req), (int)len);
 	if(evhttp_request_get_response_code(req) != HTTP_OK) {
 		d->parent->ready_cb(evhttp_request_get_response_code(req), d->parent, d, d->parent->cb_data);
 		return;
@@ -419,7 +419,7 @@ static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
 	data = evbuffer_pullup(input_buffer, len);
-	debug_printf("upnpc_soap_response %d (%d bytes)\n", code, (int)len);
+	debug_printf("%s %d (%d bytes)\n", __func__, code, (int)len);
 	debug_printf("%.*s\n", (int)len, (char *)data);
 	if(data == NULL)
 		return;
@@ -562,7 +562,7 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 		return -1;
 	}
 	if(snprintf(body, body_len + 1, fmt_soap, method, service, args_xml?args_xml:"", method) != body_len) {
-		debug_printf("snprintf() returned strange value...\n");
+		debug_printf("%s: snprintf() returned strange value...\n", __func__);
 	}
 	free(args_xml);
 	args_xml = NULL;
