@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.22 2014/12/05 13:42:59 nanard Exp $
+# $Id: Makefile,v 1.23 2014/12/06 10:54:01 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -76,10 +76,12 @@ depend:
 
 minissdpd.o: config.h getifaddr.h upnputils.h openssdpsocket.h
 minissdpd.o: minissdpdtypes.h daemonize.h codelength.h ifacewatch.h
+minissdpd.o: asyncsendto.h
 openssdpsocket.o: config.h openssdpsocket.h minissdpdtypes.h upnputils.h
 daemonize.o: daemonize.h config.h
 upnputils.o: config.h upnputils.h getroute.h minissdpdtypes.h
 ifacewatch.o: config.h openssdpsocket.h minissdpdtypes.h upnputils.h
 getroute.o: getroute.h upnputils.h
 getifaddr.o: config.h getifaddr.h
+asyncsendto.o: asyncsendto.h upnputils.h
 testcodelength.o: codelength.h
