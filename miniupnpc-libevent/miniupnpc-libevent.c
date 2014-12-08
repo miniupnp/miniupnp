@@ -390,8 +390,10 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	printIGD(&igd);
 #endif /* DEBUG */
 	d->control_conn_url = build_url_string(igd.urlbase, d->root_desc_location, igd.first.controlurl);
+	d->event_conn_url = build_url_string(igd.urlbase, d->root_desc_location, igd.first.eventsuburl);
 	d->conn_service_type = strdup(igd.first.servicetype);
 	d->control_cif_url = build_url_string(igd.urlbase, d->root_desc_location, igd.CIF.controlurl);
+	d->event_cif_url = build_url_string(igd.urlbase, d->root_desc_location, igd.CIF.eventsuburl);
 	d->cif_service_type = strdup(igd.CIF.servicetype);
 	debug_printf("control_conn_url='%s'\n  (service_type='%s')\n",
 	             d->control_conn_url, d->conn_service_type);

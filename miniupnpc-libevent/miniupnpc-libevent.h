@@ -56,8 +56,10 @@ struct upnpc_device {
 	char * root_desc_location;
 	struct evhttp_connection * desc_conn;
 	char * control_cif_url;
+	char * event_cif_url;
 	char * cif_service_type;
 	char * control_conn_url;
+	char * event_conn_url;
 	char * conn_service_type;
 	struct evhttp_connection * soap_conn;
 	struct NameValueParserData soap_response_data;
