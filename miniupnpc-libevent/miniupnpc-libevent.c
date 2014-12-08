@@ -427,6 +427,7 @@ static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
 	ClearNameValueList(&d->soap_response_data);
 	ParseNameValue((char *)data, (int)len, 
 	               &d->soap_response_data);
+	d->state &= ~UPNPC_DEVICE_SOAP_REQ;
 	if(d->state & UPNPC_DEVICE_READY) {
 		d->parent->soap_cb(code, d->parent, d, d->parent->cb_data);
 	} else if(d->state & UPNPC_DEVICE_GETSTATUS) {
@@ -442,7 +443,6 @@ static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
 			d->parent->ready_cb(UPNPC_ERR_NOT_CONNECTED, d->parent, d, d->parent->cb_data);
 		}
 	}
-	d->state &= ~UPNPC_DEVICE_SOAP_REQ;
 }
 
 static int upnpc_get_desc(upnpc_device_t * d, const char * url)
@@ -537,6 +537,11 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	struct evhttp_request * req;
 	struct evkeyvalq * headers;
 	struct evbuffer * buffer;
+
+	if(p->state & UPNPC_DEVICE_SOAP_REQ) {
+		debug_printf("%s: another SOAP request in progress\n", __func__);
+		return UPNPC_ERR_REQ_IN_PROGRESS;
+	}
 
 	if(arg_count > 0) {
 		int i;
