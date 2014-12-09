@@ -340,8 +340,8 @@ intervening space) by either an integer or the keyword "infinite". */
 				h->req_NTOff = p - h->req_buf;
 				h->req_NTLen = n;
 			}
-#endif
-#endif
+#endif /* UPNP_STRICT */
+#endif /* ENABLE_EVENTS */
 		}
 		/* the loop below won't run off the end of the buffer
 		 * because the buffer is guaranteed to contain the \r\n\r\n
@@ -1099,7 +1099,7 @@ BuildResp2_upnphttp(struct upnphttp * h, int respcode,
 /* responding 200 OK ! */
 void
 BuildResp_upnphttp(struct upnphttp * h,
-                        const char * body, int bodylen)
+                   const char * body, int bodylen)
 {
 	BuildResp2_upnphttp(h, 200, "OK", body, bodylen);
 }
