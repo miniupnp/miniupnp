@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.391 2014/12/09 09:48:04 nanard Exp $
 
 2014/12/09:
   fix upnp_add_inboundpinhole() : check inet_pton() return
+  fix upnp_redirect() : check inet_aton() return
     Credits goes to Stephen Röttger of the Google Security Team for identifying
     the vulnerabilities
 
