@@ -45,17 +45,21 @@ BuildSendAndCloseSoapResp(struct upnphttp * h,
 		"</s:Body>"
 		"</s:Envelope>\r\n";
 
-	BuildHeader_upnphttp(h, 200, "OK",  sizeof(beforebody) - 1
-		+ sizeof(afterbody) - 1 + bodylen );
+	int r = BuildHeader_upnphttp(h, 200, "OK",  sizeof(beforebody) - 1
+	                             + sizeof(afterbody) - 1 + bodylen );
 
-	memcpy(h->res_buf + h->res_buflen, beforebody, sizeof(beforebody) - 1);
-	h->res_buflen += sizeof(beforebody) - 1;
+	if(r >= 0) {
+		memcpy(h->res_buf + h->res_buflen, beforebody, sizeof(beforebody) - 1);
+		h->res_buflen += sizeof(beforebody) - 1;
 
-	memcpy(h->res_buf + h->res_buflen, body, bodylen);
-	h->res_buflen += bodylen;
+		memcpy(h->res_buf + h->res_buflen, body, bodylen);
+		h->res_buflen += bodylen;
 
-	memcpy(h->res_buf + h->res_buflen, afterbody, sizeof(afterbody) - 1);
-	h->res_buflen += sizeof(afterbody) - 1;
+		memcpy(h->res_buf + h->res_buflen, afterbody, sizeof(afterbody) - 1);
+		h->res_buflen += sizeof(afterbody) - 1;
+	} else {
+		BuildResp2_upnphttp(h, 500, "Internal Server Error", NULL, 0);
+	}
 
 	SendRespAndClose_upnphttp(h);
 }
