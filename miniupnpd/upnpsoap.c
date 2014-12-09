@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.130 2014/11/28 13:18:57 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.132 2014/12/09 09:46:46 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -1031,6 +1031,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 			body = realloc(body, bodyalloc);
 			if(!body)
 			{
+				syslog(LOG_CRIT, "realloc(%p, %u) FAILED", body_sav, (unsigned)bodyalloc);
 				ClearNameValueList(&data);
 				SoapError(h, 501, "ActionFailed");
 				free(body_sav);
@@ -1055,6 +1056,20 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	free(port_list);
 	port_list = NULL;
 
+	if((bodylen + sizeof(list_end) + 1024) > bodyalloc)
+	{
+		char * body_sav = body;
+		bodyalloc += (sizeof(list_end) + 1024);
+		body = realloc(body, bodyalloc);
+		if(!body)
+		{
+			syslog(LOG_CRIT, "realloc(%p, %u) FAILED", body_sav, (unsigned)bodyalloc);
+			ClearNameValueList(&data);
+			SoapError(h, 501, "ActionFailed");
+			free(body_sav);
+			return;
+		}
+	}
 	memcpy(body+bodylen, list_end, sizeof(list_end));
 	bodylen += (sizeof(list_end) - 1);
 	bodylen += snprintf(body+bodylen, bodyalloc-bodylen, resp_end,
