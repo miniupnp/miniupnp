@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.94 2014/12/09 09:46:45 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.95 2014/12/09 10:38:02 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -304,7 +304,7 @@ ParseHttpHeaders(struct upnphttp * h)
 			else if(strncasecmp(line, "SID", 3)==0)
 			{
 				p = colon + 1;
-				while(isspace(*p))
+				while((*p == ' ') || (*p != '\t'))
 					p++;
 				n = 0;
 				while(!isspace(p[n]))
@@ -322,7 +322,7 @@ intervening space) by either an integer or the keyword "infinite". */
 			else if(strncasecmp(line, "Timeout", 7)==0)
 			{
 				p = colon + 1;
-				while(isspace(*p))
+				while((*p == ' ') || (*p != '\t'))
 					p++;
 				if(strncasecmp(p, "Second-", 7)==0) {
 					h->req_Timeout = atoi(p+7);
@@ -332,7 +332,7 @@ intervening space) by either an integer or the keyword "infinite". */
 			else if(strncasecmp(line, "nt", 2)==0)
 			{
 				p = colon + 1;
-				while(isspace(*p))
+				while((*p == ' ') || (*p == '\t'))
 					p++;
 				n = 0;
 				while(!isspace(p[n]))
