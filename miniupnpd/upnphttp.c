@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.98 2014/12/09 16:45:47 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.99 2014/12/09 17:25:30 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -220,7 +220,7 @@ ParseHttpHeaders(struct upnphttp * h)
 		}
 		if(colon)
 		{
-			if(strncasecmp(line, "Content-Length", 14)==0)
+			if(strncasecmp(line, "Content-Length:", 15)==0)
 			{
 				p = colon;
 				while((*p < '0' || *p > '9') && (*p != '\r') && (*p != '\n'))
@@ -234,7 +234,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				printf("    readbufflen=%d contentoff = %d\n",
 					h->req_buflen, h->req_contentoff);*/
 			}
-			else if(strncasecmp(line, "Host", 4)==0)
+			else if(strncasecmp(line, "Host:", 5)==0)
 			{
 				p = colon;
 				n = 0;
@@ -245,7 +245,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				h->req_HostOff = p - h->req_buf;
 				h->req_HostLen = n;
 			}
-			else if(strncasecmp(line, "SOAPAction", 10)==0)
+			else if(strncasecmp(line, "SOAPAction:", 11)==0)
 			{
 				p = colon;
 				n = 0;
@@ -261,7 +261,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				h->req_soapActionOff = p - h->req_buf;
 				h->req_soapActionLen = n;
 			}
-			else if(strncasecmp(line, "accept-language", 15) == 0)
+			else if(strncasecmp(line, "accept-language:", 16) == 0)
 			{
 				p = colon;
 				n = 0;
@@ -279,7 +279,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				memcpy(h->accept_language, p, n);
 				h->accept_language[n] = '\0';
 			}
-			else if(strncasecmp(line, "expect", 6) == 0)
+			else if(strncasecmp(line, "expect:", 7) == 0)
 			{
 				p = colon;
 				n = 0;
@@ -293,7 +293,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				}
 			}
 #ifdef ENABLE_EVENTS
-			else if(strncasecmp(line, "Callback", 8)==0)
+			else if(strncasecmp(line, "Callback:", 9)==0)
 			{
 				/* The Callback can contain several urls :
 				 * If there is more than one URL, when the service sends
@@ -312,7 +312,7 @@ ParseHttpHeaders(struct upnphttp * h)
 				h->req_CallbackOff = p - h->req_buf;
 				h->req_CallbackLen = MAX(0, n + 1);
 			}
-			else if(strncasecmp(line, "SID", 3)==0)
+			else if(strncasecmp(line, "SID:", 4)==0)
 			{
 				p = colon + 1;
 				while((*p == ' ') || (*p == '\t'))
@@ -330,7 +330,7 @@ either number of seconds or infinite. Recommendation
 by a UPnP Forum working committee. Defined by UPnP vendor.
  Consists of the keyword "Second-" followed (without an
 intervening space) by either an integer or the keyword "infinite". */
-			else if(strncasecmp(line, "Timeout", 7)==0)
+			else if(strncasecmp(line, "Timeout:", 8)==0)
 			{
 				p = colon + 1;
 				while((*p == ' ') || (*p == '\t'))
@@ -340,7 +340,7 @@ intervening space) by either an integer or the keyword "infinite". */
 				}
 			}
 #ifdef UPNP_STRICT
-			else if(strncasecmp(line, "nt", 2)==0)
+			else if(strncasecmp(line, "nt:", 3)==0)
 			{
 				p = colon + 1;
 				while((*p == ' ') || (*p == '\t'))
