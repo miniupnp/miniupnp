@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.91 2014/04/09 14:08:12 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.94 2014/12/09 09:46:45 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -223,7 +223,7 @@ ParseHttpHeaders(struct upnphttp * h)
 			if(strncasecmp(line, "Content-Length", 14)==0)
 			{
 				p = colon;
-				while(*p < '0' || *p > '9')
+				while((*p < '0' || *p > '9') && (*p != '\r') && (*p != '\n'))
 					p++;
 				h->req_contentlen = atoi(p);
 				if(h->req_contentlen < 0) {
