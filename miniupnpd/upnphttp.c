@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.96 2014/12/09 10:43:35 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.98 2014/12/09 16:45:47 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -233,6 +233,17 @@ ParseHttpHeaders(struct upnphttp * h)
 				/*printf("*** Content-Lenght = %d ***\n", h->req_contentlen);
 				printf("    readbufflen=%d contentoff = %d\n",
 					h->req_buflen, h->req_contentoff);*/
+			}
+			else if(strncasecmp(line, "Host", 4)==0)
+			{
+				p = colon;
+				n = 0;
+				while(*p == ':' || *p == ' ' || *p == '\t')
+					p++;
+				while(p[n]>' ')
+					n++;
+				h->req_HostOff = p - h->req_buf;
+				h->req_HostLen = n;
 			}
 			else if(strncasecmp(line, "SOAPAction", 10)==0)
 			{
@@ -746,6 +757,35 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	syslog(LOG_INFO, "HTTP REQUEST : %s %s (%s)",
 	       HttpCommand, HttpUrl, HttpVer);
 	ParseHttpHeaders(h);
+	if(h->req_HostOff > 0 && h->req_HostLen > 0) {
+		syslog(LOG_DEBUG, "Host: %.*s", h->req_HostLen, h->req_buf + h->req_HostOff);
+		p = h->req_buf + h->req_HostOff;
+		if(*p == '[') {
+			/* IPv6 */
+			p++;
+			while(p < h->req_buf + h->req_HostOff + h->req_HostLen) {
+				if(*p == ']') break;
+				/* TODO check *p in [0-9a-f:.] */
+				p++;
+			}
+			if(*p != ']') {
+				syslog(LOG_NOTICE, "DNS rebinding attack suspected (Host: %.*s)", h->req_HostLen, h->req_buf + h->req_HostOff);
+				Send404(h);/* 403 */
+				return;
+			}
+			p++;
+			/* TODO : Check port */
+		} else {
+			for(i = 0; i < h->req_HostLen; i++) {
+				if(*p != ':' && *p != '.' && (*p > '9' || *p < '0')) {
+					syslog(LOG_NOTICE, "DNS rebinding attack suspected (Host: %.*s)", h->req_HostLen, h->req_buf + h->req_HostOff);
+					Send404(h);/* 403 */
+					return;
+				}
+				p++;
+			}
+		}
+	}
 	if(strcmp("POST", HttpCommand) == 0)
 	{
 		h->req_command = EPost;
