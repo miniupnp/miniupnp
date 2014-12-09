@@ -1,4 +1,9 @@
-$Id: Changelog.txt,v 1.385 2014/12/04 10:21:32 nanard Exp $
+$Id: Changelog.txt,v 1.391 2014/12/09 09:48:04 nanard Exp $
+
+2014/12/09:
+  fix upnp_add_inboundpinhole() : check inet_pton() return
+    Credits goes to Stephen Röttger of the Google Security Team for identifying
+    the vulnerabilities
 
 2014/12/04:
   check "sysctl -n net.ipv6.bindv6only" for linux
