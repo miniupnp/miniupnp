@@ -304,7 +304,7 @@ ParseHttpHeaders(struct upnphttp * h)
 			else if(strncasecmp(line, "SID", 3)==0)
 			{
 				p = colon + 1;
-				while((*p == ' ') || (*p != '\t'))
+				while((*p == ' ') || (*p == '\t'))
 					p++;
 				n = 0;
 				while(!isspace(p[n]))
@@ -322,7 +322,7 @@ intervening space) by either an integer or the keyword "infinite". */
 			else if(strncasecmp(line, "Timeout", 7)==0)
 			{
 				p = colon + 1;
-				while((*p == ' ') || (*p != '\t'))
+				while((*p == ' ') || (*p == '\t'))
 					p++;
 				if(strncasecmp(p, "Second-", 7)==0) {
 					h->req_Timeout = atoi(p+7);
