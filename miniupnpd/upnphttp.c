@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.95 2014/12/09 10:38:02 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.96 2014/12/09 10:43:35 nanard Exp $ */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
@@ -1091,9 +1091,10 @@ BuildResp2_upnphttp(struct upnphttp * h, int respcode,
                     const char * body, int bodylen)
 {
 	int r = BuildHeader_upnphttp(h, respcode, respmsg, bodylen);
-	if(body && (r >= 0))
+	if(body && (r >= 0)) {
 		memcpy(h->res_buf + h->res_buflen, body, bodylen);
-	h->res_buflen += bodylen;
+		h->res_buflen += bodylen;
+	}
 }
 
 /* responding 200 OK ! */
