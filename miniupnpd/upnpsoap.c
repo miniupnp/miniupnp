@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.132 2014/12/09 09:46:46 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.133 2014/12/09 17:29:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -2078,7 +2078,7 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 			len = strlen(soapMethods[i].methodName);
 			if((len == methodlen) && memcmp(p, soapMethods[i].methodName, len) == 0) {
 #ifdef DEBUG
-				syslog(LOG_DEBUG, "Remote Call of SoapMethod '%s'\n",
+				syslog(LOG_DEBUG, "Remote Call of SoapMethod '%s'",
 				       soapMethods[i].methodName);
 #endif /* DEBUG */
 				soapMethods[i].methodImpl(h, soapMethods[i].methodName);
