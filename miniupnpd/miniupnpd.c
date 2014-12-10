@@ -599,6 +599,16 @@ static void
 set_startup_time(int sysuptime)
 {
 	startup_time = time(NULL);
+#ifdef USE_TIME_AS_BOOTID
+	if(startup_time > 60*60*24 && upnp_bootid == 1) {
+		/* We know we are not January the 1st 1970 */
+		upnp_bootid = (unsigned int)startup_time;
+		/* from UDA v1.1 :
+		 * A convenient mechanism is to set this field value to the time
+		 * that the device sends its initial announcement, expressed as
+		 * seconds elapsed since midnight January 1, 1970; */
+	}
+#endif /* USE_TIME_AS_BOOTID */
 	if(sysuptime)
 	{
 		/* use system uptime instead of daemon uptime */
