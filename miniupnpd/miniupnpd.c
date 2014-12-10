@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.199 2014/05/19 23:14:25 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.205 2014/12/10 09:33:25 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -1100,6 +1100,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 		else switch(argv[i][1])
 		{
+		case 'b':
+			if(i+1 < argc) {
+				upnp_bootid = (unsigned int)strtoul(argv[++i], NULL, 10);
+			} else
+				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
+			break;
 		case 'o':
 			if(i+1 < argc)
 				use_ext_ip_addr = argv[++i];
@@ -1491,7 +1497,7 @@ print_usage:
 #ifdef ENABLE_NFQUEUE
                         "\t\t[-Q queue] [-n name]\n"
 #endif
-			"\t\t[-A \"permission rule\"]\n"
+			"\t\t[-A \"permission rule\"] [-b BOOTID]\n"
 	        "\nNotes:\n\tThere can be one or several listening_ips.\n"
 	        "\tNotify interval is in seconds. Default is 30 seconds.\n"
 			"\tDefault pid file is '%s'.\n"
@@ -1521,6 +1527,7 @@ print_usage:
 			"\texamples :\n"
 			"\t  \"allow 1024-65535 192.168.1.0/24 1024-65535\"\n"
 			"\t  \"deny 0-65535 0.0.0.0/0 0-65535\"\n"
+			"\t-b sets the value of BOOTID.UPNP.ORG SSDP header\n"
 			"\t-h prints this help and quits.\n"
 	        "", argv[0], pidfilename, DEFAULT_CONFIG);
 	return 1;
@@ -1623,7 +1630,7 @@ main(int argc, char * * argv)
 		return 0;
 	}
 
-	syslog(LOG_INFO, "Starting%s%swith external interface %s",
+	syslog(LOG_INFO, "Starting%s%swith external interface %s BOOTID=%u",
 #ifdef ENABLE_NATPMP
 #ifdef ENABLE_PCP
 	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP/PCP " : " ",
@@ -1634,7 +1641,7 @@ main(int argc, char * * argv)
 	       " ",
 #endif
 	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
-	       ext_if_name);
+	       ext_if_name, upnp_bootid);
 
 	if(GETFLAG(ENABLEUPNPMASK))
 	{
