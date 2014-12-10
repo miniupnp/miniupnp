@@ -1498,9 +1498,9 @@ print_usage:
 			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
 			"\t\t[-t notify_interval] [-P pid_filename] "
 #ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
-			"[-z fiendly_name]\n"
+			"[-z fiendly_name]"
 #endif
-			"\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
+			"\n\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
 #ifdef USE_PF
                         "\t\t[-q queue] [-T tag]\n"
 #endif
@@ -1520,7 +1520,7 @@ print_usage:
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
 #ifdef ENABLE_NATPMP
-			"\t-N enable NAT-PMP functionality.\n"
+			"\t-N enables NAT-PMP functionality.\n"
 #endif
 			"\t-B sets bitrates reported by daemon in bits per second.\n"
 			"\t-w sets the presentation url. Default is http address on port 80\n"
