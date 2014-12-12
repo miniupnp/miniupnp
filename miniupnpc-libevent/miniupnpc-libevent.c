@@ -397,6 +397,7 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	d->cif_service_type = strdup(igd.CIF.servicetype);
 	debug_printf("control_conn_url='%s'\n  (service_type='%s')\n",
 	             d->control_conn_url, d->conn_service_type);
+	debug_printf("event_conn_url='%s'\n", d->event_conn_url);
 	debug_printf("control_cif_url='%s'\n  (service_type='%s')\n",
 	             d->control_cif_url, d->cif_service_type);
 
@@ -686,10 +687,14 @@ static void upnpc_device_finalize(upnpc_device_t * d)
 	d->root_desc_location = NULL;
 	free(d->control_cif_url);
 	d->control_cif_url = NULL;
+	free(d->event_cif_url);
+	d->event_cif_url = NULL;
 	free(d->cif_service_type);
 	d->cif_service_type = NULL;
 	free(d->control_conn_url);
 	d->control_conn_url = NULL;
+	free(d->event_conn_url);
+	d->event_conn_url = NULL;
 	free(d->conn_service_type);
 	d->conn_service_type = NULL;
 	if(d->desc_conn) {
