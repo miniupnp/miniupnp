@@ -13,6 +13,8 @@ CFLAGS += -D_BSD_SOURCE
 CFLAGS += -D_POSIX_C_SOURCE=200112L
 CFLAGS += -I/usr/local/include
 
+#CFLAGS += -DENABLE_UPNP_EVENTS
+
 LDFLAGS = -levent
 LDFLAGS += -L/usr/local/lib
 

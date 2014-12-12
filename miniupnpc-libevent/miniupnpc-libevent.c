@@ -411,6 +411,30 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	}
 }
 
+#ifdef ENABLE_UPNP_EVENTS
+static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
+{
+	size_t len;
+	unsigned char * data;
+	struct evbuffer * input_buffer;
+	upnpc_device_t * d = (upnpc_device_t *)pvoid;
+
+	input_buffer = evhttp_request_get_input_buffer(req);
+	len = evbuffer_get_length(input_buffer);
+	data = evbuffer_pullup(input_buffer, len);
+	debug_printf("%s %d (%d bytes)\n", __func__, evhttp_request_get_response_code(req), (int)len);
+	d->state &= ~UPNPC_DEVICE_SOAP_REQ;
+	if(evhttp_request_get_response_code(req) != HTTP_OK) {
+		/* TODO ERROR */
+	} else {
+		const char * sid;
+		struct evkeyvalq * headers = evhttp_request_get_input_headers(req);
+		sid = evhttp_find_header(headers, "sid");
+		debug_printf("SID=%s\n", sid);
+	}
+}
+#endif /* ENABLE_UPNP_EVENTS */
+
 static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
 {
 	size_t len;
@@ -606,6 +630,52 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	return 0;
 }
 
+#ifdef ENABLE_UPNP_EVENTS
+void upnpc_event_conn_req(struct evhttp_request * req, void * data)
+{
+	size_t len;
+	char * xml_data;
+	struct evbuffer * input_buffer;
+	struct evkeyvalq * headers;
+	const char * sid;
+	const char * nts;
+	const char * seq;
+	struct NameValueParserData parsed_data;
+	struct NameValue * nv;
+	upnpc_device_t * d = (upnpc_device_t *)data;
+
+	debug_printf("%s(%p, %p)\n", __func__, req, d);
+	input_buffer = evhttp_request_get_input_buffer(req);
+	len = evbuffer_get_length(input_buffer);
+	if(len == 0) {
+		evhttp_send_reply(req, 406, "Not Acceptable", NULL);
+		return;
+	}
+	xml_data = (char *)evbuffer_pullup(input_buffer, len);
+	headers = evhttp_request_get_input_headers(req);
+	sid = evhttp_find_header(headers, "sid");
+	nts = evhttp_find_header(headers, "nts");
+	seq = evhttp_find_header(headers, "seq");
+	debug_printf("SID=%s NTS=%s SEQ=%s\n", sid, nts, seq);
+	if(sid == NULL || nts == NULL || seq == NULL) {
+		evhttp_send_reply(req, 412, "Precondition Failed", NULL);
+		return;
+	}
+	/*debug_printf("%.*s\n", len, xml_data);*/
+	ParseNameValue(xml_data, len, &parsed_data);
+	for(nv = parsed_data.l_head; nv != NULL; nv = nv->l_next) {
+		if(d->parent->value_changed_cb) {
+			d->parent->value_changed_cb(d->parent, d, d->parent->cb_data, d->conn_service_type, nv->name, nv->value);
+		} else {
+			debug_printf("%s=%s\n", nv->name, nv->value);
+		}
+	}
+	ClearNameValueList(&parsed_data);
+	/* response : 200 OK */
+	evhttp_send_reply(req, 200, "OK", NULL);
+}
+#endif /* ENABLE_UPNP_EVENTS */
+
 /* public functions */
 int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
                upnpc_callback_fn ready_cb, upnpc_callback_fn soap_cb, void * cb_data)
@@ -693,6 +763,15 @@ int upnpc_set_local_address(upnpc_t * p, const char * address, uint16_t port)
 	return UPNPC_OK;
 }
 
+#ifdef ENABLE_UPNP_EVENTS
+int upnpc_set_event_callback(upnpc_t * p, upnpc_event_callback_fn cb)
+{
+	if(!p || !cb) return UPNPC_ERR_INVALID_ARGS;
+	p->value_changed_cb = cb;
+	return UPNPC_OK;
+}
+#endif /* ENABLE_UPNP_EVENTS */
+
 static void upnpc_device_finalize(upnpc_device_t * d)
 {
 	d->state = 0;
@@ -743,8 +822,70 @@ int upnpc_finalize(upnpc_t * p)
 		p->devices = d->next;
 		free(d);
 	}
+	free(p->local_address);
+	p->local_address = NULL;
+#ifdef ENABLE_UPNP_EVENTS
+	if(p->http_server) {
+		evhttp_free(p->http_server);
+		p->http_server = NULL;
+	}
+#endif /* ENABLE_UPNP_EVENTS */
 	return UPNPC_OK;
 }
+
+#ifdef ENABLE_UPNP_EVENTS
+int upnpc_event_subscribe(upnpc_device_t * p)
+{
+	char hostname[MAXHOSTNAMELEN+1];
+	char hostname_port[MAXHOSTNAMELEN+1+6];
+	unsigned short port;
+	char * path;
+	unsigned int scope_id;
+	struct evhttp_request * req;
+	struct evkeyvalq * headers;
+	char callback_header[7+15+1+5+9+2+1];
+
+	if(p->parent->http_server == NULL) {
+		/* HTTP server to receive event notifications */
+		p->parent->http_server = evhttp_new(p->parent->base);
+		if(p->parent->http_server == NULL) {
+			debug_printf("evhttp_new() FAILED\n");
+			return -1;
+		}
+		evhttp_set_allowed_methods(p->parent->http_server, EVHTTP_REQ_NOTIFY);
+		evhttp_set_cb(p->parent->http_server, "/evt_conn", upnpc_event_conn_req, p);
+		if(evhttp_bind_socket(p->parent->http_server, p->parent->local_address, p->parent->local_port) < 0) {
+			debug_printf("evhttp_bind_socket() FAILED\n");
+			return -1;
+		}
+	}
+	/*if(!parseURL(p->event_cif_url, hostname, &port, &path, &scope_id)) {*/
+	if(!parseURL(p->event_conn_url, hostname, &port, &path, &scope_id)) {
+		return -1;
+	}
+	if(port != 80)
+		snprintf(hostname_port, sizeof(hostname_port), "%s:%hu", hostname, port);
+	else
+		strncpy(hostname_port, hostname, sizeof(hostname_port));
+	if(p->soap_conn == NULL) {
+		p->soap_conn = evhttp_connection_base_new(p->parent->base, NULL, hostname, port);
+	}
+	req = evhttp_request_new(upnpc_subscribe_response, p);
+	headers = evhttp_request_get_output_headers(req);
+	/*buffer = evhttp_request_get_output_buffer(req);*/
+	evhttp_add_header(headers, "Host", hostname_port);
+	/*evhttp_add_header(headers, "User-Agent", "***");*/
+	snprintf(callback_header, sizeof(callback_header), "<http://%s:%hu/evt_conn>", p->parent->local_address, p->parent->local_port);
+	evhttp_add_header(headers, "Callback", callback_header);
+	evhttp_add_header(headers, "NT", "upnp:event");
+	/*evhttp_add_header(headers, "NTS", "");*/
+	evhttp_add_header(headers, "Timeout", "3600");
+	/*evbuffer_add(buffer, body, body_len);*/
+	evhttp_make_request(p->soap_conn, req, EVHTTP_REQ_SUBSCRIBE, path);
+	p->state |= UPNPC_DEVICE_SOAP_REQ;
+	return 0;
+}
+#endif /* ENABLE_UPNP_EVENTS */
 
 int upnpc_get_external_ip_address(upnpc_device_t * p)
 {

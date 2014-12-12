@@ -49,6 +49,9 @@ typedef struct upnpc_device upnpc_device_t;
 typedef struct upnpc upnpc_t;
 
 typedef void(* upnpc_callback_fn)(int, upnpc_t *, upnpc_device_t *, void *);
+#ifdef ENABLE_UPNP_EVENTS
+typedef void(* upnpc_event_callback_fn)(upnpc_t *, upnpc_device_t *, void *, const char *, const char *, const char *);
+#endif /* ENABLE_UPNP_EVENTS */
 
 struct upnpc_device {
 	upnpc_t * parent;
@@ -76,6 +79,10 @@ struct upnpc {
 	upnpc_callback_fn ready_cb;
 	upnpc_callback_fn soap_cb;
 	void * cb_data;
+#ifdef ENABLE_UPNP_EVENTS
+	struct evhttp * http_server;
+	upnpc_event_callback_fn value_changed_cb;
+#endif /* ENABLE_UPNP_EVENTS */
 	char * local_address;
 	uint16_t local_port;
 };
@@ -85,9 +92,17 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 
 int upnpc_set_local_address(upnpc_t * p, const char * address, uint16_t port);
 
+#ifdef ENABLE_UPNP_EVENTS
+int upnpc_set_event_callback(upnpc_t * p, upnpc_event_callback_fn cb);
+#endif /* ENABLE_UPNP_EVENTS */
+
 int upnpc_start(upnpc_t * p);
 
 int upnpc_finalize(upnpc_t * p);
+
+#ifdef ENABLE_UPNP_EVENTS
+int upnpc_event_subscribe(upnpc_device_t * p);
+#endif /* ENABLE_UPNP_EVENTS */
 
 int upnpc_get_external_ip_address(upnpc_device_t * p);
 

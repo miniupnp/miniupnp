@@ -45,7 +45,11 @@ static void ready(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 		printf("READY ! %d\n", code);
 		printf("  root_desc_location='%s'\n", d->root_desc_location);
 		/* 1st request */
+#ifdef ENABLE_UPNP_EVENTS
+		upnpc_event_subscribe(d);
+#else
 		upnpc_get_status_info(d);
+#endif /* ENABLE_UPNP_EVENTS */
 	} else {
 		printf("DISCOVER ERROR : %d\n", code);
 		switch(code) {
@@ -121,6 +125,15 @@ static void soap(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 		event_base_loopbreak(base);
 	}
 }
+
+#ifdef ENABLE_UPNP_EVENTS
+/* event callback */
+static void event_callback(upnpc_t * p, upnpc_device_t * d, void * data,
+                           const char * service_id, const char * property_name, const char * property_value)
+{
+	printf("PROPERTY VALUE CHANGE (service=%s): %s=%s\n", service_id, property_name, property_value);
+}
+#endif /* ENABLE_UPNP_EVENTS */
 
 /* use a UDP "connection" to 8.8.8.8
  * to retrieve local address */
@@ -216,6 +229,9 @@ int main(int argc, char * * argv)
 		return 1;
 	}
 	upnpc_set_local_address(&upnp, local_address, 50000);
+#ifdef ENABLE_UPNP_EVENTS
+	upnpc_set_event_callback(&upnp, event_callback);
+#endif /* ENABLE_UPNP_EVENTS */
 	if(upnpc_start(&upnp) != UPNPC_OK) {
 		fprintf(stderr, "upnp_start() failed\n");
 		return 1;
