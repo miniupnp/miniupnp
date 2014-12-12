@@ -101,12 +101,6 @@ int upnpc_delete_port_mapping(upnpc_device_t * p,
 
 int upnpc_get_status_info(upnpc_device_t * p);
 
-#ifdef UPNPC_USE_SELECT
-int upnpc_select_fds(upnpc_t * p, int * nfds, fd_set * readfds, fd_set * writefds);
-#endif /* UPNPC_USE_SELECT */
-
-int upnpc_process(upnpc_t * p);
-
 #ifdef __cplusplus
 }
 #endif
