@@ -62,7 +62,7 @@
 #ifdef DEBUG
 #define debug_printf(...) fprintf(stderr, __VA_ARGS__)
 #else
-#define debug_printf(...)
+#define debug_printf(...) (void)
 #endif
 
 /* compare the begining of a string with a constant string */
