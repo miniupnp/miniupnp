@@ -606,7 +606,6 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 {
 	int opt = 1;
 	struct sockaddr_in addr;
-	struct timeval timeout;
 
 	if(p == NULL || base == NULL)
 		return UPNPC_ERR_INVALID_ARGS;
@@ -654,6 +653,14 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 		close(p->ssdp_socket);
 		return UPNPC_ERR_BIND_FAILED;
 	}
+	return UPNPC_OK;
+}
+
+int upnpc_start(upnpc_t * p)
+{
+	struct timeval timeout;
+	if(p == NULL || p->base == NULL)
+		return UPNPC_ERR_INVALID_ARGS;
 	/* event on SSDP */
 	p->ev_ssdp_recv = event_new(p->base, p->ssdp_socket,
 	                         EV_READ|EV_PERSIST,

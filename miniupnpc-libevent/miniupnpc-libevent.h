@@ -81,6 +81,8 @@ struct upnpc {
 int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
                upnpc_callback_fn ready_cb, upnpc_callback_fn soap_cb, void * cb_data);
 
+int upnpc_start(upnpc_t * p);
+
 int upnpc_finalize(upnpc_t * p);
 
 int upnpc_get_external_ip_address(upnpc_device_t * p);

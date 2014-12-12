@@ -215,6 +215,10 @@ int main(int argc, char * * argv)
 		fprintf(stderr, "upnpc_init() failed\n");
 		return 1;
 	}
+	if(upnpc_start(&upnp) != UPNPC_OK) {
+		fprintf(stderr, "upnp_start() failed\n");
+		return 1;
+	}
 
 	event_base_dispatch(base);	/* TODO : check return value */
 	printf("finishing...\n");
