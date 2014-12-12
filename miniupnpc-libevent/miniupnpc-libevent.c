@@ -451,6 +451,7 @@ static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
 static int upnpc_get_desc(upnpc_device_t * d, const char * url)
 {
 	char hostname[MAXHOSTNAMELEN+1];
+	char hostname_port[MAXHOSTNAMELEN+1+6];
 	unsigned short port;
 	char * path;
 	unsigned int scope_id;
@@ -464,6 +465,10 @@ static int upnpc_get_desc(upnpc_device_t * d, const char * url)
 	             &path, &scope_id)) {
 		return -1;
 	}
+	if(port != 80)
+		snprintf(hostname_port, sizeof(hostname_port), "%s:%hu", hostname, port);
+	else
+		strncpy(hostname_port, hostname, sizeof(hostname_port));
 	if(d->desc_conn == NULL) {
 		d->desc_conn = evhttp_connection_base_new(d->parent->base, NULL, hostname, port);
 	}
@@ -473,7 +478,7 @@ static int upnpc_get_desc(upnpc_device_t * d, const char * url)
 	/*evhttp_connection_set_timeout(p->desc_conn, 600);*/
 	req = evhttp_request_new(upnpc_desc_received/*callback*/, d);
 	headers = evhttp_request_get_output_headers(req);
-	evhttp_add_header(headers, "Host", hostname);
+	evhttp_add_header(headers, "Host", hostname_port);
 	evhttp_add_header(headers, "Connection", "close");
 	/*evhttp_add_header(headers, "User-Agent", "***");*/
 	evhttp_make_request(d->desc_conn, req, EVHTTP_REQ_GET, path);
@@ -532,10 +537,10 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 		"\r\n";
 	int body_len;
 	char hostname[MAXHOSTNAMELEN+1];
+	char hostname_port[MAXHOSTNAMELEN+1+6];
 	unsigned short port;
 	char * path;
 	unsigned int scope_id;
-	char portstr[8];
 	char * args_xml = NULL;
 	struct evhttp_request * req;
 	struct evkeyvalq * headers;
@@ -578,9 +583,9 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 		return -1;
 	}
 	if(port != 80)
-		snprintf(portstr, sizeof(portstr), ":%hu", port);
+		snprintf(hostname_port, sizeof(hostname_port), "%s:%hu", hostname, port);
 	else
-		portstr[0] = '\0';
+		strncpy(hostname_port, hostname, sizeof(hostname_port));
 	snprintf(action, sizeof(action), "\"%s#%s\"", service, method);
 	if(p->soap_conn == NULL) {
 		p->soap_conn = evhttp_connection_base_new(p->parent->base, NULL, hostname, port);
@@ -588,7 +593,7 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	req = evhttp_request_new(upnpc_soap_response, p);
 	headers = evhttp_request_get_output_headers(req);
 	buffer = evhttp_request_get_output_buffer(req);
-	evhttp_add_header(headers, "Host", hostname);
+	evhttp_add_header(headers, "Host", hostname_port);
 	evhttp_add_header(headers, "SOAPAction", action);
 	evhttp_add_header(headers, "Content-Type", "text/xml");
 	/*evhttp_add_header(headers, "User-Agent", "***");*/
