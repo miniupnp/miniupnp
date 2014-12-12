@@ -76,10 +76,14 @@ struct upnpc {
 	upnpc_callback_fn ready_cb;
 	upnpc_callback_fn soap_cb;
 	void * cb_data;
+	char * local_address;
+	uint16_t local_port;
 };
 
 int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
                upnpc_callback_fn ready_cb, upnpc_callback_fn soap_cb, void * cb_data);
+
+int upnpc_set_local_address(upnpc_t * p, const char * address, uint16_t port);
 
 int upnpc_start(upnpc_t * p);
 

@@ -680,6 +680,14 @@ int upnpc_start(upnpc_t * p)
 	return UPNPC_OK;
 }
 
+int upnpc_set_local_address(upnpc_t * p, const char * address, uint16_t port)
+{
+	if(!p || !address) return UPNPC_ERR_INVALID_ARGS;
+	p->local_address = strdup(address);	/* TODO check error */
+	p->local_port = port;
+	return UPNPC_OK;
+}
+
 static void upnpc_device_finalize(upnpc_device_t * d)
 {
 	d->state = 0;
