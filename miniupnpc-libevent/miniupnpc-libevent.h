@@ -67,6 +67,9 @@ struct upnpc_device {
 	struct evhttp_connection * soap_conn;
 	struct NameValueParserData soap_response_data;
 	unsigned int state;
+#ifdef ENABLE_UPNP_EVENTS
+	char * event_conn_sid;
+#endif /* ENABLE_UPNP_EVENTS */
 };
 
 struct upnpc {

@@ -431,6 +431,11 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 		struct evkeyvalq * headers = evhttp_request_get_input_headers(req);
 		sid = evhttp_find_header(headers, "sid");
 		debug_printf("SID=%s\n", sid);
+		if(sid) {
+			if(d->event_conn_sid)
+				free(d->event_conn_sid);
+			d->event_conn_sid = strdup(sid);
+		}
 	}
 }
 #endif /* ENABLE_UPNP_EVENTS */
@@ -639,28 +644,39 @@ void upnpc_event_conn_req(struct evhttp_request * req, void * data)
 	struct evkeyvalq * headers;
 	const char * sid;
 	const char * nts;
+	const char * nt;
 	const char * seq;
 	struct NameValueParserData parsed_data;
 	struct NameValue * nv;
 	upnpc_device_t * d = (upnpc_device_t *)data;
 
 	debug_printf("%s(%p, %p)\n", __func__, req, d);
+	headers = evhttp_request_get_input_headers(req);
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
-	if(len == 0) {
-		evhttp_send_reply(req, 406, "Not Acceptable", NULL);
-		return;
-	}
-	xml_data = (char *)evbuffer_pullup(input_buffer, len);
-	headers = evhttp_request_get_input_headers(req);
 	sid = evhttp_find_header(headers, "sid");
 	nts = evhttp_find_header(headers, "nts");
+	nt = evhttp_find_header(headers, "nt");
 	seq = evhttp_find_header(headers, "seq");
+	if(len == 0 || nts == NULL || nt == NULL) {
+		/* 400 Bad request :
+		 * The NT or NTS header field is missing
+		 * or the request is malformed. */
+		evhttp_send_reply(req, 400, "Bad Request", NULL);
+		return;
+	}
 	debug_printf("SID=%s NTS=%s SEQ=%s\n", sid, nts, seq);
-	if(sid == NULL || nts == NULL || seq == NULL) {
+	if(sid == NULL || 0 != strcmp(sid, d->event_conn_sid)
+	   || 0 != strcmp(nt, "upnp:event") || 0 != strcmp(nts, "upnp:propchange")) {
+		/* 412 Precondition Failed :
+		 *  An SID does not correspond to a known, un-expired subscription
+		 *  or the NT header field does not equal upnp:event
+		 *  or the NTS header field does not equal upnp:propchange
+		 *  or the SID header field is missing or empty.  */
 		evhttp_send_reply(req, 412, "Precondition Failed", NULL);
 		return;
 	}
+	xml_data = (char *)evbuffer_pullup(input_buffer, len);
 	/*debug_printf("%.*s\n", len, xml_data);*/
 	ParseNameValue(xml_data, len, &parsed_data);
 	for(nv = parsed_data.l_head; nv != NULL; nv = nv->l_next) {
@@ -798,6 +814,10 @@ static void upnpc_device_finalize(upnpc_device_t * d)
 		d->soap_conn = NULL;
 	}
 	ClearNameValueList(&d->soap_response_data);
+#ifdef ENABLE_UPNP_EVENTS
+	free(d->event_conn_sid);
+	d->event_conn_sid = NULL;
+#endif /* ENABLE_UPNP_EVENTS */
 }
 
 int upnpc_finalize(upnpc_t * p)
