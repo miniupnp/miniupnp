@@ -1,4 +1,4 @@
-/* $Id: upnpglobalvars.c,v 1.38 2014/12/10 09:02:15 nanard Exp $ */
+/* $Id: upnpglobalvars.c,v 1.39 2014/12/10 09:49:22 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2014 Thomas Bernard
@@ -133,5 +133,14 @@ unsigned int upnp_bootid = 1;      /* BOOTID.UPNP.ORG */
  * current set of device and service descriptions; control points can
  * parse this header field to detect whether they need to send new
  * description query messages. */
+/* UPnP 1.1 devices MAY freely assign configid numbers from 0 to
+ * 16777215 (2^24-1). Higher numbers are reserved for future use, and
+ * can be assigned by the Technical Committee. The configuration of a
+ * root device consists of the following information: the DDD of the
+ * root device and all its embedded devices, and the SCPDs of all the
+ * contained services. If any part of the configuration changes, the
+ * CONFIGID.UPNP.ORG field value MUST be changed.
+ * DDD = Device Description Document
+ * SCPD = Service Control Protocol Description */
 unsigned int upnp_configid = 1337; /* CONFIGID.UPNP.ORG */
 
