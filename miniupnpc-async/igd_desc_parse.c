@@ -1,4 +1,4 @@
-/* $Id: igd_desc_parse.c,v 1.15 2014/07/01 13:01:17 nanard Exp $ */
+/* $Id: igd_desc_parse.c,v 1.16 2014/11/17 17:19:13 nanard Exp $ */
 /* Project : miniupnp
  * http://miniupnp.free.fr/
  * Author : Thomas Bernard
@@ -88,6 +88,7 @@ void IGDdata(void * d, const char * data, int l)
 	}
 }
 
+#ifdef DEBUG
 void printIGD(struct IGDdatas * d)
 {
 	printf("urlbase = '%s'\n", d->urlbase);
@@ -116,5 +117,5 @@ void printIGD(struct IGDdatas * d)
 	printf(" eventSubURL = '%s'\n", d->IPv6FC.eventsuburl);
 	printf(" SCPDURL = '%s'\n", d->IPv6FC.scpdurl);
 }
-
+#endif /* DEBUG */
 
