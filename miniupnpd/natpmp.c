@@ -165,7 +165,7 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
                              struct sockaddr_in6 * receiveraddr,
                              unsigned char * msg_buff, size_t msg_buff_size)
 {
-#if IPV6_PKTINFO
+#ifdef IPV6_PKTINFO
 	struct iovec iov;
 	uint8_t c[1000];
 	struct msghdr msg;
@@ -218,7 +218,7 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 			}
 		}
 	}
-#else
+#else /* IPV6_PKTINFO */
 	int n;
 
 	n = recvfrom(s, msg_buff, msg_buff_size, 0,
@@ -234,7 +234,7 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 		}
 		return n;
 	}
-#endif
+#endif /* IPV6_PKTINFO */
 
 	return n;
 }
