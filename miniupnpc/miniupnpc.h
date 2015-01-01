@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.34 2014/01/31 13:18:25 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.39 2014/12/20 09:13:51 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
@@ -122,6 +122,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 
 /* UPNP_GetIGDFromUrl()
  * Used when skipping the discovery process.
+ * When succeding, urls, data, and lanaddr arguments are set.
  * return value :
  *   0 - Not ok
  *   1 - OK */
