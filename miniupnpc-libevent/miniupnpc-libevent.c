@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.21 2014/12/02 13:33:41 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.24 2014/12/15 11:10:29 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -62,7 +62,7 @@
 #ifdef DEBUG
 #define debug_printf(...) fprintf(stderr, __VA_ARGS__)
 #else
-#define debug_printf(...) (void)
+#define debug_printf(...) (void)0
 #endif
 
 /* compare the begining of a string with a constant string */
