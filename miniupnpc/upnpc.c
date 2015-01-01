@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.106 2014/12/01 09:24:31 nanard Exp $ */
+/* $Id: upnpc.c,v 1.108 2014/12/20 09:13:16 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2014 Thomas Bernard
@@ -626,7 +626,7 @@ int main(int argc, char ** argv)
 					   device->descURL, device->st);
 			}
 		}
-		else
+		else if(!rootdescurl)
 		{
 			printf("upnpDiscover() error code=%d\n", error);
 		}
