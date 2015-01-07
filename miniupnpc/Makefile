@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.119 2014/11/26 10:42:03 nanard Exp $
+# $Id: Makefile,v 1.120 2015/01/07 09:07:32 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2014 Thomas Bernard
+# (c) 2005-2015 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -233,6 +233,13 @@ ifeq ($(OS), Linux)
 endif
 endif
 
+install-static:	updateversion $(FILESTOINSTALL)
+	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRINC)
+	$(INSTALL) -m 644 $(HEADERS) $(DESTDIR)$(INSTALLDIRINC)
+	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRLIB)
+	$(INSTALL) -m 644 $(LIBRARY) $(DESTDIR)$(INSTALLDIRLIB)
+	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRBIN)
+	$(INSTALL) -m 755 external-ip.sh $(DESTDIR)$(INSTALLDIRBIN)/external-ip
 
 cleaninstall:
 	$(RM) -r $(DESTDIR)$(INSTALLDIRINC)
