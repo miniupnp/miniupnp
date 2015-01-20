@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.72 2014/10/22 11:54:45 nanard Exp $ */
+/* $Id: minissdp.c,v 1.73 2015/01/17 11:26:05 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -883,7 +883,9 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			{
 				if (lan_addr == NULL)
 				{
-					syslog(LOG_ERR, "Can't find in which sub network the client is");
+					syslog(LOG_ERR,
+					       "Can't find in which sub network the client %s is",
+					       sender_str);
 					return;
 				}
 				announced_host = lan_addr->str;

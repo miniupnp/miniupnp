@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.205 2014/12/10 09:33:25 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.206 2015/01/17 11:26:04 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -1640,7 +1640,7 @@ main(int argc, char * * argv)
 		return 0;
 	}
 
-	syslog(LOG_INFO, "Starting%s%swith external interface %s BOOTID=%u",
+	syslog(LOG_INFO, "version " MINIUPNPD_VERSION " starting%s%sext if %s BOOTID=%u",
 #ifdef ENABLE_NATPMP
 #ifdef ENABLE_PCP
 	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP/PCP " : " ",
