@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.24 2014/12/15 11:10:29 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.25 2015/02/05 17:56:38 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -363,6 +363,10 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	struct xmlparser parser;
 	upnpc_device_t * d = (upnpc_device_t *)pvoid;
 
+	if(req == NULL) {
+		debug_printf("%s(%p, %p) NULL argument !\n", __func__, req, pvoid);
+		return;
+	}
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
 	data = evbuffer_pullup(input_buffer, len);
@@ -419,6 +423,10 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 	struct evbuffer * input_buffer;
 	upnpc_device_t * d = (upnpc_device_t *)pvoid;
 
+	if(req == NULL) {
+		debug_printf("%s(%p, %p) NULL argument !\n", __func__, req, pvoid);
+		return;
+	}
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
 	data = evbuffer_pullup(input_buffer, len);
@@ -446,8 +454,13 @@ static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
 	unsigned char * data;
 	struct evbuffer * input_buffer;
 	upnpc_device_t * d = (upnpc_device_t *)pvoid;
-	int code = evhttp_request_get_response_code(req);
+	int code;
 
+	if(req == NULL) {
+		debug_printf("%s(%p, %p) NULL argument !\n", __func__, req, pvoid);
+		return;
+	}
+	code = evhttp_request_get_response_code(req);
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
 	data = evbuffer_pullup(input_buffer, len);
