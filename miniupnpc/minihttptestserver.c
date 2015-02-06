@@ -1,7 +1,7 @@
-/* $Id: minihttptestserver.c,v 1.16 2014/04/01 15:08:28 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.17 2015/02/06 10:31:19 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
- * Copyright (c) 2011-2014 Thomas Bernard
+ * Copyright (c) 2011-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -414,7 +414,14 @@ void handle_http_connection(int c)
 		             "Content-Length: %d\r\n"
 		             "\r\n", content_length);
 		response_len = content_length+n+CRAP_LENGTH;
-		response_buffer = realloc(response_buffer, response_len);
+		p = realloc(response_buffer, response_len);
+		if(p == NULL) {
+			/* error 500 */
+			free(response_buffer);
+			response_buffer = NULL;
+			break;
+		}
+		response_buffer = p;
 		build_content(response_buffer + n, content_length);
 		build_crap(response_buffer + n + content_length, CRAP_LENGTH);
 		break;
@@ -445,7 +452,14 @@ void handle_http_connection(int c)
 		             "Content-Type: text/plain\r\n"
 		             "\r\n");
 		response_len = content_length+n;
-		response_buffer = realloc(response_buffer, response_len);
+		p = realloc(response_buffer, response_len);
+		if(p == NULL) {
+			/* Error 500 */
+			free(response_buffer);
+			response_buffer = NULL;
+			break;
+		}
+		response_buffer = p;
 		build_content(response_buffer + n, response_len - n);
 	}
 
