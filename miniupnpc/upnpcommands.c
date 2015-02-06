@@ -1,7 +1,7 @@
-/* $Id: upnpcommands.c,v 1.42 2014/01/31 13:18:25 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.45 2015/02/06 10:37:00 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2012 Thomas Bernard
+ * Copyright (c) 2005-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -159,7 +159,7 @@ UPNP_GetStatusInfo(const char * controlURL,
 		if(up)
 			sscanf(up,"%u",uptime);
 		else
-			uptime = 0;
+			*uptime = 0;
 	}
 
 	if(lastconnerror) {
