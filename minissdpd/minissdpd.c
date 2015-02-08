@@ -1,6 +1,6 @@
-/* $Id: minissdpd.c,v 1.44 2014/12/05 17:31:46 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.45 2015/02/08 08:51:54 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2014 Thomas Bernard
+ * (c) 2007-2015 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -196,7 +196,8 @@ add_to_buffer(struct reqelem * req, const unsigned char * data, int len)
 	}
 	tmp = realloc(req->output_buffer, req->output_buffer_len + len);
 	if(tmp == NULL) {
-		syslog(LOG_ERR, "%s: failed to allocate %d bytes", __func__, req->output_buffer_len + len);
+		syslog(LOG_ERR, "%s: failed to allocate %d bytes",
+		       __func__, req->output_buffer_len + len);
 		return -1;
 	}
 	req->output_buffer = tmp;
@@ -269,13 +270,16 @@ updateDevice(const struct header * headers, time_t t)
 			/* update Location ! */
 			if(headers[HEADER_LOCATION].l > p->headers[HEADER_LOCATION].l)
 			{
-				p = realloc(p, sizeof(struct device)
-		           + headers[0].l+headers[1].l+headers[2].l );
-				if(!p)	/* allocation error */
+				struct device * tmp;
+				tmp = realloc(p, sizeof(struct device)
+				    + headers[0].l+headers[1].l+headers[2].l);
+				if(!tmp)	/* allocation error */
 				{
 					syslog(LOG_ERR, "updateDevice() : memory allocation error");
+					free(p);
 					return 0;
 				}
+				p = tmp;
 				*pp = p;
 			}
 			memcpy(p->data + p->headers[0].l + p->headers[1].l,

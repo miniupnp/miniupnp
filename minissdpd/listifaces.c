@@ -1,5 +1,5 @@
-/* $Id: listifaces.c,v 1.6 2014/02/03 14:32:14 nanard Exp $ */
-/* (c) 2006-2014 Thomas BERNARD
+/* $Id: listifaces.c,v 1.7 2015/02/08 08:51:54 nanard Exp $ */
+/* (c) 2006-2015 Thomas BERNARD
  * http://miniupnp.free.fr/ http://miniupnp.tuxfamily.org/
  */
 #include <sys/types.h>
@@ -49,11 +49,20 @@ void listifaces(void)
 	/*s = socket(PF_INET, SOCK_DGRAM, 0);*/
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	do {
+		char * tmp;
 #ifdef __linux__
 		buflen += buflen;
 #endif
-		if(buflen > 0)
-			buf = realloc(buf, buflen);
+		if(buflen > 0) {
+			tmp = realloc(buf, buflen);
+			if(!tmp) {
+				fprintf(stderr, "error allocating %d bytes.\n", buflen);
+				close(f);
+				free(buf);
+				return;
+			}
+			buf = tmp;
+		}
 		ifc.ifc_len = buflen;
 		ifc.ifc_buf = (caddr_t)buf;
 		if(ioctl(s, SIOCGIFCONF, &ifc) < 0)

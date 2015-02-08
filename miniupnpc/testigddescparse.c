@@ -1,8 +1,8 @@
-/* $Id: testigddescparse.c,v 1.7 2014/11/17 19:28:20 nanard Exp $ */
+/* $Id: testigddescparse.c,v 1.8 2015/02/08 08:46:06 nanard Exp $ */
 /* Project : miniupnp
  * http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2008-2014 Thomas Bernard
+ * Copyright (c) 2008-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -155,6 +155,11 @@ int main(int argc, char * * argv)
 	len = ftell(f);
 	fseek(f, 0, SEEK_SET);
 	buffer = malloc(len);
+	if(!buffer) {
+		fprintf(stderr, "Memory allocation error.\n");
+		fclose(f);
+		return 1;
+	}
 	fread(buffer, 1, len, f);
 	fclose(f);
 	f = NULL;
@@ -162,6 +167,7 @@ int main(int argc, char * * argv)
 		f = fopen(argv[2], "r");
 		if(!f) {
 			fprintf(stderr, "Cannot open %s for reading.\n", argv[2]);
+			free(buffer);
 			return 1;
 		}
 	}

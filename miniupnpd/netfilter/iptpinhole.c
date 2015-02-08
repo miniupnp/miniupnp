@@ -1,7 +1,7 @@
-/* $Id: iptpinhole.c,v 1.8 2012/09/18 08:29:17 nanard Exp $ */
+/* $Id: iptpinhole.c,v 1.12 2015/02/08 09:16:50 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2012 Thomas Bernard
+ * (c) 2012-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -201,10 +201,16 @@ int add_pinhole(const char * ifname,
 {
 	int uid;
 	struct ip6t_entry * e;
+	struct ip6t_entry * tmp;
 	struct ip6t_entry_match *match = NULL;
 	struct ip6t_entry_target *target = NULL;
 
 	e = calloc(1, sizeof(struct ip6t_entry));
+	if(!e) {
+		syslog(LOG_ERR, "%s: calloc(%d) failed",
+		       "add_pinhole", (int)sizeof(struct ip6t_entry));
+		return -1;
+	}
 	e->ipv6.proto = proto;
 	if (proto)
 		e->ipv6.flags |= IP6T_F_PROTO;
@@ -223,9 +229,17 @@ int add_pinhole(const char * ifname,
 
 	match = new_match(proto, rem_port, int_port);
 	target = get_accept_target();
-	e = realloc(e, sizeof(struct ip6t_entry)
+	tmp = realloc(e, sizeof(struct ip6t_entry)
 	               + match->u.match_size
 	               + target->u.target_size);
+	if(!tmp) {
+		syslog(LOG_ERR, "%s: realloc(%d) failed",
+		       "add_pinhole", (int)(sizeof(struct ip6t_entry) + match->u.match_size + target->u.target_size));
+		free(e);
+		free(match);
+		free(target);
+		return -1;
+	}
 	memcpy(e->elems, match, match->u.match_size);
 	memcpy(e->elems + match->u.match_size, target, target->u.target_size);
 	e->target_offset = sizeof(struct ip6t_entry)
