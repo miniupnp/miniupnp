@@ -1,4 +1,4 @@
-/* $Id: iptpinhole.c,v 1.12 2015/02/08 09:16:50 nanard Exp $ */
+/* $Id: iptpinhole.c,v 1.13 2015/02/08 09:44:20 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012-2015 Thomas Bernard
@@ -240,6 +240,7 @@ int add_pinhole(const char * ifname,
 		free(target);
 		return -1;
 	}
+	e = tmp;
 	memcpy(e->elems, match, match->u.match_size);
 	memcpy(e->elems + match->u.match_size, target, target->u.target_size);
 	e->target_offset = sizeof(struct ip6t_entry)
