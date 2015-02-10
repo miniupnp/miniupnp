@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.134 2015/02/08 09:17:14 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.135 2015/02/10 15:01:24 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -1477,7 +1477,7 @@ AddPinhole(struct upnphttp * h, const char * action)
 	}
 	/* I guess it is useless to convert int_ip to literal ipv6 address */
 	/* rem_host should be converted to literal ipv6 : */
-	if(rem_host)
+	if(rem_host && (rem_host[0] != '\0'))
 	{
 		struct addrinfo *ai, *p;
 		struct addrinfo hints;

@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.394 2014/12/10 09:33:24 nanard Exp $
+$Id: Changelog.txt,v 1.395 2015/02/10 15:01:02 nanard Exp $
+
+2015/02/10:
+  IP wildcard for AddPinhole() is empty string
 
 2014/12/10:
   Checking Host: HTTP request header to prevent DNS rebinding attack

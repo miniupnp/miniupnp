@@ -1,4 +1,4 @@
-/* $Id: iptpinhole.c,v 1.13 2015/02/08 09:44:20 nanard Exp $ */
+/* $Id: iptpinhole.c,v 1.14 2015/02/10 15:01:03 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012-2015 Thomas Bernard
@@ -217,7 +217,7 @@ int add_pinhole(const char * ifname,
 
 	if(ifname)
 		strncpy(e->ipv6.iniface, ifname, IFNAMSIZ);
-	if(rem_host) {
+	if(rem_host && (rem_host[0] != '\0')) {
 		inet_pton(AF_INET6, rem_host, &e->ipv6.src);
 		memset(&e->ipv6.smsk, 0xff, sizeof(e->ipv6.smsk));
 	}
@@ -350,7 +350,7 @@ get_pinhole_info(unsigned short uid,
 	p = get_pinhole(uid);
 	if(!p)
 		return -2;	/* Not found */
-	if(rem_host) {
+	if(rem_host && (rem_host[0] != '\0')) {
 		if(inet_ntop(AF_INET6, &p->saddr, rem_host, rem_hostlen) == NULL)
 			return -1;
 	}
