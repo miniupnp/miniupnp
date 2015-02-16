@@ -1,7 +1,7 @@
 /* $Id: upnphttp.h,v 1.40 2014/12/09 16:41:21 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -20,9 +20,11 @@
 #if 0
 /* according to "UPnP Device Architecture 1.0" */
 #define UPNP_VERSION_STRING "UPnP/1.0"
-#else
 /* according to "UPnP Device Architecture 1.1" */
 #define UPNP_VERSION_STRING "UPnP/1.1"
+#else
+/* according to "UPnP Device Architecture 2.0" */
+#define UPNP_VERSION_STRING "UPnP/2.0"
 #endif
 
 /* server: HTTP header returned in all HTTP responses : */

@@ -1,7 +1,7 @@
 /* $Id: upnpdescgen.c,v 1.77 2014/03/10 11:04:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -140,7 +140,7 @@ static const struct XMLElt rootDesc[] =
 #else
 	{"device", INITHELPER(5,12)},
 #endif
-	{"/major", "1"},
+	{"/major", "2"},
 	{"/minor", "0"},
 /* 5 */
 	{"/deviceType", DEVICE_TYPE_IGD},
@@ -976,7 +976,7 @@ genServiceDesc(int * len, const struct serviceDesc * s)
 	str = strcat_char(str, len, &tmplen, '>');
 
 	str = strcat_str(str, len, &tmplen,
-		"<specVersion><major>1</major><minor>0</minor></specVersion>");
+		"<specVersion><major>2</major><minor>0</minor></specVersion>");
 
 	i = 0;
 	str = strcat_str(str, len, &tmplen, "<actionList>");
