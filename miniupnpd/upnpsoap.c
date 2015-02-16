@@ -681,19 +681,24 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 		"</u:DeletePortMappingResponse>";
 
 	struct NameValueParserData data;
-	const char * r_host, * ext_port, * protocol;
+	const char * ext_port, * protocol;
 	unsigned short eport;
+#ifdef UPNP_STRICT
+	const char * r_host;
+#endif /* UPNP_STRICT */
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	r_host = GetValueFromNameValueList(&data, "NewRemoteHost");
 	ext_port = GetValueFromNameValueList(&data, "NewExternalPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
+#ifdef UPNP_STRICT
+	r_host = GetValueFromNameValueList(&data, "NewRemoteHost");
+#endif /* UPNP_STRICT */
 
 #ifdef UPNP_STRICT
 	if(!ext_port || !protocol || !r_host)
 #else
 	if(!ext_port || !protocol)
-#endif
+#endif /* UPNP_STRICT */
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
@@ -707,8 +712,8 @@ DeletePortMapping(struct upnphttp * h, const char * action)
 		SoapError(h, 726, "RemoteHostOnlySupportsWildcard");
 		return;
 	}
-#endif
-#endif
+#endif /* UPNP_STRICT */
+#endif /* SUPPORT_REMOTEHOST */
 
 	eport = (unsigned short)atoi(ext_port);
 
@@ -1145,19 +1150,21 @@ GetDefaultConnectionService(struct upnphttp * h, const char * action)
 static void
 SetConnectionType(struct upnphttp * h, const char * action)
 {
+#ifdef UPNP_STRICT
 	const char * connection_type;
+#endif /* UPNP_STRICT */
 	struct NameValueParserData data;
 	UNUSED(action);
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	connection_type = GetValueFromNameValueList(&data, "NewConnectionType");
 #ifdef UPNP_STRICT
+	connection_type = GetValueFromNameValueList(&data, "NewConnectionType");
 	if(!connection_type) {
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
 	}
-#endif
+#endif /* UPNP_STRICT */
 	/* Unconfigured, IP_Routed, IP_Bridged */
 	ClearNameValueList(&data);
 	/* always return a ReadOnly error */
