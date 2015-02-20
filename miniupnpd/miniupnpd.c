@@ -715,8 +715,16 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		memcpy(lan_addr->ifname, str, n);
 		lan_addr->ifname[n] = '\0';
 		if(getifaddr(lan_addr->ifname, lan_addr->str, sizeof(lan_addr->str),
-		             &lan_addr->addr, &lan_addr->mask) < 0)
+		             &lan_addr->addr, &lan_addr->mask) < 0) {
+#ifdef ENABLE_IPV6
+			fprintf(stderr, "interface \"%s\" has no IPv4 address\n", str);
+			lan_addr->str[0] = '\0';
+			lan_addr->addr.s_addr = htonl(0x00000000u);
+			lan_addr->mask.s_addr = htonl(0xffffffffu);
+#else /* ENABLE_IPV6 */
 			goto parselan_error;
+#endif /* ENABLE_IPV6 */
+		}
 		/*printf("%s => %s\n", lan_addr->ifname, lan_addr->str);*/
 	}
 	else
