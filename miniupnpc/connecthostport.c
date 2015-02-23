@@ -37,6 +37,7 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #endif /* #ifndef USE_GETHOSTBYNAME */
+#include <fcntl.h>
 #endif /* #else _WIN32 */
 
 /* definition of PRINT_SOCKET_ERROR */
@@ -56,6 +57,83 @@
 #define MAXHOSTNAMELEN 64
 #endif
 
+#ifndef SOCKET_TIMEOUT
+#define SOCKET_TIMEOUT 3000
+#endif
+
+/* connectAsync()
+ * connect the specified socket asynchronously.
+ * returns 0 in case of success or -1 in case of error */
+static int connectAsync(int s, struct addrinfo *p)
+{
+	int n;
+	/* Set the socket to non-blocking mode */
+#ifdef _WIN32
+	u_long mode = 1;
+	ioctlsocket(s, FIONBIO, &mode);
+#else /* #ifdef _WIN32 */
+	int flags = fcntl(s, F_GETFL);
+	fcntl(s, F_SETFL, flags & ~O_NONBLOCK);
+#endif /* #else _WIN32 */
+	
+	n = connect(s, p->ai_addr, p->ai_addrlen);
+#ifdef _WIN32
+	if ((n < 0) && (WSAGetLastError() != WSAEWOULDBLOCK))
+	{
+		return n;
+	}
+#else /* #ifdef _WIN32 */
+	if ((n < 0) && (errno != EINPROGRESS))
+	{
+		return n;
+	}
+#endif /* #else _WIN32 */
+
+	if (n == 0)
+	{
+		/* connection attempt has succeeded immediately */
+		return n;
+	}
+	else
+	{
+		/* connection attempt is still in progress */
+ 		fd_set wset;
+		struct timeval timeout;
+		timeout.tv_sec = SOCKET_TIMEOUT / 1000;
+ 		timeout.tv_usec = (SOCKET_TIMEOUT % 1000) * 1000;
+ 
+ 		/* Wait for the socket to become writable */
+#ifdef MINIUPNPC_IGNORE_EINTR
+ 		do
+		{
+#endif
+			FD_ZERO(&wset);
+			FD_SET(s, &wset);
+			n = select(s + 1, NULL, &wset, NULL, &timeout);
+#ifdef MINIUPNPC_IGNORE_EINTR
+		} while(n < 0 && errno == EINTR);
+#endif
+
+		if (n < 0)
+		{
+			/* There was a socket error */
+			PRINT_SOCKET_ERROR("select");
+			return n;
+		}
+		else if (n == 0)
+		{
+			/* Timeout exceeded */
+			return -1;
+		}
+
+		if (FD_ISSET(s, &wset))
+		{
+			return 0;
+		}
+		return -1;
+	}
+}
+ 
 /* connecthostport()
  * return a socket connected (TCP) to the host and port
  * or -1 in case of error */
@@ -92,50 +170,25 @@ int connecthostport(const char * host, unsigned short port,
 		return -1;
 	}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-	/* setting a 3 seconds timeout for the connect() call */
-	timeout.tv_sec = 3;
-	timeout.tv_usec = 0;
-	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
+	/* setting a timeout for the connect() call */
+	/* TODO setting a timeout on the socket doesn't work for the connect() call. Now the client
+	   is made to work asynchronously this code can probably be removed.*/
+	timeout.tv_sec = SOCKET_TIMEOUT / 1000;
+	timeout.tv_usec = (SOCKET_TIMEOUT % 1000) * 1000;
+	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *) &timeout, sizeof(struct timeval)) < 0)
 	{
 		PRINT_SOCKET_ERROR("setsockopt");
 	}
-	timeout.tv_sec = 3;
-	timeout.tv_usec = 0;
-	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
+	timeout.tv_sec = SOCKET_TIMEOUT / 1000;
+	timeout.tv_usec = (SOCKET_TIMEOUT % 1000) * 1000;
+	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *) &timeout, sizeof(struct timeval)) < 0)
 	{
 		PRINT_SOCKET_ERROR("setsockopt");
 	}
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 	dest.sin_family = AF_INET;
 	dest.sin_port = htons(port);
-	n = connect(s, (struct sockaddr *)&dest, sizeof(struct sockaddr_in));
-#ifdef MINIUPNPC_IGNORE_EINTR
-	/* EINTR The system call was interrupted by a signal that was caught
-	 * EINPROGRESS The socket is nonblocking and the connection cannot
-	 *             be completed immediately. */
-	while(n < 0 && (errno == EINTR || errno = EINPROGRESS))
-	{
-		socklen_t len;
-		fd_set wset;
-		int err;
-		FD_ZERO(&wset);
-		FD_SET(s, &wset);
-		if((n = select(s + 1, NULL, &wset, NULL, NULL)) == -1 && errno == EINTR)
-			continue;
-		/*len = 0;*/
-		/*n = getpeername(s, NULL, &len);*/
-		len = sizeof(err);
-		if(getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &len) < 0) {
-			PRINT_SOCKET_ERROR("getsockopt");
-			closesocket(s);
-			return -1;
-		}
-		if(err != 0) {
-			errno = err;
-			n = -1;
-		}
-	}
-#endif /* #ifdef MINIUPNPC_IGNORE_EINTR */
+	n = connectAsync(s, &dest);
 	if(n<0)
 	{
 		PRINT_SOCKET_ERROR("connect");
@@ -191,49 +244,23 @@ int connecthostport(const char * host, unsigned short port,
 			addr6->sin6_scope_id = scope_id;
 		}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-		/* setting a 3 seconds timeout for the connect() call */
-		timeout.tv_sec = 3;
-		timeout.tv_usec = 0;
-		if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
+		/* setting a timeout for the connect() call */
+		/* TODO setting a timeout on the socket doesn't work for the connect() call. Now the client
+	       is made to work asynchronously this code can probably be removed.*/
+		timeout.tv_sec = SOCKET_TIMEOUT / 1000;
+		timeout.tv_usec = (SOCKET_TIMEOUT % 1000) * 1000;
+		if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *) &timeout, sizeof(struct timeval)) < 0)
 		{
 			PRINT_SOCKET_ERROR("setsockopt");
 		}
-		timeout.tv_sec = 3;
-		timeout.tv_usec = 0;
-		if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
+		timeout.tv_sec = SOCKET_TIMEOUT / 1000;
+		timeout.tv_usec = (SOCKET_TIMEOUT % 1000) * 1000;
+		if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *) &timeout, sizeof(struct timeval)) < 0)
 		{
 			PRINT_SOCKET_ERROR("setsockopt");
 		}
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
-		n = connect(s, p->ai_addr, p->ai_addrlen);
-#ifdef MINIUPNPC_IGNORE_EINTR
-		/* EINTR The system call was interrupted by a signal that was caught
-		 * EINPROGRESS The socket is nonblocking and the connection cannot
-		 *             be completed immediately. */
-		while(n < 0 && (errno == EINTR || errno == EINPROGRESS))
-		{
-			socklen_t len;
-			fd_set wset;
-			int err;
-			FD_ZERO(&wset);
-			FD_SET(s, &wset);
-			if((n = select(s + 1, NULL, &wset, NULL, NULL)) == -1 && errno == EINTR)
-				continue;
-			/*len = 0;*/
-			/*n = getpeername(s, NULL, &len);*/
-			len = sizeof(err);
-			if(getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &len) < 0) {
-				PRINT_SOCKET_ERROR("getsockopt");
-				closesocket(s);
-				freeaddrinfo(ai);
-				return -1;
-			}
-			if(err != 0) {
-				errno = err;
-				n = -1;
-			}
-		}
-#endif /* #ifdef MINIUPNPC_IGNORE_EINTR */
+		n = connectAsync(s, p);
 		if(n < 0)
 		{
 			closesocket(s);

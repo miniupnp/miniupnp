@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <errno.h>
 #endif
 #include "minisoap.h"
 #include "miniupnpcstrings.h"
@@ -28,6 +29,10 @@
 #define PRINT_SOCKET_ERROR(x)    printf("Socket error: %s, %d\n", x, WSAGetLastError());
 #else
 #define PRINT_SOCKET_ERROR(x) perror(x)
+#endif
+
+#ifndef SOCKET_TIMEOUT
+#define SOCKET_TIMEOUT 3000
 #endif
 
 /* httpWrite sends the headers and the body to the socket
@@ -49,6 +54,34 @@ httpWrite(int fd, const char * body, int bodysize,
 	  return 0;
 	memcpy(p, headers, headerssize);
 	memcpy(p+headerssize, body, bodysize);
+	{
+		/* Wait for the socket to become writable */
+		fd_set wset;
+		struct timeval timeout;
+		timeout.tv_sec = SOCKET_TIMEOUT / 1000;
+		timeout.tv_usec = (SOCKET_TIMEOUT % 1000) * 1000;
+
+#ifdef MINIUPNPC_IGNORE_EINTR
+		do {
+#endif
+			FD_ZERO(&wset);
+			FD_SET(fd, &wset);
+			n = select(fd + 1, NULL, &wset, NULL, &timeout);
+#ifdef MINIUPNPC_IGNORE_EINTR
+		} while(n < 0 && errno == EINTR);
+#endif
+
+		if (n < 0) {
+			/* There was a socket error */
+			PRINT_SOCKET_ERROR("select");
+			free(p);
+			return -1;
+		} else if (n == 0) {
+			/* Timeout exceeded */
+			free(p);
+			return -1;
+		}
+	}
 	/*n = write(fd, p, headerssize+bodysize);*/
 	n = send(fd, p, headerssize+bodysize, 0);
 	if(n<0) {

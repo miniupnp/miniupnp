@@ -14,6 +14,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <io.h>
+#include <iphlpapi.h>
 #define MAXHOSTNAMELEN 64
 #define snprintf _snprintf
 #define socklen_t int
@@ -24,6 +25,9 @@
 #define strncasecmp memicmp
 #endif /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
 #endif /* #ifndef strncasecmp */
+#if defined(WINVER) && (WINVER < 0x600)
+#undef IF_NAMESIZE
+#endif
 #else /* #ifdef _WIN32 */
 #include <unistd.h>
 #include <sys/param.h>
@@ -37,6 +41,7 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netdb.h>
+#include <errno.h>
 #define closesocket close
 #include <strings.h>
 #endif /* #else _WIN32 */
@@ -56,6 +61,10 @@
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
+#endif
+
+#ifndef SOCKET_TIMEOUT
+#define SOCKET_TIMEOUT 3000
 #endif
 
 /*
@@ -401,6 +410,33 @@ miniwget3(const char * host,
 	/* sending the HTTP request */
 	while(sent < len)
 	{
+		/* Wait for the socket to become writable */
+		fd_set wset;
+		struct timeval timeout;
+		timeout.tv_sec = SOCKET_TIMEOUT / 1000;
+		timeout.tv_usec = (SOCKET_TIMEOUT % 1000) * 1000;
+
+#ifdef MINIUPNPC_IGNORE_EINTR
+		do {
+#endif
+			FD_ZERO(&wset);
+			FD_SET(s, &wset);
+			n = select(s + 1, NULL, &wset, NULL, &timeout);
+#ifdef MINIUPNPC_IGNORE_EINTR
+		} while(n < 0 && errno == EINTR);
+#endif
+
+		if (n < 0) {
+			/* There was a socket error */
+			perror("select");
+			closesocket(s);
+			return NULL;
+		} else if (n == 0) {
+			/* Timeout exceeded */
+			closesocket(s);
+			return NULL;
+		}
+
 		n = send(s, buf+sent, len-sent, 0);
 		if(n < 0)
 		{
