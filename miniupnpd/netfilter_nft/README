@@ -1,0 +1,10 @@
+Currently nftables support is 'very alpha' version.
+Only support NAT/Filter add and del.
+
+How to install:
+ + Run 'make' command with 'Makefile.linux_nft',
+   i.e. > make -f Makefile.linux_nft
+
+Prerequisites:
+ + Please run 'netfilter_nft/scripts/nft_init.sh'
+   i.e. > sudo ./netfilter_nft/scripts/nft_init.sh
