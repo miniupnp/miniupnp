@@ -42,10 +42,10 @@ fi
 if [ $nft_filter_miniupnpd_exists -eq "1" ]; then
 	echo "create chain in filter "
 	nft "add chain filter miniupnpd { \
-		type nat hook forward priority -200 ; }"
+		type filter hook forward priority -200 ; }"
 fi
 if [ $nft_mangle_miniupnpd_exists -eq "1" ]; then
 	echo "create chain in mangle"
 	nft "add chain mangle miniupnpd { \
-		type nat hook prerouting priority -100 ; }"
+		type route hook prerouting priority -100 ; }"
 fi
