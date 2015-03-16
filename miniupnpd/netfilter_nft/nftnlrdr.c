@@ -59,8 +59,8 @@ add_redirect_rule2(const char * ifname,
 {
 	struct nft_rule *r;
 	UNUSED(timestamp);
-        printf("add redirect rule2(%s %s %u %s %u %d %s)!\n",
-                    ifname, rhost, eport, iaddr, iport, proto, desc);
+        printf("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
+	       ifname, rhost, eport, iaddr, iport, proto, desc);
 	r = rule_set_dnat(NFPROTO_IPV4, ifname, proto,
 			  0, eport, 
 			  inet_addr(iaddr), iport,  desc, NULL);
@@ -106,7 +106,10 @@ add_filter_rule2(const char * ifname,
 {
 	struct nft_rule *r = NULL;
 	in_addr_t rhost_addr = 0;
-	if (rhost != NULL) {
+
+	printf("add_filter_rule2(%s, %s, %s, %d, %d, %d, %s)\n",
+	       ifname, rhost, iaddr, eport, iport, proto, desc);
+	if (rhost != NULL && strcmp(rhost, "") != 0) {
             rhost_addr = inet_addr(rhost);
         }
 	r = rule_set_filter(NFPROTO_IPV4, ifname, proto,
