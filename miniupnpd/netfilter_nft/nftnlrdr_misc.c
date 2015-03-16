@@ -480,6 +480,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	struct nft_rule_expr *expr;
 	struct nft_rule_expr_iter *itr;
 	rule_t *r;
+	char *chain;
 	UNUSED(data);
 
 	r = malloc(sizeof(rule_t)); 
@@ -496,10 +497,16 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 		goto err_free;
 	}
 
+	chain = (char *)nft_rule_attr_get_data(t, NFT_RULE_ATTR_CHAIN, &len);
+	if (strcmp(chain, miniupnpd_nft_nat_chain) != 0 &&
+	    strcmp(chain, miniupnpd_nft_peer_chain) != 0 &&
+	    strcmp(chain, miniupnpd_nft_forward_chain) != 0) {
+		goto rule_skip;
+	}
+
 	r->table = strdup(
 		(char *)nft_rule_attr_get_data(t, NFT_RULE_ATTR_TABLE, &len));
-	r->chain = strdup(
-		(char *)nft_rule_attr_get_data(t, NFT_RULE_ATTR_CHAIN, &len));
+	r->chain = strdup(chain);
 	r->family = *(uint32_t*)nft_rule_attr_get_data(t, NFT_RULE_ATTR_FAMILY,
 						       &len);
 	r->desc = (char *)nft_rule_attr_get_data(t, NFT_RULE_ATTR_USERDATA,
@@ -521,9 +528,15 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	while ((expr = nft_rule_expr_iter_next(itr)) != NULL) {
 		rule_expr_cb(expr, r);
 	}
-	LIST_INSERT_HEAD(&head, r, entry);
-	rule_list_length++;
 
+	if (r->type == RULE_NONE) {
+		free(r);
+	} else {
+		LIST_INSERT_HEAD(&head, r, entry);
+		rule_list_length++;
+	}
+
+rule_skip:
 err_free:
 	nft_rule_free(t);
 err:
@@ -594,9 +607,15 @@ reflesh_nft_cache(uint32_t family)
 	if (p1 != NULL) {
 		while(p1 != NULL) {
 			p2 = (rule_t *)LIST_NEXT(p1, entry);
-			free(p1->desc);
-			free(p1->table);
-			free(p1->chain);
+			if (p1->desc != NULL) {
+				free(p1->desc);
+			}
+			if (p1->table != NULL) {
+				free(p1->table);
+			}
+			if (p1->chain != NULL) {
+				free(p1->chain);
+			}
 			free(p1);
 			p1 = p2;
 		}
