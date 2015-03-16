@@ -155,6 +155,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		    (p->type == RULE_NAT || p->type == RULE_SNAT)) {
 			iaddr = p->iaddr;
 			iport = p->iport;
+
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
 			nft_send_request(r, NFT_MSG_DELRULE);
@@ -171,6 +172,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
 			nft_send_request(r, NFT_MSG_DELRULE);
+			break;
 		}
 	}
 
