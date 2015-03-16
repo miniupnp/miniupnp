@@ -233,15 +233,18 @@ set_reg (rule_t *r, uint32_t dreg, enum rule_reg_type type, uint32_t val)
 static inline void
 parse_rule_immediate(struct nft_rule_expr *e, rule_t *r)
 {
-	uint32_t dreg, reg_val;
+	uint32_t dreg, reg_val, reg_len;
 
 	dreg = nft_rule_expr_get_u32(e, NFT_EXPR_IMM_DREG);
 
 	if (dreg == NFT_REG_VERDICT) {
 		reg_val = nft_rule_expr_get_u32(e, NFT_EXPR_IMM_VERDICT);
 	} else {
-		reg_val = nft_rule_expr_get_u32(e, NFT_EXPR_IMM_DATA);
+		reg_val = *(uint32_t *)nft_rule_expr_get(e,
+							 NFT_EXPR_IMM_DATA,
+							 &reg_len);
 	}
+
 	set_reg(r, dreg, RULE_REG_IMM_VAL, reg_val);
 	return;
 }
@@ -283,29 +286,30 @@ parse_rule_meta(struct nft_rule_expr *e, rule_t *r)
 static inline void
 parse_rule_nat(struct nft_rule_expr *e, rule_t *r)
 {
-	uint32_t addr_min_reg, addr_max_reg;
-	uint16_t proto_min_reg, proto_max_reg;
+	uint32_t addr_min_reg, addr_max_reg, proto_min_reg, proto_max_reg;
+	uint16_t proto_min_val;
 	r->type = RULE_NAT;
 
 	r->nat_type = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_TYPE);
 	r->family = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_FAMILY);
 	addr_min_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_ADDR_MIN);
 	addr_max_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_ADDR_MAX);
-	proto_min_reg = nft_rule_expr_get_u16(e, NFT_EXPR_NAT_REG_PROTO_MIN);
-	proto_max_reg = nft_rule_expr_get_u16(e, NFT_EXPR_NAT_REG_PROTO_MAX);
+	proto_min_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_PROTO_MIN);
+	proto_max_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_PROTO_MAX);
 
 	if (addr_min_reg != addr_max_reg ||
 	    proto_min_reg != proto_max_reg) {
 		syslog(LOG_ERR, "Unsupport proto/addr range for NAT");
 	}
 
+	proto_min_val = htons((uint16_t)*get_reg_val_ptr(r, proto_min_reg));
 	if (r->nat_type == NFT_NAT_DNAT) {
 		r->iaddr = (in_addr_t)*get_reg_val_ptr(r, addr_min_reg);
-		r->iport = ntohl(*get_reg_val_ptr(r, proto_min_reg));
+		r->iport = proto_min_val;
 	} else if (r->nat_type == NFT_NAT_SNAT) {
 		r->eaddr = (in_addr_t)*get_reg_val_ptr(r, addr_min_reg);
 		if (proto_min_reg == NFT_REG_1) { 
-			r->eport = ntohl(*get_reg_val_ptr(r, proto_min_reg));
+			r->eport = proto_min_val;
 		}
 	}
 
