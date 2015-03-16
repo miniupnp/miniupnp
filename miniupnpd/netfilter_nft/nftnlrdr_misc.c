@@ -1034,7 +1034,7 @@ rule_del_handle(rule_t *rule)
 	nft_rule_attr_set(r, NFT_RULE_ATTR_TABLE, rule->table);
 	nft_rule_attr_set(r, NFT_RULE_ATTR_CHAIN, rule->chain);
 	nft_rule_attr_set_u32(r, NFT_RULE_ATTR_FAMILY, rule->family);
-	nft_rule_attr_set_u64(r, NFT_RULE_ATTR_POSITION, rule->handle);
+	nft_rule_attr_set_u64(r, NFT_RULE_ATTR_HANDLE, rule->handle);
 
 	return r;
 }
