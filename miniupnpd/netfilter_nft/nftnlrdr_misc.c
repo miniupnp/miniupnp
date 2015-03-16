@@ -283,15 +283,16 @@ parse_rule_meta(struct nft_rule_expr *e, rule_t *r)
 static inline void
 parse_rule_nat(struct nft_rule_expr *e, rule_t *r)
 {
-	uint32_t addr_min_reg, addr_max_reg, proto_min_reg, proto_max_reg;
+	uint32_t addr_min_reg, addr_max_reg;
+	uint16_t proto_min_reg, proto_max_reg;
 	r->type = RULE_NAT;
 
 	r->nat_type = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_TYPE);
 	r->family = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_FAMILY);
 	addr_min_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_ADDR_MIN);
 	addr_max_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_ADDR_MAX);
-	proto_min_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_PROTO_MIN);
-	proto_max_reg = nft_rule_expr_get_u32(e, NFT_EXPR_NAT_REG_PROTO_MAX);
+	proto_min_reg = nft_rule_expr_get_u16(e, NFT_EXPR_NAT_REG_PROTO_MIN);
+	proto_max_reg = nft_rule_expr_get_u16(e, NFT_EXPR_NAT_REG_PROTO_MAX);
 
 	if (addr_min_reg != addr_max_reg ||
 	    proto_min_reg != proto_max_reg) {
@@ -730,7 +731,7 @@ expr_add_meta(struct nft_rule *r, uint32_t meta_key, uint32_t dreg)
 }
 
 static void
-expr_set_reg_val(struct nft_rule *r, enum nft_registers dreg, uint32_t val) 
+expr_set_reg_val_u32(struct nft_rule *r, enum nft_registers dreg, uint32_t val)
 {
 	struct nft_rule_expr *e;
 	e = nft_rule_expr_alloc("immediate");
@@ -740,6 +741,20 @@ expr_set_reg_val(struct nft_rule *r, enum nft_registers dreg, uint32_t val)
 	}
 	nft_rule_expr_set_u32(e, NFT_EXPR_IMM_DREG, dreg);
 	nft_rule_expr_set_u32(e, NFT_EXPR_IMM_DATA, val);
+	nft_rule_add_expr(r, e);
+}
+
+static void
+expr_set_reg_val_u16(struct nft_rule *r, enum nft_registers dreg, uint32_t val)
+{
+	struct nft_rule_expr *e;
+	e = nft_rule_expr_alloc("immediate");
+	if (e == NULL) {
+		perror("expr dreg oom");
+		exit(EXIT_FAILURE);
+	}
+	nft_rule_expr_set_u32(e, NFT_EXPR_IMM_DREG, dreg);
+	nft_rule_expr_set_u16(e, NFT_EXPR_IMM_DATA, val);
 	nft_rule_add_expr(r, e);
 }
 
@@ -773,10 +788,10 @@ expr_add_nat(struct nft_rule *r, uint32_t t, uint32_t family,
 	nft_rule_expr_set_u32(e, NFT_EXPR_NAT_TYPE, t);
 	nft_rule_expr_set_u32(e, NFT_EXPR_NAT_FAMILY, family);
 
-	expr_set_reg_val(r, NFT_REG_1, (uint32_t)addr_min);
+	expr_set_reg_val_u32(r, NFT_REG_1, (uint32_t)addr_min);
 	nft_rule_expr_set_u32(e, NFT_EXPR_NAT_REG_ADDR_MIN, NFT_REG_1);
 	nft_rule_expr_set_u32(e, NFT_EXPR_NAT_REG_ADDR_MAX, NFT_REG_1);
-	expr_set_reg_val(r, NFT_REG_2, proto_min);
+	expr_set_reg_val_u16(r, NFT_REG_2, proto_min);
 	nft_rule_expr_set_u16(e, NFT_EXPR_NAT_REG_PROTO_MIN, NFT_REG_2);
 	nft_rule_expr_set_u16(e, NFT_EXPR_NAT_REG_PROTO_MAX, NFT_REG_2);
 
