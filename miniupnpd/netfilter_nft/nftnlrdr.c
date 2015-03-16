@@ -199,7 +199,7 @@ get_peer_rule_by_index(int index,
 		if (index == i) {
 			r = peer_cache[i];
 			if (ifname != NULL) {
-				if_indextoname(r->ifidx, ifname);
+				if_indextoname(r->ingress_ifidx, ifname);
 			}
 			if (eport != NULL) {
 				*eport = r->eport;
@@ -281,7 +281,7 @@ get_redirect_rule_by_index(int index,
 		if (index == i) {
 			r = redirect_cache[i];
 			if (ifname != NULL) {
-				if_indextoname(r->ifidx, ifname);
+				if_indextoname(r->ingress_ifidx, ifname);
 			}
 			if (eport != NULL) {
 				*eport = r->eport;
