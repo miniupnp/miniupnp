@@ -115,7 +115,7 @@ print_rule(rule_t *r)
 			       "%s:%d (%s)\n",
 			       r->handle,
 			       r->table, r->chain, 
-			       if_indextoname(r->ifidx, ifname_buf),
+			       if_indextoname(r->ingress_ifidx, ifname_buf),
 			       get_family_string(r->family),
 			       get_proto_string(r->proto), r->eport, 
 			       iaddr_str, r->iport,
@@ -127,7 +127,7 @@ print_rule(rule_t *r)
 			       "proto:%d, iaddr: %s, "
 			       "iport:%d, rhost:%s rport:%d (%s)\n",
 			       r->handle, r->table, r->chain,
-			       r->nat_type, r->family, r->ifidx,
+			       r->nat_type, r->family, r->ingress_ifidx,
 			       eaddr_str, r->eport,
 			       r->proto, iaddr_str, r->iport, 
 			       rhost_str, r->rport,
@@ -138,7 +138,7 @@ print_rule(rule_t *r)
 			       "eaddr: %s, eport:%d, "
 			       "proto:%d, iaddr: %s, iport:%d, rhost:%s (%s)\n",
 			       r->handle, r->table, r->chain,
-			       r->nat_type, r->family, r->ifidx,
+			       r->nat_type, r->family, r->ingress_ifidx,
 			       eaddr_str, r->eport,
 			       r->proto, iaddr_str, r->iport, rhost_str,
 			       r->desc);
@@ -268,6 +268,12 @@ parse_rule_meta(struct nft_rule_expr *e, rule_t *r)
 		reg_type = RULE_REG_IIF;
 		set_reg(r, dreg, reg_type, 0);
 		return ;
+		
+	case NFT_META_OIF:
+		reg_type = RULE_REG_IIF;
+		set_reg(r, dreg, reg_type, 0);
+		return ;
+		
 	}
 	syslog(LOG_DEBUG, "parse_rule_meta :Not support key %d\n", key);
 
@@ -377,7 +383,7 @@ parse_rule_cmp(struct nft_rule_expr *e, rule_t *r) {
 	switch (r->reg1_type) {
 	case RULE_REG_IIF:
 		if (data_len == sizeof(uint32_t) && op == NFT_CMP_EQ) {
-			r->ifidx = *(uint32_t *)data_val;
+			r->ingress_ifidx = *(uint32_t *)data_val;
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}

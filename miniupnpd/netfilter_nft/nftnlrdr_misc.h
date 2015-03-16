@@ -14,6 +14,7 @@
 enum rule_reg_type { 
 	RULE_REG_NONE,
 	RULE_REG_IIF,
+	RULE_REG_OIF,
 	RULE_REG_IP_SRC_ADDR,
 	RULE_REG_IP_DEST_ADDR,
 	RULE_REG_IP_SD_ADDR, /* source & dest */
@@ -41,7 +42,8 @@ typedef struct rule_ {
 	uint32_t nat_type;
 	uint32_t filter_action;
 	uint32_t family;
-	uint32_t ifidx;
+	uint32_t ingress_ifidx;
+	uint32_t egress_ifidx;
 	in_addr_t eaddr;
 	in_addr_t iaddr;
 	in_addr_t rhost;
