@@ -31,21 +31,17 @@ nft_mangle_miniupnpd_exists=$?
 
 if [ $nft_nat_miniupnpd_exists -eq "1" ]; then
 	echo "create chain in nat"
-	nft "add chain nat miniupnpd { \
-		type nat hook prerouting priority -200 ; }"
+	nft "add chain nat miniupnpd"
 fi
 if [ $nft_nat_miniupnpd_pcp_peer_exists -eq "1" ]; then
 	echo "create pcp peer chain in nat"
-	nft "add chain nat miniupnpd-pcp-peer { \
-		type nat hook postrouting priority -300 ; }"
+	nft "add chain nat miniupnpd-pcp-peer"
 fi
 if [ $nft_filter_miniupnpd_exists -eq "1" ]; then
 	echo "create chain in filter "
-	nft "add chain filter miniupnpd { \
-		type filter hook forward priority -200 ; }"
+	nft "add chain filter miniupnpd"
 fi
 if [ $nft_mangle_miniupnpd_exists -eq "1" ]; then
 	echo "create chain in mangle"
-	nft "add chain mangle miniupnpd { \
-		type route hook prerouting priority -100 ; }"
+	nft "add chain mangle miniupnpd"
 fi
