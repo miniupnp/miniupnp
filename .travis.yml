@@ -2,7 +2,7 @@ language: c
 compiler:
   - gcc
 before_script:
-  - apt-get install -y git wget bison flex libgmp-dev libreadline-dev libnfnetlink-dev libmnl-dev libssl-dev
+  - sudo apt-get install -y git wget bison flex libgmp-dev libreadline-dev libnfnetlink-dev libmnl-dev libssl-dev
   - (wget -O - ftp://ftp.netfilter.org/pub/libnftnl/libnftnl-1.0.3.tar.bz2 | tar xvfpj - ; cd libnftnl-1.0.3; ./configure; make ; make install)
   - (wget -O - ftp://ftp.netfilter.org/pub/nftables/nftables-0.4.tar.bz2 | tar xvfpj - ; cd nftables-0.4; ./configure; make; make install)
   - (wget -O - ftp://ftp.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.1.tar.bz2 | tar xvfpj -; cd libnfnetlink-1.0.1; ./configure; make ; make install)
