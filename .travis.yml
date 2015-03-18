@@ -7,4 +7,4 @@ before_script:
   - (wget -O - ftp://ftp.netfilter.org/pub/nftables/nftables-0.4.tar.bz2 | tar xvfpj - ; cd nftables-0.4; ./configure; make; make install)
   - (wget -O - ftp://ftp.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.1.tar.bz2 | tar xvfpj -; cd libnfnetlink-1.0.1; ./configure; make ; make install)
 script:
-  - make -f Makefile.linux_nft config.h all
+  - cd miniupnpd && make -f Makefile.linux_nft config.h all
