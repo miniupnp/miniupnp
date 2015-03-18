@@ -16,7 +16,7 @@
 # (default INSTALLPREFIX is /usr)
 #
 #
-CFLAGS = -O -g -DDEBUG
+CFLAGS = -O -g #-DDEBUG
 CFLAGS ?= -Os
 CFLAGS += -fno-strict-aliasing
 CFLAGS += -fno-common
@@ -53,10 +53,11 @@ PCFILE_FOUND := $(shell $(PKG_CONFIG) --exists libnftnl; echo $$?)
 
 ifeq (${PCFILE_FOUND},0)
 
-CFLAGS  += $(shell $(PKG_CONFIG) --cflags libnftnl)
-LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l libnftnl)
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libnftnl)
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other libnftnl)
+PKG_CONFIG_LIBS = libnftnl libmnl
+CFLAGS  += $(shell $(PKG_CONFIG) --cflags $(PKG_CONFIG_LIBS))
+LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l $(PKG_CONFIG_LIBS))
+LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L $(PKG_CONFIG_LIBS))
+LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other $(PKG_CONFIG_LIBS))
 else
 
 ARCH ?= $(shell uname -m | grep -q "x86_64" && echo 64)
