@@ -86,8 +86,7 @@ endif (NOT WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "AmigaOS")
 
 if (WIN32)
   set_source_files_properties (${MINIUPNPC_SOURCES} PROPERTIES
-                                                    COMPILE_DEFINITIONS MINIUPNP_STATICLIB
-                                                    COMPILE_DEFINITIONS MINIUPNP_EXPORTS
+                                                    COMPILE_DEFINITIONS "MINIUPNP_STATICLIB;MINIUPNP_EXPORTS"
   )
 endif (WIN32)
 
