@@ -577,7 +577,9 @@ int main(int argc, char ** argv)
 		}
 	}
 
-	if(!command || (command == 'a' && commandargc<4)
+	if(!command 
+           || (command == 'a' && commandargc<4)
+	   || (command == 'b' && commandargc<3)
 	   || (command == 'd' && argc<2)
 	   || (command == 'r' && argc<2)
 	   || (command == 'A' && commandargc<6)
@@ -585,6 +587,7 @@ int main(int argc, char ** argv)
 	   || (command == 'D' && commandargc<1))
 	{
 		fprintf(stderr, "Usage :\t%s [options] -a ip port external_port protocol [duration]\n\t\tAdd port redirection\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -b port external_port protocol [duration]\n\t\tAdd port redirection to this system\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -d external_port protocol <remote host>\n\t\tDelete port redirection\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -s\n\t\tGet Connection status\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -l\n\t\tList redirections\n", argv[0]);
@@ -675,6 +678,13 @@ int main(int argc, char ** argv)
 						   commandargv[0], commandargv[1],
 						   commandargv[2], commandargv[3],
 						   (commandargc > 4)?commandargv[4]:"0",
+						   description, 0);
+				break;
+			case 'b':
+				SetRedirectAndTest(&urls, &data,
+						   lanaddr, commandargv[0],
+						   commandargv[1], commandargv[2],
+						   (commandargc > 3)?commandargv[3]:"0",
 						   description, 0);
 				break;
 			case 'd':
