@@ -41,6 +41,18 @@ const char * protofix(const char * proto)
 	return 0;
 }
 
+/* is_int() checks if parameter is an integer or not
+ * 1 for integer
+ * 0 for not an integer */
+int is_int(char const* s) {
+	int i,n;
+	if(s){
+		return sscanf(s, "%d %n", &i, &n) == 1 && !s[n];
+	}else{
+		return(0);	/* null as input, so not an integer ... */
+	}
+}
+
 static void DisplayInfos(struct UPNPUrls * urls,
                          struct IGDdatas * data)
 {
@@ -577,7 +589,8 @@ int main(int argc, char ** argv)
 		}
 	}
 
-	if(!command || (command == 'a' && commandargc<4)
+	if(!command 
+	   || (command == 'a' && commandargc<4)
 	   || (command == 'd' && argc<2)
 	   || (command == 'r' && argc<2)
 	   || (command == 'A' && commandargc<6)
@@ -591,7 +604,7 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "       \t%s [options] -L\n\t\tList redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -n ip port external_port protocol [duration]\n\t\tAdd (any) port redirection allowing IGD to use alternative external_port (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -N external_port_start external_port_end protocol [manage]\n\t\tDelete range of port redirections (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -r port1 protocol1 [port2 protocol2] [...]\n\t\tAdd all redirections to the current host\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n\t\tAdd all redirections to the current host\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n\t\tAdd Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -U uniqueID new_lease_time\n\t\tUpdate Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -C uniqueID\n\t\tCheck if Pinhole is Working (for IGD:2 only)\n", argv[0]);
@@ -699,13 +712,24 @@ int main(int argc, char ** argv)
 				GetConnectionStatus(&urls, &data);
 				break;
 			case 'r':
-				for(i=0; i<commandargc; i+=2)
-				{
-					/*printf("port %s protocol %s\n", argv[i], argv[i+1]);*/
-					SetRedirectAndTest(&urls, &data,
-							   lanaddr, commandargv[i],
-							   commandargv[i], commandargv[i+1], "0",
-							   description, 0);
+				i=0;
+				while(i<commandargc){
+					if(!is_int(commandargv[i+1])){
+						/* 2nd parameter not an integer, so format is '<port> <protocol>' */
+						/* Note: no 2nd parameter is also not-an-integer, and will lead to a "Wrong arguments" */
+						SetRedirectAndTest(&urls, &data,
+								   lanaddr, commandargv[i],
+								   commandargv[i], commandargv[i+1], "0",
+								   description, 0);
+						i+=2;	/* 2 parameters parsed */
+					} else {
+						/* 2nd parameter is an integer, so format is '<port> <external_port> <protocol>' */
+						SetRedirectAndTest(&urls, &data,
+								   lanaddr, commandargv[i],
+								   commandargv[i+1], commandargv[i+2], "0",
+								   description, 0);
+						i+=3;	/* 3 parameters parsed */
+					}
 				}
 				break;
 			case 'A':
