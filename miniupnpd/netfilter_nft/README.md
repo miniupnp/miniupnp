@@ -8,11 +8,13 @@ nftables support is 'alpha' version, not "so much" stable.
 
 ##How to build miniupnpd with nftables:
 Run 'make' command with 'Makefile.linux_nft',
-   i.e. > make -f Makefile.linux_nft
+
+`make -f Makefile.linux_nft`
 
 ##How to Run 
-- Please run 'netfilter_nft/scripts/nft_init.sh' to add miniupnpd chain.
-   i.e. > sudo ./netfilter_nft/scripts/nft_init.sh
+Please run 'netfilter_nft/scripts/nft_init.sh' to add miniupnpd chain.
+
+`sudo ./netfilter_nft/scripts/nft_init.sh`
 
 ##FAQ
 I will add this section when I get question.
