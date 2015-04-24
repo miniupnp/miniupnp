@@ -16,6 +16,7 @@
 /* for IPPROTO_TCP / IPPROTO_UDP */
 #include <netinet/in.h>
 #endif
+#include <ctype.h>
 #include "miniwget.h"
 #include "miniupnpc.h"
 #include "upnpcommands.h"
@@ -44,13 +45,17 @@ const char * protofix(const char * proto)
 /* is_int() checks if parameter is an integer or not
  * 1 for integer
  * 0 for not an integer */
-int is_int(char const* s) {
-	int i,n;
-	if(s){
-		return sscanf(s, "%d %n", &i, &n) == 1 && !s[n];
-	}else{
-		return(0);	/* null as input, so not an integer ... */
+int is_int(char const* s)
+{
+	if(s == NULL)
+		return 0;
+	while(*s) {
+		/* #define isdigit(c) ((c) >= '0' && (c) <= '9') */
+		if(!isdigit(*s))
+			return 0;
+		s++;
 	}
+	return 1;
 }
 
 static void DisplayInfos(struct UPNPUrls * urls,
@@ -589,7 +594,7 @@ int main(int argc, char ** argv)
 		}
 	}
 
-	if(!command 
+	if(!command
 	   || (command == 'a' && commandargc<4)
 	   || (command == 'd' && argc<2)
 	   || (command == 'r' && argc<2)
@@ -712,23 +717,28 @@ int main(int argc, char ** argv)
 				GetConnectionStatus(&urls, &data);
 				break;
 			case 'r':
-				i=0;
-				while(i<commandargc){
-					if(!is_int(commandargv[i+1])){
-						/* 2nd parameter not an integer, so format is '<port> <protocol>' */
-						/* Note: no 2nd parameter is also not-an-integer, and will lead to a "Wrong arguments" */
-						SetRedirectAndTest(&urls, &data,
-								   lanaddr, commandargv[i],
-								   commandargv[i], commandargv[i+1], "0",
-								   description, 0);
-						i+=2;	/* 2 parameters parsed */
-					} else {
-						/* 2nd parameter is an integer, so format is '<port> <external_port> <protocol>' */
+				i = 0;
+				while(i<commandargc)
+				{
+					if(!is_int(commandargv[i])) {
+						/* 1st parameter not an integer : error */
+						fprintf(stderr, "command -r : %s is not an port number\n", commandargv[i]);
+						retcode = 1;
+						break;
+					} else if(is_int(commandargv[i+1])){
+						/* 2nd parameter is an integer : <port> <external_port> <protocol> */
 						SetRedirectAndTest(&urls, &data,
 								   lanaddr, commandargv[i],
 								   commandargv[i+1], commandargv[i+2], "0",
 								   description, 0);
 						i+=3;	/* 3 parameters parsed */
+					} else {
+						/* 2nd parameter not an integer : <port> <protocol> */
+						SetRedirectAndTest(&urls, &data,
+								   lanaddr, commandargv[i],
+								   commandargv[i], commandargv[i+1], "0",
+								   description, 0);
+						i+=2;	/* 2 parameters parsed */
 					}
 				}
 				break;
