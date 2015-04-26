@@ -63,7 +63,7 @@ else
 ARCH ?= $(shell uname -m | grep -q "x86_64" && echo 64)
 endif # ifdef PCFILE_FOUND
 
-LDLIBS += -lnfnetlink
+#LDLIBS += -lnfnetlink
 
 TEST := $(shell $(PKG_CONFIG) --atleast-version=1.0.2 libnetfilter_conntrack && $(PKG_CONFIG) --atleast-version=1.0.3 libmnl && echo 1)
 ifeq ($(TEST),1)
