@@ -1,6 +1,6 @@
 # $Id: Makefile.linux,v 1.86 2014/04/09 07:22:28 nanard Exp $
 # MiniUPnP project
-# (c) 2006-2014 Thomas Bernard
+# (c) 2006-2015 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author : Thomas Bernard
 # for use with GNU Make
@@ -138,7 +138,7 @@ endif # ($(TEST), 1)
 endif # ifdef IPTABLESPATH
 endif # ifdef PCFILE_FOUND
 
-LDLIBS += -lnfnetlink
+#LDLIBS += -lnfnetlink
 
 TEST := $(shell $(PKG_CONFIG) --atleast-version=1.0.2 libnetfilter_conntrack && $(PKG_CONFIG) --atleast-version=1.0.3 libmnl && echo 1)
 ifeq ($(TEST),1)
