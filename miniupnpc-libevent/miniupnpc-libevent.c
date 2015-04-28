@@ -614,6 +614,7 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	body_len = snprintf(NULL, 0, fmt_soap, method, service, args_xml?args_xml:"", method);
 	body = malloc(body_len + 1);
 	if(body == NULL) {
+		free(args_xml);
 		return -1;
 	}
 	if(snprintf(body, body_len + 1, fmt_soap, method, service, args_xml?args_xml:"", method) != body_len) {
@@ -622,6 +623,7 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	free(args_xml);
 	args_xml = NULL;
 	if(!parseURL(url, hostname, &port, &path, &scope_id)) {
+		free(body);
 		return -1;
 	}
 	if(port != 80)

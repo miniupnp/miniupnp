@@ -703,6 +703,7 @@ static int upnpc_build_soap_request(upnpc_t * p, const char * url,
 	body = malloc(body_len + 1);
 	if(body == NULL) {
 		p->state = EError;
+		free(args_xml);
 		return -1;
 	}
 	if(snprintf(body, body_len + 1, fmt_soap, action, service, args_xml?args_xml:"", action) != body_len) {
@@ -712,6 +713,7 @@ static int upnpc_build_soap_request(upnpc_t * p, const char * url,
 	args_xml = NULL;
 	if(!parseURL(url, hostname, &port, &path, &scope_id)) {
 		p->state = EError;
+		free(body);
 		return -1;
 	}
 	if(port != 80)
