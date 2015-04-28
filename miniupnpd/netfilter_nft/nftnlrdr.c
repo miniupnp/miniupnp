@@ -39,6 +39,12 @@
 
 #include "nftnlrdr_misc.h"
 
+#ifdef DEBUG
+#define d_printf(x) {printf x;}
+#else
+#define d_printf(x)
+#endif
+
 /* dummy init and shutdown functions */
 int init_redirect(void)
 {
@@ -59,8 +65,8 @@ add_redirect_rule2(const char * ifname,
 {
 	struct nft_rule *r;
 	UNUSED(timestamp);
-        printf("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
-	       ifname, rhost, eport, iaddr, iport, proto, desc);
+        d_printf("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
+	         ifname, rhost, eport, iaddr, iport, proto, desc);
 	r = rule_set_dnat(NFPROTO_IPV4, ifname, proto,
 			  0, eport, 
 			  inet_addr(iaddr), iport,  desc, NULL);
@@ -83,7 +89,7 @@ add_peer_redirect_rule2(const char * ifname,
 	struct nft_rule *r;
 	UNUSED(ifname); UNUSED(timestamp);
 
-        printf("add peer redirect rule2()!\n");
+        d_printf("add peer redirect rule2()!\n");
 	r = rule_set_snat(NFPROTO_IPV4, proto, 
 			  inet_addr(rhost), rport, 
 			  inet_addr(eaddr), eport, 
@@ -107,8 +113,8 @@ add_filter_rule2(const char * ifname,
 	struct nft_rule *r = NULL;
 	in_addr_t rhost_addr = 0;
 
-	printf("add_filter_rule2(%s, %s, %s, %d, %d, %d, %s)\n",
-	       ifname, rhost, iaddr, eport, iport, proto, desc);
+	d_printf("add_filter_rule2(%s, %s, %s, %d, %d, %d, %s)\n",
+	         ifname, rhost, iaddr, eport, iport, proto, desc);
 	if (rhost != NULL && strcmp(rhost, "") != 0) {
             rhost_addr = inet_addr(rhost);
         }
@@ -148,7 +154,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
         uint16_t iport = 0;
         extern void print_rule(rule_t *r) ;
 
-	printf("delete_redirect_and_filter_rules(%d %d)\n", eport, proto);
+	d_printf("delete_redirect_and_filter_rules(%d %d)\n", eport, proto);
 	reflesh_nft_cache(NFPROTO_IPV4);
 	LIST_FOREACH(p, &head, entry) {
 		if (p->eport == eport && p->proto == proto && 
@@ -199,7 +205,7 @@ get_peer_rule_by_index(int index,
 	rule_t *r;
 	UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
 
-        printf("get_peer_rule_by_index()\n");
+        d_printf("get_peer_rule_by_index()\n");
 	reflesh_nft_cache(NFPROTO_IPV4);
 	if (peer_cache == NULL) {
 		return -1;
@@ -285,7 +291,7 @@ get_redirect_rule_by_index(int index,
 	rule_t *r;
 	UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
 
-        printf("get_redirect_rule_by_index()\n");
+        d_printf("get_redirect_rule_by_index()\n");
 	reflesh_nft_cache(NFPROTO_IPV4);
 	if (redirect_cache == NULL) {
 		return -1;
@@ -352,7 +358,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 	UNUSED(packets);
 	UNUSED(bytes);
 
-        printf("get_nat_redirect_rule()\n");
+        d_printf("get_nat_redirect_rule()\n");
 	reflesh_nft_cache(NFPROTO_IPV4);
 
 	LIST_FOREACH(p, &head, entry) {
@@ -388,7 +394,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	unsigned short *array;
 	unsigned short *tmp;
 
-        printf("get_portmappings_in_range()\n");
+        d_printf("get_portmappings_in_range()\n");
 	*number = 0;
 	capacity = 128;
 	array = calloc(capacity, sizeof(unsigned short));

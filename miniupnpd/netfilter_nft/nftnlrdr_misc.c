@@ -36,6 +36,12 @@
 #include "../macros.h"
 #include "../upnpglobalvars.h"
 
+#ifdef DEBUG
+#define d_printf(x) {printf x;}
+#else
+#define d_printf(x)
+#endif
+
 #define RULE_CACHE_INVALID  0
 #define RULE_CACHE_VALID    1
 
@@ -466,7 +472,7 @@ rule_expr_cb(struct nft_rule_expr *e, void *data)
 	} else if (strncmp("immediate", attr_name, sizeof("immediate")) == 0) {
 		parse_rule_immediate(e, r);
 	} else {
-		printf("unknown attr: %s\n", attr_name);
+		syslog(LOG_ERR, "unknown attr: %s\n", attr_name);
 	} 
 	return MNL_CB_OK;
 }
