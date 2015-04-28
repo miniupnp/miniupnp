@@ -201,6 +201,10 @@ get_peer_rule_by_index(int index,
 
         printf("get_peer_rule_by_index()\n");
 	reflesh_nft_cache(NFPROTO_IPV4);
+	if (peer_cache == NULL) {
+		return -1;
+	}
+
 	for (i = 0; peer_cache[i] != NULL; i++) {
 		if (index == i) {
 			r = peer_cache[i];
@@ -283,6 +287,10 @@ get_redirect_rule_by_index(int index,
 
         printf("get_redirect_rule_by_index()\n");
 	reflesh_nft_cache(NFPROTO_IPV4);
+	if (redirect_cache == NULL) {
+		return -1;
+	}
+
 	for (i = 0; redirect_cache[i] != NULL; i++) {
 		if (index == i) {
 			r = redirect_cache[i];
