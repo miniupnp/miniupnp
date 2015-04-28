@@ -177,7 +177,7 @@ print_rule(rule_t *r)
 		       iaddr_str, r->eport, r->packets, r->bytes);
 		break;
 	default:
-		printf("XXX: unknown type: %d\n", r->type);
+		printf("nftables: unknown type: %d\n", r->type);
 	}
 }
 
