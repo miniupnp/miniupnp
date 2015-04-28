@@ -37,7 +37,7 @@
 #include "../upnpglobalvars.h"
 
 #ifdef DEBUG
-#define d_printf(x) {printf x;}
+#define d_printf(x) do { printf x; } while (0)
 #else
 #define d_printf(x)
 #endif
