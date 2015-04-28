@@ -64,6 +64,7 @@ add_redirect_rule2(const char * ifname,
 		   const char * desc, unsigned int timestamp)
 {
 	struct nft_rule *r;
+	UNUSED(rhost);
 	UNUSED(timestamp);
         d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
 	          ifname, rhost, eport, iaddr, iport, proto, desc));
