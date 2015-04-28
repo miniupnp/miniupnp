@@ -1169,6 +1169,8 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 
 	for(j=0; j<n_sockets; j++)
 	{
+		if(sockets[j] < 0)
+			continue;
 #ifdef ENABLE_IPV6
 		ipv6 = j & 1;
 		if(ipv6) {
