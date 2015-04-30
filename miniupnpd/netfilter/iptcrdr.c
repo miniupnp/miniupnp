@@ -1434,9 +1434,9 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 							break;
 						}
 						array = tmp;
-						array[*number] = eport;
-						(*number)++;
 					}
+					array[*number] = eport;
+					(*number)++;
 				}
 			}
 		}

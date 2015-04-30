@@ -16,6 +16,7 @@
 /* for IPPROTO_TCP / IPPROTO_UDP */
 #include <netinet/in.h>
 #endif
+#include <ctype.h>
 #include "miniwget.h"
 #include "miniupnpc.h"
 #include "upnpcommands.h"
@@ -39,6 +40,22 @@ const char * protofix(const char * proto)
 	if(b)
 		return proto_udp;
 	return 0;
+}
+
+/* is_int() checks if parameter is an integer or not
+ * 1 for integer
+ * 0 for not an integer */
+int is_int(char const* s)
+{
+	if(s == NULL)
+		return 0;
+	while(*s) {
+		/* #define isdigit(c) ((c) >= '0' && (c) <= '9') */
+		if(!isdigit(*s))
+			return 0;
+		s++;
+	}
+	return 1;
 }
 
 static void DisplayInfos(struct UPNPUrls * urls,
@@ -577,7 +594,8 @@ int main(int argc, char ** argv)
 		}
 	}
 
-	if(!command || (command == 'a' && commandargc<4)
+	if(!command
+	   || (command == 'a' && commandargc<4)
 	   || (command == 'd' && argc<2)
 	   || (command == 'r' && argc<2)
 	   || (command == 'A' && commandargc<6)
@@ -591,7 +609,7 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "       \t%s [options] -L\n\t\tList redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -n ip port external_port protocol [duration]\n\t\tAdd (any) port redirection allowing IGD to use alternative external_port (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -N external_port_start external_port_end protocol [manage]\n\t\tDelete range of port redirections (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -r port1 protocol1 [port2 protocol2] [...]\n\t\tAdd all redirections to the current host\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n\t\tAdd all redirections to the current host\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n\t\tAdd Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -U uniqueID new_lease_time\n\t\tUpdate Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -C uniqueID\n\t\tCheck if Pinhole is Working (for IGD:2 only)\n", argv[0]);
@@ -699,13 +717,29 @@ int main(int argc, char ** argv)
 				GetConnectionStatus(&urls, &data);
 				break;
 			case 'r':
-				for(i=0; i<commandargc; i+=2)
+				i = 0;
+				while(i<commandargc)
 				{
-					/*printf("port %s protocol %s\n", argv[i], argv[i+1]);*/
-					SetRedirectAndTest(&urls, &data,
-							   lanaddr, commandargv[i],
-							   commandargv[i], commandargv[i+1], "0",
-							   description, 0);
+					if(!is_int(commandargv[i])) {
+						/* 1st parameter not an integer : error */
+						fprintf(stderr, "command -r : %s is not an port number\n", commandargv[i]);
+						retcode = 1;
+						break;
+					} else if(is_int(commandargv[i+1])){
+						/* 2nd parameter is an integer : <port> <external_port> <protocol> */
+						SetRedirectAndTest(&urls, &data,
+								   lanaddr, commandargv[i],
+								   commandargv[i+1], commandargv[i+2], "0",
+								   description, 0);
+						i+=3;	/* 3 parameters parsed */
+					} else {
+						/* 2nd parameter not an integer : <port> <protocol> */
+						SetRedirectAndTest(&urls, &data,
+								   lanaddr, commandargv[i],
+								   commandargv[i], commandargv[i+1], "0",
+								   description, 0);
+						i+=2;	/* 2 parameters parsed */
+					}
 				}
 				break;
 			case 'A':

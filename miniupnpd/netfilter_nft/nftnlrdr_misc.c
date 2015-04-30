@@ -36,6 +36,12 @@
 #include "../macros.h"
 #include "../upnpglobalvars.h"
 
+#ifdef DEBUG
+#define d_printf(x) do { printf x; } while (0)
+#else
+#define d_printf(x)
+#endif
+
 #define RULE_CACHE_INVALID  0
 #define RULE_CACHE_VALID    1
 
@@ -177,7 +183,7 @@ print_rule(rule_t *r)
 		       iaddr_str, r->eport, r->packets, r->bytes);
 		break;
 	default:
-		printf("XXX: unknown type: %d\n", r->type);
+		printf("nftables: unknown type: %d\n", r->type);
 	}
 }
 
@@ -466,7 +472,7 @@ rule_expr_cb(struct nft_rule_expr *e, void *data)
 	} else if (strncmp("immediate", attr_name, sizeof("immediate")) == 0) {
 		parse_rule_immediate(e, r);
 	} else {
-		printf("unknown attr: %s\n", attr_name);
+		syslog(LOG_ERR, "unknown attr: %s\n", attr_name);
 	} 
 	return MNL_CB_OK;
 }
@@ -550,8 +556,15 @@ reflesh_nft_redirect_cache(void)
 	int i;
 	uint32_t len;
 
-	free(redirect_cache);
+	if (redirect_cache != NULL) {
+		free(redirect_cache);
+	}
 	len = rule_list_length - rule_list_peer_length;
+	if (len == 0) {
+		redirect_cache = NULL;
+		return;
+	} 
+
 	redirect_cache = (rule_t **)malloc(sizeof(rule_t *) * len);
 	bzero(redirect_cache, sizeof(rule_t *) * len);
 
@@ -573,7 +586,13 @@ reflesh_nft_peer_cache(void)
 	rule_t *p;
 	int i;
 
-	free(peer_cache);
+	if (peer_cache != NULL) {
+		free(peer_cache);
+	}
+	if (rule_list_peer_length == 0) {
+		peer_cache = NULL;
+		return;
+	}
 	peer_cache = (rule_t **)malloc(
 		sizeof(rule_t *) * rule_list_peer_length);
 	bzero(peer_cache, sizeof(rule_t *) * rule_list_peer_length);
@@ -599,8 +618,9 @@ reflesh_nft_cache(uint32_t family)
 	rule_t *p1, *p2;
 	int ret;
 
-	if (rule_list_validate == RULE_CACHE_VALID)
+	if (rule_list_validate == RULE_CACHE_VALID) {
 		return;
+	}
 
 	t = NULL;
 	p1 = LIST_FIRST(&head);

@@ -30,7 +30,7 @@ endif (NO_GETADDRINFO)
 
 if (NOT WIN32)
   add_definitions (-DMINIUPNPC_SET_SOCKET_TIMEOUT)
-  add_definitions (-D_BSD_SOURCE -D_POSIX_C_SOURCE=200112L)
+  add_definitions (-D_BSD_SOURCE -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200112L)
 else (NOT WIN32)
   add_definitions (-D_WIN32_WINNT=0x0501) # XP or higher for getnameinfo and friends
 endif (NOT WIN32)
@@ -86,8 +86,7 @@ endif (NOT WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "AmigaOS")
 
 if (WIN32)
   set_source_files_properties (${MINIUPNPC_SOURCES} PROPERTIES
-                                                    COMPILE_DEFINITIONS MINIUPNP_STATICLIB
-                                                    COMPILE_DEFINITIONS MINIUPNP_EXPORTS
+                                                    COMPILE_DEFINITIONS "MINIUPNP_STATICLIB;MINIUPNP_EXPORTS"
   )
 endif (WIN32)
 

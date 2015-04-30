@@ -126,6 +126,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		memcpy(tmp->buffer + urlsize + 1, p, stsize);
 		p += stsize;
 		tmp->buffer[urlsize+1+stsize] = '\0';
+		tmp->scope_id = 0;	/* default value. scope_id is not available with MiniSSDPd */
 		devlist = tmp;
 		/* added for compatibility with recent versions of MiniSSDPd
 		 * >= 2007/12/19 */
