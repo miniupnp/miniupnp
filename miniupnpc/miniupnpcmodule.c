@@ -58,7 +58,7 @@ static PyMemberDef UPnP_members[] = {
 	{"multicastif", T_STRING, offsetof(UPnPObject, multicastif),
 	 0, "IP of the network interface to be used for multicast operations"
 	},
-	{"minissdpdsocket", T_STRING, offsetof(UPnPObject, multicastif),
+	{"minissdpdsocket", T_STRING, offsetof(UPnPObject, minissdpdsocket),
 	 0, "path of the MiniSSDPd unix socket"
 	},
 	{NULL}
