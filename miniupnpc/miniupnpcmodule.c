@@ -64,11 +64,36 @@ static PyMemberDef UPnP_members[] = {
 	{NULL}
 };
 
+
+static int UPnP_init(UPnPObject *self, PyObject *args, PyObject *kwds)
+{
+	char* multicastif = NULL;
+	char* minissdpdsocket = NULL;
+	static char *kwlist[] = {
+		"multicastif", "minissdpdsocket", "discoverdelay", NULL
+	};
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|zzI", kwlist, 
+					&multicastif,
+					&minissdpdsocket,
+					&self->discoverdelay))
+		return -1; 
+
+	if(multicastif)
+		self->multicastif = strdup(multicastif);
+	if(minissdpdsocket)
+		self->minissdpdsocket = strdup(minissdpdsocket);
+
+	return 0;
+}
+
 static void
 UPnPObject_dealloc(UPnPObject *self)
 {
 	freeUPNPDevlist(self->devlist);
 	FreeUPNPUrls(&self->urls);
+	free(self->multicastif);
+	free(self->minissdpdsocket);
 	Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -85,8 +110,8 @@ UPnP_discover(UPnPObject *self)
 	}
 	Py_BEGIN_ALLOW_THREADS
 	self->devlist = upnpDiscover((int)self->discoverdelay/*timeout in ms*/,
-	                             0/* multicast if*/,
-	                             0/*minissdpd socket*/,
+	                             self->multicastif,
+	                             self->minissdpdsocket,
 								 0/*sameport flag*/,
 	                             0/*ip v6*/,
 	                             0/*error */);
@@ -554,7 +579,7 @@ static PyTypeObject UPnPType = {
     0,                         /* tp_descr_get */
     0,                         /* tp_descr_set */
     0,                         /* tp_dictoffset */
-    0,/*(initproc)UPnP_init,*/      /* tp_init */
+    (initproc)UPnP_init,       /* tp_init */
     0,                         /* tp_alloc */
 #ifndef _WIN32
     PyType_GenericNew,/*UPnP_new,*/      /* tp_new */

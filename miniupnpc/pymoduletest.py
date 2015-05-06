@@ -7,15 +7,21 @@
 # import the python miniupnpc module
 import miniupnpc
 import sys
+import argparse
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-m', '--multicastif')
+parser.add_argument('-p', '--minissdpdsocket')
+parser.add_argument('-d', '--discoverdelay', type=int, default=200)
 
 # create the object
-u = miniupnpc.UPnP()
+u = miniupnpc.UPnP(**vars(parser.parse_args()))
 print 'inital(default) values :'
 print ' discoverdelay', u.discoverdelay
 print ' lanaddr', u.lanaddr
 print ' multicastif', u.multicastif
 print ' minissdpdsocket', u.minissdpdsocket
-u.discoverdelay = 200;
 #u.minissdpdsocket = '../minissdpd/minissdpd.sock'
 # discovery process, it usualy takes several seconds (2 seconds or more)
 print 'Discovering... delay=%ums' % u.discoverdelay
