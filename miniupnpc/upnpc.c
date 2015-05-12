@@ -543,6 +543,7 @@ int main(int argc, char ** argv)
 	const char * rootdescurl = 0;
 	const char * multicastif = 0;
 	const char * minissdpdpath = 0;
+	int localport = UPNP_LOCAL_PORT_ANY;
 	int retcode = 0;
 	int error = 0;
 	int ipv6 = 0;
@@ -575,6 +576,16 @@ int main(int argc, char ** argv)
 				rootdescurl = argv[++i];
 			else if(argv[i][1] == 'm')
 				multicastif = argv[++i];
+			else if(argv[i][1] == 'z'){
+				char junk;
+				if(sscanf(argv[++i], "%d%c", &localport, &junk)!=1 ||
+					localport<0 || localport>65535 || 
+				   (localport >1 && localport < 1024)){
+					fprintf(stderr, "Invalid localport '%s'\n", argv[i]);
+					localport = UPNP_LOCAL_PORT_ANY;
+					break;
+				}
+			}
 			else if(argv[i][1] == 'p')
 				minissdpdpath = argv[++i];
 			else if(argv[i][1] == '6')
@@ -626,13 +637,14 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "  -6 : use ip v6 instead of ip v4.\n");
 		fprintf(stderr, "  -u url : bypass discovery process by providing the XML root description url.\n");
 		fprintf(stderr, "  -m address/interface : provide ip address (ip v4) or interface name (ip v4 or v6) to use for sending SSDP multicast packets.\n");
+		fprintf(stderr, "  -z localport : SSDP packets local (source) port (1024-65535).\n");
 		fprintf(stderr, "  -p path : use this path for MiniSSDPd socket.\n");
 		return 1;
 	}
 
 	if( rootdescurl
 	  || (devlist = upnpDiscover(2000, multicastif, minissdpdpath,
-	                             0/*sameport*/, ipv6, &error)))
+	                             localport, ipv6, &error)))
 	{
 		struct UPNPDev * device;
 		struct UPNPUrls urls;

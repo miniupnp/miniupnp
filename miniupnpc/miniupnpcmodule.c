@@ -42,6 +42,7 @@ typedef struct {
 	struct UPNPUrls urls;
 	struct IGDdatas data;
 	unsigned int discoverdelay;	/* value passed to upnpDiscover() */
+	unsigned int localport;		/* value passed to upnpDiscover() */
 	char lanaddr[40];	/* our ip address on the LAN */
 	char * multicastif;
 	char * minissdpdsocket;
@@ -53,6 +54,15 @@ static PyMemberDef UPnP_members[] = {
 	},
 	{"discoverdelay", T_UINT, offsetof(UPnPObject, discoverdelay),
 	 0/*READWRITE*/, "value in ms used to wait for SSDP responses"
+	},
+	{"localport", T_UINT, offsetof(UPnPObject, localport),
+	 0/*READWRITE*/,
+	    "If localport is set to UPNP_LOCAL_PORT_SAME(1) "
+	    "SSDP packets will be sent from the source port "
+	    "1900 (same as destination port), if set to "
+	    "UPNP_LOCAL_PORT_ANY(0) system assign a source "
+	    "port, any other value will be attempted as the "
+	    "source port"
 	},
 	/* T_STRING is allways readonly :( */
 	{"multicastif", T_STRING, offsetof(UPnPObject, multicastif),
@@ -70,15 +80,22 @@ static int UPnP_init(UPnPObject *self, PyObject *args, PyObject *kwds)
 	char* multicastif = NULL;
 	char* minissdpdsocket = NULL;
 	static char *kwlist[] = {
-		"multicastif", "minissdpdsocket", "discoverdelay", NULL
+		"multicastif", "minissdpdsocket", "discoverdelay", 
+		"localport", NULL
 	};
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|zzI", kwlist, 
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|zzII", kwlist, 
 					&multicastif,
 					&minissdpdsocket,
-					&self->discoverdelay))
+					&self->discoverdelay,
+					&self->localport))
 		return -1; 
 
+	if(self->localport>1 &&
+	   (self->localport>65534||self->localport<1024)) {
+	    PyErr_SetString(PyExc_Exception, "Invalid localport value");
+	    return -1;
+	}
 	if(multicastif)
 		self->multicastif = strdup(multicastif);
 	if(minissdpdsocket)
@@ -112,7 +129,7 @@ UPnP_discover(UPnPObject *self)
 	self->devlist = upnpDiscover((int)self->discoverdelay/*timeout in ms*/,
 	                             self->multicastif,
 	                             self->minissdpdsocket,
-								 0/*sameport flag*/,
+	                             (int)self->localport,
 	                             0/*ip v6*/,
 	                             0/*error */);
 	Py_END_ALLOW_THREADS

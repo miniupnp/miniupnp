@@ -21,6 +21,12 @@
 #define MINIUPNPC_VERSION	"1.9"
 #define MINIUPNPC_API_VERSION	12
 
+/* Source port:
+   Using "1" as an alias for 1900 for backwards compatability
+   (presuming one would have used that for the "sameport" parameter) */
+#define UPNP_LOCAL_PORT_ANY     0
+#define UPNP_LOCAL_PORT_SAME    1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,30 +58,32 @@ struct UPNPDev {
  * is NULL.
  * If multicastif is not NULL, it will be used instead of the default
  * multicast interface for sending SSDP discover packets.
- * If sameport is not null, SSDP packets will be sent from the source port
- * 1900 (same as destination port) otherwise system assign a source port. */
+ * If localport is set to UPNP_LOCAL_PORT_SAME(1) SSDP packets will be sent
+ * from the source port 1900 (same as destination port), if set to 
+ * UPNP_LOCAL_PORT_ANY(0) system assign a source port, any other value will 
+ * be attempted as the source port */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
-             const char * minissdpdsock, int sameport,
+             const char * minissdpdsock, int localport,
              int ipv6,
              int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
-                const char * minissdpdsock, int sameport,
+                const char * minissdpdsock, int localport,
                 int ipv6,
                 int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
-                const char * minissdpdsock, int sameport,
+                const char * minissdpdsock, int localport,
                 int ipv6,
                 int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
-                    const char * minissdpdsock, int sameport,
+                    const char * minissdpdsock, int localport,
                     int ipv6,
                     int * error);
 

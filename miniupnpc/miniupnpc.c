@@ -344,7 +344,7 @@ parseMSEARCHReply(const char * reply, int size,
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
-                    const char * minissdpdsock, int sameport,
+                    const char * minissdpdsock, int localport,
                     int ipv6,
                     int * error)
 {
@@ -376,6 +376,8 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 #endif
 	int linklocal = 1;
 
+	if(localport==UPNP_LOCAL_PORT_SAME)
+		localport = PORT;
 	if(error)
 		*error = UPNPDISCOVER_UNKNOWN_ERROR;
 #if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
@@ -411,14 +413,14 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	if(ipv6) {
 		struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_r;
 		p->sin6_family = AF_INET6;
-		if(sameport)
-			p->sin6_port = htons(PORT);
+		if(localport)
+			p->sin6_port = htons(localport);
 		p->sin6_addr = in6addr_any; /* in6addr_any is not available with MinGW32 3.4.2 */
 	} else {
 		struct sockaddr_in * p = (struct sockaddr_in *)&sockudp_r;
 		p->sin_family = AF_INET;
-		if(sameport)
-			p->sin_port = htons(PORT);
+		if(localport)
+			p->sin_port = htons(localport);
 		p->sin_addr.s_addr = INADDR_ANY;
 	}
 #ifdef _WIN32
@@ -715,7 +717,7 @@ error:
 /* upnpDiscover() Discover IGD device */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
-             const char * minissdpdsock, int sameport,
+             const char * minissdpdsock, int localport,
              int ipv6,
              int * error)
 {
@@ -732,14 +734,14 @@ upnpDiscover(int delay, const char * multicastif,
 		0
 	};
 	return upnpDiscoverDevices(deviceList,
-	                           delay, multicastif, minissdpdsock, sameport,
+	                           delay, multicastif, minissdpdsock, localport,
 	                           ipv6, error);
 }
 
 /* upnpDiscoverAll() Discover all UPnP devices */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
-                const char * minissdpdsock, int sameport,
+                const char * minissdpdsock, int localport,
                 int ipv6,
                 int * error)
 {
@@ -749,14 +751,14 @@ upnpDiscoverAll(int delay, const char * multicastif,
 		0
 	};
 	return upnpDiscoverDevices(deviceList,
-	                           delay, multicastif, minissdpdsock, sameport,
+	                           delay, multicastif, minissdpdsock, localport,
 	                           ipv6, error);
 }
 
 /* upnpDiscoverDevice() Discover a specific device */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
-                const char * minissdpdsock, int sameport,
+                const char * minissdpdsock, int localport,
                 int ipv6,
                 int * error)
 {
@@ -765,7 +767,7 @@ upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
 		0
 	};
 	return upnpDiscoverDevices(deviceList,
-	                           delay, multicastif, minissdpdsock, sameport,
+	                           delay, multicastif, minissdpdsock, localport,
 	                           ipv6, error);
 }
 

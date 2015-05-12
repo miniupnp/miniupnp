@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--multicastif')
 parser.add_argument('-p', '--minissdpdsocket')
 parser.add_argument('-d', '--discoverdelay', type=int, default=200)
+parser.add_argument('-z', '--localport', type=int, default=0)
 
 # create the object
 u = miniupnpc.UPnP(**vars(parser.parse_args()))
