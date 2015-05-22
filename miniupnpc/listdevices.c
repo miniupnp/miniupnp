@@ -1,4 +1,4 @@
-/* $Id: listdevices.c,v 1.2 2014/11/17 09:50:56 nanard Exp $ */
+/* $Id: listdevices.c,v 1.3 2015/05/22 10:14:04 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2013-2014 Thomas Bernard

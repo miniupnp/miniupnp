@@ -1,8 +1,8 @@
-/* $Id: miniupnpc.h,v 1.39 2014/12/20 09:13:51 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.41 2015/05/22 10:23:48 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2014 Thomas Bernard
+ * Copyright (c) 2005-2015 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
 #ifndef MINIUPNPC_H_INCLUDED
@@ -19,7 +19,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"1.9"
-#define MINIUPNPC_API_VERSION	12
+#define MINIUPNPC_API_VERSION	13
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,7 +53,9 @@ struct UPNPDev {
  * If multicastif is not NULL, it will be used instead of the default
  * multicast interface for sending SSDP discover packets.
  * If sameport is not null, SSDP packets will be sent from the source port
- * 1900 (same as destination port) otherwise system assign a source port. */
+ * 1900 (same as destination port) otherwise system assign a source port.
+ * "searchalltypes" parameter is useful when searching several types,
+ * if 0, the discovery will stop with the first type returning results. */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
              const char * minissdpdsock, int sameport,
@@ -77,7 +79,8 @@ upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
                     const char * minissdpdsock, int sameport,
                     int ipv6,
-                    int * error);
+                    int * error,
+                    int searchalltypes);
 
 /* freeUPNPDevlist()
  * free list returned by upnpDiscover() */

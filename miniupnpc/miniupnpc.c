@@ -1,8 +1,8 @@
-/* $Id: miniupnpc.c,v 1.124 2014/12/01 09:25:11 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.126 2015/05/22 10:12:58 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2014 Thomas Bernard
+ * copyright (c) 2005-2015 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #define __EXTENSIONS__ 1
@@ -346,7 +346,8 @@ upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
                     const char * minissdpdsock, int sameport,
                     int ipv6,
-                    int * error)
+                    int * error,
+                    int searchalltypes)
 {
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = 0;
@@ -382,11 +383,22 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	/* first try to get infos from minissdpd ! */
 	if(!minissdpdsock)
 		minissdpdsock = "/var/run/minissdpd.sock";
-	for(deviceIndex = 0; !devlist && deviceTypes[deviceIndex]; deviceIndex++) {
-		devlist = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
-		                                  minissdpdsock);
+	for(deviceIndex = 0; deviceTypes[deviceIndex]; deviceIndex++) {
+		tmp = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
+		                              minissdpdsock);
+		if(tmp) {
+#ifdef DEBUG
+			printf("returned by MiniSSDPD: %s\n", tmp->st);
+#endif /* DEBUG */
+			tmp->pNext = devlist;
+			devlist = tmp;
+			if(!searchalltypes && !strstr(tmp->st, "rootdevice"))
+				break;
+		}
+	}
+	for(tmp = devlist; tmp != NULL; tmp = tmp->pNext) {
 		/* We return what we have found if it was not only a rootdevice */
-		if(devlist && !strstr(deviceTypes[deviceIndex], "rootdevice")) {
+		if(!strstr(tmp->st, "rootdevice")) {
 			if(error)
 				*error = UPNPDISCOVER_SUCCESS;
 			return devlist;
@@ -650,7 +662,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 				goto error;
 			} else if (n == 0) {
 				/* no data or Time Out */
-				if (devlist) {
+				if (devlist && !searchalltypes) {
 					/* found some devices, stop now*/
 					if(error)
 						*error = UPNPDISCOVER_SUCCESS;
@@ -733,7 +745,7 @@ upnpDiscover(int delay, const char * multicastif,
 	};
 	return upnpDiscoverDevices(deviceList,
 	                           delay, multicastif, minissdpdsock, sameport,
-	                           ipv6, error);
+	                           ipv6, error, 0);
 }
 
 /* upnpDiscoverAll() Discover all UPnP devices */
@@ -750,7 +762,7 @@ upnpDiscoverAll(int delay, const char * multicastif,
 	};
 	return upnpDiscoverDevices(deviceList,
 	                           delay, multicastif, minissdpdsock, sameport,
-	                           ipv6, error);
+	                           ipv6, error, 0);
 }
 
 /* upnpDiscoverDevice() Discover a specific device */
@@ -766,7 +778,7 @@ upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
 	};
 	return upnpDiscoverDevices(deviceList,
 	                           delay, multicastif, minissdpdsock, sameport,
-	                           ipv6, error);
+	                           ipv6, error, 0);
 }
 
 /* freeUPNPDevlist() should be used to

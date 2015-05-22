@@ -1,6 +1,12 @@
-$Id: apiversions.txt,v 1.3 2014/01/31 13:14:32 nanard Exp $
+$Id: apiversions.txt,v 1.6 2015/05/22 10:23:48 nanard Exp $
 
 Differences in API between miniUPnPc versions
+
+API version 13
+miniupnpc.h:
+  add searchalltype param to upnpDiscoverDevices() function
+  updated macro :
+    #define MINIUPNPC_API_VERSION  13
 
 API version 12
 miniupnpc.h :
