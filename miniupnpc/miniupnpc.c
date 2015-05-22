@@ -76,7 +76,8 @@
 
 
 #if defined(HAS_IP_MREQN) && defined(NEED_STRUCT_IP_MREQN)
-/* Several versions of glibc don't define this structure, define it here and compile with CFLAGS NEED_STRUCT_IP_MREQN */
+/* Several versions of glibc don't define this structure,
+ * define it here and compile with CFLAGS NEED_STRUCT_IP_MREQN */
 struct ip_mreqn
 {
 	struct in_addr	imr_multiaddr;		/* IP multicast address of group */
