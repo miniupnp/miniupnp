@@ -12,6 +12,7 @@
 int main(int argc, char * * argv)
 {
 	const char * searched_device = NULL;
+	const char * * searched_devices = NULL;
 	const char * multicastif = 0;
 	const char * minissdpdpath = 0;
 	int ipv6 = 0;
@@ -29,6 +30,13 @@ int main(int argc, char * * argv)
 				return 1;
 			}
 			searched_device = argv[i];
+		} else if(strcmp(argv[i], "-l") == 0) {
+			if(++i >= argc) {
+				fprintf(stderr, "-l option needs at least one argument\n");
+				return 1;
+			}
+			searched_devices = (const char * *)(argv + i);
+			break;
 		} else if(strcmp(argv[i], "-m") == 0) {
 			if(++i >= argc) {
 				fprintf(stderr, "-m option needs one argument\n");
@@ -36,11 +44,12 @@ int main(int argc, char * * argv)
 			}
 			multicastif = argv[i];
 		} else {
-			printf("usage : %s [options]\n", argv[0]);
+			printf("usage : %s [options] [-l <device1> <device2> ...]\n", argv[0]);
 			printf("options :\n");
 			printf("   -6 : use IPv6\n");
-			printf("   -d <device string> : search only for this type of device\n");
 			printf("   -m address/ifname : network interface to use for multicast\n");
+			printf("   -d <device string> : search only for this type of device\n");
+			printf("   -l <device1> <device2> ... : search only for theses types of device\n");
 			printf("   -h : this help\n");
 			return 1;
 		}
@@ -51,6 +60,13 @@ int main(int argc, char * * argv)
 		devlist = upnpDiscoverDevice(searched_device,
 		                             2000, multicastif, minissdpdpath,
 		                             0/*sameport*/, ipv6, &error);
+	} else if(searched_devices) {
+		printf("searching UPnP device types :\n");
+		for(i = 0; searched_devices[i]; i++)
+			printf("\t%s\n", searched_devices[i]);
+		devlist = upnpDiscoverDevices(searched_devices,
+		                              2000, multicastif, minissdpdpath,
+		                              0/*sameport*/, ipv6, &error, 1);
 	} else {
 		printf("searching all UPnP devices\n");
 		devlist = upnpDiscoverAll(2000, multicastif, minissdpdpath,
