@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.126 2015/05/22 10:12:58 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.127 2015/05/22 10:42:46 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -653,8 +653,10 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			break;
 		}
 #endif /* #ifdef NO_GETADDRINFO */
-		/* Waiting for SSDP REPLY packet to M-SEARCH */
-		do {
+		/* Waiting for SSDP REPLY packet to M-SEARCH
+		 * if searchalltypes is set, enter the loop only
+		 * when the last deviceType is reached */
+		if(!searchalltypes || !deviceTypes[deviceIndex + 1]) do {
 			n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
 			if (n < 0) {
 				/* error */
@@ -663,20 +665,14 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 				goto error;
 			} else if (n == 0) {
 				/* no data or Time Out */
+#ifdef DEBUG
+				printf("NODATA or TIMEOUT\n");
+#endif /* DEBUG */
 				if (devlist && !searchalltypes) {
 					/* found some devices, stop now*/
 					if(error)
 						*error = UPNPDISCOVER_SUCCESS;
 					goto error;
-				}
-				if(ipv6) {
-					/* switch linklocal flag */
-					if(linklocal) {
-						linklocal = 0;
-						--deviceIndex;
-					} else {
-						linklocal = 1;
-					}
 				}
 			} else {
 				const char * descURL=NULL;
@@ -688,7 +684,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 #ifdef DEBUG
 					printf("M-SEARCH Reply:\n  ST: %.*s\n  Location: %.*s\n",
 					       stsize, st, urlsize, descURL);
-#endif
+#endif /* DEBUG */
 					for(tmp=devlist; tmp; tmp = tmp->pNext) {
 						if(memcmp(tmp->descURL, descURL, urlsize) == 0 &&
 						   tmp->descURL[urlsize] == '\0' &&
@@ -719,6 +715,15 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 				}
 			}
 		} while(n > 0);
+		if(ipv6) {
+			/* switch linklocal flag */
+			if(linklocal) {
+				linklocal = 0;
+				--deviceIndex;
+			} else {
+				linklocal = 1;
+			}
+		}
 	}
 error:
 	closesocket(sudp);
