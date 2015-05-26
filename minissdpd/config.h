@@ -19,6 +19,9 @@
 /* Maximum number of network interface we can listen on */
 #define MAX_IF_ADDR 8
 
+/* The size of unix socket response buffer */
+#define RESPONSE_BUFFER_SIZE (1024 * 4)
+
 /* Uncomment the following line in order to make minissdpd
  * listen on 1.2.3.4:1900 instead of *:1900
  * Note : it prevents broadcast packets to be received,
