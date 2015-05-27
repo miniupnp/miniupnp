@@ -5,7 +5,6 @@
  * copyright (c) 2005-2015 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
-#include "config.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -94,13 +93,13 @@ main(int argc, char * * argv)
 	char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	int s;
 	int i;
-	unsigned char buf[RESPONSE_BUFFER_SIZE];
-    unsigned char chunk[4096];
+	void * tmp;
+	unsigned char * resp = NULL;
+	size_t respsize = 0;
+	unsigned char buf[4096];
 	ssize_t n;
-    int total = 0; 
+	int total = 0;
 	const char * sockpath = "/var/run/minissdpd.sock";
-
-    printf("Response buffer size %d bytes\n", (int)RESPONSE_BUFFER_SIZE);
 
 	for(i=0; i<argc-1; i++) {
 		if(0==strcmp(argv[i], "-s"))
@@ -129,26 +128,35 @@ main(int argc, char * * argv)
 		s = connect_unix_socket(sockpath);
 	}
 
-    chunk[0] = 0; /* Slight hack for printing num devices when 0 */
+	buf[0] = 0; /* Slight hack for printing num devices when 0 */
 	SENDCOMMAND(command3, sizeof(command3));
-	n = read(s, chunk, sizeof(chunk));
+	n = read(s, buf, sizeof(buf));
 	printf("Response received %d bytes\n", (int)n);
-    printf("Number of devices %d\n", (int)chunk[0]);
-    while (1) {
-        if (n < (int)sizeof(chunk)) {
-            if (n > 0) {
-                memcpy(buf + total, chunk, n);
-                total += n;
-            }
-            break;
-        }
+	printf("Number of devices %d\n", (int)buf[0]);
+	while(n > 0) {
+		tmp = realloc(resp, respsize + n);
+		if(tmp == NULL) {
+			fprintf(stderr, "memory allocation error\n");
+			break;
+		}
+		resp = tmp;
+		respsize += n;
+		if (n > 0) {
+			memcpy(resp + total, buf, n);
+			total += n;
+		}
+		if (n < (ssize_t)sizeof(buf)) {
+			break;
+		}
 
-        memcpy(buf + total, chunk, n);
-        total += n;
-        n = read(s, chunk, sizeof(chunk));
-        printf("response received %d bytes\n", (int)n);
-    }
-	printresponse(buf, total);
+		n = read(s, buf, sizeof(buf));
+		printf("response received %d bytes\n", (int)n);
+	}
+	if(resp != NULL) {
+		printresponse(resp, total);
+		free(resp);
+		resp = NULL;
+	}
 	if(n == 0) {
 		close(s);
 		s = connect_unix_socket(sockpath);
