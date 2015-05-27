@@ -88,6 +88,9 @@ main(int argc, char * * argv)
 	char command1[] = "\x01\x00urn:schemas-upnp-org:device:InternetGatewayDevice";
 	char command2[] = "\x02\x00uuid:fc4ec57e-b051-11db-88f8-0060085db3f6::upnp:rootdevice";
 	char command3[] = { 0x03, 0x00 };
+	/* old versions of minissdpd would reject a command with
+	 * a zero length string argument */
+	char command3compat[] = "\x03\x00ssdp:all";
 	char command4[] = "\x04\x00test:test:test";
 	char bad_command[] = { 0xff, 0xff };
 	char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
@@ -107,6 +110,7 @@ main(int argc, char * * argv)
 	}
 	command1[1] = sizeof(command1) - 3;
 	command2[1] = sizeof(command2) - 3;
+	command3compat[1] = sizeof(command3compat) - 3;
 	command4[1] = sizeof(command4) - 3;
 	s = connect_unix_socket(sockpath);
 
@@ -131,6 +135,13 @@ main(int argc, char * * argv)
 	buf[0] = 0; /* Slight hack for printing num devices when 0 */
 	SENDCOMMAND(command3, sizeof(command3));
 	n = read(s, buf, sizeof(buf));
+	if(n == 0) {
+		printf("command3 failed, testing compatible one\n");
+		close(s);
+		s = connect_unix_socket(sockpath);
+		SENDCOMMAND(command3compat, sizeof(command3compat) - 1);
+		n = read(s, buf, sizeof(buf));
+	}
 	printf("Response received %d bytes\n", (int)n);
 	printf("Number of devices %d\n", (int)buf[0]);
 	while(n > 0) {
