@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2014 Thomas Bernard
+ * copyright (c) 2005-2015 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include "config.h"
@@ -78,7 +78,7 @@ int connect_unix_socket(const char * sockpath)
 		perror("connect");
 		exit(1);
 	}
-	printf("Connected.\n");
+	printf("Connected to %s\n", addr.sun_path);
 	return s;
 }
 
@@ -155,6 +155,7 @@ main(int argc, char * * argv)
 	}
 
 	SENDCOMMAND(command4, sizeof(command4));
+	/* no response for request type 4 */
 
 	SENDCOMMAND(bad_command, sizeof(bad_command));
 	n = read(s, buf, sizeof(buf));
