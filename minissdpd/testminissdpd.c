@@ -5,6 +5,8 @@
  * copyright (c) 2005-2014 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
+#include "config.h"
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,9 +94,13 @@ main(int argc, char * * argv)
 	char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	int s;
 	int i;
-	unsigned char buf[16*1024];
+	unsigned char buf[RESPONSE_BUFFER_SIZE];
+    unsigned char chunk[4096];
 	ssize_t n;
+    int total = 0; 
 	const char * sockpath = "/var/run/minissdpd.sock";
+
+    printf("Response buffer size %d bytes\n", (int)RESPONSE_BUFFER_SIZE);
 
 	for(i=0; i<argc-1; i++) {
 		if(0==strcmp(argv[i], "-s"))
@@ -123,10 +129,26 @@ main(int argc, char * * argv)
 		s = connect_unix_socket(sockpath);
 	}
 
+    chunk[0] = 0; /* Slight hack for printing num devices when 0 */
 	SENDCOMMAND(command3, sizeof(command3));
-	n = read(s, buf, sizeof(buf));
+	n = read(s, chunk, sizeof(chunk));
 	printf("Response received %d bytes\n", (int)n);
-	printresponse(buf, n);
+    printf("Number of devices %d\n", (int)chunk[0]);
+    while (1) {
+        if (n < (int)sizeof(chunk)) {
+            if (n > 0) {
+                memcpy(buf + total, chunk, n);
+                total += n;
+            }
+            break;
+        }
+
+        memcpy(buf + total, chunk, n);
+        total += n;
+        n = read(s, chunk, sizeof(chunk));
+        printf("response received %d bytes\n", (int)n);
+    }
+	printresponse(buf, total);
 	if(n == 0) {
 		close(s);
 		s = connect_unix_socket(sockpath);
@@ -151,4 +173,3 @@ main(int argc, char * * argv)
 	close(s);
 	return 0;
 }
-

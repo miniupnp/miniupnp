@@ -726,7 +726,7 @@ void processRequest(struct reqelem * req)
 	const unsigned char * p;
 	int type;
 	struct device * d = devlist;
-	unsigned char rbuf[4096];
+	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
 	unsigned char * rp = rbuf+1;
 	unsigned char nrep = 0;
 	time_t t;
