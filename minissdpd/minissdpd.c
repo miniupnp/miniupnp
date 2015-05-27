@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.45 2015/02/08 08:51:54 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.47 2015/05/27 12:43:14 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2015 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -915,7 +915,7 @@ void processRequest(struct reqelem * req)
 		    serv = serv->entries.le_next) {
 			if(0 == strcmp(newserv->usn, serv->usn)
 			  && 0 == strcmp(newserv->st, serv->st)) {
-				syslog(LOG_INFO, "Service allready in the list. Updating...");
+				syslog(LOG_INFO, "Service already in the list. Updating...");
 				free(newserv->st);
 				free(newserv->usn);
 				free(serv->server);
