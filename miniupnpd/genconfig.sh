@@ -265,8 +265,6 @@ case $OS_NAME in
 		OS_NAME=UPnP
 		OS_URL=http://tomatousb.org/
 		echo "" >> ${CONFIGFILE}
-		echo "#include <tomato_config.h>" >> ${CONFIGFILE}
-		echo "" >> ${CONFIGFILE}
 		echo "#ifdef LINUX26" >> ${CONFIGFILE}
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		echo "#endif" >> ${CONFIGFILE}
