@@ -107,7 +107,7 @@ getifstats(const char * ifname, struct ifdata * data)
 		}
 		fclose(f);
 	} else {
-		syslog(LOG_WARNING, "cannot read %s file : %m", fname);
+		syslog(LOG_INFO, "cannot read %s file : %m", fname);
 	}
 #ifdef GET_WIRELESS_STATS
 	if(data->baudrate == BAUDRATE_DEFAULT) {
