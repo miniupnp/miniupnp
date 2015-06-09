@@ -385,15 +385,26 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	if(!minissdpdsock)
 		minissdpdsock = "/var/run/minissdpd.sock";
 	for(deviceIndex = 0; deviceTypes[deviceIndex]; deviceIndex++) {
-		tmp = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
-		                              minissdpdsock);
-		if(tmp) {
+		struct UPNPDev * minissdpd_devlist;
+		int only_rootdevice = 1;
+		minissdpd_devlist = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
+		                                            minissdpdsock);
+		if(minissdpd_devlist) {
 #ifdef DEBUG
-			printf("returned by MiniSSDPD: %s\n", tmp->st);
+			printf("returned by MiniSSDPD: %s\n", minissdpd_devlist->st);
+			if(!strstr(minissdpd_devlist->st, "rootdevice"))
+				only_rootdevice = 0;
 #endif /* DEBUG */
+			for(tmp = minissdpd_devlist; tmp->pNext != NULL; tmp = tmp->pNext) {
+#ifdef DEBUG
+				printf("returned by MiniSSDPD: %s\n", tmp->pNext->st);
+#endif /* DEBUG */
+				if(!strstr(tmp->st, "rootdevice"))
+					only_rootdevice = 0;
+			}
 			tmp->pNext = devlist;
-			devlist = tmp;
-			if(!searchalltypes && !strstr(tmp->st, "rootdevice"))
+			devlist = minissdpd_devlist;
+			if(!searchalltypes && !only_rootdevice)
 				break;
 		}
 	}
