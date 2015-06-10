@@ -6,9 +6,9 @@
 # $ PREFIX=/tmp/dummylocation make install
 # or
 # $ INSTALLPREFIX=/usr/local make install
-# or 
+# or
 # make install (will go to /usr/bin, /usr/lib, etc...)
-CC = gcc
+CC ?= gcc
 #AR = gar
 CFLAGS = -O0 -g -DDEBUG
 #CFLAGS = -O
