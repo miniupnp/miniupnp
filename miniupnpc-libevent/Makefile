@@ -43,6 +43,7 @@ all:	$(EXECUTABLE)
 clean:
 	$(RM) $(OBJS)
 	$(RM) $(EXECUTABLE)
+	$(RM) $(LIB)
 
 upnpc-libevent:	upnpc-libevent.o $(LIB)
 
