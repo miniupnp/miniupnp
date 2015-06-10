@@ -1,4 +1,4 @@
-#MiniUPnP Project
+#MiniUPnP Project [![Build Status](https://travis-ci.org/Chocobo1/miniupnp.svg?branch=master)](https://travis-ci.org/Chocobo1/miniupnp)
 ### Main Author : Thomas BERNARD
 ### Web Site: http://miniupnp.free.fr or http://miniupnp.tuxfamily.org
 ### Github: https://github.com/miniupnp/miniupnp

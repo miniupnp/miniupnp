@@ -1,0 +1,31 @@
+language: c
+
+env:
+  - 'PROJECT=minissdpd'
+  - 'PROJECT=miniupnpc'
+  - 'PROJECT=miniupnpc-async'
+  - 'PROJECT=miniupnpc-libevent'
+  - 'PROJECT=miniupnpd'
+
+compiler:
+  - gcc
+  - clang
+
+# container-based builds
+sudo: false
+
+# packages list: https://github.com/travis-ci/apt-package-whitelist/blob/master/ubuntu-precise
+addons:
+  apt:
+    packages:
+    - iptables-dev
+    - libevent-dev
+    - libnfnetlink-dev
+
+script:
+  - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
+  - 'MAKEFILE=Makefile && if [ -a Makefile.linux ]; then MAKEFILE=Makefile.linux; fi'
+  - 'make -f $MAKEFILE -j3'
+
+after_success:
+  - 'if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE check; fi'
