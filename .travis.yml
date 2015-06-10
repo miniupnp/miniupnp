@@ -1,0 +1,26 @@
+language: c
+compiler:
+  - gcc
+  - clang
+
+git:
+  depth: 1
+
+matrix:
+  fast_finish: true
+
+env:
+  - 'PROJECT=minissdpd'
+  - 'PROJECT=miniupnpc'
+  - 'PROJECT=miniupnpc-async'
+  - 'PROJECT=miniupnpc-libevent'
+  - 'PROJECT=miniupnpd'
+
+before_install:
+  - 'sudo apt-get -qq update'
+  - 'sudo apt-get -qq install iptables-dev libevent-dev libnfnetlink-dev'
+
+script:
+  - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
+  - 'MAKEFILE=Makefile && if [ -a Makefile.linux ]; then MAKEFILE=Makefile.linux; fi'
+  - 'make -f $MAKEFILE -j2'
