@@ -391,13 +391,15 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		                                            minissdpdsock);
 		if(minissdpd_devlist) {
 #ifdef DEBUG
-			printf("returned by MiniSSDPD: %s\n", minissdpd_devlist->st);
+			printf("returned by MiniSSDPD: %s\t%s\n",
+			       minissdpd_devlist->st, minissdpd_devlist->descURL);
+#endif /* DEBUG */
 			if(!strstr(minissdpd_devlist->st, "rootdevice"))
 				only_rootdevice = 0;
-#endif /* DEBUG */
 			for(tmp = minissdpd_devlist; tmp->pNext != NULL; tmp = tmp->pNext) {
 #ifdef DEBUG
-				printf("returned by MiniSSDPD: %s\n", tmp->pNext->st);
+				printf("returned by MiniSSDPD: %s\t%s\n",
+				       tmp->pNext->st, tmp->pNext->descURL);
 #endif /* DEBUG */
 				if(!strstr(tmp->st, "rootdevice"))
 					only_rootdevice = 0;
@@ -416,8 +418,9 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			return devlist;
 		}
 	}
-#endif
-	/* fallback to direct discovery */
+#endif	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
+
+	/* direct discovery if minissdpd responses are not sufficient */
 #ifdef _WIN32
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 #else
@@ -503,7 +506,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			pIPAddrTable = NULL;
 		}
 	}
-#endif
+#endif	/* _WIN32 */
 
 #ifdef _WIN32
 	if (setsockopt(sudp, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof (opt)) < 0)

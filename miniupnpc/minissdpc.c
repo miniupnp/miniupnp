@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2014 Thomas Bernard
+ * copyright (c) 2005-2015 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 /*#include <syslog.h>*/
@@ -50,7 +50,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 	ssize_t n;
 	unsigned char * p;
 	unsigned char * url;
-	unsigned int i;
+	unsigned int i, ndev;
 	unsigned int urlsize, stsize, usnsize, l;
 	int s;
 	struct sockaddr_un addr;
@@ -104,8 +104,9 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		close(s);
 		return NULL;
 	}
+	ndev = buffer[0];
 	p = buffer + 1;
-	for(i = 0; i < buffer[0]; i++)
+	for(i = 0; i < ndev; i++)
 	{
 		if(p+2>=buffer+sizeof(buffer))
 			break;
