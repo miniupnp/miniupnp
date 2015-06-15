@@ -73,7 +73,8 @@ fi
 # Tomato USB special case
 if [ -f ../shared/tomato_version ]; then
 	OS_NAME=Tomato
-	OS_VERSION="Tomato $(cat ../shared/tomato_version)"
+	TOMATO_VER=`cat ../shared/tomato_version | cut -d' ' -f2,3`
+	OS_VERSION="Tomato $TOMATO_VER"
 fi
 
 ${RM} ${CONFIGFILE}
