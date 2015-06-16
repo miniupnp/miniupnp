@@ -1,4 +1,4 @@
-/* $Id: testminissdpd.c,v 1.8 2014/02/28 18:38:21 nanard Exp $ */
+/* $Id: testminissdpd.c,v 1.11 2015/05/27 20:03:21 nanard Exp $ */
 /* Project : miniupnp
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
@@ -25,10 +25,22 @@ void printresponse(const unsigned char * resp, int n)
 	const unsigned char * p;
 	if(n == 0)
 		return;
-	for(i=0; i<n; i++)
-		printf("%02x ", resp[i]);
-	printf("\n");
-	nresp = resp[0];
+	/* first, hexdump the response : */
+	for(i = 0; i < n; i += 16) {
+		printf("%06x | ", i);
+		for(l = i; l < n && l < (i + 16); l++)
+			printf("%02x ", resp[l]);
+		while(l < (i + 16)) {
+			printf("   ");
+			l++;
+		}
+		printf("| ");
+		for(l = i; l < n && l < (i + 16); l++)
+			putchar((resp[l] >= ' ' && resp[l] < 128) ? resp[l] : '.');
+		putchar('\n');
+	}
+	/* now parse and display all devices of response */
+	nresp = resp[0]; /* 1st byte : number of devices in response */
 	p = resp + 1;
 	for(i = 0; i < (int)nresp; i++) {
 		if(p >= resp + n)
@@ -37,7 +49,7 @@ void printresponse(const unsigned char * resp, int n)
 		DECODELENGTH(l, p);
 		if(p + l > resp + n)
 			goto error;
-		printf("%d - %.*s\n", i, l, p);
+		printf("%d - %.*s\n", i, l, p); /* URL */
 		p += l;
 		if(p >= resp + n)
 			goto error;
@@ -45,7 +57,7 @@ void printresponse(const unsigned char * resp, int n)
 		DECODELENGTH(l, p);
 		if(p + l > resp + n)
 			goto error;
-		printf("    %.*s\n", l, p);
+		printf("    %.*s\n", l, p);	/* ST */
 		p += l;
 		if(p >= resp + n)
 			goto error;
@@ -53,7 +65,7 @@ void printresponse(const unsigned char * resp, int n)
 		DECODELENGTH(l, p);
 		if(p + l > resp + n)
 			goto error;
-		printf("    %.*s\n", l, p);
+		printf("    %.*s\n", l, p); /* USN */
 		p += l;
 	}
 	return;
@@ -62,7 +74,7 @@ error:
 }
 
 #define SENDCOMMAND(command, size) write(s, command, size); \
-              printf("Command written type=%u\n", (unsigned)command[0]);
+              printf("Command written type=%u\n", (unsigned char)command[0]);
 
 int connect_unix_socket(const char * sockpath)
 {
@@ -73,7 +85,7 @@ int connect_unix_socket(const char * sockpath)
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, sockpath, sizeof(addr.sun_path));
 	if(connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
-		fprintf(stderr, "connecting to %s\n", addr.sun_path);
+		fprintf(stderr, "connecting to %s : ", addr.sun_path);
 		perror("connect");
 		exit(1);
 	}
