@@ -63,9 +63,6 @@
 #include <errno.h>
 #define closesocket close
 #endif /* #else _WIN32 */
-#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-#include <sys/time.h>
-#endif
 #if defined(__amigaos__) || defined(__amigaos4__)
 /* Amiga OS specific stuff */
 #define TIMEVAL struct timeval
