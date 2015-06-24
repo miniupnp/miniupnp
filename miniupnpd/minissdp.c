@@ -1237,6 +1237,7 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 	}
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, minissdpdsocketpath, sizeof(addr.sun_path));
+	addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 	if(connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
 		syslog(LOG_ERR, "connect(\"%s\"): %m", minissdpdsocketpath);
 		close(s);
