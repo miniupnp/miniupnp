@@ -815,6 +815,7 @@ DeletePortMappingRange(struct upnphttp * h, const char * action)
 	{
 		SoapError(h, 730, "PortMappingNotFound");
 		ClearNameValueList(&data);
+		free(port_list);
 		return;
 	}
 
