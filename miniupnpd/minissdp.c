@@ -185,7 +185,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 			{
 				syslog(LOG_WARNING,
 				       "Failed to add multicast membership for interface %s",
-				       lan_addr->str ? lan_addr->str : "NULL");
+				       strlen(lan_addr->str) ? lan_addr->str : "NULL");
 			}
 		}
 	}
