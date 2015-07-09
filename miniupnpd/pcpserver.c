@@ -1114,9 +1114,14 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	     index++)
 		if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
 		   && (proto2==proto)
-		   && 0 == strcmp(desc, pcp_msg_info->desc)
 		   && ((iport2==iport) || (iport==0))) {
-			if (!pcp_msg_info->is_fw) {
+			if(0 != strcmp(desc, pcp_msg_info->desc)) {
+				/* nonce does not match */
+				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+				syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
+				       iport, (pcp_msg_info->protocol == IPPROTO_TCP)?"TCP":"UDP");
+				return;
+			} else if (!pcp_msg_info->is_fw) {
 				r = _upnp_delete_redir(eport2, proto2);
 			} else {
 #ifdef ENABLE_UPNPPINHOLE
