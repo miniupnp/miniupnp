@@ -967,7 +967,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				      pcp_msg_info->protocol,
 				      iaddr_old, sizeof(iaddr_old),
 				      &iport_old, 0, 0, 0, 0,
-				      &timestamp, 0, 0);
+				      NULL/*&timestamp*/, 0, 0);
 
 		if(r==0) {
 			if((strcmp(pcp_msg_info->mapped_str, iaddr_old)!=0)
