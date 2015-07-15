@@ -1,4 +1,4 @@
-/* $Id: listdevices.c,v 1.3 2015/05/22 10:14:04 nanard Exp $ */
+/* $Id: listdevices.c,v 1.4 2015/07/15 12:51:30 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2013-2014 Thomas Bernard
@@ -7,6 +7,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#endif /* _WIN32 */
 #include "miniupnpc.h"
 
 int main(int argc, char * * argv)
@@ -20,6 +23,16 @@ int main(int argc, char * * argv)
 	struct UPNPDev * devlist = 0;
 	struct UPNPDev * dev;
 	int i;
+
+#ifdef _WIN32
+	WSADATA wsaData;
+	int nResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if(nResult != NO_ERROR)
+	{
+		fprintf(stderr, "WSAStartup() failed.\n");
+		return -1;
+	}
+#endif
 
 	for(i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "-6") == 0)
