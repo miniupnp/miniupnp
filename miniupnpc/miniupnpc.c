@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.127 2015/05/22 10:42:46 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.131 2015/07/15 12:41:14 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -463,9 +463,11 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		printf("ifIndex=%lu nextHop=%lx \n", ip_forward.dwForwardIfIndex, ip_forward.dwForwardNextHop);
 #endif
 		pIPAddrTable = (MIB_IPADDRTABLE *) malloc(sizeof (MIB_IPADDRTABLE));
-		if (GetIpAddrTable(pIPAddrTable, &dwSize, 0) == ERROR_INSUFFICIENT_BUFFER) {
-			free(pIPAddrTable);
-			pIPAddrTable = (MIB_IPADDRTABLE *) malloc(dwSize);
+		if(pIPAddrTable) {
+			if (GetIpAddrTable(pIPAddrTable, &dwSize, 0) == ERROR_INSUFFICIENT_BUFFER) {
+				free(pIPAddrTable);
+				pIPAddrTable = (MIB_IPADDRTABLE *) malloc(dwSize);
+			}
 		}
 		if(pIPAddrTable) {
 			dwRetVal = GetIpAddrTable( pIPAddrTable, &dwSize, 0 );
