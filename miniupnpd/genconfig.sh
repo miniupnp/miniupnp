@@ -2,7 +2,7 @@
 # $Id: genconfig.sh,v 1.78 2014/12/10 09:34:42 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
-# (c) 2006-2014 Thomas Bernard
+# (c) 2006-2015 Thomas Bernard
 # This software is subject to the conditions detailed in the
 # LICENCE file provided within the distribution
 
