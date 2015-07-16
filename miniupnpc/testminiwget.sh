@@ -1,7 +1,7 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.10 2013/11/13 15:08:08 nanard Exp $
+# $Id: testminiwget.sh,v 1.12 2015/07/16 15:13:49 nanard Exp $
 # project miniupnp : http://miniupnp.free.fr/
-# (c) 2011-2012 Thomas Bernard
+# (c) 2011-2015 Thomas Bernard
 #
 # test program for miniwget.c
 # is usually invoked by "make check"
