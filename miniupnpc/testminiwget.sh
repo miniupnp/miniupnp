@@ -15,7 +15,7 @@
 # The script was tested and works with ksh, bash
 # it should now also run with dash
 
-TMPD=`mktemp -d miniwgetXXXXXXXXXX`
+TMPD=`mktemp -t -d miniwgetXXXXXXXXXX`
 HTTPSERVEROUT="${TMPD}/httpserverout"
 EXPECTEDFILE="${TMPD}/expectedfile"
 DOWNLOADEDFILE="${TMPD}/downloadedfile"

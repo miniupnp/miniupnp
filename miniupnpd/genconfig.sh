@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.78 2014/12/10 09:34:42 nanard Exp $
+# $Id: genconfig.sh,v 1.81 2015/07/16 15:00:21 nanard Exp $
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2015 Thomas Bernard
@@ -36,7 +36,7 @@ done
 
 RM="rm -f"
 MV="mv"
-CONFIGFILE="config.h.tmp"
+CONFIGFILE=`mktemp tmp.config.h.XXXXXXXXXX`
 CONFIGFILE_FINAL="config.h"
 CONFIGMACRO="CONFIG_H_INCLUDED"
 
