@@ -15,7 +15,7 @@ CFLAGS += -I/usr/local/include
 
 #CFLAGS += -DENABLE_UPNP_EVENTS
 
-LDFLAGS = -levent
+LDLIBS   = -levent
 LDFLAGS += -L/usr/local/lib
 
 ifeq ($(OS), Darwin)
