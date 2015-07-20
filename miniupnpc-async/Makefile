@@ -94,8 +94,8 @@ upnpc-static:	upnpc.o $(LIBRARY)
 upnpc-shared:	upnpc.o $(SHAREDLIBRARY)
 	$(CC) -o $@ $^
 
-#testasync:	testasync.o libminiupnpc-async.a
-testasync:	testasync.o -lminiupnpc-async
+testasync:	testasync.o libminiupnpc-async.a
+#testasync:	testasync.o -lminiupnpc-async
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
