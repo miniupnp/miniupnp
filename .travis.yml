@@ -9,16 +9,21 @@ git:
 matrix:
   fast_finish: true
 
+addons:
+  apt:
+    packages:
+    - iptables-dev
+    - libevent-dev
+    - libnfnetlink-dev
+
+sudo: false
+
 env:
   - 'PROJECT=minissdpd'
   - 'PROJECT=miniupnpc'
   - 'PROJECT=miniupnpc-async'
   - 'PROJECT=miniupnpc-libevent'
   - 'PROJECT=miniupnpd'
-
-before_install:
-  - 'sudo apt-get -qq update'
-  - 'sudo apt-get -qq install iptables-dev libevent-dev libnfnetlink-dev'
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
