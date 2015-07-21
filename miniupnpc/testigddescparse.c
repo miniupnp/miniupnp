@@ -141,7 +141,7 @@ int main(int argc, char * * argv)
 	FILE * f;
 	char * buffer;
 	int len;
-	int r = 0;
+	int r;
 	if(argc<2) {
 		fprintf(stderr, "Usage: %s file.xml [file.values]\n", argv[0]);
 		return 1;
@@ -160,7 +160,13 @@ int main(int argc, char * * argv)
 		fclose(f);
 		return 1;
 	}
-	fread(buffer, 1, len, f);
+	r = (int)fread(buffer, 1, len, f);
+	if(r != len) {
+		fprintf(stderr, "Failed to read file %s. %d out of %d bytes.\n",
+		        argv[1], r, len);
+		fclose(f);
+		return 1;
+	}
 	fclose(f);
 	f = NULL;
 	if(argc > 2) {
