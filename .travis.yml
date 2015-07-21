@@ -24,3 +24,4 @@ script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
   - 'MAKEFILE=Makefile && if [ -a Makefile.linux ]; then MAKEFILE=Makefile.linux; fi'
   - 'make -f $MAKEFILE -j2'
+  - 'if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE check; fi'
