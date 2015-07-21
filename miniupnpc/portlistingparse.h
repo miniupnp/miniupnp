@@ -1,13 +1,13 @@
 /* $Id: portlistingparse.h,v 1.10 2014/11/01 10:37:32 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2011-2012 Thomas Bernard
+ * (c) 2011-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #ifndef PORTLISTINGPARSE_H_INCLUDED
 #define PORTLISTINGPARSE_H_INCLUDED
 
-#include "declspec.h"
+#include "miniupnpc_declspec.h"
 /* for the definition of UNSIGNED_INTEGER */
 #include "miniupnpctypes.h"
 

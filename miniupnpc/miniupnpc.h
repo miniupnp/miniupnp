@@ -8,7 +8,7 @@
 #ifndef MINIUPNPC_H_INCLUDED
 #define MINIUPNPC_H_INCLUDED
 
-#include "declspec.h"
+#include "miniupnpc_declspec.h"
 #include "igd_desc_parse.h"
 
 /* error codes : */

@@ -9,7 +9,7 @@
 
 #include "upnpreplyparse.h"
 #include "portlistingparse.h"
-#include "declspec.h"
+#include "miniupnpc_declspec.h"
 #include "miniupnpctypes.h"
 
 /* MiniUPnPc return codes : */

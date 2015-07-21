@@ -325,33 +325,39 @@ minihttptestserver:	minihttptestserver.o
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 igd_desc_parse.o: igd_desc_parse.h
-miniupnpc.o: miniupnpc.h declspec.h igd_desc_parse.h minissdpc.h miniwget.h
-miniupnpc.o: minisoap.h minixml.h upnpcommands.h upnpreplyparse.h
+miniupnpc.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h minissdpc.h
+miniupnpc.o: miniwget.h minisoap.h minixml.h upnpcommands.h upnpreplyparse.h
 miniupnpc.o: portlistingparse.h miniupnpctypes.h connecthostport.h
 miniupnpc.o: receivedata.h
 minixml.o: minixml.h
 minisoap.o: minisoap.h miniupnpcstrings.h
-miniwget.o: miniupnpcstrings.h miniwget.h declspec.h connecthostport.h
-miniwget.o: receivedata.h
-upnpc.o: miniwget.h declspec.h miniupnpc.h igd_desc_parse.h upnpcommands.h
-upnpc.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h upnperrors.h
-upnpcommands.o: upnpcommands.h upnpreplyparse.h portlistingparse.h declspec.h
-upnpcommands.o: miniupnpctypes.h miniupnpc.h igd_desc_parse.h
+miniwget.o: miniupnpcstrings.h miniwget.h miniupnpc_declspec.h
+miniwget.o: connecthostport.h receivedata.h
+upnpc.o: miniwget.h miniupnpc_declspec.h miniupnpc.h igd_desc_parse.h
+upnpc.o: upnpcommands.h upnpreplyparse.h portlistingparse.h miniupnpctypes.h
+upnpc.o: upnperrors.h miniupnpcstrings.h
+upnpcommands.o: upnpcommands.h upnpreplyparse.h portlistingparse.h
+upnpcommands.o: miniupnpc_declspec.h miniupnpctypes.h miniupnpc.h
+upnpcommands.o: igd_desc_parse.h
 upnpreplyparse.o: upnpreplyparse.h minixml.h
 testminixml.o: minixml.h igd_desc_parse.h
 minixmlvalid.o: minixml.h
 testupnpreplyparse.o: upnpreplyparse.h
-minissdpc.o: minissdpc.h miniupnpc.h declspec.h igd_desc_parse.h codelength.h
-upnperrors.o: upnperrors.h declspec.h upnpcommands.h upnpreplyparse.h
-upnperrors.o: portlistingparse.h miniupnpctypes.h miniupnpc.h
-upnperrors.o: igd_desc_parse.h
-testigddescparse.o: igd_desc_parse.h minixml.h miniupnpc.h declspec.h
-testminiwget.o: miniwget.h declspec.h
+minissdpc.o: minissdpc.h miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h
+minissdpc.o: codelength.h
+upnperrors.o: upnperrors.h miniupnpc_declspec.h upnpcommands.h
+upnperrors.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
+upnperrors.o: miniupnpc.h igd_desc_parse.h
+testigddescparse.o: igd_desc_parse.h minixml.h miniupnpc.h
+testigddescparse.o: miniupnpc_declspec.h
+testminiwget.o: miniwget.h miniupnpc_declspec.h
 connecthostport.o: connecthostport.h
-portlistingparse.o: portlistingparse.h declspec.h miniupnpctypes.h minixml.h
+portlistingparse.o: portlistingparse.h miniupnpc_declspec.h miniupnpctypes.h
+portlistingparse.o: minixml.h
 receivedata.o: receivedata.h
-testportlistingparse.o: portlistingparse.h declspec.h miniupnpctypes.h
-miniupnpcmodule.o: miniupnpc.h declspec.h igd_desc_parse.h upnpcommands.h
-miniupnpcmodule.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
-miniupnpcmodule.o: upnperrors.h
-listdevices.o: miniupnpc.h declspec.h igd_desc_parse.h
+testportlistingparse.o: portlistingparse.h miniupnpc_declspec.h
+testportlistingparse.o: miniupnpctypes.h
+miniupnpcmodule.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h
+miniupnpcmodule.o: upnpcommands.h upnpreplyparse.h portlistingparse.h
+miniupnpcmodule.o: miniupnpctypes.h upnperrors.h
+listdevices.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h
