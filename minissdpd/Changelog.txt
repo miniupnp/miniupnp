@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.39 2014/12/05 13:42:59 nanard Exp $
+$Id: Changelog.txt,v 1.41 2015/07/21 15:39:36 nanard Exp $
+
+2015/07/21:
+	set multicast TTL to 2 by default and configurable
 
 2015/05/27:
 	support larger buffer size (useful for type 3 requests)

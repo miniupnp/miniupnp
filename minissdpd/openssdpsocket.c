@@ -1,7 +1,7 @@
-/* $Id: openssdpsocket.c,v 1.15 2014/11/28 16:20:58 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.16 2015/07/21 15:39:37 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -102,7 +102,7 @@ AddDropMulticastMembership(int s, struct lan_addr_s * lan_addr, int ipv6, int dr
 }
 
 int
-OpenAndConfSSDPReceiveSocket(int ipv6)
+OpenAndConfSSDPReceiveSocket(int ipv6, unsigned char ttl)
 {
 	int s;
 	int opt = 1;
@@ -192,9 +192,14 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 	}
 	else
 #endif /* SSDP_LISTEN_ON_SPECIFIC_ADDR */
-	    sockname.sin_addr.s_addr = htonl(INADDR_ANY);
+	sockname.sin_addr.s_addr = htonl(INADDR_ANY);
 	sockname_len = sizeof(struct sockaddr_in);
 #endif /* ENABLE_IPV6 */
+
+	if(setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
+	{
+		syslog(LOG_WARNING, "setsockopt(IP_MULTICAST_TTL): %m");
+	}
 
 	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 	{

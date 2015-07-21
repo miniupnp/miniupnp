@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.47 2015/05/27 12:43:14 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.48 2015/07/21 15:39:36 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2015 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -1062,6 +1062,7 @@ int main(int argc, char * * argv)
 	struct sockaddr_in6 sendername6;
 	socklen_t sendername6_len;
 #endif	/* ENABLE_IPV6 */
+	unsigned char ttl = 2;	/* UDA says it should default to 2 */
 
 	LIST_INIT(&reqlisthead);
 	LIST_INIT(&servicelisthead);
@@ -1069,28 +1070,38 @@ int main(int argc, char * * argv)
 	/* process command line */
 	for(i=1; i<argc; i++)
 	{
-		if(0==strcmp(argv[i], "-i")) {
-			lan_addr = malloc(sizeof(struct lan_addr_s));
-			if(lan_addr == NULL) {
-				fprintf(stderr, "malloc(%d) FAILED\n", (int)sizeof(struct lan_addr_s));
-				break;
-			}
-			if(parselanaddr(lan_addr, argv[++i]) != 0) {
-				fprintf(stderr, "can't parse \"%s\" as a valid address or interface name\n", argv[i]);
-				free(lan_addr);
-			} else {
-				LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
-			}
-		} else if(0==strcmp(argv[i], "-d"))
+ 		if(0==strcmp(argv[i], "-d"))
 			debug_flag = 1;
-		else if(0==strcmp(argv[i], "-s"))
-			sockpath = argv[++i];
-		else if(0==strcmp(argv[i], "-p"))
-			pidfilename = argv[++i];
 #ifdef ENABLE_IPV6
 		else if(0==strcmp(argv[i], "-6"))
 			ipv6 = 1;
 #endif	/* ENABLE_IPV6 */
+		else {
+			if((i + 1) >= argc) {
+				fprintf(stderr, "option %s needs an argument.\n", argv[i]);
+				break;
+			}
+			if(0==strcmp(argv[i], "-i")) {
+				lan_addr = malloc(sizeof(struct lan_addr_s));
+				if(lan_addr == NULL) {
+					fprintf(stderr, "malloc(%d) FAILED\n", (int)sizeof(struct lan_addr_s));
+					break;
+				}
+				if(parselanaddr(lan_addr, argv[++i]) != 0) {
+					fprintf(stderr, "can't parse \"%s\" as a valid address or interface name\n", argv[i]);
+					free(lan_addr);
+				} else {
+					LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
+				}
+			} else if(0==strcmp(argv[i], "-s"))
+				sockpath = argv[++i];
+			else if(0==strcmp(argv[i], "-p"))
+				pidfilename = argv[++i];
+			else if(0==strcmp(argv[i], "-t"))
+				ttl = (unsigned char)atoi(argv[++i]);
+			else
+				fprintf(stderr, "unknown commandline option %s.\n", argv[i]);
+		}
 	}
 	if(lan_addrs.lh_first == NULL)
 	{
@@ -1099,7 +1110,7 @@ int main(int argc, char * * argv)
 #ifdef ENABLE_IPV6
 		        "[-6] "
 #endif /* ENABLE_IPV6 */
-		        "[-s socket] [-p pidfile] "
+		        "[-s socket] [-p pidfile] [-t TTL] "
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
@@ -1143,7 +1154,7 @@ int main(int argc, char * * argv)
 	/* open route/interface config changes socket */
 	s_ifacewatch = OpenAndConfInterfaceWatchSocket();
 	/* open UDP socket(s) for receiving SSDP packets */
-	s_ssdp = OpenAndConfSSDPReceiveSocket(0);
+	s_ssdp = OpenAndConfSSDPReceiveSocket(0, ttl);
 	if(s_ssdp < 0)
 	{
 		syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages, exiting");
@@ -1152,7 +1163,7 @@ int main(int argc, char * * argv)
 	}
 #ifdef ENABLE_IPV6
 	if(ipv6) {
-		s_ssdp6 = OpenAndConfSSDPReceiveSocket(1);
+		s_ssdp6 = OpenAndConfSSDPReceiveSocket(1, ttl);
 		if(s_ssdp6 < 0)
 		{
 			syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages (IPv6), exiting");
