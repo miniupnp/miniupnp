@@ -87,7 +87,7 @@ int main(int argc, char * * argv)
 	}
 	if(devlist) {
 		for(dev = devlist; dev != NULL; dev = dev->pNext) {
-			printf("%-48s\t%s\n", dev->st, dev->descURL);
+			printf("%-100s\t%s\n", dev->usn, dev->descURL);
 		}
 		freeUPNPDevlist(devlist);
 	} else {
