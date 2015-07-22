@@ -1,7 +1,7 @@
 /* $Id: listdevices.c,v 1.4 2015/07/15 12:51:30 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2013-2014 Thomas Bernard
+ * Copyright (c) 2013-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -86,8 +86,10 @@ int main(int argc, char * * argv)
 		                             0/*sameport*/, ipv6, &error);
 	}
 	if(devlist) {
-		for(dev = devlist; dev != NULL; dev = dev->pNext) {
-			printf("%-100s\t%s\n", dev->usn, dev->descURL);
+		for(dev = devlist, i = 1; dev != NULL; dev = dev->pNext, i++) {
+			printf("%3d: %-48s\n", i, dev->st);
+			printf("     %s\n", dev->descURL);
+			printf("     %s\n", dev->usn);
 		}
 		freeUPNPDevlist(devlist);
 	} else {
