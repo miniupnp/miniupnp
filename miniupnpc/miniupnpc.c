@@ -272,7 +272,8 @@ char * simpleUPnPcommand(int s, const char * url, const char * service,
 static void
 parseMSEARCHReply(const char * reply, int size,
                   const char * * location, int * locationsize,
-			      const char * * st, int * stsize)
+			      const char * * st, int * stsize,
+			      const char * * usn, int * usnsize)
 {
 	int a, b, i;
 	i = 0;
@@ -313,6 +314,11 @@ parseMSEARCHReply(const char * reply, int size,
 					{
 						*st = reply+b;
 						*stsize = i-b;
+					}
+					else if(0==strncasecmp(reply+a, "usn", 3))
+					{
+						*usn = reply+b;
+						*usnsize = i-b;
 					}
 					b = 0;
 				}
@@ -701,24 +707,28 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 				int urlsize=0;
 				const char * st=NULL;
 				int stsize=0;
-				parseMSEARCHReply(bufr, n, &descURL, &urlsize, &st, &stsize);
+				const char * usn=NULL;
+				int usnsize=0;
+				parseMSEARCHReply(bufr, n, &descURL, &urlsize, &st, &stsize, &usn, &usnsize);
 				if(st&&descURL) {
 #ifdef DEBUG
-					printf("M-SEARCH Reply:\n  ST: %.*s\n  Location: %.*s\n",
-					       stsize, st, urlsize, descURL);
+					printf("M-SEARCH Reply:\n  ST: %.*s\n  USN: %.*s\n  Location: %.*s\n",
+					       stsize, st, usnsize, (usn?usn:""), urlsize, descURL);
 #endif /* DEBUG */
 					for(tmp=devlist; tmp; tmp = tmp->pNext) {
 						if(memcmp(tmp->descURL, descURL, urlsize) == 0 &&
 						   tmp->descURL[urlsize] == '\0' &&
 						   memcmp(tmp->st, st, stsize) == 0 &&
-						   tmp->st[stsize] == '\0')
+						   tmp->st[stsize] == '\0' &&
+						   (usnsize == 0 || memcmp(tmp->usn, usn, usnsize) == 0) &&
+						   tmp->usn[usnsize] == '\0')
 							break;
 					}
 					/* at the exit of the loop above, tmp is null if
 					 * no duplicate device was found */
 					if(tmp)
 						continue;
-					tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize);
+					tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize+usnsize);
 					if(!tmp) {
 						/* memory allocation error */
 						if(error)
@@ -728,10 +738,14 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 					tmp->pNext = devlist;
 					tmp->descURL = tmp->buffer;
 					tmp->st = tmp->buffer + 1 + urlsize;
+					tmp->usn = tmp->st + 1 + stsize;
 					memcpy(tmp->buffer, descURL, urlsize);
 					tmp->buffer[urlsize] = '\0';
-					memcpy(tmp->buffer + urlsize + 1, st, stsize);
+					memcpy(tmp->st, st, stsize);
 					tmp->buffer[urlsize+1+stsize] = '\0';
+					if(usn != NULL)
+						memcpy(tmp->usn, usn, usnsize);
+					tmp->buffer[urlsize+1+stsize+1+usnsize] = '\0';
 					tmp->scope_id = scope_id;
 					devlist = tmp;
 				}

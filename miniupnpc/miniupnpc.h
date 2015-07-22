@@ -38,7 +38,8 @@ struct UPNPDev {
 	char * descURL;
 	char * st;
 	unsigned int scope_id;
-	char buffer[2];
+	char * usn;
+	char buffer[3];
 };
 
 /* upnpDiscover()

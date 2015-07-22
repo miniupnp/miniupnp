@@ -50,6 +50,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 	ssize_t n;
 	unsigned char * p;
 	unsigned char * url;
+	unsigned char * st;
 	unsigned int bufferindex;
 	unsigned int i, ndev;
 	unsigned int urlsize, stsize, usnsize, l;
@@ -196,9 +197,30 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 #ifdef DEBUG
 		printf("   stsize=%u", stsize);
 #endif /* DEBUG */
-		tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize);
+		st = malloc(stsize);
+		if (st == NULL) {
+			free(url);
+			break;
+		}
+		READ_COPY_BUFFER(st, stsize);
+		if(n<=0) {
+			free(url);
+			free(st);
+			break;
+		}
+		DECODELENGTH_READ(usnsize, READ_BYTE_BUFFER);
+		if(n<=0) {
+			free(url);
+			free(st);
+			break;
+		}
+#ifdef DEBUG
+		printf("   usnsize=%u\n", usnsize);
+#endif /* DEBUG */
+		tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize+usnsize);
 		if(tmp == NULL) {
 			free(url);
+			free(st);
 			break;
 		}
 		tmp->pNext = devlist;
@@ -206,29 +228,21 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		tmp->st = tmp->buffer + 1 + urlsize;
 		memcpy(tmp->buffer, url, urlsize);
 		tmp->buffer[urlsize] = '\0';
+		memcpy(tmp->st, st, stsize);
+		tmp->buffer[urlsize+1+stsize] = '\0';
 		free(url);
+		free(st);
 		url = NULL;
-		READ_COPY_BUFFER(tmp->buffer + urlsize + 1, stsize);
+		st = NULL;
+		tmp->usn = tmp->buffer + 1 + urlsize + 1 + stsize;
+		READ_COPY_BUFFER(tmp->usn, usnsize);
 		if(n<=0) {
 			free(tmp);
 			break;
 		}
-		tmp->buffer[urlsize+1+stsize] = '\0';
+		tmp->buffer[urlsize+1+stsize+1+usnsize] = '\0';
 		tmp->scope_id = 0;	/* default value. scope_id is not available with MiniSSDPd */
 		devlist = tmp;
-		/* added for compatibility with recent versions of MiniSSDPd
-		 * >= 2007/12/19 */
-		DECODELENGTH_READ(usnsize, READ_BYTE_BUFFER);
-		if(n<=0) {
-			break;
-		}
-#ifdef DEBUG
-		printf("   usnsize=%u\n", usnsize);
-#endif /* DEBUG */
-		READ_DISCARD_BUFFER(usnsize);
-		if(n<=0) {
-			break;
-		}
 	}
 	close(s);
 	return devlist;
