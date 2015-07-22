@@ -1,6 +1,6 @@
-/* $Id: miniupnpc-libevent.h,v 1.11 2014/12/02 13:33:42 nanard Exp $ */
+/* $Id: miniupnpc-libevent.h,v 1.13 2015/07/22 13:48:37 nanard Exp $ */
 /* miniupnpc-libevent
- * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
+ * Copyright (c) 2008-2015, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -88,6 +88,7 @@ struct upnpc {
 #endif /* ENABLE_UPNP_EVENTS */
 	char * local_address;
 	uint16_t local_port;
+	unsigned char ttl;
 };
 
 int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
