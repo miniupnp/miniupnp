@@ -1,10 +1,4 @@
 language: c
-compiler:
-  - gcc
-  - clang
-
-git:
-  depth: 1
 
 matrix:
   fast_finish: true
@@ -16,6 +10,7 @@ addons:
     - libevent-dev
     - libnfnetlink-dev
 
+# container-based builds
 sudo: false
 
 env:
@@ -25,8 +20,14 @@ env:
   - 'PROJECT=miniupnpc-libevent'
   - 'PROJECT=miniupnpd'
 
+compiler:
+  - gcc
+  - clang
+
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
   - 'MAKEFILE=Makefile && if [ -a Makefile.linux ]; then MAKEFILE=Makefile.linux; fi'
-  - 'make -f $MAKEFILE -j2'
+  - 'make -f $MAKEFILE -j3'
+
+after_success:
   - 'if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE check; fi'
