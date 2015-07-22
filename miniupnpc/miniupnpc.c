@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.131 2015/07/15 12:41:14 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.132 2015/07/22 12:51:43 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -374,6 +374,9 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	MIB_IPFORWARDROW ip_forward;
 #endif
 	int linklocal = 1;
+	unsigned char ttl = 2; /* UDA v1.1 says :
+		The TTL for the IP packet SHOULD default to 2 and
+		SHOULD be configurable. */
 
 	if(error)
 		*error = UPNPDISCOVER_UNKNOWN_ERROR;
@@ -515,8 +518,14 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	{
 		if(error)
 			*error = UPNPDISCOVER_SOCKET_ERROR;
-		PRINT_SOCKET_ERROR("setsockopt");
+		PRINT_SOCKET_ERROR("setsockopt(SO_REUSEADDR,...)");
 		return NULL;
+	}
+
+	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl) < 0))
+	{
+		/* not a fatal error */
+		PRINT_SOCKET_ERROR("setsockopt(IP_MULTICAST_TTL,...)");
 	}
 
 	if(multicastif)
