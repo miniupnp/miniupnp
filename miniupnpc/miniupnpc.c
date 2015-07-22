@@ -701,17 +701,17 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 				const char * usn=NULL;
 				int usnsize=0;
 				parseMSEARCHReply(bufr, n, &descURL, &urlsize, &st, &stsize, &usn, &usnsize);
-				if(st&&descURL&&usn) {
+				if(st&&descURL) {
 #ifdef DEBUG
 					printf("M-SEARCH Reply:\n  ST: %.*s\n  USN: %.*s\n  Location: %.*s\n",
-					       stsize, st, usnsize, usn, urlsize, descURL);
+					       stsize, st, usnsize, (usn?usn:""), urlsize, descURL);
 #endif /* DEBUG */
 					for(tmp=devlist; tmp; tmp = tmp->pNext) {
 						if(memcmp(tmp->descURL, descURL, urlsize) == 0 &&
 						   tmp->descURL[urlsize] == '\0' &&
 						   memcmp(tmp->st, st, stsize) == 0 &&
 						   tmp->st[stsize] == '\0' &&
-						   memcmp(tmp->usn, usn, usnsize) == 0 &&
+						   (usnsize == 0 || memcmp(tmp->usn, usn, usnsize) == 0) &&
 						   tmp->usn[usnsize] == '\0')
 							break;
 					}
@@ -734,7 +734,8 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 					tmp->buffer[urlsize] = '\0';
 					memcpy(tmp->st, st, stsize);
 					tmp->buffer[urlsize+1+stsize] = '\0';
-					memcpy(tmp->usn, usn, usnsize);
+					if(usn != NULL)
+						memcpy(tmp->usn, usn, usnsize);
 					tmp->buffer[urlsize+1+stsize+1+usnsize] = '\0';
 					tmp->scope_id = scope_id;
 					devlist = tmp;
