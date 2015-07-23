@@ -1,5 +1,11 @@
-$Id: Changelog.txt,v 1.208 2015/07/15 12:18:59 nanard Exp $
+$Id: Changelog.txt,v 1.210 2015/07/23 17:15:01 nanard Exp $
 miniUPnP client Changelog.
+
+2015/07/23:
+  split getDevicesFromMiniSSDPD
+
+2015/07/22:
+  Read USN from SSDP messages.
 
 2015/07/15:
   Check malloc/calloc
