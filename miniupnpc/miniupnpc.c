@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.132 2015/07/22 12:51:43 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.135 2015/07/23 20:40:08 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -344,12 +344,15 @@ parseMSEARCHReply(const char * reply, int size,
  * return a chained list of all devices found or NULL if
  * no devices was found.
  * It is up to the caller to free the chained list
- * delay is in millisecond (poll) */
+ * delay is in millisecond (poll).
+ * UDA v1.1 says :
+ *   The TTL for the IP packet SHOULD default to 2 and
+ *   SHOULD be configurable. */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
                     const char * minissdpdsock, int sameport,
-                    int ipv6,
+                    int ipv6, unsigned char ttl,
                     int * error,
                     int searchalltypes)
 {
@@ -380,9 +383,6 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	MIB_IPFORWARDROW ip_forward;
 #endif
 	int linklocal = 1;
-	unsigned char ttl = 2; /* UDA v1.1 says :
-		The TTL for the IP packet SHOULD default to 2 and
-		SHOULD be configurable. */
 
 	if(error)
 		*error = UPNPDISCOVER_UNKNOWN_ERROR;
@@ -770,7 +770,7 @@ error:
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
              const char * minissdpdsock, int sameport,
-             int ipv6,
+             int ipv6, unsigned char ttl,
              int * error)
 {
 	static const char * const deviceList[] = {
@@ -787,14 +787,14 @@ upnpDiscover(int delay, const char * multicastif,
 	};
 	return upnpDiscoverDevices(deviceList,
 	                           delay, multicastif, minissdpdsock, sameport,
-	                           ipv6, error, 0);
+	                           ipv6, ttl, error, 0);
 }
 
 /* upnpDiscoverAll() Discover all UPnP devices */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
-                int ipv6,
+                int ipv6, unsigned char ttl,
                 int * error)
 {
 	static const char * const deviceList[] = {
@@ -804,14 +804,14 @@ upnpDiscoverAll(int delay, const char * multicastif,
 	};
 	return upnpDiscoverDevices(deviceList,
 	                           delay, multicastif, minissdpdsock, sameport,
-	                           ipv6, error, 0);
+	                           ipv6, ttl, error, 0);
 }
 
 /* upnpDiscoverDevice() Discover a specific device */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
-                int ipv6,
+                int ipv6, unsigned char ttl,
                 int * error)
 {
 	const char * const deviceList[] = {
@@ -820,7 +820,7 @@ upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
 	};
 	return upnpDiscoverDevices(deviceList,
 	                           delay, multicastif, minissdpdsock, sameport,
-	                           ipv6, error, 0);
+	                           ipv6, ttl, error, 0);
 }
 
 /* freeUPNPDevlist() should be used to

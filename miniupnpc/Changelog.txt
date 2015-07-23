@@ -1,8 +1,10 @@
-$Id: Changelog.txt,v 1.210 2015/07/23 17:15:01 nanard Exp $
+$Id: Changelog.txt,v 1.212 2015/07/23 20:41:50 nanard Exp $
 miniUPnP client Changelog.
 
 2015/07/23:
   split getDevicesFromMiniSSDPD
+  add ttl argument to upnpDiscover() functions
+  increments API_VERSION to 14
 
 2015/07/22:
   Read USN from SSDP messages.

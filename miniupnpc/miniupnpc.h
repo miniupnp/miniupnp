@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.41 2015/05/22 10:23:48 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.44 2015/07/23 20:40:10 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
@@ -19,7 +19,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"1.9"
-#define MINIUPNPC_API_VERSION	13
+#define MINIUPNPC_API_VERSION	14
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,30 +56,31 @@ struct UPNPDev {
  * If sameport is not null, SSDP packets will be sent from the source port
  * 1900 (same as destination port) otherwise system assign a source port.
  * "searchalltypes" parameter is useful when searching several types,
- * if 0, the discovery will stop with the first type returning results. */
+ * if 0, the discovery will stop with the first type returning results.
+ * TTL should default to 2. */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
              const char * minissdpdsock, int sameport,
-             int ipv6,
+             int ipv6, unsigned char ttl,
              int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
-                int ipv6,
+                int ipv6, unsigned char ttl,
                 int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
                 const char * minissdpdsock, int sameport,
-                int ipv6,
+                int ipv6, unsigned char ttl,
                 int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
                     const char * minissdpdsock, int sameport,
-                    int ipv6,
+                    int ipv6, unsigned char ttl,
                     int * error,
                     int searchalltypes);
 
