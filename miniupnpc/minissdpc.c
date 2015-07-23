@@ -137,6 +137,8 @@ connectToMiniSSDPD(const char * socketpath)
 		perror("setsockopt");
 	}
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
+	if(!socketpath)
+		socketpath = "/var/run/minissdpd.sock";
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, socketpath, sizeof(addr.sun_path));
 	/* TODO : check if we need to handle the EINTR */
