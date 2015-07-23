@@ -8,8 +8,35 @@
 #ifndef MINISSDPC_H_INCLUDED
 #define MINISSDPC_H_INCLUDED
 
-struct UPNPDev *
-getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath);
+#include "miniupnpc_declspec.h"
+
+/* error codes : */
+#define MINISSDPC_SUCCESS (0)
+#define MINISSDPC_SOCKET_ERROR (-101)
+#define MINISSDPC_INVALID_INPUT (-103)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+MINIUPNP_LIBSPEC struct UPNPDev *
+getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * error);
+
+MINIUPNP_LIBSPEC int
+connectToMiniSSDPD(const char * socketpath);
+
+MINIUPNP_LIBSPEC int
+disconnectFromMiniSSDPD(int fd);
+
+MINIUPNP_LIBSPEC int
+requestDevicesFromMiniSSDPD(int fd, const char * devtype);
+
+MINIUPNP_LIBSPEC struct UPNPDev *
+receiveDevicesFromMiniSSDPD(int fd, int * error);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

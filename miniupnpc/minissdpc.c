@@ -42,23 +42,28 @@ struct sockaddr_un {
 #include "codelength.h"
 
 struct UPNPDev *
-getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
+getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * error)
 {
-	struct UPNPDev * tmp;
-	struct UPNPDev * devlist = NULL;
-	unsigned char buffer[256];
-	ssize_t n;
-	unsigned char * p;
-	unsigned char * url;
-	unsigned char * st;
-	unsigned int bufferindex;
-	unsigned int i, ndev;
-	unsigned int urlsize, stsize, usnsize, l;
+	struct UPNPDev * devlist;
 	int s;
-	struct sockaddr_un addr;
-#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-	struct timeval timeout;
-#endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
+	int res;
+
+	s = connectToMiniSSDPD(socketpath);
+	if (s < 0) {
+		if (error)
+			*error = s;
+		return NULL;
+	}
+	res = requestDevicesFromMiniSSDPD(s, devtype);
+	if (res < 0) {
+		if (error)
+			*error = res;
+		return NULL;
+	}
+	devlist = receiveDevicesFromMiniSSDPD(s, error);
+	disconnectFromMiniSSDPD(s);
+	return devlist;
+}
 
 /* macros used to read from unix socket */
 #define READ_BYTE_BUFFER(c) \
@@ -101,12 +106,21 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		bufferindex += lcopy; \
 	}
 
+int
+connectToMiniSSDPD(const char * socketpath)
+{
+	int s;
+	struct sockaddr_un addr;
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+	struct timeval timeout;
+#endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
+
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(s < 0)
 	{
 		/*syslog(LOG_ERR, "socket(unix): %m");*/
 		perror("socket(unix)");
-		return NULL;
+		return MINISSDPC_SOCKET_ERROR;
 	}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 	/* setting a 3 seconds timeout */
@@ -129,9 +143,26 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 	if(connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0)
 	{
 		/*syslog(LOG_WARNING, "connect(\"%s\"): %m", socketpath);*/
-		close(s);
-		return NULL;
+		return MINISSDPC_SOCKET_ERROR;
 	}
+	return s;
+}
+
+int
+disconnectFromMiniSSDPD(int s)
+{
+	if (close(s) < 0)
+		return MINISSDPC_SOCKET_ERROR;
+	return MINISSDPC_SUCCESS;
+}
+
+int
+requestDevicesFromMiniSSDPD(int s, const char * devtype)
+{
+	unsigned char buffer[256];
+	unsigned char * p;
+	unsigned int stsize, l;
+
 	stsize = strlen(devtype);
 	if(stsize == 8 && 0 == memcmp(devtype, "ssdp:all", 8))
 	{
@@ -150,8 +181,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		fprintf(stderr, "devtype is too long ! stsize=%u sizeof(buffer)=%u\n",
 		        stsize, (unsigned)sizeof(buffer));
 #endif /* DEBUG */
-		close(s);
-		return NULL;
+		return MINISSDPC_INVALID_INPUT;
 	}
 	memcpy(p, devtype, stsize);
 	p += stsize;
@@ -159,14 +189,31 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 	{
 		/*syslog(LOG_ERR, "write(): %m");*/
 		perror("minissdpc.c: write()");
-		close(s);
-		return NULL;
+		return MINISSDPC_SOCKET_ERROR;
 	}
+	return MINISSDPC_SUCCESS;
+}
+
+struct UPNPDev *
+receiveDevicesFromMiniSSDPD(int s, int * error)
+{
+	struct UPNPDev * tmp;
+	struct UPNPDev * devlist = NULL;
+	unsigned char buffer[256];
+	ssize_t n;
+	unsigned char * p;
+	unsigned char * url;
+	unsigned char * st;
+	unsigned int bufferindex;
+	unsigned int i, ndev;
+	unsigned int urlsize, stsize, usnsize, l;
+
 	n = read(s, buffer, sizeof(buffer));
 	if(n<=0)
 	{
 		perror("minissdpc.c: read()");
-		close(s);
+		if (error)
+			*error = MINISSDPC_SOCKET_ERROR;
 		return NULL;
 	}
 	ndev = buffer[0];
@@ -244,7 +291,8 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		tmp->scope_id = 0;	/* default value. scope_id is not available with MiniSSDPd */
 		devlist = tmp;
 	}
-	close(s);
+	if (error)
+		*error = MINISSDPC_SUCCESS;
 	return devlist;
 }
 

@@ -394,7 +394,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		struct UPNPDev * minissdpd_devlist;
 		int only_rootdevice = 1;
 		minissdpd_devlist = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
-		                                            minissdpdsock);
+		                                            minissdpdsock, 0);
 		if(minissdpd_devlist) {
 #ifdef DEBUG
 			printf("returned by MiniSSDPD: %s\t%s\n",
