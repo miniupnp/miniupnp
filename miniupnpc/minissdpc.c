@@ -224,53 +224,60 @@ receiveDevicesFromMiniSSDPD(int s, int * error)
 	{
 		DECODELENGTH_READ(urlsize, READ_BYTE_BUFFER);
 		if(n<=0) {
-			break;
+			if (error)
+				*error = MINISSDPC_INVALID_SERVER_REPLY;
+			return devlist;
 		}
 #ifdef DEBUG
 		printf("  urlsize=%u", urlsize);
 #endif /* DEBUG */
 		url = malloc(urlsize);
 		if(url == NULL) {
-			break;
+			if (error)
+				*error = MINISSDPC_MEMORY_ERROR;
+			return devlist;
 		}
 		READ_COPY_BUFFER(url, urlsize);
 		if(n<=0) {
-			free(url);
-			break;
+			if (error)
+				*error = MINISSDPC_INVALID_SERVER_REPLY;
+			goto free_url_and_return;
 		}
 		DECODELENGTH_READ(stsize, READ_BYTE_BUFFER);
 		if(n<=0) {
-			free(url);
-			break;
+			if (error)
+				*error = MINISSDPC_INVALID_SERVER_REPLY;
+			goto free_url_and_return;
 		}
 #ifdef DEBUG
 		printf("   stsize=%u", stsize);
 #endif /* DEBUG */
 		st = malloc(stsize);
 		if (st == NULL) {
-			free(url);
-			break;
+			if (error)
+				*error = MINISSDPC_MEMORY_ERROR;
+			goto free_url_and_return;
 		}
 		READ_COPY_BUFFER(st, stsize);
 		if(n<=0) {
-			free(url);
-			free(st);
-			break;
+			if (error)
+				*error = MINISSDPC_INVALID_SERVER_REPLY;
+			goto free_url_and_st_and_return;
 		}
 		DECODELENGTH_READ(usnsize, READ_BYTE_BUFFER);
 		if(n<=0) {
-			free(url);
-			free(st);
-			break;
+			if (error)
+				*error = MINISSDPC_INVALID_SERVER_REPLY;
+			goto free_url_and_st_and_return;
 		}
 #ifdef DEBUG
 		printf("   usnsize=%u\n", usnsize);
 #endif /* DEBUG */
 		tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize+usnsize);
 		if(tmp == NULL) {
-			free(url);
-			free(st);
-			break;
+			if (error)
+				*error = MINISSDPC_MEMORY_ERROR;
+			goto free_url_and_st_and_return;
 		}
 		tmp->pNext = devlist;
 		tmp->descURL = tmp->buffer;
@@ -286,8 +293,9 @@ receiveDevicesFromMiniSSDPD(int s, int * error)
 		tmp->usn = tmp->buffer + 1 + urlsize + 1 + stsize;
 		READ_COPY_BUFFER(tmp->usn, usnsize);
 		if(n<=0) {
-			free(tmp);
-			break;
+			if (error)
+				*error = MINISSDPC_INVALID_SERVER_REPLY;
+			goto free_tmp_and_return;
 		}
 		tmp->buffer[urlsize+1+stsize+1+usnsize] = '\0';
 		tmp->scope_id = 0;	/* default value. scope_id is not available with MiniSSDPd */
@@ -295,6 +303,16 @@ receiveDevicesFromMiniSSDPD(int s, int * error)
 	}
 	if (error)
 		*error = MINISSDPC_SUCCESS;
+	return devlist;
+
+free_url_and_st_and_return:
+	free(st);
+free_url_and_return:
+	free(url);
+	return devlist;
+
+free_tmp_and_return:
+	free(tmp);
 	return devlist;
 }
 

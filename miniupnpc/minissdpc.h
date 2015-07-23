@@ -13,7 +13,9 @@
 /* error codes : */
 #define MINISSDPC_SUCCESS (0)
 #define MINISSDPC_SOCKET_ERROR (-101)
+#define MINISSDPC_MEMORY_ERROR (-102)
 #define MINISSDPC_INVALID_INPUT (-103)
+#define MINISSDPC_INVALID_SERVER_REPLY (-104)
 
 #ifdef __cplusplus
 extern "C" {
