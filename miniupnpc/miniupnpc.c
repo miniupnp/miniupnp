@@ -528,7 +528,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		return NULL;
 	}
 
-	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl) < 0))
+	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
 	{
 		/* not a fatal error */
 		PRINT_SOCKET_ERROR("setsockopt(IP_MULTICAST_TTL,...)");
