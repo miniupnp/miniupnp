@@ -1,8 +1,8 @@
-/* $Id: minissdpc.h,v 1.1 2007/08/31 15:15:33 nanard Exp $ */
+/* $Id: minissdpc.h,v 1.4 2015/07/23 20:40:08 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2007 Thomas Bernard
+ * Copyright (c) 2005-2015 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
 #ifndef MINISSDPC_H_INCLUDED
