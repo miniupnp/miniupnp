@@ -30,4 +30,5 @@ script:
   - 'make -f $MAKEFILE -j3'
 
 after_success:
+  - 'make -f $MAKEFILE install'
   - 'if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE check; fi'
