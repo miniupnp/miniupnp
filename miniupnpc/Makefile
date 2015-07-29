@@ -81,7 +81,7 @@ OBJS = $(patsubst %.c,%.o,$(SRCS))
 HEADERS = miniupnpc.h miniwget.h upnpcommands.h igd_desc_parse.h \
           upnpreplyparse.h upnperrors.h miniupnpctypes.h \
           portlistingparse.h \
-          declspec.h
+          miniupnpc_declspec.h
 
 # library names
 LIBRARY = libminiupnpc.a
@@ -292,7 +292,7 @@ jnaerator-%.jar:
 
 jar: $(SHAREDLIBRARY)  $(JNAERATOR)
 	$(JAVA) -jar $(JNAERATOR) $(JNAERATORARGS) \
-	miniupnpc.h declspec.h upnpcommands.h upnpreplyparse.h \
+	miniupnpc.h miniupnpc_declspec.h upnpcommands.h upnpreplyparse.h \
 	igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) \
 	-package fr.free.miniupnp -o . -jar java/miniupnpc_$(JARSUFFIX).jar -v
 
