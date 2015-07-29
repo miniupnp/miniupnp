@@ -27,8 +27,7 @@ compiler:
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
   - 'MAKEFILE=Makefile && if [ -a Makefile.linux ]; then MAKEFILE=Makefile.linux; fi'
-  - 'make -f $MAKEFILE -j3'
+  - 'make -f $MAKEFILE -j3 && if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE check; fi'
 
 after_success:
   - 'make -f $MAKEFILE install'
-  - 'if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE check; fi'
