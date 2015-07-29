@@ -165,6 +165,7 @@ int main(int argc, char * * argv)
 		fprintf(stderr, "Failed to read file %s. %d out of %d bytes.\n",
 		        argv[1], r, len);
 		fclose(f);
+		free(buffer);
 		return 1;
 	}
 	fclose(f);

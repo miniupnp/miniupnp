@@ -94,7 +94,7 @@ getHTTPResponse(int s, int * size)
 		return NULL;
 	}
 	content_buf = malloc(content_buf_len);
-	if(header_buf == NULL)
+	if(content_buf == NULL)
 	{
 		free(header_buf);
 #ifdef DEBUG
