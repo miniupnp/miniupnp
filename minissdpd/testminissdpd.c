@@ -126,7 +126,7 @@ main(int argc, char * * argv)
 	command4[1] = sizeof(command4) - 3;
 	s = connect_unix_socket(sockpath);
 
-	SENDCOMMAND(command1, sizeof(command1) - 1);
+	n = SENDCOMMAND(command1, sizeof(command1) - 1);
 	n = read(s, buf, sizeof(buf));
 	printf("Response received %d bytes\n", (int)n);
 	printresponse(buf, n);
@@ -135,7 +135,7 @@ main(int argc, char * * argv)
 		s = connect_unix_socket(sockpath);
 	}
 
-	SENDCOMMAND(command2, sizeof(command2) - 1);
+	n = SENDCOMMAND(command2, sizeof(command2) - 1);
 	n = read(s, buf, sizeof(buf));
 	printf("Response received %d bytes\n", (int)n);
 	printresponse(buf, n);
@@ -145,13 +145,13 @@ main(int argc, char * * argv)
 	}
 
 	buf[0] = 0; /* Slight hack for printing num devices when 0 */
-	SENDCOMMAND(command3, sizeof(command3));
+	n = SENDCOMMAND(command3, sizeof(command3));
 	n = read(s, buf, sizeof(buf));
 	if(n == 0) {
 		printf("command3 failed, testing compatible one\n");
 		close(s);
 		s = connect_unix_socket(sockpath);
-		SENDCOMMAND(command3compat, sizeof(command3compat) - 1);
+		n = SENDCOMMAND(command3compat, sizeof(command3compat) - 1);
 		n = read(s, buf, sizeof(buf));
 	}
 	printf("Response received %d bytes\n", (int)n);
@@ -185,10 +185,10 @@ main(int argc, char * * argv)
 		s = connect_unix_socket(sockpath);
 	}
 
-	SENDCOMMAND(command4, sizeof(command4));
+	n = SENDCOMMAND(command4, sizeof(command4));
 	/* no response for request type 4 */
 
-	SENDCOMMAND(bad_command, sizeof(bad_command));
+	n = SENDCOMMAND(bad_command, sizeof(bad_command));
 	n = read(s, buf, sizeof(buf));
 	printf("Response received %d bytes\n", (int)n);
 	printresponse(buf, n);
@@ -197,7 +197,7 @@ main(int argc, char * * argv)
 		s = connect_unix_socket(sockpath);
 	}
 
-	SENDCOMMAND(overflow, sizeof(overflow));
+	n = SENDCOMMAND(overflow, sizeof(overflow));
 	n = read(s, buf, sizeof(buf));
 	printf("Response received %d bytes\n", (int)n);
 	printresponse(buf, n);
