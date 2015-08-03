@@ -823,19 +823,6 @@ upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
 	                           ipv6, ttl, error, 0);
 }
 
-/* freeUPNPDevlist() should be used to
- * free the chained list returned by upnpDiscover() */
-MINIUPNP_LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist)
-{
-	struct UPNPDev * next;
-	while(devlist)
-	{
-		next = devlist->pNext;
-		free(devlist);
-		devlist = next;
-	}
-}
-
 static char *
 build_absolute_url(const char * baseurl, const char * descURL,
                    const char * url, unsigned int scope_id)

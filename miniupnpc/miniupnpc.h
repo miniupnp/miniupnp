@@ -10,6 +10,7 @@
 
 #include "miniupnpc_declspec.h"
 #include "igd_desc_parse.h"
+#include "upnpdev.h"
 
 /* error codes : */
 #define UPNPDISCOVER_SUCCESS (0)
@@ -32,15 +33,6 @@ char *
 simpleUPnPcommand(int, const char *, const char *,
                   const char *, struct UPNParg *,
                   int *);
-
-struct UPNPDev {
-	struct UPNPDev * pNext;
-	char * descURL;
-	char * st;
-	unsigned int scope_id;
-	char * usn;
-	char buffer[3];
-};
 
 /* upnpDiscover()
  * discover UPnP devices on the network.
@@ -83,10 +75,6 @@ upnpDiscoverDevices(const char * const deviceTypes[],
                     int ipv6, unsigned char ttl,
                     int * error,
                     int searchalltypes);
-
-/* freeUPNPDevlist()
- * free list returned by upnpDiscover() */
-MINIUPNP_LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist);
 
 /* parserootdesc() :
  * parse root XML description of a UPnP device and fill the IGDdatas

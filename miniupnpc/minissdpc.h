@@ -9,6 +9,7 @@
 #define MINISSDPC_H_INCLUDED
 
 #include "miniupnpc_declspec.h"
+#include "upnpdev.h"
 
 /* error codes : */
 #define MINISSDPC_SUCCESS (0)
