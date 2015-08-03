@@ -37,6 +37,14 @@ requestDevicesFromMiniSSDPD(int fd, const char * devtype);
 MINIUPNP_LIBSPEC struct UPNPDev *
 receiveDevicesFromMiniSSDPD(int fd, int * error);
 
+MINIUPNP_LIBSPEC struct UPNPDev *
+ssdpDiscoverDevices(const char * const deviceTypes[],
+                    int delay, const char * multicastif,
+                    int sameport,
+                    int ipv6, unsigned char ttl,
+                    int * error,
+                    int searchalltypes);
+
 #ifdef __cplusplus
 }
 #endif
