@@ -68,7 +68,6 @@ struct ip_mreqn
 #endif
 
 #include "minissdpc.h"
-#include "miniupnpc.h"
 
 #include "codelength.h"
 #include "receivedata.h"
@@ -470,7 +469,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	int linklocal = 1;
 
 	if(error)
-		*error = UPNPDISCOVER_UNKNOWN_ERROR;
+		*error = MINISSDPC_UNKNOWN_ERROR;
 
 #ifdef _WIN32
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -480,7 +479,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	if(sudp < 0)
 	{
 		if(error)
-			*error = UPNPDISCOVER_SOCKET_ERROR;
+			*error = MINISSDPC_SOCKET_ERROR;
 		PRINT_SOCKET_ERROR("socket");
 		return NULL;
 	}
@@ -568,7 +567,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif
 	{
 		if(error)
-			*error = UPNPDISCOVER_SOCKET_ERROR;
+			*error = MINISSDPC_SOCKET_ERROR;
 		PRINT_SOCKET_ERROR("setsockopt(SO_REUSEADDR,...)");
 		return NULL;
 	}
@@ -631,14 +630,14 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	         ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in)) != 0)
 	{
 		if(error)
-			*error = UPNPDISCOVER_SOCKET_ERROR;
+			*error = MINISSDPC_SOCKET_ERROR;
 		PRINT_SOCKET_ERROR("bind");
 		closesocket(sudp);
 		return NULL;
 	}
 
 	if(error)
-		*error = UPNPDISCOVER_SUCCESS;
+		*error = MINISSDPC_SUCCESS;
 	/* Calculating maximum response time in seconds */
 	mx = ((unsigned int)delay) / 1000u;
 	if(mx == 0) {
@@ -683,7 +682,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
 		if (n < 0) {
 			if(error)
-				*error = UPNPDISCOVER_SOCKET_ERROR;
+				*error = MINISSDPC_SOCKET_ERROR;
 			PRINT_SOCKET_ERROR("sendto");
 			break;
 		}
@@ -697,7 +696,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		                      : UPNP_MCAST_ADDR,
 		                      XSTR(PORT), &hints, &servinfo)) != 0) {
 			if(error)
-				*error = UPNPDISCOVER_SOCKET_ERROR;
+				*error = MINISSDPC_SOCKET_ERROR;
 #ifdef _WIN32
 			fprintf(stderr, "getaddrinfo() failed: %d\n", rv);
 #else
@@ -722,7 +721,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		freeaddrinfo(servinfo);
 		if(n < 0) {
 			if(error)
-				*error = UPNPDISCOVER_SOCKET_ERROR;
+				*error = MINISSDPC_SOCKET_ERROR;
 			break;
 		}
 #endif /* #ifdef NO_GETADDRINFO */
@@ -734,7 +733,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			if (n < 0) {
 				/* error */
 				if(error)
-					*error = UPNPDISCOVER_SOCKET_ERROR;
+					*error = MINISSDPC_SOCKET_ERROR;
 				goto error;
 			} else if (n == 0) {
 				/* no data or Time Out */
@@ -744,7 +743,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				if (devlist && !searchalltypes) {
 					/* found some devices, stop now*/
 					if(error)
-						*error = UPNPDISCOVER_SUCCESS;
+						*error = MINISSDPC_SUCCESS;
 					goto error;
 				}
 			} else {
@@ -777,7 +776,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					if(!tmp) {
 						/* memory allocation error */
 						if(error)
-							*error = UPNPDISCOVER_MEMORY_ERROR;
+							*error = MINISSDPC_MEMORY_ERROR;
 						goto error;
 					}
 					tmp->pNext = devlist;
