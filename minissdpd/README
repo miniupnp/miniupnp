@@ -24,15 +24,22 @@ close unix socket connection.
 
 * Request format :
 1st byte : request type
-		  1 - type
-		  2 - USN (unique id)
-		  3 - everything
-		  4 - submit service (see below)
+           0 - version
+           1 - type
+           2 - USN (unique id)
+           3 - everything
+           4 - submit service (see below)
 n bytes : string length : 1 byte if < 128 else the upper bit indicate that
 one additional byte should be read, etc. (see codelength.h)
 n bytes = string
 
 Response format :
+
+request type 0 (version) :
+n bytes string length
+n bytes = version string
+
+request type 1 / 2 / 3 :
 1st byte : number of services/devices
 For each service/device :
 URL :

@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.48 2015/07/21 15:39:36 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.49 2015/08/06 13:16:58 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2015 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -27,8 +27,10 @@
 /* unix sockets */
 #include <sys/un.h>
 /* for getpwnam() and getgrnam() */
+#if 0
 #include <pwd.h>
 #include <grp.h>
+#endif
 
 #include "getifaddr.h"
 #include "upnputils.h"
@@ -727,7 +729,7 @@ void processRequest(struct reqelem * req)
 	int type;
 	struct device * d = devlist;
 	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
-	unsigned char * rp = rbuf+1;
+	unsigned char * rp;
 	unsigned char nrep = 0;
 	time_t t;
 	struct service * newserv = NULL;
@@ -749,19 +751,31 @@ void processRequest(struct reqelem * req)
 	p = buf + 1;
 	DECODELENGTH_CHECKLIMIT(l, p, buf + n);
 	if(p+l > buf+n) {
-		syslog(LOG_WARNING, "bad request (length encoding)");
+		syslog(LOG_WARNING, "bad request (length encoding l=%u n=%u)",
+		       l, (unsigned)n);
 		goto error;
 	}
-	if(l == 0 && type != 3) {
+	if(l == 0 && type != 3 && type != 0) {
 		syslog(LOG_WARNING, "bad request (length=0)");
 		goto error;
 	}
 	syslog(LOG_INFO, "(s=%d) request type=%d str='%.*s'",
 	       req->socket, type, l, p);
 	switch(type) {
+	case 0:	/* version */
+		rp = rbuf;
+		CODELENGTH((sizeof(MINISSDPD_VERSION) - 1), rp);
+		memcpy(rp, MINISSDPD_VERSION, sizeof(MINISSDPD_VERSION) - 1);
+		rp += (sizeof(MINISSDPD_VERSION) - 1);
+		if(write_or_buffer(req, rbuf, rp - rbuf) < 0) {
+			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
+			goto error;
+		}
+		break;
 	case 1:	/* request by type */
 	case 2:	/* request by USN (unique id) */
 	case 3:	/* everything */
+		rp = rbuf+1;
 		while(d && (nrep < 255)) {
 			if(d->t < t) {
 				syslog(LOG_INFO, "outdated device");

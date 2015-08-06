@@ -1,4 +1,4 @@
-/* $Id: testminissdpd.c,v 1.11 2015/05/27 20:03:21 nanard Exp $ */
+/* $Id: testminissdpd.c,v 1.12 2015/08/06 13:16:59 nanard Exp $ */
 /* Project : miniupnp
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
@@ -17,6 +17,19 @@
 #define DECODELENGTH(n, p) n = 0; \
                            do { n = (n << 7) | (*p & 0x7f); } \
                            while(*(p++)&0x80);
+
+void printversion(const unsigned char * resp, int n)
+{
+	int l;
+	const unsigned char * p;
+
+	p = resp;
+	DECODELENGTH(l, p);
+	if(resp + n < p + l) {
+		printf("get version error\n");
+	}
+	printf("MiniSSDPd version : %.*s\n", l, p);
+}
 
 void printresponse(const unsigned char * resp, int n)
 {
@@ -97,6 +110,7 @@ int connect_unix_socket(const char * sockpath)
 int
 main(int argc, char * * argv)
 {
+	char command0[] = { 0x00, 0x00 };
 	char command1[] = "\x01\x00urn:schemas-upnp-org:device:InternetGatewayDevice";
 	char command2[] = "\x02\x00uuid:fc4ec57e-b051-11db-88f8-0060085db3f6::upnp:rootdevice";
 	char command3[] = { 0x03, 0x00 };
@@ -125,6 +139,17 @@ main(int argc, char * * argv)
 	command3compat[1] = sizeof(command3compat) - 3;
 	command4[1] = sizeof(command4) - 3;
 	s = connect_unix_socket(sockpath);
+
+	n = SENDCOMMAND(command0, sizeof(command0));
+	n = read(s, buf, sizeof(buf));
+	printf("Response received %d bytes\n", (int)n);
+	if(n > 0) {
+		printversion(buf, n);
+	} else {
+		printf("Command 0 (get version) not supported\n");
+		close(s);
+		s = connect_unix_socket(sockpath);
+	}
 
 	n = SENDCOMMAND(command1, sizeof(command1) - 1);
 	n = read(s, buf, sizeof(buf));
