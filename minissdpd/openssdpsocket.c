@@ -1,4 +1,4 @@
-/* $Id: openssdpsocket.c,v 1.16 2015/07/21 15:39:37 nanard Exp $ */
+/* $Id: openssdpsocket.c,v 1.17 2015/08/06 14:05:37 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -106,6 +106,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6, unsigned char ttl)
 {
 	int s;
 	int opt = 1;
+	unsigned char loopchar = 0;
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
 #else /* ENABLE_IPV6 */
@@ -195,6 +196,11 @@ OpenAndConfSSDPReceiveSocket(int ipv6, unsigned char ttl)
 	sockname.sin_addr.s_addr = htonl(INADDR_ANY);
 	sockname_len = sizeof(struct sockaddr_in);
 #endif /* ENABLE_IPV6 */
+
+	if(setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, (char *)&loopchar, sizeof(loopchar)) < 0)
+	{
+		syslog(LOG_WARNING, "setsockopt(IP_MULTICAST_LOOP): %m");
+	}
 
 	if(setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
 	{
