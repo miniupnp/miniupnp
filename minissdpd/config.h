@@ -7,7 +7,7 @@
 #ifndef CONFIG_H_INCLUDED
 #define CONFIG_H_INCLUDED
 
-#define MINISSDPD_VERSION "1.3"
+#define MINISSDPD_VERSION "1.4"
 
 /* use BSD daemon() ? */
 #define USE_DAEMON

@@ -1,5 +1,7 @@
 $Id: Changelog.txt,v 1.42 2015/08/06 13:16:58 nanard Exp $
 
+VERSION 1.4:
+
 2015/08/06:
 	added command 0 (version)
 
