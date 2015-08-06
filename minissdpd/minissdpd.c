@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.49 2015/08/06 13:16:58 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.50 2015/08/06 14:05:49 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2015 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -492,7 +492,8 @@ containsForbiddenChars(const unsigned char * p, int len)
  *     1 : a device was added.  */
 static int
 ParseSSDPPacket(int s, const char * p, ssize_t n,
-                const struct sockaddr * addr)
+                const struct sockaddr * addr,
+                const char * searched_device)
 {
 	const char * linestart;
 	const char * lineend;
@@ -648,6 +649,10 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 	case METHOD_NOTIFY:
 		if(nts==NTS_SSDP_ALIVE || nts==NTS_SSDP_UPDATE) {
 			if(headers[HEADER_NT].p && headers[HEADER_USN].p && headers[HEADER_LOCATION].p) {
+				/* filter if needed */
+				if(searched_device &&
+				   0 != memcmp(headers[HEADER_NT].p, searched_device, headers[HEADER_NT].l))
+					break;
 				r = updateDevice(headers, time(NULL) + lifetime);
 			} else {
 				syslog(LOG_WARNING, "missing header nt=%p usn=%p location=%p",
@@ -993,13 +998,14 @@ sigterm(int sig)
 #define UPNP_MCAST_LL_ADDR "FF02::C" /* link-local */
 #define UPNP_MCAST_SL_ADDR "FF05::C" /* site-local */
 
-/* send the M-SEARCH request for all devices */
-void ssdpDiscoverAll(int s, int ipv6)
+/* send the M-SEARCH request for devices
+ * either all devices (third argument is NULL or "*") or a specific one */
+static void ssdpDiscover(int s, int ipv6, const char * search)
 {
 	static const char MSearchMsgFmt[] =
 	"M-SEARCH * HTTP/1.1\r\n"
 	"HOST: %s:" XSTR(PORT) "\r\n"
-	"ST: ssdp:all\r\n"
+	"ST: %s\r\n"
 	"MAN: \"ssdp:discover\"\r\n"
 	"MX: %u\r\n"
 	"\r\n";
@@ -1014,7 +1020,8 @@ void ssdpDiscoverAll(int s, int ipv6)
 		             MSearchMsgFmt,
 		             ipv6 ?
 		             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
-		             : UPNP_MCAST_ADDR, mx);
+		             : UPNP_MCAST_ADDR,
+		             (search ? search : "ssdp:all"), mx);
 		memset(&sockudp_w, 0, sizeof(struct sockaddr_storage));
 		if(ipv6) {
 			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_w;
@@ -1077,6 +1084,7 @@ int main(int argc, char * * argv)
 	socklen_t sendername6_len;
 #endif	/* ENABLE_IPV6 */
 	unsigned char ttl = 2;	/* UDA says it should default to 2 */
+	const char * searched_device = NULL;	/* if not NULL, search/filter a specific device type */
 
 	LIST_INIT(&reqlisthead);
 	LIST_INIT(&servicelisthead);
@@ -1113,6 +1121,8 @@ int main(int argc, char * * argv)
 				pidfilename = argv[++i];
 			else if(0==strcmp(argv[i], "-t"))
 				ttl = (unsigned char)atoi(argv[++i]);
+			else if(0==strcmp(argv[i], "-f"))
+				searched_device = argv[++i];
 			else
 				fprintf(stderr, "unknown commandline option %s.\n", argv[i]);
 		}
@@ -1125,6 +1135,7 @@ int main(int argc, char * * argv)
 		        "[-6] "
 #endif /* ENABLE_IPV6 */
 		        "[-s socket] [-p pidfile] [-t TTL] "
+		        "-f device "
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
@@ -1244,9 +1255,9 @@ int main(int argc, char * * argv)
 
 	/* send M-SEARCH ssdp:all Requests */
 	if(s_ssdp >= 0)
-		ssdpDiscoverAll(s_ssdp, 0);
+		ssdpDiscover(s_ssdp, 0, searched_device);
 	if(s_ssdp6 >= 0)
-		ssdpDiscoverAll(s_ssdp6, 1);
+		ssdpDiscover(s_ssdp6, 1, searched_device);
 
 	/* Main loop */
 	while(!quitting) {
@@ -1312,7 +1323,7 @@ int main(int argc, char * * argv)
 				/* Parse and process the packet received */
 				/*printf("%.*s", n, buf);*/
 				i = ParseSSDPPacket(s_ssdp6, buf, n,
-				                    (struct sockaddr *)&sendername6);
+				                    (struct sockaddr *)&sendername6, searched_device);
 				syslog(LOG_DEBUG, "** i=%d deltadev=%d **", i, deltadev);
 				if(i==0 || (i*deltadev < 0))
 				{
@@ -1346,7 +1357,7 @@ int main(int argc, char * * argv)
 				/* Parse and process the packet received */
 				/*printf("%.*s", n, buf);*/
 				i = ParseSSDPPacket(s_ssdp, buf, n,
-				                    (struct sockaddr *)&sendername);
+				                    (struct sockaddr *)&sendername, searched_device);
 				syslog(LOG_DEBUG, "** i=%d deltadev=%d **", i, deltadev);
 				if(i==0 || (i*deltadev < 0))
 				{

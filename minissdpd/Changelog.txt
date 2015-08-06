@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.43 2015/08/06 14:05:49 nanard Exp $
 
 2015/08/06:
 	disable multicast loop
+	add -f command line option to filter for a specific device type
 
 VERSION 1.4:
 
