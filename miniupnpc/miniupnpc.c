@@ -961,9 +961,9 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
 	UPNP_GetStatusInfo(urls->controlURL, data->first.servicetype,
 	                   status, &uptime, NULL);
 	if(0 == strcmp("Connected", status))
-	{
 		return 1;
-	}
+	else if(0 == strcmp("Up", status))	/* Also accept "Up" */
+		return 1;
 	else
 		return 0;
 }
