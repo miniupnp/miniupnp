@@ -112,8 +112,9 @@ UPnP_discover(UPnPObject *self)
 	self->devlist = upnpDiscover((int)self->discoverdelay/*timeout in ms*/,
 	                             self->multicastif,
 	                             self->minissdpdsocket,
-								 0/*sameport flag*/,
+	                             0/*sameport flag*/,
 	                             0/*ip v6*/,
+	                             2/* TTL */,
 	                             0/*error */);
 	Py_END_ALLOW_THREADS
 	/* Py_RETURN_NONE ??? */
