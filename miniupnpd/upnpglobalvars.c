@@ -14,6 +14,10 @@
 
 /* network interface for internet */
 const char * ext_if_name = 0;
+#ifndef MULTIPLE_EXTERNAL_IP
+/* network interface for LAN */
+const char * int_if_name = 0;
+#endif
 
 /* file to store leases */
 #ifdef ENABLE_LEASEFILE

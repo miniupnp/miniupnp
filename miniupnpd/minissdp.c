@@ -50,14 +50,19 @@
 static int
 AddMulticastMembership(int s, in_addr_t ifaddr)
 {
-	struct ip_mreq imr;	/* Ip multicast membership */
+	struct ip_mreqn imr;	/* Ip multicast membership */
 
     /* setting up imr structure */
     imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
     /*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
-    imr.imr_interface.s_addr = ifaddr;	/*inet_addr(ifaddr);*/
+    imr.imr_address.s_addr = ifaddr;	/*inet_addr(ifaddr);*/
+#ifndef MULTIPLE_EXTERNAL_IP
+    imr.imr_ifindex = if_nametoindex(int_if_name);
+#else
+    imr.imr_ifindex = 0;
+#endif
 
-	if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&imr, sizeof(struct ip_mreq)) < 0)
+	if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&imr, sizeof(struct ip_mreqn)) < 0)
 	{
         syslog(LOG_ERR, "setsockopt(udp, IP_ADD_MEMBERSHIP): %m");
 		return -1;
@@ -154,6 +159,13 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		syslog(LOG_WARNING, "%s: set_non_blocking(): %m",
 		       "OpenAndConfSSDPReceiveSocket");
 	}
+
+#ifndef MULTIPLE_EXTERNAL_IP
+	if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, int_if_name, strlen(int_if_name)) < 0)
+	{
+	    syslog(LOG_WARNING, "setsockopt(udp, SO_BINDTODEVICE): %m");
+	}
+#endif
 
 	if(bind(s, (struct sockaddr *)&sockname, sockname_len) < 0)
 	{
