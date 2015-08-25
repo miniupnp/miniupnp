@@ -125,6 +125,7 @@ case $OS_NAME in
 		if [ $VER -ge 700049 ]; then
 			echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
 		fi
+		HAVE_IP_MREQN=1
 		# new way to see which one to use PF or IPF.
 		# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=957
 		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
@@ -213,6 +214,10 @@ case $OS_NAME in
 		KERNVERC=`echo $OS_VERSION | awk -F. '{print $3}'`
 		KERNVERD=`echo $OS_VERSION | awk -F. '{print $4}'`
 		#echo "$KERNVERA.$KERNVERB.$KERNVERC.$KERNVERD"
+		# from the 2.4 version, struct ip_mreqn instead of struct ip_mreq
+		if [ \( $KERNVERA -ge 3 \) -o \( $KERNVERA -eq 2 -a $KERNVERB -ge 4 \) ]; then
+			HAVE_IP_MREQN=1
+		fi
 		# Debian GNU/Linux special case
 		if [ -f /etc/debian_version ]; then
 			OS_NAME=Debian
@@ -433,6 +438,11 @@ else
 	echo "/*#define V6SOCKETS_ARE_V6ONLY*/" >> ${CONFIGFILE}
 fi
 echo "" >> ${CONFIGFILE}
+
+if [ -n "$HAVE_IP_MREQN" ]; then
+	echo "#define HAVE_IP_MREQN" >> ${CONFIGFILE}
+	echo "" >> ${CONFIGFILE}
+fi
 
 echo "/* Enable the support of IGD v2 specification." >> ${CONFIGFILE}
 echo " * This is not fully tested yet and can cause incompatibilities with some" >> ${CONFIGFILE}

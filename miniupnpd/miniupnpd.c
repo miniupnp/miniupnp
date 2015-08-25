@@ -370,12 +370,14 @@ OpenAndConfHTTPSocket(unsigned short * port)
 	listenname_len =  sizeof(struct sockaddr_in);
 #endif
 
+/* TODO: Bind to device only if one LAN interface
 #ifndef MULTIPLE_EXTERNAL_IP
 	if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, int_if_name, strlen(int_if_name)) < 0)
 	{
 		syslog(LOG_WARNING, "setsockopt(udp, SO_BINDTODEVICE): %m");
 	}
 #endif
+*/
 
 #ifdef ENABLE_IPV6
 	if(bind(s,
@@ -1108,9 +1110,6 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				use_ext_ip_addr = ary_options[i].value;
 				break;
 			case UPNPLISTENING_IP:
-#ifndef MULTIPLE_EXTERNAL_IP
-				int_if_name = ary_options[i].value;
-#endif
 				lan_addr = (struct lan_addr_s *) malloc(sizeof(struct lan_addr_s));
 				if (lan_addr == NULL)
 				{

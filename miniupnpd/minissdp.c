@@ -44,25 +44,42 @@
 #endif
 
 /* AddMulticastMembership()
- * param s		socket
- * param ifaddr	ip v4 address
+ * param s			socket
+ * param lan_addr	lan address
  */
 static int
-AddMulticastMembership(int s, in_addr_t ifaddr)
+AddMulticastMembership(int s, struct lan_addr_s * lan_addr)
 {
+#ifndef HAVE_IP_MREQN
+	/* The ip_mreqn structure appeared in Linux 2.4. */
+	struct ip_mreq imr;	/* Ip multicast membership */
+#else	/* HAVE_IP_MREQN */
 	struct ip_mreqn imr;	/* Ip multicast membership */
+#endif	/* HAVE_IP_MREQN */
 
     /* setting up imr structure */
     imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
     /*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
-    imr.imr_address.s_addr = ifaddr;	/*inet_addr(ifaddr);*/
+#ifndef HAVE_IP_MREQN
+	imr.imr_interface.s_addr = lan_addr->addr.s_addr;
+#else	/* HAVE_IP_MREQN */
+    imr.imr_address.s_addr = lan_addr->addr.s_addr;
 #ifndef MULTIPLE_EXTERNAL_IP
-    imr.imr_ifindex = if_nametoindex(int_if_name);
-#else
+#ifdef ENABLE_IPV6
+	imr.imr_ifindex = lan_addr->index;
+#else	/* ENABLE_IPV6 */
+    imr.imr_ifindex = if_nametoindex(lan_addr->ifname);
+#endif	/* ENABLE_IPV6 */
+#else	/* MULTIPLE_EXTERNAL_IP */
     imr.imr_ifindex = 0;
-#endif
+#endif	/* MULTIPLE_EXTERNAL_IP */
+#endif	/* HAVE_IP_MREQN */
 
+#ifndef HAVE_IP_MREQN
+	if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&imr, sizeof(struct ip_mreq)) < 0)
+#else	/* HAVE_IP_MREQN */
 	if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&imr, sizeof(struct ip_mreqn)) < 0)
+#endif	/* HAVE_IP_MREQN */
 	{
         syslog(LOG_ERR, "setsockopt(udp, IP_ADD_MEMBERSHIP): %m");
 		return -1;
@@ -160,12 +177,14 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		       "OpenAndConfSSDPReceiveSocket");
 	}
 
+/* TODO: Bind to device only if one LAN interface
 #ifndef MULTIPLE_EXTERNAL_IP
 	if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, int_if_name, strlen(int_if_name)) < 0)
 	{
 	    syslog(LOG_WARNING, "setsockopt(udp, SO_BINDTODEVICE): %m");
 	}
 #endif
+*/
 
 	if(bind(s, (struct sockaddr *)&sockname, sockname_len) < 0)
 	{
@@ -193,7 +212,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 	{
 		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next)
 		{
-			if(AddMulticastMembership(s, lan_addr->addr.s_addr) < 0)
+			if(AddMulticastMembership(s, lan_addr) < 0)
 			{
 				syslog(LOG_WARNING,
 				       "Failed to add multicast membership for interface %s",

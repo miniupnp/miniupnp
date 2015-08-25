@@ -15,10 +15,6 @@
 
 /* name of the network interface used to acces internet */
 extern const char * ext_if_name;
-#ifndef MULTIPLE_EXTERNAL_IP
-/* network interface for LAN */
-extern const char * int_if_name;
-#endif
 
 /* file to store all leases */
 #ifdef ENABLE_LEASEFILE
