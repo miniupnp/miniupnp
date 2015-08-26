@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.73 2015/01/17 11:26:05 nanard Exp $ */
+/* $Id: minissdp.c,v 1.77 2015/08/26 07:36:52 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -177,14 +177,17 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		       "OpenAndConfSSDPReceiveSocket");
 	}
 
-/* TODO: Bind to device only if one LAN interface
-#ifndef MULTIPLE_EXTERNAL_IP
-	if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, int_if_name, strlen(int_if_name)) < 0)
+#if defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP)
+	/* One and only one LAN interface */
+	if(lan_addrs.lh_first != NULL && lan_addrs.lh_first->list.le_next == NULL
+	   && strlen(lan_addrs.lh_first->ifname) > 0)
 	{
-	    syslog(LOG_WARNING, "setsockopt(udp, SO_BINDTODEVICE): %m");
+		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+		              lan_addrs.lh_first->ifname,
+		              strlen(lan_addrs.lh_first->ifname)) < 0)
+		    syslog(LOG_WARNING, "setsockopt(udp, SO_BINDTODEVICE): %m");
 	}
-#endif
-*/
+#endif /* defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP) */
 
 	if(bind(s, (struct sockaddr *)&sockname, sockname_len) < 0)
 	{

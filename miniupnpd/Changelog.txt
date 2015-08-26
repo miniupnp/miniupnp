@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.398 2015/04/26 14:43:27 nanard Exp $
+$Id: Changelog.txt,v 1.400 2015/08/26 07:32:31 nanard Exp $
+
+2015/08/25:
+  better bind socket to right interface(s),
+    using struct ip_mreqn, SO_BINDTODEVICE
 
 2015/04/30:
   Adding linux/nftables support
