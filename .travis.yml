@@ -30,4 +30,4 @@ script:
   - 'make -f $MAKEFILE -j3 && if [ "$PROJECT" = "miniupnpc" -o "$PROJECT" = "minissdpd" ]; then make -f $MAKEFILE check; fi && if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE pythonmodule; fi'
 
 after_success:
-  - 'make -f $MAKEFILE install'
+  - 'INSTALLPREFIX="$HOME/$PROJECT" make -f $MAKEFILE install'
