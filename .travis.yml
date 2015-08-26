@@ -6,6 +6,7 @@ matrix:
 addons:
   apt:
     packages:
+    # packages list: https://github.com/travis-ci/apt-package-whitelist/blob/master/ubuntu-precise
     - iptables-dev
     - libevent-dev
     - libnfnetlink-dev
@@ -27,7 +28,9 @@ compiler:
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
   - 'MAKEFILE=Makefile && if [ -a Makefile.linux ]; then MAKEFILE=Makefile.linux; fi'
-  - 'make -f $MAKEFILE -j3 && if [ "$PROJECT" = "miniupnpc" -o "$PROJECT" = "minissdpd" ]; then make -f $MAKEFILE check; fi && if [ "$PROJECT" = "miniupnpc" ]; then make -f $MAKEFILE pythonmodule; fi'
+  - 'make -f $MAKEFILE -j3'
+  - 'if [ "$PROJECT" = "miniupnpc" -o "$PROJECT" = "minissdpd" ]; then make -f $MAKEFILE check; fi'
+  - 'if [ "$PROJECT" = "miniupnpc" ]; then INSTALLPREFIX="$HOME/_pythonmodule" make -f $MAKEFILE pythonmodule; fi'
 
 after_success:
   - 'INSTALLPREFIX="$HOME/$PROJECT" make -f $MAKEFILE install'
