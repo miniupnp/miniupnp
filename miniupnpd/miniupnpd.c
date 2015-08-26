@@ -378,7 +378,8 @@ OpenAndConfHTTPSocket(unsigned short * port)
 		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
 		              lan_addrs.lh_first->ifname,
 		              strlen(lan_addrs.lh_first->ifname)) < 0)
-			syslog(LOG_WARNING, "setsockopt(udp, SO_BINDTODEVICE): %m");
+			syslog(LOG_WARNING, "setsockopt(http, SO_BINDTODEVICE, %s): %m",
+			       lan_addrs.lh_first->ifname);
 	}
 #endif /* defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP) */
 

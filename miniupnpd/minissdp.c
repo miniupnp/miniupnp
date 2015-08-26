@@ -185,7 +185,9 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
 		              lan_addrs.lh_first->ifname,
 		              strlen(lan_addrs.lh_first->ifname)) < 0)
-		    syslog(LOG_WARNING, "setsockopt(udp, SO_BINDTODEVICE): %m");
+		    syslog(LOG_WARNING, "%s: setsockopt(udp%s, SO_BINDTODEVICE, %s): %m",
+			       "OpenAndConfSSDPReceiveSocket", ipv6 ? "6" : "",
+			       lan_addrs.lh_first->ifname);
 	}
 #endif /* defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP) */
 
