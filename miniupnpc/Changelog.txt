@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.212 2015/07/23 20:41:50 nanard Exp $
 miniUPnP client Changelog.
 
+2015/08/27:
+  avoid unix socket leak in getDevicesFromMiniSSDPD()
+
 2015/08/16:
   Also accept "Up" as ConnectionStatus value
 

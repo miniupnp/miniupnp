@@ -44,7 +44,7 @@ struct sockaddr_un {
 struct UPNPDev *
 getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * error)
 {
-	struct UPNPDev * devlist;
+	struct UPNPDev * devlist = NULL;
 	int s;
 	int res;
 
@@ -58,9 +58,9 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * err
 	if (res < 0) {
 		if (error)
 			*error = res;
-		return NULL;
+	} else {
+		devlist = receiveDevicesFromMiniSSDPD(s, error);
 	}
-	devlist = receiveDevicesFromMiniSSDPD(s, error);
 	disconnectFromMiniSSDPD(s);
 	return devlist;
 }
@@ -145,6 +145,7 @@ connectToMiniSSDPD(const char * socketpath)
 	if(connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0)
 	{
 		/*syslog(LOG_WARNING, "connect(\"%s\"): %m", socketpath);*/
+		close(s);
 		return MINISSDPC_SOCKET_ERROR;
 	}
 	return s;
