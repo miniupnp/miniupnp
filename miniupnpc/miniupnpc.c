@@ -301,8 +301,18 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 #endif	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
 
 	/* direct discovery if minissdpd responses are not sufficient */
-	return ssdpDiscoverDevices(deviceTypes, delay, multicastif, sameport,
-	                           ipv6, ttl, error, searchalltypes);
+	{
+		struct UPNPDev * discovered_devlist;
+		discovered_devlist = ssdpDiscoverDevices(deviceTypes, delay, multicastif, sameport,
+		                                         ipv6, ttl, error, searchalltypes);
+		if(devlist == NULL)
+			devlist = discovered_devlist;
+		else {
+			for(tmp = devlist; tmp->pNext != NULL; tmp = tmp->pNext);
+			tmp->pNext = discovered_devlist;
+		}
+	}
+	return devlist;
 }
 
 /* upnpDiscover() Discover IGD device */
