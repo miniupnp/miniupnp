@@ -9,9 +9,11 @@
 #define MINISSDPC_H_INCLUDED
 
 #include "miniupnpc_declspec.h"
+#include "upnpdev.h"
 
 /* error codes : */
 #define MINISSDPC_SUCCESS (0)
+#define MINISSDPC_UNKNOWN_ERROR (-1)
 #define MINISSDPC_SOCKET_ERROR (-101)
 #define MINISSDPC_MEMORY_ERROR (-102)
 #define MINISSDPC_INVALID_INPUT (-103)
@@ -35,6 +37,14 @@ requestDevicesFromMiniSSDPD(int fd, const char * devtype);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 receiveDevicesFromMiniSSDPD(int fd, int * error);
+
+MINIUPNP_LIBSPEC struct UPNPDev *
+ssdpDiscoverDevices(const char * const deviceTypes[],
+                    int delay, const char * multicastif,
+                    int sameport,
+                    int ipv6, unsigned char ttl,
+                    int * error,
+                    int searchalltypes);
 
 #ifdef __cplusplus
 }

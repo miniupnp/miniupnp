@@ -62,13 +62,13 @@ SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        minixmlvalid.c testupnpreplyparse.c minissdpc.c \
        upnperrors.c testigddescparse.c testminiwget.c \
        connecthostport.c portlistingparse.c receivedata.c \
-       testportlistingparse.c miniupnpcmodule.c \
+       upnpdev.c testportlistingparse.c miniupnpcmodule.c \
        minihttptestserver.c \
        listdevices.c
 
 LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
-          connecthostport.o portlistingparse.o receivedata.o
+          connecthostport.o portlistingparse.o receivedata.o upnpdev.o
 
 ifneq ($(OS), AmigaOS)
 CFLAGS := -fPIC $(CFLAGS)
