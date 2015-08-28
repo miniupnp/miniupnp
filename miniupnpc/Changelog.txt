@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.212 2015/07/23 20:41:50 nanard Exp $
+$Id: Changelog.txt,v 1.214 2015/08/28 12:14:17 nanard Exp $
 miniUPnP client Changelog.
+
+2015/08/28:
+  move ssdpDiscoverDevices() to minissdpc.c
 
 2015/08/27:
   avoid unix socket leak in getDevicesFromMiniSSDPD()
