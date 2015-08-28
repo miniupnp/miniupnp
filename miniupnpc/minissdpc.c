@@ -18,6 +18,13 @@
 #include <io.h>
 #include <winsock.h>
 #include <stdint.h>
+#ifndef strncasecmp
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#define strncasecmp _memicmp
+#else /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
+#define strncasecmp memicmp
+#endif /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
+#endif /* #ifndef strncasecmp */
 #endif
 #if defined(__amigaos__) || defined(__amigaos4__)
 #include <sys/socket.h>
