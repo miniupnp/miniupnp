@@ -8,6 +8,7 @@
 /*#include <syslog.h>*/
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -41,6 +42,7 @@ struct sockaddr_un {
 #else /* defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__) */
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
