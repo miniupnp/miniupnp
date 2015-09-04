@@ -5,18 +5,6 @@
  * copyright (c) 2005-2015 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
-#define __EXTENSIONS__ 1
-#if !defined(__APPLE__) && !defined(__sun)
-#if !defined(_XOPEN_SOURCE) && !defined(__OpenBSD__) && !defined(__NetBSD__)
-#ifndef __cplusplus
-#define _XOPEN_SOURCE 600
-#endif
-#endif
-#ifndef __BSD_VISIBLE
-#define __BSD_VISIBLE 1
-#endif
-#endif
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
