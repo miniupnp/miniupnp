@@ -31,7 +31,7 @@ compiler:
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
-  - 'MAKEFILE=Makefile && if [ -a Makefile.linux ]; then MAKEFILE=Makefile.linux; fi'
+  - 'MAKEFILE=Makefile && if [ -f Makefile.linux -a "$TRAVIS_OS_NAME" = "linux" ]; then MAKEFILE=Makefile.linux; elif [ -f Makefile.macosx -a "$TRAVIS_OS_NAME" = "osx" ]; then MAKEFILE=Makefile.macosx; fi'
   - 'make -f $MAKEFILE -j3'
   - 'if [ "$PROJECT" = "miniupnpc" -o "$PROJECT" = "minissdpd" ]; then make -f $MAKEFILE check; fi'
   - 'if [ "$PROJECT" = "miniupnpc" ]; then INSTALLPREFIX="$HOME/_pythonmodule" make -f $MAKEFILE pythonmodule; fi'
