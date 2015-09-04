@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.12 2015/07/16 15:13:49 nanard Exp $
+# $Id: testminiwget.sh,v 1.13 2015/09/03 17:57:44 nanard Exp $
 # project miniupnp : http://miniupnp.free.fr/
 # (c) 2011-2015 Thomas Bernard
 #
@@ -15,7 +15,7 @@
 # The script was tested and works with ksh, bash
 # it should now also run with dash
 
-TMPD=`mktemp -t -d miniwgetXXXXXXXXXX`
+TMPD=`mktemp -d -t miniwgetXXXXXXXXXX`
 HTTPSERVEROUT="${TMPD}/httpserverout"
 EXPECTEDFILE="${TMPD}/expectedfile"
 DOWNLOADEDFILE="${TMPD}/downloadedfile"
