@@ -7,7 +7,7 @@ IF=lo
 if [ "$OS" = "Darwin" ] ; then
 	IF=lo0
 fi
-SOCKET=`mktemp -t minissdpdsocket`
+SOCKET=`mktemp -t minissdpdsocketXXXXXX`
 PID="${SOCKET}.pid"
 ./minissdpd -s $SOCKET -p $PID -i $IF  || exit 1
 ./testminissdpd -s $SOCKET || exit 2
