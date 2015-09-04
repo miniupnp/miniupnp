@@ -50,9 +50,12 @@ JAVA = java
 #JNAERATOR = jnaerator-0.9.8-shaded.jar
 #JNAERATORARGS = -library miniupnpc
 #JNAERATOR = jnaerator-0.10-shaded.jar
-JNAERATOR = jnaerator-0.11-shaded.jar
+#JNAERATOR = jnaerator-0.11-shaded.jar
+# https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12/jnaerator-0.12-shaded.jar
+JNAERATOR = jnaerator-0.12-shaded.jar
 JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
-JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
+#JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
+JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12
 
 ifeq (SunOS, $(OS))
   LDFLAGS=-lsocket -lnsl -lresolv
