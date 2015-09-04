@@ -8,6 +8,7 @@
 /*#include <syslog.h>*/
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -18,21 +19,30 @@
 #include <io.h>
 #include <winsock.h>
 #include <stdint.h>
-#endif
+#ifndef strncasecmp
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#define strncasecmp _memicmp
+#else /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
+#define strncasecmp memicmp
+#endif /* defined(_MSC_VER) && (_MSC_VER >= 1400) */
+#endif /* #ifndef strncasecmp */
+#endif /* _WIN32 */
 #if defined(__amigaos__) || defined(__amigaos4__)
 #include <sys/socket.h>
-#endif
+#endif /* defined(__amigaos__) || defined(__amigaos4__) */
 #if defined(__amigaos__)
 #define uint16_t unsigned short
-#endif
+#endif /* defined(__amigaos__) */
 /* Hack */
 #define UNIX_PATH_LEN   108
 struct sockaddr_un {
   uint16_t sun_family;
   char     sun_path[UNIX_PATH_LEN];
 };
-#else
+#else /* defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__) */
 #include <sys/socket.h>
+#include <sys/param.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
