@@ -29,6 +29,10 @@ compiler:
   - gcc
   - clang
 
+before_install:
+  - 'if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update; fi'
+  - 'if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew outdated libevent2 || brew upgrade libevent2; fi'
+
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
   - 'MAKEFILE=Makefile && if [ -f Makefile.linux -a "$TRAVIS_OS_NAME" = "linux" ]; then MAKEFILE=Makefile.linux; elif [ -f Makefile.macosx -a "$TRAVIS_OS_NAME" = "osx" ]; then MAKEFILE=Makefile.macosx; fi'
