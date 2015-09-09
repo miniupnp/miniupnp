@@ -31,7 +31,7 @@ compiler:
 
 before_install:
   - 'if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update; fi'
-  - 'if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew outdated libevent2 || brew upgrade libevent2; fi'
+  - 'if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew outdated libevent || brew upgrade libevent; fi'
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
