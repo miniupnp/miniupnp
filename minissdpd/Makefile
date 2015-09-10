@@ -62,10 +62,14 @@ ifneq ($(OS), Darwin)
 	$(INSTALL) minissdpd.init.d.script $(PREFIX)/etc/init.d/minissdpd
 endif
 
-check:	validateminissdpd
+check:	validateminissdpd validatecodelength
 
 validateminissdpd:	testminissdpd minissdpd
 	./testminissdpd.sh
+	touch $@
+
+validatecodelength:	testcodelength
+	./testcodelength
 	touch $@
 
 minissdpd: $(MINISSDPDOBJS)
