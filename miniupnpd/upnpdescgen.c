@@ -1,7 +1,7 @@
 /* $Id: upnpdescgen.c,v 1.77 2014/03/10 11:04:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -880,6 +880,14 @@ genXML(char * str, int * len, int * tmplen,
 				str = strcat_char(str, len, tmplen, '<');
 				str = strcat_str(str, len, tmplen, eltname+1);
 				str = strcat_char(str, len, tmplen, '>');
+#ifdef RANDOMIZE_URLS
+				if(p[i].data[0] == '/')
+				{
+					/* prepend all URL paths with a "random" value */
+					str = strcat_char(str, len, tmplen, '/');
+					str = strcat_str(str, len, tmplen, random_url);
+				}
+#endif /* RANDOMIZE_URLS */
 				str = strcat_str(str, len, tmplen, p[i].data);
 				str = strcat_char(str, len, tmplen, '<');
 				str = strcat_str(str, len, tmplen, eltname);
@@ -916,7 +924,7 @@ genXML(char * str, int * len, int * tmplen,
 			k = (unsigned long)p[i].data;
 			i = k & 0xffff;
 			j = i + (k >> 16);
-			top++;
+			top++;	/* TODO : check stack overflow ! */
 			/*printf(" +pile[%d]\t%d %d\n", top, i, j); */
 			pile[top].i = i;
 			pile[top].j = j;

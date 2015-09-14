@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.400 2015/08/26 07:32:31 nanard Exp $
 
+2015/09/14:
+  Randomize URLs to avoid http://www.filet-o-firewall.com/
+
 2015/08/25:
   better bind socket to right interface(s),
     using struct ip_mreqn, SO_BINDTODEVICE

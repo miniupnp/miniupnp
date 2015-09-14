@@ -1656,6 +1656,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 
 	/* initialize random number generator */
 	srandom((unsigned int)time(NULL));
+#ifdef RANDOMIZE_URLS
+	snprintf(random_url, RANDOM_URL_MAX_LEN, "%08lx", random());
+#endif /* RANDOMIZE_URLS */
 
 	/* initialize redirection engine (and pinholes) */
 	if(init_redirect() < 0)

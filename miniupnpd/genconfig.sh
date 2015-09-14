@@ -535,6 +535,13 @@ cat >> ${CONFIGFILE} <<EOF
 /* Uncomment the following line if your device does not have a proper clock
  * BOOTID.UPNP.ORG can be set with command line */
 #define USE_TIME_AS_BOOTID
+
+EOF
+
+cat >> ${CONFIGFILE} <<EOF
+/* With the following macro defined, a random string is prepended to all URLs */
+#define RANDOMIZE_URLS
+
 EOF
 
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}

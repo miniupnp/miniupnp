@@ -2,7 +2,7 @@
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2014 Thomas Bernard
+ * Copyright (c) 2005-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -28,6 +28,9 @@
 #include "upnpsoap.h"
 #include "upnpevents.h"
 #include "upnputils.h"
+#ifdef RANDOMIZE_URLS
+#include "upnpglobalvars.h"
+#endif /* RANDOMIZE_URLS */
 
 #ifdef ENABLE_HTTPS
 #include <openssl/err.h>
@@ -786,6 +789,17 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 			}
 		}
 	}
+#ifdef RANDOMIZE_URLS
+	/* first check if the URL begins with the randomized string */
+	if(HttpUrl[0] != '/' || memcmp(HttpUrl+1, random_url, strlen(random_url)) != 0)
+	{
+		Send404(h);
+		return;
+	}
+	/* remove "random" from the start of the URL */
+	p = HttpUrl + strlen(random_url) + 1;
+	memmove(HttpUrl, p, strlen(p) + 1);
+#endif /* RANDOMIZE_URLS */
 	if(strcmp("POST", HttpCommand) == 0)
 	{
 		h->req_command = EPost;

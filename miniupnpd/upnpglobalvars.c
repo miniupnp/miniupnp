@@ -1,7 +1,7 @@
 /* $Id: upnpglobalvars.c,v 1.39 2014/12/10 09:49:22 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -143,4 +143,8 @@ unsigned int upnp_bootid = 1;      /* BOOTID.UPNP.ORG */
  * DDD = Device Description Document
  * SCPD = Service Control Protocol Description */
 unsigned int upnp_configid = 1337; /* CONFIGID.UPNP.ORG */
+
+#ifdef RANDOMIZE_URLS
+char random_url[RANDOM_URL_MAX_LEN] = "random";
+#endif /* RANDOMIZE_URLS */
 

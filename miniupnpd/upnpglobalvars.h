@@ -1,7 +1,7 @@
 /* $Id: upnpglobalvars.h,v 1.38 2014/03/10 11:04:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -144,7 +144,7 @@ extern char ipv6_addr_for_http_with_brackets[64];
 /* address used to bind local services */
 extern struct in6_addr ipv6_bind_addr;
 
-#endif
+#endif /* ENABLE_IPV6 */
 
 extern const char * minissdpdsocketpath;
 
@@ -152,5 +152,9 @@ extern const char * minissdpdsocketpath;
 extern unsigned int upnp_bootid;
 extern unsigned int upnp_configid;
 
-#endif
+#ifdef RANDOMIZE_URLS
+#define RANDOM_URL_MAX_LEN (16)
+extern char random_url[];
+#endif /* RANDOMIZE_URLS */
 
+#endif /* UPNPGLOBALVARS_H_INCLUDED */

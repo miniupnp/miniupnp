@@ -458,10 +458,17 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 		"USN: %s%s%.*s%s\r\n"
 		"EXT:\r\n"
 		"SERVER: " MINIUPNPD_SERVER_STRING "\r\n"
+#ifndef RANDOMIZE_URLS
 		"LOCATION: http://%s:%u" ROOTDESC_PATH "\r\n"
 #ifdef ENABLE_HTTPS
 		"SECURELOCATION.UPNP.ORG: https://%s:%u" ROOTDESC_PATH "\r\n"
-#endif
+#endif	/* ENABLE_HTTPS */
+#else	/* RANDOMIZE_URLS */
+		"LOCATION: http://%s:%u/%s" ROOTDESC_PATH "\r\n"
+#ifdef ENABLE_HTTPS
+		"SECURELOCATION.UPNP.ORG: https://%s:%u/%s" ROOTDESC_PATH "\r\n"
+#endif	/* ENABLE_HTTPS */
+#endif	/* RANDOMIZE_URLS */
 		"OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n" /* UDA v1.1 */
 		"01-NLS: %u\r\n" /* same as BOOTID. UDA v1.1 */
 		"BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
@@ -474,9 +481,15 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 		uuidvalue, st_is_uuid ? "" : "::",
 		st_is_uuid ? 0 : st_len, st, suffix,
 		host, (unsigned int)http_port,
+#ifdef RANDOMIZE_URLS
+		random_url,
+#endif	/* RANDOMIZE_URLS */
 #ifdef ENABLE_HTTPS
 		host, (unsigned int)https_port,
-#endif
+#ifdef RANDOMIZE_URLS
+		random_url,
+#endif	/* RANDOMIZE_URLS */
+#endif	/* ENABLE_HTTPS */
 		upnp_bootid, upnp_bootid, upnp_configid);
 	if(l<0)
 	{
@@ -563,10 +576,17 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 		"NOTIFY * HTTP/1.1\r\n"
 		"HOST: %s:%d\r\n"
 		"CACHE-CONTROL: max-age=%u\r\n"
+#ifndef RANDOMIZE_URLS
 		"LOCATION: http://%s:%u" ROOTDESC_PATH "\r\n"
 #ifdef ENABLE_HTTPS
 		"SECURELOCATION.UPNP.ORG: https://%s:%u" ROOTDESC_PATH "\r\n"
-#endif
+#endif	/* ENABLE_HTTPS */
+#else	/* RANDOMIZE_URLS */
+		"LOCATION: http://%s:%u/%s" ROOTDESC_PATH "\r\n"
+#ifdef ENABLE_HTTPS
+		"SECURELOCATION.UPNP.ORG: https://%s:%u/%s" ROOTDESC_PATH "\r\n"
+#endif	/* ENABLE_HTTPS */
+#endif	/* RANDOMIZE_URLS */
 		"SERVER: " MINIUPNPD_SERVER_STRING "\r\n"
 		"NT: %s%s\r\n"
 		"USN: %s%s%s%s\r\n"
@@ -579,9 +599,15 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 		dest_str, SSDP_PORT,			/* HOST: */
 		lifetime,						/* CACHE-CONTROL: */
 		host, (unsigned int)http_port,	/* LOCATION: */
+#ifdef RANDOMIZE_URLS
+		random_url,
+#endif	/* RANDOMIZE_URLS */
 #ifdef ENABLE_HTTPS
 		host, (unsigned int)https_port,	/* SECURE-LOCATION: */
-#endif
+#ifdef RANDOMIZE_URLS
+		random_url,
+#endif	/* RANDOMIZE_URLS */
+#endif	/* ENABLE_HTTPS */
 		nt, suffix,						/* NT: */
 		usn1, usn2, usn3, suffix,		/* USN: */
 		upnp_bootid,					/* 01-NLS: */
