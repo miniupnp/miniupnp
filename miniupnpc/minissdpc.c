@@ -17,6 +17,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <io.h>
+#include <iphlpapi.h>
 #include <winsock.h>
 #include <stdint.h>
 #ifndef strncasecmp
