@@ -4,9 +4,6 @@ os:
   - linux
   - osx
 
-matrix:
-  fast_finish: true
-
 addons:
   apt:
     packages:
