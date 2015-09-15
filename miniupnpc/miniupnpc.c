@@ -244,7 +244,9 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 {
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = 0;
+#if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
 	int deviceIndex;
+#endif /* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
 
 	if(error)
 		*error = UPNPDISCOVER_UNKNOWN_ERROR;
