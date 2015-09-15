@@ -22,6 +22,11 @@ env:
   - 'PROJECT=miniupnpc-libevent'
   - 'PROJECT=miniupnpd'
 
+matrix:
+  exclude:
+    - os: osx
+      env: PROJECT=miniupnpd
+
 compiler:
   - gcc
   - clang
