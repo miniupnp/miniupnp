@@ -537,34 +537,36 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		}
 		if(pIPAddrTable) {
 			dwRetVal = GetIpAddrTable( pIPAddrTable, &dwSize, 0 );
+			if (dwRetVal == NO_ERROR) {
 #ifdef DEBUG
-			printf("\tNum Entries: %ld\n", pIPAddrTable->dwNumEntries);
+				printf("\tNum Entries: %ld\n", pIPAddrTable->dwNumEntries);
 #endif
-			for (i=0; i < (int) pIPAddrTable->dwNumEntries; i++) {
+				for (i=0; i < (int) pIPAddrTable->dwNumEntries; i++) {
 #ifdef DEBUG
-				printf("\n\tInterface Index[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwIndex);
-				IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwAddr;
-				printf("\tIP Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
-				IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwMask;
-				printf("\tSubnet Mask[%d]:    \t%s\n", i, inet_ntoa(IPAddr) );
-				IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwBCastAddr;
-				printf("\tBroadCast[%d]:      \t%s (%ld)\n", i, inet_ntoa(IPAddr), pIPAddrTable->table[i].dwBCastAddr);
-				printf("\tReassembly size[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwReasmSize);
-				printf("\tType and State[%d]:", i);
-				printf("\n");
+					printf("\n\tInterface Index[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwIndex);
+					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwAddr;
+					printf("\tIP Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
+					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwMask;
+					printf("\tSubnet Mask[%d]:    \t%s\n", i, inet_ntoa(IPAddr) );
+					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwBCastAddr;
+					printf("\tBroadCast[%d]:      \t%s (%ld)\n", i, inet_ntoa(IPAddr), pIPAddrTable->table[i].dwBCastAddr);
+					printf("\tReassembly size[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwReasmSize);
+					printf("\tType and State[%d]:", i);
+					printf("\n");
 #endif
-				if (pIPAddrTable->table[i].dwIndex == ip_forward.dwForwardIfIndex) {
-					/* Set the address of this interface to be used */
-					struct in_addr mc_if;
-					memset(&mc_if, 0, sizeof(mc_if));
-					mc_if.s_addr = pIPAddrTable->table[i].dwAddr;
-					if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0) {
-						PRINT_SOCKET_ERROR("setsockopt");
-					}
-					((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = pIPAddrTable->table[i].dwAddr;
+					if (pIPAddrTable->table[i].dwIndex == ip_forward.dwForwardIfIndex) {
+						/* Set the address of this interface to be used */
+						struct in_addr mc_if;
+						memset(&mc_if, 0, sizeof(mc_if));
+						mc_if.s_addr = pIPAddrTable->table[i].dwAddr;
+						if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0) {
+							PRINT_SOCKET_ERROR("setsockopt");
+						}
+						((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = pIPAddrTable->table[i].dwAddr;
 #ifndef DEBUG
-					break;
+						break;
 #endif
+					}
 				}
 			}
 			free(pIPAddrTable);
@@ -586,7 +588,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	}
 
 #ifdef _WIN32
-	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &_ttl, sizeof(_ttl)) < 0)
+	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, (const char *)&_ttl, sizeof(_ttl)) < 0)
 #else  /* _WIN32 */
 	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
 #endif /* _WIN32 */
