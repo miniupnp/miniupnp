@@ -14,3 +14,4 @@ testportinuse
 netfilter/testiptcrdr
 netfilter/testiptcrdr_dscp
 netfilter/testiptcrdr_peer
+testdescs
