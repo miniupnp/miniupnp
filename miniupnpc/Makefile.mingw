@@ -12,9 +12,10 @@ LDLIBS = -lws2_32 -liphlpapi
 # -liphlpapi is needed for GetBestRoute() and GetIpAddrTable()
 PYTHON=\utils\python25\python
 OBJS=miniwget.o minixml.o igd_desc_parse.o minisoap.o \
+     minissdpc.o \
      miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
      connecthostport.o portlistingparse.o receivedata.o \
-     upnpdev.o minissdpc.c
+     upnpdev.o
 OBJSDLL=$(addprefix dll/, $(OBJS))
 
 all:	init upnpc-static upnpc-shared testminixml libminiupnpc.a miniupnpc.dll
