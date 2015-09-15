@@ -13,7 +13,8 @@ LDLIBS = -lws2_32 -liphlpapi
 PYTHON=\utils\python25\python
 OBJS=miniwget.o minixml.o igd_desc_parse.o minisoap.o \
      miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
-     connecthostport.o portlistingparse.o receivedata.o
+     connecthostport.o portlistingparse.o receivedata.o \
+     upnpdev.o minissdpc.c
 OBJSDLL=$(addprefix dll/, $(OBJS))
 
 all:	init upnpc-static upnpc-shared testminixml libminiupnpc.a miniupnpc.dll
@@ -89,4 +90,8 @@ testminixml:	minixml.o igd_desc_parse.o testminixml.c
 upnpreplyparse.o:	upnpreplyparse.c upnpreplyparse.h minixml.h
 
 upnpcommands.o:	upnpcommands.c upnpcommands.h upnpreplyparse.h miniupnpc.h portlistingparse.h
+
+minissdpc.o:	minissdpc.c minissdpc.h codelength.h receivedata.h
+
+upnpdev.o:	upnpdev.c upnpdev.h
 
