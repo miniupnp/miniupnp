@@ -1,0 +1,3 @@
+build_script:
+  - cmd: 'cd miniupnpc'
+  - cmd: 'mingw32make.bat'
