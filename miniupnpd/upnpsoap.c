@@ -248,6 +248,7 @@ GetStatusInfo(struct upnphttp * h, const char * action, const char * ns)
 static void
 GetNATRSIPStatus(struct upnphttp * h, const char * action, const char * ns)
 {
+#if 0
 	static const char resp[] =
 		"<u:GetNATRSIPStatusResponse "
 		"xmlns:u=\"" SERVICE_TYPE_WANIPC "\">"
@@ -255,6 +256,15 @@ GetNATRSIPStatus(struct upnphttp * h, const char * action, const char * ns)
 		"<NewNATEnabled>1</NewNATEnabled>"
 		"</u:GetNATRSIPStatusResponse>";
 	UNUSED(action);
+#endif
+	static const char resp[] =
+		"<u:%sResponse "
+		"xmlns:u=\"%s\">"
+		"<NewRSIPAvailable>0</NewRSIPAvailable>"
+		"<NewNATEnabled>1</NewNATEnabled>"
+		"</u:%sResponse>";
+	char body[512];
+	int bodylen;
 	/* 2.2.9. RSIPAvailable
 	 * This variable indicates if Realm-specific IP (RSIP) is available
 	 * as a feature on the InternetGatewayDevice. RSIP is being defined
@@ -263,7 +273,10 @@ GetNATRSIPStatus(struct upnphttp * h, const char * action, const char * ns)
 	 * applications that otherwise break if NAT is introduced
 	 * (e.g. IPsec-based VPNs).
 	 * A gateway that does not support RSIP should set this variable to 0. */
-	BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+	bodylen = snprintf(body, sizeof(body), resp,
+		action, ns, /*SERVICE_TYPE_WANIPC,*/
+		action);
+	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
 static void
@@ -319,10 +332,15 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 {
 	int r;
 
-	static const char resp[] =
+	/*static const char resp[] =
 		"<u:AddPortMappingResponse "
-		"xmlns:u=\"" SERVICE_TYPE_WANIPC "\"/>";
+		"xmlns:u=\"" SERVICE_TYPE_WANIPC "\"/>";*/
+	static const char resp[] =
+		"<u:%sResponse "
+		"xmlns:u=\"%s\"/>";
 
+	char body[512];
+	int bodylen;
 	struct NameValueParserData data;
 	char * int_ip, * int_port, * ext_port, * protocol, * desc;
 	char * leaseduration_str;
@@ -462,7 +480,9 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	switch(r)
 	{
 	case 0:	/* success */
-		BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+		bodylen = snprintf(body, sizeof(body), resp,
+		                   action, ns/*SERVICE_TYPE_WANIPC*/);
+		BuildSendAndCloseSoapResp(h, body, bodylen);
 		break;
 	case -2:	/* already redirected */
 	case -3:	/* not permitted */
@@ -673,7 +693,7 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 		       r_host ? r_host : "NULL", ext_port, protocol, int_ip,
 		       (unsigned int)iport, desc);
 		bodylen = snprintf(body, sizeof(body), resp,
-				action, SERVICE_TYPE_WANIPC,
+				action, ns/*SERVICE_TYPE_WANIPC*/,
 				(unsigned int)iport, int_ip, desc, leaseduration,
 				action);
 		BuildSendAndCloseSoapResp(h, body, bodylen);
@@ -687,11 +707,17 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 {
 	int r;
 
-	static const char resp[] =
+	/*static const char resp[] =
 		"<u:DeletePortMappingResponse "
 		"xmlns:u=\"" SERVICE_TYPE_WANIPC "\">"
-		"</u:DeletePortMappingResponse>";
+		"</u:DeletePortMappingResponse>";*/
+	static const char resp[] =
+		"<u:%sResponse "
+		"xmlns:u=\"%s\">"
+		"</u:%sResponse>";
 
+	char body[512];
+	int bodylen;
 	struct NameValueParserData data;
 	const char * ext_port, * protocol;
 	unsigned short eport;
@@ -769,7 +795,9 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 	}
 	else
 	{
-		BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+		bodylen = snprintf(body, sizeof(body), resp,
+		                   action, ns, action);
+		BuildSendAndCloseSoapResp(h, body, bodylen);
 	}
 
 	ClearNameValueList(&data);
@@ -780,10 +808,16 @@ static void
 DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns)
 {
 	int r = -1;
-	static const char resp[] =
+	/*static const char resp[] =
 		"<u:DeletePortMappingRangeResponse "
 		"xmlns:u=\"" SERVICE_TYPE_WANIPC "\">"
-		"</u:DeletePortMappingRangeResponse>";
+		"</u:DeletePortMappingRangeResponse>";*/
+	static const char resp[] =
+		"<u:%sResponse "
+		"xmlns:u=\"%s\">"
+		"</u:%sResponse>";
+	char body[512];
+	int bodylen;
 	struct NameValueParserData data;
 	const char * protocol;
 	const char * startport_s, * endport_s;
@@ -791,7 +825,6 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	/*int manage;*/
 	unsigned short * port_list;
 	unsigned int i, number = 0;
-	UNUSED(action);
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	startport_s = GetValueFromNameValueList(&data, "NewStartPort");
@@ -838,7 +871,9 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 		       action, port_list[i], protocol, r < 0 ? "failed" : "ok");
 	}
 	free(port_list);
-	BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+	bodylen = snprintf(body, sizeof(body), resp,
+	                   action, ns, action);
+	BuildSendAndCloseSoapResp(h, body, bodylen);
 
 	ClearNameValueList(&data);
 }
@@ -1106,10 +1141,16 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 static void
 SetDefaultConnectionService(struct upnphttp * h, const char * action, const char * ns)
 {
-	static const char resp[] =
+	/*static const char resp[] =
 		"<u:SetDefaultConnectionServiceResponse "
 		"xmlns:u=\"urn:schemas-upnp-org:service:Layer3Forwarding:1\">"
-		"</u:SetDefaultConnectionServiceResponse>";
+		"</u:SetDefaultConnectionServiceResponse>";*/
+	static const char resp[] =
+		"<u:%sResponse "
+		"xmlns:u=\"%s\">"
+		"</u:%sResponse>";
+	char body[512];
+	int bodylen;
 	struct NameValueParserData data;
 	char * p;
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
@@ -1129,7 +1170,9 @@ SetDefaultConnectionService(struct upnphttp * h, const char * action, const char
 #endif
 		{
 			syslog(LOG_INFO, "%s(%s) : Ignored", action, p);
-			BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
+			bodylen = snprintf(body, sizeof(body), resp,
+			                   action, ns, action);
+			BuildSendAndCloseSoapResp(h, body, bodylen);
 		}
 	} else {
 		/* missing argument */
