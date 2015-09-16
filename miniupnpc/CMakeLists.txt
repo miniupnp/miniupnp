@@ -166,7 +166,7 @@ install (FILES
   upnperrors.h
   miniupnpctypes.h
   portlistingparse.h
-  declspec.h
+  miniupnpc_declspec.h
   DESTINATION include/miniupnpc
 )
 
