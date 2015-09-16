@@ -109,7 +109,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * err
 
 /* macros used to read from unix socket */
 #define READ_BYTE_BUFFER(c) \
-	if(bufferindex >= n) { \
+	if((int)bufferindex >= n) { \
 		n = read(s, buffer, sizeof(buffer)); \
 		if(n<=0) break; \
 		bufferindex = 0; \
@@ -123,7 +123,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * err
 #define READ_COPY_BUFFER(dst, len) \
 	for(l = len, p = (unsigned char *)dst; l > 0; ) { \
 		unsigned int lcopy; \
-		if(bufferindex >= n) { \
+		if((int)bufferindex >= n) { \
 			n = read(s, buffer, sizeof(buffer)); \
 			if(n<=0) break; \
 			bufferindex = 0; \
