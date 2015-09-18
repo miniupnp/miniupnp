@@ -161,6 +161,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\minissdpc.c"
+				>
+			</File>
+			<File
 				RelativePath="..\miniupnpc.c"
 				>
 			</File>
@@ -182,6 +186,10 @@
 			</File>
 			<File
 				RelativePath="..\upnpcommands.c"
+				>
+			</File>
+			<File
+				RelativePath="..\upnpdev.c"
 				>
 			</File>
 			<File
@@ -215,6 +223,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\minissdpc.h"
+				>
+			</File>
+			<File
 				RelativePath="..\miniupnpc.h"
 				>
 			</File>
@@ -244,6 +256,10 @@
 			</File>
 			<File
 				RelativePath="..\upnpcommands.h"
+				>
+			</File>
+			<File
+				RelativePath="..\upnpdev.h"
 				>
 			</File>
 			<File
