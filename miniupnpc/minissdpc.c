@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.15 2012/01/21 13:30:31 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.28 2015/09/18 13:05:39 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -8,9 +8,7 @@
 /*#include <syslog.h>*/
 #include <stdio.h>
 #include <string.h>
-#include <strings.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <sys/types.h>
 #if defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__)
 #ifdef _WIN32
@@ -19,7 +17,12 @@
 #include <io.h>
 #include <iphlpapi.h>
 #include <winsock.h>
+#define snprintf _snprintf
+#if !defined(_MSC_VER)
 #include <stdint.h>
+#else /* !defined(_MSC_VER) */
+typedef unsigned short uint16_t;
+#endif /* !defined(_MSC_VER) */
 #ifndef strncasecmp
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
 #define strncasecmp _memicmp
@@ -41,6 +44,8 @@ struct sockaddr_un {
   char     sun_path[UNIX_PATH_LEN];
 };
 #else /* defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__) */
+#include <strings.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -79,9 +84,11 @@ struct ip_mreqn
 #endif
 
 #include "minissdpc.h"
+#include "receivedata.h"
+
+#if !(defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__))
 
 #include "codelength.h"
-#include "receivedata.h"
 
 struct UPNPDev *
 getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * error)
@@ -358,6 +365,8 @@ free_tmp_and_return:
 	free(tmp);
 	return devlist;
 }
+
+#endif /* !(defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__)) */
 
 /* parseMSEARCHReply()
  * the last 4 arguments are filled during the parsing :
