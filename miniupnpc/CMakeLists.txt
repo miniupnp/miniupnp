@@ -70,9 +70,11 @@ set (MINIUPNPC_SOURCES
   miniupnpc.c
   minixml.c
   minisoap.c
+  minissdpc.c
   miniwget.c
   upnpc.c
   upnpcommands.c
+  upnpdev.c
   upnpreplyparse.c
   upnperrors.c
   connecthostport.c
