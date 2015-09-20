@@ -70,9 +70,11 @@ set (MINIUPNPC_SOURCES
   miniupnpc.c
   minixml.c
   minisoap.c
+  minissdpc.c
   miniwget.c
   upnpc.c
   upnpcommands.c
+  upnpdev.c
   upnpreplyparse.c
   upnperrors.c
   connecthostport.c
@@ -164,6 +166,7 @@ install (FILES
   igd_desc_parse.h
   upnpreplyparse.h
   upnperrors.h
+  upnpdev.h
   miniupnpctypes.h
   portlistingparse.h
   miniupnpc_declspec.h
