@@ -40,9 +40,7 @@ CONFIGFILE="config.h.tmp"
 CONFIGFILE_FINAL="config.h"
 CONFIGMACRO="CONFIG_H_INCLUDED"
 
-# version reported in XML descriptions
-#UPNP_VERSION=20070827
-UPNP_VERSION=`date +"%Y%m%d"`
+MINIUPNPD_DATE=`date +"%Y%m%d"`
 # Facility to syslog
 LOG_MINIUPNPD="LOG_DAEMON"
 
@@ -90,7 +88,7 @@ echo "#include <inttypes.h>" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 echo "#define MINIUPNPD_VERSION \"`cat VERSION`\"" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
-echo "#define UPNP_VERSION	\"$UPNP_VERSION\"" >> ${CONFIGFILE}
+echo "#define MINIUPNPD_DATE	\"$MINIUPNPD_DATE\"" >> ${CONFIGFILE}
 
 # OS Specific stuff
 case $OS_NAME in
