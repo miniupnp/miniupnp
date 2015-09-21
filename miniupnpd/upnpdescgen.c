@@ -140,8 +140,8 @@ static const struct XMLElt rootDesc[] =
 #else
 	{"device", INITHELPER(5,12)},
 #endif
-	{"/major", "2"},
-	{"/minor", "0"},
+	{"/major", UPNP_VERSION_MAJOR_STR},
+	{"/minor", UPNP_VERSION_MINOR_STR},
 /* 5 */
 	{"/deviceType", DEVICE_TYPE_IGD},
 		/* urn:schemas-upnp-org:device:InternetGatewayDevice:1 or 2 */
@@ -976,7 +976,8 @@ genServiceDesc(int * len, const struct serviceDesc * s)
 	str = strcat_char(str, len, &tmplen, '>');
 
 	str = strcat_str(str, len, &tmplen,
-		"<specVersion><major>2</major><minor>0</minor></specVersion>");
+		"<specVersion><major>" UPNP_VERSION_MAJOR_STR "</major>"
+		"<minor>" UPNP_VERSION_MINOR_STR "</minor></specVersion>");
 
 	i = 0;
 	str = strcat_str(str, len, &tmplen, "<actionList>");
