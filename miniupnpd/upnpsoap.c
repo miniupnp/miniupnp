@@ -106,7 +106,7 @@ GetTotalBytesSent(struct upnphttp * h, const char * action, const char * ns)
 
 	r = getifstats(ext_if_name, &data);
 	bodylen = snprintf(body, sizeof(body), resp,
-	         action, ns,
+	         action, ns, /* was "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" */
              r<0?0:data.obytes, action);
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
@@ -128,7 +128,7 @@ GetTotalBytesReceived(struct upnphttp * h, const char * action, const char * ns)
 
 	r = getifstats(ext_if_name, &data);
 	bodylen = snprintf(body, sizeof(body), resp,
-	         action, ns,
+	         action, ns, /* was "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" */
 	         r<0?0:data.ibytes, action);
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
@@ -172,7 +172,7 @@ GetTotalPacketsReceived(struct upnphttp * h, const char * action, const char * n
 
 	r = getifstats(ext_if_name, &data);
 	bodylen = snprintf(body, sizeof(body), resp,
-	         action, ns,
+	         action, ns, /* was "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" */
 	         r<0?0:data.ipackets, action);
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
@@ -211,7 +211,7 @@ GetCommonLinkProperties(struct upnphttp * h, const char * action, const char * n
 		status = "Down";
 	}
 	bodylen = snprintf(body, sizeof(body), resp,
-	    action, ns,
+	    action, ns, /* was "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" */
 	    wan_access_type,
 	    upstream_bitrate, downstream_bitrate,
 	    status, action);
@@ -1196,6 +1196,7 @@ GetDefaultConnectionService(struct upnphttp * h, const char * action, const char
 	char body[1024];
 	int bodylen;
 
+	/* namespace : urn:schemas-upnp-org:service:Layer3Forwarding:1 */
 	bodylen = snprintf(body, sizeof(body), resp,
 	                   action, ns, uuidvalue_wcd, action);
 	BuildSendAndCloseSoapResp(h, body, bodylen);
