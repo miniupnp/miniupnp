@@ -40,9 +40,7 @@ CONFIGFILE=`mktemp tmp.config.h.XXXXXXXXXX`
 CONFIGFILE_FINAL="config.h"
 CONFIGMACRO="CONFIG_H_INCLUDED"
 
-# version reported in XML descriptions
-#UPNP_VERSION=20070827
-UPNP_VERSION=`date +"%Y%m%d"`
+MINIUPNPD_DATE=`date +"%Y%m%d"`
 # Facility to syslog
 LOG_MINIUPNPD="LOG_DAEMON"
 
@@ -90,8 +88,26 @@ echo "" >> ${CONFIGFILE}
 echo "#include <inttypes.h>" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 echo "#define MINIUPNPD_VERSION \"`cat VERSION`\"" >> ${CONFIGFILE}
+echo "#define MINIUPNPD_DATE	\"$MINIUPNPD_DATE\"" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
-echo "#define UPNP_VERSION	\"$UPNP_VERSION\"" >> ${CONFIGFILE}
+
+cat >> ${CONFIGFILE} <<EOF
+#ifndef XSTR
+#define XSTR(s) STR(s)
+#define STR(s) #s
+#endif /* XSTR */
+EOF
+
+echo "" >> ${CONFIGFILE}
+cat >> ${CONFIGFILE} <<EOF
+/* UPnP version reported in XML descriptions
+ * 1.0 / 1.1 / 2.0 depending on which UDA (UPnP Device Architecture) Version */
+#define UPNP_VERSION_MAJOR	2
+#define UPNP_VERSION_MINOR	0
+#define UPNP_VERSION_MAJOR_STR	XSTR(UPNP_VERSION_MAJOR)
+#define UPNP_VERSION_MINOR_STR	XSTR(UPNP_VERSION_MINOR)
+EOF
+echo "" >> ${CONFIGFILE}
 
 # OS Specific stuff
 case $OS_NAME in
