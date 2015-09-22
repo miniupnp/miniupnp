@@ -153,6 +153,26 @@ typedef struct pcp_info {
 	char desc[64];
 } pcp_info_t;
 
+/* getPCPOpCodeStr()
+ * return a string representation of the PCP OpCode
+ * can be used for debug output */
+static const char * getPCPOpCodeStr(uint8_t opcode)
+{
+	switch(opcode) {
+	case PCP_OPCODE_ANNOUNCE:
+		return "ANNOUNCE";
+	case PCP_OPCODE_MAP:
+		return "MAP";
+	case PCP_OPCODE_PEER:
+		return "PEER";
+#ifdef  PCP_SADSCP
+	case PCP_OPCODE_SADSCP:
+		return "SADSCP";
+#endif	/* PCP_SADSCP */
+	default:
+		return "UNKNOWN";
+	}
+}
 #ifdef PCP_SADSCP
 int get_dscp_value(pcp_info_t *pcp_msg_info) {
 
@@ -258,7 +278,7 @@ static void printMAPOpcodeVersion2(const uint8_t *buf)
 }
 #endif /* DEBUG */
 
-static int parsePCPMAP_version1(const uint8_t *map_v1,
+static void parsePCPMAP_version1(const uint8_t *map_v1,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_map_op = 1;
@@ -267,16 +287,9 @@ static int parsePCPMAP_version1(const uint8_t *map_v1,
 	pcp_msg_info->ext_port = READNU16(map_v1 + 6);
 
 	pcp_msg_info->ext_ip = (struct in6_addr *)(map_v1 + 8);
-
-	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port != 0) {
-		syslog(LOG_ERR, "PCP MAP: Protocol was ZERO, but internal port has non-ZERO value.");
-		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
-		return 1;
-	}
-	return 0;
 }
 
-static int parsePCPMAP_version2(const uint8_t *map_v2,
+static void parsePCPMAP_version2(const uint8_t *map_v2,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_map_op = 1;
@@ -286,14 +299,6 @@ static int parsePCPMAP_version2(const uint8_t *map_v2,
 	pcp_msg_info->ext_port = READNU16(map_v2 + 18);
 
 	pcp_msg_info->ext_ip = (struct in6_addr *)(map_v2 + 20);
-
-	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0 ) {
-		syslog(LOG_ERR, "PCP MAP: Protocol was ZERO, but internal port has non-ZERO value.");
-		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
-		return PCP_ERR_MALFORMED_REQUEST;
-	}
-
-	return 0;
 }
 
 #ifdef PCP_PEER
@@ -336,7 +341,7 @@ static void printPEEROpcodeVersion2(const uint8_t *buf)
  * Function extracting information from peer_buf to pcp_msg_info
  * @return : when no problem occurred 0 is returned, 1 otherwise
  */
-static int parsePCPPEER_version1(const uint8_t *buf,
+static void parsePCPPEER_version1(const uint8_t *buf,
 		pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_peer_op = 1;
@@ -347,20 +352,13 @@ static int parsePCPPEER_version1(const uint8_t *buf,
 
 	pcp_msg_info->ext_ip = (struct in6_addr *)(buf + 8);
 	pcp_msg_info->peer_ip = (struct in6_addr *)(buf + 28);
-
-	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port !=0) {
-		syslog(LOG_ERR, "PCP PEER: protocol was ZERO, but internal port has non-ZERO value.");
-		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
-		return 1;
-	}
-	return 0;
 }
 
 /*
  * Function extracting information from peer_buf to pcp_msg_info
  * @return : when no problem occurred 0 is returned, 1 otherwise
  */
-static int parsePCPPEER_version2(const uint8_t *buf, pcp_info_t *pcp_msg_info)
+static void parsePCPPEER_version2(const uint8_t *buf, pcp_info_t *pcp_msg_info)
 {
 	pcp_msg_info->is_peer_op = 1;
 	memcpy(pcp_msg_info->nonce, buf, 12);
@@ -371,13 +369,6 @@ static int parsePCPPEER_version2(const uint8_t *buf, pcp_info_t *pcp_msg_info)
 
 	pcp_msg_info->ext_ip = (struct in6_addr *)(buf + 20);
 	pcp_msg_info->peer_ip = (struct in6_addr *)(buf + 40);
-
-	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port != 0) {
-		syslog(LOG_ERR, "PCP PEER: protocol was ZERO, but internal port has non-ZERO value.");
-		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
-		return 1;
-	}
-	return 0;
 }
 #endif /* PCP_PEER */
 
@@ -1153,6 +1144,8 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 
 	/* protocol zero means 'all protocols' : internal port MUST be zero */
 	if (pcp_msg_info->protocol == 0 && pcp_msg_info->int_port != 0) {
+		syslog(LOG_ERR, "PCP %s: Protocol was ZERO, but internal port "
+		       "has non-ZERO value.", getPCPOpCodeStr(pcp_msg_info->opcode));
 		pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 		return 0;
 	}
@@ -1181,7 +1174,7 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	case PCP_OPCODE_PEER:
 		snprintf(pcp_msg_info->desc, sizeof(pcp_msg_info->desc),
 			 "PCP %s %08x%08x%08x",
-			 pcp_msg_info->opcode == PCP_OPCODE_MAP ? "MAP":"PEER",
+			 getPCPOpCodeStr(pcp_msg_info->opcode),
 			 pcp_msg_info->nonce[0],
 			 pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
 		break;
@@ -1243,9 +1236,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 #ifdef DEBUG
 			printMAPOpcodeVersion1(req);
 #endif /* DEBUG */
-			if ( parsePCPMAP_version1(req, pcp_msg_info) ) {
-				return pcp_msg_info->result_code;
-			}
+			parsePCPMAP_version1(req, pcp_msg_info);
 
 			req += PCP_MAP_V1_SIZE;
 
@@ -1258,9 +1249,8 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				}
 			} else {
 				syslog(LOG_ERR, "PCP: Invalid PCP v1 MAP message.");
+				return pcp_msg_info->result_code;
 			}
-
-
 			break;
 
 #ifdef PCP_PEER
@@ -1275,9 +1265,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 #ifdef DEBUG
 			printPEEROpcodeVersion1(req);
 #endif /* DEBUG */
-			if ( parsePCPPEER_version1(req, pcp_msg_info) ) {
-				 return pcp_msg_info->result_code;
-			}
+			parsePCPPEER_version1(req, pcp_msg_info);
 
 			req += PCP_PEER_V1_SIZE;
 
@@ -1291,6 +1279,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				}
 			} else {
 				syslog(LOG_ERR, "PCP: Invalid PCP v1 PEER message.");
+				 return pcp_msg_info->result_code;
 			}
 
 
@@ -1320,10 +1309,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 #ifdef DEBUG
 			printMAPOpcodeVersion2(req);
 #endif /* DEBUG */
-
-			if (parsePCPMAP_version2(req, pcp_msg_info) ) {
-				return pcp_msg_info->result_code;
-			}
+			parsePCPMAP_version2(req, pcp_msg_info);
 			req += PCP_MAP_V2_SIZE;
 
 			parsePCPOptions(req, remainingSize, pcp_msg_info);
@@ -1336,6 +1322,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				}
 			} else {
 				syslog(LOG_ERR, "PCP: Invalid PCP v2 MAP message.");
+				return pcp_msg_info->result_code;
 			}
 
 
