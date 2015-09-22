@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.400 2015/08/26 07:32:31 nanard Exp $
+$Id: Changelog.txt,v 1.403 2015/09/22 10:10:52 nanard Exp $
+
+2015/09/22:
+  cleanup UPNP_VERSION macro / add UPNP_VERSION_MAJOR, UPNP_VERSION_MINOR
+  Dont use packed structs anymore to read/write PCP messages
 
 2015/09/15:
   use name server from query in SOAP responses
