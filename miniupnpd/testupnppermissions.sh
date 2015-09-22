@@ -1,5 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 # $Id: $
+
+# Array are not available with POSIX sh
+# bash / ksh
 
 RULE[1]="allow 1-20000 11.12.13.14/22 1234"
 RULEA[1]="allow 1-20000 0b0c0d0e/fffffc00 1234-1234"
