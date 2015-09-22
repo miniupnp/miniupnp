@@ -16,3 +16,4 @@ netfilter/testiptcrdr_dscp
 netfilter/testiptcrdr_peer
 testdescs
 validateupnppermissions
+validategetifaddr

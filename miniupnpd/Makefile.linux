@@ -167,7 +167,7 @@ clean:
 	$(RM) testgetroute.o testasyncsendto.o
 	$(RM) testportinuse.o
 	$(RM) miniupnpdctl.o
-	$(RM) validateupnppermissions
+	$(RM) validateupnppermissions validategetifaddr
 
 install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
 	netfilter/iptables_init.sh netfilter/iptables_removeall.sh \
@@ -198,10 +198,14 @@ else
 	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=`($(STAGING_DIR_HOST)/bin/genuuid||$(STAGING_DIR_HOST)/bin/uuidgen||$(STAGING_DIR_HOST)/bin/uuid) 2>/dev/null`/" miniupnpd.conf
 endif
 
-check:	validateupnppermissions
+check:	validateupnppermissions validategetifaddr
 
 validateupnppermissions:	testupnppermissions testupnppermissions.sh
 	./testupnppermissions.sh
+	touch $@
+
+validategetifaddr:	testgetifaddr testgetifaddr.sh
+	./testgetifaddr.sh
 	touch $@
 
 miniupnpd:	$(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
