@@ -173,6 +173,16 @@ static const char * getPCPOpCodeStr(uint8_t opcode)
 		return "UNKNOWN";
 	}
 }
+
+/* useful to copy ext_ip only if needed, as request and response
+ * buffers are same */
+static void copyIPv6IfDifferent(void * dest, const void * src)
+{
+	if(dest != src) {
+		memcpy(dest, src, sizeof(struct in6_addr));
+	}
+}
+
 #ifdef PCP_SADSCP
 int get_dscp_value(pcp_info_t *pcp_msg_info) {
 
@@ -1451,12 +1461,14 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 		if (response[0] == 1) {	/* version */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
-			memcpy(response + PCP_COMMON_RESPONSE_SIZE + 8, pcp_msg_info->ext_ip, sizeof(struct in6_addr));
+			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 8,
+			                    pcp_msg_info->ext_ip);
 		}
 		else if (response[0] == 2) {
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 16, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 18, pcp_msg_info->ext_port);
-			memcpy(response + PCP_COMMON_RESPONSE_SIZE + 20, pcp_msg_info->ext_ip, sizeof(struct in6_addr));
+			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 20,
+			                    pcp_msg_info->ext_ip);
 		}
 	}
 #ifdef PCP_PEER
@@ -1465,13 +1477,15 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 24, pcp_msg_info->peer_port);
-			memcpy(response + PCP_COMMON_RESPONSE_SIZE + 8, pcp_msg_info->ext_ip, sizeof(struct in6_addr));
+			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 8,
+			                    pcp_msg_info->ext_ip);
 		}
 		else if (response[0] == 2) {
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 16, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 18, pcp_msg_info->ext_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 36, pcp_msg_info->peer_port);
-			memcpy(response + PCP_COMMON_RESPONSE_SIZE + 20, pcp_msg_info->ext_ip, sizeof(struct in6_addr));
+			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 20,
+			                    pcp_msg_info->ext_ip);
 		}
 	}
 #endif /* PCP_PEER */
