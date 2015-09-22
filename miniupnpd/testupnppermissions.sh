@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: $
+# $Id: testupnppermissions.sh,v 1.2 2015/09/22 15:12:14 nanard Exp $
 
 # Array are not available with POSIX sh
 # bash / ksh
@@ -16,22 +16,24 @@ s=1
 ./testupnppermissions "${RULE[@]}" | while read l;
 do
 	if [ -z "$l" ]; then i=$(($i+1)); s=1; else
-		#echo "$i $s"
+		#echo "$i $s : checking '$l'"
 		case $s in
 			1)
 			if [ "$i '${RULE[$i]}'" != "$l" ] ; then
 				exit $s
 			fi;;
 			2)
-			if [ ! \( "perm rule added : ${RULEA[$i]}" = "$l" \) ] ; then
+			if [ "Permission read successfully" = "$l" ] ; then
+				s=$(($s+1))
+			elif [ "perm rule added : ${RULEA[$i]}" != "$l" ] ; then
 				exit $s
 			fi;;
 			3)
-			if [ ! \( "Permission read successfully" = "$l" \) ] ; then
+			if [ "Permission read successfully" != "$l" ] ; then
 				exit $s
 			fi;;
 			4)
-			if [ ! \( "${RULEB[$i]}" = "$l" \) ] ; then
+			if [ "${RULEB[$i]}" != "$l" ] ; then
 				exit $s
 			fi;;
 			*)
