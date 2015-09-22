@@ -540,6 +540,9 @@ static void parsePCPOptions(void* pcp_buf, int remain, pcp_info_t *pcp_msg_info)
 		remain -= option_length;
 		pcp_buf += option_length;
 	}
+	if (remain > 0) {
+		syslog(LOG_WARNING, "%s: remain=%d", "parsePCPOptions", remain);
+	}
 }
 
 
