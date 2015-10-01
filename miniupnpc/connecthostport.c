@@ -23,6 +23,10 @@
 #define socklen_t int
 #else /* #ifdef _WIN32 */
 #include <unistd.h>
+#include <sys/types.h>
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+#include <sys/time.h>
+#endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 #include <sys/param.h>
 #include <sys/select.h>
 #include <errno.h>
@@ -33,7 +37,6 @@
  * during the connect() call */
 #define MINIUPNPC_IGNORE_EINTR
 #ifndef USE_GETHOSTBYNAME
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #endif /* #ifndef USE_GETHOSTBYNAME */
