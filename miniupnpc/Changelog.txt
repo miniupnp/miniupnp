@@ -1,5 +1,9 @@
-$Id: Changelog.txt,v 1.214 2015/08/28 12:14:17 nanard Exp $
+$Id: Changelog.txt,v 1.215 2015/10/01 09:26:11 nanard Exp $
 miniUPnP client Changelog.
+
+2015/09/15:
+  Fix buffer overflow in igd_desc_parse.c/IGDstartelt()
+    Discovered by Aleksandar Nikolic of Cisco Talos
 
 2015/08/28:
   move ssdpDiscoverDevices() to minissdpc.c
