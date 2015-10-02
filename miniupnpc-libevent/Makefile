@@ -10,7 +10,11 @@ CFLAGS += -fPIC
 CFLAGS += -ansi
 CFLAGS += -Wall -W
 CFLAGS += -D_BSD_SOURCE
+ifneq ($(OS), Darwin)
+ifneq ($(OS), FreeBSD)
 CFLAGS += -D_POSIX_C_SOURCE=200112L
+endif
+endif
 CFLAGS += -I/usr/local/include
 
 #CFLAGS += -DENABLE_UPNP_EVENTS
