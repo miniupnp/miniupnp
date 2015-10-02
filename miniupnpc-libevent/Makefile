@@ -1,6 +1,7 @@
 # $Id: Makefile,v 1.7 2014/11/28 13:14:19 nanard Exp $
 
 OS = $(shell uname -s)
+PKG_CONFIG ?= pkg-config
 
 CFLAGS = -O0 -g -DDEBUG
 # libevent debug
@@ -15,17 +16,20 @@ ifneq ($(OS), FreeBSD)
 CFLAGS += -D_POSIX_C_SOURCE=200112L
 endif
 endif
-CFLAGS += -I/usr/local/include
+#CFLAGS += -I/usr/local/include
+CFLAGS += $(shell $(PKG_CONFIG) --cflags libevent)
 
 #CFLAGS += -DENABLE_UPNP_EVENTS
 
-LDLIBS   = -levent
-LDFLAGS += -L/usr/local/lib
+#LDLIBS   = -levent
+LDLIBS   = $(shell $(PKG_CONFIG) --libs-only-l libevent)
+#LDFLAGS += -L/usr/local/lib
+LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libevent)
 
 ifeq ($(OS), Darwin)
 CFLAGS += -D_DARWIN_C_SOURCE
-CFLAGS += -I/opt/local/include
-LDFLAGS += -L/opt/local/lib
+#CFLAGS += -I/opt/local/include
+#LDFLAGS += -L/opt/local/lib
 endif
 
 LIB = libminiupnpc-ev.a
