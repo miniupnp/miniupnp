@@ -80,16 +80,16 @@ static int UPnP_init(UPnPObject *self, PyObject *args, PyObject *kwds)
 	char* multicastif = NULL;
 	char* minissdpdsocket = NULL;
 	static char *kwlist[] = {
-		"multicastif", "minissdpdsocket", "discoverdelay", 
+		"multicastif", "minissdpdsocket", "discoverdelay",
 		"localport", NULL
 	};
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|zzII", kwlist, 
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|zzII", kwlist,
 					&multicastif,
 					&minissdpdsocket,
 					&self->discoverdelay,
 					&self->localport))
-		return -1; 
+		return -1;
 
 	if(self->localport>1 &&
 	   (self->localport>65534||self->localport<1024)) {

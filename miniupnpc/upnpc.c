@@ -577,11 +577,13 @@ int main(int argc, char ** argv)
 				rootdescurl = argv[++i];
 			else if(argv[i][1] == 'm')
 				multicastif = argv[++i];
-			else if(argv[i][1] == 'z'){
+			else if(argv[i][1] == 'z')
+			{
 				char junk;
 				if(sscanf(argv[++i], "%d%c", &localport, &junk)!=1 ||
-					localport<0 || localport>65535 || 
-				   (localport >1 && localport < 1024)){
+					localport<0 || localport>65535 ||
+				   (localport >1 && localport < 1024))
+				{
 					fprintf(stderr, "Invalid localport '%s'\n", argv[i]);
 					localport = UPNP_LOCAL_PORT_ANY;
 					break;

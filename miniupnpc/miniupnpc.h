@@ -52,8 +52,8 @@ simpleUPnPcommand(int, const char *, const char *,
  * If multicastif is not NULL, it will be used instead of the default
  * multicast interface for sending SSDP discover packets.
  * If localport is set to UPNP_LOCAL_PORT_SAME(1) SSDP packets will be sent
- * from the source port 1900 (same as destination port), if set to 
- * UPNP_LOCAL_PORT_ANY(0) system assign a source port, any other value will 
+ * from the source port 1900 (same as destination port), if set to
+ * UPNP_LOCAL_PORT_ANY(0) system assign a source port, any other value will
  * be attempted as the source port.
  * "searchalltypes" parameter is useful when searching several types,
  * if 0, the discovery will stop with the first type returning results.
