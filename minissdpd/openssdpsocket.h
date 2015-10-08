@@ -1,7 +1,7 @@
-/* $Id: openssdpsocket.h,v 1.6 2014/11/28 16:20:58 nanard Exp $ */
+/* $Id: openssdpsocket.h,v 1.7 2015/07/21 15:39:38 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #ifndef OPENSSDPSOCKET_H_INCLUDED
@@ -13,10 +13,11 @@
  * Open a socket and configure it for receiving SSDP packets
  *
  * @param ipv6	open INET6 or INET socket
+ * @param ttl	multicast TTL
  * @return socket
  */
 int
-OpenAndConfSSDPReceiveSocket(int ipv6);
+OpenAndConfSSDPReceiveSocket(int ipv6, unsigned char ttl);
 
 /**
  * Add or Drop the multicast membership for SSDP on the interface

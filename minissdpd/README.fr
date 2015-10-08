@@ -6,6 +6,7 @@ fermeture de la connexion.
 
 format de requete :
 1 octet : type de la requete
+          0 - version
           1 - type
 		  2 - USN (id unique)
 		  3 - tout

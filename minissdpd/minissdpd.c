@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.45 2015/02/08 08:51:54 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.50 2015/08/06 14:05:49 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2007-2015 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -27,8 +27,10 @@
 /* unix sockets */
 #include <sys/un.h>
 /* for getpwnam() and getgrnam() */
+#if 0
 #include <pwd.h>
 #include <grp.h>
+#endif
 
 #include "getifaddr.h"
 #include "upnputils.h"
@@ -490,7 +492,8 @@ containsForbiddenChars(const unsigned char * p, int len)
  *     1 : a device was added.  */
 static int
 ParseSSDPPacket(int s, const char * p, ssize_t n,
-                const struct sockaddr * addr)
+                const struct sockaddr * addr,
+                const char * searched_device)
 {
 	const char * linestart;
 	const char * lineend;
@@ -646,6 +649,10 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 	case METHOD_NOTIFY:
 		if(nts==NTS_SSDP_ALIVE || nts==NTS_SSDP_UPDATE) {
 			if(headers[HEADER_NT].p && headers[HEADER_USN].p && headers[HEADER_LOCATION].p) {
+				/* filter if needed */
+				if(searched_device &&
+				   0 != memcmp(headers[HEADER_NT].p, searched_device, headers[HEADER_NT].l))
+					break;
 				r = updateDevice(headers, time(NULL) + lifetime);
 			} else {
 				syslog(LOG_WARNING, "missing header nt=%p usn=%p location=%p",
@@ -726,8 +733,8 @@ void processRequest(struct reqelem * req)
 	const unsigned char * p;
 	int type;
 	struct device * d = devlist;
-	unsigned char rbuf[4096];
-	unsigned char * rp = rbuf+1;
+	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
+	unsigned char * rp;
 	unsigned char nrep = 0;
 	time_t t;
 	struct service * newserv = NULL;
@@ -749,19 +756,31 @@ void processRequest(struct reqelem * req)
 	p = buf + 1;
 	DECODELENGTH_CHECKLIMIT(l, p, buf + n);
 	if(p+l > buf+n) {
-		syslog(LOG_WARNING, "bad request (length encoding)");
+		syslog(LOG_WARNING, "bad request (length encoding l=%u n=%u)",
+		       l, (unsigned)n);
 		goto error;
 	}
-	if(l == 0 && type != 3) {
+	if(l == 0 && type != 3 && type != 0) {
 		syslog(LOG_WARNING, "bad request (length=0)");
 		goto error;
 	}
 	syslog(LOG_INFO, "(s=%d) request type=%d str='%.*s'",
 	       req->socket, type, l, p);
 	switch(type) {
+	case 0:	/* version */
+		rp = rbuf;
+		CODELENGTH((sizeof(MINISSDPD_VERSION) - 1), rp);
+		memcpy(rp, MINISSDPD_VERSION, sizeof(MINISSDPD_VERSION) - 1);
+		rp += (sizeof(MINISSDPD_VERSION) - 1);
+		if(write_or_buffer(req, rbuf, rp - rbuf) < 0) {
+			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
+			goto error;
+		}
+		break;
 	case 1:	/* request by type */
 	case 2:	/* request by USN (unique id) */
 	case 3:	/* everything */
+		rp = rbuf+1;
 		while(d && (nrep < 255)) {
 			if(d->t < t) {
 				syslog(LOG_INFO, "outdated device");
@@ -915,7 +934,7 @@ void processRequest(struct reqelem * req)
 		    serv = serv->entries.le_next) {
 			if(0 == strcmp(newserv->usn, serv->usn)
 			  && 0 == strcmp(newserv->st, serv->st)) {
-				syslog(LOG_INFO, "Service allready in the list. Updating...");
+				syslog(LOG_INFO, "Service already in the list. Updating...");
 				free(newserv->st);
 				free(newserv->usn);
 				free(serv->server);
@@ -979,13 +998,14 @@ sigterm(int sig)
 #define UPNP_MCAST_LL_ADDR "FF02::C" /* link-local */
 #define UPNP_MCAST_SL_ADDR "FF05::C" /* site-local */
 
-/* send the M-SEARCH request for all devices */
-void ssdpDiscoverAll(int s, int ipv6)
+/* send the M-SEARCH request for devices
+ * either all devices (third argument is NULL or "*") or a specific one */
+static void ssdpDiscover(int s, int ipv6, const char * search)
 {
 	static const char MSearchMsgFmt[] =
 	"M-SEARCH * HTTP/1.1\r\n"
 	"HOST: %s:" XSTR(PORT) "\r\n"
-	"ST: ssdp:all\r\n"
+	"ST: %s\r\n"
 	"MAN: \"ssdp:discover\"\r\n"
 	"MX: %u\r\n"
 	"\r\n";
@@ -1000,7 +1020,8 @@ void ssdpDiscoverAll(int s, int ipv6)
 		             MSearchMsgFmt,
 		             ipv6 ?
 		             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
-		             : UPNP_MCAST_ADDR, mx);
+		             : UPNP_MCAST_ADDR,
+		             (search ? search : "ssdp:all"), mx);
 		memset(&sockudp_w, 0, sizeof(struct sockaddr_storage));
 		if(ipv6) {
 			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_w;
@@ -1062,6 +1083,8 @@ int main(int argc, char * * argv)
 	struct sockaddr_in6 sendername6;
 	socklen_t sendername6_len;
 #endif	/* ENABLE_IPV6 */
+	unsigned char ttl = 2;	/* UDA says it should default to 2 */
+	const char * searched_device = NULL;	/* if not NULL, search/filter a specific device type */
 
 	LIST_INIT(&reqlisthead);
 	LIST_INIT(&servicelisthead);
@@ -1069,28 +1092,40 @@ int main(int argc, char * * argv)
 	/* process command line */
 	for(i=1; i<argc; i++)
 	{
-		if(0==strcmp(argv[i], "-i")) {
-			lan_addr = malloc(sizeof(struct lan_addr_s));
-			if(lan_addr == NULL) {
-				fprintf(stderr, "malloc(%d) FAILED\n", (int)sizeof(struct lan_addr_s));
-				break;
-			}
-			if(parselanaddr(lan_addr, argv[++i]) != 0) {
-				fprintf(stderr, "can't parse \"%s\" as a valid address or interface name\n", argv[i]);
-				free(lan_addr);
-			} else {
-				LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
-			}
-		} else if(0==strcmp(argv[i], "-d"))
+ 		if(0==strcmp(argv[i], "-d"))
 			debug_flag = 1;
-		else if(0==strcmp(argv[i], "-s"))
-			sockpath = argv[++i];
-		else if(0==strcmp(argv[i], "-p"))
-			pidfilename = argv[++i];
 #ifdef ENABLE_IPV6
 		else if(0==strcmp(argv[i], "-6"))
 			ipv6 = 1;
 #endif	/* ENABLE_IPV6 */
+		else {
+			if((i + 1) >= argc) {
+				fprintf(stderr, "option %s needs an argument.\n", argv[i]);
+				break;
+			}
+			if(0==strcmp(argv[i], "-i")) {
+				lan_addr = malloc(sizeof(struct lan_addr_s));
+				if(lan_addr == NULL) {
+					fprintf(stderr, "malloc(%d) FAILED\n", (int)sizeof(struct lan_addr_s));
+					break;
+				}
+				if(parselanaddr(lan_addr, argv[++i]) != 0) {
+					fprintf(stderr, "can't parse \"%s\" as a valid address or interface name\n", argv[i]);
+					free(lan_addr);
+				} else {
+					LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
+				}
+			} else if(0==strcmp(argv[i], "-s"))
+				sockpath = argv[++i];
+			else if(0==strcmp(argv[i], "-p"))
+				pidfilename = argv[++i];
+			else if(0==strcmp(argv[i], "-t"))
+				ttl = (unsigned char)atoi(argv[++i]);
+			else if(0==strcmp(argv[i], "-f"))
+				searched_device = argv[++i];
+			else
+				fprintf(stderr, "unknown commandline option %s.\n", argv[i]);
+		}
 	}
 	if(lan_addrs.lh_first == NULL)
 	{
@@ -1099,7 +1134,8 @@ int main(int argc, char * * argv)
 #ifdef ENABLE_IPV6
 		        "[-6] "
 #endif /* ENABLE_IPV6 */
-		        "[-s socket] [-p pidfile] "
+		        "[-s socket] [-p pidfile] [-t TTL] "
+		        "-f device "
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
@@ -1143,7 +1179,7 @@ int main(int argc, char * * argv)
 	/* open route/interface config changes socket */
 	s_ifacewatch = OpenAndConfInterfaceWatchSocket();
 	/* open UDP socket(s) for receiving SSDP packets */
-	s_ssdp = OpenAndConfSSDPReceiveSocket(0);
+	s_ssdp = OpenAndConfSSDPReceiveSocket(0, ttl);
 	if(s_ssdp < 0)
 	{
 		syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages, exiting");
@@ -1152,7 +1188,7 @@ int main(int argc, char * * argv)
 	}
 #ifdef ENABLE_IPV6
 	if(ipv6) {
-		s_ssdp6 = OpenAndConfSSDPReceiveSocket(1);
+		s_ssdp6 = OpenAndConfSSDPReceiveSocket(1, ttl);
 		if(s_ssdp6 < 0)
 		{
 			syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages (IPv6), exiting");
@@ -1219,9 +1255,9 @@ int main(int argc, char * * argv)
 
 	/* send M-SEARCH ssdp:all Requests */
 	if(s_ssdp >= 0)
-		ssdpDiscoverAll(s_ssdp, 0);
+		ssdpDiscover(s_ssdp, 0, searched_device);
 	if(s_ssdp6 >= 0)
-		ssdpDiscoverAll(s_ssdp6, 1);
+		ssdpDiscover(s_ssdp6, 1, searched_device);
 
 	/* Main loop */
 	while(!quitting) {
@@ -1287,7 +1323,7 @@ int main(int argc, char * * argv)
 				/* Parse and process the packet received */
 				/*printf("%.*s", n, buf);*/
 				i = ParseSSDPPacket(s_ssdp6, buf, n,
-				                    (struct sockaddr *)&sendername6);
+				                    (struct sockaddr *)&sendername6, searched_device);
 				syslog(LOG_DEBUG, "** i=%d deltadev=%d **", i, deltadev);
 				if(i==0 || (i*deltadev < 0))
 				{
@@ -1321,7 +1357,7 @@ int main(int argc, char * * argv)
 				/* Parse and process the packet received */
 				/*printf("%.*s", n, buf);*/
 				i = ParseSSDPPacket(s_ssdp, buf, n,
-				                    (struct sockaddr *)&sendername);
+				                    (struct sockaddr *)&sendername, searched_device);
 				syslog(LOG_DEBUG, "** i=%d deltadev=%d **", i, deltadev);
 				if(i==0 || (i*deltadev < 0))
 				{

@@ -4,3 +4,5 @@ testcodelength
 testminissdpd
 listifaces
 Makefile.bak
+validateminissdpd
+validatecodelength

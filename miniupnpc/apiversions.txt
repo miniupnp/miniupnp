@@ -1,6 +1,20 @@
-$Id: apiversions.txt,v 1.3 2014/01/31 13:14:32 nanard Exp $
+$Id: apiversions.txt,v 1.7 2015/07/23 20:40:08 nanard Exp $
 
 Differences in API between miniUPnPc versions
+
+API version 14
+miniupnpc.h
+  add ttl argument to upnpDiscover() upnpDiscoverAll() upnpDiscoverDevice()
+  upnpDiscoverDevices()
+  getDevicesFromMiniSSDPD() :
+    connectToMiniSSDPD() / disconnectFromMiniSSDPD()
+    requestDevicesFromMiniSSDPD() / receiveDevicesFromMiniSSDPD()
+
+API version 13
+miniupnpc.h:
+  add searchalltype param to upnpDiscoverDevices() function
+  updated macro :
+    #define MINIUPNPC_API_VERSION  13
 
 API version 12
 miniupnpc.h :

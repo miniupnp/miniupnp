@@ -1,15 +1,16 @@
-/* $Id: miniupnpc.h,v 1.39 2014/12/20 09:13:51 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.44 2015/07/23 20:40:10 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2014 Thomas Bernard
+ * Copyright (c) 2005-2015 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
 #ifndef MINIUPNPC_H_INCLUDED
 #define MINIUPNPC_H_INCLUDED
 
-#include "declspec.h"
+#include "miniupnpc_declspec.h"
 #include "igd_desc_parse.h"
+#include "upnpdev.h"
 
 /* error codes : */
 #define UPNPDISCOVER_SUCCESS (0)
@@ -19,7 +20,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"1.9"
-#define MINIUPNPC_API_VERSION	12
+#define MINIUPNPC_API_VERSION	14
 
 /* Source port:
    Using "1" as an alias for 1900 for backwards compatability
@@ -39,14 +40,6 @@ simpleUPnPcommand(int, const char *, const char *,
                   const char *, struct UPNParg *,
                   int *);
 
-struct UPNPDev {
-	struct UPNPDev * pNext;
-	char * descURL;
-	char * st;
-	unsigned int scope_id;
-	char buffer[2];
-};
-
 /* upnpDiscover()
  * discover UPnP devices on the network.
  * The discovered devices are returned as a chained list.
@@ -61,35 +54,35 @@ struct UPNPDev {
  * If localport is set to UPNP_LOCAL_PORT_SAME(1) SSDP packets will be sent
  * from the source port 1900 (same as destination port), if set to 
  * UPNP_LOCAL_PORT_ANY(0) system assign a source port, any other value will 
- * be attempted as the source port */
+ * be attempted as the source port.
+ * "searchalltypes" parameter is useful when searching several types,
+ * if 0, the discovery will stop with the first type returning results.
+ * TTL should default to 2. */
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscover(int delay, const char * multicastif,
              const char * minissdpdsock, int localport,
-             int ipv6,
+             int ipv6, unsigned char ttl,
              int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverAll(int delay, const char * multicastif,
                 const char * minissdpdsock, int localport,
-                int ipv6,
+                int ipv6, unsigned char ttl,
                 int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevice(const char * device, int delay, const char * multicastif,
                 const char * minissdpdsock, int localport,
-                int ipv6,
+                int ipv6, unsigned char ttl,
                 int * error);
 
 MINIUPNP_LIBSPEC struct UPNPDev *
 upnpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
                     const char * minissdpdsock, int localport,
-                    int ipv6,
-                    int * error);
-
-/* freeUPNPDevlist()
- * free list returned by upnpDiscover() */
-MINIUPNP_LIBSPEC void freeUPNPDevlist(struct UPNPDev * devlist);
+                    int ipv6, unsigned char ttl,
+                    int * error,
+                    int searchalltypes);
 
 /* parserootdesc() :
  * parse root XML description of a UPnP device and fill the IGDdatas

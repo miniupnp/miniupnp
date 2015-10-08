@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.206 2015/01/17 11:26:04 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.210 2015/08/26 07:32:32 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -49,6 +49,9 @@
 #include <sys/un.h>
 #endif
 
+#ifdef TOMATO
+#include <sys/stat.h>
+#endif /* TOMATO */
 #include "macros.h"
 #include "upnpglobalvars.h"
 #include "upnphttp.h"
@@ -92,7 +95,7 @@ struct ctlelem {
 	int socket;
 	LIST_ENTRY(ctlelem) entries;
 };
-#endif
+#endif	/* USE_MINIUPNPDCTL */
 
 #ifdef ENABLE_NFQUEUE
 /* globals */
@@ -103,11 +106,186 @@ static struct sockaddr_in ssdp;
 static int nfqueue_cb( struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data) ;
 int identify_ip_protocol (char *payload);
 int get_udp_dst_port (char *payload);
-#endif
+#endif	/* ENABLE_NFQUEUE */
 
 /* variables used by signals */
 static volatile sig_atomic_t quitting = 0;
 volatile sig_atomic_t should_send_public_address_change_notif = 0;
+
+#ifdef TOMATO
+#if 1
+/* Tomato specific code */
+static volatile sig_atomic_t gotusr2 = 0;
+
+static void
+sigusr2(int sig)
+{
+	gotusr2 = 1;
+}
+
+static void
+tomato_save(const char *fname)
+{
+	unsigned short eport;
+	unsigned short iport;
+	unsigned int leaseduration;
+	unsigned int timestamp;
+	char proto[4];
+	char iaddr[32];
+	char desc[64];
+	char rhost[32];
+	int n;
+	FILE *f;
+	int t;
+	char tmp[128];
+
+	strcpy(tmp, "/etc/upnp/saveXXXXXX");
+	if ((t = mkstemp(tmp)) != -1)
+	{
+		if ((f = fdopen(t, "w")) != NULL)
+		{
+			n = 0;
+			while (upnp_get_redirection_infos_by_index(n, &eport, proto, &iport, iaddr, sizeof(iaddr), desc, sizeof(desc), rhost, sizeof(rhost), &leaseduration) == 0)
+			{
+				timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
+				fprintf(f, "%s %u %s %u [%s] %u\n", proto, eport, iaddr, iport, desc, timestamp);
+				++n;
+			}
+			fclose(f);
+			rename(tmp, fname);
+		}
+		else 
+		{
+			close(t);
+		}
+		unlink(tmp);
+	}
+}
+
+static void
+tomato_load(void)
+{
+	FILE *f;
+	char s[256];
+	unsigned short eport;
+	unsigned short iport;
+	unsigned int leaseduration;
+	unsigned int timestamp;
+	time_t current_time;
+	char proto[4];
+	char iaddr[32];
+	char *rhost;
+	char *a, *b;
+
+	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
+	{
+		current_time = time(NULL);
+		s[sizeof(s) - 1] = 0;
+		while (fgets(s, sizeof(s) - 1, f)) {
+			if (sscanf(s, "%3s %hu %31s %hu [%*s] %u", proto, &eport, iaddr, &iport, &timestamp) >= 4)
+			{
+				if (((a = strchr(s, '[')) != NULL) && ((b = strrchr(a, ']')) != NULL))
+				{
+					if (timestamp > 0)
+					{
+						if (timestamp > current_time)
+							leaseduration = current_time - timestamp;
+						else
+							continue;
+					}
+					else
+					{
+						leaseduration = 0;	/* default value */
+					}
+					*b = 0;
+					rhost = NULL;
+					upnp_redirect(rhost, eport, iaddr, iport, proto, a + 1, leaseduration);
+				}
+			}
+		}
+		fclose(f);
+	}
+#ifdef ENABLE_NATPMP
+#if 0
+	ScanNATPMPforExpiration();
+#endif
+#endif /* ENABLE_NATPMP */
+	unlink("/etc/upnp/load");
+}
+
+static void
+tomato_delete(void)
+{
+	FILE *f;
+	char s[128];
+	unsigned short eport;
+	unsigned short iport;
+	unsigned int leaseduration;
+	char proto[4];
+	char iaddr[32];
+	char desc[64];
+	char rhost[32];
+	int n;
+
+	if ((f = fopen("/etc/upnp/delete", "r")) != NULL)
+	{
+		s[sizeof(s) - 1] = 0;
+		while (fgets(s, sizeof(s) - 1, f))
+		{
+			if (sscanf(s, "%3s %hu", proto, &eport) == 2)
+			{
+				if (proto[0] == '*')
+				{
+					n = upnp_get_portmapping_number_of_entries();
+					while (--n >= 0)
+					{
+						if (upnp_get_redirection_infos_by_index(n, &eport, proto, &iport, iaddr, sizeof(iaddr), desc, sizeof(desc), rhost, sizeof(rhost), &leaseduration) == 0)
+						{
+							upnp_delete_redirection(eport, proto);
+						}
+					}
+					break;
+				}
+				else
+				{
+					upnp_delete_redirection(eport, proto);
+				}
+			}
+		}
+		fclose(f);
+		unlink("/etc/upnp/delete");
+	}
+}
+
+static void
+tomato_helper(void)
+{
+	struct stat st;
+	
+	if (stat("/etc/upnp/delete", &st) == 0)
+	{
+		tomato_delete();
+	}
+
+	if (stat("/etc/upnp/load", &st) == 0)
+	{
+		tomato_load();
+	}
+
+	if (stat("/etc/upnp/save", &st) == 0)
+	{
+		tomato_save("/etc/upnp/data");
+		unlink("/etc/upnp/save");
+	}
+
+	if (stat("/etc/upnp/info", &st) == 0)
+	{
+		tomato_save("/etc/upnp/data.info");
+		unlink("/etc/upnp/info");
+	}
+}
+#endif  /* 1 (tomato) */
+#endif	/* TOMATO */
 
 /* OpenAndConfHTTPSocket() :
  * setup the socket used to handle incoming HTTP connections. */
@@ -191,6 +369,19 @@ OpenAndConfHTTPSocket(unsigned short * port)
 	listenname.sin_addr.s_addr = htonl(INADDR_ANY);
 	listenname_len =  sizeof(struct sockaddr_in);
 #endif
+
+#if defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP)
+	/* One and only one LAN interface */
+	if(lan_addrs.lh_first != NULL && lan_addrs.lh_first->list.le_next == NULL
+	   && strlen(lan_addrs.lh_first->ifname) > 0)
+	{
+		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+		              lan_addrs.lh_first->ifname,
+		              strlen(lan_addrs.lh_first->ifname)) < 0)
+			syslog(LOG_WARNING, "setsockopt(http, SO_BINDTODEVICE, %s): %m",
+			       lan_addrs.lh_first->ifname);
+	}
+#endif /* defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP) */
 
 #ifdef ENABLE_IPV6
 	if(bind(s,
@@ -991,7 +1182,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				strncpy(model_url, ary_options[i].value, MODEL_URL_MAX_LEN);
 				model_url[MODEL_URL_MAX_LEN-1] = '\0';
 				break;
-#endif
+#endif	/* ENABLE_MANUFACTURER_INFO_CONFIGURATION */
 #ifdef USE_NETFILTER
 			case UPNPFORWARDCHAIN:
 				miniupnpd_forward_chain = ary_options[i].value;
@@ -999,7 +1190,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPNATCHAIN:
 				miniupnpd_nat_chain = ary_options[i].value;
 				break;
-#endif
+#endif	/* USE_NETFILTER */
 			case UPNPNOTIFY_INTERVAL:
 				v->notify_interval = atoi(ary_options[i].value);
 				break;
@@ -1012,7 +1203,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(LOGPACKETSMASK);	/*logpackets = 1;*/
 				break;
-#endif
+#endif	/* defined(USE_PF) || defined(USE_IPF) */
 			case UPNPUUID:
 				strncpy(uuidvalue_igd+5, ary_options[i].value,
 				        strlen(uuidvalue_igd+5) + 1);
@@ -1042,7 +1233,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPTAG:
 				tag = ary_options[i].value;
 				break;
-#endif
+#endif	/* USE_PF */
 #ifdef ENABLE_NATPMP
 			case UPNPENABLENATPMP:
 				if(strcmp(ary_options[i].value, "yes") == 0)
@@ -1052,7 +1243,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 						SETFLAG(ENABLENATPMPMASK);
 					/*enablenatpmp = atoi(ary_options[i].value);*/
 				break;
-#endif
+#endif	/* ENABLE_NATPMP */
 #ifdef ENABLE_PCP
 			case UPNPPCPMINLIFETIME:
 					min_lifetime = atoi(ary_options[i].value);
@@ -1070,13 +1261,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(PCP_ALLOWTHIRDPARTYMASK);
 				break;
-#endif
+#endif	/* ENABLE_PCP */
 #ifdef PF_ENABLE_FILTER_RULES
 			case UPNPQUICKRULES:
 				if(strcmp(ary_options[i].value, "no") == 0)
 					SETFLAG(PFNOQUICKRULESMASK);
 				break;
-#endif
+#endif	/* PF_ENABLE_FILTER_RULES */
 			case UPNPENABLE:
 				if(strcmp(ary_options[i].value, "yes") != 0)
 					CLEARFLAG(ENABLEUPNPMASK);
@@ -1089,7 +1280,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPLEASEFILE:
 				lease_file = ary_options[i].value;
 				break;
-#endif
+#endif	/* ENABLE_LEASEFILE */
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
@@ -1105,7 +1296,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			fprintf(stderr, "Check your configuration file.\n");
 			return 1;
 		}
-#endif
+#endif	/* ENABLE_PCP */
 	}
 #endif /* DISABLE_CONFIG_FILE */
 
@@ -1157,7 +1348,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			friendly_name[FRIENDLY_NAME_MAX_LEN-1] = '\0';
 			break;
-#endif
+#endif	/* ENABLE_MANUFACTURER_INFO_CONFIGURATION */
 		case 's':
 			if(i+1 < argc)
 				strncpy(serialnumber, argv[++i], SERIALNUMBER_MAX_LEN);
@@ -1177,7 +1368,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			/*enablenatpmp = 1;*/
 			SETFLAG(ENABLENATPMPMASK);
 			break;
-#endif
+#endif	/* ENABLE_NATPMP */
 		case 'U':
 			/*sysuptime = 1;*/
 			SETFLAG(SYSUPTIMEMASK);
@@ -1190,7 +1381,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			/*logpackets = 1;*/
 			SETFLAG(LOGPACKETSMASK);
 			break;
-#endif
+#endif	/* defined(USE_PF) || defined(USE_IPF) */
 		case 'S':
 			SETFLAG(SECUREMODEMASK);
 			break;
@@ -1213,7 +1404,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
-#endif
+#endif	/* USE_PF */
 		case 'p':
 			if(i+1 < argc)
 				v->port = atoi(argv[++i]);
@@ -1227,7 +1418,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
-#endif
+#endif	/* ENABLE_HTTPS */
 #ifdef ENABLE_NFQUEUE
 		case 'Q':
 			if(i+1<argc)
@@ -1249,7 +1440,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			}
 			break;
-#endif
+#endif	/* ENABLE_NFQUEUE */
 		case 'P':
 			if(i+1 < argc)
 				pidfilename = argv[++i];
@@ -1290,7 +1481,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					fprintf(stderr, "can't parse \"%s\" as a valid "
 #ifndef ENABLE_IPV6
 					        "LAN address or "
-#endif
+#endif	/* #ifndef ENABLE_IPV6 */
 					        "interface name\n", argv[i]);
 					free(lan_addr);
 					break;
@@ -1306,7 +1497,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
-#else
+#else	/* #ifndef MULTIPLE_EXTERNAL_IP */
 			if(i+2 < argc)
 			{
 				char *val=calloc((strlen(argv[i+1]) + strlen(argv[i+2]) + 1), sizeof(char));
@@ -1345,7 +1536,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 			else
 				fprintf(stderr, "Option -%c takes two arguments.\n", argv[i][1]);
-#endif
+#endif 	/* #ifndef MULTIPLE_EXTERNAL_IP */
 			break;
 		case 'A':
 			if(i+1 < argc) {
@@ -1412,6 +1603,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		syslog(LOG_ERR, "MiniUPnPd is already running. EXITING");
 		return 1;
 	}
+	
+#ifdef TOMATO
+	syslog(LOG_NOTICE, "version " MINIUPNPD_VERSION " started");
+#endif /* TOMATO */
 
 	set_startup_time(GETFLAG(SYSUPTIMEMASK));
 
@@ -1442,8 +1637,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		syslog(LOG_ERR, "Failed to set %s handler. EXITING", "SIGINT");
 		return 1;
 	}
+#ifdef TOMATO
+	sa.sa_handler = sigusr2;
+	sigaction(SIGUSR2, &sa, NULL);
+	if(signal(SIGPIPE, SIG_IGN) == SIG_ERR)
+#else	/* TOMATO */
 	sa.sa_handler = SIG_IGN;
 	if(sigaction(SIGPIPE, &sa, NULL) < 0)
+#endif	/* TOMATO */
 	{
 		syslog(LOG_ERR, "Failed to ignore SIGPIPE signals");
 	}
@@ -1476,6 +1677,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	syslog(LOG_INFO, "Reloading rules from lease file");
 	reload_from_lease_file();
 #endif
+
+#ifdef TOMATO
+	tomato_load();
+#endif /* TOMATO */
 
 	return 0;
 print_usage:
@@ -1810,6 +2015,10 @@ main(int argc, char * * argv)
 	}
 #endif
 
+#ifdef TOMATO
+	tomato_helper();
+#endif
+
 	/* main loop */
 	while(!quitting)
 	{
@@ -2064,6 +2273,14 @@ main(int argc, char * * argv)
 		if(select(max_fd+1, &readset, &writeset, 0, &timeout) < 0)
 		{
 			if(quitting) goto shutdown;
+#ifdef TOMATO
+			if (gotusr2)
+			{
+				gotusr2 = 0;
+				tomato_helper();
+				continue;
+			}
+#endif	/* TOMATO */
 			if(errno == EINTR) continue; /* interrupted by a signal, start again */
 			syslog(LOG_ERR, "select(all): %m");
 			syslog(LOG_ERR, "Failed to select open sockets. EXITING");
@@ -2349,6 +2566,9 @@ shutdown:
 	/* try to send pending packets */
 	finalize_sendto();
 
+#ifdef TOMATO
+	tomato_save("/etc/upnp/data");
+#endif	/* TOMATO */
 	/* close out open sockets */
 	while(upnphttphead.lh_first != NULL)
 	{

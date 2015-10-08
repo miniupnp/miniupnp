@@ -1,4 +1,4 @@
-/* $Id: miniupnpc-libevent.c,v 1.25 2015/02/05 17:56:38 nanard Exp $ */
+/* $Id: miniupnpc-libevent.c,v 1.27 2015/07/22 13:51:09 nanard Exp $ */
 /* miniupnpc-libevent
  * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -651,6 +651,14 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 }
 
 #ifdef ENABLE_UPNP_EVENTS
+#define EVHTTP_REQ_NOTIFY	((EVHTTP_REQ_MAX) << 1)
+#define EVHTTP_REQ_SUBSCRIBE ((EVHTTP_REQ_NOTIFY) << 1)
+static const struct evhttp_extended_methods ext_methods[] = {
+	{"NOTIFY", EVHTTP_REQ_NOTIFY, EVHTTP_METHOD_HAS_BODY},
+	{"SUBSCRIBE", EVHTTP_REQ_SUBSCRIBE, EVHTTP_METHOD_HAS_BODY},
+	{NULL, 0, 0}
+};
+
 void upnpc_event_conn_req(struct evhttp_request * req, void * data)
 {
 	size_t len;
@@ -721,10 +729,17 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 	p->ready_cb = ready_cb;
 	p->soap_cb = soap_cb;
 	p->cb_data = cb_data;
+	p->ttl = 2;
 	/* open the socket for SSDP */
 	p->ssdp_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(p->ssdp_socket < 0) {
 		return UPNPC_ERR_SOCKET_FAILED;
+	}
+	/* set multicast TTL */
+	if(setsockopt(p->ssdp_socket, IPPROTO_IP, IP_MULTICAST_TTL, &p->ttl, sizeof(p->ttl) < 0))
+	{
+		/* not a fatal error */
+		debug_printf("setsockopt(%d, ..., IP_MULTICAST_TTL, ...) FAILED\n", p->ssdp_socket);
 	}
 	/* set REUSEADDR */
 #ifdef _WIN32
@@ -887,6 +902,7 @@ int upnpc_event_subscribe(upnpc_device_t * p)
 			debug_printf("evhttp_new() FAILED\n");
 			return -1;
 		}
+		evhttp_set_extended_methods(p->parent->http_server, ext_methods);
 		evhttp_set_allowed_methods(p->parent->http_server, EVHTTP_REQ_NOTIFY);
 		evhttp_set_cb(p->parent->http_server, "/evt_conn", upnpc_event_conn_req, p);
 		if(evhttp_bind_socket(p->parent->http_server, p->parent->local_address, p->parent->local_port) < 0) {
@@ -905,6 +921,7 @@ int upnpc_event_subscribe(upnpc_device_t * p)
 	if(p->soap_conn == NULL) {
 		p->soap_conn = evhttp_connection_base_new(p->parent->base, NULL, hostname, port);
 	}
+	evhttp_connection_set_extended_methods(p->soap_conn, ext_methods);
 	req = evhttp_request_new(upnpc_subscribe_response, p);
 	headers = evhttp_request_get_output_headers(req);
 	/*buffer = evhttp_request_get_output_buffer(req);*/

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.120 2015/01/07 09:07:32 nanard Exp $
+# $Id: Makefile,v 1.126 2015/08/28 12:14:18 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
@@ -35,8 +35,15 @@ CFLAGS += -W -Wstrict-prototypes
 CFLAGS += -fno-common
 CFLAGS += -DMINIUPNPC_SET_SOCKET_TIMEOUT
 CFLAGS += -DMINIUPNPC_GET_SRC_ADDR
-CFLAGS += -D_BSD_SOURCE -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200112L
-CFLAGS += -ansi
+CFLAGS += -D_BSD_SOURCE
+CFLAGS += -D_DEFAULT_SOURCE
+ifneq ($(OS), FreeBSD)
+ifneq ($(OS), Darwin)
+#CFLAGS += -D_POSIX_C_SOURCE=200112L
+CFLAGS += -D_XOPEN_SOURCE=600
+endif
+endif
+#CFLAGS += -ansi
 # -DNO_GETADDRINFO
 INSTALL = install
 SH = /bin/sh
@@ -46,29 +53,32 @@ JAVA = java
 #JNAERATOR = jnaerator-0.9.8-shaded.jar
 #JNAERATORARGS = -library miniupnpc
 #JNAERATOR = jnaerator-0.10-shaded.jar
-JNAERATOR = jnaerator-0.11-shaded.jar
+#JNAERATOR = jnaerator-0.11-shaded.jar
+# https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12/jnaerator-0.12-shaded.jar
+JNAERATOR = jnaerator-0.12-shaded.jar
 JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
-JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
+#JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
+JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12
 
 ifeq (SunOS, $(OS))
   LDFLAGS=-lsocket -lnsl -lresolv
 endif
 
 # APIVERSION is used to build SONAME
-APIVERSION = 12
+APIVERSION = 14
 
 SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
        minixmlvalid.c testupnpreplyparse.c minissdpc.c \
        upnperrors.c testigddescparse.c testminiwget.c \
        connecthostport.c portlistingparse.c receivedata.c \
-       testportlistingparse.c miniupnpcmodule.c \
+       upnpdev.c testportlistingparse.c miniupnpcmodule.c \
        minihttptestserver.c \
        listdevices.c
 
 LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
-          connecthostport.o portlistingparse.o receivedata.o
+          connecthostport.o portlistingparse.o receivedata.o upnpdev.o
 
 ifneq ($(OS), AmigaOS)
 CFLAGS := -fPIC $(CFLAGS)
@@ -81,7 +91,8 @@ OBJS = $(patsubst %.c,%.o,$(SRCS))
 HEADERS = miniupnpc.h miniwget.h upnpcommands.h igd_desc_parse.h \
           upnpreplyparse.h upnperrors.h miniupnpctypes.h \
           portlistingparse.h \
-          declspec.h
+          upnpdev.h \
+          miniupnpc_declspec.h
 
 # library names
 LIBRARY = libminiupnpc.a
@@ -292,7 +303,7 @@ jnaerator-%.jar:
 
 jar: $(SHAREDLIBRARY)  $(JNAERATOR)
 	$(JAVA) -jar $(JNAERATOR) $(JNAERATORARGS) \
-	miniupnpc.h declspec.h upnpcommands.h upnpreplyparse.h \
+	miniupnpc.h miniupnpc_declspec.h upnpcommands.h upnpreplyparse.h \
 	igd_desc_parse.h miniwget.h upnperrors.h $(SHAREDLIBRARY) \
 	-package fr.free.miniupnp -o . -jar java/miniupnpc_$(JARSUFFIX).jar -v
 
@@ -325,33 +336,40 @@ minihttptestserver:	minihttptestserver.o
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 igd_desc_parse.o: igd_desc_parse.h
-miniupnpc.o: miniupnpc.h declspec.h igd_desc_parse.h minissdpc.h miniwget.h
-miniupnpc.o: minisoap.h minixml.h upnpcommands.h upnpreplyparse.h
-miniupnpc.o: portlistingparse.h miniupnpctypes.h connecthostport.h
-miniupnpc.o: receivedata.h
+miniupnpc.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h upnpdev.h
+miniupnpc.o: minissdpc.h miniwget.h minisoap.h minixml.h upnpcommands.h
+miniupnpc.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
+miniupnpc.o: connecthostport.h
 minixml.o: minixml.h
 minisoap.o: minisoap.h miniupnpcstrings.h
-miniwget.o: miniupnpcstrings.h miniwget.h declspec.h connecthostport.h
-miniwget.o: receivedata.h
-upnpc.o: miniwget.h declspec.h miniupnpc.h igd_desc_parse.h upnpcommands.h
-upnpc.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h upnperrors.h
-upnpcommands.o: upnpcommands.h upnpreplyparse.h portlistingparse.h declspec.h
-upnpcommands.o: miniupnpctypes.h miniupnpc.h igd_desc_parse.h
+miniwget.o: miniupnpcstrings.h miniwget.h miniupnpc_declspec.h
+miniwget.o: connecthostport.h receivedata.h
+upnpc.o: miniwget.h miniupnpc_declspec.h miniupnpc.h igd_desc_parse.h
+upnpc.o: upnpdev.h upnpcommands.h upnpreplyparse.h portlistingparse.h
+upnpc.o: miniupnpctypes.h upnperrors.h miniupnpcstrings.h
+upnpcommands.o: upnpcommands.h upnpreplyparse.h portlistingparse.h
+upnpcommands.o: miniupnpc_declspec.h miniupnpctypes.h miniupnpc.h
+upnpcommands.o: igd_desc_parse.h upnpdev.h
 upnpreplyparse.o: upnpreplyparse.h minixml.h
 testminixml.o: minixml.h igd_desc_parse.h
 minixmlvalid.o: minixml.h
 testupnpreplyparse.o: upnpreplyparse.h
-minissdpc.o: minissdpc.h miniupnpc.h declspec.h igd_desc_parse.h codelength.h
-upnperrors.o: upnperrors.h declspec.h upnpcommands.h upnpreplyparse.h
-upnperrors.o: portlistingparse.h miniupnpctypes.h miniupnpc.h
-upnperrors.o: igd_desc_parse.h
-testigddescparse.o: igd_desc_parse.h minixml.h miniupnpc.h declspec.h
-testminiwget.o: miniwget.h declspec.h
+minissdpc.o: minissdpc.h miniupnpc_declspec.h upnpdev.h miniupnpc.h
+minissdpc.o: igd_desc_parse.h receivedata.h codelength.h
+upnperrors.o: upnperrors.h miniupnpc_declspec.h upnpcommands.h
+upnperrors.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
+upnperrors.o: miniupnpc.h igd_desc_parse.h upnpdev.h
+testigddescparse.o: igd_desc_parse.h minixml.h miniupnpc.h
+testigddescparse.o: miniupnpc_declspec.h upnpdev.h
+testminiwget.o: miniwget.h miniupnpc_declspec.h
 connecthostport.o: connecthostport.h
-portlistingparse.o: portlistingparse.h declspec.h miniupnpctypes.h minixml.h
+portlistingparse.o: portlistingparse.h miniupnpc_declspec.h miniupnpctypes.h
+portlistingparse.o: minixml.h
 receivedata.o: receivedata.h
-testportlistingparse.o: portlistingparse.h declspec.h miniupnpctypes.h
-miniupnpcmodule.o: miniupnpc.h declspec.h igd_desc_parse.h upnpcommands.h
-miniupnpcmodule.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
-miniupnpcmodule.o: upnperrors.h
-listdevices.o: miniupnpc.h declspec.h igd_desc_parse.h
+upnpdev.o: upnpdev.h miniupnpc_declspec.h
+testportlistingparse.o: portlistingparse.h miniupnpc_declspec.h
+testportlistingparse.o: miniupnpctypes.h
+miniupnpcmodule.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h
+miniupnpcmodule.o: upnpdev.h upnpcommands.h upnpreplyparse.h
+miniupnpcmodule.o: portlistingparse.h miniupnpctypes.h upnperrors.h
+listdevices.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h upnpdev.h

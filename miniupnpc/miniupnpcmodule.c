@@ -131,6 +131,7 @@ UPnP_discover(UPnPObject *self)
 	                             self->minissdpdsocket,
 	                             (int)self->localport,
 	                             0/*ip v6*/,
+	                             2/* TTL */,
 	                             0/*error */);
 	Py_END_ALLOW_THREADS
 	/* Py_RETURN_NONE ??? */

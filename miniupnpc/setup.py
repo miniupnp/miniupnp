@@ -6,7 +6,7 @@
 # python script to build the miniupnpc module under unix
 #
 # replace libminiupnpc.a by libminiupnpc.so for shared library usage
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 from distutils import sysconfig
 sysconfig.get_config_vars()["OPT"] = ''
 sysconfig.get_config_vars()["CFLAGS"] = ''

@@ -1,5 +1,37 @@
-$Id: Changelog.txt,v 1.203 2015/04/27 15:50:19 nanard Exp $
+$Id: Changelog.txt,v 1.215 2015/10/01 09:26:11 nanard Exp $
 miniUPnP client Changelog.
+
+2015/09/15:
+  Fix buffer overflow in igd_desc_parse.c/IGDstartelt()
+    Discovered by Aleksandar Nikolic of Cisco Talos
+
+2015/08/28:
+  move ssdpDiscoverDevices() to minissdpc.c
+
+2015/08/27:
+  avoid unix socket leak in getDevicesFromMiniSSDPD()
+
+2015/08/16:
+  Also accept "Up" as ConnectionStatus value
+
+2015/07/23:
+  split getDevicesFromMiniSSDPD
+  add ttl argument to upnpDiscover() functions
+  increments API_VERSION to 14
+
+2015/07/22:
+  Read USN from SSDP messages.
+
+2015/07/15:
+  Check malloc/calloc
+
+2015/06/16:
+  update getDevicesFromMiniSSDPD() to process longer minissdpd
+    responses
+
+2015/05/22:
+  add searchalltypes param to upnpDiscoverDevices()
+  increments API_VERSION to 13
 
 2015/04/30:
   upnpc: output version on the terminal

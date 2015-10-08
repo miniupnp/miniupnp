@@ -4,6 +4,7 @@ Main author : Thomas BERNARD
 Web site : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 Github : https://github.com/miniupnp/miniupnp/
 Freecode : http://freecode.com/projects/miniupnp
+Travis CI : https://travis-ci.org/miniupnp/miniupnp
 
 miniupnpc/ : MiniUPnP client - an UPnP IGD control point
 miniupnpd/ : MiniUPnP daemon - an implementation of a UPnP IGD
@@ -53,3 +54,5 @@ Thanks to :
     * Yonetani Tomokazu
     * Markus Stenberg
     * Tomofumi Hayashi
+    * Konstantin Tokarev
+    * Mike Tzou

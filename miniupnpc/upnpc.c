@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.108 2014/12/20 09:13:16 nanard Exp $ */
+/* $Id: upnpc.c,v 1.111 2015/07/23 20:40:10 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2015 Thomas Bernard
@@ -547,6 +547,7 @@ int main(int argc, char ** argv)
 	int retcode = 0;
 	int error = 0;
 	int ipv6 = 0;
+	unsigned char ttl = 2;	/* defaulting to 2 */
 	const char * description = 0;
 
 #ifdef _WIN32
@@ -559,7 +560,7 @@ int main(int argc, char ** argv)
 	}
 #endif
     printf("upnpc : miniupnpc library test client, version %s.\n", MINIUPNPC_VERSION_STRING);
-	printf(" (c) 2005-2014 Thomas Bernard.\n");
+	printf(" (c) 2005-2015 Thomas Bernard.\n");
     printf("Go to http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/\n"
 	       "for more information.\n");
 	/* command line processing */
@@ -592,6 +593,8 @@ int main(int argc, char ** argv)
 				ipv6 = 1;
 			else if(argv[i][1] == 'e')
 				description = argv[++i];
+			else if(argv[i][1] == 't')
+				ttl = (unsigned char)atoi(argv[++i]);
 			else
 			{
 				command = argv[i][1];
@@ -639,12 +642,13 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "  -m address/interface : provide ip address (ip v4) or interface name (ip v4 or v6) to use for sending SSDP multicast packets.\n");
 		fprintf(stderr, "  -z localport : SSDP packets local (source) port (1024-65535).\n");
 		fprintf(stderr, "  -p path : use this path for MiniSSDPd socket.\n");
+		fprintf(stderr, "  -t ttl : set multicast TTL. Default value is 2.\n");
 		return 1;
 	}
 
 	if( rootdescurl
 	  || (devlist = upnpDiscover(2000, multicastif, minissdpdpath,
-	                             localport, ipv6, &error)))
+	                             localport, ipv6, ttl, &error)))
 	{
 		struct UPNPDev * device;
 		struct UPNPUrls urls;

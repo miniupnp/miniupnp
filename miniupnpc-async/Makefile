@@ -6,9 +6,9 @@
 # $ PREFIX=/tmp/dummylocation make install
 # or
 # $ INSTALLPREFIX=/usr/local make install
-# or 
+# or
 # make install (will go to /usr/bin, /usr/lib, etc...)
-CC = gcc
+CC ?= gcc
 #AR = gar
 CFLAGS = -O0 -g -DDEBUG
 #CFLAGS = -O
@@ -71,7 +71,8 @@ install:	$(LIBRARY) $(SHAREDLIBRARY)
 	$(INSTALL) -d $(INSTALLDIRLIB)
 	$(INSTALL) -m 644 $(LIBRARY) $(INSTALLDIRLIB)
 	$(INSTALL) -m 644 $(SHAREDLIBRARY) $(INSTALLDIRLIB)/$(SONAME)
-	$(INSTALL) -m 755 upnpc-shared $(INSTALLDIRBIN)/upnpc
+	$(INSTALL) -d $(INSTALLDIRBIN)
+	$(INSTALL) -m 755 $(EXECUTABLES) $(INSTALLDIRBIN)
 	ln -fs $(SONAME) $(INSTALLDIRLIB)/$(SHAREDLIBRARY)
 
 cleaninstall:
@@ -94,8 +95,8 @@ upnpc-static:	upnpc.o $(LIBRARY)
 upnpc-shared:	upnpc.o $(SHAREDLIBRARY)
 	$(CC) -o $@ $^
 
-#testasync:	testasync.o libminiupnpc-async.a
-testasync:	testasync.o -lminiupnpc-async
+testasync:	testasync.o libminiupnpc-async.a
+#testasync:	testasync.o -lminiupnpc-async
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 

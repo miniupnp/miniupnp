@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.23 2014/12/06 10:54:01 nanard Exp $
+# $Id: Makefile,v 1.25 2015/08/06 10:17:52 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -18,7 +18,7 @@ CFLAGS += -W -Wstrict-prototypes
 CFLAGS += -fno-strict-aliasing -fno-common
 CFLAGS += -D_GNU_SOURCE
 CFLAGS += -ansi
-CC = gcc
+CC ?= gcc
 RM = rm -f
 INSTALL = install
 OS = $(shell uname -s)
@@ -43,9 +43,11 @@ SBININSTALLDIR = $(INSTALLPREFIX)/sbin
 MANINSTALLDIR = $(INSTALLPREFIX)/share/man
 
 
-.PHONY:	all clean install depend
+.PHONY:	all clean install depend check test
 
 all:	$(EXECUTABLES)
+
+test:	check
 
 clean:
 	$(RM) $(ALLOBJS) $(EXECUTABLES)
@@ -59,6 +61,16 @@ ifneq ($(OS), Darwin)
 	$(INSTALL) -d $(PREFIX)/etc/init.d
 	$(INSTALL) minissdpd.init.d.script $(PREFIX)/etc/init.d/minissdpd
 endif
+
+check:	validateminissdpd validatecodelength
+
+validateminissdpd:	testminissdpd minissdpd
+	./testminissdpd.sh
+	touch $@
+
+validatecodelength:	testcodelength
+	./testcodelength
+	touch $@
 
 minissdpd: $(MINISSDPDOBJS)
 

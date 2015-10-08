@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.17 2015/02/06 10:31:19 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.18 2015/07/15 12:41:15 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011-2015 Thomas Bernard
@@ -104,6 +104,8 @@ char * build_chunked_response(int content_length, int * response_len)
 	/* allocate to have some margin */
 	buffer_length = 256 + content_length + (content_length >> 4);
 	response_buffer = malloc(buffer_length);
+	if(response_buffer == NULL)
+		return NULL;
 	*response_len = snprintf(response_buffer, buffer_length,
 	                         "HTTP/1.1 200 OK\r\n"
 	                         "Content-Type: text/plain\r\n"
@@ -112,6 +114,10 @@ char * build_chunked_response(int content_length, int * response_len)
 
 	/* build the content */
 	content_buffer = malloc(content_length);
+	if(content_buffer == NULL) {
+		free(response_buffer);
+		return NULL;
+	}
 	build_content(content_buffer, content_length);
 
 	/* chunk it */
@@ -578,12 +584,16 @@ int main(int argc, char * * argv) {
 		if(f) {
 			char * buffer;
 			buffer = malloc(16*1024);
-			build_content(buffer, 16*1024);
-			i = fwrite(buffer, 1, 16*1024, f);
-			if(i != 16*1024) {
-				fprintf(stderr, "error writing to file %s : %dbytes written (out of %d)\n", expected_file_name, i, 16*1024);
+			if(buffer == NULL) {
+				fprintf(stderr, "memory allocation error\n");
+			} else {
+				build_content(buffer, 16*1024);
+				i = fwrite(buffer, 1, 16*1024, f);
+				if(i != 16*1024) {
+					fprintf(stderr, "error writing to file %s : %dbytes written (out of %d)\n", expected_file_name, i, 16*1024);
+				}
+				free(buffer);
 			}
-			free(buffer);
 			fclose(f);
 		} else {
 			fprintf(stderr, "error opening file %s for writing\n", expected_file_name);
