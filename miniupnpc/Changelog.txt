@@ -1,6 +1,11 @@
 $Id: Changelog.txt,v 1.215 2015/10/01 09:26:11 nanard Exp $
 miniUPnP client Changelog.
 
+2015/10/08:
+  Change sameport to localport
+    see https://github.com/miniupnp/miniupnp/pull/120
+  increments API_VERSION to 15
+
 2015/09/15:
   Fix buffer overflow in igd_desc_parse.c/IGDstartelt()
     Discovered by Aleksandar Nikolic of Cisco Talos

@@ -20,7 +20,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"1.9"
-#define MINIUPNPC_API_VERSION	14
+#define MINIUPNPC_API_VERSION	15
 
 /* Source port:
    Using "1" as an alias for 1900 for backwards compatability
