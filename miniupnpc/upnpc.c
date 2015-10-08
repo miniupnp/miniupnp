@@ -559,7 +559,7 @@ int main(int argc, char ** argv)
 	}
 #endif
     printf("upnpc : miniupnpc library test client, version %s.\n", MINIUPNPC_VERSION_STRING);
-	printf(" (c) 2005-2014 Thomas Bernard.\n");
+	printf(" (c) 2005-2015 Thomas Bernard.\n");
     printf("Go to http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/\n"
 	       "for more information.\n");
 	/* command line processing */
