@@ -437,7 +437,7 @@ parseMSEARCHReply(const char * reply, int size,
 }
 
 /* port upnp discover : SSDP protocol */
-#define PORT 1900
+#define SSDP_PORT 1900
 #define XSTR(s) STR(s)
 #define STR(s) #s
 #define UPNP_MCAST_ADDR "239.255.255.250"
@@ -468,7 +468,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	int opt = 1;
 	static const char MSearchMsgFmt[] =
 	"M-SEARCH * HTTP/1.1\r\n"
-	"HOST: %s:" XSTR(PORT) "\r\n"
+	"HOST: %s:" XSTR(SSDP_PORT) "\r\n"
 	"ST: %s\r\n"
 	"MAN: \"ssdp:discover\"\r\n"
 	"MX: %u\r\n"
@@ -495,7 +495,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		*error = MINISSDPC_UNKNOWN_ERROR;
 
 	if(localport==UPNP_LOCAL_PORT_SAME)
-		localport = PORT;
+		localport = SSDP_PORT;
 
 #ifdef _WIN32
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -700,14 +700,14 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		if(ipv6) {
 			struct sockaddr_in6 * p = (struct sockaddr_in6 *)&sockudp_w;
 			p->sin6_family = AF_INET6;
-			p->sin6_port = htons(PORT);
+			p->sin6_port = htons(SSDP_PORT);
 			inet_pton(AF_INET6,
 			          linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR,
 			          &(p->sin6_addr));
 		} else {
 			struct sockaddr_in * p = (struct sockaddr_in *)&sockudp_w;
 			p->sin_family = AF_INET;
-			p->sin_port = htons(PORT);
+			p->sin_port = htons(SSDP_PORT);
 			p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
 		}
 		n = sendto(sudp, bufr, n, 0, &sockudp_w,
@@ -726,7 +726,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		if ((rv = getaddrinfo(ipv6
 		                      ? (linklocal ? UPNP_MCAST_LL_ADDR : UPNP_MCAST_SL_ADDR)
 		                      : UPNP_MCAST_ADDR,
-		                      XSTR(PORT), &hints, &servinfo)) != 0) {
+		                      XSTR(SSDP_PORT), &hints, &servinfo)) != 0) {
 			if(error)
 				*error = MINISSDPC_SOCKET_ERROR;
 #ifdef _WIN32
