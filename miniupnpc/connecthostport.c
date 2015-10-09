@@ -116,7 +116,7 @@ int connecthostport(const char * host, unsigned short port,
 	/* EINTR The system call was interrupted by a signal that was caught
 	 * EINPROGRESS The socket is nonblocking and the connection cannot
 	 *             be completed immediately. */
-	while(n < 0 && (errno == EINTR || errno = EINPROGRESS))
+	while(n < 0 && (errno == EINTR || errno == EINPROGRESS))
 	{
 		socklen_t len;
 		fd_set wset;
