@@ -653,7 +653,7 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 #ifdef ENABLE_UPNP_EVENTS
 #define EVHTTP_REQ_NOTIFY	((EVHTTP_REQ_MAX) << 1)
 #define EVHTTP_REQ_SUBSCRIBE ((EVHTTP_REQ_NOTIFY) << 1)
-static const struct evhttp_extended_methods ext_methods[] = {
+static const struct evhttp_extended_method ext_methods[] = {
 	{"NOTIFY", EVHTTP_REQ_NOTIFY, EVHTTP_METHOD_HAS_BODY},
 	{"SUBSCRIBE", EVHTTP_REQ_SUBSCRIBE, EVHTTP_METHOD_HAS_BODY},
 	{NULL, 0, 0}
