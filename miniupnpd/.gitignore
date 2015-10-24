@@ -17,3 +17,5 @@ netfilter/testiptcrdr_peer
 testdescs
 validateupnppermissions
 validategetifaddr
+testssdppktgen
+validatessdppktgen

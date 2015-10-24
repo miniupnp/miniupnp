@@ -153,7 +153,8 @@ TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl testgetifaddr \
-              testgetroute testasyncsendto testportinuse
+              testgetroute testasyncsendto testportinuse \
+              testssdppktgen
 
 .PHONY:	all clean install depend genuuid
 
@@ -198,7 +199,7 @@ else
 	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=`($(STAGING_DIR_HOST)/bin/genuuid||$(STAGING_DIR_HOST)/bin/uuidgen||$(STAGING_DIR_HOST)/bin/uuid) 2>/dev/null`/" miniupnpd.conf
 endif
 
-check:	validateupnppermissions validategetifaddr
+check:	validateupnppermissions validategetifaddr validatessdppktgen
 
 validateupnppermissions:	testupnppermissions testupnppermissions.sh
 	./testupnppermissions.sh
@@ -206,6 +207,10 @@ validateupnppermissions:	testupnppermissions testupnppermissions.sh
 
 validategetifaddr:	testgetifaddr testgetifaddr.sh
 	./testgetifaddr.sh
+	touch $@
+
+validatessdppktgen:	testssdppktgen
+	./testssdppktgen
 	touch $@
 
 miniupnpd:	$(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
@@ -219,6 +224,8 @@ testupnppermissions:	testupnppermissions.o upnppermissions.o
 testgetifaddr:	testgetifaddr.o getifaddr.o
 
 testgetroute:	testgetroute.o linux/getroute.o upnputils.o
+
+testssdppktgen:	testssdppktgen.o
 
 testasyncsendto:	testasyncsendto.o asyncsendto.o upnputils.o \
 	linux/getroute.o
@@ -236,7 +243,7 @@ depend:	config.h
 	$(ALLOBJS:.o=.c) $(TESTUPNPDESCGENOBJS:.o=.c) \
 	testgetifstats.c testupnppermissions.c testgetifaddr.c \
 	testgetroute.c testasyncsendto.c testportinuse.c \
-	miniupnpdctl.c 2>/dev/null
+	miniupnpdctl.c testssdppktgen.c 2>/dev/null
 
 # DO NOT DELETE
 
@@ -313,3 +320,4 @@ testgetroute.o: config.h miniupnpdtypes.h
 testasyncsendto.o: miniupnpdtypes.h config.h upnputils.h asyncsendto.h
 testportinuse.o: macros.h config.h portinuse.h
 miniupnpdctl.o: macros.h
+testssdppktgen.o: macros.h config.h miniupnpdpath.h upnphttp.h
