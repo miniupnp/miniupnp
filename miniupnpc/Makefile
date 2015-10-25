@@ -15,6 +15,7 @@ VERSION = $(shell cat VERSION)
 
 ifeq ($(OS), Darwin)
 JARSUFFIX=mac
+LIBTOOL ?= $(shell which libtool)
 endif
 ifeq ($(OS), Linux)
 JARSUFFIX=linux
@@ -261,7 +262,11 @@ depend:
 	makedepend -Y -- $(CFLAGS) -- $(SRCS) 2>/dev/null
 
 $(LIBRARY):	$(LIBOBJS)
+ifeq ($(OS), Darwin)
+	$(LIBTOOL) -static -o $@ $?
+else
 	$(AR) crs $@ $?
+endif
 
 $(SHAREDLIBRARY):	$(LIBOBJS)
 ifeq ($(OS), Darwin)
@@ -272,13 +277,12 @@ else
 endif
 
 upnpc-static:	upnpc.o $(LIBRARY)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^ $(LOADLIBES) $(LDLIBS)
 
 upnpc-shared:	upnpc.o $(SHAREDLIBRARY)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^ $(LOADLIBES) $(LDLIBS)
 
-listdevices:	listdevices.o $(LIBRARY) $(LDLIBS)
-	$(CC) $(LDFLAGS) -o $@ $^
+listdevices:	listdevices.o $(LIBRARY)
 
 testminixml:	$(TESTMINIXMLOBJS)
 
