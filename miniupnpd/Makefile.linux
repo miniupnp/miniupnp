@@ -168,7 +168,7 @@ clean:
 	$(RM) testgetroute.o testasyncsendto.o
 	$(RM) testportinuse.o
 	$(RM) miniupnpdctl.o
-	$(RM) validateupnppermissions validategetifaddr
+	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
 
 install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
 	netfilter/iptables_init.sh netfilter/iptables_removeall.sh \

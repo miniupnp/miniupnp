@@ -143,7 +143,7 @@ TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
-              testportinuse
+              testportinuse testssdppktgen
 
 .if $(OSNAME) == "Darwin"
 LIBS =
@@ -172,6 +172,7 @@ clean:
 	miniupnpdctl.o testgetifaddr.o testgetroute.o testasyncsendto.o \
 	testportinuse.o \
 	$(PFOBJS) $(IPFOBJS) $(IPFWOBJS)
+	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
 
 install:	miniupnpd genuuid
 	$(STRIP) miniupnpd
@@ -198,10 +199,25 @@ genuuid:
 	sed -e "s/^uuid=[-0-9a-fA-F]*/uuid=$(UUID)/" miniupnpd.conf.before > miniupnpd.conf
 	$(RM) miniupnpd.conf.before
 
+check:  validateupnppermissions validategetifaddr validatessdppktgen
+
+validateupnppermissions: testupnppermissions testupnppermissions.sh
+	./testupnppermissions.sh
+	touch $@
+
+validategetifaddr:	testgetifaddr testgetifaddr.sh
+	./testgetifaddr.sh
+	touch $@
+
+validatessdppktgen:	testssdppktgen
+	./testssdppktgen
+	touch $@
+
 depend:	config.h
 	mkdep $(ALLOBJS:.o=.c) testupnpdescgen.c testgetifstats.c \
     testupnppermissions.c miniupnpdctl.c testgetifaddr.c \
-	testgetroute.c testportinuse.c testasyncsendto.c
+	testgetroute.c testportinuse.c testasyncsendto.c \
+	testssdppktgen.c
 
 miniupnpd: config.h $(ALLOBJS)
 	$(CC) $(CFLAGS) -o $@ $(ALLOBJS) $(LIBS)
