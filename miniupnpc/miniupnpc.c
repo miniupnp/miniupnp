@@ -129,6 +129,7 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 		char * p;
 		const char * pe, * pv;
 		int soapbodylen;
+		const char * const pend = soapbody + sizeof(soapbody);
 		soapbodylen = snprintf(soapbody, sizeof(soapbody),
 						"<?xml version=\"1.0\"?>\r\n"
 	    	            "<" SOAPPREFIX ":Envelope "
@@ -142,39 +143,54 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 		p = soapbody + soapbodylen;
 		while(args->elt)
 		{
-			/* check that we are never overflowing the string... */
-			if(soapbody + sizeof(soapbody) <= p + 100)
-			{
-				/* we keep a margin of at least 100 bytes */
+			if((p+1) > pend) // check for space to write next byte
 				return NULL;
-			}
 			*(p++) = '<';
+
 			pe = args->elt;
-			while(*pe)
+			while(p < pend && *pe)
 				*(p++) = *(pe++);
+
+			if((p+1) > pend) // check for space to write next byte
+				return NULL;
 			*(p++) = '>';
+
 			if((pv = args->val))
 			{
-				while(*pv)
+				while(p < pend && *pv)
 					*(p++) = *(pv++);
 			}
+
+			if((p+2) > pend) // check for space to write next 2 bytes
+				return NULL;
 			*(p++) = '<';
 			*(p++) = '/';
+
 			pe = args->elt;
-			while(*pe)
+			while(p < pend && *pe)
 				*(p++) = *(pe++);
+
+			if((p+1) > pend) // check for space to write next byte
+				return NULL;
 			*(p++) = '>';
+
 			args++;
 		}
+		if((p+4) > pend) // check for space to write next 4 bytes
+			return NULL;
 		*(p++) = '<';
 		*(p++) = '/';
 		*(p++) = SERVICEPREFIX2;
 		*(p++) = ':';
+
 		pe = action;
-		while(*pe)
+		while(p < pend && *pe)
 			*(p++) = *(pe++);
+
 		strncpy(p, "></" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>\r\n",
-		        soapbody + sizeof(soapbody) - p);
+		        pend - p);
+		if(soapbody[sizeof(soapbody)-1]) // strncpy pads buffer with 0s, so if it doesn't end in 0, could not fit full string
+			return NULL;
 	}
 	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
 	if(s < 0) {
