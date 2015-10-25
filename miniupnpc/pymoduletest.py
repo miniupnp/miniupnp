@@ -1,4 +1,5 @@
 #! /usr/bin/python
+# vim: tabstop=2 shiftwidth=2 expandtab
 # MiniUPnP project
 # Author : Thomas Bernard
 # This Sample code is public domain.
@@ -7,17 +8,39 @@
 # import the python miniupnpc module
 import miniupnpc
 import sys
-import argparse
 
+try:
+  import argparse
+  parser = argparse.ArgumentParser()
+  parser.add_argument('-m', '--multicastif')
+  parser.add_argument('-p', '--minissdpdsocket')
+  parser.add_argument('-d', '--discoverdelay', type=int, default=200)
+  parser.add_argument('-z', '--localport', type=int, default=0)
+  # create the object
+  u = miniupnpc.UPnP(**vars(parser.parse_args()))
+except:
+  print 'argparse not available'
+  i = 1
+  multicastif = None
+  minissdpdsocket = None
+  discoverdelay = 200
+  localport = 0
+  while i < len(sys.argv):
+    print sys.argv[i]
+    if sys.argv[i] == '-m' or sys.argv[i] == '--multicastif':
+      multicastif = sys.argv[i+1]
+    elif sys.argv[i] == '-p' or sys.argv[i] == '--minissdpdsocket':
+      minissdpdsocket = sys.argv[i+1]
+    elif sys.argv[i] == '-d' or sys.argv[i] == '--discoverdelay':
+      discoverdelay = int(sys.argv[i+1])
+    elif sys.argv[i] == '-z' or sys.argv[i] == '--localport':
+      localport = int(sys.argv[i+1])
+    else:
+      raise Exception('invalid argument %s' % sys.argv[i])
+    i += 2
+  # create the object
+  u = miniupnpc.UPnP(multicastif, minissdpdsocket, discoverdelay, localport)
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--multicastif')
-parser.add_argument('-p', '--minissdpdsocket')
-parser.add_argument('-d', '--discoverdelay', type=int, default=200)
-parser.add_argument('-z', '--localport', type=int, default=0)
-
-# create the object
-u = miniupnpc.UPnP(**vars(parser.parse_args()))
 print 'inital(default) values :'
 print ' discoverdelay', u.discoverdelay
 print ' lanaddr', u.lanaddr
@@ -37,6 +60,8 @@ except Exception, e:
 print 'local ip address :', u.lanaddr
 print 'external ip address :', u.externalipaddress()
 print u.statusinfo(), u.connectiontype()
+print 'total bytes : sent', u.totalbytesent(), 'received', u.totalbytereceived()
+print 'total packets : sent', u.totalpacketsent(), 'received', u.totalpacketreceived()
 
 #print u.addportmapping(64000, 'TCP',
 #                       '192.168.1.166', 63000, 'port mapping test', '')
@@ -56,4 +81,8 @@ while True:
 	i = i + 1
 
 print u.getspecificportmapping(port, proto)
+try:
+  print u.getportmappingnumberofentries()
+except Exception, e:
+  print 'GetPortMappingNumberOfEntries() is not supported :', e
 

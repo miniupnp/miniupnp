@@ -169,7 +169,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalBytesSent(self->urls.controlURL_CIF,
 	                           self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -180,7 +184,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalBytesReceived(self->urls.controlURL_CIF,
 		                           self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -191,7 +199,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalPacketsSent(self->urls.controlURL_CIF,
 		                         self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -202,7 +214,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalPacketsReceived(self->urls.controlURL_CIF,
 		                          self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -219,7 +235,11 @@ Py_BEGIN_ALLOW_THREADS
 	                   status, &uptime, lastconnerror);
 Py_END_ALLOW_THREADS
 	if(r==UPNPCOMMAND_SUCCESS) {
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 		return Py_BuildValue("(s,I,s)", status, uptime, lastconnerror);
+#else
+		return Py_BuildValue("(s,i,s)", status, (int)uptime, lastconnerror);
+#endif
 	} else {
 		/* TODO: have our own exception type ! */
 		PyErr_SetString(PyExc_Exception, strupnperror(r));
@@ -412,7 +432,11 @@ Py_BEGIN_ALLOW_THREADS
 									   &n);
 Py_END_ALLOW_THREADS
 	if(r==UPNPCOMMAND_SUCCESS) {
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 		return Py_BuildValue("I", n);
+#else
+		return Py_BuildValue("i", (int)n);
+#endif
 	} else {
 		/* TODO: have our own exception type ! */
 		PyErr_SetString(PyExc_Exception, strupnperror(r));
@@ -497,9 +521,15 @@ Py_END_ALLOW_THREADS
 		ePort = (unsigned short)atoi(extPort);
 		iPort = (unsigned short)atoi(intPort);
 		dur = (unsigned int)strtoul(duration, 0, 0);
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 		return Py_BuildValue("(H,s,(s,H),s,s,s,I)",
 		                     ePort, protocol, intClient, iPort,
 		                     desc, enabled, rHost, dur);
+#else
+		return Py_BuildValue("(i,s,(s,i),s,s,s,i)",
+		                     (int)ePort, protocol, intClient, (int)iPort,
+		                     desc, enabled, rHost, (int)dur);
+#endif
 	}
 	else
 	{
