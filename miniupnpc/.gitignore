@@ -28,3 +28,5 @@ validateportlistingparse
 listdevices
 testigddescparse
 validateigddescparse
+dist/
+miniupnpc.egg-info/
