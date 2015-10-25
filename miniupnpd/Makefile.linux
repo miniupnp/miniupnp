@@ -79,7 +79,7 @@ ifeq "$(wildcard /etc/gentoo-release )" ""
 LDLIBS ?= -liptc
 else # gentoo
 # the following is better, at least on gentoo with iptables 1.4.6
-# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=1618
+# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=1618
 # and http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=2183
 LDLIBS ?= -lip4tc
 CPPFLAGS := -DIPTABLES_143 $(CPPFLAGS)
@@ -134,7 +134,7 @@ TESTIP6TC := $(shell test -f /lib/libip6tc.so && echo 1)
 ifeq ($(TESTIP6TC), 1)
 LDLIBS := $(LDLIBS) -lip6tc
 endif # ($(TESTIP6TC), 1)
-endif # ($(TEST), 1)
+endif # ($(TEST), 1)
 endif # ifdef IPTABLESPATH
 endif # ifdef PCFILE_FOUND
 
