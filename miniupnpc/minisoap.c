@@ -105,6 +105,8 @@ int soapPostSubmit(int fd,
 					   "Pragma: no-cache\r\n"
 					   "\r\n",
 					   url, httpversion, host, portstr, bodysize, action);
+	if ((unsigned int)headerssize >= sizeof(headerbuf))
+		return 0;
 #ifdef DEBUG
 	/*printf("SOAP request : headersize=%d bodysize=%d\n",
 	       headerssize, bodysize);

@@ -110,7 +110,8 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 	snprintf(soapact, sizeof(soapact), "%s#%s", service, action);
 	if(args==NULL)
 	{
-		/*soapbodylen = */snprintf(soapbody, sizeof(soapbody),
+		int soapbodylen;
+		soapbodylen = snprintf(soapbody, sizeof(soapbody),
 						"<?xml version=\"1.0\"?>\r\n"
 	    	              "<" SOAPPREFIX ":Envelope "
 						  "xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
@@ -120,6 +121,8 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 						  "</" SERVICEPREFIX ":%s>"
 						  "</" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>"
 					 	  "\r\n", action, service, action);
+		if ((unsigned int)soapbodylen >= sizeof(soapbody))
+			return NULL;
 	}
 	else
 	{
@@ -134,6 +137,8 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 						"<" SOAPPREFIX ":Body>"
 						"<" SERVICEPREFIX ":%s xmlns:" SERVICEPREFIX "=\"%s\">",
 						action, service);
+		if ((unsigned int)soapbodylen >= sizeof(soapbody))
+			return NULL;
 		p = soapbody + soapbodylen;
 		while(args->elt)
 		{
