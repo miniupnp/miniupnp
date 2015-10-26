@@ -46,10 +46,10 @@ miniupnpc.dll:	libminiupnpc.a $(OBJSDLL)
 	$(OBJSDLL) $(LDLIBS)
 
 miniupnpc.lib:	miniupnpc.dll
-	echo $@ generated with $<
+#	echo $@ generated with $<
 
 dll/upnpc.o:	upnpc.o
-	echo $@ generated with $<
+#	echo $@ generated with $<
 
 .c.o:
 	$(CC) $(CFLAGS) -DMINIUPNP_STATICLIB -c -o $@ $<
