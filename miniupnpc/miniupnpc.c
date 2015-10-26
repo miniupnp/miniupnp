@@ -1,4 +1,5 @@
 /* $Id: miniupnpc.c,v 1.135 2015/07/23 20:40:08 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -103,73 +104,93 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 	char * path;
 	char soapact[128];
 	char soapbody[2048];
+	int soapbodylen;
 	char * buf;
-    int n;
+	int n;
 
 	*bufsize = 0;
 	snprintf(soapact, sizeof(soapact), "%s#%s", service, action);
 	if(args==NULL)
 	{
-		/*soapbodylen = */snprintf(soapbody, sizeof(soapbody),
-						"<?xml version=\"1.0\"?>\r\n"
-	    	              "<" SOAPPREFIX ":Envelope "
+		soapbodylen = snprintf(soapbody, sizeof(soapbody),
+						  "<?xml version=\"1.0\"?>\r\n"
+						  "<" SOAPPREFIX ":Envelope "
 						  "xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
 						  SOAPPREFIX ":encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
 						  "<" SOAPPREFIX ":Body>"
 						  "<" SERVICEPREFIX ":%s xmlns:" SERVICEPREFIX "=\"%s\">"
 						  "</" SERVICEPREFIX ":%s>"
 						  "</" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>"
-					 	  "\r\n", action, service, action);
+						  "\r\n", action, service, action);
+		if ((unsigned int)soapbodylen >= sizeof(soapbody))
+			return NULL;
 	}
 	else
 	{
 		char * p;
 		const char * pe, * pv;
-		int soapbodylen;
+		const char * const pend = soapbody + sizeof(soapbody);
 		soapbodylen = snprintf(soapbody, sizeof(soapbody),
 						"<?xml version=\"1.0\"?>\r\n"
-	    	            "<" SOAPPREFIX ":Envelope "
+						"<" SOAPPREFIX ":Envelope "
 						"xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
 						SOAPPREFIX ":encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
 						"<" SOAPPREFIX ":Body>"
 						"<" SERVICEPREFIX ":%s xmlns:" SERVICEPREFIX "=\"%s\">",
 						action, service);
+		if ((unsigned int)soapbodylen >= sizeof(soapbody))
+			return NULL;
 		p = soapbody + soapbodylen;
 		while(args->elt)
 		{
-			/* check that we are never overflowing the string... */
-			if(soapbody + sizeof(soapbody) <= p + 100)
-			{
-				/* we keep a margin of at least 100 bytes */
+			if(p >= pend) /* check for space to write next byte */
 				return NULL;
-			}
 			*(p++) = '<';
+
 			pe = args->elt;
-			while(*pe)
+			while(p < pend && *pe)
 				*(p++) = *(pe++);
+
+			if(p >= pend) /* check for space to write next byte */
+				return NULL;
 			*(p++) = '>';
+
 			if((pv = args->val))
 			{
-				while(*pv)
+				while(p < pend && *pv)
 					*(p++) = *(pv++);
 			}
+
+			if((p+2) > pend) /* check for space to write next 2 bytes */
+				return NULL;
 			*(p++) = '<';
 			*(p++) = '/';
+
 			pe = args->elt;
-			while(*pe)
+			while(p < pend && *pe)
 				*(p++) = *(pe++);
+
+			if(p >= pend) /* check for space to write next byte */
+				return NULL;
 			*(p++) = '>';
+
 			args++;
 		}
+		if((p+4) > pend) /* check for space to write next 4 bytes */
+			return NULL;
 		*(p++) = '<';
 		*(p++) = '/';
 		*(p++) = SERVICEPREFIX2;
 		*(p++) = ':';
+
 		pe = action;
-		while(*pe)
+		while(p < pend && *pe)
 			*(p++) = *(pe++);
+
 		strncpy(p, "></" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>\r\n",
-		        soapbody + sizeof(soapbody) - p);
+		        pend - p);
+		if(soapbody[sizeof(soapbody)-1]) /* strncpy pads buffer with 0s, so if it doesn't end in 0, could not fit full string */
+			return NULL;
 	}
 	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
 	if(s < 0) {

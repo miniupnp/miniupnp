@@ -685,6 +685,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		             (linklocal ? "[" UPNP_MCAST_LL_ADDR "]" :  "[" UPNP_MCAST_SL_ADDR "]")
 		             : UPNP_MCAST_ADDR,
 		             deviceTypes[deviceIndex], mx);
+		if ((unsigned int)n >= sizeof(bufr)) {
+			if(error)
+				*error = MINISSDPC_MEMORY_ERROR;
+			goto error;
+		}
 #ifdef DEBUG
 		/*printf("Sending %s", bufr);*/
 		printf("Sending M-SEARCH request to %s with ST: %s\n",

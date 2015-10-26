@@ -414,6 +414,11 @@ miniwget3(const char * host,
 
 				 "\r\n",
 			   path, httpversion, host, port);
+	if ((unsigned int)len >= sizeof(buf))
+	{
+		closesocket(s);
+		return NULL;
+	}
 	sent = 0;
 	/* sending the HTTP request */
 	while(sent < len)
