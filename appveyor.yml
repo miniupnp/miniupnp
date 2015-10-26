@@ -4,4 +4,4 @@ install:
 build_script:
   - cmd: 'cd miniupnpc'
   - cmd: 'mingw32-make -f Makefile.mingw'
-  - cmd: 'upnpc-static.exe -l'
+#  - cmd: 'upnpc-static.exe -l'
