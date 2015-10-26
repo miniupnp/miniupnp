@@ -4,7 +4,7 @@
 # (c) 2005-2015 Thomas Bernard
 # This Makefile is made for MinGW
 #
-CC = gcc
+CC ?= gcc
 #CFLAGS = -Wall -g -DDEBUG -D_WIN32_WINNT=0X501
 CFLAGS = -Wall -Os -DNDEBUG -D_WIN32_WINNT=0X501
 LDLIBS = -lws2_32 -liphlpapi
@@ -55,7 +55,7 @@ dll/upnpc.o:	upnpc.o
 	$(CC) $(CFLAGS) -DMINIUPNP_STATICLIB -c -o $@ $<
 	$(CC) $(CFLAGS) -DMINIUPNP_EXPORTS -c -o dll/$@ $<
 
-upnpc.o:
+upnpc.o:	upnpc.c
 	$(CC) $(CFLAGS) -DMINIUPNP_STATICLIB -c -o $@ $<
 	$(CC) $(CFLAGS) -c -o dll/$@ $<
 
@@ -75,7 +75,7 @@ miniupnpcstrings.h: miniupnpcstrings.h.in wingenminiupnpcstrings
 
 minixml.o:	minixml.c minixml.h
 
-upnpc.o:	upnpc.c miniwget.h minisoap.h miniupnpc.h igd_desc_parse.h
+upnpc.o:	miniwget.h minisoap.h miniupnpc.h igd_desc_parse.h
 upnpc.o:	upnpreplyparse.h upnpcommands.h upnperrors.h miniupnpcstrings.h
 
 miniwget.o:	miniwget.c miniwget.h miniupnpcstrings.h connecthostport.h
