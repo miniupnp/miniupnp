@@ -1,4 +1,5 @@
 /* $Id: miniupnpc.c,v 1.135 2015/07/23 20:40:08 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
@@ -103,24 +104,24 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 	char * path;
 	char soapact[128];
 	char soapbody[2048];
+	int soapbodylen;
 	char * buf;
-    int n;
+	int n;
 
 	*bufsize = 0;
 	snprintf(soapact, sizeof(soapact), "%s#%s", service, action);
 	if(args==NULL)
 	{
-		int soapbodylen;
 		soapbodylen = snprintf(soapbody, sizeof(soapbody),
-						"<?xml version=\"1.0\"?>\r\n"
-	    	              "<" SOAPPREFIX ":Envelope "
+						  "<?xml version=\"1.0\"?>\r\n"
+						  "<" SOAPPREFIX ":Envelope "
 						  "xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
 						  SOAPPREFIX ":encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
 						  "<" SOAPPREFIX ":Body>"
 						  "<" SERVICEPREFIX ":%s xmlns:" SERVICEPREFIX "=\"%s\">"
 						  "</" SERVICEPREFIX ":%s>"
 						  "</" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>"
-					 	  "\r\n", action, service, action);
+						  "\r\n", action, service, action);
 		if ((unsigned int)soapbodylen >= sizeof(soapbody))
 			return NULL;
 	}
@@ -128,11 +129,10 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 	{
 		char * p;
 		const char * pe, * pv;
-		int soapbodylen;
 		const char * const pend = soapbody + sizeof(soapbody);
 		soapbodylen = snprintf(soapbody, sizeof(soapbody),
 						"<?xml version=\"1.0\"?>\r\n"
-	    	            "<" SOAPPREFIX ":Envelope "
+						"<" SOAPPREFIX ":Envelope "
 						"xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
 						SOAPPREFIX ":encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
 						"<" SOAPPREFIX ":Body>"
@@ -143,7 +143,7 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 		p = soapbody + soapbodylen;
 		while(args->elt)
 		{
-			if((p+1) > pend) // check for space to write next byte
+			if(p >= pend) /* check for space to write next byte */
 				return NULL;
 			*(p++) = '<';
 
@@ -151,7 +151,7 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 			while(p < pend && *pe)
 				*(p++) = *(pe++);
 
-			if((p+1) > pend) // check for space to write next byte
+			if(p >= pend) /* check for space to write next byte */
 				return NULL;
 			*(p++) = '>';
 
@@ -161,7 +161,7 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 					*(p++) = *(pv++);
 			}
 
-			if((p+2) > pend) // check for space to write next 2 bytes
+			if((p+2) > pend) /* check for space to write next 2 bytes */
 				return NULL;
 			*(p++) = '<';
 			*(p++) = '/';
@@ -170,13 +170,13 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 			while(p < pend && *pe)
 				*(p++) = *(pe++);
 
-			if((p+1) > pend) // check for space to write next byte
+			if(p >= pend) /* check for space to write next byte */
 				return NULL;
 			*(p++) = '>';
 
 			args++;
 		}
-		if((p+4) > pend) // check for space to write next 4 bytes
+		if((p+4) > pend) /* check for space to write next 4 bytes */
 			return NULL;
 		*(p++) = '<';
 		*(p++) = '/';
@@ -189,7 +189,7 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 
 		strncpy(p, "></" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>\r\n",
 		        pend - p);
-		if(soapbody[sizeof(soapbody)-1]) // strncpy pads buffer with 0s, so if it doesn't end in 0, could not fit full string
+		if(soapbody[sizeof(soapbody)-1]) /* strncpy pads buffer with 0s, so if it doesn't end in 0, could not fit full string */
 			return NULL;
 	}
 	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
