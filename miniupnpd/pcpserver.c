@@ -799,7 +799,8 @@ static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 	}
 	/* TODO: add upnp function for PI */
 	pcp_msg_info->result_code = r;
-	syslog(LOG_ERR, "PCP PEER: %s peer mapping %s %s:%hu(%hu)->%s:%hu '%s'",
+	syslog(r == PCP_SUCCESS ? LOG_INFO : LOG_ERR,
+	       "PCP PEER: %s peer mapping %s %s:%hu(%hu)->%s:%hu '%s'",
 	       r == PCP_SUCCESS ? "added" : "failed to add",
 	       (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
 	       pcp_msg_info->mapped_str,
@@ -1043,7 +1044,8 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 	else
 		r = CreatePCPMap_NAT(pcp_msg_info);
 	pcp_msg_info->result_code = r;
-	syslog(LOG_ERR, "PCP MAP: %s mapping %s %hu->%s:%hu '%s'",
+	syslog(r == PCP_SUCCESS ? LOG_INFO : LOG_ERR,
+	      "PCP MAP: %s mapping %s %hu->%s:%hu '%s'",
 	       r == PCP_SUCCESS ? "added" : "failed to add",
 	       (pcp_msg_info->protocol==IPPROTO_TCP)?"TCP":"UDP",
 	       pcp_msg_info->ext_port,
