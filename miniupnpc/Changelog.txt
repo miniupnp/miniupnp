@@ -1,5 +1,13 @@
-$Id: Changelog.txt,v 1.215 2015/10/01 09:26:11 nanard Exp $
+$Id: Changelog.txt,v 1.219 2015/10/26 17:05:06 nanard Exp $
 miniUPnP client Changelog.
+
+2015/10/26:
+  snprintf() overflow check. check overflow in simpleUPnPcommand2()
+
+2015/10/25:
+  fix compilation with old macs
+  fix compilation with mingw32 (for Appveyor)
+  fix python module for python <= 2.3
 
 2015/10/08:
   Change sameport to localport
