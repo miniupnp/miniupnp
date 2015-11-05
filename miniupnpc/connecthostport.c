@@ -1,7 +1,7 @@
-/* $Id: connecthostport.c,v 1.13 2014/03/31 12:36:36 nanard Exp $ */
+/* $Id: connecthostport.c,v 1.15 2015/10/09 16:26:19 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2010-2014 Thomas Bernard
+ * Copyright (c) 2010-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
