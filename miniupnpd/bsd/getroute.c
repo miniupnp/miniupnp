@@ -1,4 +1,4 @@
-/* $Id: getroute.c,v 1.5 2015/11/16 19:29:50 nanard Exp $ */
+/* $Id: getroute.c,v 1.6 2015/11/16 21:53:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -56,8 +56,11 @@ get_src_for_route_to(const struct sockaddr * dst,
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_seq = 1;
 	rtm.rtm_addrs = RTA_DST;	/* destination address */
-	memcpy(m_rtmsg.m_space, dst, sizeof(struct sockaddr));
-	rtm.rtm_msglen = sizeof(struct rt_msghdr) + sizeof(struct sockaddr);
+	l = sizeof(struct sockaddr);
+	if(dst->sa_family == AF_INET6)
+		l = sizeof(struct sockaddr_in6);
+	memcpy(m_rtmsg.m_space, dst, l);
+	rtm.rtm_msglen = sizeof(struct rt_msghdr) + l;
 	if(write(s, &m_rtmsg, rtm.rtm_msglen) < 0) {
 		syslog(LOG_ERR, "write: %m");
 		close(s);
