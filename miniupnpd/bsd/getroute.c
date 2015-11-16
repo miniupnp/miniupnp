@@ -1,4 +1,4 @@
-/* $Id: getroute.c,v 1.4 2014/03/31 12:27:14 nanard Exp $ */
+/* $Id: getroute.c,v 1.5 2015/11/16 19:29:50 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -84,8 +84,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 				sockaddr_to_string(sa, tmp, sizeof(tmp));
 				syslog(LOG_DEBUG, "type=%d sa_len=%d sa_family=%d %s",
 				       i, SA_LEN(sa), sa->sa_family, tmp);
-				if((i == RTA_DST || i == RTA_GATEWAY) &&
-				   (src_len && src)) {
+				if(i == RTA_DST || i == RTA_GATEWAY) {
 					size_t len = 0;
 					void * paddr = NULL;
 					if(sa->sa_family == AF_INET) {
@@ -96,13 +95,15 @@ get_src_for_route_to(const struct sockaddr * dst,
 						len = sizeof(struct in6_addr);
 					}
 					if(paddr) {
-						if(*src_len < len) {
-							syslog(LOG_WARNING, "cannot copy src. %u<%u",
-							       (unsigned)*src_len, (unsigned)len);
-							return -1;
+						if(src && src_len) {
+							if(*src_len < len) {
+								syslog(LOG_WARNING, "cannot copy src. %u<%u",
+								       (unsigned)*src_len, (unsigned)len);
+								return -1;
+							}
+							memcpy(src, paddr, len);
+							*src_len = len;
 						}
-						memcpy(src, paddr, len);
-						*src_len = len;
 						found = 1;
 					}
 				}
