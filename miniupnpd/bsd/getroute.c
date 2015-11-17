@@ -56,10 +56,16 @@ get_src_for_route_to(const struct sockaddr * dst,
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_seq = 1;
 	rtm.rtm_addrs = RTA_DST;	/* destination address */
-	l = sizeof(struct sockaddr);
-	if(dst->sa_family == AF_INET6)
+	if(dst->sa_family == AF_INET) {
+		l = sizeof(struct sockaddr_in);
+	} else if(dst->sa_family == AF_INET6) {
 		l = sizeof(struct sockaddr_in6);
+	} else {
+		syslog(LOG_ERR, "unexpected address family : %d", dst->sa_family);
+		return -1;
+	}
 	memcpy(m_rtmsg.m_space, dst, l);
+	((struct sockaddr *)m_rtmsg.m_space)->sa_len = l;
 	rtm.rtm_msglen = sizeof(struct rt_msghdr) + l;
 	if(write(s, &m_rtmsg, rtm.rtm_msglen) < 0) {
 		syslog(LOG_ERR, "write: %m");
@@ -86,7 +92,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 				sa = (struct sockaddr *)p;
 				sockaddr_to_string(sa, tmp, sizeof(tmp));
 				syslog(LOG_DEBUG, "type=%d sa_len=%d sa_family=%d %s",
-				       i, SA_LEN(sa), sa->sa_family, tmp);
+				       i, sa->sa_len, sa->sa_family, tmp);
 				if(i == RTA_DST || i == RTA_GATEWAY) {
 					size_t len = 0;
 					void * paddr = NULL;
@@ -117,7 +123,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 						*index = sdl->sdl_index;
 				}
 #endif
-				p += SA_LEN(sa);
+				p += SA_SIZE(sa);
 			}
 		}
 	}
