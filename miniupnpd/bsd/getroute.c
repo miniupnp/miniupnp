@@ -1,4 +1,4 @@
-/* $Id: getroute.c,v 1.7 2015/11/16 22:46:45 nanard Exp $ */
+/* $Id: getroute.c,v 1.9 2015/11/17 09:54:00 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -20,6 +20,9 @@
 #include "../config.h"
 #include "../upnputils.h"
 
+#ifndef SA_SIZE
+#define SA_SIZE(sa) (SA_LEN(sa))
+#endif /* SA_SIZE */
 
 int
 get_src_for_route_to(const struct sockaddr * dst,
@@ -64,7 +67,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 	}
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.rtm_type = RTM_GET;
-	rtm.rtm_flags = RTF_UP;
+	rtm.rtm_flags = RTF_UP/* | RTF_SOURCE*/;
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_seq = 1;
 	rtm.rtm_addrs = RTA_DST;	/* destination address */
