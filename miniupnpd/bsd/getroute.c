@@ -92,7 +92,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 				sa = (struct sockaddr *)p;
 				sockaddr_to_string(sa, tmp, sizeof(tmp));
 				syslog(LOG_DEBUG, "type=%d sa_len=%d sa_family=%d %s",
-				       i, SA_LEN(sa), sa->sa_family, tmp);
+				       i, sa->sa_len, sa->sa_family, tmp);
 				if(i == RTA_DST || i == RTA_GATEWAY) {
 					size_t len = 0;
 					void * paddr = NULL;
@@ -123,7 +123,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 						*index = sdl->sdl_index;
 				}
 #endif
-				p += SA_LEN(sa);
+				p += SA_SIZE(sa);
 			}
 		}
 	}
