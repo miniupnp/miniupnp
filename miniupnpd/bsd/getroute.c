@@ -65,7 +65,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 		return -1;
 	}
 	memcpy(m_rtmsg.m_space, dst, l);
-	m_rtmsg.m_space[0] = l;
+	((struct sockaddr *)m_rtmsg.m_space)->sa_len = l;
 	rtm.rtm_msglen = sizeof(struct rt_msghdr) + l;
 	if(write(s, &m_rtmsg, rtm.rtm_msglen) < 0) {
 		syslog(LOG_ERR, "write: %m");
