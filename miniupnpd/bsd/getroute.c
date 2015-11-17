@@ -1,4 +1,4 @@
-/* $Id: getroute.c,v 1.6 2015/11/16 21:53:41 nanard Exp $ */
+/* $Id: getroute.c,v 1.7 2015/11/16 22:46:45 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2013 Thomas Bernard
@@ -45,6 +45,18 @@ get_src_for_route_to(const struct sockaddr * dst,
 		return -1;
 	}
 #endif
+	if(dst->sa_len > 0) {
+		l = dst->sa_len;
+	} else {
+		if(dst->sa_family == AF_INET)
+			l = sizeof(struct sockaddr_in);
+		else if(dst->sa_family == AF_INET6)
+			l = sizeof(struct sockaddr_in6);
+		else {
+			syslog(LOG_ERR, "unknown address family %d", dst->sa_family);
+			return -1;
+		}
+	}
 	s = socket(PF_ROUTE, SOCK_RAW, dst->sa_family);
 	if(s < 0) {
 		syslog(LOG_ERR, "socket(PF_ROUTE) failed : %m");
@@ -56,10 +68,8 @@ get_src_for_route_to(const struct sockaddr * dst,
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_seq = 1;
 	rtm.rtm_addrs = RTA_DST;	/* destination address */
-	l = sizeof(struct sockaddr);
-	if(dst->sa_family == AF_INET6)
-		l = sizeof(struct sockaddr_in6);
 	memcpy(m_rtmsg.m_space, dst, l);
+	((struct sockaddr *)m_rtmsg.m_space)->sa_len = l;
 	rtm.rtm_msglen = sizeof(struct rt_msghdr) + l;
 	if(write(s, &m_rtmsg, rtm.rtm_msglen) < 0) {
 		syslog(LOG_ERR, "write: %m");
