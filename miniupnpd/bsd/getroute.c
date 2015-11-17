@@ -42,12 +42,6 @@ get_src_for_route_to(const struct sockaddr * dst,
 
 	if(dst == NULL)
 		return -1;
-#ifdef __APPLE__
-	if(dst->sa_family == AF_INET6) {
-		syslog(LOG_ERR, "Sorry, get_src_for_route_to() is known to fail with IPV6 on OS X...");
-		return -1;
-	}
-#endif
 	if(dst->sa_len > 0) {
 		l = dst->sa_len;
 	} else {
@@ -87,8 +81,8 @@ get_src_for_route_to(const struct sockaddr * dst,
 			close(s);
 			return -1;
 		}
-		syslog(LOG_DEBUG, "read l=%d seq=%d pid=%d",
-		       l, rtm.rtm_seq, rtm.rtm_pid);
+		syslog(LOG_DEBUG, "read l=%d seq=%d pid=%d   sizeof(struct rt_msghdr)=%d",
+		       l, rtm.rtm_seq, rtm.rtm_pid, sizeof(struct rt_msghdr));
 	} while(l > 0 && (rtm.rtm_pid != getpid() || rtm.rtm_seq != 1));
 	close(s);
 	p = m_rtmsg.m_space;
