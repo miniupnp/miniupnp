@@ -85,11 +85,19 @@ get_src_for_route_to(const struct sockaddr * dst,
 		       l, rtm.rtm_seq, rtm.rtm_pid, (int)sizeof(struct rt_msghdr));
 	} while(l > 0 && (rtm.rtm_pid != getpid() || rtm.rtm_seq != 1));
 	close(s);
+	if(l <= 0) {
+		syslog(LOG_WARNING, "no matching ROUTE response message");
+		return -1;
+	}
 	p = m_rtmsg.m_space;
 	if(rtm.rtm_addrs) {
 		for(i=1; i<0x8000; i <<= 1) {
 			if(i & rtm.rtm_addrs) {
 				char tmp[256] = { 0 };
+				if(p >= (char *)&m_rtmsg + l) {
+					syslog(LOG_ERR, "error parsing ROUTE response message");
+					break;
+				}
 				sa = (struct sockaddr *)p;
 				sockaddr_to_string(sa, tmp, sizeof(tmp));
 				syslog(LOG_DEBUG, "type=%d sa_len=%d sa_family=%d %s",
