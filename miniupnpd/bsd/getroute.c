@@ -1,7 +1,7 @@
-/* $Id: getroute.c,v 1.9 2015/11/17 09:54:00 nanard Exp $ */
+/* $Id: getroute.c,v 1.11 2015/11/18 08:49:26 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2013 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -82,7 +82,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 			return -1;
 		}
 		syslog(LOG_DEBUG, "read l=%d seq=%d pid=%d   sizeof(struct rt_msghdr)=%d",
-		       l, rtm.rtm_seq, rtm.rtm_pid, sizeof(struct rt_msghdr));
+		       l, rtm.rtm_seq, rtm.rtm_pid, (int)sizeof(struct rt_msghdr));
 	} while(l > 0 && (rtm.rtm_pid != getpid() || rtm.rtm_seq != 1));
 	close(s);
 	p = m_rtmsg.m_space;
@@ -124,7 +124,12 @@ get_src_for_route_to(const struct sockaddr * dst,
 						*index = sdl->sdl_index;
 				}
 #endif
-				p += SA_SIZE(sa);
+				/* at least 4 bytes per address are reserved,
+				 * that is true with OpenBSD 4.3 */
+				if(SA_SIZE(sa) > 0)
+					p += SA_SIZE(sa);
+				else
+					p += 4;
 			}
 		}
 	}
