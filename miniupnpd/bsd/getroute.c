@@ -61,10 +61,10 @@ get_src_for_route_to(const struct sockaddr * dst,
 	}
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.rtm_type = RTM_GET;
-	rtm.rtm_flags = RTF_UP/* | RTF_SOURCE*/;
+	rtm.rtm_flags = RTF_UP;
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_seq = 1;
-	rtm.rtm_addrs = RTA_DST;	/* destination address */
+	rtm.rtm_addrs = RTA_DST | RTA_IFA;	/* pass destination address & request source */
 	memcpy(m_rtmsg.m_space, dst, l);
 	((struct sockaddr *)m_rtmsg.m_space)->sa_len = l;
 	rtm.rtm_msglen = sizeof(struct rt_msghdr) + l;
@@ -94,7 +94,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 				sockaddr_to_string(sa, tmp, sizeof(tmp));
 				syslog(LOG_DEBUG, "type=%d sa_len=%d sa_family=%d %s",
 				       i, sa->sa_len, sa->sa_family, tmp);
-				if(i == RTA_DST || i == RTA_GATEWAY) {
+				if(i == RTA_IFA) {
 					size_t len = 0;
 					void * paddr = NULL;
 					if(sa->sa_family == AF_INET) {
@@ -118,7 +118,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 					}
 				}
 #ifdef AF_LINK
-				if(sa->sa_family == AF_LINK) {
+				else if((i == RTA_IFP) && (sa->sa_family == AF_LINK)) {
 					struct sockaddr_dl * sdl = (struct sockaddr_dl *)sa;
 					if(index)
 						*index = sdl->sdl_index;
