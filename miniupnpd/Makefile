@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.83 2014/04/18 08:24:41 nanard Exp $
+# $Id: Makefile,v 1.87 2015/11/05 11:16:13 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -194,6 +194,9 @@ UUID != if which uuidgen 2>&1 > /dev/null; then \
         else echo "00000000-0000-0000-0000-000000000000"; \
         fi
 
+# bash or ksh
+SH != which bash || which ksh
+
 genuuid:
 	$(MV) miniupnpd.conf miniupnpd.conf.before
 	sed -e "s/^uuid=[-0-9a-fA-F]*/uuid=$(UUID)/" miniupnpd.conf.before > miniupnpd.conf
@@ -202,7 +205,7 @@ genuuid:
 check:  validateupnppermissions validategetifaddr validatessdppktgen
 
 validateupnppermissions: testupnppermissions testupnppermissions.sh
-	./testupnppermissions.sh
+	$(SH) ./testupnppermissions.sh
 	touch $@
 
 validategetifaddr:	testgetifaddr testgetifaddr.sh
