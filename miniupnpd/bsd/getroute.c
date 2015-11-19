@@ -1,4 +1,4 @@
-/* $Id: getroute.c,v 1.11 2015/11/18 08:49:26 nanard Exp $ */
+/* $Id: getroute.c,v 1.12 2015/11/19 11:46:30 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -133,11 +133,13 @@ get_src_for_route_to(const struct sockaddr * dst,
 				}
 #endif
 				/* at least 4 bytes per address are reserved,
-				 * that is true with OpenBSD 4.3 */
+				 * that is true with OpenBSD 4.3.
+				 * The test is only useful when SA_SIZE() is not properly
+				 * defined, as it should be always >= sizeof(long) */
 				if(SA_SIZE(sa) > 0)
 					p += SA_SIZE(sa);
 				else
-					p += 4;
+					p += sizeof(long);
 			}
 		}
 	}
