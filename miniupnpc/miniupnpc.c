@@ -587,7 +587,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 			{
 				desc[i].is_igd = 1;
 				n_igd++;
-				strncpy(lanaddr, myLanAddr, lanaddrlen);
+				if(lanaddr)
+					strncpy(lanaddr, myLanAddr, lanaddrlen);
 			}
 		}
 	}
