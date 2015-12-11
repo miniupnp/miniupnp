@@ -282,7 +282,7 @@ static const struct XMLElt rootDesc[] =
 #ifdef ENABLE_L3F_SERVICE
 /* 60 / 65 = SERVICES_OFFSET+2 */
 	{"/serviceType", "urn:schemas-upnp-org:service:Layer3Forwarding:1"},
-	{"/serviceId", "urn:upnp-org:serviceId:Layer3Forwarding1"},
+	{"/serviceId", "urn:upnp-org:serviceId:L3Forwarding1"},
 	{"/controlURL", L3F_CONTROLURL}, /* The Layer3Forwarding service is only */
 	{"/eventSubURL", L3F_EVENTURL}, /* recommended, not mandatory */
 	{"/SCPDURL", L3F_PATH},
