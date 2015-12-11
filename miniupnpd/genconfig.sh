@@ -6,6 +6,10 @@
 # This software is subject to the conditions detailed in the
 # LICENCE file provided within the distribution
 
+# default to UPnP Device Architecture (UDA) v2.0
+UPNP_VERSION_MAJOR=2
+UPNP_VERSION_MAJOR=0
+
 for argv; do
 case "$argv" in
 	--ipv6) IPV6=1 ;;
@@ -15,6 +19,15 @@ case "$argv" in
 	--vendorcfg) VENDORCFG=1 ;;
 	--pcp-peer) PCP_PEER=1 ;;
 	--portinuse) PORTINUSE=1 ;;
+	--uda-version=*)
+		UPNP_VERSION=$(echo $argv | cut -d= -f2)
+		UPNP_VERSION_MAJOR=$(echo $UPNP_VERSION | cut -s -d. -f1)
+		UPNP_VERSION_MINOR=$(echo $UPNP_VERSION | cut -s -d. -f2)
+		echo "Setting UPnP version major=$UPNP_VERSION_MAJOR minor=$UPNP_VERSION_MINOR"
+		if [ -z "$UPNP_VERSION_MAJOR" ] || [ -z "$UPNP_VERSION_MINOR" ] ; then
+			echo "UPnP Version invalid in option $argv"
+			exit 1
+		fi ;;
 	--help|-h)
 		echo "Usage : $0 [options]"
 		echo " --ipv6      enable IPv6"
@@ -102,8 +115,8 @@ echo "" >> ${CONFIGFILE}
 cat >> ${CONFIGFILE} <<EOF
 /* UPnP version reported in XML descriptions
  * 1.0 / 1.1 / 2.0 depending on which UDA (UPnP Device Architecture) Version */
-#define UPNP_VERSION_MAJOR	2
-#define UPNP_VERSION_MINOR	0
+#define UPNP_VERSION_MAJOR	${UPNP_VERSION_MAJOR}
+#define UPNP_VERSION_MINOR	${UPNP_VERSION_MINOR}
 #define UPNP_VERSION_MAJOR_STR	XSTR(UPNP_VERSION_MAJOR)
 #define UPNP_VERSION_MINOR_STR	XSTR(UPNP_VERSION_MINOR)
 EOF
