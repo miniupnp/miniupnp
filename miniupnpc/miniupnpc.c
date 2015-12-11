@@ -546,6 +546,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	int state = -1; /* state 1 : IGD connected. State 2 : IGD. State 3 : anything */
 	int n_igd = 0;
 	char extIpAddr[16];
+	char myLanAddr[40];
 	if(!devlist)
 	{
 #ifdef DEBUG
@@ -568,7 +569,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 		/* we should choose an internet gateway device.
 		 * with st == urn:schemas-upnp-org:device:InternetGatewayDevice:1 */
 		desc[i].xml = miniwget_getaddr(dev->descURL, &(desc[i].size),
-		                               lanaddr, lanaddrlen,
+		                               myLanAddr, sizeof(myLanAddr),
 		                               dev->scope_id);
 #ifdef DEBUG
 		if(!desc[i].xml)
@@ -586,6 +587,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 			{
 				desc[i].is_igd = 1;
 				n_igd++;
+				strncpy(lanaddr, myLanAddr, lanaddrlen);
 			}
 		}
 	}
