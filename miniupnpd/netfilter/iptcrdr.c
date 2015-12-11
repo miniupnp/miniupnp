@@ -73,6 +73,12 @@ add_filter_rule(int proto, const char * rhost,
                 const char * iaddr, unsigned short iport);
 
 static int
+addmasqueraderule(int proto,
+           unsigned short eport,
+           const char * iaddr, unsigned short iport,
+           const char * rhost, const char * extif);
+
+static int
 addpeernatrule(int proto,
            const char * eaddr, unsigned short eport,
            const char * iaddr, unsigned short iport,
@@ -222,8 +228,13 @@ add_redirect_rule2(const char * ifname,
 	UNUSED(ifname);
 
 	r = addnatrule(proto, eport, iaddr, iport, rhost);
-	if(r >= 0)
+	if(r >= 0) {
 		add_redirect_desc(eport, proto, desc, timestamp);
+		r = addmasqueraderule(proto, eport, iaddr, iport, rhost, ifname);
+		if(r <= 0) {
+			syslog(LOG_NOTICE, "add_redirect_rule2(): addmasqueraderule returned %d", r);
+		}
+	}
 	return r;
 }
 
@@ -1003,6 +1014,29 @@ get_dscp_target(unsigned char dscp)
 	return target;
 }
 
+static struct ipt_entry_target *
+get_masquerade_target(unsigned short port)
+{
+	struct ipt_entry_target * target;
+	struct ip_nat_multi_range * mr;
+	struct ip_nat_range * range;
+	size_t size;
+
+	size =   IPT_ALIGN(sizeof(struct ipt_entry_target))
+	       + IPT_ALIGN(sizeof(struct ip_nat_multi_range));
+	target = calloc(1, size);
+	target->u.target_size = size;
+	strncpy(target->u.user.name, "MASQUERADE", sizeof(target->u.user.name));
+	/* one ip_nat_range already included in ip_nat_multi_range */
+	mr = (struct ip_nat_multi_range *)&target->data[0];
+	mr->rangesize = 1;
+	range = &mr->range[0];
+	range->min.tcp.port = range->max.tcp.port = htons(port);
+	/*range->min.all = range->max.all = htons(port);*/
+	range->flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
+	return target;
+}
+
 /* iptc_init_verify_and_append()
  * return 0 on success, -1 on failure */
 static int
@@ -1128,6 +1162,80 @@ addnatrule(int proto, unsigned short eport,
 	}
 
 	r = iptc_init_verify_and_append("nat", miniupnpd_nat_chain, e, "addnatrule");
+	free(target);
+	free(match);
+	free(e);
+	return r;
+}
+
+/* for "Port Triggering"
+ * Section 2.5.16 figure 2.2 in UPnP-gw-WANIPConnection-v2-Service.pdf
+ * iptables -t nat -I POSTROUTING -o extif -s iaddr -p UDP --sport iport -j MASQUERADE --to-ports eport
+ * iptables -t nat -A MINIUPNPD-PCP-PEER -o extif -s iaddr -p UDP --sport iport -j MASQUERADE --to-ports eport
+ */
+static int
+addmasqueraderule(int proto,
+           unsigned short eport,
+           const char * iaddr, unsigned short iport,
+           const char * rhost, const char * extif)
+{
+	int r = 0;
+	struct ipt_entry * e;
+	struct ipt_entry * tmp;
+	struct ipt_entry_match *match = NULL;
+	struct ipt_entry_target *target = NULL;
+
+	e = calloc(1, sizeof(struct ipt_entry));
+	if(!e) {
+		syslog(LOG_ERR, "%s: calloc(%d) error", "addmasqueraderule",
+		       (int)sizeof(struct ipt_entry));
+		return -1;
+	}
+	e->ip.proto = proto;
+	if(proto == IPPROTO_TCP) {
+		match = get_tcp_match(0, iport);
+	} else {
+		match = get_udp_match(0, iport);
+	}
+	e->nfcache = NFC_IP_DST_PT;
+	target = get_masquerade_target(eport);
+	e->nfcache |= NFC_UNKNOWN;
+	tmp = realloc(e, sizeof(struct ipt_entry)
+	               + match->u.match_size
+				   + target->u.target_size);
+	if(!tmp) {
+		syslog(LOG_ERR, "%s: realloc(%d) error", "addmasqueraderule",
+		       (int)(sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size));
+		free(e);
+		free(match);
+		free(target);
+		return -1;
+	}
+	e = tmp;
+	memcpy(e->elems, match, match->u.match_size);
+	memcpy(e->elems + match->u.match_size, target, target->u.target_size);
+	e->target_offset = sizeof(struct ipt_entry)
+	                   + match->u.match_size;
+	e->next_offset = sizeof(struct ipt_entry)
+	                 + match->u.match_size
+					 + target->u.target_size;
+	if(extif != NULL) {
+		strncpy(e->ip.outiface, extif, sizeof(e->ip.outiface));
+		memset(e->ip.outiface_mask, 0xff, strlen(e->ip.outiface) + 1);/* Include nul-terminator in match */
+	}
+	/* internal host */
+	if(iaddr && (iaddr[0] != '\0') && (0 != strcmp(iaddr, "*")))
+	{
+		e->ip.src.s_addr = inet_addr(iaddr);
+		e->ip.smsk.s_addr = INADDR_NONE;
+	}
+	/* remote host */
+	if(rhost && (rhost[0] != '\0') && (0 != strcmp(rhost, "*"))) {
+		e->ip.dst.s_addr = inet_addr(rhost);
+		e->ip.dmsk.s_addr = INADDR_NONE;
+	}
+
+	r = iptc_init_verify_and_append("nat", miniupnpd_peer_chain, e, "addmasqueraderule");
 	free(target);
 	free(match);
 	free(e);

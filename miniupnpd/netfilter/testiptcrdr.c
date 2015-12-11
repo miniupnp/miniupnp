@@ -1,7 +1,7 @@
 /* $Id: testiptcrdr.c,v 1.18 2012/04/24 22:41:53 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2012 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -11,7 +11,7 @@
 #include <syslog.h>
 
 #include "iptcrdr.c"
-#include "../commonrdr.h"
+/*#include "../commonrdr.h"*/
 
 #ifndef PRIu64
 #define PRIu64 "llu"
@@ -22,7 +22,9 @@ main(int argc, char ** argv)
 {
 	unsigned short eport, iport;
 	const char * iaddr;
-	printf("Usage %s <ext_port> <internal_ip> <internal_port>\n", argv[0]);
+	int r;
+	int proto = IPPROTO_TCP;
+	printf("Usage %s <ext_port> <internal_ip> <internal_port> [TCP/UDP]\n", argv[0]);
 
 	if(argc<4)
 		return -1;
@@ -30,11 +32,22 @@ main(int argc, char ** argv)
 	eport = (unsigned short)atoi(argv[1]);
 	iaddr = argv[2];
 	iport = (unsigned short)atoi(argv[3]);
-	printf("trying to redirect port %hu to %s:%hu\n", eport, iaddr, iport);
-	if(addnatrule(IPPROTO_TCP, eport, iaddr, iport, NULL) < 0)
+	if(argc >= 4) {
+		if(strcasecmp(argv[4], "udp") == 0)
+			proto = IPPROTO_UDP;
+	}
+	printf("trying to redirect port %hu to %s:%hu proto %d\n",
+	       eport, iaddr, iport, proto);
+	if(addnatrule(proto, eport, iaddr, iport, NULL) < 0)
 		return -1;
-	if(add_filter_rule(IPPROTO_TCP, NULL, iaddr, iport) < 0)
+	r = addmasqueraderule(proto, eport, iaddr, iport, NULL, "ppp0");
+	syslog(LOG_DEBUG, "addmasqueraderule() returned %d", r);
+	if(add_filter_rule(proto, NULL, iaddr, iport) < 0)
 		return -1;
+	if(proto == IPPROTO_UDP) {
+		if(addpeernatrule(proto, "8.8.8.8"/*eaddr*/, eport, iaddr, iport, NULL, 0) < 0)
+			fprintf(stderr, "addpeenatrule failed\n");
+	}
 	/* test */
 	{
 		unsigned short p1, p2;
@@ -63,8 +76,8 @@ main(int argc, char ** argv)
 	}
 	printf("trying to list nat rules :\n");
 	list_redirect_rule(argv[1]);
-	printf("deleting\n");
-	delete_redirect_and_filter_rules(eport, IPPROTO_TCP);
+	//printf("deleting\n");
+	//delete_redirect_and_filter_rules(eport, proto);
 	return 0;
 }
 
