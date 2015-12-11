@@ -261,7 +261,7 @@ static const struct XMLElt rootDesc[] =
 #ifdef ENABLE_6FC_SERVICE
 /* 58 */
 	{"/serviceType", "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1"},
-	{"/serviceId", "urn:upnp-org:serviceId:WANIPv6FC1"},
+	{"/serviceId", "urn:upnp-org:serviceId:WANIPv6Firewall1"},
 	{"/controlURL", WANIP6FC_CONTROLURL},
 	{"/eventSubURL", WANIP6FC_EVENTURL},
 	{"/SCPDURL", WANIP6FC_PATH},
