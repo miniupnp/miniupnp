@@ -743,11 +743,32 @@ static const struct serviceDesc scpd6FC =
 
 #ifdef ENABLE_DP_SERVICE
 /* UPnP-gw-DeviceProtection-v1-Service.pdf */
+
+static const struct argument SendSetupMessageArgs[] =
+{
+	{1|0x80, 6},	/* ProtocolType */
+	{1|0x80, 5},	/* InMessage */
+	{2|0x80, 5},	/* OutMessage */
+	{0, 0}
+};
+
+static const struct argument GetSupportedProtocolsArgs[] =
+{
+	{2, 1},	/* ProtocolList */
+	{0, 0}
+};
+
+static const struct argument GetAssignedRolesArgs[] =
+{
+	{2, 6},	/* RoleList */
+	{0, 0}
+};
+
 static const struct action DPActions[] =
 {
-	{"SendSetupMessage", 0},
-	{"GetSupportedProtocols", 0},
-	{"GetAssignedRoles", 0},
+	{"SendSetupMessage", SendSetupMessageArgs},
+	{"GetSupportedProtocols", GetSupportedProtocolsArgs},
+	{"GetAssignedRoles", GetAssignedRolesArgs},
 	{0, 0}
 };
 
