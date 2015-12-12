@@ -513,22 +513,23 @@ static struct {
 #ifdef ENABLE_6FC_SERVICE
 	{"urn:schemas-upnp-org:service:WANIPv6FirewallControl:", 1, uuidvalue_wcd},
 #endif
-#else
+#else /* IGD_V2 */
+	/* IGD v1 */
 	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", 1, uuidvalue_igd},
 	{"urn:schemas-upnp-org:device:WANConnectionDevice:", 1, uuidvalue_wcd},
 	{"urn:schemas-upnp-org:device:WANDevice:", 1, uuidvalue_wan},
 	{"urn:schemas-upnp-org:service:WANIPConnection:", 1, uuidvalue_wcd},
-#endif
+#endif /* IGD_V2 */
 	{"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:", 1, uuidvalue_wan},
 #ifndef UPNP_STRICT
 	/* We use WAN IP Connection, not PPP connection,
 	 * but buggy control points may try to use WanPPPConnection
 	 * anyway */
 	{"urn:schemas-upnp-org:service:WANPPPConnection:", 1, uuidvalue_wcd},
-#endif
+#endif /* UPNP_STRICT */
 #ifdef ENABLE_L3F_SERVICE
 	{"urn:schemas-upnp-org:service:Layer3Forwarding:", 1, uuidvalue_igd},
-#endif
+#endif /* ENABLE_L3F_SERVICE */
 /* we might want to support urn:schemas-wifialliance-org:device:WFADevice:1
  * urn:schemas-wifialliance-org:device:WFADevice:1
  * in the future */
