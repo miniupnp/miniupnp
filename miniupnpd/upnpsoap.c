@@ -2030,7 +2030,7 @@ GetSupportedProtocols(struct upnphttp * h, const char * action, const char * ns)
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
-		"<ProtocolList>%s</ProtocolList>"
+		"<ProtocolList><![CDATA[%s]]></ProtocolList>"
 		"</u:%sResponse>";
 	char body[1024];
 	int bodylen;
