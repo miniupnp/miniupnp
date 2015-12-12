@@ -1,4 +1,5 @@
 /* $Id: upnpdescgen.c,v 1.77 2014/03/10 11:04:53 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -109,18 +110,18 @@ static const int upnpallowedranges[] = {
 
 static const char * magicargname[] = {
 	0,
-	"StartPort",
-	"EndPort",
-	"RemoteHost",
-	"RemotePort",
-	"InternalClient",
-	"InternalPort",
-	"IsWorking",
-	"ProtocolType",
-	"InMessage",
-	"OutMessage",
-	"ProtocolList",
-	"RoleList"
+	"StartPort",		/* 1 */
+	"EndPort",			/* 2 */
+	"RemoteHost",		/* 3 */
+	"RemotePort",		/* 4 */
+	"InternalClient",	/* 5 */
+	"InternalPort",		/* 6 */
+	"IsWorking",		/* 7 */
+	"ProtocolType",		/* 8 */
+	"InMessage",		/* 9 */
+	"OutMessage",		/* 10 */
+	"ProtocolList",		/* 11 */
+	"RoleList"			/* 12 */
 };
 
 static const char xmlver[] =
