@@ -24,6 +24,7 @@
 
 
 /* Event magical values codes */
+#define SETUPREADY_MAGICALVALUE (248)
 #define CONNECTIONSTATUS_MAGICALVALUE (249)
 #define FIREWALLENABLED_MAGICALVALUE (250)
 #define INBOUNDPINHOLEALLOWED_MAGICALVALUE (251)
@@ -780,7 +781,7 @@ static const struct action DPActions[] =
 
 static const struct stateVar DPVars[] =
 {
-	{"SetupReady", 1|0x80},
+	{"SetupReady", 1|0x80, 0, 0, SETUPREADY_MAGICALVALUE},
 	{"SupportedProtocols", 0},
 	{"A_ARG_TYPE_ACL", 0},
 	{"A_ARG_TYPE_IdentityList", 0},
@@ -1195,6 +1196,13 @@ genEventVars(int * len, const struct serviceDesc * s)
 			switch(v->ieventvalue) {
 			case 0:
 				break;
+#ifdef ENABLE_DP_SERVICE
+			case SETUPREADY_MAGICALVALUE:
+				/* always ready for setup */
+				snprintf(tmp, sizeof(tmp), "%d", 1);
+				str = strcat_str(str, len, &tmplen, tmp);
+				break;
+#endif
 			case CONNECTIONSTATUS_MAGICALVALUE:
 				/* or get_wan_connection_status_str(ext_if_name) */
 				str = strcat_str(str, len, &tmplen,
