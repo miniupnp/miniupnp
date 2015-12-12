@@ -497,14 +497,6 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 	}
 }
 
-#ifndef IGD_V2
-#define IGD_VER 1
-#define WANIPC_VER 1
-#else
-#define IGD_VER 2
-#define WANIPC_VER 2
-#endif
-
 static struct {
 	const char * s;
 	const int version;
@@ -512,11 +504,22 @@ static struct {
 } const known_service_types[] =
 {
 	{"upnp:rootdevice", 0, uuidvalue_igd},
-	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", IGD_VER, uuidvalue_igd},
+#ifdef IGD_V2
+	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", 2, uuidvalue_igd},
+	{"urn:schemas-upnp-org:device:WANConnectionDevice:", 2, uuidvalue_wcd},
+	{"urn:schemas-upnp-org:device:WANDevice:", 2, uuidvalue_wan},
+	{"urn:schemas-upnp-org:service:WANIPConnection:", 2, uuidvalue_wcd},
+	{"urn:schemas-upnp-org:service:DeviceProtection:", 1, uuidvalue_igd},
+#ifdef ENABLE_6FC_SERVICE
+	{"urn:schemas-upnp-org:service:WANIPv6FirewallControl:", 1, uuidvalue_wcd},
+#endif
+#else
+	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", 1, uuidvalue_igd},
 	{"urn:schemas-upnp-org:device:WANConnectionDevice:", 1, uuidvalue_wcd},
 	{"urn:schemas-upnp-org:device:WANDevice:", 1, uuidvalue_wan},
+	{"urn:schemas-upnp-org:service:WANIPConnection:", 1, uuidvalue_wcd},
+#endif
 	{"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:", 1, uuidvalue_wan},
-	{"urn:schemas-upnp-org:service:WANIPConnection:", WANIPC_VER, uuidvalue_wcd},
 #ifndef UPNP_STRICT
 	/* We use WAN IP Connection, not PPP connection,
 	 * but buggy control points may try to use WanPPPConnection
@@ -525,9 +528,6 @@ static struct {
 #endif
 #ifdef ENABLE_L3F_SERVICE
 	{"urn:schemas-upnp-org:service:Layer3Forwarding:", 1, uuidvalue_igd},
-#endif
-#ifdef ENABLE_6FC_SERVICE
-	{"urn:schemas-upnp-org:service:WANIPv6FirewallControl:", 1, uuidvalue_wcd},
 #endif
 /* we might want to support urn:schemas-wifialliance-org:device:WFADevice:1
  * urn:schemas-wifialliance-org:device:WFADevice:1
