@@ -1187,7 +1187,11 @@ GetDefaultConnectionService(struct upnphttp * h, const char * action, const char
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
+#ifdef IGD_V2
+		"<NewDefaultConnectionService>%s:WANConnectionDevice:2,"
+#else
 		"<NewDefaultConnectionService>%s:WANConnectionDevice:1,"
+#endif
 		SERVICE_ID_WANIPC "</NewDefaultConnectionService>"
 		"</u:%sResponse>";
 	/* example from UPnP_IGD_Layer3Forwarding 1.0.pdf :
