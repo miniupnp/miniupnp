@@ -1985,7 +1985,7 @@ SendSetupMessage(struct upnphttp * h, const char * action, const char * ns)
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
-		"<NewOutMessage>%s</NewOutMessage>"
+		"<OutMessage>%s</OutMessage>"
 		"</u:%sResponse>";
 	char body[1024];
 	int bodylen;
@@ -2026,7 +2026,7 @@ GetSupportedProtocols(struct upnphttp * h, const char * action, const char * ns)
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
-		"<NewProtocolList>%s</NewProtocolList>"
+		"<ProtocolList>%s</ProtocolList>"
 		"</u:%sResponse>";
 	char body[1024];
 	int bodylen;
@@ -2052,7 +2052,7 @@ GetAssignedRoles(struct upnphttp * h, const char * action, const char * ns)
 	static const char resp[] =
 		"<u:%sResponse "
 		"xmlns:u=\"%s\">"
-		"<NewRoleList>%s</NewRoleList>"
+		"<RoleList>%s</RoleList>"
 		"</u:%sResponse>";
 	char body[1024];
 	int bodylen;
