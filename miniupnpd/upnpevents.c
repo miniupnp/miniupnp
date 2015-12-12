@@ -1,7 +1,7 @@
-/* $Id: upnpevents.c,v 1.30 2014/03/14 22:26:07 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.31 2015/12/12 09:36:22 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2008-2014 Thomas Bernard
+ * (c) 2008-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
