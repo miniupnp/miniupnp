@@ -665,11 +665,13 @@ with HTTP error 412 Precondition Failed. */
 				BuildResp2_upnphttp(h, 400, "Incompatible header fields", 0, 0);
 			} else
 #endif
-			if(renewSubscription(h->req_buf + h->req_SIDOff, h->req_SIDLen,
-			                     h->req_Timeout) < 0) {
+			sid = upnpevents_renewSubscription(h->req_buf + h->req_SIDOff,
+			                                   h->req_SIDLen, h->req_Timeout);
+			if(!sid) {
 				BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
 			} else {
-				h->respflags = FLAG_TIMEOUT;
+				h->respflags = FLAG_TIMEOUT | FLAG_SID;
+				h->res_SID = sid;
 				BuildResp_upnphttp(h, 0, 0);
 			}
 		}

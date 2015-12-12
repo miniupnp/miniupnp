@@ -143,8 +143,8 @@ upnpevents_addSubscriber(const char * eventurl,
 }
 
 /* renew a subscription (update the timeout) */
-int
-renewSubscription(const char * sid, int sidlen, int timeout)
+const char *
+upnpevents_renewSubscription(const char * sid, int sidlen, int timeout)
 {
 	struct subscriber * sub;
 	for(sub = subscriberlist.lh_first; sub != NULL; sub = sub->entries.le_next) {
@@ -155,10 +155,10 @@ renewSubscription(const char * sid, int sidlen, int timeout)
 				continue;
 #endif
 			sub->timeout = (timeout ? time(NULL) + timeout : 0);
-			return 0;
+			return sub->uuid;
 		}
 	}
-	return -1;
+	return NULL;
 }
 
 int
