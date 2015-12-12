@@ -1999,8 +1999,8 @@ SendSetupMessage(struct upnphttp * h, const char * action, const char * ns)
 	const char * OutMessage = "";	/* base64 */
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-	ProtocolType = GetValueFromNameValueList(&data, "NewProtocolType");	/* string */
-	InMessage = GetValueFromNameValueList(&data, "NewInMessage");	/* base64 */
+	ProtocolType = GetValueFromNameValueList(&data, "ProtocolType");	/* string */
+	InMessage = GetValueFromNameValueList(&data, "InMessage");	/* base64 */
 
 	if(ProtocolType == NULL || InMessage == NULL)
 	{
