@@ -115,7 +115,12 @@ static const char * magicargname[] = {
 	"RemotePort",
 	"InternalClient",
 	"InternalPort",
-	"IsWorking"
+	"IsWorking",
+	"ProtocolType",
+	"InMessage",
+	"OutMessage",
+	"ProtocolList",
+	"RoleList"
 };
 
 static const char xmlver[] =
@@ -743,11 +748,32 @@ static const struct serviceDesc scpd6FC =
 
 #ifdef ENABLE_DP_SERVICE
 /* UPnP-gw-DeviceProtection-v1-Service.pdf */
+
+static const struct argument SendSetupMessageArgs[] =
+{
+	{1|0x80|(8<<2), 6},	/* ProtocolType */
+	{1|0x80|(9<<2), 5},	/* InMessage */
+	{2|0x80|(10<<2), 5},	/* OutMessage */
+	{0, 0}
+};
+
+static const struct argument GetSupportedProtocolsArgs[] =
+{
+	{2|0x80|(11<<2), 1},	/* ProtocolList */
+	{0, 0}
+};
+
+static const struct argument GetAssignedRolesArgs[] =
+{
+	{2|0x80|(12<<2), 6},	/* RoleList */
+	{0, 0}
+};
+
 static const struct action DPActions[] =
 {
-	{"SendSetupMessage", 0},
-	{"GetSupportedProtocols", 0},
-	{"GetAssignedRoles", 0},
+	{"SendSetupMessage", SendSetupMessageArgs},
+	{"GetSupportedProtocols", GetSupportedProtocolsArgs},
+	{"GetAssignedRoles", GetAssignedRolesArgs},
 	{0, 0}
 };
 
