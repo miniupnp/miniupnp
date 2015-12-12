@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.408 2015/11/16 19:29:42 nanard Exp $
 
+2015/12/12:
+  add commandline option to genconfig.sh to set UPnP (UDA) version
+
 2015/11/16:
   Fix bsd/getroute.c get_src_for_route_to() when args are NULL
 

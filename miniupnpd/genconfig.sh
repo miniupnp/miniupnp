@@ -8,7 +8,7 @@
 
 # default to UPnP Device Architecture (UDA) v2.0
 UPNP_VERSION_MAJOR=2
-UPNP_VERSION_MAJOR=0
+UPNP_VERSION_MINOR=0
 
 for argv; do
 case "$argv" in
@@ -37,6 +37,7 @@ case "$argv" in
 		echo " --vendorcfg enable configuration of manufacturer info"
 		echo " --pcp-peer  enable PCP PEER operation"
 		echo " --portinuse enable port in use check"
+		echo " --uda-version=x.x  set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		exit 1
 		;;
 	*)
