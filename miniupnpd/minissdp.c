@@ -521,12 +521,12 @@ static struct {
 	{"urn:schemas-upnp-org:service:WANIPConnection:", 1, uuidvalue_wcd},
 #endif /* IGD_V2 */
 	{"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:", 1, uuidvalue_wan},
-#ifndef UPNP_STRICT
+#ifdef ADVERTISE_WANPPPCONN
 	/* We use WAN IP Connection, not PPP connection,
 	 * but buggy control points may try to use WanPPPConnection
 	 * anyway */
 	{"urn:schemas-upnp-org:service:WANPPPConnection:", 1, uuidvalue_wcd},
-#endif /* UPNP_STRICT */
+#endif /* ADVERTISE_WANPPPCONN */
 #ifdef ENABLE_L3F_SERVICE
 	{"urn:schemas-upnp-org:service:Layer3Forwarding:", 1, uuidvalue_igd},
 #endif /* ENABLE_L3F_SERVICE */

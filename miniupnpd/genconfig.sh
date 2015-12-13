@@ -28,6 +28,7 @@ case "$argv" in
 			echo "UPnP Version invalid in option $argv"
 			exit 1
 		fi ;;
+	--disable-pppconn) DISABLEPPPCONN=1 ;;
 	--help|-h)
 		echo "Usage : $0 [options]"
 		echo " --ipv6      enable IPv6"
@@ -38,6 +39,7 @@ case "$argv" in
 		echo " --pcp-peer  enable PCP PEER operation"
 		echo " --portinuse enable port in use check"
 		echo " --uda-version=x.x  set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
+		echo " --disable-pppconn  disable WANPPPConnection"
 		exit 1
 		;;
 	*)
@@ -451,6 +453,15 @@ echo " * Enabling the Layer3Forwarding Service seems to be the more compatible" 
 echo " * option. */" >> ${CONFIGFILE}
 echo "/*#define HAS_DUMMY_SERVICE*/" >> ${CONFIGFILE}
 echo "#define ENABLE_L3F_SERVICE" >> ${CONFIGFILE}
+echo "" >> ${CONFIGFILE}
+
+echo "/* define ADVERTISE_WANPPPCONN to allow buggy Control Point to use" >> ${CONFIGFILE}
+echo " * WANPPPConnection instead of WANIPConnection. */" >>  ${CONFIGFILE}
+if [ -n "$STRICT" ] || [ -n "$DISABLEPPPCONN" ] ; then
+	echo "/*#define ADVERTISE_WANPPPCONN*/" >> ${CONFIGFILE}
+else
+	echo "#define ADVERTISE_WANPPPCONN" >> ${CONFIGFILE}
+fi
 echo "" >> ${CONFIGFILE}
 
 echo "/* Enable IP v6 support */" >> ${CONFIGFILE}
