@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.412 2015/12/12 09:36:20 nanard Exp $
+$Id: Changelog.txt,v 1.414 2015/12/15 11:09:57 nanard Exp $
+
+2015/12/13:
+  --disable-pppconn to disable WanPPPConnection
+  more fixes in DeviceProtection service
 
 2015/12/12:
   add commandline option to genconfig.sh to set UPnP (UDA) version
