@@ -18,14 +18,6 @@
 #include <openssl/ssl.h>
 #endif /* ENABLE_HTTPS */
 
-#if 0
-/* according to "UPnP Device Architecture 1.0" */
-#define UPNP_VERSION_STRING "UPnP/1.0"
-/* according to "UPnP Device Architecture 1.1" */
-#define UPNP_VERSION_STRING "UPnP/1.1"
-/* according to "UPnP Device Architecture 2.0" */
-#define UPNP_VERSION_STRING "UPnP/2.0"
-#endif
 #define UPNP_VERSION_STRING "UPnP/" UPNP_VERSION_MAJOR_STR "." UPNP_VERSION_MINOR_STR
 
 /* server: HTTP header returned in all HTTP responses : */
