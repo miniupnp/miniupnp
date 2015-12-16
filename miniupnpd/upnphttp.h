@@ -1,4 +1,5 @@
-/* $Id: upnphttp.h,v 1.40 2014/12/09 16:41:21 nanard Exp $ */
+/* $Id: upnphttp.h,v 1.42 2015/12/16 10:21:49 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -63,6 +64,7 @@ struct upnphttp {
 #ifdef ENABLE_HTTPS
 	SSL * ssl;
 #endif /* ENABLE_HTTPS */
+	char clientaddr_str[64];	/* used for syslog() output */
 	enum httpStates state;
 	char HttpVer[16];
 	/* request */

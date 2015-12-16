@@ -1,8 +1,9 @@
-/* $Id: upnphttp.c,v 1.99 2014/12/09 17:25:30 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.103 2015/12/16 10:21:49 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab */
 /* Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2014 Thomas Bernard
+ * Copyright (c) 2005-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -736,6 +737,7 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	char * HttpVer;
 	char * p;
 	int i;
+
 	p = h->req_buf;
 	if(!p)
 		return;
@@ -756,8 +758,8 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	for(i = 0; i<15 && *p != '\r'; i++)
 		HttpVer[i] = *(p++);
 	HttpVer[i] = '\0';
-	syslog(LOG_INFO, "HTTP REQUEST : %s %s (%s)",
-	       HttpCommand, HttpUrl, HttpVer);
+	syslog(LOG_INFO, "HTTP REQUEST from %s : %s %s (%s)",
+	       h->clientaddr_str, HttpCommand, HttpUrl, HttpVer);
 	ParseHttpHeaders(h);
 	if(h->req_HostOff > 0 && h->req_HostLen > 0) {
 		syslog(LOG_DEBUG, "Host: %.*s", h->req_HostLen, h->req_buf + h->req_HostOff);

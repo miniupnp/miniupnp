@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.414 2015/12/15 11:09:57 nanard Exp $
+$Id: Changelog.txt,v 1.415 2015/12/16 10:21:48 nanard Exp $
+
+2015/12/16:
+  improve syslog message for incoming HTTP requests
 
 2015/12/13:
   --disable-pppconn to disable WanPPPConnection
