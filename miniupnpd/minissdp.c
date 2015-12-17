@@ -1,4 +1,5 @@
 /* $Id: minissdp.c,v 1.77 2015/08/26 07:36:52 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -401,14 +402,15 @@ EXT:
 /* Responds to a SSDP "M-SEARCH"
  * s :          socket to use
  * addr :       peer
- * st, st_len : ST: header
- * suffix :     suffix for USN: header
+ * st, st_len, st_suffix : ST: header
+ * usn_suffix : suffix for USN: header
  * host, port : our HTTP host, port
  * delay :      in milli-seconds
  */
 static void
 SendSSDPResponse(int s, const struct sockaddr * addr,
-                 const char * st, int st_len, const char * suffix,
+                 const char * st, int st_len, const char * st_suffix,
+                 const char * usn_suffix,
                  const char * host, unsigned short http_port,
 #ifdef ENABLE_HTTPS
                  unsigned short https_port,
@@ -460,14 +462,14 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 		"CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 		"\r\n",
 #ifdef ENABLE_HTTP_DATE
-		http_date,
+		http_date,						/* DATE: */
 #endif
-		st_len, st, suffix,
+		st_len, st, st_suffix,			/* ST: */
 		uuidvalue, st_is_uuid ? "" : "::",
-		st_is_uuid ? 0 : st_len, st, suffix,
-		host, (unsigned int)http_port,
+		st_is_uuid ? 0 : st_len, st, usn_suffix,	/* USN: */
+		host, (unsigned int)http_port,	/* LOCATION: */
 #ifdef ENABLE_HTTPS
-		host, (unsigned int)https_port,
+		host, (unsigned int)https_port,	/* SECURELOCATION: */
 #endif
 		upnp_bootid, upnp_bootid, upnp_configid);
 	if(l<0)
@@ -798,6 +800,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	const char * st = NULL;
 	int st_len = 0;
 	int st_ver = 0;
+	char st_ver_str[4];
 	char sender_str[64];
 	char ver_str[4];
 	const char * announced_host = NULL;
@@ -857,6 +860,10 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					l--;
 				st_ver = atoi(st+l);
 				syslog(LOG_DEBUG, "ST: %.*s (ver=%d)", st_len, st, st_ver);
+				if(st_ver==0)
+					st_ver_str[0] = '\0';
+				else
+					snprintf(st_ver_str, sizeof(st_ver_str), "%d", st_ver);
 				/*j = 0;*/
 				/*while(bufr[i+j]!='\r') j++;*/
 				/*syslog(LOG_INFO, "%.*s", j, bufr+i);*/
@@ -982,30 +989,72 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					 * it MUST respond to search requests for both that type
 					 * and “urn:schemas-upnp-org:service:xyz:1”. The response
 					 * MUST specify the same version as was contained in the
-					 * search request. [...] */
-#ifndef SSDP_RESPOND_SAME_VERSION
+					 * search request. [...]
+					 *
+					 * UPnP-arch-DeviceArchitecture-v2.0.pdf :
+					 * ST Required :
+					 *  Field value contains Search Target. Single URI. The
+					 *  response sent by the device depends on the field value
+					 *  of the ST header field that was sent in the request.
+					 *  In some cases, the device shall send multiple response
+					 *  messages as follows.
+					 *  If the received ST field value was:
+					 *  [...]
+					 *  urn:schemas-upnp-org:device:deviceType:ver
+					 *    Respond once for each matching device, root or embedded.
+					 *    Shall be urn:schemas-upnp-org:device:deviceType:ver where 
+					 *    deviceType and ver are defined by UPnP Forum working
+					 *    committee and ver shall contain the *version* of the device
+					 *    type *contained in the M-SEARCH request*.
+					 * USN Required :
+					 *  Field value contains Unique Service Name. Identifies
+					 *  a unique instance of a device or service. Shall be one
+					 *  of the following. (See Table 1 1, “Root device discovery
+					 *  messages”, Table 1 2, “Embedded device discovery messages”,
+					 *  and Table 1 3, “Service discovery messages” above.)
+					 *  The prefix (before the double colon) shall match the value
+					 *  of the UDN element in the device description OR the
+					 *  lower ST version used in the M-Search request.
+					 *  (Section 2, “Description” explains the UDN element.) Single URI
+					 *  uuid:device-UUID::urn:schemas-upnp-org:device:deviceType:ver
+					 *    Sent once for every device, root or embedded, where
+					 *    device-UUID is specified by the UPnP vendor, deviceType
+					 *    and ver are defined by UPnP Forum working committee
+					 *    and *ver specifies version of the device type*.
+					 *    See section 1.1.4, “UUID format and RECOMMENDED generation
+					 *    algorithms” for the MANDATORY UUID format.
+					 *
+					 *
+					 * So if the M-SEARCH request contains
+					 *  ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1
+					 * and we are implementing IGD v2, the M-SEARCH response
+					 * should include
+					 *  ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1
+					 *  USN: uuid:UUID::urn:schemas-upnp-org:device:InternetGatewayDevice:2
+					 */
 					if(i==0)
 						ver_str[0] = '\0';
 					else
 						snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
-#endif
+
 					syslog(LOG_INFO, "Single search found");
 #ifdef DELAY_MSEARCH_RESPONSE
 					delay = random() / (1 + RAND_MAX / (1000 * mx_value));
 #ifdef DEBUG
 					syslog(LOG_DEBUG, "mx=%dsec delay=%ums", mx_value, delay);
-#endif
-#endif
+#endif /* DEBUG */
+#endif /* DELAY_MSEARCH_RESPONSE */
 					SendSSDPResponse(s, sender,
+					                 known_service_types[i].s, l,
 #ifdef SSDP_RESPOND_SAME_VERSION
-					                 st, st_len, "",
-#else
-					                 known_service_types[i].s, l, ver_str,
-#endif
+					                 st_ver_str, ver_str,
+#else  /* SSDP_RESPOND_SAME_VERSION */
+					                 ver_str, ver_str,
+#endif /* SSDP_RESPOND_SAME_VERSION */
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
-#endif
+#endif /* ENABLE_HTTPS */
 					                 known_service_types[i].uuid,
 					                 delay);
 					break;
@@ -1030,7 +1079,8 @@ ProcessSSDPData(int s, const char *bufr, int n,
 						snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 					l = (int)strlen(known_service_types[i].s);
 					SendSSDPResponse(s, sender,
-					                 known_service_types[i].s, l, ver_str,
+					                 known_service_types[i].s, l,
+					                 ver_str, ver_str,
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
@@ -1042,7 +1092,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #ifdef DELAY_MSEARCH_RESPONSE
 					delay += delay_increment;
 #endif
-				SendSSDPResponse(s, sender, uuidvalue_igd, strlen(uuidvalue_igd), "",
+				SendSSDPResponse(s, sender, uuidvalue_igd, strlen(uuidvalue_igd), "", "",
 				                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 				                 https_port,
@@ -1051,7 +1101,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #ifdef DELAY_MSEARCH_RESPONSE
 					delay += delay_increment;
 #endif
-				SendSSDPResponse(s, sender, uuidvalue_wan, strlen(uuidvalue_wan), "",
+				SendSSDPResponse(s, sender, uuidvalue_wan, strlen(uuidvalue_wan), "", "",
 				                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 				                 https_port,
@@ -1060,7 +1110,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #ifdef DELAY_MSEARCH_RESPONSE
 					delay += delay_increment;
 #endif
-				SendSSDPResponse(s, sender, uuidvalue_wcd, strlen(uuidvalue_wcd), "",
+				SendSSDPResponse(s, sender, uuidvalue_wcd, strlen(uuidvalue_wcd), "", "",
 				                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 				                 https_port,
@@ -1077,7 +1127,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				if(0 == memcmp(st, uuidvalue_igd, l))
 				{
 					syslog(LOG_INFO, "ssdp:uuid (IGD) found");
-					SendSSDPResponse(s, sender, st, st_len, "",
+					SendSSDPResponse(s, sender, st, st_len, "", "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
@@ -1087,7 +1137,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				else if(0 == memcmp(st, uuidvalue_wan, l))
 				{
 					syslog(LOG_INFO, "ssdp:uuid (WAN) found");
-					SendSSDPResponse(s, sender, st, st_len, "",
+					SendSSDPResponse(s, sender, st, st_len, "", "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
@@ -1097,7 +1147,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				else if(0 == memcmp(st, uuidvalue_wcd, l))
 				{
 					syslog(LOG_INFO, "ssdp:uuid (WCD) found");
-					SendSSDPResponse(s, sender, st, st_len, "",
+					SendSSDPResponse(s, sender, st, st_len, "", "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
 					                 https_port,
