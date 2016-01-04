@@ -430,7 +430,7 @@ get_portmappings_in_range(unsigned short startport,
                           int proto,
                           unsigned int * number)
 {
-	unsigned short * array = NULL;
+	unsigned short *array = NULL, *array2 = NULL;
 	unsigned int capacity = 128;
 	int i, count_rules, total_rules = 0;
 	struct ip_fw * rules = NULL;
@@ -459,12 +459,14 @@ get_portmappings_in_range(unsigned short startport,
 		    && eport <= endport) {
 			if(*number >= capacity) {
 				capacity += 128;
-				array = realloc(array, sizeof(unsigned short)*capacity);
-				if(!array) {
+				array2 = realloc(array, sizeof(unsigned short)*capacity);
+				if(!array2) {
 					syslog(LOG_ERR, "get_portmappings_in_range() : realloc(%lu) error", sizeof(unsigned short)*capacity);
 					*number = 0;
+					free(array);
 					goto error;
 				}
+				array = array2;
 			}
 			array[*number] = eport;
 			(*number)++;

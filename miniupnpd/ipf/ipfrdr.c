@@ -723,7 +723,7 @@ unsigned short *
 get_portmappings_in_range(unsigned short startport, unsigned short endport,
                           int proto, unsigned int * number)
 {
-	unsigned short * array;
+	unsigned short *array, *array2;
 	unsigned int capacity;
 	unsigned short eport;
 	ipfgeniter_t iter;
@@ -742,7 +742,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 		syslog(LOG_ERR, "get_portmappings_in_range() : calloc error");
 		return NULL;
 	}
-	
+
 	memset(&obj, 0, sizeof(obj));
 	obj.ipfo_rev = IPFILTER_VERSION;
 	obj.ipfo_ptr = &iter;
@@ -761,10 +761,10 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 			    "get_portmappings_in_range");
 			break;
 		}
-		
+
 		if (strcmp(ipn.in_tag.ipt_tag, group_name) != 0)
 			continue;
-		
+
 #if IPFILTER_VERSION >= 5000000
 		eport = ntohs(ipn.in_dpmin);
 		if( (eport == ntohs(ipn.in_dpmax))
@@ -781,13 +781,15 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 			{
 				/* need to increase the capacity of the array */
 				capacity += 128;
-				array = realloc(array, sizeof(unsigned short)*capacity);
-				if(!array)
+				array2 = realloc(array, sizeof(unsigned short)*capacity);
+				if(!array2)
 				{
 					syslog(LOG_ERR, "get_portmappings_in_range() : realloc(%lu) error", sizeof(unsigned short)*capacity);
 					*number = 0;
+					free(array);
 					return NULL;
 				}
+				array = array2;
 			}
 			array[*number] = eport;
 			(*number)++;
