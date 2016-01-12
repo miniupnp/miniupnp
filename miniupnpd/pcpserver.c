@@ -1097,6 +1097,8 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			if(0 != strcmp(desc, pcp_msg_info->desc)) {
 				/* nonce does not match */
 				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+				syslog(LOG_ERR, "desc not matching : '%s' != '%s'",
+				       desc, pcp_msg_info->desc);
 				syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
 				       iport, (pcp_msg_info->protocol == IPPROTO_TCP)?"TCP":"UDP");
 				return;
