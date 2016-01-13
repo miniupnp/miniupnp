@@ -682,7 +682,12 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 		processMSEARCH(s, st, st_len, addr);
 		break;
 	default:
-		syslog(LOG_WARNING, "method %.*s, don't know what to do", methodlen, p);
+		{
+			char addr_str[64];
+			sockaddr_to_string(addr, addr_str, sizeof(addr_str));
+			syslog(LOG_WARNING, "method %.*s, don't know what to do (from %s)",
+			       methodlen, p, addr_str);
+		}
 	}
 	return r;
 }
@@ -771,7 +776,7 @@ void processRequest(struct reqelem * req)
 		goto error;
 	}
 	if(l == 0 && type != MINISSDPD_SEARCH_ALL && type != MINISSDPD_GET_VERSION) {
-		syslog(LOG_WARNING, "bad request (length=0)");
+		syslog(LOG_WARNING, "bad request (length=0, type=%d)", type);
 		goto error;
 	}
 	syslog(LOG_INFO, "(s=%d) request type=%d str='%.*s'",
