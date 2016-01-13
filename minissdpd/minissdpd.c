@@ -73,6 +73,16 @@ struct device {
 #define NTS_SSDP_BYEBYE	2
 #define NTS_SSDP_UPDATE	3
 
+/* request types */
+enum request_type {
+	MINISSDPD_GET_VERSION = 0,
+	MINISSDPD_SEARCH_TYPE = 1,
+	MINISSDPD_SEARCH_USN = 2,
+	MINISSDPD_SEARCH_ALL = 3,
+	MINISSDPD_SUBMIT = 4,
+	MINISSDPD_NOTIF = 5
+};
+
 /* discovered device list kept in memory */
 struct device * devlist = 0;
 
@@ -731,7 +741,7 @@ void processRequest(struct reqelem * req)
 	unsigned int l, m;
 	unsigned char buf[2048];
 	const unsigned char * p;
-	int type;
+	enum request_type type;
 	struct device * d = devlist;
 	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
 	unsigned char * rp;
@@ -760,14 +770,14 @@ void processRequest(struct reqelem * req)
 		       l, (unsigned)n);
 		goto error;
 	}
-	if(l == 0 && type != 3 && type != 0) {
+	if(l == 0 && type != MINISSDPD_SEARCH_ALL && type != MINISSDPD_GET_VERSION) {
 		syslog(LOG_WARNING, "bad request (length=0)");
 		goto error;
 	}
 	syslog(LOG_INFO, "(s=%d) request type=%d str='%.*s'",
 	       req->socket, type, l, p);
 	switch(type) {
-	case 0:	/* version */
+	case MINISSDPD_GET_VERSION:
 		rp = rbuf;
 		CODELENGTH((sizeof(MINISSDPD_VERSION) - 1), rp);
 		memcpy(rp, MINISSDPD_VERSION, sizeof(MINISSDPD_VERSION) - 1);
@@ -777,9 +787,9 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 		break;
-	case 1:	/* request by type */
-	case 2:	/* request by USN (unique id) */
-	case 3:	/* everything */
+	case MINISSDPD_SEARCH_TYPE:	/* request by type */
+	case MINISSDPD_SEARCH_USN:	/* request by USN (unique id) */
+	case MINISSDPD_SEARCH_ALL:	/* everything */
 		rp = rbuf+1;
 		while(d && (nrep < 255)) {
 			if(d->t < t) {
@@ -790,9 +800,9 @@ void processRequest(struct reqelem * req)
 				  + d->headers[HEADER_USN].l + 6
 				  + (rp - rbuf) >= (int)sizeof(rbuf))
 					break;
-				if( (type==1 && 0==memcmp(d->headers[HEADER_NT].p, p, l))
-				  ||(type==2 && 0==memcmp(d->headers[HEADER_USN].p, p, l))
-				  ||(type==3) ) {
+				if( (type==MINISSDPD_SEARCH_TYPE && 0==memcmp(d->headers[HEADER_NT].p, p, l))
+				  ||(type==MINISSDPD_SEARCH_USN && 0==memcmp(d->headers[HEADER_USN].p, p, l))
+				  ||(type==MINISSDPD_SEARCH_ALL) ) {
 					/* response :
 					 * 1 - Location
 					 * 2 - NT (device/service type)
@@ -822,9 +832,9 @@ void processRequest(struct reqelem * req)
 			if(strlen(serv->location) + strlen(serv->st)
 			  + strlen(serv->usn) + 6 + (rp - rbuf) >= sizeof(rbuf))
 			  	break;
-			if( (type==1 && 0==strncmp(serv->st, (const char *)p, l))
-			  ||(type==2 && 0==strncmp(serv->usn, (const char *)p, l))
-			  ||(type==3) ) {
+			if( (type==MINISSDPD_SEARCH_TYPE && 0==strncmp(serv->st, (const char *)p, l))
+			  ||(type==MINISSDPD_SEARCH_USN && 0==strncmp(serv->usn, (const char *)p, l))
+			  ||(type==MINISSDPD_SEARCH_ALL) ) {
 				/* response :
 				 * 1 - Location
 				 * 2 - NT (device/service type)
