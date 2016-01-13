@@ -315,6 +315,7 @@ delete_pinhole(unsigned short uid)
 	}
 	ip6tc_free(h);
 	syslog(LOG_WARNING, "delete_pinhole() rule with PID=%hu not found", uid);
+	LIST_REMOVE(p, entries);
 	return -2;	/* not found */
 error:
 	ip6tc_free(h);
