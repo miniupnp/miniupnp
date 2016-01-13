@@ -46,6 +46,7 @@
 /* current request management stucture */
 struct reqelem {
 	int socket;
+	int is_notify;	/* has subscribed to notifications */
 	LIST_ENTRY(reqelem) entries;
 	unsigned char * output_buffer;
 	int output_buffer_offset;
@@ -68,6 +69,16 @@ struct device {
 	struct header headers[3]; /* NT, USN and LOCATION headers */
 	char data[];
 };
+
+/* Services stored for answering to M-SEARCH */
+struct service {
+	char * st;	/* Service type */
+	char * usn;	/* Unique identifier */
+	char * server;	/* Server string */
+	char * location;	/* URL */
+	LIST_ENTRY(service) entries;
+};
+LIST_HEAD(servicehead, service) servicelisthead;
 
 #define NTS_SSDP_ALIVE	1
 #define NTS_SSDP_BYEBYE	2
@@ -93,6 +104,16 @@ unsigned int upnp_configid = 1337;
 /* LAN interfaces/addresses */
 struct lan_addr_list lan_addrs;
 
+/* connected clients */
+LIST_HEAD(reqstructhead, reqelem) reqlisthead;
+
+/* functions prototypes */
+
+#define NOTIF_NEW    1
+#define NOTIF_UPDATE 2
+#define NOTIF_REMOVE 3
+static void
+sendNotifications(int notif_type, const struct device * dev, const struct service * serv);
 
 /* functions */
 
@@ -296,6 +317,7 @@ updateDevice(const struct header * headers, time_t t)
 			}
 			memcpy(p->data + p->headers[0].l + p->headers[1].l,
 			       headers[2].p, headers[2].l);
+			/* TODO : check p->headers[HEADER_LOCATION].l */
 			return 0;
 		}
 		pp = &p->next;
@@ -324,6 +346,7 @@ updateDevice(const struct header * headers, time_t t)
 			pc += headers[i].l;
 		}
 		devlist = p;
+		sendNotifications(NOTIF_NEW, p, NULL);
 	}
 	return 1;
 }
@@ -346,6 +369,7 @@ removeDevice(const struct header * headers)
 		  && (0==memcmp(p->headers[HEADER_USN].p, headers[HEADER_USN].p, headers[HEADER_USN].l)) )
 		{
 			syslog(LOG_INFO, "remove device : %.*s", headers[HEADER_USN].l, headers[HEADER_USN].p);
+			sendNotifications(NOTIF_REMOVE, p, NULL);
 			*pp = p->next;
 			free(p);
 			return -1;
@@ -355,6 +379,68 @@ removeDevice(const struct header * headers)
 	}
 	syslog(LOG_WARNING, "device not found for removing : %.*s", headers[HEADER_USN].l, headers[HEADER_USN].p);
 	return 0;
+}
+
+/* sent notifications to client having subscribed */
+static void
+sendNotifications(int notif_type, const struct device * dev, const struct service * serv)
+{
+	struct reqelem * req;
+	unsigned int m;
+	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
+	unsigned char * rp;
+
+	for(req = reqlisthead.lh_first; req; req = req->entries.le_next) {
+		if(!req->is_notify) continue;
+		rbuf[0] = '\xff'; /* special code for notifications */
+		rbuf[1] = (unsigned char)notif_type;
+		rbuf[2] = 0;
+		rp = rbuf + 3;
+		if(dev) {
+			/* response :
+			 * 1 - Location
+			 * 2 - NT (device/service type)
+			 * 3 - usn */
+			m = dev->headers[HEADER_LOCATION].l;
+			CODELENGTH(m, rp);
+			memcpy(rp, dev->headers[HEADER_LOCATION].p, dev->headers[HEADER_LOCATION].l);
+			rp += dev->headers[HEADER_LOCATION].l;
+			m = dev->headers[HEADER_NT].l;
+			CODELENGTH(m, rp);
+			memcpy(rp, dev->headers[HEADER_NT].p, dev->headers[HEADER_NT].l);
+			rp += dev->headers[HEADER_NT].l;
+			m = dev->headers[HEADER_USN].l;
+			CODELENGTH(m, rp);
+			memcpy(rp, dev->headers[HEADER_USN].p, dev->headers[HEADER_USN].l);
+			rp += dev->headers[HEADER_USN].l;
+			rbuf[2]++;
+		}
+		if(serv) {
+			/* response :
+			 * 1 - Location
+			 * 2 - NT (device/service type)
+			 * 3 - usn */
+			m = strlen(serv->location);
+			CODELENGTH(m, rp);
+			memcpy(rp, serv->location, m);
+			rp += m;
+			m = strlen(serv->st);
+			CODELENGTH(m, rp);
+			memcpy(rp, serv->st, m);
+			rp += m;
+			m = strlen(serv->usn);
+			CODELENGTH(m, rp);
+			memcpy(rp, serv->usn, m);
+			rp += m;
+			rbuf[2]++;
+		}
+		if(rbuf[2] > 0) {
+			if(write_or_buffer(req, rbuf, rp - rbuf) < 0) {
+				syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
+				/*goto error;*/
+			}
+		}
+	}
 }
 
 /* SendSSDPMSEARCHResponse() :
@@ -403,16 +489,6 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 		syslog(LOG_ERR, "%s: sendto(udp): %m", __func__);
 	}
 }
-
-/* Services stored for answering to M-SEARCH */
-struct service {
-	char * st;	/* Service type */
-	char * usn;	/* Unique identifier */
-	char * server;	/* Server string */
-	char * location;	/* URL */
-	LIST_ENTRY(service) entries;
-};
-LIST_HEAD(servicehead, service) servicelisthead;
 
 /* Process M-SEARCH requests */
 static void
@@ -775,7 +851,8 @@ void processRequest(struct reqelem * req)
 		       l, (unsigned)n);
 		goto error;
 	}
-	if(l == 0 && type != MINISSDPD_SEARCH_ALL && type != MINISSDPD_GET_VERSION) {
+	if(l == 0 && type != MINISSDPD_SEARCH_ALL
+	   && type != MINISSDPD_GET_VERSION && type != MINISSDPD_NOTIF) {
 		syslog(LOG_WARNING, "bad request (length=0, type=%d)", type);
 		goto error;
 	}
@@ -867,7 +944,7 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 		break;
-	case 4:	/* submit service */
+	case MINISSDPD_SUBMIT:	/* submit service */
 		newserv = malloc(sizeof(struct service));
 		if(!newserv) {
 			syslog(LOG_ERR, "cannot allocate memory");
@@ -963,7 +1040,16 @@ void processRequest(struct reqelem * req)
 		}
 		/* Inserting new service */
 		LIST_INSERT_HEAD(&servicelisthead, newserv, entries);
+		sendNotifications(NOTIF_NEW, NULL, newserv);
 		newserv = NULL;
+		break;
+	case MINISSDPD_NOTIF:	/* switch socket to notify */
+		rbuf[0] = '\0';
+		if(write_or_buffer(req, rbuf, 1) < 0) {
+			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
+			goto error;
+		}
+		req->is_notify = 1;
 		break;
 	default:
 		syslog(LOG_WARNING, "Unknown request type %d", type);
@@ -1076,7 +1162,6 @@ int main(int argc, char * * argv)
 #endif	/* ENABLE_IPV6 */
 	int s_unix = -1;	/* unix socket communicating with clients */
 	int s_ifacewatch = -1;	/* socket to receive Route / network interface config changes */
-	LIST_HEAD(reqstructhead, reqelem) reqlisthead;
 	struct reqelem * req;
 	struct reqelem * reqnext;
 	fd_set readfds;

@@ -1,5 +1,10 @@
 $Id: Changelog.txt,v 1.43 2015/08/06 14:05:49 nanard Exp $
 
+VERSION 1.5:
+
+2016/01/13:
+	add "notification" mode (command 5)
+
 2015/08/06:
 	disable multicast loop
 	add -f command line option to filter for a specific device type

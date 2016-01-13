@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2015 Thomas Bernard
+ * copyright (c) 2005-2016 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 
@@ -14,9 +14,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define DECODELENGTH(n, p) n = 0; \
-                           do { n = (n << 7) | (*p & 0x7f); } \
-                           while(*(p++)&0x80);
+#include "codelength.h"
+#include "printresponse.h"
 
 void printversion(const unsigned char * resp, int n)
 {
@@ -29,61 +28,6 @@ void printversion(const unsigned char * resp, int n)
 		printf("get version error\n");
 	}
 	printf("MiniSSDPd version : %.*s\n", l, p);
-}
-
-void printresponse(const unsigned char * resp, int n)
-{
-	int i, l;
-	unsigned int nresp;
-	const unsigned char * p;
-	if(n == 0)
-		return;
-	/* first, hexdump the response : */
-	for(i = 0; i < n; i += 16) {
-		printf("%06x | ", i);
-		for(l = i; l < n && l < (i + 16); l++)
-			printf("%02x ", resp[l]);
-		while(l < (i + 16)) {
-			printf("   ");
-			l++;
-		}
-		printf("| ");
-		for(l = i; l < n && l < (i + 16); l++)
-			putchar((resp[l] >= ' ' && resp[l] < 128) ? resp[l] : '.');
-		putchar('\n');
-	}
-	/* now parse and display all devices of response */
-	nresp = resp[0]; /* 1st byte : number of devices in response */
-	p = resp + 1;
-	for(i = 0; i < (int)nresp; i++) {
-		if(p >= resp + n)
-			goto error;
-		/*l = *(p++);*/
-		DECODELENGTH(l, p);
-		if(p + l > resp + n)
-			goto error;
-		printf("%d - %.*s\n", i, l, p); /* URL */
-		p += l;
-		if(p >= resp + n)
-			goto error;
-		/*l = *(p++);*/
-		DECODELENGTH(l, p);
-		if(p + l > resp + n)
-			goto error;
-		printf("    %.*s\n", l, p);	/* ST */
-		p += l;
-		if(p >= resp + n)
-			goto error;
-		/*l = *(p++);*/
-		DECODELENGTH(l, p);
-		if(p + l > resp + n)
-			goto error;
-		printf("    %.*s\n", l, p); /* USN */
-		p += l;
-	}
-	return;
-error:
-	printf("*** WARNING : TRUNCATED RESPONSE ***\n");
 }
 
 #define SENDCOMMAND(command, size) write(s, command, size); \
@@ -110,16 +54,17 @@ int connect_unix_socket(const char * sockpath)
 int
 main(int argc, char * * argv)
 {
-	char command0[] = { 0x00, 0x00 };
+	const char command0[] = { 0x00, 0x00 };
 	char command1[] = "\x01\x00urn:schemas-upnp-org:device:InternetGatewayDevice";
 	char command2[] = "\x02\x00uuid:fc4ec57e-b051-11db-88f8-0060085db3f6::upnp:rootdevice";
-	char command3[] = { 0x03, 0x00 };
+	const char command3[] = { 0x03, 0x00 };
 	/* old versions of minissdpd would reject a command with
 	 * a zero length string argument */
 	char command3compat[] = "\x03\x00ssdp:all";
 	char command4[] = "\x04\x00test:test:test";
-	char bad_command[] = { 0xff, 0xff };
-	char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	const char bad_command[] = { 0xff, 0xff };
+	const char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	const char command5[] = { 0x05, 0x00 };
 	int s;
 	int i;
 	void * tmp;
@@ -223,6 +168,15 @@ main(int argc, char * * argv)
 	}
 
 	n = SENDCOMMAND(overflow, sizeof(overflow));
+	n = read(s, buf, sizeof(buf));
+	printf("Response received %d bytes\n", (int)n);
+	printresponse(buf, n);
+	if(n == 0) {
+		close(s);
+		s = connect_unix_socket(sockpath);
+	}
+
+	n = SENDCOMMAND(command5, sizeof(command5));
 	n = read(s, buf, sizeof(buf));
 	printf("Response received %d bytes\n", (int)n);
 	printresponse(buf, n);
