@@ -1,6 +1,6 @@
 /* $Id: minissdpd.c,v 1.50 2015/08/06 14:05:49 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2015 Thomas Bernard
+ * (c) 2007-2016 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -1160,6 +1160,8 @@ int main(int argc, char * * argv)
 		syslog(LOG_ERR, "MiniSSDPd is already running. EXITING");
 		return 1;
 	}
+
+	upnp_bootid = (unsigned int)time(NULL);
 
 	/* set signal handlers */
 	memset(&sa, 0, sizeof(struct sigaction));
