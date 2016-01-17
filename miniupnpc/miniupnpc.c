@@ -1,9 +1,9 @@
 /* $Id: miniupnpc.c,v 1.135 2015/07/23 20:40:08 nanard Exp $ */
-/* vim: tabstop=4 shiftwidth=4 noexpandtab */
-/* Project : miniupnp
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2015 Thomas Bernard
+ * copyright (c) 2005-2016 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #include <stdlib.h>
