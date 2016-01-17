@@ -68,7 +68,7 @@ struct sockaddr_un {
 #define HAS_IP_MREQN
 #endif
 
-#if !defined(HAS_IP_MREQN)
+#if !defined(HAS_IP_MREQN) && !defined(_WIN32)
 #include <sys/ioctl.h>
 #endif
 
@@ -652,7 +652,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				{
 					PRINT_SOCKET_ERROR("setsockopt");
 				}
-#else
+#elif !defined(_WIN32)
 				struct ifreq ifr;
 				int ifrlen = sizeof(ifr);
 				strncpy(ifr.ifr_name, multicastif, IFNAMSIZ);
@@ -666,10 +666,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				{
 					PRINT_SOCKET_ERROR("setsockopt");
 				}
-/*#ifdef DEBUG
+#else /* _WIN32 */
+#ifdef DEBUG
 				printf("Setting of multicast interface not supported with interface name.\n");
-#endif*/
 #endif
+#endif /* #ifdef HAS_IP_MREQN / !defined(_WIN32) */
 			}
 		}
 	}
