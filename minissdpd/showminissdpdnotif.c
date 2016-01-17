@@ -1,5 +1,6 @@
 /* $Id: $ */
-/* MiniUPnP project
+/* vim: shiftwidth=4 tabstop=4 noexpandtab
+ * MiniUPnP project
  * (c) 2016 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
@@ -66,6 +67,8 @@ int main(int argc, char * * argv)
 			if(errno == EINTR) continue;
 			perror("read");
 			break;
+		} else if(n == 0) {
+			printf("Socket closed\n");
 		}
 		printf("%d bytes read\n", (int)n);
 		printresponse(buffer, (int)n);
