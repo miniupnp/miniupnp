@@ -1,5 +1,6 @@
 /* $Id: $ */
-/* Project : miniupnp
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * Project : miniupnp
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
  * copyright (c) 2005-2016 Thomas Bernard
@@ -36,48 +37,50 @@ void printresponse(const unsigned char * resp, int n)
 			putchar((resp[l] >= ' ' && resp[l] < 128) ? resp[l] : '.');
 		putchar('\n');
 	}
-	/* now parse and display all devices of response */
-	nresp = resp[0]; /* 1st byte : number of devices in response */
-	if(nresp == 0xff) {
-		/* notification */
-		notif_type = resp[1];
-		nresp = resp[2];
-		printf("Notification : ");
-		switch(notif_type) {
-		case NOTIF_NEW:	printf("new\n"); break;
-		case NOTIF_UPDATE:	printf("update\n"); break;
-		case NOTIF_REMOVE:	printf("remove\n"); break;
-		default:	printf("**UNKNOWN**\n");
+	for(p = resp; p < resp + n; ) {
+		/* now parse and display all devices of response */
+		nresp = p[0]; /* 1st byte : number of devices in response */
+		if(nresp == 0xff) {
+			/* notification */
+			notif_type = p[1];
+			nresp = p[2];
+			printf("Notification : ");
+			switch(notif_type) {
+			case NOTIF_NEW:	printf("new\n"); break;
+			case NOTIF_UPDATE:	printf("update\n"); break;
+			case NOTIF_REMOVE:	printf("remove\n"); break;
+			default:	printf("**UNKNOWN**\n");
+			}
+			p += 3;
+		} else {
+			p++;
 		}
-		p = resp + 3;
-	} else {
-		p = resp + 1;
-	}
-	for(i = 0; i < (int)nresp; i++) {
-		if(p >= resp + n)
-			goto error;
-		/*l = *(p++);*/
-		DECODELENGTH(l, p);
-		if(p + l > resp + n)
-			goto error;
-		printf("%d - %.*s\n", i, l, p); /* URL */
-		p += l;
-		if(p >= resp + n)
-			goto error;
-		/*l = *(p++);*/
-		DECODELENGTH(l, p);
-		if(p + l > resp + n)
-			goto error;
-		printf("    %.*s\n", l, p);	/* ST */
-		p += l;
-		if(p >= resp + n)
-			goto error;
-		/*l = *(p++);*/
-		DECODELENGTH(l, p);
-		if(p + l > resp + n)
-			goto error;
-		printf("    %.*s\n", l, p); /* USN */
-		p += l;
+		for(i = 0; i < (int)nresp; i++) {
+			if(p >= resp + n)
+				goto error;
+			/*l = *(p++);*/
+			DECODELENGTH(l, p);
+			if(p + l > resp + n)
+				goto error;
+			printf("%d - %.*s\n", i, l, p); /* URL */
+			p += l;
+			if(p >= resp + n)
+				goto error;
+			/*l = *(p++);*/
+			DECODELENGTH(l, p);
+			if(p + l > resp + n)
+				goto error;
+			printf("    %.*s\n", l, p);	/* ST */
+			p += l;
+			if(p >= resp + n)
+				goto error;
+			/*l = *(p++);*/
+			DECODELENGTH(l, p);
+			if(p + l > resp + n)
+				goto error;
+			printf("    %.*s\n", l, p); /* USN */
+			p += l;
+		}
 	}
 	return;
 error:
