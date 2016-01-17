@@ -69,6 +69,7 @@ int main(int argc, char * * argv)
 			break;
 		} else if(n == 0) {
 			printf("Socket closed\n");
+			break;
 		}
 		printf("%d bytes read\n", (int)n);
 		printresponse(buffer, (int)n);
