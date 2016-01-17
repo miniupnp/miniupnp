@@ -1,5 +1,6 @@
 /* $Id: minissdpc.c,v 1.28 2015/09/18 13:05:39 nanard Exp $ */
-/* Project : miniupnp
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
  * copyright (c) 2005-2015 Thomas Bernard
@@ -65,6 +66,10 @@ struct sockaddr_un {
 
 #if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__APPLE__) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun) && !defined(__GNU__) && !defined(__FreeBSD_kernel__)
 #define HAS_IP_MREQN
+#endif
+
+#if !defined(HAS_IP_MREQN)
+#include <sys/ioctl.h>
 #endif
 
 #if defined(HAS_IP_MREQN) && defined(NEED_STRUCT_IP_MREQN)
@@ -648,9 +653,22 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					PRINT_SOCKET_ERROR("setsockopt");
 				}
 #else
-#ifdef DEBUG
+				struct ifreq ifr;
+				int ifrlen = sizeof(ifr);
+				strncpy(ifr.ifr_name, multicastif, IFNAMSIZ);
+				ifr.ifr_name[IFNAMSIZ-1] = '\0';
+				if(ioctl(sudp, SIOCGIFADDR, &ifr, &ifrlen) < 0)
+				{
+					PRINT_SOCKET_ERROR("ioctl(...SIOCGIFADDR...)");
+				}
+				mc_if.s_addr = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr;
+				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0)
+				{
+					PRINT_SOCKET_ERROR("setsockopt");
+				}
+/*#ifdef DEBUG
 				printf("Setting of multicast interface not supported with interface name.\n");
-#endif
+#endif*/
 #endif
 			}
 		}
