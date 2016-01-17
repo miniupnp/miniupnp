@@ -48,6 +48,10 @@ int main(int argc, char * * argv)
 	if(sigaction(SIGINT, &sa, NULL)) {
 		fprintf(stderr, "Failed to set SIGINT handler.\n");
 	}
+	sa.sa_handler = sighandler;
+	if(sigaction(SIGTERM, &sa, NULL)) {
+		fprintf(stderr, "Failed to set SIGTERM handler.\n");
+	}
 
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	addr.sun_family = AF_UNIX;
