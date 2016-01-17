@@ -1,5 +1,6 @@
 /* $Id: minissdpd.c,v 1.50 2015/08/06 14:05:49 nanard Exp $ */
-/* MiniUPnP project
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * (c) 2007-2016 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
@@ -1235,7 +1236,7 @@ int main(int argc, char * * argv)
 		        "[-6] "
 #endif /* ENABLE_IPV6 */
 		        "[-s socket] [-p pidfile] [-t TTL] "
-		        "-f device "
+		        "[-f device] "
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
