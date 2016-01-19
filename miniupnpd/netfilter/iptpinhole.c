@@ -51,7 +51,12 @@ void init_iptpinhole(void)
 
 void shutdown_iptpinhole(void)
 {
-	/* TODO empty list */
+	struct pinhole_t * p;
+	while(pinhole_list.lh_first != NULL) {
+		p = pinhole_list.lh_first;
+		LIST_REMOVE(p, entries);
+		free(p);
+	}
 }
 
 /* return uid */
