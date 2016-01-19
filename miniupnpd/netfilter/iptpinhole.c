@@ -291,7 +291,7 @@ find_pinhole(const char * ifname,
 			return (int)p->uid;
 		}
 	}
-	return -1;	/* not found */
+	return -2;	/* not found */
 }
 
 int
