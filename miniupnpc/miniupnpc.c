@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.144 2016/01/22 14:19:55 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.146 2016/01/22 15:19:42 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -126,6 +126,7 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 	int soapbodylen;
 	char * buf;
 	int n;
+	int status_code;
 
 	*bufsize = 0;
 	snprintf(soapact, sizeof(soapact), "%s#%s", service, action);
@@ -229,11 +230,15 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 		return NULL;
 	}
 
-	buf = getHTTPResponse(s, bufsize);
+	buf = getHTTPResponse(s, bufsize, &status_code);
 #ifdef DEBUG
 	if(*bufsize > 0 && buf)
 	{
-		printf("SOAP Response :\n%.*s\n", *bufsize, buf);
+		printf("HTTP %d SOAP Response :\n%.*s\n", status_code, *bufsize, buf);
+	}
+	else
+	{
+		printf("HTTP %d, empty SOAP response. size=%d\n", status_code, *bufsize);
 	}
 #endif
 	closesocket(s);
