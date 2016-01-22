@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.135 2015/07/23 20:40:08 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.144 2016/01/22 14:19:55 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -71,6 +71,25 @@
 #define SOAPPREFIX "s"
 #define SERVICEPREFIX "u"
 #define SERVICEPREFIX2 'u'
+
+/* check if an ip address is a private (LAN) address
+ * see https://tools.ietf.org/html/rfc1918 */
+static int is_rfc1918addr(const char * addr)
+{
+	/* 192.168.0.0     -   192.168.255.255 (192.168/16 prefix) */
+	if(COMPARE(addr, "192.168."))
+		return 1;
+	/* 10.0.0.0        -   10.255.255.255  (10/8 prefix) */
+	if(COMPARE(addr, "10."))
+		return 1;
+	/* 172.16.0.0      -   172.31.255.255  (172.16/12 prefix) */
+	if(COMPARE(addr, "172.")) {
+		int i = atoi(addr + 4);
+		if((16 <= i) && (i <= 31))
+			return 1;
+	}
+	return 0;
+}
 
 /* root description parsing */
 MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
@@ -526,7 +545,7 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
  *     3 = an UPnP device has been found but was not recognized as an IGD
  *
  * In any positive non zero return case, the urls and data structures
- * passed as parameters are set. Donc forget to call FreeUPNPUrls(urls) to
+ * passed as parameters are set. Dont forget to call FreeUPNPUrls(urls) to
  * free allocated memory.
  */
 MINIUPNP_LIBSPEC int
@@ -604,20 +623,24 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				parserootdesc(desc[i].xml, desc[i].size, data);
 				if(desc[i].is_igd || state >= 3 )
 				{
+				  int is_connected;
+
 				  GetUPNPUrls(urls, data, dev->descURL, dev->scope_id);
 
 				  /* in state 2 and 3 we dont test if device is connected ! */
 				  if(state >= 2)
 				    goto free_and_return;
+				  is_connected = UPNPIGD_IsConnected(urls, data);
 #ifdef DEBUG
 				  printf("UPNPIGD_IsConnected(%s) = %d\n",
-				     urls->controlURL,
-			         UPNPIGD_IsConnected(urls, data));
+				     urls->controlURL, is_connected);
 #endif
 				  /* checks that status is connected AND there is a external IP address assigned */
-				  if(UPNPIGD_IsConnected(urls, data)
-				     && (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0))
-					goto free_and_return;
+				  if(is_connected &&
+				     (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
+					if(!is_rfc1918addr(extIpAddr))
+					  goto free_and_return;
+				  }
 				  FreeUPNPUrls(urls);
 				  if(data->second.servicetype[0] != '\0') {
 #ifdef DEBUG
@@ -629,14 +652,16 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				    memcpy(&data->first, &data->second, sizeof(struct IGDdatas_service));
 				    memcpy(&data->second, &data->tmp, sizeof(struct IGDdatas_service));
 				    GetUPNPUrls(urls, data, dev->descURL, dev->scope_id);
+				    is_connected = UPNPIGD_IsConnected(urls, data);
 #ifdef DEBUG
 				    printf("UPNPIGD_IsConnected(%s) = %d\n",
-				       urls->controlURL,
-			           UPNPIGD_IsConnected(urls, data));
+				       urls->controlURL, is_connected);
 #endif
-				    if(UPNPIGD_IsConnected(urls, data)
-				       && (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0))
-					  goto free_and_return;
+				    if(is_connected &&
+				       (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
+					  if(!is_rfc1918addr(extIpAddr))
+					    goto free_and_return;
+				    }
 				    FreeUPNPUrls(urls);
 				  }
 				}

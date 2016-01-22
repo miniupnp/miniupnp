@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.219 2015/10/26 17:05:06 nanard Exp $
+$Id: Changelog.txt,v 1.220 2016/01/22 14:19:54 nanard Exp $
 miniUPnP client Changelog.
+
+2016/01/22:
+  Improve UPNPIGD_IsConnected() to check if WAN address is not private.
 
 2015/10/26:
   snprintf() overflow check. check overflow in simpleUPnPcommand2()
