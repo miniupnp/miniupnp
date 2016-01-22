@@ -1,7 +1,7 @@
-/* $Id: miniwget.h,v 1.7 2012/06/23 22:35:59 nanard Exp $ */
+/* $Id: miniwget.h,v 1.11 2016/01/22 15:19:43 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2015 Thomas Bernard
+ * Copyright (c) 2005-2016 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-MINIUPNP_LIBSPEC void * getHTTPResponse(int s, int * size);
+MINIUPNP_LIBSPEC void * getHTTPResponse(int s, int * size, int * status_code);
 
 MINIUPNP_LIBSPEC void * miniwget(const char *, int *, unsigned int);
 
