@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.113 2016/01/22 14:07:49 nanard Exp $ */
+/* $Id: upnpc.c,v 1.114 2016/01/22 15:04:23 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2016 Thomas Bernard
@@ -66,7 +66,7 @@ static void DisplayInfos(struct UPNPUrls * urls,
 	char connectionType[64];
 	char status[64];
 	char lastconnerr[64];
-	unsigned int uptime;
+	unsigned int uptime = 0;
 	unsigned int brUp, brDown;
 	time_t timenow, timestarted;
 	int r;
@@ -82,9 +82,11 @@ static void DisplayInfos(struct UPNPUrls * urls,
 	else
 		printf("Status : %s, uptime=%us, LastConnectionError : %s\n",
 		       status, uptime, lastconnerr);
-	timenow = time(NULL);
-	timestarted = timenow - uptime;
-	printf("  Time started : %s", ctime(&timestarted));
+	if(uptime > 0) {
+		timenow = time(NULL);
+		timestarted = timenow - uptime;
+		printf("  Time started : %s", ctime(&timestarted));
+	}
 	if(UPNP_GetLinkLayerMaxBitRates(urls->controlURL_CIF, data->CIF.servicetype,
 	                                &brDown, &brUp) != UPNPCOMMAND_SUCCESS) {
 		printf("GetLinkLayerMaxBitRates failed.\n");
@@ -538,7 +540,7 @@ int main(int argc, char ** argv)
 	char ** commandargv = 0;
 	int commandargc = 0;
 	struct UPNPDev * devlist = 0;
-	char lanaddr[64];	/* my ip address on the LAN */
+	char lanaddr[64] = "unset";	/* my ip address on the LAN */
 	int i;
 	const char * rootdescurl = 0;
 	const char * multicastif = 0;
