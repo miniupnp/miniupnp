@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.147 2016/01/24 16:32:24 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.148 2016/01/24 17:24:36 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -571,6 +571,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	int n_igd = 0;
 	char extIpAddr[16];
 	char myLanAddr[40];
+	int status_code = -1;
+
 	if(!devlist)
 	{
 #ifdef DEBUG
@@ -594,7 +596,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 		 * with st == urn:schemas-upnp-org:device:InternetGatewayDevice:1 */
 		desc[i].xml = miniwget_getaddr(dev->descURL, &(desc[i].size),
 		                               myLanAddr, sizeof(myLanAddr),
-		                               dev->scope_id);
+		                               dev->scope_id, &status_code);
 #ifdef DEBUG
 		if(!desc[i].xml)
 		{
@@ -702,8 +704,9 @@ UPNP_GetIGDFromUrl(const char * rootdescurl,
 {
 	char * descXML;
 	int descXMLsize = 0;
+
 	descXML = miniwget_getaddr(rootdescurl, &descXMLsize,
-	   	                       lanaddr, lanaddrlen, 0);
+	                           lanaddr, lanaddrlen, 0, NULL);
 	if(descXML) {
 		memset(data, 0, sizeof(struct IGDdatas));
 		memset(urls, 0, sizeof(struct UPNPUrls));

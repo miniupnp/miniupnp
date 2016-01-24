@@ -1,4 +1,4 @@
-/* $Id: miniwget.c,v 1.74 2016/01/22 15:19:43 nanard Exp $ */
+/* $Id: miniwget.c,v 1.75 2016/01/24 17:24:36 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
@@ -362,7 +362,8 @@ static void *
 miniwget3(const char * host,
           unsigned short port, const char * path,
           int * size, char * addr_str, int addr_str_len,
-          const char * httpversion, unsigned int scope_id)
+          const char * httpversion, unsigned int scope_id,
+          int * status_code)
 {
 	char buf[2048];
     int s;
@@ -370,7 +371,6 @@ miniwget3(const char * host,
 	int len;
 	int sent;
 	void * content;
-	int status_code;
 
 	*size = 0;
 	s = connecthostport(host, port, scope_id);
@@ -461,7 +461,7 @@ miniwget3(const char * host,
 			sent += n;
 		}
 	}
-	content = getHTTPResponse(s, size, &status_code);
+	content = getHTTPResponse(s, size, status_code);
 	closesocket(s);
 	return content;
 }
@@ -470,18 +470,20 @@ miniwget3(const char * host,
  * Call miniwget3(); retry with HTTP/1.1 if 1.0 fails. */
 static void *
 miniwget2(const char * host,
-		  unsigned short port, const char * path,
-		  int * size, char * addr_str, int addr_str_len,
-          unsigned int scope_id)
+          unsigned short port, const char * path,
+          int * size, char * addr_str, int addr_str_len,
+          unsigned int scope_id, int * status_code)
 {
 	char * respbuffer;
 
 #if 1
 	respbuffer = miniwget3(host, port, path, size,
-	                       addr_str, addr_str_len, "1.1", scope_id);
+	                       addr_str, addr_str_len, "1.1",
+	                       scope_id, status_code);
 #else
 	respbuffer = miniwget3(host, port, path, size,
-	                       addr_str, addr_str_len, "1.0", scope_id);
+	                       addr_str, addr_str_len, "1.0",
+	                       scope_id, status_code);
 	if (*size == 0)
 	{
 #ifdef DEBUG
@@ -489,7 +491,8 @@ miniwget2(const char * host,
 #endif
 		free(respbuffer);
 		respbuffer = miniwget3(host, port, path, size,
-		                       addr_str, addr_str_len, "1.1", scope_id);
+		                       addr_str, addr_str_len, "1.1",
+		                       scope_id, status_code);
 	}
 #endif
 	return respbuffer;
@@ -614,7 +617,8 @@ parseURL(const char * url,
 }
 
 void *
-miniwget(const char * url, int * size, unsigned int scope_id)
+miniwget(const char * url, int * size,
+         unsigned int scope_id, int * status_code)
 {
 	unsigned short port;
 	char * path;
@@ -627,12 +631,13 @@ miniwget(const char * url, int * size, unsigned int scope_id)
 	printf("parsed url : hostname='%s' port=%hu path='%s' scope_id=%u\n",
 	       hostname, port, path, scope_id);
 #endif
-	return miniwget2(hostname, port, path, size, 0, 0, scope_id);
+	return miniwget2(hostname, port, path, size, 0, 0, scope_id, status_code);
 }
 
 void *
 miniwget_getaddr(const char * url, int * size,
-                 char * addr, int addrlen, unsigned int scope_id)
+                 char * addr, int addrlen, unsigned int scope_id,
+                 int * status_code)
 {
 	unsigned short port;
 	char * path;
@@ -647,6 +652,6 @@ miniwget_getaddr(const char * url, int * size,
 	printf("parsed url : hostname='%s' port=%hu path='%s' scope_id=%u\n",
 	       hostname, port, path, scope_id);
 #endif
-	return miniwget2(hostname, port, path, size, addr, addrlen, scope_id);
+	return miniwget2(hostname, port, path, size, addr, addrlen, scope_id, status_code);
 }
 

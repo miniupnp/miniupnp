@@ -1,5 +1,9 @@
-$Id: Changelog.txt,v 1.221 2016/01/22 15:07:27 nanard Exp $
+$Id: Changelog.txt,v 1.222 2016/01/24 17:24:35 nanard Exp $
 miniUPnP client Changelog.
+
+2016/01/24:
+  change miniwget to return HTTP status code
+  increments API_VERSION to 16
 
 2016/01/22:
   Improve UPNPIGD_IsConnected() to check if WAN address is not private.
