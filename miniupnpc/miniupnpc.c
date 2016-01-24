@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.146 2016/01/22 15:19:42 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.147 2016/01/24 16:32:24 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -643,7 +643,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				  /* checks that status is connected AND there is a external IP address assigned */
 				  if(is_connected &&
 				     (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
-					if(!is_rfc1918addr(extIpAddr))
+					if(!is_rfc1918addr(extIpAddr) && (extIpAddr[0] != '\0')
+					   && (0 != strcmp(extIpAddr, "0.0.0.0")))
 					  goto free_and_return;
 				  }
 				  FreeUPNPUrls(urls);
@@ -664,7 +665,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 #endif
 				    if(is_connected &&
 				       (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
-					  if(!is_rfc1918addr(extIpAddr))
+					  if(!is_rfc1918addr(extIpAddr) && (extIpAddr[0] != '\0')
+					     && (0 != strcmp(extIpAddr, "0.0.0.0")))
 					    goto free_and_return;
 				    }
 				    FreeUPNPUrls(urls);
