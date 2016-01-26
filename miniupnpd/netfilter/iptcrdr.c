@@ -238,7 +238,7 @@ add_redirect_rule2(const char * ifname,
 	return r;
 }
 
-/* add_redirect_rule2() */
+/* add_peer_redirect_rule2() */
 int
 add_peer_redirect_rule2(const char * ifname,
                    const char * rhost, unsigned short rport,
@@ -798,6 +798,9 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 			{
 				target = (void *)e + e->target_offset;
 				mr = (const struct ip_nat_multi_range *)&target->data[0];
+				syslog(LOG_DEBUG, "postrouting rule #%u: %s %s %hu",
+				       i, target->u.user.name, inet_ntoa(e->ip.src), ntohs(mr->range[0].min.all));
+				/* target->u.user.name SNAT / MASQUERADE */
 				if (eport != ntohs(mr->range[0].min.all)) {
 					continue;
 				}
@@ -1108,7 +1111,7 @@ iptc_init_verify_and_append(const char * table,
 }
 
 /* add nat rule
- * iptables -t nat -A MINIUPNPD -p proto --dport eport -j DNAT --to iaddr:iport
+ * iptables -t nat -A MINIUPNPD -p <proto> [-s <rhost>] --dport <eport> -j DNAT --to <iaddr>:<iport>
  * */
 static int
 addnatrule(int proto, unsigned short eport,
@@ -1170,8 +1173,8 @@ addnatrule(int proto, unsigned short eport,
 
 /* for "Port Triggering"
  * Section 2.5.16 figure 2.2 in UPnP-gw-WANIPConnection-v2-Service.pdf
- * iptables -t nat -I POSTROUTING -o extif -s iaddr -p UDP --sport iport -j MASQUERADE --to-ports eport
- * iptables -t nat -A MINIUPNPD-POSTROUTING -o extif -s iaddr -p UDP --sport iport -j MASQUERADE --to-ports eport
+ * iptables -t nat -A MINIUPNPD-POSTROUTING -o <extif> -s <iaddr>
+ *          -p <proto> [-d <rhost>] --sport <iport> -j MASQUERADE --to-ports <eport>
  */
 static int
 addmasqueraderule(int proto,
@@ -1242,9 +1245,11 @@ addmasqueraderule(int proto,
 	return r;
 }
 
-/* iptables -t nat -A MINIUPNPD-POSTROUTING -s iaddr -d rhost
- *    -p proto --sport iport --dport rport -j SNAT
- *    --to-source ext_ip:eport */
+/* called by add_peer_redirect_rule2()
+ *
+ * iptables -t nat -A MINIUPNPD-POSTROUTING -s <iaddr> -d <rhost>
+ *    -p <proto> --sport <iport> --dport <rport> -j SNAT
+ *    --to-source <eaddr>:<eport> */
 static int
 addpeernatrule(int proto,
            const char * eaddr, unsigned short eport,
@@ -1313,8 +1318,9 @@ addpeernatrule(int proto,
 	return r;
 }
 
-/* iptables -t mangle -A MINIUPNPD -s iaddr -d rhost
- *    -p proto --sport iport --dport rport -j DSCP
+/* called by add_peer_dscp_rule2()
+ * iptables -t mangle -A MINIUPNPD -s <iaddr> -d <rhost>
+ *    -p <proto> --sport <iport> --dport <rport> -j DSCP
  *    --set-dscp 0xXXXX                   */
 static int
 addpeerdscprule(int proto, unsigned char dscp,
@@ -1400,7 +1406,7 @@ get_accept_target(void)
 }
 
 /* add_filter_rule()
- * */
+ * iptables -t filter -A MINIUPNPD [-s <rhost>] -p <proto> -d <iaddr> --dport <iport> -j ACCEPT */
 static int
 add_filter_rule(int proto, const char * rhost,
                 const char * iaddr, unsigned short iport)
