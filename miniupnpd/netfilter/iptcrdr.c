@@ -1,7 +1,7 @@
 /* $Id: iptcrdr.c,v 1.53 2015/02/08 09:10:00 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include <stdio.h>
@@ -528,18 +528,18 @@ get_peer_rule_by_index(int index,
 		       iptc_strerror(errno));
 		return -1;
 	}
-	if(!iptc_is_chain(miniupnpd_peer_chain, h))
+	if(!iptc_is_chain(miniupnpd_nat_postrouting_chain, h))
 	{
-		syslog(LOG_ERR, "chain %s not found", miniupnpd_peer_chain);
+		syslog(LOG_ERR, "chain %s not found", miniupnpd_nat_postrouting_chain);
 	}
 	else
 	{
 #ifdef IPTABLES_143
-		for(e = iptc_first_rule(miniupnpd_peer_chain, h);
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, h);
 		    e;
 			e = iptc_next_rule(e, h))
 #else
-		for(e = iptc_first_rule(miniupnpd_peer_chain, &h);
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, &h);
 		    e;
 			e = iptc_next_rule(e, &h))
 #endif
@@ -785,11 +785,11 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		i = 0;
 		/* we must find the right index for the filter rule */
 #ifdef IPTABLES_143
-		for(e = iptc_first_rule(miniupnpd_peer_chain, h);
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, h);
 		    e;
 			e = iptc_next_rule(e, h), i++)
 #else
-		for(e = iptc_first_rule(miniupnpd_peer_chain, &h);
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, &h);
 		    e;
 			e = iptc_next_rule(e, &h), i++)
 #endif
@@ -818,7 +818,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 
 				index = i;
 				syslog(LOG_INFO, "Trying to delete peer rule at index %u", index);
-				r2 = delete_rule_and_commit(index, h, miniupnpd_peer_chain, "delete_peer_rule");
+				r2 = delete_rule_and_commit(index, h, miniupnpd_nat_postrouting_chain, "delete_peer_rule");
 				h = NULL;
 				break;
 			}
@@ -1171,7 +1171,7 @@ addnatrule(int proto, unsigned short eport,
 /* for "Port Triggering"
  * Section 2.5.16 figure 2.2 in UPnP-gw-WANIPConnection-v2-Service.pdf
  * iptables -t nat -I POSTROUTING -o extif -s iaddr -p UDP --sport iport -j MASQUERADE --to-ports eport
- * iptables -t nat -A MINIUPNPD-PCP-PEER -o extif -s iaddr -p UDP --sport iport -j MASQUERADE --to-ports eport
+ * iptables -t nat -A MINIUPNPD-POSTROUTING -o extif -s iaddr -p UDP --sport iport -j MASQUERADE --to-ports eport
  */
 static int
 addmasqueraderule(int proto,
@@ -1235,14 +1235,14 @@ addmasqueraderule(int proto,
 		e->ip.dmsk.s_addr = INADDR_NONE;
 	}
 
-	r = iptc_init_verify_and_append("nat", miniupnpd_peer_chain, e, "addmasqueraderule");
+	r = iptc_init_verify_and_append("nat", miniupnpd_nat_postrouting_chain, e, "addmasqueraderule");
 	free(target);
 	free(match);
 	free(e);
 	return r;
 }
 
-/* iptables -t nat -A MINIUPNPD-PCP-PEER -s iaddr -d rhost
+/* iptables -t nat -A MINIUPNPD-POSTROUTING -s iaddr -d rhost
  *    -p proto --sport iport --dport rport -j SNAT
  *    --to-source ext_ip:eport */
 static int
@@ -1306,7 +1306,7 @@ addpeernatrule(int proto,
 		e->ip.dmsk.s_addr = INADDR_NONE;
 	}
 
-	r = iptc_init_verify_and_append("nat", miniupnpd_peer_chain, e, "addpeernatrule");
+	r = iptc_init_verify_and_append("nat", miniupnpd_nat_postrouting_chain, e, "addpeernatrule");
 	free(target);
 	free(match);
 	free(e);

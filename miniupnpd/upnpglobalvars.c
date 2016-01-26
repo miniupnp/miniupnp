@@ -1,7 +1,7 @@
 /* $Id: upnpglobalvars.c,v 1.39 2014/12/10 09:49:22 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -93,7 +93,7 @@ const char * tag = 0;
 /* chain name to use, both in the nat table
  * and the filter table */
 const char * miniupnpd_nat_chain = "MINIUPNPD";
-const char * miniupnpd_peer_chain = "MINIUPNPD-PCP-PEER";
+const char * miniupnpd_nat_postrouting_chain = "MINIUPNPD-POSTROUTING";
 const char * miniupnpd_forward_chain = "MINIUPNPD";
 #ifdef ENABLE_UPNPPINHOLE
 const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
