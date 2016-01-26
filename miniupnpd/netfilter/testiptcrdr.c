@@ -44,10 +44,13 @@ main(int argc, char ** argv)
 	syslog(LOG_DEBUG, "addmasqueraderule() returned %d", r);
 	if(add_filter_rule(proto, NULL, iaddr, iport) < 0)
 		return -1;
+#if 0
+	/* TEST */
 	if(proto == IPPROTO_UDP) {
 		if(addpeernatrule(proto, "8.8.8.8"/*eaddr*/, eport, iaddr, iport, NULL, 0) < 0)
 			fprintf(stderr, "addpeenatrule failed\n");
 	}
+#endif
 	/* test */
 	{
 		unsigned short p1, p2;
@@ -76,8 +79,8 @@ main(int argc, char ** argv)
 	}
 	printf("trying to list nat rules :\n");
 	list_redirect_rule(argv[1]);
-	//printf("deleting\n");
-	//delete_redirect_and_filter_rules(eport, proto);
+	printf("deleting\n");
+	delete_redirect_and_filter_rules(eport, proto);
 	return 0;
 }
 
