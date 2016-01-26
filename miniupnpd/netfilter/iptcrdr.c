@@ -1015,13 +1015,13 @@ iptc_init_verify_and_append(const char * table,
 	h = iptc_init(table);
 	if(!h)
 	{
-		syslog(LOG_ERR, "%s : iptc_init() error : %s\n",
+		syslog(LOG_ERR, "%s() : iptc_init() error : %s\n",
 		       logcaller, iptc_strerror(errno));
 		return -1;
 	}
 	if(!iptc_is_chain(miniupnpd_chain, h))
 	{
-		syslog(LOG_ERR, "%s : chain %s not found",
+		syslog(LOG_ERR, "%s() : chain %s not found",
 		       logcaller, miniupnpd_chain);
 		if(h)
 #ifdef IPTABLES_143
@@ -1038,7 +1038,7 @@ iptc_init_verify_and_append(const char * table,
 	if(!iptc_append_entry(miniupnpd_chain, e, &h))
 #endif
 	{
-		syslog(LOG_ERR, "%s : iptc_append_entry() error : %s\n",
+		syslog(LOG_ERR, "%s() : iptc_append_entry() error : %s\n",
 		       logcaller, iptc_strerror(errno));
 		if(h)
 #ifdef IPTABLES_143
@@ -1054,7 +1054,7 @@ iptc_init_verify_and_append(const char * table,
 	if(!iptc_commit(&h))
 #endif
 	{
-		syslog(LOG_ERR, "%s : iptc_commit() error : %s\n",
+		syslog(LOG_ERR, "%s() : iptc_commit() error : %s\n",
 		       logcaller, iptc_strerror(errno));
 		if(h)
 #ifdef IPTABLES_143
@@ -1127,7 +1127,7 @@ addnatrule(int proto, unsigned short eport,
 		e->ip.smsk.s_addr = INADDR_NONE;
 	}
 
-	r = iptc_init_verify_and_append("nat", miniupnpd_nat_chain, e, "addnatrule()");
+	r = iptc_init_verify_and_append("nat", miniupnpd_nat_chain, e, "addnatrule");
 	free(target);
 	free(match);
 	free(e);
@@ -1198,7 +1198,7 @@ addpeernatrule(int proto,
 		e->ip.dmsk.s_addr = INADDR_NONE;
 	}
 
-	r = iptc_init_verify_and_append("nat", miniupnpd_peer_chain, e, "addpeernatrule()");
+	r = iptc_init_verify_and_append("nat", miniupnpd_peer_chain, e, "addpeernatrule");
 	free(target);
 	free(match);
 	free(e);
@@ -1269,7 +1269,7 @@ addpeerdscprule(int proto, unsigned char dscp,
 	}
 
 	r = iptc_init_verify_and_append("mangle", miniupnpd_nat_chain, e,
-	                                "addpeerDSCPrule()");
+	                                "addpeerDSCPrule");
 	free(target);
 	free(match);
 	free(e);
@@ -1346,7 +1346,7 @@ add_filter_rule(int proto, const char * rhost,
 		e->ip.smsk.s_addr = INADDR_NONE;
 	}
 
-	r = iptc_init_verify_and_append("filter", miniupnpd_forward_chain, e, "add_filter_rule()");
+	r = iptc_init_verify_and_append("filter", miniupnpd_forward_chain, e, "add_filter_rule");
 	free(target);
 	free(match);
 	free(e);
