@@ -1193,6 +1193,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPNATCHAIN:
 				miniupnpd_nat_chain = ary_options[i].value;
 				break;
+			case UPNPNATPOSTCHAIN:
+				miniupnpd_nat_postrouting_chain = ary_options[i].value;
+				break;
 #endif	/* USE_NETFILTER */
 			case UPNPNOTIFY_INTERVAL:
 				v->notify_interval = atoi(ary_options[i].value);
