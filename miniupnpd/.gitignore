@@ -22,3 +22,4 @@ validatessdppktgen
 .depend
 pf/testobsdrdr
 pf/testpfpinhole
+netfilter/test_nfct_get
