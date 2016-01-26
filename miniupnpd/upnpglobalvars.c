@@ -84,27 +84,41 @@ unsigned int num_dscp_values = 0;
 unsigned int nextruletoclean_timestamp = 0;
 
 #ifdef USE_PF
+/* "rdr-anchor miniupnpd" or/and "anchor miniupnpd" in pf.conf */
 const char * anchor_name = "miniupnpd";
 const char * queue = 0;
 const char * tag = 0;
 #endif
 
 #ifdef USE_NETFILTER
-/* chain name to use, both in the nat table
- * and the filter table */
-const char * miniupnpd_nat_chain = "MINIUPNPD";
-const char * miniupnpd_nat_postrouting_chain = "MINIUPNPD-POSTROUTING";
-const char * miniupnpd_forward_chain = "MINIUPNPD";
-#ifdef ENABLE_UPNPPINHOLE
-const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
-#endif
+/* chain names to use in the nat and filter tables. */
 
-#endif
+/* iptables -t nat -N MINIUPNPD
+ * iptables -t nat -A PREROUTING -i <ext_if_name> -j MINIUPNPD */
+const char * miniupnpd_nat_chain = "MINIUPNPD";
+
+/* iptables -t nat -N MINIUPNPD-POSTROUTING
+ * iptables -t nat -A POSTROUTING -o <ext_if_name> -j MINIUPNPD-POSTROUTING */
+const char * miniupnpd_nat_postrouting_chain = "MINIUPNPD-POSTROUTING";
+
+/* iptables -t filter -N MINIUPNPD
+ * iptables -t filter -A FORWARD -i <ext_if_name> ! -o <ext_if_name> -j MINIUPNPD */
+const char * miniupnpd_forward_chain = "MINIUPNPD";
+
+#ifdef ENABLE_UPNPPINHOLE
+/* ip6tables -t filter -N MINIUPNPD
+ * ip6tables -t filter -A FORWARD -i <ext_if_name> ! -o <ext_if_name> -j MINIUPNPD */
+const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
+#endif /* ENABLE_UPNPPINHOLE */
+
+#endif /* USE_NETFILTER */
+
 #ifdef ENABLE_NFQUEUE
 int nfqueue = -1;
 int n_nfqix = 0;
 unsigned nfqix[MAX_LAN_ADDR];
-#endif
+#endif /* ENABLE_NFQUEUE */
+
 struct lan_addr_list lan_addrs;
 
 #ifdef ENABLE_IPV6
