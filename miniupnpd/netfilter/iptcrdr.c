@@ -76,7 +76,7 @@ static int
 addmasqueraderule(int proto,
            unsigned short eport,
            const char * iaddr, unsigned short iport,
-           const char * rhost, const char * extif);
+           const char * rhost/*, const char * extif*/);
 
 static int
 addpeernatrule(int proto,
@@ -230,8 +230,8 @@ add_redirect_rule2(const char * ifname,
 	r = addnatrule(proto, eport, iaddr, iport, rhost);
 	if(r >= 0) {
 		add_redirect_desc(eport, proto, desc, timestamp);
-		r = addmasqueraderule(proto, eport, iaddr, iport, rhost, ifname);
-		if(r <= 0) {
+		r = addmasqueraderule(proto, eport, iaddr, iport, rhost/*, ifname*/);
+		if(r < 0) {
 			syslog(LOG_NOTICE, "add_redirect_rule2(): addmasqueraderule returned %d", r);
 		}
 	}
@@ -1173,14 +1173,19 @@ addnatrule(int proto, unsigned short eport,
 
 /* for "Port Triggering"
  * Section 2.5.16 figure 2.2 in UPnP-gw-WANIPConnection-v2-Service.pdf
- * iptables -t nat -A MINIUPNPD-POSTROUTING -o <extif> -s <iaddr>
+ *
+ *   When a control point creates a port forwarding rule with AddPortMapping()
+ *   action for inbound traffic , this rule MUST also be applied when NAT port
+ *   triggering occurs for outbound traffic.
+ *
+ * iptables -t nat -A MINIUPNPD-POSTROUTING {-o <extif>} -s <iaddr>
  *          -p <proto> [-d <rhost>] --sport <iport> -j MASQUERADE --to-ports <eport>
  */
 static int
 addmasqueraderule(int proto,
            unsigned short eport,
            const char * iaddr, unsigned short iport,
-           const char * rhost, const char * extif)
+           const char * rhost/*, const char * extif*/)
 {
 	int r = 0;
 	struct ipt_entry * e;
@@ -1222,10 +1227,14 @@ addmasqueraderule(int proto,
 	e->next_offset = sizeof(struct ipt_entry)
 	                 + match->u.match_size
 					 + target->u.target_size;
+#if 0
+	/* do not add outiface (-o) to rule, as the MINIUPNPD-POSTROUTING chain
+	 * should already have matched it */
 	if(extif != NULL) {
 		strncpy(e->ip.outiface, extif, sizeof(e->ip.outiface));
 		memset(e->ip.outiface_mask, 0xff, strlen(e->ip.outiface) + 1);/* Include nul-terminator in match */
 	}
+#endif
 	/* internal host */
 	if(iaddr && (iaddr[0] != '\0') && (0 != strcmp(iaddr, "*")))
 	{

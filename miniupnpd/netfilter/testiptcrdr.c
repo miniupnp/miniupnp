@@ -40,7 +40,7 @@ main(int argc, char ** argv)
 	       eport, iaddr, iport, proto);
 	if(addnatrule(proto, eport, iaddr, iport, NULL) < 0)
 		return -1;
-	r = addmasqueraderule(proto, eport, iaddr, iport, NULL, "ppp0");
+	r = addmasqueraderule(proto, eport, iaddr, iport, NULL);
 	syslog(LOG_DEBUG, "addmasqueraderule() returned %d", r);
 	if(add_filter_rule(proto, NULL, iaddr, iport) < 0)
 		return -1;
