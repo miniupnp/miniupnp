@@ -664,17 +664,20 @@ with HTTP error 412 Precondition Failed. */
 			if(h->req_NTOff > 0) {
 				syslog(LOG_WARNING, "Both NT: and SID: in SUBSCRIBE");
 				BuildResp2_upnphttp(h, 400, "Incompatible header fields", 0, 0);
-			} else
-#endif
-			sid = upnpevents_renewSubscription(h->req_buf + h->req_SIDOff,
-			                                   h->req_SIDLen, h->req_Timeout);
-			if(!sid) {
-				BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
 			} else {
-				h->respflags = FLAG_TIMEOUT | FLAG_SID;
-				h->res_SID = sid;
-				BuildResp_upnphttp(h, 0, 0);
+#endif /* UPNP_STRICT */
+				sid = upnpevents_renewSubscription(h->req_buf + h->req_SIDOff,
+				                                   h->req_SIDLen, h->req_Timeout);
+				if(!sid) {
+					BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
+				} else {
+					h->respflags = FLAG_TIMEOUT | FLAG_SID;
+					h->res_SID = sid;
+					BuildResp_upnphttp(h, 0, 0);
+				}
+#ifdef UPNP_STRICT
 			}
+#endif /* UPNP_STRICT */
 		}
 		SendRespAndClose_upnphttp(h);
 	}
