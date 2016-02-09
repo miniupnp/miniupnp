@@ -72,11 +72,13 @@ static int
 add_filter_rule(int proto, const char * rhost,
                 const char * iaddr, unsigned short iport);
 
+#ifdef ENABLE_PORT_TRIGGERING
 static int
 addmasqueraderule(int proto,
            unsigned short eport,
            const char * iaddr, unsigned short iport,
            const char * rhost/*, const char * extif*/);
+#endif /* ENABLE_PORT_TRIGGERING */
 
 static int
 addpeernatrule(int proto,
@@ -230,10 +232,13 @@ add_redirect_rule2(const char * ifname,
 	r = addnatrule(proto, eport, iaddr, iport, rhost);
 	if(r >= 0) {
 		add_redirect_desc(eport, proto, desc, timestamp);
+#ifdef ENABLE_PORT_TRIGGERING
+		/* TODO : check if this should be done only with UDP */
 		r = addmasqueraderule(proto, eport, iaddr, iport, rhost/*, ifname*/);
 		if(r < 0) {
 			syslog(LOG_NOTICE, "add_redirect_rule2(): addmasqueraderule returned %d", r);
 		}
+#endif /* ENABLE_PORT_TRIGGERING */
 	}
 	return r;
 }
@@ -1017,6 +1022,7 @@ get_dscp_target(unsigned char dscp)
 	return target;
 }
 
+#ifdef ENABLE_PORT_TRIGGERING
 static struct ipt_entry_target *
 get_masquerade_target(unsigned short port)
 {
@@ -1039,6 +1045,7 @@ get_masquerade_target(unsigned short port)
 	range->flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
 	return target;
 }
+#endif /* ENABLE_PORT_TRIGGERING */
 
 /* iptc_init_verify_and_append()
  * return 0 on success, -1 on failure */
@@ -1181,6 +1188,7 @@ addnatrule(int proto, unsigned short eport,
  * iptables -t nat -A MINIUPNPD-POSTROUTING {-o <extif>} -s <iaddr>
  *          -p <proto> [-d <rhost>] --sport <iport> -j MASQUERADE --to-ports <eport>
  */
+#ifdef ENABLE_PORT_TRIGGERING
 static int
 addmasqueraderule(int proto,
            unsigned short eport,
@@ -1253,6 +1261,7 @@ addmasqueraderule(int proto,
 	free(e);
 	return r;
 }
+#endif /* ENABLE_PORT_TRIGGERING */
 
 /* called by add_peer_redirect_rule2()
  *
