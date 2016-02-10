@@ -268,6 +268,12 @@ case $OS_NAME in
 			OS_VERSION=`cat /etc/gentoo-release`
 			OS_URL=http://www.gentoo.org/
 		fi
+		# ClearOS special case
+		if [ -f /etc/clearos-release ]; then
+			OS_NAME=ClearOS
+			OS_VERSION=`grep ^base_version /etc/product | awk '{ print $3 }'`
+			OS_URL=https://www.clearos.com/
+		fi
 		# use lsb_release (Linux Standard Base) when available
 		LSB_RELEASE=`which lsb_release`
 		if [ 0 -eq $? ]; then
