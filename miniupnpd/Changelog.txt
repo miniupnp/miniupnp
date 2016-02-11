@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.416 2016/01/19 10:03:28 nanard Exp $
+$Id: Changelog.txt,v 1.418 2016/02/11 10:35:11 nanard Exp $
+
+2016/02/11:
+  use Linux libuuid uuid_generate() / BSD uuid_create() API
 
 2016/01/28:
   renamed iptables chain MINIUPNPD-PCP-PEER to MINIUPNPD-POSTROUTING

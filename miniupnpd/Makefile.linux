@@ -148,6 +148,7 @@ LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libnetfilter_conntrack)
 endif # ($(TEST),1)
 
 LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libssl)
+LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l uuid)
 
 TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
