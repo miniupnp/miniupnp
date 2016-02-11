@@ -1,4 +1,4 @@
-/* $Id: upnpevents.c,v 1.34 2016/02/11 10:35:13 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.35 2016/02/11 10:41:44 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2008-2016 Thomas Bernard
@@ -139,7 +139,7 @@ newSubscriber(const char * eventurl, const char * callback, int callbacklen)
 					status = (uint32_t)-1;
 				} else {
 					memcpy(tmp->uuid, "uuid:", 5);
-					memcpy(tmp->uuid + 5, uuid_str, 36)
+					memcpy(tmp->uuid + 5, uuid_str, 36);
 					tmp->uuid[sizeof(tmp->uuid)-1] = '\0';
 				}
 				free(uuid_str);
