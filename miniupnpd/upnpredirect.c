@@ -588,6 +588,10 @@ remove_unused_rules(struct rule_state * list)
 		{
 			if(packets == list->packets && bytes == list->bytes)
 			{
+				syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
+				       "%" PRIu64 "packets %" PRIu64 "bytes",
+				       list->eport, (list->proto==IPPROTO_TCP)?"TCP":"UDP",
+				       packets, bytes);
 				_upnp_delete_redir(list->eport, list->proto);
 				n++;
 			}
