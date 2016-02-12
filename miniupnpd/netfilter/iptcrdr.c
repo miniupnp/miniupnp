@@ -209,31 +209,6 @@ get_redirect_desc(unsigned short eport, int proto,
 		*timestamp = 0;
 }
 
-#if USE_INDEX_FROM_DESC_LIST
-static int
-get_redirect_desc_by_index(int index, unsigned short * eport, int * proto,
-                  char * desc, int desclen, unsigned int * timestamp)
-{
-	int i = 0;
-	struct rdr_desc * p;
-	if(!desc || (desclen == 0))
-		return -1;
-	for(p = rdr_desc_list; p; p = p->next, i++)
-	{
-		if(i == index)
-		{
-			*eport = p->eport;
-			*proto = (int)p->proto;
-			strncpy(desc, p->str, desclen);
-			if(timestamp)
-				*timestamp = p->timestamp;
-			return 0;
-		}
-	}
-	return -1;
-}
-#endif
-
 /* add_redirect_rule2() */
 int
 add_redirect_rule2(const char * ifname,
@@ -421,15 +396,6 @@ get_redirect_rule_by_index(int index,
                            u_int64_t * packets, u_int64_t * bytes)
 {
 	int r = -1;
-#if USE_INDEX_FROM_DESC_LIST
-	r = get_redirect_desc_by_index(index, eport, proto,
-	                               desc, desclen, timestamp);
-	if (r==0)
-	{
-		r = get_redirect_rule(ifname, *eport, *proto, iaddr, iaddrlen, iport,
-				      0, 0, packets, bytes);
-	}
-#else
 	int i = 0;
 	IPTC_HANDLE h;
 	const struct ipt_entry * e;
@@ -507,7 +473,6 @@ get_redirect_rule_by_index(int index,
 #else
 		iptc_free(&h);
 #endif
-#endif
 	return r;
 }
 
@@ -523,15 +488,6 @@ get_peer_rule_by_index(int index,
                            u_int64_t * packets, u_int64_t * bytes)
 {
 	int r = -1;
-#if USE_INDEX_FROM_DESC_LIST && 0
-	r = get_redirect_desc_by_index(index, eport, proto,
-	                               desc, desclen, timestamp);
-	if (r==0)
-	{
-		r = get_redirect_rule(ifname, *eport, *proto, iaddr, iaddrlen, iport,
-				      0, 0, packets, bytes);
-	}
-#else
 	int i = 0;
 	IPTC_HANDLE h;
 	const struct ipt_entry * e;
@@ -620,7 +576,6 @@ get_peer_rule_by_index(int index,
 		iptc_free(h);
 #else
 		iptc_free(&h);
-#endif
 #endif
 	return r;
 }
