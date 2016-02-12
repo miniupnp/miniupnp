@@ -326,12 +326,18 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old, iaddr_old, iport_old);
 			timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
-			/* TODO : update lease file */
 			if(iport != iport_old) {
-				return update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
+				r = update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
 			} else {
-				return update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
+				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
 			}
+#ifdef ENABLE_LEASEFILE
+			if(r == 0) {
+				lease_file_remove(eport, proto);
+				lease_file_add(eport, iaddr, iport, proto, desc, timestamp);
+			}
+#endif /* ENABLE_LEASEFILE */
+			return r;
 		} else {
 			syslog(LOG_INFO, "port %hu %s (rhost '%s') already redirected to %s:%hu",
 				eport, protocol, rhost_old, iaddr_old, iport_old);
