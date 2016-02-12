@@ -1,4 +1,4 @@
-/* $Id: iptcrdr.c,v 1.57 2016/02/12 12:34:39 nanard Exp $ */
+/* $Id: iptcrdr.c,v 1.58 2016/02/12 14:27:46 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2016 Thomas Bernard
@@ -1617,7 +1617,7 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 	struct ip_nat_multi_range * mr;
 	const struct ipt_entry_match *match;
 	uint32_t iaddr = 0;
-	unsigned short old_iport;
+	unsigned short old_iport = 0;
 
 	h = iptc_init("nat");
 	if(!h)
