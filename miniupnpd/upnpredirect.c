@@ -1,5 +1,6 @@
 /* $Id: upnpredirect.c,v 1.90 2016/02/12 12:59:41 nanard Exp $ */
-/* MiniUPnP project
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
@@ -55,7 +56,7 @@ static int
 proto_atoi(const char * protocol)
 {
 	int proto = IPPROTO_TCP;
-	if(strcmp(protocol, "UDP") == 0)
+	if(strcasecmp(protocol, "UDP") == 0)
 		proto = IPPROTO_UDP;
 	return proto;
 }
