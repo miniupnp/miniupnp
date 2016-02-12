@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.418 2016/02/11 10:35:11 nanard Exp $
+$Id: Changelog.txt,v 1.421 2016/02/12 12:34:37 nanard Exp $
+
+2016/02/12:
+  add iptc_init() check in iptcrdr.c/init_redirect()
 
 2016/02/11:
   use Linux libuuid uuid_generate() / BSD uuid_create() API

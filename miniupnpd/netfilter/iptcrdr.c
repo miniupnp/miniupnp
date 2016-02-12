@@ -1,4 +1,4 @@
-/* $Id: iptcrdr.c,v 1.53 2015/02/08 09:10:00 nanard Exp $ */
+/* $Id: iptcrdr.c,v 1.57 2016/02/12 12:34:39 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2016 Thomas Bernard
@@ -91,9 +91,24 @@ addpeerdscprule(int proto, unsigned char dscp,
            const char * iaddr, unsigned short iport,
            const char * rhost, unsigned short rport);
 
-/* dummy init and shutdown functions */
+/* dummy init and shutdown functions
+ * Only test iptc_init() */
 int init_redirect(void)
 {
+	IPTC_HANDLE h;
+
+	h = iptc_init("nat");
+	if(!h) {
+		syslog(LOG_ERR, "iptc_init() failed : %s",
+		       iptc_strerror(errno));
+		return -1;
+	} else {
+#ifdef IPTABLES_143
+		iptc_free(h);
+#else
+		iptc_free(&h);
+#endif
+	}
 	return 0;
 }
 
