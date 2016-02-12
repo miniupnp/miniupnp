@@ -1,5 +1,6 @@
 /* $Id: obsdrdr.c,v 1.86 2016/02/12 13:11:03 nanard Exp $ */
-/* MiniUPnP project
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
@@ -71,7 +72,7 @@
 #error "USE_PF macro is undefined, check consistency between config.h and Makefile"
 #else
 
-/* list too keep timestamps for port mappings having a lease duration */
+/* list to keep timestamps for port mappings having a lease duration */
 struct timestamp_entry {
 	struct timestamp_entry * next;
 	unsigned int timestamp;
@@ -110,6 +111,26 @@ remove_timestamp_entry(unsigned short eport, int proto)
 		}
 		p = &(e->next);
 		e = *p;
+	}
+}
+
+static void
+add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
+{
+	struct timestamp_entry * tmp;
+	tmp = malloc(sizeof(struct timestamp_entry));
+	if(tmp)
+	{
+		tmp->next = timestamp_list;
+		tmp->timestamp = timestamp;
+		tmp->eport = eport;
+		tmp->protocol = (short)proto;
+		timestamp_list = tmp;
+	}
+	else
+	{
+		syslog(LOG_ERR, "add_timestamp_entry() malloc(%lu) error",
+		       sizeof(struct timestamp_entry));
 	}
 }
 
@@ -361,18 +382,7 @@ add_redirect_rule2(const char * ifname,
 #endif
 	}
 	if(r == 0 && timestamp > 0)
-	{
-		struct timestamp_entry * tmp;
-		tmp = malloc(sizeof(struct timestamp_entry));
-		if(tmp)
-		{
-			tmp->next = timestamp_list;
-			tmp->timestamp = timestamp;
-			tmp->eport = eport;
-			tmp->protocol = (short)proto;
-			timestamp_list = tmp;
-		}
-	}
+		add_timestamp_entry(eport, proto, timestamp);
 	return r;
 }
 
