@@ -1,7 +1,7 @@
-/* $Id: upnpredirect.c,v 1.85 2014/12/09 09:17:54 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.90 2016/02/12 12:59:41 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -254,6 +254,7 @@ int reload_from_lease_file()
  *          -1 failed to redirect
  *          -2 already redirected
  *          -3 permission check failed
+ *          -4 already redirected (other mechanism)
  */
 int
 upnp_redirect(const char * rhost, unsigned short eport,
@@ -299,7 +300,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	} else if (port_in_use(ext_if_name, eport, proto, iaddr, iport) > 0) {
 		syslog(LOG_INFO, "port %hu protocol %s already in use",
 		       eport, protocol);
-		return -2;
+		return -4;
 #endif /* CHECK_PORTINUSE */
 	} else {
 		timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;

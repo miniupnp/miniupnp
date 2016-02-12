@@ -1,7 +1,7 @@
-/* $Id: upnpsoap.c,v 1.142 2015/12/15 11:12:37 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.144 2016/02/12 12:35:03 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -474,7 +474,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
              ExternalPort must be a wildcard and cannot be a specific port
              value (deprecated in IGD v2)
      * 728 - NoPortMapsAvailable
-             There are not enough free prots available to complete the mapping
+             There are not enough free ports available to complete the mapping
              (added in IGD v2)
 	 * 729 - ConflictWithOtherMechanisms (added in IGD v2) */
 	switch(r)
@@ -484,6 +484,11 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		                   action, ns/*SERVICE_TYPE_WANIPC*/);
 		BuildSendAndCloseSoapResp(h, body, bodylen);
 		break;
+	case -4:
+#ifdef IGD_V2
+		SoapError(h, 729, "ConflictWithOtherMechanisms");
+		break;
+#endif /* IGD_V2 */
 	case -2:	/* already redirected */
 	case -3:	/* not permitted */
 		SoapError(h, 718, "ConflictInMappingEntry");
