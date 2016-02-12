@@ -427,14 +427,12 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	eport = (unsigned short)atoi(ext_port);
 	iport = (unsigned short)atoi(int_port);
 
-	/* TODO : check if we are supporting wildcard ExternalPort
 	if (strcmp(ext_port, "*") == 0 || eport == 0)
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 716, "Wildcard not permited in ExtPort");
 		return;
 	}
-	*/
 
 	leaseduration = leaseduration_str ? atoi(leaseduration_str) : 0;
 #ifdef IGD_V2
