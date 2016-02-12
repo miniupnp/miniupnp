@@ -1,4 +1,4 @@
-/* $Id: ipfrdr.c,v 1.16 2013/05/20 00:07:47 nanard Exp $ */
+/* $Id: ipfrdr.c,v 1.18 2016/02/12 14:12:25 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2007 Darren Reed
@@ -797,3 +797,26 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	} while (ipn.in_next != NULL);
 	return array;
 }
+
+/* update the port mapping internal port, decription and timestamp */
+int
+update_portmapping(const char * ifname, unsigned short eport, int proto,
+                   unsigned short iport, const char * desc,
+                   unsigned int timestamp)
+{
+	/* TODO: implement update_portmapping() */
+	syslog(LOG_ERR, __FILE__ " update_portmapping() is not implemented");
+	return -1;
+}
+
+/* update the port mapping decription and timestamp */
+int
+update_portmapping_desc_timestamp(const char * ifname,
+                   unsigned short eport, int proto,
+                   const char * desc, unsigned int timestamp)
+{
+	del_redirect_desc(eport, proto);
+	add_redirect_desc(eport,proto, timestamp, desc);
+	return 0;
+}
+
