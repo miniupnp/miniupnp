@@ -1552,6 +1552,249 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	return array;
 }
 
+int
+update_portmapping_desc_timestamp(const char * ifname,
+                   unsigned short eport, int proto,
+                   const char * desc, unsigned int timestamp)
+{
+	UNUSED(ifname);
+	del_redirect_desc(eport, proto);
+	add_redirect_desc(eport, proto, desc, timestamp);
+	return 0;
+}
+
+static int
+update_rule_and_commit(const char * table, const char * chain,
+                       unsigned index, const struct ipt_entry * e)
+{
+	IPTC_HANDLE h;
+	int r = 0;
+
+	h = iptc_init(table);
+	if(!h)
+	{
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "update_rule_and_commit", iptc_strerror(errno));
+		return -1;
+	}
+#ifdef IPTABLES_143
+	if(!iptc_replace_entry(chain, e, index, h))
+#else
+	if(!iptc_replace_entry(chain, e, index, &h))
+#endif
+	{
+		syslog(LOG_ERR, "%s(): iptc_replace_entry: %s",
+		       "update_rule_and_commit", iptc_strerror(errno));
+		r = -1;
+	}
+#ifdef IPTABLES_143
+	else if(!iptc_commit(h))
+#else
+	else if(!iptc_commit(&h))
+#endif
+	{
+		syslog(LOG_ERR, "%s(): iptc_commit: %s",
+		       "update_rule_and_commit", iptc_strerror(errno));
+		r = -1;
+	}
+#ifdef IPTABLES_143
+	iptc_free(h);
+#else
+	iptc_free(&h);
+#endif
+	return r;
+}
+
+int
+update_portmapping(const char * ifname, unsigned short eport, int proto,
+                   unsigned short iport, const char * desc,
+                   unsigned int timestamp)
+{
+	int r = 0;
+	int found = 0;
+	unsigned index = 0;
+	unsigned i = 0;
+	IPTC_HANDLE h;
+	const struct ipt_entry * e;
+	struct ipt_entry * new_e = NULL;
+	size_t entry_len;
+	const struct ipt_entry_target * target;
+	struct ip_nat_multi_range * mr;
+	const struct ipt_entry_match *match;
+	uint32_t iaddr = 0;
+	unsigned short old_iport;
+
+	h = iptc_init("nat");
+	if(!h)
+	{
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "update_portmapping", iptc_strerror(errno));
+		return -1;
+	}
+	/* First step : find the right nat rule */
+	if(!iptc_is_chain(miniupnpd_nat_chain, h))
+	{
+		syslog(LOG_ERR, "chain %s not found", miniupnpd_nat_chain);
+		r = -1;
+	}
+	else
+	{
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_nat_chain, h);
+		    e;
+			e = iptc_next_rule(e, h), i++)
+#else
+		for(e = iptc_first_rule(miniupnpd_nat_chain, &h);
+		    e;
+			e = iptc_next_rule(e, &h), i++)
+#endif
+		{
+			if(proto==e->ip.proto)
+			{
+				match = (const struct ipt_entry_match *)&e->elems;
+				if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+				{
+					const struct ipt_tcp * info;
+					info = (const struct ipt_tcp *)match->data;
+					if(eport != info->dpts[0])
+						continue;
+				}
+				else
+				{
+					const struct ipt_udp * info;
+					info = (const struct ipt_udp *)match->data;
+					if(eport != info->dpts[0])
+						continue;
+				}
+				/* we found the right rule */
+				found = 1;
+				index = i;
+				target = (void *)e + e->target_offset;
+				mr = (struct ip_nat_multi_range *)&target->data[0];
+				iaddr = mr->range[0].min_ip;
+				old_iport = ntohs(mr->range[0].min.all);
+				entry_len = sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size;
+				new_e = malloc(entry_len);
+				if(new_e == NULL) {
+					syslog(LOG_ERR, "%s: malloc(%u) error",
+					       "update_portmapping", (unsigned)entry_len);
+					r = -1;
+				}
+				else
+				{
+					memcpy(new_e, e, entry_len);
+				}
+				break;
+			}
+		}
+	}
+#ifdef IPTABLES_143
+	iptc_free(h);
+#else
+	iptc_free(&h);
+#endif
+	if(!found || r < 0)
+		return -1;
+	syslog(LOG_INFO, "Trying to update nat rule at index %u", index);
+	target = (void *)new_e + new_e->target_offset;
+	mr = (struct ip_nat_multi_range *)&target->data[0];
+	mr->range[0].min.all = mr->range[0].max.all = htons(iport);
+	/* first update the nat rule */
+	r = update_rule_and_commit("nat", miniupnpd_nat_chain, index, new_e);
+	free(new_e); new_e = NULL;
+	if(r < 0)
+		return r;
+
+	/* update filter rule */
+	h = iptc_init("filter");
+	if(!h)
+	{
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "update_portmapping", iptc_strerror(errno));
+		return -1;
+	}
+	i = 0; found = 0;
+	if(!iptc_is_chain(miniupnpd_forward_chain, h))
+	{
+		syslog(LOG_ERR, "chain %s not found", miniupnpd_forward_chain);
+	}
+	else
+	{
+		/* we must find the right index for the filter rule */
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_forward_chain, h);
+		    e;
+			e = iptc_next_rule(e, h), i++)
+#else
+		for(e = iptc_first_rule(miniupnpd_forward_chain, &h);
+		    e;
+			e = iptc_next_rule(e, &h), i++)
+#endif
+		{
+			if(proto!=e->ip.proto)
+				continue;
+			target = (void *)e + e->target_offset;
+			match = (const struct ipt_entry_match *)&e->elems;
+			if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+			{
+				const struct ipt_tcp * info;
+				info = (const struct ipt_tcp *)match->data;
+				if(old_iport != info->dpts[0])
+					continue;
+			}
+			else
+			{
+				const struct ipt_udp * info;
+				info = (const struct ipt_udp *)match->data;
+				if(old_iport != info->dpts[0])
+					continue;
+			}
+			if(iaddr != e->ip.dst.s_addr)
+				continue;
+			index = i;
+			found = 1;
+			entry_len = sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size;
+			new_e = malloc(entry_len);
+			if(new_e == NULL) {
+				syslog(LOG_ERR, "%s: malloc(%u) error",
+				       "update_portmapping", (unsigned)entry_len);
+				r = -1;
+			} else {
+				memcpy(new_e, e, entry_len);
+			}
+			break;
+		}
+	}
+#ifdef IPTABLES_143
+	iptc_free(h);
+#else
+	iptc_free(&h);
+#endif
+	if(!found || r < 0)
+		return -1;
+
+	syslog(LOG_INFO, "Trying to update filter rule at index %u", index);
+	match = (struct ipt_entry_match *)&new_e->elems;
+	if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+	{
+		struct ipt_tcp * info;
+		info = (struct ipt_tcp *)match->data;
+		info->dpts[0] = info->dpts[1] = iport;
+	}
+	else
+	{
+		struct ipt_udp * info;
+		info = (struct ipt_udp *)match->data;
+		info->dpts[0] = info->dpts[1] = iport;
+	}
+	r = update_rule_and_commit("filter", miniupnpd_forward_chain, index, new_e);
+	free(new_e); new_e = NULL;
+	if(r < 0)
+		return r;
+
+	return update_portmapping_desc_timestamp(ifname, eport, proto, desc, timestamp);
+}
+
 /* ================================ */
 #ifdef DEBUG
 static int

@@ -3,6 +3,7 @@ $Id: Changelog.txt,v 1.421 2016/02/12 12:34:37 nanard Exp $
 2016/02/12:
   return error 729 - ConflictWithOtherMechanisms if IGD v2 is enabled.
   add iptc_init() check in iptcrdr.c/init_redirect()
+  add update_portmapping() / update_portmapping_desc_timestamp() functions
 
 2016/02/11:
   use Linux libuuid uuid_generate() / BSD uuid_create() API

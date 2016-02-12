@@ -53,6 +53,8 @@ main(int argc, char ** argv)
 			fprintf(stderr, "addpeenatrule failed\n");
 	}
 #endif
+	/*update_portmapping_desc_timestamp(NULL, eport, proto, "updated desc", time(NULL)+42);*/
+	update_portmapping(NULL, eport, proto, iport+1, "updated rule", time(NULL)+42);
 	/* test */
 	{
 		unsigned short p1, p2;
