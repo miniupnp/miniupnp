@@ -614,10 +614,20 @@ error:
 	return -1;
 }
 
+#define priv_delete_redirect_rule(ifname, eport, proto, iport, \
+                                  iaddr, rhost, rhostlen) \
+        priv_delete_redirect_rule_check_desc(ifname, eport, proto, iport, \
+                                             iaddr, rhost, rhostlen, 0, NULL)
+/* if check_desc is true, only delete the rule if the description differs.
+ * returns : -1 : error / rule not found
+ *            0 : rule deleted
+ *            1 : rule untouched
+ */
 static int
-priv_delete_redirect_rule(const char * ifname, unsigned short eport,
+priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
                           int proto, unsigned short * iport,
-                          in_addr_t * iaddr, char * rhost, int rhostlen)
+                          in_addr_t * iaddr, char * rhost, int rhostlen,
+                          int check_desc, const char * desc)
 {
 	int i, n;
 	struct pfioc_rule pr;
@@ -700,6 +710,12 @@ priv_delete_redirect_rule(const char * ifname, unsigned short eport,
 				else
 					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr,
 					          rhost, rhostlen);
+			}
+			if(check_desc) {
+				if((desc == NULL && pr.rule.label[0] == '\0') ||
+				   (desc && 0 == strcmp(desc, pr.rule.label))) {
+					return 1;
+				}
 			}
 			pr.action = PF_CHANGE_GET_TICKET;
         	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
@@ -1033,9 +1049,17 @@ update_portmapping_desc_timestamp(const char * ifname,
 	in_addr_t iaddr;
 	char iaddr_str[16];
 	char rhost[32];
+	int r;
 
-	if(priv_delete_redirect_rule(ifname, eport, proto, &iport, &iaddr, rhost, sizeof(rhost)) < 0)
+	r = priv_delete_redirect_rule_check_desc(ifname, eport, proto, &iport, &iaddr, rhost, sizeof(rhost), 1, desc);
+	if(r < 0)
 		return -1;
+	if(r == 1) {
+		/* only change timestamp */
+		remove_timestamp_entry(eport, proto);
+		add_timestamp_entry(eport, proto, timestamp);
+		return 0;
+	}
 	if (priv_delete_filter_rule(ifname, iport, proto, iaddr) < 0)
 		return -1;
 
