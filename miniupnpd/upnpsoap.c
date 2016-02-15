@@ -904,7 +904,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 	unsigned short eport, iport;
 	const char * m_index;
 	char * endptr;
-	char protocol[4], iaddr[32];
+	char protocol[8], iaddr[32];
 	char desc[64];
 	char rhost[40];
 	unsigned int leaseduration = 0;

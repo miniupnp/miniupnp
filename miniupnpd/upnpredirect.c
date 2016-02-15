@@ -58,6 +58,10 @@ proto_atoi(const char * protocol)
 	int proto = IPPROTO_TCP;
 	if(strcasecmp(protocol, "UDP") == 0)
 		proto = IPPROTO_UDP;
+#ifdef IPPROTO_UDPLITE
+	else if(strcasecmp(protocol, "UDPLITE") == 0)
+		proto = IPPROTO_UDPLITE;
+#endif /* IPPROTO_UDPLITE */
 	return proto;
 }
 
@@ -74,9 +78,11 @@ proto_itoa(int proto)
 	case IPPROTO_TCP:
 		protocol = "TCP";
 		break;
+#ifdef IPPROTO_UDPLITE
 	case IPPROTO_UDPLITE:
 		protocol = "UDPLITE";
 		break;
+#endif /* IPPROTO_UDPLITE */
 	default:
 		protocol = "*UNKNOWN*";
 	}
@@ -481,6 +487,10 @@ upnp_get_redirection_infos_by_index(int index,
 		                 : 0;
 		if(proto == IPPROTO_TCP)
 			memcpy(protocol, "TCP", 4);
+#ifdef IPPROTO_UDPLITE
+		else if(proto == IPPROTO_UDPLITE)
+			memcpy(protocol, "UDPLITE", 8);
+#endif /* IPPROTO_UDPLITE */
 		else
 			memcpy(protocol, "UDP", 4);
 		return 0;
