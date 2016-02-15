@@ -61,6 +61,28 @@ proto_atoi(const char * protocol)
 	return proto;
 }
 
+/* proto_itoa()
+ * convert IPPROTO_UDP, IPPROTO_UDP, etc. to "UDP", "TCP" */
+static const char *
+proto_itoa(int proto)
+{
+	const char * protocol;
+	switch(proto) {
+	case IPPROTO_UDP:
+		protocol = "UDP";
+		break;
+	case IPPROTO_TCP:
+		protocol = "TCP";
+		break;
+	case IPPROTO_UDPLITE:
+		protocol = "UDPLITE";
+		break;
+	default:
+		protocol = "*UNKNOWN*";
+	}
+	return protocol;
+}
+
 #ifdef ENABLE_LEASEFILE
 static int
 lease_file_add(unsigned short eport,
@@ -81,7 +103,7 @@ lease_file_add(unsigned short eport,
 	}
 
 	fprintf(fd, "%s:%hu:%s:%hu:%u:%s\n",
-	        ((proto==IPPROTO_TCP)?"TCP":"UDP"), eport, iaddr, iport,
+	        proto_itoa(proto), eport, iaddr, iport,
 	        timestamp, desc);
 	fclose(fd);
 
@@ -114,7 +136,7 @@ lease_file_remove(unsigned short eport, int proto)
 		return 0;
 	}
 
-	snprintf( str, sizeof(str), "%s:%u", ((proto==IPPROTO_TCP)?"TCP":"UDP"), eport);
+	snprintf( str, sizeof(str), "%s:%u", proto_itoa(proto), eport);
 	str_size = strlen(str);
 
 	tmp = mkstemp(tmpfilename);
@@ -593,7 +615,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		if(tmp->to_remove)
 		{
 			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
-			       tmp->eport, (tmp->proto==IPPROTO_TCP)?"TCP":"UDP");
+			       tmp->eport, proto_itoa(tmp->proto));
 			_upnp_delete_redir(tmp->eport, tmp->proto);
 			*p = tmp->next;
 			free(tmp);
@@ -636,7 +658,7 @@ remove_unused_rules(struct rule_state * list)
 			{
 				syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
 				       "%" PRIu64 "packets %" PRIu64 "bytes",
-				       list->eport, (list->proto==IPPROTO_TCP)?"TCP":"UDP",
+				       list->eport, proto_itoa(list->proto),
 				       packets, bytes);
 				_upnp_delete_redir(list->eport, list->proto);
 				n++;
@@ -694,7 +716,7 @@ write_ruleset_details(int s)
 		             "%2d %s %s:%hu->%s:%hu "
 		             "'%s' %u %" PRIu64 " %" PRIu64 "\n",
 		             /*"'%s' %llu %llu\n",*/
-		             i, proto==IPPROTO_TCP?"TCP":"UDP", rhost,
+		             i, proto_itoa(proto), rhost,
 		             eport, iaddr, iport, desc, timestamp, packets, bytes);
 		write(s, buffer, n);
 		i++;
