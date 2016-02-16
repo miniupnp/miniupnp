@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -952,6 +952,13 @@ genXML(char * str, int * len, int * tmplen,
 			/*printf("<%s>\n", eltname); */
 			str = strcat_char(str, len, tmplen, '<');
 			str = strcat_str(str, len, tmplen, eltname);
+			if(memcmp(eltname, "root ", 5) == 0) {
+				char configid_str[16];
+				/* add configId attribute, required by UDA 1.1 */
+				snprintf(configid_str, sizeof(configid_str), "\"%u\"", upnp_configid);
+				str = strcat_str(str, len, tmplen, " configId=");
+				str = strcat_str(str, len, tmplen, configid_str);
+			}
 			str = strcat_char(str, len, tmplen, '>');
 			k = (unsigned long)p[i].data;
 			i = k & 0xffff;
