@@ -675,6 +675,12 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 #endif
 
 	eport = (unsigned short)atoi(ext_port);
+	if(eport == 0)
+	{
+		ClearNameValueList(&data);
+		SoapError(h, 402, "Invalid Args");
+		return;
+	}
 
 	/* TODO : add r_host as an input parameter ...
 	 * We prevent several Port Mapping with same external port
@@ -758,6 +764,12 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 #endif /* SUPPORT_REMOTEHOST */
 
 	eport = (unsigned short)atoi(ext_port);
+	if(eport == 0)
+	{
+		ClearNameValueList(&data);
+		SoapError(h, 402, "Invalid Args");
+		return;
+	}
 
 	syslog(LOG_INFO, "%s: external port: %hu, protocol: %s",
 		action, eport, protocol);
