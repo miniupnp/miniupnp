@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.421 2016/02/12 12:34:37 nanard Exp $
+$Id: Changelog.txt,v 1.422 2016/02/16 12:15:02 nanard Exp $
+
+2016/02/16:
+  minor changes to follow UDA 1.1 more closely.
+  more argument checking in Soap methods.
 
 2016/02/12:
   return error 729 - ConflictWithOtherMechanisms if IGD v2 is enabled.
