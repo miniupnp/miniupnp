@@ -385,7 +385,11 @@ static void upnp_event_prepare(struct upnp_event_notify * obj)
 	static const char notifymsg[] =
 		"NOTIFY %s HTTP/1.1\r\n"
 		"Host: %s%s\r\n"
-		"Content-Type: text/xml\r\n"
+#if (UPNP_VERSION_MAJOR == 1) && (UPNP_VERSION_MINOR == 0)
+		"Content-Type: text/xml\r\n"	/* UDA v1.0 */
+#else
+		"Content-Type: text/xml; charset=\"utf-8\"\r\n"	/* UDA v1.1 or later */
+#endif
 		"Content-Length: %d\r\n"
 		"NT: upnp:event\r\n"
 		"NTS: upnp:propchange\r\n"
