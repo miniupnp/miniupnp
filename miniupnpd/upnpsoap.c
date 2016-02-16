@@ -31,6 +31,16 @@
 #include "getconnstatus.h"
 #include "upnpurns.h"
 
+/* utility function */
+static int is_numeric(const char * s)
+{
+	while(*s) {
+		if(*s < '0' || *s > '9') return 0;
+		s++;
+	}
+	return 1;
+}
+
 static void
 BuildSendAndCloseSoapResp(struct upnphttp * h,
                           const char * body, int bodylen)
@@ -545,6 +555,11 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 
 	eport = (unsigned short)atoi(ext_port);
 	iport = (unsigned short)atoi(int_port);
+	if(iport == 0 || !is_numeric(ext_port)) {
+		ClearNameValueList(&data);
+		SoapError(h, 402, "Invalid Args");
+		return;
+	}
 #ifndef SUPPORT_REMOTEHOST
 #ifdef UPNP_STRICT
 	if (r_host && (strlen(r_host) > 0) && (0 != strcmp(r_host, "*")))
@@ -847,7 +862,8 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	endport_s = GetValueFromNameValueList(&data, "NewEndPort");
 	protocol = GetValueFromNameValueList(&data, "NewProtocol");
 	/*manage = atoi(GetValueFromNameValueList(&data, "NewManage"));*/
-	if(startport_s == NULL || endport_s == NULL || protocol == NULL) {
+	if(startport_s == NULL || endport_s == NULL || protocol == NULL ||
+	   !is_numeric(startport_s) || !is_numeric(endport_s)) {
 		SoapError(h, 402, "Invalid Args");
 		ClearNameValueList(&data);
 		return;
@@ -1035,7 +1051,8 @@ GetListOfPortMappings(struct upnphttp * h, const char * action, const char * ns)
 	/*manage_s = GetValueFromNameValueList(&data, "NewManage");*/
 	number_s = GetValueFromNameValueList(&data, "NewNumberOfPorts");
 	if(startport_s == NULL || endport_s == NULL || protocol == NULL ||
-	   number_s == NULL) {
+	   number_s == NULL || !is_numeric(number_s) ||
+	   !is_numeric(startport_s) || !is_numeric(endport_s)) {
 		SoapError(h, 402, "Invalid Args");
 		ClearNameValueList(&data);
 		return;
