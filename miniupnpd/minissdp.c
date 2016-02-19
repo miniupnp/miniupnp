@@ -630,10 +630,14 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 {
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
+	/* UDA 1.1 AnnexA and UDA 2.0 only allow/define the use of
+	 * Link-Local and Site-Local multicast scopes */
 	static struct { const char * p1, * p2; } const mcast_addrs[] =
 		{ { LL_SSDP_MCAST_ADDR, "[" LL_SSDP_MCAST_ADDR "]" },	/* Link Local */
 		  { SL_SSDP_MCAST_ADDR, "[" SL_SSDP_MCAST_ADDR "]" },	/* Site Local */
+#ifndef UPNP_STRICT
 		  { GL_SSDP_MCAST_ADDR, "[" GL_SSDP_MCAST_ADDR "]" },	/* Global */
+#endif /* ! UPNP_STRICT */
 		  { NULL, NULL } };
 	int j;
 #else /* ENABLE_IPV6 */
