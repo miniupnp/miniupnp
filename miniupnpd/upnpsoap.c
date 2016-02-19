@@ -99,6 +99,9 @@ GetConnectionTypeInfo(struct upnphttp * h, const char * action, const char * ns)
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
+/* maximum value for a UPNP ui4 type variable */
+#define UPNP_UI4_MAX (4294967295ul)
+
 static void
 GetTotalBytesSent(struct upnphttp * h, const char * action, const char * ns)
 {
@@ -117,7 +120,11 @@ GetTotalBytesSent(struct upnphttp * h, const char * action, const char * ns)
 	r = getifstats(ext_if_name, &data);
 	bodylen = snprintf(body, sizeof(body), resp,
 	         action, ns, /* was "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" */
+#ifdef UPNP_STRICT
+             r<0?0:(data.obytes & UPNP_UI4_MAX), action);
+#else /* UPNP_STRICT */
              r<0?0:data.obytes, action);
+#endif /* UPNP_STRICT */
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
@@ -137,9 +144,18 @@ GetTotalBytesReceived(struct upnphttp * h, const char * action, const char * ns)
 	struct ifdata data;
 
 	r = getifstats(ext_if_name, &data);
+	/* TotalBytesReceived
+	 * This variable represents the cumulative counter for total number of
+	 * bytes received downstream across all connection service instances on
+	 * WANDevice. The count rolls over to 0 after it reaching the maximum
+	 * value (2^32)-1. */
 	bodylen = snprintf(body, sizeof(body), resp,
 	         action, ns, /* was "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" */
+#ifdef UPNP_STRICT
+	         r<0?0:(data.ibytes & UPNP_UI4_MAX), action);
+#else /* UPNP_STRICT */
 	         r<0?0:data.ibytes, action);
+#endif /* UPNP_STRICT */
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
@@ -161,7 +177,11 @@ GetTotalPacketsSent(struct upnphttp * h, const char * action, const char * ns)
 	r = getifstats(ext_if_name, &data);
 	bodylen = snprintf(body, sizeof(body), resp,
 	         action, ns,/*"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1",*/
+#ifdef UPNP_STRICT
+	         r<0?0:(data.opackets & UPNP_UI4_MAX), action);
+#else /* UPNP_STRICT */
 	         r<0?0:data.opackets, action);
+#endif /* UPNP_STRICT */
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
@@ -183,7 +203,11 @@ GetTotalPacketsReceived(struct upnphttp * h, const char * action, const char * n
 	r = getifstats(ext_if_name, &data);
 	bodylen = snprintf(body, sizeof(body), resp,
 	         action, ns, /* was "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" */
+#ifdef UPNP_STRICT
+	         r<0?0:(data.ipackets & UPNP_UI4_MAX), action);
+#else /* UPNP_STRICT */
 	         r<0?0:data.ipackets, action);
+#endif /* UPNP_STRICT */
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
