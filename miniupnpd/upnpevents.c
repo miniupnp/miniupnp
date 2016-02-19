@@ -318,12 +318,15 @@ upnp_event_notify_connect(struct upnp_event_notify * obj)
 	p += 7;	/* http:// */
 #ifdef ENABLE_IPV6
 	if(*p == '[') {	/* ip v6 */
+		obj->addrstr[i++] = '[';
 		p++;
 		obj->ipv6 = 1;
 		while(*p != ']' && i < (sizeof(obj->addrstr)-1))
 			obj->addrstr[i++] = *(p++);
 		if(*p == ']')
 			p++;
+		if(i < (sizeof(obj->addrstr)-1))
+			obj->addrstr[i++] = ']';
 	} else {
 #endif
 		while(*p != '/' && *p != ':' && i < (sizeof(obj->addrstr)-1))
@@ -349,9 +352,16 @@ upnp_event_notify_connect(struct upnp_event_notify * obj)
 	obj->path = p;
 #ifdef ENABLE_IPV6
 	if(obj->ipv6) {
+		char addrstr_tmp[48];
 		struct sockaddr_in6 * sa = (struct sockaddr_in6 *)&addr;
 		sa->sin6_family = AF_INET6;
-		inet_pton(AF_INET6, obj->addrstr, &(sa->sin6_addr));
+		i = (int)strlen(obj->addrstr);
+		if(i > 2) {
+			i -= 2;
+			memcpy(addrstr_tmp, obj->addrstr + 1, i);
+			addrstr_tmp[i] = '\0';
+			inet_pton(AF_INET6, addrstr_tmp, &(sa->sin6_addr));
+		}
 		sa->sin6_port = htons(port);
 		addrlen = sizeof(struct sockaddr_in6);
 	} else {
