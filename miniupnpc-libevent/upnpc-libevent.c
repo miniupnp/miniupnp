@@ -1,6 +1,6 @@
 /* $Id: upnpc-libevent.c,v 1.11 2014/12/02 13:33:42 nanard Exp $ */
 /* miniupnpc-libevent
- * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
+ * Copyright (c) 2008-2016, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -36,6 +36,16 @@ static void sighandler(int signal)
 		event_base_loopbreak(base);
 }
 
+static enum {
+	EInitial = 0,
+	EGetStatusInfo,
+	EGetExtIp,
+	EGetMaxRate,
+	EAddPortMapping,
+	EDeletePortMapping,
+	EFinished
+	} state = EInitial;
+
 /* ready callback */
 static void ready(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 {
@@ -48,6 +58,7 @@ static void ready(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 #ifdef ENABLE_UPNP_EVENTS
 		upnpc_event_subscribe(d);
 #else
+		state = EGetStatusInfo;
 		upnpc_get_status_info(d);
 #endif /* ENABLE_UPNP_EVENTS */
 	} else {
@@ -67,15 +78,6 @@ static void ready(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 		}
 	}
 }
-
-static enum {
-	EGetStatusInfo = 0,
-	EGetExtIp,
-	EGetMaxRate,
-	EAddPortMapping,
-	EDeletePortMapping,
-	EFinished
-	} state = EGetStatusInfo;
 
 /* soap callback */
 static void soap(int code, upnpc_t * p, upnpc_device_t * d, void * data)
@@ -133,6 +135,13 @@ static void event_callback(upnpc_t * p, upnpc_device_t * d, void * data,
 {
 	(void)p; (void)d; (void)data;
 	printf("PROPERTY VALUE CHANGE (service=%s): %s=%s\n", service_id, property_name, property_value);
+}
+
+/* subscribe callback */
+static void subscribe_callback(int code, upnpc_t * p, upnpc_device_t * d, void * data)
+{
+	state = EGetStatusInfo;
+	upnpc_get_status_info(d);
 }
 #endif /* ENABLE_UPNP_EVENTS */
 
@@ -231,7 +240,7 @@ int main(int argc, char * * argv)
 	}
 	upnpc_set_local_address(&upnp, local_address, 50000);
 #ifdef ENABLE_UPNP_EVENTS
-	upnpc_set_event_callback(&upnp, event_callback);
+	upnpc_set_event_callbacks(&upnp, event_callback, subscribe_callback);
 #endif /* ENABLE_UPNP_EVENTS */
 	if(upnpc_start(&upnp) != UPNPC_OK) {
 		fprintf(stderr, "upnp_start() failed\n");

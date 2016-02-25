@@ -1,6 +1,6 @@
 /* $Id: miniupnpc-libevent.c,v 1.27 2015/07/22 13:51:09 nanard Exp $ */
 /* miniupnpc-libevent
- * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
+ * Copyright (c) 2008-2016, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -422,6 +422,7 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 	unsigned char * data;
 	struct evbuffer * input_buffer;
 	upnpc_device_t * d = (upnpc_device_t *)pvoid;
+	int code;
 
 	if(req == NULL) {
 		debug_printf("%s(%p, %p) NULL argument !\n", __func__, req, pvoid);
@@ -432,7 +433,8 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 	data = evbuffer_pullup(input_buffer, len);
 	debug_printf("%s %d (%d bytes)\n", __func__, evhttp_request_get_response_code(req), (int)len);
 	d->state &= ~UPNPC_DEVICE_SOAP_REQ;
-	if(evhttp_request_get_response_code(req) != HTTP_OK) {
+	code = evhttp_request_get_response_code(req);
+	if(code != HTTP_OK) {
 		/* TODO ERROR */
 	} else {
 		const char * sid;
@@ -445,6 +447,8 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 			d->event_conn_sid = strdup(sid);
 		}
 	}
+	if(d->parent->subscribe_cb)
+		d->parent->subscribe_cb(code, d->parent, d, d->parent->cb_data);
 }
 #endif /* ENABLE_UPNP_EVENTS */
 
@@ -665,6 +669,7 @@ void upnpc_event_conn_req(struct evhttp_request * req, void * data)
 	char * xml_data;
 	struct evbuffer * input_buffer;
 	struct evkeyvalq * headers;
+	const char * uri;
 	const char * sid;
 	const char * nts;
 	const char * nt;
@@ -673,7 +678,9 @@ void upnpc_event_conn_req(struct evhttp_request * req, void * data)
 	struct NameValue * nv;
 	upnpc_device_t * d = (upnpc_device_t *)data;
 
-	debug_printf("%s(%p, %p)\n", __func__, req, d);
+	uri = evhttp_request_get_uri(req);
+	debug_printf("%s(%p, %p) %04x %s\n", __func__, req, d,
+	             evhttp_request_get_command(req), uri);
 	headers = evhttp_request_get_input_headers(req);
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
@@ -810,10 +817,11 @@ int upnpc_set_local_address(upnpc_t * p, const char * address, uint16_t port)
 }
 
 #ifdef ENABLE_UPNP_EVENTS
-int upnpc_set_event_callback(upnpc_t * p, upnpc_event_callback_fn cb)
+int upnpc_set_event_callbacks(upnpc_t * p, upnpc_event_callback_fn cb, upnpc_callback_fn subscribe_cb)
 {
 	if(!p || !cb) return UPNPC_ERR_INVALID_ARGS;
 	p->value_changed_cb = cb;
+	p->subscribe_cb = subscribe_cb;
 	return UPNPC_OK;
 }
 #endif /* ENABLE_UPNP_EVENTS */

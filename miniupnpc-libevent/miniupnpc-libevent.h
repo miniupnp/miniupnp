@@ -1,6 +1,6 @@
 /* $Id: miniupnpc-libevent.h,v 1.13 2015/07/22 13:48:37 nanard Exp $ */
 /* miniupnpc-libevent
- * Copyright (c) 2008-2015, Thomas BERNARD <miniupnp@free.fr>
+ * Copyright (c) 2008-2016, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -85,6 +85,7 @@ struct upnpc {
 #ifdef ENABLE_UPNP_EVENTS
 	struct evhttp * http_server;
 	upnpc_event_callback_fn value_changed_cb;
+	upnpc_callback_fn subscribe_cb;
 #endif /* ENABLE_UPNP_EVENTS */
 	char * local_address;
 	uint16_t local_port;
@@ -97,7 +98,8 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 int upnpc_set_local_address(upnpc_t * p, const char * address, uint16_t port);
 
 #ifdef ENABLE_UPNP_EVENTS
-int upnpc_set_event_callback(upnpc_t * p, upnpc_event_callback_fn cb);
+int upnpc_set_event_callbacks(upnpc_t * p, upnpc_event_callback_fn cb,
+                              upnpc_callback_fn subscribe_cb);
 #endif /* ENABLE_UPNP_EVENTS */
 
 int upnpc_start(upnpc_t * p);
