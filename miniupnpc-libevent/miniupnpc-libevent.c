@@ -450,6 +450,17 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 	if(d->parent->subscribe_cb)
 		d->parent->subscribe_cb(code, d->parent, d, d->parent->cb_data);
 }
+
+static void upnpc_unsubscribe_response(struct evhttp_request * req, void * pvoid)
+{
+	upnpc_device_t * d = (upnpc_device_t *)pvoid;
+
+	debug_printf("%s\n", __func__);
+	if(d->parent->http_server) {
+		evhttp_free(d->parent->http_server);
+		d->parent->http_server = NULL;
+	}
+}
 #endif /* ENABLE_UPNP_EVENTS */
 
 static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
@@ -983,6 +994,36 @@ int upnpc_event_subscribe(upnpc_device_t * p)
 	/*evhttp_add_header(headers, "NTS", "");*/
 	evhttp_add_header(headers, "Timeout", "3600");
 	/*evbuffer_add(buffer, body, body_len);*/
+	evhttp_make_request(p->soap_conn, req, EVHTTP_REQ_SUBSCRIBE, path);
+	p->state |= UPNPC_DEVICE_SOAP_REQ;
+	return 0;
+}
+
+int upnpc_event_unsubscribe(upnpc_device_t * p)
+{
+	char hostname[MAXHOSTNAMELEN+1];
+	char hostname_port[MAXHOSTNAMELEN+1+6];
+	unsigned short port;
+	char * path;
+	unsigned int scope_id;
+	struct evhttp_request * req;
+	struct evkeyvalq * headers;
+
+	if(!parseURL(p->event_conn_url, hostname, &port, &path, &scope_id)) {
+		return -1;
+	}
+	if(port != 80)
+		snprintf(hostname_port, sizeof(hostname_port), "%s:%hu", hostname, port);
+	else
+		strncpy(hostname_port, hostname, sizeof(hostname_port));
+	if(p->soap_conn == NULL) {
+		p->soap_conn = evhttp_connection_base_new(p->parent->base, NULL, hostname, port);
+	}
+	evhttp_connection_set_extended_method_cmp(p->soap_conn, ext_methods_func);
+	req = evhttp_request_new(upnpc_unsubscribe_response, p);
+	headers = evhttp_request_get_output_headers(req);
+	evhttp_add_header(headers, "Host", hostname_port);
+	evhttp_add_header(headers, "SID", p->event_conn_sid);
 	evhttp_make_request(p->soap_conn, req, EVHTTP_REQ_SUBSCRIBE, path);
 	p->state |= UPNPC_DEVICE_SOAP_REQ;
 	return 0;

@@ -108,6 +108,7 @@ int upnpc_finalize(upnpc_t * p);
 
 #ifdef ENABLE_UPNP_EVENTS
 int upnpc_event_subscribe(upnpc_device_t * p);
+int upnpc_event_unsubscribe(upnpc_device_t * p);
 #endif /* ENABLE_UPNP_EVENTS */
 
 int upnpc_get_external_ip_address(upnpc_device_t * p);

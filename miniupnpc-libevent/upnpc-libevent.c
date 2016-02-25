@@ -135,6 +135,10 @@ static void event_callback(upnpc_t * p, upnpc_device_t * d, void * data,
 {
 	(void)p; (void)d; (void)data;
 	printf("PROPERTY VALUE CHANGE (service=%s): %s=%s\n", service_id, property_name, property_value);
+	if(state == EFinished) {
+		printf("****** EFinished ******\n");
+		upnpc_event_unsubscribe(d);
+	}
 }
 
 /* subscribe callback */
