@@ -657,11 +657,51 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 #ifdef ENABLE_UPNP_EVENTS
 #define EVHTTP_REQ_NOTIFY	((EVHTTP_REQ_MAX) << 1)
 #define EVHTTP_REQ_SUBSCRIBE ((EVHTTP_REQ_NOTIFY) << 1)
+#define EVHTTP_REQ_UNSUBSCRIBE ((EVHTTP_REQ_SUBSCRIBE) << 1)
+#if 0
 static const struct evhttp_extended_method ext_methods[] = {
 	{"NOTIFY", EVHTTP_REQ_NOTIFY, EVHTTP_METHOD_HAS_BODY},
 	{"SUBSCRIBE", EVHTTP_REQ_SUBSCRIBE, EVHTTP_METHOD_HAS_BODY},
 	{NULL, 0, 0}
 };
+#endif
+int ext_methods_func(struct evhttp_extended_method * method)
+{
+	printf("**************************************************************\n");
+	printf("ext_methods_func(%p)\n", method);
+	printf(" method=%s type=%d flags=%d\n",
+	       method->method, method->type, method->flags);
+	if(method->method == NULL) {
+		switch(method->type) {
+		case EVHTTP_REQ_NOTIFY:
+			method->method = "NOTIFY";
+			method->flags |= EVHTTP_METHOD_HAS_BODY;
+			break;
+		case EVHTTP_REQ_SUBSCRIBE:
+			method->method = "SUBSCRIBE";
+			break;
+		case EVHTTP_REQ_UNSUBSCRIBE:
+			method->method = "UNSUBSCRIBE";
+			break;
+		default:
+abort();
+			return -1;	/* unknown method */
+		}
+	} else {
+		if(strcmp(method->method, "NOTIFY") == 0) {
+			method->type = EVHTTP_REQ_NOTIFY;
+			method->flags |= EVHTTP_METHOD_HAS_BODY;
+		} else if(strcmp(method->method, "SUBSCRIBE") == 0) {
+			method->type = EVHTTP_REQ_SUBSCRIBE;
+		} else if(strcmp(method->method, "UNSUBSCRIBE") == 0) {
+			method->type = EVHTTP_REQ_UNSUBSCRIBE;
+		} else {
+abort();
+			return -1;	/* unknown method */
+		}
+	}
+	return 0;
+}
 
 void upnpc_event_conn_req(struct evhttp_request * req, void * data)
 {
@@ -910,7 +950,8 @@ int upnpc_event_subscribe(upnpc_device_t * p)
 			debug_printf("evhttp_new() FAILED\n");
 			return -1;
 		}
-		evhttp_set_extended_methods(p->parent->http_server, ext_methods);
+		/*evhttp_set_extended_methods(p->parent->http_server, ext_methods);*/
+		evhttp_set_extended_method_cmp(p->parent->http_server, ext_methods_func);
 		evhttp_set_allowed_methods(p->parent->http_server, EVHTTP_REQ_NOTIFY);
 		evhttp_set_cb(p->parent->http_server, "/evt_conn", upnpc_event_conn_req, p);
 		if(evhttp_bind_socket(p->parent->http_server, p->parent->local_address, p->parent->local_port) < 0) {
@@ -929,7 +970,8 @@ int upnpc_event_subscribe(upnpc_device_t * p)
 	if(p->soap_conn == NULL) {
 		p->soap_conn = evhttp_connection_base_new(p->parent->base, NULL, hostname, port);
 	}
-	evhttp_connection_set_extended_methods(p->soap_conn, ext_methods);
+	/*evhttp_connection_set_extended_methods(p->soap_conn, ext_methods);*/
+	evhttp_connection_set_extended_method_cmp(p->soap_conn, ext_methods_func);
 	req = evhttp_request_new(upnpc_subscribe_response, p);
 	headers = evhttp_request_get_output_headers(req);
 	/*buffer = evhttp_request_get_output_buffer(req);*/
