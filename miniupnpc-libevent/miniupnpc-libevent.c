@@ -419,7 +419,7 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 {
 	size_t len;
-	unsigned char * data;
+	/*unsigned char * data;*/
 	struct evbuffer * input_buffer;
 	upnpc_device_t * d = (upnpc_device_t *)pvoid;
 	int code;
@@ -430,7 +430,7 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 	}
 	input_buffer = evhttp_request_get_input_buffer(req);
 	len = evbuffer_get_length(input_buffer);
-	data = evbuffer_pullup(input_buffer, len);
+	/*data = evbuffer_pullup(input_buffer, len);*/
 	debug_printf("%s %d (%d bytes)\n", __func__, evhttp_request_get_response_code(req), (int)len);
 	d->state &= ~UPNPC_DEVICE_SOAP_REQ;
 	code = evhttp_request_get_response_code(req);
@@ -454,6 +454,7 @@ static void upnpc_subscribe_response(struct evhttp_request * req, void * pvoid)
 static void upnpc_unsubscribe_response(struct evhttp_request * req, void * pvoid)
 {
 	upnpc_device_t * d = (upnpc_device_t *)pvoid;
+	(void)req;
 
 	debug_printf("%s\n", __func__);
 	if(d->parent->http_server) {

@@ -144,6 +144,8 @@ static void event_callback(upnpc_t * p, upnpc_device_t * d, void * data,
 /* subscribe callback */
 static void subscribe_callback(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 {
+	(void)p; (void)data;
+	printf("subscribe_callback(%d)\n", code);
 	state = EGetStatusInfo;
 	upnpc_get_status_info(d);
 }
