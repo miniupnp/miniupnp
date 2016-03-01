@@ -1,7 +1,7 @@
 $Id: Changelog.txt,v 1.45 2016/03/01 18:06:46 nanard Exp $
 
 2016/03/01:
-	Fix broken overflow test (p+l > buf+n) thanks to Salva Piero
+	Fix broken overflow test (p+l > buf+n) thanks to Salva Peiro
 
 VERSION 1.5:
 
