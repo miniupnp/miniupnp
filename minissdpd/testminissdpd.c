@@ -1,4 +1,4 @@
-/* $Id: testminissdpd.c,v 1.12 2015/08/06 13:16:59 nanard Exp $ */
+/* $Id: testminissdpd.c,v 1.14 2016/03/01 17:49:51 nanard Exp $ */
 /* Project : miniupnp
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
@@ -65,6 +65,7 @@ main(int argc, char * * argv)
 	const char bad_command[] = { 0xff, 0xff };
 	const char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	const char command5[] = { 0x05, 0x00 };
+	const char bad_command4[] = { 0x04, 0x01, 0x60, 0x8f, 0xff, 0xff, 0xff, 0x7f};
 	int s;
 	int i;
 	void * tmp;
@@ -177,6 +178,15 @@ main(int argc, char * * argv)
 	}
 
 	n = SENDCOMMAND(command5, sizeof(command5));
+	n = read(s, buf, sizeof(buf));
+	printf("Response received %d bytes\n", (int)n);
+	printresponse(buf, n);
+	if(n == 0) {
+		close(s);
+		s = connect_unix_socket(sockpath);
+	}
+
+	n = SENDCOMMAND(bad_command4, sizeof(bad_command4));
 	n = read(s, buf, sizeof(buf));
 	printf("Response received %d bytes\n", (int)n);
 	printresponse(buf, n);

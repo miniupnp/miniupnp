@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.50 2015/08/06 14:05:49 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.53 2016/03/01 18:06:46 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * (c) 2007-2016 Thomas Bernard
@@ -847,7 +847,7 @@ void processRequest(struct reqelem * req)
 	type = buf[0];
 	p = buf + 1;
 	DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-	if(p+l > buf+n) {
+	if(l > (unsigned)(buf+n-p)) {
 		syslog(LOG_WARNING, "bad request (length encoding l=%u n=%u)",
 		       l, (unsigned)n);
 		goto error;
@@ -969,7 +969,7 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 		DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-		if(p+l > buf+n) {
+		if(l > (unsigned)(buf+n-p)) {
 			syslog(LOG_WARNING, "bad request (length encoding)");
 			goto error;
 		}
@@ -987,7 +987,7 @@ void processRequest(struct reqelem * req)
 		newserv->usn[l] = '\0';
 		p += l;
 		DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-		if(p+l > buf+n) {
+		if(l > (unsigned)(buf+n-p)) {
 			syslog(LOG_WARNING, "bad request (length encoding)");
 			goto error;
 		}
@@ -1005,7 +1005,7 @@ void processRequest(struct reqelem * req)
 		newserv->server[l] = '\0';
 		p += l;
 		DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-		if(p+l > buf+n) {
+		if(l > (unsigned)(buf+n-p)) {
 			syslog(LOG_WARNING, "bad request (length encoding)");
 			goto error;
 		}
