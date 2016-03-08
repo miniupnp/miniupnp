@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.425 2016/02/20 19:11:58 nanard Exp $
+$Id: Changelog.txt,v 1.426 2016/03/08 09:23:50 nanard Exp $
+
+2016/03/08:
+  linux/netfilter: do not add MASQUERADE rule if ports are equals
 
 2016/02/19:
   set IPv6 Hop limit to 10
