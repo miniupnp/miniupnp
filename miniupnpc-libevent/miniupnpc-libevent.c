@@ -1,6 +1,6 @@
 /* $Id: miniupnpc-libevent.c,v 1.27 2015/07/22 13:51:09 nanard Exp $ */
 /* miniupnpc-libevent
- * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
+ * Copyright (c) 2008-2016, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -240,6 +240,10 @@ static void upnpc_receive_and_parse_ssdp(evutil_socket_t s, short events, upnpc_
 				debug_printf("device already known\n");
 			} else {
 				device = malloc(sizeof(upnpc_device_t));
+				if(device == NULL) {
+					debug_printf("Memory allocation error\n");
+					return;
+				}
 				memset(device, 0, sizeof(upnpc_device_t));
 				device->parent = p;
 				device->next = p->devices;
@@ -247,7 +251,9 @@ static void upnpc_receive_and_parse_ssdp(evutil_socket_t s, short events, upnpc_
 				if(upnpc_set_root_desc_location(device, location, locationsize) < 0) {
 					return;
 				}
-				upnpc_get_desc(device, device->root_desc_location);
+				if(upnpc_get_desc(device, device->root_desc_location)) {
+					debug_printf("FAILED to request device root description\n");
+				}
 			}
 #if 0
 			event_del(p->ev_ssdp_recv);	/* stop receiving SSDP responses */
@@ -523,8 +529,7 @@ static int upnpc_get_desc(upnpc_device_t * d, const char * url)
 	evhttp_add_header(headers, "Host", hostname_port);
 	evhttp_add_header(headers, "Connection", "close");
 	/*evhttp_add_header(headers, "User-Agent", "***");*/
-	evhttp_make_request(d->desc_conn, req, EVHTTP_REQ_GET, path);
-	return 0;
+	return evhttp_make_request(d->desc_conn, req, EVHTTP_REQ_GET, path);
 }
 
 static char * build_url_string(const char * urlbase, const char * root_desc_url, const char * controlurl)
