@@ -182,7 +182,7 @@ tomato_load(void)
 		current_time = time(NULL);
 		s[sizeof(s) - 1] = 0;
 		while (fgets(s, sizeof(s) - 1, f)) {
-			if (sscanf(s, "%3s %hu %31s %hu [%*[^]]] %u", proto, &eport, iaddr, &iport, &timestamp) >= 4) {
+			if (sscanf(s, "%3s %hu %31s %hu [%*[^]]] %u", proto, &eport, iaddr, &iport, &timestamp) >= 4)
 			{
 				if (((a = strchr(s, '[')) != NULL) && ((b = strrchr(a, ']')) != NULL))
 				{
