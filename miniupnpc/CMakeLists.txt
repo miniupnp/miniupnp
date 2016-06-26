@@ -76,7 +76,6 @@ set (MINIUPNPC_SOURCES
   minisoap.c
   minissdpc.c
   miniwget.c
-  upnpc.c
   upnpcommands.c
   upnpdev.c
   upnpreplyparse.c
@@ -112,21 +111,25 @@ if (NOT UPNPC_BUILD_STATIC AND NOT UPNPC_BUILD_SHARED)
 endif (NOT UPNPC_BUILD_STATIC AND NOT UPNPC_BUILD_SHARED)
 
 if (UPNPC_BUILD_STATIC)
-  add_library (upnpc-static STATIC ${MINIUPNPC_SOURCES})
-  set_target_properties (upnpc-static PROPERTIES OUTPUT_NAME "miniupnpc")
-  target_link_libraries (upnpc-static ${LDLIBS})
-  set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} upnpc-static)
-  set (UPNPC_LIBRARY_TARGET upnpc-static)
+  add_library (libminiupnpc-static STATIC ${MINIUPNPC_SOURCES})
+  set_target_properties (libminiupnpc-static PROPERTIES OUTPUT_NAME "miniupnpc")
+  target_link_libraries (libminiupnpc-static ${LDLIBS})
+  set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} libminiupnpc-static)
+  set (UPNPC_LIBRARY_TARGET libminiupnpc-static)
+  add_executable (upnpc-static upnpc.c)
+  target_link_libraries (upnpc-static PRIVATE libminiupnpc-static)
 endif (UPNPC_BUILD_STATIC)
 
 if (UPNPC_BUILD_SHARED)
-  add_library (upnpc-shared SHARED ${MINIUPNPC_SOURCES})
-  set_target_properties (upnpc-shared PROPERTIES OUTPUT_NAME "miniupnpc")
-  set_target_properties (upnpc-shared PROPERTIES VERSION ${MINIUPNPC_VERSION})
-  set_target_properties (upnpc-shared PROPERTIES SOVERSION ${MINIUPNPC_API_VERSION})
-  target_link_libraries (upnpc-shared ${LDLIBS})
-  set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} upnpc-shared)
-  set (UPNPC_LIBRARY_TARGET upnpc-shared)
+  add_library (libminiupnpc-shared SHARED ${MINIUPNPC_SOURCES})
+  set_target_properties (libminiupnpc-shared PROPERTIES OUTPUT_NAME "miniupnpc")
+  set_target_properties (libminiupnpc-shared PROPERTIES VERSION ${MINIUPNPC_VERSION})
+  set_target_properties (libminiupnpc-shared PROPERTIES SOVERSION ${MINIUPNPC_API_VERSION})
+  target_link_libraries (libminiupnpc-shared ${LDLIBS})
+  set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} libminiupnpc-shared)
+  set (UPNPC_LIBRARY_TARGET libminiupnpc-shared)
+  add_executable (upnpc-shared upnpc.c)
+  target_link_libraries (upnpc-shared PRIVATE libminiupnpc-shared)
 endif (UPNPC_BUILD_SHARED)
 
 if (UPNPC_BUILD_TESTS)
