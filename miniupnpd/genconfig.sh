@@ -234,6 +234,9 @@ case $OS_NAME in
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
+		# net.inet6.ip6.v6only has been on by default for many years
+		# and this sysctl node has been removed
+		V6SOCKETS_ARE_V6ONLY=1
 		OS_URL=http://www.dragonflybsd.org/
 		;;
 	SunOS)
