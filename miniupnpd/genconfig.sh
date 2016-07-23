@@ -233,6 +233,7 @@ case $OS_NAME in
 			FW=pf
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
+		echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
 		OS_URL=http://www.dragonflybsd.org/
 		;;
 	SunOS)
