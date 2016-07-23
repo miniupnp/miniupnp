@@ -251,7 +251,7 @@ static struct nlist list[] = {
 			abort();
 		}
 		/* no support for IPv6 */
-		if ((inp->inp_vflag & INP_IPV6) != 0)
+		if (INP_ISIPV6(inp) != 0)
 			continue;
 		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu <=> %hu %08lx:%hu",
 		       (u_long)inp->inp_laddr.s_addr, ntohs(inp->inp_lport),
