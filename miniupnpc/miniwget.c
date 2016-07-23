@@ -345,7 +345,7 @@ getHTTPResponse(int s, int * size, int * status_code)
 		}
 	}
 end_of_stream:
-	free(header_buf); header_buf = NULL;
+	free(header_buf);
 	*size = content_buf_used;
 	if(content_buf_used == 0)
 	{
@@ -519,7 +519,7 @@ parseURL(const char * url,
 	char * p1, *p2, *p3;
 	if(!url)
 		return 0;
-	p1 = strstr(url, "://");
+	p1 = (char *)strstr(url, "://");
 	if(!p1)
 		return 0;
 	p1 += 3;

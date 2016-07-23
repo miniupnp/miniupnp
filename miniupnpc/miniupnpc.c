@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.148 2016/01/24 17:24:36 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.149 2016/02/09 09:50:46 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -432,7 +432,7 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	base = (baseurl[0] == '\0') ? descURL : baseurl;
 	n = strlen(base);
 	if(n > 7) {
-		p = strchr(base + 7, '/');
+		p = (char *)strchr(base + 7, '/');
 		if(p)
 			n = p - base;
 	}
@@ -568,7 +568,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	int ndev = 0;
 	int i;
 	int state = -1; /* state 1 : IGD connected. State 2 : IGD. State 3 : anything */
-	int n_igd = 0;
+//	int n_igd = 0;
 	char extIpAddr[16];
 	char myLanAddr[40];
 	int status_code = -1;
@@ -612,7 +612,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 			           "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:"))
 			{
 				desc[i].is_igd = 1;
-				n_igd++;
+//				n_igd++;
 				if(lanaddr)
 					strncpy(lanaddr, myLanAddr, lanaddrlen);
 			}
@@ -682,9 +682,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 free_and_return:
 	if(desc) {
 		for(i = 0; i < ndev; i++) {
-			if(desc[i].xml) {
-				free(desc[i].xml);
-			}
+			free(desc[i].xml);
 		}
 		free(desc);
 	}
@@ -706,13 +704,12 @@ UPNP_GetIGDFromUrl(const char * rootdescurl,
 	int descXMLsize = 0;
 
 	descXML = miniwget_getaddr(rootdescurl, &descXMLsize,
-	                           lanaddr, lanaddrlen, 0, NULL);
+	   	                       lanaddr, lanaddrlen, 0, NULL);
 	if(descXML) {
 		memset(data, 0, sizeof(struct IGDdatas));
 		memset(urls, 0, sizeof(struct UPNPUrls));
 		parserootdesc(descXML, descXMLsize, data);
 		free(descXML);
-		descXML = NULL;
 		GetUPNPUrls(urls, data, rootdescurl, 0);
 		return 1;
 	} else {

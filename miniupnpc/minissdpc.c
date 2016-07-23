@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.28 2015/09/18 13:05:39 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.31 2016/01/19 09:56:46 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -17,7 +17,6 @@
 #include <ws2tcpip.h>
 #include <io.h>
 #include <iphlpapi.h>
-#include <winsock.h>
 #define snprintf _snprintf
 #if !defined(_MSC_VER)
 #include <stdint.h>
@@ -588,7 +587,6 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				}
 			}
 			free(pIPAddrTable);
-			pIPAddrTable = NULL;
 		}
 	}
 #endif	/* _WIN32 */
