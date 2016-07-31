@@ -1,7 +1,7 @@
 install:
-  - set PATH=%PATH%;C:\MinGW\bin
+  - set PATH=%PATH%;C:\msys64\mingw32\bin
 
 build_script:
-  - cmd: 'cd miniupnpc'
-  - cmd: 'mingw32-make -f Makefile.mingw'
-#  - cmd: 'upnpc-static.exe -l'
+  - cd miniupnpc
+  - mingw32-make -f Makefile.mingw
+#  - upnpc-static.exe -l
