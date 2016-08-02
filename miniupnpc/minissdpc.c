@@ -556,18 +556,18 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			dwRetVal = GetIpAddrTable( pIPAddrTable, &dwSize, 0 );
 			if (dwRetVal == NO_ERROR) {
 #ifdef DEBUG
-				printf("\tNum Entries: %ld\n", pIPAddrTable->dwNumEntries);
+				printf("\tNum Entries: %lu\n", pIPAddrTable->dwNumEntries);
 #endif
 				for (i=0; i < (int) pIPAddrTable->dwNumEntries; i++) {
 #ifdef DEBUG
-					printf("\n\tInterface Index[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwIndex);
+					printf("\n\tInterface Index[%d]:\t%lu\n", i, pIPAddrTable->table[i].dwIndex);
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwAddr;
 					printf("\tIP Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwMask;
 					printf("\tSubnet Mask[%d]:    \t%s\n", i, inet_ntoa(IPAddr) );
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwBCastAddr;
-					printf("\tBroadCast[%d]:      \t%s (%ld)\n", i, inet_ntoa(IPAddr), pIPAddrTable->table[i].dwBCastAddr);
-					printf("\tReassembly size[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwReasmSize);
+					printf("\tBroadCast[%d]:      \t%s (%lu)\n", i, inet_ntoa(IPAddr), pIPAddrTable->table[i].dwBCastAddr);
+					printf("\tReassembly size[%d]:\t%lu\n", i, pIPAddrTable->table[i].dwReasmSize);
 					printf("\tType and State[%d]:", i);
 					printf("\n");
 #endif

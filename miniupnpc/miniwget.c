@@ -519,7 +519,7 @@ parseURL(const char * url,
 	char * p1, *p2, *p3;
 	if(!url)
 		return 0;
-	p1 = (char *)strstr(url, "://");
+	p1 = strstr(url, "://");
 	if(!p1)
 		return 0;
 	p1 += 3;
