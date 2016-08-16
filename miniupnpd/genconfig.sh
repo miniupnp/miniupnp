@@ -233,6 +233,8 @@ case $OS_NAME in
 			FW=pf
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
+		# PFRULE_INOUT_COUNTS should be set for DragonFly > 2.8
+		# version detection is not yet added to this script.
 		echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
 		# net.inet6.ip6.v6only has been on by default for many years
 		# and this sysctl node has been removed
