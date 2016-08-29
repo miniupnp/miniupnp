@@ -131,7 +131,6 @@ int main(int argc, char * * argv)
 			}
 		}
 	}
-	//test
 	upnpc_finalize(&upnp);
 	return 0;
 }
