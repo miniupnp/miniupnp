@@ -242,7 +242,7 @@ static void NewListRedirections(struct UPNPUrls * urls,
  * 2 - get extenal ip address
  * 3 - Add port mapping
  * 4 - get this port mapping from the IGD */
-static void SetRedirectAndTest(struct UPNPUrls * urls,
+static int SetRedirectAndTest(struct UPNPUrls * urls,
 			       struct IGDdatas * data,
 			       const char * iaddr,
 			       const char * iport,
@@ -262,13 +262,13 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 	if(!iaddr || !iport || !eport || !proto)
 	{
 		fprintf(stderr, "Wrong arguments\n");
-		return;
+		return UPNPCOMMAND_INVALID_ARGS;
 	}
 	proto = protofix(proto);
 	if(!proto)
 	{
 		fprintf(stderr, "invalid protocol\n");
-		return;
+		return UPNPCOMMAND_HTTP_ERROR;
 	}
 
 	r = UPNP_GetExternalIPAddress(urls->controlURL,
@@ -310,9 +310,11 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 		printf("external %s:%s %s is redirected to internal %s:%s (duration=%s)\n",
 		       externalIPAddress, eport, proto, intClient, intPort, duration);
 	}
+
+	return r;
 }
 
-static void
+static int
 RemoveRedirect(struct UPNPUrls * urls,
                struct IGDdatas * data,
                const char * eport,
@@ -323,19 +325,21 @@ RemoveRedirect(struct UPNPUrls * urls,
 	if(!proto || !eport)
 	{
 		fprintf(stderr, "invalid arguments\n");
-		return;
+		return UPNPCOMMAND_INVALID_ARGS;
 	}
 	proto = protofix(proto);
 	if(!proto)
 	{
 		fprintf(stderr, "protocol invalid\n");
-		return;
+		return UPNPCOMMAND_HTTP_ERROR;
 	}
 	r = UPNP_DeletePortMapping(urls->controlURL, data->first.servicetype, eport, proto, remoteHost);
 	printf("UPNP_DeletePortMapping() returned : %d\n", r);
+
+	return r;
 }
 
-static void
+static int
 RemoveRedirectRange(struct UPNPUrls * urls,
 		    struct IGDdatas * data,
 		    const char * ePortStart, char const * ePortEnd,
@@ -349,16 +353,18 @@ RemoveRedirectRange(struct UPNPUrls * urls,
 	if(!proto || !ePortStart || !ePortEnd)
 	{
 		fprintf(stderr, "invalid arguments\n");
-		return;
+		return UPNPCOMMAND_INVALID_ARGS;
 	}
 	proto = protofix(proto);
 	if(!proto)
 	{
 		fprintf(stderr, "protocol invalid\n");
-		return;
+		return UPNPCOMMAND_HTTP_ERROR;
 	}
 	r = UPNP_DeletePortMappingRange(urls->controlURL, data->first.servicetype, ePortStart, ePortEnd, proto, manage);
 	printf("UPNP_DeletePortMappingRange() returned : %d\n", r);
+
+	return r;
 }
 
 /* IGD:2, functions for service WANIPv6FirewallControl:1 */
@@ -711,18 +717,18 @@ int main(int argc, char ** argv)
 				NewListRedirections(&urls, &data);
 				break;
 			case 'a':
-				SetRedirectAndTest(&urls, &data,
+				retcode = SetRedirectAndTest(&urls, &data,
 						   commandargv[0], commandargv[1],
 						   commandargv[2], commandargv[3],
 						   (commandargc > 4)?commandargv[4]:"0",
 						   description, 0);
 				break;
 			case 'd':
-				RemoveRedirect(&urls, &data, commandargv[0], commandargv[1],
+				retcode = RemoveRedirect(&urls, &data, commandargv[0], commandargv[1],
 				               commandargc > 2 ? commandargv[2] : NULL);
 				break;
 			case 'n':	/* aNy */
-				SetRedirectAndTest(&urls, &data,
+				retcode = SetRedirectAndTest(&urls, &data,
 						   commandargv[0], commandargv[1],
 						   commandargv[2], commandargv[3],
 						   (commandargc > 4)?commandargv[4]:"0",
@@ -732,7 +738,7 @@ int main(int argc, char ** argv)
 				if (commandargc < 3)
 					fprintf(stderr, "too few arguments\n");
 
-				RemoveRedirectRange(&urls, &data, commandargv[0], commandargv[1], commandargv[2],
+				retcode = RemoveRedirectRange(&urls, &data, commandargv[0], commandargv[1], commandargv[2],
 						    commandargc > 3 ? commandargv[3] : NULL);
 				break;
 			case 's':
@@ -740,6 +746,7 @@ int main(int argc, char ** argv)
 				break;
 			case 'r':
 				i = 0;
+				int ret;
 				while(i<commandargc)
 				{
 					if(!is_int(commandargv[i])) {
@@ -749,17 +756,19 @@ int main(int argc, char ** argv)
 						break;
 					} else if(is_int(commandargv[i+1])){
 						/* 2nd parameter is an integer : <port> <external_port> <protocol> */
-						SetRedirectAndTest(&urls, &data,
+						ret = SetRedirectAndTest(&urls, &data,
 								   lanaddr, commandargv[i],
 								   commandargv[i+1], commandargv[i+2], "0",
 								   description, 0);
+						retcode = (retcode == 0 ? ret : retcode); // keep first error
 						i+=3;	/* 3 parameters parsed */
 					} else {
 						/* 2nd parameter not an integer : <port> <protocol> */
-						SetRedirectAndTest(&urls, &data,
+						ret = SetRedirectAndTest(&urls, &data,
 								   lanaddr, commandargv[i],
 								   commandargv[i], commandargv[i+1], "0",
 								   description, 0);
+						retcode = (retcode == 0 ? ret : retcode); // keep first error
 						i+=2;	/* 2 parameters parsed */
 					}
 				}
