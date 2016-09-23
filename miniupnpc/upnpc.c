@@ -314,7 +314,7 @@ static int SetRedirectAndTest(struct UPNPUrls * urls,
 	return 0;
 }
 
-static void
+static int
 RemoveRedirect(struct UPNPUrls * urls,
                struct IGDdatas * data,
                const char * eport,
@@ -325,19 +325,25 @@ RemoveRedirect(struct UPNPUrls * urls,
 	if(!proto || !eport)
 	{
 		fprintf(stderr, "invalid arguments\n");
-		return;
+		return -1;
 	}
 	proto = protofix(proto);
 	if(!proto)
 	{
 		fprintf(stderr, "protocol invalid\n");
-		return;
+		return -1;
 	}
 	r = UPNP_DeletePortMapping(urls->controlURL, data->first.servicetype, eport, proto, remoteHost);
-	printf("UPNP_DeletePortMapping() returned : %d\n", r);
+	if(r!=UPNPCOMMAND_SUCCESS) {
+		printf("UPNP_DeletePortMapping() failed with code : %d\n", r);
+		return -2;
+	}else {
+		printf("UPNP_DeletePortMapping() returned : %d\n", r);
+	}
+	return 0;
 }
 
-static void
+static int
 RemoveRedirectRange(struct UPNPUrls * urls,
 		    struct IGDdatas * data,
 		    const char * ePortStart, char const * ePortEnd,
@@ -351,16 +357,22 @@ RemoveRedirectRange(struct UPNPUrls * urls,
 	if(!proto || !ePortStart || !ePortEnd)
 	{
 		fprintf(stderr, "invalid arguments\n");
-		return;
+		return -1;
 	}
 	proto = protofix(proto);
 	if(!proto)
 	{
 		fprintf(stderr, "protocol invalid\n");
-		return;
+		return -1;
 	}
 	r = UPNP_DeletePortMappingRange(urls->controlURL, data->first.servicetype, ePortStart, ePortEnd, proto, manage);
-	printf("UPNP_DeletePortMappingRange() returned : %d\n", r);
+	if(r!=UPNPCOMMAND_SUCCESS) {
+		printf("UPNP_DeletePortMappingRange() failed with code : %d\n", r);
+		return -2;
+	}else {
+		printf("UPNP_DeletePortMappingRange() returned : %d\n", r);
+	}
+	return 0;
 }
 
 /* IGD:2, functions for service WANIPv6FirewallControl:1 */
@@ -721,8 +733,9 @@ int main(int argc, char ** argv)
 					retcode = 2;
 				break;
 			case 'd':
-				RemoveRedirect(&urls, &data, commandargv[0], commandargv[1],
-				               commandargc > 2 ? commandargv[2] : NULL);
+				if (RemoveRedirect(&urls, &data, commandargv[0], commandargv[1],
+				               commandargc > 2 ? commandargv[2] : NULL) < 0)
+					retcode = 2;
 				break;
 			case 'n':	/* aNy */
 				if (SetRedirectAndTest(&urls, &data,
@@ -736,8 +749,9 @@ int main(int argc, char ** argv)
 				if (commandargc < 3)
 					fprintf(stderr, "too few arguments\n");
 
-				RemoveRedirectRange(&urls, &data, commandargv[0], commandargv[1], commandargv[2],
-						    commandargc > 3 ? commandargv[3] : NULL);
+				if (RemoveRedirectRange(&urls, &data, commandargv[0], commandargv[1], commandargv[2],
+						    commandargc > 3 ? commandargv[3] : NULL) < 0)
+					retcode = 2;
 				break;
 			case 's':
 				GetConnectionStatus(&urls, &data);
