@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.133 2016/01/24 17:24:35 nanard Exp $
+# $Id: Makefile,v 1.134 2016/10/07 09:04:36 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2015 Thomas Bernard
+# (c) 2005-2016 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
