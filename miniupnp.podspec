@@ -5,7 +5,7 @@ Pod::Spec.new do |spec|
   spec.authors = "The MiniUPnP Authors"
   spec.license = { type: "BSD", file: "miniupnpc/LICENSE" }
 
-  spec.version = "2.0.0.1"
+  spec.version = "2.0.0.2"
   spec.source = {
       git: 'https://github.com/cpp-ethereum-ios/miniupnp.git',
       tag: "v#{spec.version}"
@@ -42,7 +42,7 @@ Pod::Spec.new do |spec|
     create_universal_library() {
       lipo -create -output libminiupnpc.dylib \
         build-ios/{armv7,arm64,i386,x86_64}/usr/lib/libminiupnpc.dylib
-      install_name_tool -id "$(pwd)/libminiupnpc.dylib" libminiupnpc.dylib
+      install_name_tool -id "@rpath/libminiupnpc.dylib" libminiupnpc.dylib
     }
 
     cd miniupnpc
