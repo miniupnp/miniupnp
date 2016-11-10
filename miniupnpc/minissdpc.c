@@ -73,6 +73,9 @@ struct sockaddr_un {
 
 #if !defined(HAS_IP_MREQN) && !defined(_WIN32)
 #include <sys/ioctl.h>
+#if defined(__sun)
+#include <sys/sockio.h>
+#endif
 #endif
 
 #if defined(HAS_IP_MREQN) && defined(NEED_STRUCT_IP_MREQN)

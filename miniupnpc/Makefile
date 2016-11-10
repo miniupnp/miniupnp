@@ -43,8 +43,10 @@ CFLAGS += -D_NETBSD_SOURCE
 endif
 ifneq ($(OS), FreeBSD)
 ifneq ($(OS), Darwin)
+ifneq ($(OS), SunOS)
 #CFLAGS += -D_POSIX_C_SOURCE=200112L
 CFLAGS += -D_XOPEN_SOURCE=600
+endif
 endif
 endif
 #CFLAGS += -ansi
