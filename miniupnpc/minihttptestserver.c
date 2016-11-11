@@ -611,7 +611,7 @@ int main(int argc, char * * argv) {
 			if(pid < 0) {
 				perror("wait");
 			} else {
-				printf("child(%d) terminated with status %d\n", pid, status);
+				printf("child(%d) terminated with status %d\n", (int)pid, status);
 			}
 			--child_to_wait_for;
 		}
@@ -648,7 +648,7 @@ int main(int argc, char * * argv) {
 			if(pid < 0) {
 				perror("wait");
 			} else {
-				printf("child(%d) terminated with status %d\n", pid, status);
+				printf("child(%d) terminated with status %d\n", (int)pid, status);
 			}
 			--child_to_wait_for;
 		}
