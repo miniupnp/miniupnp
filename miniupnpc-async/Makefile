@@ -18,8 +18,13 @@ CFLAGS += -Wall -W
 CFLAGS += -D_BSD_SOURCE
 CFLAGS += -DUPNPC_USE_SELECT
 INSTALL = install
+
+OS = $(shell uname -s)
 #following libs are needed on Solaris
-#LDLIBS=-lsocket -lnsl -lresolv
+ifeq ($(OS), SunOS)
+  LDLIBS += -lsocket -lnsl -lresolv
+  CFLAGS += -D__EXTENSIONS__
+endif
 
 # APIVERSION is used to build SONAME
 APIVERSION = 0
