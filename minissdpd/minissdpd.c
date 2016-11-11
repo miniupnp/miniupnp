@@ -33,6 +33,11 @@
 #include <grp.h>
 #endif
 
+/* LOG_PERROR does not exist on Solaris */
+#ifndef LOG_PERROR
+#define LOG_PERROR 0
+#endif /* LOG_PERROR */
+
 #include "getifaddr.h"
 #include "upnputils.h"
 #include "openssdpsocket.h"
