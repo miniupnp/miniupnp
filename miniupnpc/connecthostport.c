@@ -100,13 +100,13 @@ int connecthostport(const char * host, unsigned short port,
 	timeout.tv_usec = 0;
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
 	{
-		PRINT_SOCKET_ERROR("setsockopt");
+		PRINT_SOCKET_ERROR("setsockopt SO_RCVTIMEO");
 	}
 	timeout.tv_sec = 3;
 	timeout.tv_usec = 0;
 	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
 	{
-		PRINT_SOCKET_ERROR("setsockopt");
+		PRINT_SOCKET_ERROR("setsockopt SO_SNDTIMEO");
 	}
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 	dest.sin_family = AF_INET;

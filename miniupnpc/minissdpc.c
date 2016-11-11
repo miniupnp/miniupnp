@@ -189,13 +189,13 @@ connectToMiniSSDPD(const char * socketpath)
 	timeout.tv_usec = 0;
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
 	{
-		perror("setsockopt");
+		perror("setsockopt SO_RCVTIMEO unix");
 	}
 	timeout.tv_sec = 3;
 	timeout.tv_usec = 0;
 	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
 	{
-		perror("setsockopt");
+		perror("setsockopt SO_SNDTIMEO unix");
 	}
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 	if(!socketpath)
@@ -631,7 +631,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			unsigned int ifindex = if_nametoindex(multicastif); /* eth0, etc. */
 			if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex, sizeof(ifindex)) < 0)
 			{
-				PRINT_SOCKET_ERROR("setsockopt");
+				PRINT_SOCKET_ERROR("setsockopt IPV6_MULTICAST_IF");
 			}
 #else
 #ifdef DEBUG
@@ -646,7 +646,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = mc_if.s_addr;
 				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0)
 				{
-					PRINT_SOCKET_ERROR("setsockopt");
+					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
 			} else {
 #ifdef HAS_IP_MREQN
@@ -656,7 +656,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				reqn.imr_ifindex = if_nametoindex(multicastif);
 				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&reqn, sizeof(reqn)) < 0)
 				{
-					PRINT_SOCKET_ERROR("setsockopt");
+					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
 #elif !defined(_WIN32)
 				struct ifreq ifr;
@@ -670,7 +670,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				mc_if.s_addr = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr;
 				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0)
 				{
-					PRINT_SOCKET_ERROR("setsockopt");
+					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
 #else /* _WIN32 */
 #ifdef DEBUG
