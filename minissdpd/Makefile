@@ -29,6 +29,12 @@ endif
 ifeq ($(DEB_BUILD_ARCH_OS), kfreebsd)
 	LDLIBS += -lfreebsd-glue
 endif
+ifeq ($(OS), SunOS)
+	CFLAGS += -D_XOPEN_SOURCE
+	CFLAGS += -D_XOPEN_SOURCE_EXTENDED=1
+	CFLAGS += -D__EXTENSIONS__
+	LDFLAGS += -lsocket -lnsl -lresolv
+endif
 
 #EXECUTABLES = minissdpd testminissdpd listifaces
 EXECUTABLES = minissdpd testminissdpd testcodelength \
