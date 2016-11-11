@@ -87,7 +87,9 @@ LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           connecthostport.o portlistingparse.o receivedata.o upnpdev.o
 
 ifneq ($(OS), AmigaOS)
+ifeq (,$(findstring CYGWIN,$(OS)))
 CFLAGS := -fPIC $(CFLAGS)
+endif
 LIBOBJS := $(LIBOBJS) minissdpc.o
 endif
 
