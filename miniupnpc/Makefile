@@ -43,10 +43,8 @@ CFLAGS += -D_NETBSD_SOURCE
 endif
 ifneq ($(OS), FreeBSD)
 ifneq ($(OS), Darwin)
-ifneq ($(OS), SunOS)
 #CFLAGS += -D_POSIX_C_SOURCE=200112L
 CFLAGS += -D_XOPEN_SOURCE=600
-endif
 endif
 endif
 #CFLAGS += -ansi
@@ -68,6 +66,8 @@ JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/
 
 ifeq (SunOS, $(OS))
   LDFLAGS=-lsocket -lnsl -lresolv
+  CFLAGS += -D__EXTENSIONS__
+  CFLAGS += -std=c99
 endif
 
 # APIVERSION is used to build SONAME
