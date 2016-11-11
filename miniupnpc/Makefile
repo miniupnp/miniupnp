@@ -70,6 +70,10 @@ ifeq (SunOS, $(OS))
   LDFLAGS=-lsocket -lnsl -lresolv
 endif
 
+# Flags that need to be passed to the linker so things "just work"
+CFLAGS_LD = -fopenmp -fsanitize=undefined -fsanitize=address -fsanitize=thread -fsanitize=memory
+LDFLAGS += $(strip $(filter $(CFLAGS_LD),$(CFLAGS)))
+
 # APIVERSION is used to build SONAME
 APIVERSION = 16
 
