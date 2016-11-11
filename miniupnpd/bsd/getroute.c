@@ -42,8 +42,8 @@ get_src_for_route_to(const struct sockaddr * dst,
 
 	if(dst == NULL)
 		return -1;
-	if(dst->sa_len > 0) {
-		l = dst->sa_len;
+	if(SA_LEN(dst) > 0) {
+		l = SA_LEN(dst);
 	} else {
 		if(dst->sa_family == AF_INET)
 			l = sizeof(struct sockaddr_in);
@@ -66,7 +66,9 @@ get_src_for_route_to(const struct sockaddr * dst,
 	rtm.rtm_seq = 1;
 	rtm.rtm_addrs = RTA_DST | RTA_IFA | RTA_IFP;	/* pass destination address, request source address & interface */
 	memcpy(m_rtmsg.m_space, dst, l);
+#if !defined(__sun)
 	((struct sockaddr *)m_rtmsg.m_space)->sa_len = l;
+#endif
 	rtm.rtm_msglen = sizeof(struct rt_msghdr) + l;
 	if(write(s, &m_rtmsg, rtm.rtm_msglen) < 0) {
 		syslog(LOG_ERR, "write: %m");
@@ -101,7 +103,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 				sa = (struct sockaddr *)p;
 				sockaddr_to_string(sa, tmp, sizeof(tmp));
 				syslog(LOG_DEBUG, "type=%d sa_len=%d sa_family=%d %s",
-				       i, sa->sa_len, sa->sa_family, tmp);
+				       i, SA_LEN(sa), sa->sa_family, tmp);
 				if(i == RTA_IFA) {
 					size_t len = 0;
 					void * paddr = NULL;
