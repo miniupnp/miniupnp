@@ -29,6 +29,7 @@ close unix socket connection.
            2 - USN (unique id)
            3 - everything
            4 - submit service (see below)
+           5 - switch connection to notification mode
 n bytes : string length : 1 byte if < 128 else the upper bit indicate that
 one additional byte should be read, etc. (see codelength.h)
 n bytes = string
@@ -39,8 +40,9 @@ request type 0 (version) :
 n bytes string length
 n bytes = version string
 
-request type 1 / 2 / 3 :
-1st byte : number of services/devices
+request type 1 / 2 / 3 / 5 :
+1st byte : number of services/devices, from 0 to 254.
+           255 is a special value, see below
 For each service/device :
 URL :
   n bytes string length
@@ -51,6 +53,12 @@ ST:
 USN:
   n bytes string length
   n bytes = identifier string
+
+if the 1st byte is 255, the format is as follows :
+1st byte = 255
+2nd byte = notification type (1=NEW, 2=UPDATE, 3=REMOVE)
+3rd byte = number of services/devices, from 0 to 255.
+
 
 request type 4 = submit service
 1st byte  = 4

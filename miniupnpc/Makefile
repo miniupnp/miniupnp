@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.126 2015/08/28 12:14:18 nanard Exp $
+# $Id: Makefile,v 1.134 2016/10/07 09:04:36 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2015 Thomas Bernard
+# (c) 2005-2016 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -15,6 +15,7 @@ VERSION = $(shell cat VERSION)
 
 ifeq ($(OS), Darwin)
 JARSUFFIX=mac
+LIBTOOL ?= $(shell which libtool)
 endif
 ifeq ($(OS), Linux)
 JARSUFFIX=linux
@@ -37,9 +38,14 @@ CFLAGS += -DMINIUPNPC_SET_SOCKET_TIMEOUT
 CFLAGS += -DMINIUPNPC_GET_SRC_ADDR
 CFLAGS += -D_BSD_SOURCE
 CFLAGS += -D_DEFAULT_SOURCE
+ifeq ($(OS), NetBSD)
+CFLAGS += -D_NETBSD_SOURCE
+endif
 ifneq ($(OS), FreeBSD)
+ifneq ($(OS), Darwin)
 #CFLAGS += -D_POSIX_C_SOURCE=200112L
 CFLAGS += -D_XOPEN_SOURCE=600
+endif
 endif
 #CFLAGS += -ansi
 # -DNO_GETADDRINFO
@@ -60,10 +66,12 @@ JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/
 
 ifeq (SunOS, $(OS))
   LDFLAGS=-lsocket -lnsl -lresolv
+  CFLAGS += -D__EXTENSIONS__
+  CFLAGS += -std=c99
 endif
 
 # APIVERSION is used to build SONAME
-APIVERSION = 14
+APIVERSION = 16
 
 SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnpc.c upnpcommands.c upnpreplyparse.c testminixml.c \
@@ -79,7 +87,9 @@ LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           connecthostport.o portlistingparse.o receivedata.o upnpdev.o
 
 ifneq ($(OS), AmigaOS)
+ifeq (,$(findstring CYGWIN,$(OS)))
 CFLAGS := -fPIC $(CFLAGS)
+endif
 LIBOBJS := $(LIBOBJS) minissdpc.o
 endif
 
@@ -89,6 +99,7 @@ OBJS = $(patsubst %.c,%.o,$(SRCS))
 HEADERS = miniupnpc.h miniwget.h upnpcommands.h igd_desc_parse.h \
           upnpreplyparse.h upnperrors.h miniupnpctypes.h \
           portlistingparse.h \
+          upnpdev.h \
           miniupnpc_declspec.h
 
 # library names
@@ -132,7 +143,11 @@ endif
 
 LIBDIR ?= lib
 # install directories
-INSTALLPREFIX ?= $(PREFIX)/usr
+ifeq ($(strip $(PREFIX)),)
+INSTALLPREFIX ?= /usr
+else
+INSTALLPREFIX ?= $(PREFIX)
+endif
 INSTALLDIRINC = $(INSTALLPREFIX)/include/miniupnpc
 INSTALLDIRLIB = $(INSTALLPREFIX)/$(LIBDIR)
 INSTALLDIRBIN = $(INSTALLPREFIX)/bin
@@ -258,7 +273,11 @@ depend:
 	makedepend -Y -- $(CFLAGS) -- $(SRCS) 2>/dev/null
 
 $(LIBRARY):	$(LIBOBJS)
+ifeq ($(OS), Darwin)
+	$(LIBTOOL) -static -o $@ $?
+else
 	$(AR) crs $@ $?
+endif
 
 $(SHAREDLIBRARY):	$(LIBOBJS)
 ifeq ($(OS), Darwin)
@@ -269,13 +288,12 @@ else
 endif
 
 upnpc-static:	upnpc.o $(LIBRARY)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^ $(LOADLIBES) $(LDLIBS)
 
 upnpc-shared:	upnpc.o $(SHAREDLIBRARY)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^ $(LOADLIBES) $(LDLIBS)
 
-listdevices:	listdevices.o $(LIBRARY) $(LDLIBS)
-	$(CC) $(LDFLAGS) -o $@ $^
+listdevices:	listdevices.o $(LIBRARY)
 
 testminixml:	$(TESTMINIXMLOBJS)
 
@@ -351,8 +369,8 @@ upnpreplyparse.o: upnpreplyparse.h minixml.h
 testminixml.o: minixml.h igd_desc_parse.h
 minixmlvalid.o: minixml.h
 testupnpreplyparse.o: upnpreplyparse.h
-minissdpc.o: minissdpc.h miniupnpc_declspec.h upnpdev.h codelength.h
-minissdpc.o: receivedata.h
+minissdpc.o: minissdpc.h miniupnpc_declspec.h upnpdev.h miniupnpc.h
+minissdpc.o: igd_desc_parse.h receivedata.h codelength.h
 upnperrors.o: upnperrors.h miniupnpc_declspec.h upnpcommands.h
 upnperrors.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
 upnperrors.o: miniupnpc.h igd_desc_parse.h upnpdev.h

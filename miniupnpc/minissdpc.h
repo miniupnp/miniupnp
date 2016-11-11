@@ -1,4 +1,4 @@
-/* $Id: minissdpc.h,v 1.4 2015/07/23 20:40:08 nanard Exp $ */
+/* $Id: minissdpc.h,v 1.6 2015/09/18 12:45:16 nanard Exp $ */
 /* Project: miniupnp
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author: Thomas Bernard
@@ -23,6 +23,8 @@
 extern "C" {
 #endif
 
+#if !(defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__))
+
 MINIUPNP_LIBSPEC struct UPNPDev *
 getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath, int * error);
 
@@ -38,10 +40,12 @@ requestDevicesFromMiniSSDPD(int fd, const char * devtype);
 MINIUPNP_LIBSPEC struct UPNPDev *
 receiveDevicesFromMiniSSDPD(int fd, int * error);
 
+#endif /* !(defined(_WIN32) || defined(__amigaos__) || defined(__amigaos4__)) */
+
 MINIUPNP_LIBSPEC struct UPNPDev *
 ssdpDiscoverDevices(const char * const deviceTypes[],
                     int delay, const char * multicastif,
-                    int sameport,
+                    int localport,
                     int ipv6, unsigned char ttl,
                     int * error,
                     int searchalltypes);

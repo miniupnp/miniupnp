@@ -1,6 +1,7 @@
-/* $Id: minissdpd.c,v 1.50 2015/08/06 14:05:49 nanard Exp $ */
-/* MiniUPnP project
- * (c) 2007-2015 Thomas Bernard
+/* $Id: minissdpd.c,v 1.53 2016/03/01 18:06:46 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
+ * (c) 2007-2016 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -32,6 +33,11 @@
 #include <grp.h>
 #endif
 
+/* LOG_PERROR does not exist on Solaris */
+#ifndef LOG_PERROR
+#define LOG_PERROR 0
+#endif /* LOG_PERROR */
+
 #include "getifaddr.h"
 #include "upnputils.h"
 #include "openssdpsocket.h"
@@ -46,6 +52,7 @@
 /* current request management stucture */
 struct reqelem {
 	int socket;
+	int is_notify;	/* has subscribed to notifications */
 	LIST_ENTRY(reqelem) entries;
 	unsigned char * output_buffer;
 	int output_buffer_offset;
@@ -69,9 +76,29 @@ struct device {
 	char data[];
 };
 
+/* Services stored for answering to M-SEARCH */
+struct service {
+	char * st;	/* Service type */
+	char * usn;	/* Unique identifier */
+	char * server;	/* Server string */
+	char * location;	/* URL */
+	LIST_ENTRY(service) entries;
+};
+LIST_HEAD(servicehead, service) servicelisthead;
+
 #define NTS_SSDP_ALIVE	1
 #define NTS_SSDP_BYEBYE	2
 #define NTS_SSDP_UPDATE	3
+
+/* request types */
+enum request_type {
+	MINISSDPD_GET_VERSION = 0,
+	MINISSDPD_SEARCH_TYPE = 1,
+	MINISSDPD_SEARCH_USN = 2,
+	MINISSDPD_SEARCH_ALL = 3,
+	MINISSDPD_SUBMIT = 4,
+	MINISSDPD_NOTIF = 5
+};
 
 /* discovered device list kept in memory */
 struct device * devlist = 0;
@@ -83,6 +110,16 @@ unsigned int upnp_configid = 1337;
 /* LAN interfaces/addresses */
 struct lan_addr_list lan_addrs;
 
+/* connected clients */
+LIST_HEAD(reqstructhead, reqelem) reqlisthead;
+
+/* functions prototypes */
+
+#define NOTIF_NEW    1
+#define NOTIF_UPDATE 2
+#define NOTIF_REMOVE 3
+static void
+sendNotifications(int notif_type, const struct device * dev, const struct service * serv);
 
 /* functions */
 
@@ -286,6 +323,7 @@ updateDevice(const struct header * headers, time_t t)
 			}
 			memcpy(p->data + p->headers[0].l + p->headers[1].l,
 			       headers[2].p, headers[2].l);
+			/* TODO : check p->headers[HEADER_LOCATION].l */
 			return 0;
 		}
 		pp = &p->next;
@@ -314,6 +352,7 @@ updateDevice(const struct header * headers, time_t t)
 			pc += headers[i].l;
 		}
 		devlist = p;
+		sendNotifications(NOTIF_NEW, p, NULL);
 	}
 	return 1;
 }
@@ -336,6 +375,7 @@ removeDevice(const struct header * headers)
 		  && (0==memcmp(p->headers[HEADER_USN].p, headers[HEADER_USN].p, headers[HEADER_USN].l)) )
 		{
 			syslog(LOG_INFO, "remove device : %.*s", headers[HEADER_USN].l, headers[HEADER_USN].p);
+			sendNotifications(NOTIF_REMOVE, p, NULL);
 			*pp = p->next;
 			free(p);
 			return -1;
@@ -345,6 +385,68 @@ removeDevice(const struct header * headers)
 	}
 	syslog(LOG_WARNING, "device not found for removing : %.*s", headers[HEADER_USN].l, headers[HEADER_USN].p);
 	return 0;
+}
+
+/* sent notifications to client having subscribed */
+static void
+sendNotifications(int notif_type, const struct device * dev, const struct service * serv)
+{
+	struct reqelem * req;
+	unsigned int m;
+	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
+	unsigned char * rp;
+
+	for(req = reqlisthead.lh_first; req; req = req->entries.le_next) {
+		if(!req->is_notify) continue;
+		rbuf[0] = '\xff'; /* special code for notifications */
+		rbuf[1] = (unsigned char)notif_type;
+		rbuf[2] = 0;
+		rp = rbuf + 3;
+		if(dev) {
+			/* response :
+			 * 1 - Location
+			 * 2 - NT (device/service type)
+			 * 3 - usn */
+			m = dev->headers[HEADER_LOCATION].l;
+			CODELENGTH(m, rp);
+			memcpy(rp, dev->headers[HEADER_LOCATION].p, dev->headers[HEADER_LOCATION].l);
+			rp += dev->headers[HEADER_LOCATION].l;
+			m = dev->headers[HEADER_NT].l;
+			CODELENGTH(m, rp);
+			memcpy(rp, dev->headers[HEADER_NT].p, dev->headers[HEADER_NT].l);
+			rp += dev->headers[HEADER_NT].l;
+			m = dev->headers[HEADER_USN].l;
+			CODELENGTH(m, rp);
+			memcpy(rp, dev->headers[HEADER_USN].p, dev->headers[HEADER_USN].l);
+			rp += dev->headers[HEADER_USN].l;
+			rbuf[2]++;
+		}
+		if(serv) {
+			/* response :
+			 * 1 - Location
+			 * 2 - NT (device/service type)
+			 * 3 - usn */
+			m = strlen(serv->location);
+			CODELENGTH(m, rp);
+			memcpy(rp, serv->location, m);
+			rp += m;
+			m = strlen(serv->st);
+			CODELENGTH(m, rp);
+			memcpy(rp, serv->st, m);
+			rp += m;
+			m = strlen(serv->usn);
+			CODELENGTH(m, rp);
+			memcpy(rp, serv->usn, m);
+			rp += m;
+			rbuf[2]++;
+		}
+		if(rbuf[2] > 0) {
+			if(write_or_buffer(req, rbuf, rp - rbuf) < 0) {
+				syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
+				/*goto error;*/
+			}
+		}
+	}
 }
 
 /* SendSSDPMSEARCHResponse() :
@@ -393,16 +495,6 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 		syslog(LOG_ERR, "%s: sendto(udp): %m", __func__);
 	}
 }
-
-/* Services stored for answering to M-SEARCH */
-struct service {
-	char * st;	/* Service type */
-	char * usn;	/* Unique identifier */
-	char * server;	/* Server string */
-	char * location;	/* URL */
-	LIST_ENTRY(service) entries;
-};
-LIST_HEAD(servicehead, service) servicelisthead;
 
 /* Process M-SEARCH requests */
 static void
@@ -672,7 +764,12 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 		processMSEARCH(s, st, st_len, addr);
 		break;
 	default:
-		syslog(LOG_WARNING, "method %.*s, don't know what to do", methodlen, p);
+		{
+			char addr_str[64];
+			sockaddr_to_string(addr, addr_str, sizeof(addr_str));
+			syslog(LOG_WARNING, "method %.*s, don't know what to do (from %s)",
+			       methodlen, p, addr_str);
+		}
 	}
 	return r;
 }
@@ -731,7 +828,7 @@ void processRequest(struct reqelem * req)
 	unsigned int l, m;
 	unsigned char buf[2048];
 	const unsigned char * p;
-	int type;
+	enum request_type type;
 	struct device * d = devlist;
 	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
 	unsigned char * rp;
@@ -755,19 +852,20 @@ void processRequest(struct reqelem * req)
 	type = buf[0];
 	p = buf + 1;
 	DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-	if(p+l > buf+n) {
+	if(l > (unsigned)(buf+n-p)) {
 		syslog(LOG_WARNING, "bad request (length encoding l=%u n=%u)",
 		       l, (unsigned)n);
 		goto error;
 	}
-	if(l == 0 && type != 3 && type != 0) {
-		syslog(LOG_WARNING, "bad request (length=0)");
+	if(l == 0 && type != MINISSDPD_SEARCH_ALL
+	   && type != MINISSDPD_GET_VERSION && type != MINISSDPD_NOTIF) {
+		syslog(LOG_WARNING, "bad request (length=0, type=%d)", type);
 		goto error;
 	}
 	syslog(LOG_INFO, "(s=%d) request type=%d str='%.*s'",
 	       req->socket, type, l, p);
 	switch(type) {
-	case 0:	/* version */
+	case MINISSDPD_GET_VERSION:
 		rp = rbuf;
 		CODELENGTH((sizeof(MINISSDPD_VERSION) - 1), rp);
 		memcpy(rp, MINISSDPD_VERSION, sizeof(MINISSDPD_VERSION) - 1);
@@ -777,9 +875,9 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 		break;
-	case 1:	/* request by type */
-	case 2:	/* request by USN (unique id) */
-	case 3:	/* everything */
+	case MINISSDPD_SEARCH_TYPE:	/* request by type */
+	case MINISSDPD_SEARCH_USN:	/* request by USN (unique id) */
+	case MINISSDPD_SEARCH_ALL:	/* everything */
 		rp = rbuf+1;
 		while(d && (nrep < 255)) {
 			if(d->t < t) {
@@ -790,9 +888,9 @@ void processRequest(struct reqelem * req)
 				  + d->headers[HEADER_USN].l + 6
 				  + (rp - rbuf) >= (int)sizeof(rbuf))
 					break;
-				if( (type==1 && 0==memcmp(d->headers[HEADER_NT].p, p, l))
-				  ||(type==2 && 0==memcmp(d->headers[HEADER_USN].p, p, l))
-				  ||(type==3) ) {
+				if( (type==MINISSDPD_SEARCH_TYPE && 0==memcmp(d->headers[HEADER_NT].p, p, l))
+				  ||(type==MINISSDPD_SEARCH_USN && 0==memcmp(d->headers[HEADER_USN].p, p, l))
+				  ||(type==MINISSDPD_SEARCH_ALL) ) {
 					/* response :
 					 * 1 - Location
 					 * 2 - NT (device/service type)
@@ -822,9 +920,9 @@ void processRequest(struct reqelem * req)
 			if(strlen(serv->location) + strlen(serv->st)
 			  + strlen(serv->usn) + 6 + (rp - rbuf) >= sizeof(rbuf))
 			  	break;
-			if( (type==1 && 0==strncmp(serv->st, (const char *)p, l))
-			  ||(type==2 && 0==strncmp(serv->usn, (const char *)p, l))
-			  ||(type==3) ) {
+			if( (type==MINISSDPD_SEARCH_TYPE && 0==strncmp(serv->st, (const char *)p, l))
+			  ||(type==MINISSDPD_SEARCH_USN && 0==strncmp(serv->usn, (const char *)p, l))
+			  ||(type==MINISSDPD_SEARCH_ALL) ) {
 				/* response :
 				 * 1 - Location
 				 * 2 - NT (device/service type)
@@ -852,7 +950,7 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 		break;
-	case 4:	/* submit service */
+	case MINISSDPD_SUBMIT:	/* submit service */
 		newserv = malloc(sizeof(struct service));
 		if(!newserv) {
 			syslog(LOG_ERR, "cannot allocate memory");
@@ -876,7 +974,7 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 		DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-		if(p+l > buf+n) {
+		if(l > (unsigned)(buf+n-p)) {
 			syslog(LOG_WARNING, "bad request (length encoding)");
 			goto error;
 		}
@@ -894,7 +992,7 @@ void processRequest(struct reqelem * req)
 		newserv->usn[l] = '\0';
 		p += l;
 		DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-		if(p+l > buf+n) {
+		if(l > (unsigned)(buf+n-p)) {
 			syslog(LOG_WARNING, "bad request (length encoding)");
 			goto error;
 		}
@@ -912,7 +1010,7 @@ void processRequest(struct reqelem * req)
 		newserv->server[l] = '\0';
 		p += l;
 		DECODELENGTH_CHECKLIMIT(l, p, buf + n);
-		if(p+l > buf+n) {
+		if(l > (unsigned)(buf+n-p)) {
 			syslog(LOG_WARNING, "bad request (length encoding)");
 			goto error;
 		}
@@ -948,7 +1046,16 @@ void processRequest(struct reqelem * req)
 		}
 		/* Inserting new service */
 		LIST_INSERT_HEAD(&servicelisthead, newserv, entries);
+		sendNotifications(NOTIF_NEW, NULL, newserv);
 		newserv = NULL;
+		break;
+	case MINISSDPD_NOTIF:	/* switch socket to notify */
+		rbuf[0] = '\0';
+		if(write_or_buffer(req, rbuf, 1) < 0) {
+			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
+			goto error;
+		}
+		req->is_notify = 1;
 		break;
 	default:
 		syslog(LOG_WARNING, "Unknown request type %d", type);
@@ -1061,7 +1168,6 @@ int main(int argc, char * * argv)
 #endif	/* ENABLE_IPV6 */
 	int s_unix = -1;	/* unix socket communicating with clients */
 	int s_ifacewatch = -1;	/* socket to receive Route / network interface config changes */
-	LIST_HEAD(reqstructhead, reqelem) reqlisthead;
 	struct reqelem * req;
 	struct reqelem * reqnext;
 	fd_set readfds;
@@ -1135,7 +1241,7 @@ int main(int argc, char * * argv)
 		        "[-6] "
 #endif /* ENABLE_IPV6 */
 		        "[-s socket] [-p pidfile] [-t TTL] "
-		        "-f device "
+		        "[-f device] "
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
@@ -1160,6 +1266,8 @@ int main(int argc, char * * argv)
 		syslog(LOG_ERR, "MiniSSDPd is already running. EXITING");
 		return 1;
 	}
+
+	upnp_bootid = (unsigned int)time(NULL);
 
 	/* set signal handlers */
 	memset(&sa, 0, sizeof(struct sigaction));

@@ -17,7 +17,7 @@ CFLAGS += -Wall
 CFLAGS += -W -Wstrict-prototypes
 CFLAGS += -fno-strict-aliasing -fno-common
 CFLAGS += -D_GNU_SOURCE
-CFLAGS += -ansi
+#CFLAGS += -ansi
 CC ?= gcc
 RM = rm -f
 INSTALL = install
@@ -29,14 +29,24 @@ endif
 ifeq ($(DEB_BUILD_ARCH_OS), kfreebsd)
 	LDLIBS += -lfreebsd-glue
 endif
+ifeq ($(OS), SunOS)
+	CFLAGS += -D_XOPEN_SOURCE
+	CFLAGS += -D_XOPEN_SOURCE_EXTENDED=1
+	CFLAGS += -D__EXTENSIONS__
+	LDFLAGS += -lsocket -lnsl -lresolv
+endif
 
 #EXECUTABLES = minissdpd testminissdpd listifaces
-EXECUTABLES = minissdpd testminissdpd testcodelength
+EXECUTABLES = minissdpd testminissdpd testcodelength \
+              showminissdpdnotif
 MINISSDPDOBJS = minissdpd.o openssdpsocket.o daemonize.o upnputils.o \
                 ifacewatch.o getroute.o getifaddr.o asyncsendto.o
-TESTMINISSDPDOBJS = testminissdpd.o
+TESTMINISSDPDOBJS = testminissdpd.o printresponse.o
+SHOWMINISSDPDNOTIFOBJS = showminissdpdnotif.o printresponse.o
 
-ALLOBJS = $(MINISSDPDOBJS) $(TESTMINISSDPDOBJS) testcodelength.o
+ALLOBJS = $(MINISSDPDOBJS) $(TESTMINISSDPDOBJS) \
+          $(SHOWMINISSDPDNOTIFOBJS) \
+          testcodelength.o
 
 INSTALLPREFIX ?= $(PREFIX)/usr
 SBININSTALLDIR = $(INSTALLPREFIX)/sbin
@@ -76,6 +86,8 @@ minissdpd: $(MINISSDPDOBJS)
 
 testminissdpd:	$(TESTMINISSDPDOBJS)
 
+showminissdpdnotif:	$(SHOWMINISSDPDNOTIFOBJS)
+
 testcodelength:	testcodelength.o
 
 listifaces:	listifaces.o upnputils.o
@@ -96,4 +108,8 @@ ifacewatch.o: config.h openssdpsocket.h minissdpdtypes.h upnputils.h
 getroute.o: getroute.h upnputils.h
 getifaddr.o: config.h getifaddr.h
 asyncsendto.o: asyncsendto.h upnputils.h
+testminissdpd.o: codelength.h printresponse.h
+printresponse.o: codelength.h
+showminissdpdnotif.o: codelength.h printresponse.h
+printresponse.o: codelength.h
 testcodelength.o: codelength.h

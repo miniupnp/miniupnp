@@ -1,5 +1,32 @@
-$Id: Changelog.txt,v 1.214 2015/08/28 12:14:17 nanard Exp $
+$Id: Changelog.txt,v 1.223 2016/04/19 21:06:20 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.0 : released 2016/04/19
+
+2016/01/24:
+  change miniwget to return HTTP status code
+  increments API_VERSION to 16
+
+2016/01/22:
+  Improve UPNPIGD_IsConnected() to check if WAN address is not private.
+  parse HTTP response status line in miniwget.c
+
+2015/10/26:
+  snprintf() overflow check. check overflow in simpleUPnPcommand2()
+
+2015/10/25:
+  fix compilation with old macs
+  fix compilation with mingw32 (for Appveyor)
+  fix python module for python <= 2.3
+
+2015/10/08:
+  Change sameport to localport
+    see https://github.com/miniupnp/miniupnp/pull/120
+  increments API_VERSION to 15
+
+2015/09/15:
+  Fix buffer overflow in igd_desc_parse.c/IGDstartelt()
+    Discovered by Aleksandar Nikolic of Cisco Talos
 
 2015/08/28:
   move ssdpDiscoverDevices() to minissdpc.c

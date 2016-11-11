@@ -1,7 +1,7 @@
 /* $Id: minissdp.c,v 1.77 2015/08/26 07:36:52 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -34,14 +34,6 @@
 #define LL_SSDP_MCAST_ADDR "FF02::C"
 #define SL_SSDP_MCAST_ADDR "FF05::C"
 #define GL_SSDP_MCAST_ADDR "FF0E::C"
-
-/* maximum lenght of SSDP packets we are generating
- * (reception is done in a 1500byte buffer) */
-#ifdef ENABLE_HTTPS
-#define SSDP_PACKET_MAX_LEN 768
-#else
-#define SSDP_PACKET_MAX_LEN 512
-#endif
 
 /* AddMulticastMembership()
  * param s			socket
@@ -304,6 +296,9 @@ OpenAndConfSSDPNotifySocketIPv6(unsigned int if_index)
 {
 	int s;
 	unsigned int loop = 0;
+	/* UDA 2.0 : The hop limit of each IP packet for a Site-Local scope
+	 * multicast message SHALL be configurable and SHOULD default to 10 */
+	int hop_limit = 10;
 	struct sockaddr_in6 sockname;
 
 	s = socket(PF_INET6, SOCK_DGRAM, 0);
@@ -321,6 +316,12 @@ OpenAndConfSSDPNotifySocketIPv6(unsigned int if_index)
 	if(setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &loop, sizeof(loop)) < 0)
 	{
 		syslog(LOG_ERR, "setsockopt(udp_notify, IPV6_MULTICAST_LOOP): %m");
+		close(s);
+		return -1;
+	}
+	if(setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hop_limit, sizeof(hop_limit)) < 0)
+	{
+		syslog(LOG_ERR, "setsockopt(udp_notify, IPV6_MULTICAST_HOPS): %m");
 		close(s);
 		return -1;
 	}
@@ -518,14 +519,6 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 	}
 }
 
-#ifndef IGD_V2
-#define IGD_VER 1
-#define WANIPC_VER 1
-#else
-#define IGD_VER 2
-#define WANIPC_VER 2
-#endif
-
 static struct {
 	const char * s;
 	const int version;
@@ -533,23 +526,32 @@ static struct {
 } const known_service_types[] =
 {
 	{"upnp:rootdevice", 0, uuidvalue_igd},
-	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", IGD_VER, uuidvalue_igd},
+#ifdef IGD_V2
+	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", 2, uuidvalue_igd},
+	{"urn:schemas-upnp-org:device:WANConnectionDevice:", 2, uuidvalue_wcd},
+	{"urn:schemas-upnp-org:device:WANDevice:", 2, uuidvalue_wan},
+	{"urn:schemas-upnp-org:service:WANIPConnection:", 2, uuidvalue_wcd},
+	{"urn:schemas-upnp-org:service:DeviceProtection:", 1, uuidvalue_igd},
+#ifdef ENABLE_6FC_SERVICE
+	{"urn:schemas-upnp-org:service:WANIPv6FirewallControl:", 1, uuidvalue_wcd},
+#endif
+#else /* IGD_V2 */
+	/* IGD v1 */
+	{"urn:schemas-upnp-org:device:InternetGatewayDevice:", 1, uuidvalue_igd},
 	{"urn:schemas-upnp-org:device:WANConnectionDevice:", 1, uuidvalue_wcd},
 	{"urn:schemas-upnp-org:device:WANDevice:", 1, uuidvalue_wan},
+	{"urn:schemas-upnp-org:service:WANIPConnection:", 1, uuidvalue_wcd},
+#endif /* IGD_V2 */
 	{"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:", 1, uuidvalue_wan},
-	{"urn:schemas-upnp-org:service:WANIPConnection:", WANIPC_VER, uuidvalue_wcd},
-#ifndef UPNP_STRICT
+#ifdef ADVERTISE_WANPPPCONN
 	/* We use WAN IP Connection, not PPP connection,
 	 * but buggy control points may try to use WanPPPConnection
 	 * anyway */
 	{"urn:schemas-upnp-org:service:WANPPPConnection:", 1, uuidvalue_wcd},
-#endif
+#endif /* ADVERTISE_WANPPPCONN */
 #ifdef ENABLE_L3F_SERVICE
 	{"urn:schemas-upnp-org:service:Layer3Forwarding:", 1, uuidvalue_igd},
-#endif
-#ifdef ENABLE_6FC_SERVICE
-	{"url:schemas-upnp-org:service:WANIPv6FirewallControl:", 1, uuidvalue_wcd},
-#endif
+#endif /* ENABLE_L3F_SERVICE */
 /* we might want to support urn:schemas-wifialliance-org:device:WFADevice:1
  * urn:schemas-wifialliance-org:device:WFADevice:1
  * in the future */
@@ -654,10 +656,14 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 {
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sockname;
+	/* UDA 1.1 AnnexA and UDA 2.0 only allow/define the use of
+	 * Link-Local and Site-Local multicast scopes */
 	static struct { const char * p1, * p2; } const mcast_addrs[] =
 		{ { LL_SSDP_MCAST_ADDR, "[" LL_SSDP_MCAST_ADDR "]" },	/* Link Local */
 		  { SL_SSDP_MCAST_ADDR, "[" SL_SSDP_MCAST_ADDR "]" },	/* Site Local */
+#ifndef UPNP_STRICT
 		  { GL_SSDP_MCAST_ADDR, "[" GL_SSDP_MCAST_ADDR "]" },	/* Global */
+#endif /* ! UPNP_STRICT */
 		  { NULL, NULL } };
 	int j;
 #else /* ENABLE_IPV6 */

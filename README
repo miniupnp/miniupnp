@@ -5,6 +5,7 @@ Web site : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 Github : https://github.com/miniupnp/miniupnp/
 Freecode : http://freecode.com/projects/miniupnp
 Travis CI : https://travis-ci.org/miniupnp/miniupnp
+Appveyor : https://ci.appveyor.com/project/miniupnp/miniupnp
 
 miniupnpc/ : MiniUPnP client - an UPnP IGD control point
 miniupnpd/ : MiniUPnP daemon - an implementation of a UPnP IGD
@@ -56,3 +57,5 @@ Thanks to :
     * Tomofumi Hayashi
     * Konstantin Tokarev
     * Mike Tzou
+    * Nevo Hed
+    * Salva Peiró

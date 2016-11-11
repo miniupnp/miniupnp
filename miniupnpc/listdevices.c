@@ -81,18 +81,18 @@ int main(int argc, char * * argv)
 		printf("searching UPnP device type %s\n", searched_device);
 		devlist = upnpDiscoverDevice(searched_device,
 		                             2000, multicastif, minissdpdpath,
-		                             0/*sameport*/, ipv6, ttl, &error);
+		                             0/*localport*/, ipv6, ttl, &error);
 	} else if(searched_devices) {
 		printf("searching UPnP device types :\n");
 		for(i = 0; searched_devices[i]; i++)
 			printf("\t%s\n", searched_devices[i]);
 		devlist = upnpDiscoverDevices(searched_devices,
 		                              2000, multicastif, minissdpdpath,
-		                              0/*sameport*/, ipv6, ttl, &error, 1);
+		                              0/*localport*/, ipv6, ttl, &error, 1);
 	} else {
 		printf("searching all UPnP devices\n");
 		devlist = upnpDiscoverAll(2000, multicastif, minissdpdpath,
-		                             0/*sameport*/, ipv6, ttl, &error);
+		                             0/*localport*/, ipv6, ttl, &error);
 	}
 	if(devlist) {
 		for(dev = devlist, i = 1; dev != NULL; dev = dev->pNext, i++) {

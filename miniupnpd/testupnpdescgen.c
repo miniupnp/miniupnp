@@ -1,7 +1,7 @@
 /* $Id: testupnpdescgen.c,v 1.32 2014/03/10 11:04:52 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * (c) 2006-2016 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -37,6 +37,7 @@ char model_url[] = ROOTDEV_MODELURL;
 #ifdef RANDOMIZE_URLS
 char random_url[] = "RANDOM";
 #endif /* RANDOMIZE_URLS */
+unsigned int upnp_configid = 666;
 
 char * use_ext_ip_addr = NULL;
 const char * ext_if_name = "eth0";

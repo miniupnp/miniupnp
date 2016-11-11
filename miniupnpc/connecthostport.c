@@ -1,7 +1,7 @@
-/* $Id: connecthostport.c,v 1.13 2014/03/31 12:36:36 nanard Exp $ */
+/* $Id: connecthostport.c,v 1.15 2015/10/09 16:26:19 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2010-2014 Thomas Bernard
+ * Copyright (c) 2010-2015 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -23,6 +23,10 @@
 #define socklen_t int
 #else /* #ifdef _WIN32 */
 #include <unistd.h>
+#include <sys/types.h>
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+#include <sys/time.h>
+#endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 #include <sys/param.h>
 #include <sys/select.h>
 #include <errno.h>
@@ -33,7 +37,6 @@
  * during the connect() call */
 #define MINIUPNPC_IGNORE_EINTR
 #ifndef USE_GETHOSTBYNAME
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #endif /* #ifndef USE_GETHOSTBYNAME */
@@ -97,13 +100,13 @@ int connecthostport(const char * host, unsigned short port,
 	timeout.tv_usec = 0;
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
 	{
-		PRINT_SOCKET_ERROR("setsockopt");
+		PRINT_SOCKET_ERROR("setsockopt SO_RCVTIMEO");
 	}
 	timeout.tv_sec = 3;
 	timeout.tv_usec = 0;
 	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
 	{
-		PRINT_SOCKET_ERROR("setsockopt");
+		PRINT_SOCKET_ERROR("setsockopt SO_SNDTIMEO");
 	}
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 	dest.sin_family = AF_INET;
@@ -113,7 +116,7 @@ int connecthostport(const char * host, unsigned short port,
 	/* EINTR The system call was interrupted by a signal that was caught
 	 * EINPROGRESS The socket is nonblocking and the connection cannot
 	 *             be completed immediately. */
-	while(n < 0 && (errno == EINTR || errno = EINPROGRESS))
+	while(n < 0 && (errno == EINTR || errno == EINPROGRESS))
 	{
 		socklen_t len;
 		fd_set wset;

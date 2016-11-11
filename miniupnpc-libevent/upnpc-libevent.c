@@ -131,6 +131,7 @@ static void soap(int code, upnpc_t * p, upnpc_device_t * d, void * data)
 static void event_callback(upnpc_t * p, upnpc_device_t * d, void * data,
                            const char * service_id, const char * property_name, const char * property_value)
 {
+	(void)p; (void)d; (void)data;
 	printf("PROPERTY VALUE CHANGE (service=%s): %s=%s\n", service_id, property_name, property_value);
 }
 #endif /* ENABLE_UPNP_EVENTS */

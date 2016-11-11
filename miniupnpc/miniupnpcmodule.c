@@ -42,6 +42,7 @@ typedef struct {
 	struct UPNPUrls urls;
 	struct IGDdatas data;
 	unsigned int discoverdelay;	/* value passed to upnpDiscover() */
+	unsigned int localport;		/* value passed to upnpDiscover() */
 	char lanaddr[40];	/* our ip address on the LAN */
 	char * multicastif;
 	char * minissdpdsocket;
@@ -53,6 +54,15 @@ static PyMemberDef UPnP_members[] = {
 	},
 	{"discoverdelay", T_UINT, offsetof(UPnPObject, discoverdelay),
 	 0/*READWRITE*/, "value in ms used to wait for SSDP responses"
+	},
+	{"localport", T_UINT, offsetof(UPnPObject, localport),
+	 0/*READWRITE*/,
+	    "If localport is set to UPNP_LOCAL_PORT_SAME(1) "
+	    "SSDP packets will be sent from the source port "
+	    "1900 (same as destination port), if set to "
+	    "UPNP_LOCAL_PORT_ANY(0) system assign a source "
+	    "port, any other value will be attempted as the "
+	    "source port"
 	},
 	/* T_STRING is allways readonly :( */
 	{"multicastif", T_STRING, offsetof(UPnPObject, multicastif),
@@ -70,15 +80,22 @@ static int UPnP_init(UPnPObject *self, PyObject *args, PyObject *kwds)
 	char* multicastif = NULL;
 	char* minissdpdsocket = NULL;
 	static char *kwlist[] = {
-		"multicastif", "minissdpdsocket", "discoverdelay", NULL
+		"multicastif", "minissdpdsocket", "discoverdelay",
+		"localport", NULL
 	};
 
-	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|zzI", kwlist, 
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|zzII", kwlist,
 					&multicastif,
 					&minissdpdsocket,
-					&self->discoverdelay))
-		return -1; 
+					&self->discoverdelay,
+					&self->localport))
+		return -1;
 
+	if(self->localport>1 &&
+	   (self->localport>65534||self->localport<1024)) {
+	    PyErr_SetString(PyExc_Exception, "Invalid localport value");
+	    return -1;
+	}
 	if(multicastif)
 		self->multicastif = strdup(multicastif);
 	if(minissdpdsocket)
@@ -112,7 +129,7 @@ UPnP_discover(UPnPObject *self)
 	self->devlist = upnpDiscover((int)self->discoverdelay/*timeout in ms*/,
 	                             self->multicastif,
 	                             self->minissdpdsocket,
-	                             0/*sameport flag*/,
+	                             (int)self->localport,
 	                             0/*ip v6*/,
 	                             2/* TTL */,
 	                             0/*error */);
@@ -152,7 +169,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalBytesSent(self->urls.controlURL_CIF,
 	                           self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -163,7 +184,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalBytesReceived(self->urls.controlURL_CIF,
 		                           self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -174,7 +199,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalPacketsSent(self->urls.controlURL_CIF,
 		                         self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -185,7 +214,11 @@ Py_BEGIN_ALLOW_THREADS
 	i = UPNP_GetTotalPacketsReceived(self->urls.controlURL_CIF,
 		                          self->data.CIF.servicetype);
 Py_END_ALLOW_THREADS
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 	return Py_BuildValue("I", i);
+#else
+	return Py_BuildValue("i", (int)i);
+#endif
 }
 
 static PyObject *
@@ -202,7 +235,11 @@ Py_BEGIN_ALLOW_THREADS
 	                   status, &uptime, lastconnerror);
 Py_END_ALLOW_THREADS
 	if(r==UPNPCOMMAND_SUCCESS) {
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 		return Py_BuildValue("(s,I,s)", status, uptime, lastconnerror);
+#else
+		return Py_BuildValue("(s,i,s)", status, (int)uptime, lastconnerror);
+#endif
 	} else {
 		/* TODO: have our own exception type ! */
 		PyErr_SetString(PyExc_Exception, strupnperror(r));
@@ -395,7 +432,11 @@ Py_BEGIN_ALLOW_THREADS
 									   &n);
 Py_END_ALLOW_THREADS
 	if(r==UPNPCOMMAND_SUCCESS) {
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 		return Py_BuildValue("I", n);
+#else
+		return Py_BuildValue("i", (int)n);
+#endif
 	} else {
 		/* TODO: have our own exception type ! */
 		PyErr_SetString(PyExc_Exception, strupnperror(r));
@@ -480,9 +521,15 @@ Py_END_ALLOW_THREADS
 		ePort = (unsigned short)atoi(extPort);
 		iPort = (unsigned short)atoi(intPort);
 		dur = (unsigned int)strtoul(duration, 0, 0);
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
 		return Py_BuildValue("(H,s,(s,H),s,s,s,I)",
 		                     ePort, protocol, intClient, iPort,
 		                     desc, enabled, rHost, dur);
+#else
+		return Py_BuildValue("(i,s,(s,i),s,s,s,i)",
+		                     (int)ePort, protocol, intClient, (int)iPort,
+		                     desc, enabled, rHost, (int)dur);
+#endif
 	}
 	else
 	{
