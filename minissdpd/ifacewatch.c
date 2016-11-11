@@ -39,7 +39,7 @@ extern struct lan_addr_list lan_addrs;
 #else
 #define SALIGN (sizeof(int32_t) - 1)
 #endif
-#define SA_RLEN(sa) ((sa)->sa_len ? (((sa)->sa_len + SALIGN) & ~SALIGN) : (SALIGN + 1))
+#define SA_RLEN(sa) (SA_LEN(sa) ? ((SA_LEN(sa) + SALIGN) & ~SALIGN) : (SALIGN + 1))
 #endif
 
 int
