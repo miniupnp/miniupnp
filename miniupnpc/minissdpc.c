@@ -172,7 +172,7 @@ connectToMiniSSDPD(const char * socketpath)
 {
 	int s;
 	struct sockaddr_un addr;
-#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+#if defined(MINIUPNPC_SET_SOCKET_TIMEOUT) && !defined(__sun)
 	struct timeval timeout;
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 
@@ -183,8 +183,9 @@ connectToMiniSSDPD(const char * socketpath)
 		perror("socket(unix)");
 		return MINISSDPC_SOCKET_ERROR;
 	}
-#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+#if defined(MINIUPNPC_SET_SOCKET_TIMEOUT) && !defined(__sun)
 	/* setting a 3 seconds timeout */
+	/* not supported for AF_UNIX sockets under Solaris */
 	timeout.tv_sec = 3;
 	timeout.tv_usec = 0;
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
