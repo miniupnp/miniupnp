@@ -134,16 +134,12 @@ upnp_add_inboundpinhole(const char * raddr,
 	timestamp = current + leasetime;
 	r = 0;
 
-#if 0
-	if(r == 1 && strcmp(iaddr, iaddr_old)==0 && iport==iport_old)
-	{
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with protocol %s already done. Updating it.", raddr, rport, iaddr_old, iport_old, protocol);
-		t = upnp_update_inboundpinhole(idfound, leaseTime);
-		*uid = atoi(idfound);
-		return t;
+	*uid = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
+	if(*uid >= 0) {
+		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with protocol %s found uid=%d. Updating it.", raddr, rport, iaddr, iport, protocol, *uid);
+		r = upnp_update_inboundpinhole(*uid, timestamp);
+		return (r >= 0) ? 1 : r;
 	}
-	else
-#endif
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	*uid = add_pinhole (0/*ext_if_name*/, raddr, rport,
 	                    iaddr, iport, proto, desc, timestamp);
