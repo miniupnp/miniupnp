@@ -136,7 +136,7 @@ upnp_add_inboundpinhole(const char * raddr,
 
 	*uid = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
 	if(*uid >= 0) {
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with protocol %s found uid=%d. Updating it.", raddr, rport, iaddr, iport, protocol, *uid);
+		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, *uid);
 		r = upnp_update_inboundpinhole(*uid, timestamp);
 		return (r >= 0) ? 1 : r;
 	}
