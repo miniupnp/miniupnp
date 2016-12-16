@@ -2004,7 +2004,9 @@ main(int argc, char * * argv)
 #endif
 
 #if defined(ENABLE_IPV6) && defined(ENABLE_PCP)
-	spcp_v6 = OpenAndConfPCPv6Socket();
+	if(!GETFLAG(IPV6DISABLEDMASK)) {
+		spcp_v6 = OpenAndConfPCPv6Socket();
+	}
 #endif
 
 	/* for miniupnpdctl */
