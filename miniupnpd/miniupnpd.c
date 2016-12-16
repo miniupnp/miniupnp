@@ -322,6 +322,7 @@ OpenAndConfHTTPSocket(unsigned short * port)
 		syslog(LOG_WARNING, "socket(PF_INET6, ...) failed with EAFNOSUPPORT, disabling IPv6");
 		SETFLAG(IPV6DISABLEDMASK);
 		ipv6 = 0;
+		/* Try again with IPv4 */
 		s = socket(PF_INET, SOCK_STREAM, 0);
 	}
 #endif
@@ -1927,16 +1928,18 @@ main(int argc, char * * argv)
 #endif /* V6SOCKETS_ARE_V6ONLY */
 #endif /* ENABLE_HTTPS */
 #ifdef ENABLE_IPV6
-		if(find_ipv6_addr(lan_addrs.lh_first ? lan_addrs.lh_first->ifname : NULL,
-		                  ipv6_addr_for_http_with_brackets, sizeof(ipv6_addr_for_http_with_brackets)) > 0) {
-			syslog(LOG_NOTICE, "HTTP IPv6 address given to control points : %s",
-			       ipv6_addr_for_http_with_brackets);
-		} else {
-			memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
-			syslog(LOG_WARNING, "no HTTP IPv6 address, disabling IPv6");
-			SETFLAG(IPV6DISABLEDMASK);
+		if(!GETFLAG(IPV6DISABLEDMASK)) {
+			if(find_ipv6_addr(lan_addrs.lh_first ? lan_addrs.lh_first->ifname : NULL,
+			                  ipv6_addr_for_http_with_brackets, sizeof(ipv6_addr_for_http_with_brackets)) > 0) {
+				syslog(LOG_NOTICE, "HTTP IPv6 address given to control points : %s",
+				       ipv6_addr_for_http_with_brackets);
+			} else {
+				memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
+				syslog(LOG_WARNING, "no HTTP IPv6 address, disabling IPv6");
+				SETFLAG(IPV6DISABLEDMASK);
+			}
 		}
-#endif
+#endif	/* ENABLE_IPV6 */
 
 		/* open socket for SSDP connections */
 		sudp = OpenAndConfSSDPReceiveSocket(0);
