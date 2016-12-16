@@ -1,7 +1,7 @@
 /* $Id: minihttptestserver.c,v 1.19 2015/11/17 09:07:17 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
- * Copyright (c) 2011-2015 Thomas Bernard
+ * Copyright (c) 2011-2016 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
