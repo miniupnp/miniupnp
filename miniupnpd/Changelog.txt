@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.428 2016/04/19 21:10:36 nanard Exp $
+$Id: Changelog.txt,v 1.430 2016/12/16 09:14:40 nanard Exp $
+
+2016/12/16:
+  Do not try to open IPv6 sockets once it is disabled
 
 2016/12/01:
   Fix "AddPinhole Twice" test
