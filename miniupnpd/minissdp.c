@@ -889,7 +889,26 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				mx_value = atoi(mx);
 				syslog(LOG_DEBUG, "MX: %.*s (value=%d)", mx_len, mx, mx_value);
 			}
-#endif
+#endif /* defined(UPNP_STRICT) || defined(DELAY_MSEARCH_RESPONSE) */
+#if defined(UPNP_STRICT)
+			/* Fix UDA-1.2.10 Man header empty or invalid */
+			else if((i < n - 4) && (strncasecmp(bufr+i, "man:", 3) == 0))
+			{
+				const char * man;
+				int man_len;
+				man = bufr+i+4;
+				man_len = 0;
+				while((*man == ' ' || *man == '\t') && (man < bufr + n))
+					man++;
+				while(man[man_len]!='\r' && man[man_len]!='\n'
+				     && (man + man_len < bufr + n))
+					man_len++;
+				if(strncmp(man, "\"ssdp:discover\"", 15) != 0) {
+					syslog(LOG_INFO, "ignoring SSDP packet MAN empty or invalid header");
+					return;
+				}
+			}
+#endif /* defined(UPNP_STRICT) */
 		}
 #ifdef UPNP_STRICT
 		/* For multicast M-SEARCH requests, if the search request does
