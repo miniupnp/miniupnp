@@ -1855,9 +1855,11 @@ main(int argc, char * * argv)
 
 	if(
 #ifdef ENABLE_NATPMP
-        !GETFLAG(ENABLENATPMPMASK) &&
+	   !GETFLAG(ENABLENATPMPMASK) && !GETFLAG(ENABLEUPNPMASK)
+#else
+	   !GETFLAG(ENABLEUPNPMASK)
 #endif
-        !GETFLAG(ENABLEUPNPMASK) ) {
+	   ) {
 		syslog(LOG_ERR, "Why did you run me anyway?");
 		return 0;
 	}
