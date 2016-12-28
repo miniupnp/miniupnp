@@ -1821,7 +1821,7 @@ main(int argc, char * * argv)
 #ifdef ENABLE_UPNPPINHOLE
 	unsigned int next_pinhole_ts;
 #endif
-
+	int test_mask_enabled;
 	if(init(argc, argv, &v) != 0)
 		return 1;
 #ifdef ENABLE_HTTPS
@@ -1853,11 +1853,11 @@ main(int argc, char * * argv)
 	LIST_INIT(&ctllisthead);
 #endif
 
-	if(
+	test_mask_enabled = !GETFLAG(ENABLEUPNPMASK);	
 #ifdef ENABLE_NATPMP
-        !GETFLAG(ENABLENATPMPMASK) &&
+	test_mask_enabled = test_mask_enabled && !GETFLAG(ENABLENATPMPMASK);
 #endif
-        !GETFLAG(ENABLEUPNPMASK) ) {
+	if(test_mask_enabled) {
 		syslog(LOG_ERR, "Why did you run me anyway?");
 		return 0;
 	}
