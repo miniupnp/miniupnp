@@ -65,7 +65,7 @@ JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
 JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12
 
 ifeq (SunOS, $(OS))
-  LDFLAGS=-lsocket -lnsl -lresolv
+  LDLIBS=-lsocket -lnsl -lresolv
   CFLAGS += -D__EXTENSIONS__
   CFLAGS += -std=c99
 endif
