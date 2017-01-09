@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2016 Thomas Bernard
+ * copyright (c) 2005-2017 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 /*#include <syslog.h>*/
@@ -201,6 +201,7 @@ connectToMiniSSDPD(const char * socketpath)
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
 	if(!socketpath)
 		socketpath = "/var/run/minissdpd.sock";
+	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, socketpath, sizeof(addr.sun_path));
 	/* TODO : check if we need to handle the EINTR */
