@@ -1,7 +1,7 @@
 /* $Id: getroute.c,v 1.12 2015/11/19 11:46:30 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * (c) 2006-2017 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -20,8 +20,9 @@
 #include "../config.h"
 #include "../upnputils.h"
 
+/* SA_SIZE() is a multiple of sizeof(long) with a minimum value of sizeof(long) */
 #ifndef SA_SIZE
-#define SA_SIZE(sa) (SA_LEN(sa))
+#define SA_SIZE(sa) (((SA_LEN(sa)) == 0) ? sizeof(long) : (1 + (((SA_LEN(sa)) - 1) | (sizeof(long) - 1))))
 #endif /* SA_SIZE */
 
 int
@@ -135,14 +136,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 						*index = sdl->sdl_index;
 				}
 #endif
-				/* at least 4 bytes per address are reserved,
-				 * that is true with OpenBSD 4.3.
-				 * The test is only useful when SA_SIZE() is not properly
-				 * defined, as it should be always >= sizeof(long) */
-				if(SA_SIZE(sa) > 0)
-					p += SA_SIZE(sa);
-				else
-					p += sizeof(long);
+				p += SA_SIZE(sa);
 			}
 		}
 	}
