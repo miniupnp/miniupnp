@@ -102,7 +102,8 @@ get_src_for_route_to(const struct sockaddr * dst,
 				}
 				sa = (struct sockaddr *)p;
 				sockaddr_to_string(sa, tmp, sizeof(tmp));
-				syslog(LOG_DEBUG, "type=%d sa_len=%d sa_family=%d %s",
+				syslog(LOG_DEBUG, "offset=%3d type=%2d sa_len=%d sa_family=%d %s",
+				       (int)(p - m_rtmsg.m_space),
 				       i, SA_LEN(sa), sa->sa_family, tmp);
 				if(i == RTA_IFA) {
 					size_t len = 0;
