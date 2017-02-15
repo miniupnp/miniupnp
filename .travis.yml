@@ -32,6 +32,9 @@ compiler:
   - gcc
   - clang
 
+before_install:
+  - 'if [ "$TRAVIS_OS_NAME" = "osx" ] && [ "$CC" == "gcc" ] ; then CC=gcc-4.9; fi'
+
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
   - 'MAKEFILE=Makefile && if [ -f Makefile.linux -a "$TRAVIS_OS_NAME" = "linux" ]; then MAKEFILE=Makefile.linux; elif [ -f Makefile.macosx -a "$TRAVIS_OS_NAME" = "osx" ]; then MAKEFILE=Makefile.macosx; fi'
