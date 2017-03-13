@@ -503,6 +503,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	unsigned long _ttl = (unsigned long)ttl;
 #endif
 	int linklocal = 1;
+	int sentok;
 
 	if(error)
 		*error = MINISSDPC_UNKNOWN_ERROR;
@@ -613,14 +614,22 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		return NULL;
 	}
 
+	if(ipv6) {
+		int mcastHops = ttl;
+		if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mcastHops, sizeof(mcastHops)) < 0)
+		{
+			PRINT_SOCKET_ERROR("setsockopt(IPV6_MULTICAST_HOPS,...)");
+		}
+	} else {
 #ifdef _WIN32
-	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, (const char *)&_ttl, sizeof(_ttl)) < 0)
+		if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, (const char *)&_ttl, sizeof(_ttl)) < 0)
 #else  /* _WIN32 */
-	if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
+		if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
 #endif /* _WIN32 */
-	{
-		/* not a fatal error */
-		PRINT_SOCKET_ERROR("setsockopt(IP_MULTICAST_TTL,...)");
+		{
+			/* not a fatal error */
+			PRINT_SOCKET_ERROR("setsockopt(IP_MULTICAST_TTL,...)");
+		}
 	}
 
 	if(multicastif)
@@ -705,6 +714,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	}
 	/* receiving SSDP response packet */
 	for(deviceIndex = 0; deviceTypes[deviceIndex]; deviceIndex++) {
+		sentok = 0;
 		/* sending the SSDP M-SEARCH packet */
 		n = snprintf(bufr, sizeof(bufr),
 		             MSearchMsgFmt,
@@ -748,7 +758,8 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			if(error)
 				*error = MINISSDPC_SOCKET_ERROR;
 			PRINT_SOCKET_ERROR("sendto");
-			break;
+		} else {
+			sentok = 1;
 		}
 #else /* #ifdef NO_GETADDRINFO */
 		memset(&hints, 0, sizeof(hints));
@@ -780,19 +791,20 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif
 				PRINT_SOCKET_ERROR("sendto");
 				continue;
+			} else {
+				sentok = 1;
 			}
 		}
 		freeaddrinfo(servinfo);
-		if(n < 0) {
+		if(!sentok) {
 			if(error)
 				*error = MINISSDPC_SOCKET_ERROR;
-			break;
 		}
 #endif /* #ifdef NO_GETADDRINFO */
 		/* Waiting for SSDP REPLY packet to M-SEARCH
 		 * if searchalltypes is set, enter the loop only
 		 * when the last deviceType is reached */
-		if(!searchalltypes || !deviceTypes[deviceIndex + 1]) do {
+		if((sentok && !searchalltypes) || !deviceTypes[deviceIndex + 1]) do {
 			n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
 			if (n < 0) {
 				/* error */
