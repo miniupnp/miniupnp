@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <ctype.h>
 
 #include "macros.h"
 #include "config.h"
@@ -1621,8 +1622,14 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 		goto clear_and_exit;
 	}
 	/* I guess it is useless to convert int_ip to literal ipv6 address */
+	if(rem_host)
+	{
+		/* trim */
+		while(isspace(rem_host[0]))
+			rem_host++;
+	}
 	/* rem_host should be converted to literal ipv6 : */
-	if(rem_host && (rem_host[0] != '\0'))
+	if(rem_host && (rem_host[0] != '\0') && (rem_host[0] != '*'))
 	{
 		struct addrinfo *ai, *p;
 		struct addrinfo hints;
