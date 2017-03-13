@@ -3,7 +3,7 @@
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2016 Thomas Bernard
+# (c) 2005-2017 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -48,7 +48,7 @@ CFLAGS += -D_XOPEN_SOURCE=600
 endif
 endif
 #CFLAGS += -ansi
-# -DNO_GETADDRINFO
+#CFLAGS += -DNO_GETADDRINFO
 INSTALL = install
 SH = /bin/sh
 JAVA = java

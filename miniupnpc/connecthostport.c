@@ -1,7 +1,7 @@
 /* $Id: connecthostport.c,v 1.15 2015/10/09 16:26:19 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2010-2016 Thomas Bernard
+ * Copyright (c) 2010-2017 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -36,10 +36,8 @@
 /* defining MINIUPNPC_IGNORE_EINTR enable the ignore of interruptions
  * during the connect() call */
 #define MINIUPNPC_IGNORE_EINTR
-#ifndef USE_GETHOSTBYNAME
 #include <sys/socket.h>
 #include <sys/select.h>
-#endif /* #ifndef USE_GETHOSTBYNAME */
 #endif /* #else _WIN32 */
 
 /* definition of PRINT_SOCKET_ERROR */
