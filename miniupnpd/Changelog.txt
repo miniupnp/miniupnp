@@ -3,6 +3,7 @@ $Id: Changelog.txt,v 1.430 2016/12/16 09:14:40 nanard Exp $
 2017/03/13:
   default to client address for AddPortMapping when <NewInternalClient>
     is empty
+  pass ext_if_name to add_pinhole()
 
 2016/12/23:
   Fix UDA-1.2.10 Man header empty or invalid
