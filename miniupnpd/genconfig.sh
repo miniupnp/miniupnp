@@ -60,6 +60,10 @@ CONFIGFILE_FINAL="config.h"
 CONFIGMACRO="CONFIG_H_INCLUDED"
 
 MINIUPNPD_DATE=`date +"%Y%m%d"`
+if [ -n "$SOURCE_DATE_EPOCH" ]; then
+	MINIUPNPD_DATE=`date --utc --date="@$SOURCE_DATE_EPOCH" +"%Y%m%d"`
+fi
+
 # Facility to syslog
 LOG_MINIUPNPD="LOG_DAEMON"
 
