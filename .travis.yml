@@ -33,7 +33,7 @@ compiler:
   - clang
 
 before_install:
-  - 'if [ "$TRAVIS_OS_NAME" = "osx" -a "$PROJECT" = "miniupnpc-libevent" ]; then brew update > /dev/null && brew install libevent; fi'
+  - 'if [ "$TRAVIS_OS_NAME" = "osx" ] && [ "$CC" == "gcc" ] ; then CC=gcc-4.9; fi'
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'

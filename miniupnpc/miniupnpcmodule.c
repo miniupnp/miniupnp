@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * Author : Thomas BERNARD
  * website : http://miniupnp.tuxfamily.org/
- * copyright (c) 2007-2014 Thomas Bernard
+ * copyright (c) 2007-2016 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <Python.h>
@@ -11,6 +11,10 @@
 #include "miniupnpc.h"
 #include "upnpcommands.h"
 #include "upnperrors.h"
+
+#ifdef _WIN32
+#include <winsock2.h>
+#endif
 
 /* for compatibility with Python < 2.4 */
 #ifndef Py_RETURN_NONE
@@ -669,6 +673,10 @@ initminiupnpc(void)
     PyObject* m;
 
 #ifdef _WIN32
+    /* initialize Winsock. */
+    WSADATA wsaData;
+    int nResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+
     UPnPType.tp_new = PyType_GenericNew;
 #endif
     if (PyType_Ready(&UPnPType) < 0)

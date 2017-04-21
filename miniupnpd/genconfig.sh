@@ -1,5 +1,7 @@
 #! /bin/sh
 # $Id: genconfig.sh,v 1.90 2016/02/11 10:35:12 nanard Exp $
+# vim: tabstop=4 shiftwidth=4 noexpandtab
+#
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
 # (c) 2006-2016 Thomas Bernard
@@ -58,6 +60,10 @@ CONFIGFILE_FINAL="config.h"
 CONFIGMACRO="CONFIG_H_INCLUDED"
 
 MINIUPNPD_DATE=`date +"%Y%m%d"`
+if [ -n "$SOURCE_DATE_EPOCH" ]; then
+	MINIUPNPD_DATE=`date --utc --date="@$SOURCE_DATE_EPOCH" +"%Y%m%d"`
+fi
+
 # Facility to syslog
 LOG_MINIUPNPD="LOG_DAEMON"
 
@@ -166,14 +172,14 @@ case $OS_NAME in
 		HAVE_IP_MREQN=1
 		# new way to see which one to use PF or IPF.
 		# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=957
-		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
+		if [ -f /etc/rc.subr ] && [ -f /etc/default/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
 			. /etc/rc.subr
 			# source config file so we can probe vars
-			. /etc/rc.conf
+			. /etc/default/rc.conf
 			if checkyesno ipfilter_enable; then
 				echo "Using ipf"
-			FW=ipf
+				FW=ipf
 			elif checkyesno pf_enable; then
 				echo "Using pf"
 				FW=pf
