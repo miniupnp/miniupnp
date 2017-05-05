@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2016 Thomas Bernard
+ * Copyright (c) 2005-2017 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -111,7 +111,7 @@ getHTTPResponse(int s, int * size, int * status_code)
 	chunksize_buf[0] = '\0';
 	chunksize_buf_index = 0;
 
-	while((n = receivedata(s, buf, 2048, 5000, NULL)) > 0)
+	while((n = receivedata(s, buf, sizeof(buf), 5000, NULL)) > 0)
 	{
 		if(endofheaders == 0)
 		{
