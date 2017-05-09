@@ -17,7 +17,7 @@ int
 sockaddr_to_string(const struct sockaddr * addr, char * str, size_t size);
 
 /**
- * set the file description as non blocking
+ * set the file descriptor as non blocking
  * return 0 in case of failure, 1 in case of success
  */
 int
