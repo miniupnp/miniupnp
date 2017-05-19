@@ -1,6 +1,6 @@
 /* $Id: miniupnpc-async.c,v 1.19 2014/11/07 12:05:40 nanard Exp $ */
 /* miniupnpc-async
- * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
+ * Copyright (c) 2008-2017, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -72,8 +72,8 @@ struct upnp_args {
 
 /* private functions */
 
-static int upnpc_connect(upnpc_t * p, const char * url);
-static int upnpc_send_request(upnpc_t * p);
+static int upnpc_connect(upnpc_device_t * p, const char * url);
+static int upnpc_send_request(upnpc_device_t * p);
 
 
 /* parse_msearch_reply()
@@ -83,8 +83,8 @@ static int upnpc_send_request(upnpc_t * p);
  * The strings are NOT null terminated */
 static void
 parse_msearch_reply(const char * reply, int size,
-                    const char * * location, int * locationsize,
-                    const char * * st, int * stsize)
+                    const char * * location, unsigned int * locationsize,
+                    const char * * st, unsigned int * stsize)
 {
 	int a, b, i;
 	i = 0;	/* current character index */
@@ -157,16 +157,16 @@ static int upnpc_send_ssdp_msearch(upnpc_t * p, const char * device, unsigned in
 	return 0;
 }
 
-static int upnpc_set_root_desc_location(upnpc_t * p, const char * location, int locationsize)
+static int upnpc_set_root_desc_location(upnpc_device_t * d, const char * location, int locationsize)
 {
 	char * tmp;
-	tmp = realloc(p->root_desc_location, locationsize + 1);
+	tmp = realloc(d->root_desc_location, locationsize + 1);
 	if(tmp == 0) {
 		return -1;
 	}
 	memcpy(tmp, location, locationsize);
 	tmp[locationsize] = '\0';
-	p->root_desc_location = tmp;
+	d->root_desc_location = tmp;
 	return 0;
 }
 
@@ -181,20 +181,38 @@ static int upnpc_receive_and_parse_ssdp(upnpc_t * p)
 		debug_printf("empty packet received\n");
 	} else {
 		const char * location = NULL;
-		int locationsize;
+		unsigned int locationsize;
 		const char * st = NULL;
-		int stsize;
+		unsigned int stsize;
 		debug_printf("%.*s", n, bufr);
 		parse_msearch_reply(bufr, n, &location, &locationsize, &st, &stsize);
 		debug_printf("location = '%.*s'\n", locationsize, location);
 		debug_printf("st = '%.*s'\n", stsize, st);
 		if(location != NULL) {
-			if(upnpc_set_root_desc_location(p, location, locationsize) < 0) {
+			upnpc_device_t * dev = p->device_list;
+			while(dev != NULL) {
+				if(dev->root_desc_location != NULL
+				   && strlen(dev->root_desc_location) == locationsize
+			       && memcmp(dev->root_desc_location, location, locationsize) == 0) {
+					debug_printf("device already in list (location='%s')\n", dev->root_desc_location);
+					return -1;
+				}
+				dev = dev->next;
+			}
+			dev = calloc(1, sizeof(upnpc_device_t));
+			if(dev == NULL) {
 				p->state = EError;
 				return -1;
 			}
-			p->state = EGetDescConnect;
-			upnpc_connect(p, p->root_desc_location);
+			if(upnpc_set_root_desc_location(dev, location, locationsize) < 0) {
+				free(dev);
+				p->state = EError;
+				return -1;
+			}
+			dev->next = p->device_list;
+			p->device_list = dev;
+			dev->state = EGetDescConnect;
+			upnpc_connect(dev, dev->root_desc_location);
 		} else {
 			/* or do nothing ? */
 			p->state = EError;
@@ -298,7 +316,7 @@ parseURL(const char * url,
 	return 1;
 }
 
-static int upnpc_connect(upnpc_t * p, const char * url)
+static int upnpc_connect(upnpc_device_t * p, const char * url)
 {
 	int r;
 	char hostname[MAXHOSTNAMELEN+1];
@@ -308,10 +326,10 @@ static int upnpc_connect(upnpc_t * p, const char * url)
 	struct sockaddr_in addr;
 	socklen_t addrlen;
 
-	if(p->root_desc_location == 0) {
+	/*if(p->root_desc_location == 0) {
 		p->state = EError;
 		return -1;
-	}
+	}*/
 	if(!parseURL(url/*p->root_desc_location*/, hostname, &port,
 	             &path, &scope_id)) {
 		p->state = EError;
@@ -353,7 +371,7 @@ static int upnpc_connect(upnpc_t * p, const char * url)
 	return 0;
 }
 
-static int upnpc_complete_connect(upnpc_t * p)
+static int upnpc_complete_connect(upnpc_device_t * p)
 {
 	socklen_t len;
 	int err;
@@ -376,7 +394,7 @@ static int upnpc_complete_connect(upnpc_t * p)
 	return 0;
 }
 
-static int upnpc_send_request(upnpc_t * p)
+static int upnpc_send_request(upnpc_device_t * p)
 {
 	ssize_t n;
 	static const char reqfmt[] = "GET %s HTTP/1.1\r\n"
@@ -440,7 +458,7 @@ static int upnpc_send_request(upnpc_t * p)
 	return 0;
 }
 
-static int upnpc_parse_headers(upnpc_t * p)
+static int upnpc_parse_headers(upnpc_device_t * p)
 {
 	/* search for CR LF CR LF (end of headers)
 	 * recognize also LF LF */
@@ -547,7 +565,7 @@ static char * build_url_string(const char * urlbase, const char * root_desc_url,
 	return s;
 }
 
-static int upnpc_get_response(upnpc_t * p)
+static int upnpc_get_response(upnpc_device_t * p)
 {
 	ssize_t n;
 	ssize_t count;
@@ -643,7 +661,7 @@ static int upnpc_get_response(upnpc_t * p)
 #define SERVICEPREFIX "u"
 #define SERVICEPREFIX2 'u'
 
-static int upnpc_build_soap_request(upnpc_t * p, const char * url,
+static int upnpc_build_soap_request(upnpc_device_t * p, const char * url,
                                     const char * service,
                                     const char * action,
                                     const struct upnp_args * args, int arg_count)
@@ -789,30 +807,35 @@ int upnpc_init(upnpc_t * p, const char * multicastif)
 int upnpc_finalize(upnpc_t * p)
 {
 	if(!p) return UPNPC_ERR_INVALID_ARGS;
-	free(p->root_desc_location);
-	p->root_desc_location = NULL;
-	free(p->http_request);
-	p->http_request = NULL;
-	free(p->http_response);
-	p->http_response = NULL;
-	free(p->control_cif_url);
-	p->control_cif_url = NULL;
-	free(p->control_conn_url);
-	p->control_conn_url = NULL;
 	if(p->ssdp_socket >= 0) {
 		close(p->ssdp_socket);
 		p->ssdp_socket = -1;
 	}
-	if(p->http_socket >= 0) {
-		close(p->http_socket);
-		p->http_socket = -1;
+	while(p->device_list) {
+		upnpc_device_t * next = p->device_list->next;
+		free(p->device_list->root_desc_location);
+		p->device_list->root_desc_location = NULL;
+		free(p->device_list->http_request);
+		p->device_list->http_request = NULL;
+		free(p->device_list->http_response);
+		p->device_list->http_response = NULL;
+		free(p->device_list->control_cif_url);
+		p->device_list->control_cif_url = NULL;
+		free(p->device_list->control_conn_url);
+		p->device_list->control_conn_url = NULL;
+		if(p->device_list->http_socket >= 0) {
+			close(p->device_list->http_socket);
+			p->device_list->http_socket = -1;
+		}
+		ClearNameValueList(&p->device_list->soap_response_data);
+		free(p->device_list);
+		p->device_list = next;
 	}
-	ClearNameValueList(&p->soap_response_data);
 	p->state = EFinalized;
 	return UPNPC_OK;
 }
 
-int upnpc_get_external_ip_address(upnpc_t * p)
+int upnpc_get_external_ip_address(upnpc_device_t * p)
 {
 	upnpc_build_soap_request(p, p->control_conn_url,
 	                         "urn:schemas-upnp-org:service:WANIPConnection:1",
@@ -822,7 +845,7 @@ int upnpc_get_external_ip_address(upnpc_t * p)
 	return 0;
 }
 
-int upnpc_get_link_layer_max_rate(upnpc_t * p)
+int upnpc_get_link_layer_max_rate(upnpc_device_t * p)
 {
 	upnpc_build_soap_request(p, p->control_cif_url,
 	                         "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1",
@@ -832,7 +855,7 @@ int upnpc_get_link_layer_max_rate(upnpc_t * p)
 	return 0;
 }
 
-int upnpc_add_port_mapping(upnpc_t * p,
+int upnpc_add_port_mapping(upnpc_device_t * p,
                            const char * remote_host, unsigned short ext_port,
                            unsigned short int_port, const char * int_client,
                            const char * proto, const char * description,
@@ -876,8 +899,32 @@ int upnpc_add_port_mapping(upnpc_t * p,
 #ifdef UPNPC_USE_SELECT
 int upnpc_select_fds(upnpc_t * p, int * nfds, fd_set * readfds, fd_set * writefds)
 {
+	upnpc_device_t * d;
 	int n = 0;
 	if(!p) return UPNPC_ERR_INVALID_ARGS;
+	for(d = p->device_list; d != NULL; d = d->next) {
+		switch(d->state) {
+		case EGetDescConnect:
+		case EGetDescRequest:
+		case ESoapConnect:
+		case ESoapRequest:
+			FD_SET(d->http_socket, writefds);
+			if(*nfds < d->http_socket)
+				*nfds = d->http_socket;
+			n++;
+			break;
+		case EGetDescResponse:
+		case ESoapResponse:
+			FD_SET(d->http_socket, readfds);
+			if(*nfds < d->http_socket)
+				*nfds = d->http_socket;
+			n++;
+			break;
+		default:
+			break;
+		}
+	}
+
 	switch(p->state) {
 	case ESendSSDP:
 		FD_SET(p->ssdp_socket, writefds);
@@ -886,31 +933,34 @@ int upnpc_select_fds(upnpc_t * p, int * nfds, fd_set * readfds, fd_set * writefd
 		n++;
 		break;
 	case EReceiveSSDP:
+	default:
+		/* still receive SSDP responses when processing Description, etc. */
 		FD_SET(p->ssdp_socket, readfds);
 		if(*nfds < p->ssdp_socket)
 			*nfds = p->ssdp_socket;
 		n++;
 		break;
-	case EGetDescConnect:
-	case EGetDescRequest:
-	case ESoapConnect:
-	case ESoapRequest:
-		FD_SET(p->http_socket, writefds);
-		if(*nfds < p->http_socket)
-			*nfds = p->http_socket;
-		n++;
-		break;
-	case EGetDescResponse:
-	case ESoapResponse:
-		FD_SET(p->http_socket, readfds);
-		if(*nfds < p->http_socket)
-			*nfds = p->http_socket;
-		n++;
-		break;
-	default:
-		return 0;
 	}
 	return n;
+}
+
+void upnpc_check_select_fds(upnpc_t * p, const fd_set * readfds, const fd_set * writefds)
+{
+	upnpc_device_t * d;
+
+	p->socket_flags = 0;
+	if(FD_ISSET(p->ssdp_socket, readfds))
+		p->socket_flags = UPNPC_SSDP_READABLE;
+	if(FD_ISSET(p->ssdp_socket, writefds))
+		p->socket_flags = UPNPC_SSDP_WRITEABLE;
+
+	for(d = p->device_list; d != NULL; d = d->next) {
+		d->socket_flags = 0;
+		if(FD_ISSET(d->http_socket, readfds))
+			d->socket_flags = UPNPC_HTTP_READABLE;
+		if(FD_ISSET(d->http_socket, writefds))
+			d->socket_flags = UPNPC_HTTP_WRITEABLE;
+	}
 }
 #endif
 
@@ -924,6 +974,7 @@ static const char * devices_to_search[] = {
 
 int upnpc_process(upnpc_t * p)
 {
+	upnpc_device_t * d;
 /*
 1)	Envoyer les paquets de discovery SSDP
 2)	Recevoir et traiter les reponses
@@ -931,7 +982,36 @@ int upnpc_process(upnpc_t * p)
 4)	tester les etats
 */
 	if(!p) return UPNPC_ERR_INVALID_ARGS;
-	debug_printf("state=%d\n", (int)p->state);
+	debug_printf("state=%d   socket_flags=0x%04x\n", (int)p->state, p->socket_flags);
+
+	for(d = p->device_list; d != NULL; d = d->next) {
+		switch(d->state) {
+		case EGetDescConnect:
+		case ESoapConnect:
+			upnpc_complete_connect(d);
+			break;
+		case EGetDescRequest:
+		case ESoapRequest:
+			upnpc_send_request(d);
+			break;
+		case EGetDescResponse:
+		case ESoapResponse:
+			upnpc_get_response(d);
+			break;
+		default:
+			break;
+		}
+	}
+	/* all devices ready => ready */
+	if(p->device_list != NULL) {
+		d = p->device_list;
+		while(d && d->state == EReady) d = d->next;
+		p->state = (d == NULL) ? EReady : EProcessing;
+	}
+
+	if(p->socket_flags & UPNPC_SSDP_READABLE) {
+		upnpc_receive_and_parse_ssdp(p);
+	}
 	switch(p->state) {
 	case EInit:
 		upnpc_send_ssdp_msearch(p, devices_to_search[0], 2);
@@ -940,22 +1020,13 @@ int upnpc_process(upnpc_t * p)
 		upnpc_send_ssdp_msearch(p, devices_to_search[0], 2);
 		break;
 	case EReceiveSSDP:
-		upnpc_receive_and_parse_ssdp(p);
+		/*upnpc_receive_and_parse_ssdp(p);*/
 		break;
 	/*case EGetDesc:
 		upnpc_connect(p);
 		break;*/
-	case EGetDescConnect:
-	case ESoapConnect:
-		upnpc_complete_connect(p);
-		break;
-	case EGetDescRequest:
-	case ESoapRequest:
-		upnpc_send_request(p);
-		break;
-	case EGetDescResponse:
-	case ESoapResponse:
-		upnpc_get_response(p);
+	case EReady:
+	case EProcessing:
 		break;
 	default:
 		return UPNPC_ERR_UNKNOWN_STATE;
