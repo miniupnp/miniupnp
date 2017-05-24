@@ -631,7 +631,7 @@ static int nfqueue_cb(
 
 					/* printf("pkt found %s\n",dd);*/
 					ProcessSSDPData (sudp, dd, size - x,
-					                 &sendername, (unsigned short) 5555);
+					                 &sendername, -1, (unsigned short) 5555);
 				}
 			}
 		}
@@ -984,7 +984,6 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		}
 	}
 #endif
-#ifdef ENABLE_IPV6
 	if(lan_addr->ifname[0] != '\0')
 	{
 		lan_addr->index = if_nametoindex(lan_addr->ifname);
@@ -992,6 +991,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 			fprintf(stderr, "Cannot get index for network interface %s",
 			        lan_addr->ifname);
 	}
+#ifdef ENABLE_IPV6
 	else
 	{
 		fprintf(stderr,

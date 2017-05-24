@@ -915,10 +915,10 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 	}
 #endif /* defined(IP_RECVIF) || defined(IP_PKTINFO) */
 #ifdef ENABLE_HTTPS
-	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername,
+	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername, source_ifindex,
 	                http_port, https_port);
 #else
-	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername,
+	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername, source_ifindex,
 	                http_port);
 #endif
 
@@ -927,12 +927,12 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 #ifdef ENABLE_HTTPS
 void
 ProcessSSDPData(int s, const char *bufr, int n,
-                const struct sockaddr * sender,
+                const struct sockaddr * sender, int source_if,
                 unsigned short http_port, unsigned short https_port)
 #else
 void
 ProcessSSDPData(int s, const char *bufr, int n,
-                const struct sockaddr * sender,
+                const struct sockaddr * sender, int source_if,
                 unsigned short http_port)
 #endif
 {
@@ -966,10 +966,31 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	/* get the string representation of the sender address */
 	sockaddr_to_string(sender, sender_str, sizeof(sender_str));
 	lan_addr = get_lan_for_peer(sender);
+	if(source_if >= 0)
+	{
+		if(lan_addr != NULL)
+		{
+			if(lan_addr->index != (unsigned)source_if)
+			{
+				syslog(LOG_WARNING, "interface index not matching %u != %d", lan_addr->index, source_if);
+			}
+		}
+		else
+		{
+			/* use the interface index */
+			for(lan_addr = lan_addrs.lh_first;
+			    lan_addr != NULL;
+			    lan_addr = lan_addr->list.le_next)
+			{
+				if(lan_addr->index == (unsigned)source_if)
+					break;
+			}
+		}
+	}
 	if(lan_addr == NULL)
 	{
-		syslog(LOG_WARNING, "SSDP packet sender %s not from a LAN, ignoring",
-		       sender_str);
+		syslog(LOG_WARNING, "SSDP packet sender %s (if_index=%d) not from a LAN, ignoring",
+		       sender_str, source_if);
 		return;
 	}
 
