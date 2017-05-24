@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.430 2016/12/16 09:14:40 nanard Exp $
+$Id: Changelog.txt,v 1.432 2017/05/24 22:47:53 nanard Exp $
+
+2017/05/24:
+  get SSDP packet receiving interface index and use it to check if the
+    packet is from a LAN
 
 2017/03/13:
   default to client address for AddPortMapping when <NewInternalClient>
