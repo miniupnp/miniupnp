@@ -200,19 +200,20 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 	if(!ipv6) {
 		if(setsockopt(s, IPPROTO_IP, IP_RECVIF, &on, sizeof(on)) < 0)
 		{
-			syslog(LOG_WARNING, "setsockopt(udp, IPRECVIF): %m");
+			syslog(LOG_WARNING, "setsockopt(udp, IP_RECVIF): %m");
 		}
 	}
 #endif /* IP_RECVIF */
 #ifdef IP_PKTINFO
 	/* Linux */
 	if(!ipv6) {
-		if(setsockopt(s, IPPROTO_IP, IP_RECVIF, &on, sizeof(on)) < 0)
+		if(setsockopt(s, IPPROTO_IP, IP_PKTINFO, &on, sizeof(on)) < 0)
 		{
-			syslog(LOG_WARNING, "setsockopt(udp, IPRECVIF): %m");
+			syslog(LOG_WARNING, "setsockopt(udp, IP_PKTINFO): %m");
 		}
 	}
 #endif /* IP_PKTINFO */
+	/* TODO : for IPV6 */
 
 	if(!set_non_blocking(s))
 	{
