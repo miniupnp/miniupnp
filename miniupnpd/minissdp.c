@@ -213,7 +213,14 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		}
 	}
 #endif /* IP_PKTINFO */
-	/* TODO : for IPV6 */
+#if defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO)
+	if(ipv6) {
+		if(setsockopt(s, IPPROTO_IP, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0)
+		{
+			syslog(LOG_WARNING, "setsockopt(udp, IPV6_RECVPKTINFO): %m");
+		}
+	}
+#endif /* defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO) */
 
 	if(!set_non_blocking(s))
 	{
@@ -813,13 +820,10 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 {
 	int n;
 	char bufr[1500];
-	socklen_t len_r;
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sendername;
-	len_r = sizeof(struct sockaddr_storage);
 #else
 	struct sockaddr_in sendername;
-	len_r = sizeof(struct sockaddr_in);
 #endif
 	int source_ifindex = -1;
 #ifdef IP_PKTINFO
@@ -830,11 +834,7 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 	};
 	struct msghdr mh = {
 		.msg_name = &sendername,
-#ifdef ENABLE_IPV6
-		.msg_namelen = sizeof(struct sockaddr_storage),
-#else
-		.msg_namelen = sizeof(struct sockaddr_in),
-#endif
+		.msg_namelen = sizeof(sendername),
 		.msg_iov = &iovec,
 		.msg_iovlen = 1,
 		.msg_control = cmbuf,
@@ -850,11 +850,7 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 	};
 	struct msghdr mh = {
 		.msg_name = &sendername,
-#ifdef ENABLE_IPV6
-		.msg_namelen = sizeof(struct sockaddr_storage),
-#else
-		.msg_namelen = sizeof(struct sockaddr_in),
-#endif
+		.msg_namelen = sizeof(sendername),
 		.msg_iov = &iovec,
 		.msg_iovlen = 1,
 		.msg_control = cmbuf,
@@ -866,6 +862,8 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 #if defined(IP_RECVIF) || defined(IP_PKTINFO)
 	n = recvmsg(s, &mh, 0);
 #else
+	socklen_t len_r;
+	len_r = sizeof(sendername);
 	n = recvfrom(s, bufr, sizeof(bufr), 0,
 	             (struct sockaddr *)&sendername, &len_r);
 #endif /* defined(IP_RECVIF) || defined(IP_PKTINFO) */
@@ -895,6 +893,15 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 			source_ifindex = pi->ipi_ifindex;
 		}
 #endif /* IP_PKTINFO */
+#if defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO)
+		if(cmptr->cmsg_level == IPPROTO_IPV6 && cmptr->cmsg_type == IPV6_RECVPKTINFO)
+		{
+			struct in6_pktinfo * pi6;	/* fields : ifindex, addr */
+			pi6 = (struct in6_pktinfo *)CMSG_DATA(cmptr);
+			syslog(LOG_DEBUG, "ifindex = %u", pi6->ipi6_ifindex);
+			source_ifindex = pi6->ipi6_ifindex;
+		}
+#endif /* defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO) */
 #ifdef IP_RECVIF
 		if(cmptr->cmsg_level == IPPROTO_IP && cmptr->cmsg_type == IP_RECVIF)
 		{
