@@ -153,7 +153,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 	struct sockaddr_storage sockname;
 	socklen_t sockname_len;
 	struct lan_addr_s * lan_addr;
-	int j = 1;
+	const int on = 1;
 
 	if( (s = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0)) < 0)
 	{
@@ -185,7 +185,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		sockname_len = sizeof(struct sockaddr_in);
 	}
 
-	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &j, sizeof(j)) < 0)
+	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
 	{
 		syslog(LOG_WARNING, "setsockopt(udp, SO_REUSEADDR): %m");
 	}
