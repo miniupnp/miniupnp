@@ -887,10 +887,10 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 	{
 		syslog(LOG_DEBUG, "level=%d type=%d", cmptr->cmsg_level, cmptr->cmsg_type);
 #ifdef IP_PKTINFO
-		if(cmptr->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO)
+		if(cmptr->cmsg_level == IPPROTO_IP && cmptr->cmsg_type == IP_PKTINFO)
 		{
 			struct in_pktinfo * pi;	/* fields : ifindex, spec_dst, addr */
-			pi = (struct in_pktinfo *)CMSG_DATA(cmsg);
+			pi = (struct in_pktinfo *)CMSG_DATA(cmptr);
 			syslog(LOG_DEBUG, "ifindex = %u  %s", ip->ipi_ifindex, inet_ntoa(pi->ipi_spec_dst));
 			source_ifindex = ip->ipi_ifindex;
 		}
