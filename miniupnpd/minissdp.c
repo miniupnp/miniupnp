@@ -891,8 +891,8 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 		{
 			struct in_pktinfo * pi;	/* fields : ifindex, spec_dst, addr */
 			pi = (struct in_pktinfo *)CMSG_DATA(cmptr);
-			syslog(LOG_DEBUG, "ifindex = %u  %s", ip->ipi_ifindex, inet_ntoa(pi->ipi_spec_dst));
-			source_ifindex = ip->ipi_ifindex;
+			syslog(LOG_DEBUG, "ifindex = %u  %s", pi->ipi_ifindex, inet_ntoa(pi->ipi_spec_dst));
+			source_ifindex = pi->ipi_ifindex;
 		}
 #endif /* IP_PKTINFO */
 #ifdef IP_RECVIF
