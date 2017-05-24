@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.77 2015/08/26 07:36:52 nanard Exp $ */
+/* $Id: minissdp.c,v 1.87 2017/05/24 22:33:33 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2017 Thomas Bernard
@@ -18,6 +18,7 @@
 
 #ifdef IP_RECVIF
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <net/if.h>
 #include <net/if_dl.h>
 #endif
