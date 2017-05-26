@@ -37,6 +37,7 @@ int main(int argc, char * * argv)
 	char ip_address[64];
 	int r, n;
 	upnpc_t upnp;
+	upnpc_device_t * device = NULL;
 	const char * multicastif = NULL;
 	enum methods next_method_to_call = EGetExternalIP;
 	enum methods last_method = ENothing;
@@ -82,18 +83,22 @@ int main(int argc, char * * argv)
 			break;
 		if(upnp.state == EReady) {
 			char * p;
-			printf("Process UPnP IGD Method results : HTTP %d\n", upnp.device_list->http_response_code); /* XXX */
-			if(upnp.device_list->http_response_code == 200) {
+			if(device == NULL) {
+				/* select one device */
+				device = upnp.device_list;	/* pick up the first one */
+			}
+			printf("Process UPnP IGD Method results : HTTP %d\n", device->http_response_code);
+			if(device->http_response_code == 200) {
 				switch(last_method) {
 				case EGetExternalIP:
-					p = GetValueFromNameValueList(&upnp.device_list->soap_response_data, "NewExternalIPAddress");
+					p = GetValueFromNameValueList(&device->soap_response_data, "NewExternalIPAddress");
 					printf("ExternalIPAddress = %s\n", p);
 	/*				p = GetValueFromNameValueList(&pdata, "errorCode");*/
 					break;
 				case EGetRates:
-					p = GetValueFromNameValueList(&upnp.device_list->soap_response_data, "NewLayer1DownstreamMaxBitRate");
+					p = GetValueFromNameValueList(&device->soap_response_data, "NewLayer1DownstreamMaxBitRate");
 					printf("DownStream MaxBitRate = %s\t", p);
-					p = GetValueFromNameValueList(&upnp.device_list->soap_response_data, "NewLayer1UpstreamMaxBitRate");
+					p = GetValueFromNameValueList(&device->soap_response_data, "NewLayer1UpstreamMaxBitRate");
 					printf("UpStream MaxBitRate = %s\n", p);
 					break;
 				case EAddPortMapping:
@@ -104,10 +109,10 @@ int main(int argc, char * * argv)
 				}
 			} else {
 				printf("SOAP error :\n");
-				printf("  faultcode='%s'\n", GetValueFromNameValueList(&upnp.device_list->soap_response_data, "faultcode"));
-				printf("  faultstring='%s'\n", GetValueFromNameValueList(&upnp.device_list->soap_response_data, "faultstring"));
-				printf("  errorCode=%s\n", GetValueFromNameValueList(&upnp.device_list->soap_response_data, "errorCode"));
-				printf("  errorDescription='%s'\n", GetValueFromNameValueList(&upnp.device_list->soap_response_data, "errorDescription"));
+				printf("  faultcode='%s'\n", GetValueFromNameValueList(&device->soap_response_data, "faultcode"));
+				printf("  faultstring='%s'\n", GetValueFromNameValueList(&device->soap_response_data, "faultstring"));
+				printf("  errorCode=%s\n", GetValueFromNameValueList(&device->soap_response_data, "errorCode"));
+				printf("  errorDescription='%s'\n", GetValueFromNameValueList(&device->soap_response_data, "errorDescription"));
 			}
 			if(next_method_to_call == ENothing)
 				break;
@@ -116,22 +121,22 @@ int main(int argc, char * * argv)
 			switch(next_method_to_call) {
 			case EGetExternalIP:
 				printf("GetExternalIPAddress\n");
-				upnpc_get_external_ip_address(upnp.device_list);
+				upnpc_get_external_ip_address(device);
 				next_method_to_call = EGetRates;
 				break;
 			case EGetRates:
 				printf("GetCommonLinkProperties\n");
-				upnpc_get_link_layer_max_rate(upnp.device_list);
+				upnpc_get_link_layer_max_rate(device);
 				next_method_to_call = EAddPortMapping;
 				break;
 			case EAddPortMapping:
-				if(getnameinfo((struct sockaddr *)&upnp.device_list->selfaddr, upnp.device_list->selfaddrlen,
+				if(getnameinfo((struct sockaddr *)&device->selfaddr, device->selfaddrlen,
 				               ip_address, sizeof(ip_address), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV) < 0) {
 					fprintf(stderr, "getnameinfo() failed\n");
 				}
 				printf("our IP address is %s\n", ip_address);
 				printf("AddPortMapping\n");
-				upnpc_add_port_mapping(upnp.device_list,	/* XXX */
+				upnpc_add_port_mapping(device,
                            NULL /* remote_host */, 40002 /* ext_port */,
                            42042 /* int_port */, ip_address /* int_client */,
                            "TCP" /* proto */, "this is a test" /* description */,
