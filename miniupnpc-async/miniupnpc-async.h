@@ -41,16 +41,16 @@ extern "C" {
 typedef struct upnpc_device {
 	struct upnpc_device * next;
 	enum {
-		EInit = 1,
-		EGetDescConnect,
-		EGetDescRequest,
-		EGetDescResponse,
-		EReady,
-		ESoapConnect,
-		ESoapRequest,
-		ESoapResponse,
-		EFinalized = 99,
-		EError = 1000
+		EDevInit = 1,
+		EDevGetDescConnect,
+		EDevGetDescRequest,
+		EDevGetDescResponse,
+		EDevReady,
+		EDevSoapConnect,
+		EDevSoapRequest,
+		EDevSoapResponse,
+		EDevFinalized = 99,
+		EDevError = 1000
 	} state;
 	char * root_desc_location;
 	char * control_cif_url;
@@ -73,14 +73,14 @@ typedef struct upnpc_device {
 
 typedef struct {
 	enum {
-		EInit = 1,
-		ESendSSDP,
-		EReceiveSSDP,
-		EGetDesc,
-		EReady,
-		EProcessing,
-		EFinalized = 99,
-		EError = 1000
+		EUPnPInit = 1,
+		EUPnPSendSSDP,
+		EUPnPReceiveSSDP,
+		EUPnPGetDesc,
+		EUPnPReady,
+		EUPnPProcessing,
+		EUPnPFinalized = 99,
+		EUPnPError = 1000
 	} state;
 	int socket_flags;	/* see UPNPC_*_READABLE, etc. */
 	int ssdp_socket;

@@ -49,7 +49,7 @@ int main(int argc, char * * argv)
 	}
 	r = upnpc_process(&upnp);
 	printf("upnpc_process returned %d\n", r);
-	while(upnp.state != EError) {
+	while(upnp.state != EUPnPError) {
 		int nfds;
 		fd_set readfds;
 		fd_set writefds;
@@ -81,7 +81,7 @@ int main(int argc, char * * argv)
 #endif /* DEBUG */
 		if(r < 0)
 			break;
-		if(upnp.state == EReady) {
+		if(upnp.state == EUPnPReady) {
 			char * p;
 			if(device == NULL) {
 				/* select one device */
