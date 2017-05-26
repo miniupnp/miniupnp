@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.432 2017/05/24 22:47:53 nanard Exp $
 
+2017/05/26:
+  merge https://github.com/miniupnp/miniupnp/tree/randomize_url branch
+
 2017/05/24:
   get SSDP packet receiving interface index and use it to check if the
     packet is from a LAN
@@ -91,6 +94,8 @@ VERSION 2.0 : released on 2016/04/19
 
 2015/09/14:
   Randomize URLs to avoid http://www.filet-o-firewall.com/
+    https://github.com/filetofirewall/fof
+    (specific branch, merged later, see above)
 
 2015/08/25:
   better bind socket to right interface(s),
