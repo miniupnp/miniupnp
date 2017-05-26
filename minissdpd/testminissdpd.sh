@@ -1,10 +1,10 @@
 #!/bin/sh
-# $Id: testminissdpd.sh,v 1.2 2015/09/03 18:31:25 nanard Exp $
-# (c) 2016 Thomas Bernard
+# $Id: testminissdpd.sh,v 1.8 2017/04/21 11:57:59 nanard Exp $
+# (c) 2017 Thomas Bernard
 
 OS=`uname -s`
 IF=lo
-if [ "$OS" = "Darwin" ] || [ "$OS" = "SunOS" ] ; then
+if [ "$OS" = "Darwin" ] || [ "$OS" = "OpenBSD" ] || [ "$OS" = "SunOS" ] || [ "$OS" = "FreeBSD" ] ; then
 	IF=lo0
 fi
 # if set, 1st argument is network interface

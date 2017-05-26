@@ -1,6 +1,6 @@
 /* $Id: miniupnpc-async.h,v 1.13 2014/11/07 11:25:52 nanard Exp $ */
 /* miniupnpc-async
- * Copyright (c) 2008-2014, Thomas BERNARD <miniupnp@free.fr>
+ * Copyright (c) 2008-2017, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -17,6 +17,9 @@
 #ifndef MINIUPNPC_ASYNC_H_INCLUDED
 #define MINIUPNPC_ASYNC_H_INCLUDED
 
+/* for struct sockaddr_storage */
+#include <netinet/in.h>
+
 #include "declspec.h"
 #include "upnpreplyparse.h"
 
@@ -30,25 +33,30 @@ extern "C" {
 #define UPNPC_ERR_BIND_FAILED (-3)
 #define UPNPC_ERR_UNKNOWN_STATE (-4)
 
-typedef struct {
+#define UPNPC_SSDP_READABLE  0x0001
+#define UPNPC_SSDP_WRITEABLE 0x0100
+#define UPNPC_HTTP_READABLE  0x0002
+#define UPNPC_HTTP_WRITEABLE 0x0200
+
+typedef struct upnpc_device {
+	struct upnpc_device * next;
 	enum {
-		EInit = 1,
-		ESendSSDP,
-		EReceiveSSDP,
-		/*EGetDesc,*/
-		EGetDescConnect,
-		EGetDescRequest,
-		EGetDescResponse,
-		EReady,
-		ESoapConnect,
-		ESoapRequest,
-		ESoapResponse,
-		EFinalized = 99,
-		EError = 1000
+		EDevInit = 1,
+		EDevGetDescConnect,
+		EDevGetDescRequest,
+		EDevGetDescResponse,
+		EDevReady,
+		EDevSoapConnect,
+		EDevSoapRequest,
+		EDevSoapResponse,
+		EDevFinalized = 99,
+		EDevError = 1000
 	} state;
-	int ssdp_socket;
 	char * root_desc_location;
+	char * control_cif_url;
+	char * control_conn_url;
 	int http_socket;
+	int socket_flags;	/* see UPNPC_*_READABLE, etc. */
 	char * http_request;
 	int http_request_len;
 	int http_request_sent;
@@ -58,20 +66,36 @@ typedef struct {
 	int http_response_content_length;
 	int http_response_chunked;
 	int http_response_code;
-	char * control_cif_url;
-	char * control_conn_url;
 	struct NameValueParserData soap_response_data;
+	struct sockaddr_storage selfaddr;
+	socklen_t selfaddrlen;
+} upnpc_device_t;
+
+typedef struct {
+	enum {
+		EUPnPInit = 1,
+		EUPnPSendSSDP,
+		EUPnPReceiveSSDP,
+		EUPnPGetDesc,
+		EUPnPReady,
+		EUPnPProcessing,
+		EUPnPFinalized = 99,
+		EUPnPError = 1000
+	} state;
+	int socket_flags;	/* see UPNPC_*_READABLE, etc. */
+	int ssdp_socket;
+	upnpc_device_t * device_list;
 } upnpc_t;
 
 int upnpc_init(upnpc_t * p, const char * multicastif);
 
 int upnpc_finalize(upnpc_t * p);
 
-int upnpc_get_external_ip_address(upnpc_t * p);
+int upnpc_get_external_ip_address(upnpc_device_t * p);
 
-int upnpc_get_link_layer_max_rate(upnpc_t * p);
+int upnpc_get_link_layer_max_rate(upnpc_device_t * p);
 
-int upnpc_add_port_mapping(upnpc_t * p,
+int upnpc_add_port_mapping(upnpc_device_t * p,
                            const char * remote_host, unsigned short ext_port,
                            unsigned short int_port, const char * int_client,
                            const char * proto, const char * description,
@@ -79,6 +103,7 @@ int upnpc_add_port_mapping(upnpc_t * p,
 
 #ifdef UPNPC_USE_SELECT
 int upnpc_select_fds(upnpc_t * p, int * nfds, fd_set * readfds, fd_set * writefds);
+void upnpc_check_select_fds(upnpc_t * p, const fd_set * readfds, const fd_set * writefds);
 #endif /* UPNPC_USE_SELECT */
 
 int upnpc_process(upnpc_t * p);

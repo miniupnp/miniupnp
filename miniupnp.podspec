@@ -5,7 +5,7 @@ Pod::Spec.new do |spec|
   spec.authors = "The MiniUPnP Authors"
   spec.license = { type: "BSD", file: "miniupnpc/LICENSE" }
 
-  spec.version = "2.0.0.0"
+  spec.version = "2.0.0.2"
   spec.source = {
       git: 'https://github.com/cpp-ethereum-ios/miniupnp.git',
       tag: "v#{spec.version}"
@@ -36,12 +36,13 @@ Pod::Spec.new do |spec|
         CC=`xcrun -sdk $PLATFORM -find cc` \
         CFLAGS="-arch $ARCH -isysroot $SDKPATH" \
         LIBTOOL=`xcrun -sdk $PLATFORM -find libtool` \
-        LDFLAGS="-arch $ARCH"
+        LDFLAGS="-arch $ARCH -headerpad_max_install_names"
     }
 
     create_universal_library() {
-      lipo -create -output build-ios/libminiupnpc.dylib \
+      lipo -create -output libminiupnpc.dylib \
         build-ios/{armv7,arm64,i386,x86_64}/usr/lib/libminiupnpc.dylib
+      install_name_tool -id "@rpath/libminiupnpc.dylib" libminiupnpc.dylib
     }
 
     cd miniupnpc
@@ -49,5 +50,5 @@ Pod::Spec.new do |spec|
   CMD
 
   spec.source_files = "miniupnpc/build-ios/armv7/usr/include/**/*.h"
-  spec.ios.vendored_libraries = "miniupnpc/build-ios/libminiupnpc.dylib"
+  spec.ios.vendored_libraries = "miniupnpc/libminiupnpc.dylib"
 end

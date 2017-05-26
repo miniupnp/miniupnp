@@ -11,7 +11,7 @@ miniupnpc/ : MiniUPnP client - an UPnP IGD control point
 miniupnpd/ : MiniUPnP daemon - an implementation of a UPnP IGD
                                + NAT-PMP / PCP gateway
 minissdpd/ : SSDP managing daemon. Designed to work with miniupnpc,
-             miniupnpd, minidlna, etc.
+             miniupnpd, ReadyMedia (formerly MiniDLNA), etc.
 miniupnpc-async/    : Proof of concept for a UPnP IGD control point using
                       asynchronous (non blocking) sockets.
 miniupnpc-libevent/ : UPnP IGD control point using libevent2

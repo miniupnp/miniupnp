@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.77 2015/08/26 07:36:52 nanard Exp $ */
+/* $Id: minissdp.c,v 1.87 2017/05/24 22:33:33 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2017 Thomas Bernard
@@ -15,6 +15,13 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <syslog.h>
+
+#ifdef IP_RECVIF
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+#endif
 
 #include "config.h"
 #if defined(ENABLE_IPV6) && defined(UPNP_STRICT)
@@ -153,7 +160,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 	struct sockaddr_storage sockname;
 	socklen_t sockname_len;
 	struct lan_addr_s * lan_addr;
-	int j = 1;
+	const int on = 1;
 
 	if( (s = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0)) < 0)
 	{
@@ -185,10 +192,36 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		sockname_len = sizeof(struct sockaddr_in);
 	}
 
-	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &j, sizeof(j)) < 0)
+	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
 	{
 		syslog(LOG_WARNING, "setsockopt(udp, SO_REUSEADDR): %m");
 	}
+#ifdef IP_RECVIF
+	/* BSD */
+	if(!ipv6) {
+		if(setsockopt(s, IPPROTO_IP, IP_RECVIF, &on, sizeof(on)) < 0)
+		{
+			syslog(LOG_WARNING, "setsockopt(udp, IP_RECVIF): %m");
+		}
+	}
+#endif /* IP_RECVIF */
+#ifdef IP_PKTINFO
+	/* Linux */
+	if(!ipv6) {
+		if(setsockopt(s, IPPROTO_IP, IP_PKTINFO, &on, sizeof(on)) < 0)
+		{
+			syslog(LOG_WARNING, "setsockopt(udp, IP_PKTINFO): %m");
+		}
+	}
+#endif /* IP_PKTINFO */
+#if defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO)
+	if(ipv6) {
+		if(setsockopt(s, IPPROTO_IP, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0)
+		{
+			syslog(LOG_WARNING, "setsockopt(udp, IPV6_RECVPKTINFO): %m");
+		}
+	}
+#endif /* defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO) */
 
 	if(!set_non_blocking(s))
 	{
@@ -814,17 +847,53 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 {
 	int n;
 	char bufr[1500];
-	socklen_t len_r;
 #ifdef ENABLE_IPV6
 	struct sockaddr_storage sendername;
-	len_r = sizeof(struct sockaddr_storage);
 #else
 	struct sockaddr_in sendername;
-	len_r = sizeof(struct sockaddr_in);
 #endif
+	int source_ifindex = -1;
+#ifdef IP_PKTINFO
+	char cmbuf[CMSG_SPACE(sizeof(struct in_pktinfo))];
+	struct iovec iovec = {
+		.iov_base = bufr,
+		.iov_len = sizeof(bufr)
+	};
+	struct msghdr mh = {
+		.msg_name = &sendername,
+		.msg_namelen = sizeof(sendername),
+		.msg_iov = &iovec,
+		.msg_iovlen = 1,
+		.msg_control = cmbuf,
+		.msg_controllen = sizeof(cmbuf)
+	};
+	struct cmsghdr *cmptr;
+#endif /* IP_PKTINFO */
+#ifdef IP_RECVIF
+	char cmbuf[CMSG_SPACE(sizeof(struct sockaddr_dl))];
+	struct iovec iovec = {
+		.iov_base = bufr,
+		.iov_len = sizeof(bufr)
+	};
+	struct msghdr mh = {
+		.msg_name = &sendername,
+		.msg_namelen = sizeof(sendername),
+		.msg_iov = &iovec,
+		.msg_iovlen = 1,
+		.msg_control = cmbuf,
+		.msg_controllen = sizeof(cmbuf)
+	};
+	struct cmsghdr *cmptr;
+#endif /* IP_RECVIF */
 
+#if defined(IP_RECVIF) || defined(IP_PKTINFO)
+	n = recvmsg(s, &mh, 0);
+#else
+	socklen_t len_r;
+	len_r = sizeof(sendername);
 	n = recvfrom(s, bufr, sizeof(bufr), 0,
 	             (struct sockaddr *)&sendername, &len_r);
+#endif /* defined(IP_RECVIF) || defined(IP_PKTINFO) */
 	if(n < 0)
 	{
 		/* EAGAIN, EWOULDBLOCK, EINTR : silently ignore (try again next time)
@@ -837,11 +906,45 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 		}
 		return;
 	}
+
+#if defined(IP_RECVIF) || defined(IP_PKTINFO)
+	for(cmptr = CMSG_FIRSTHDR(&mh); cmptr != NULL; cmptr = CMSG_NXTHDR(&mh, cmptr))
+	{
+		syslog(LOG_DEBUG, "level=%d type=%d", cmptr->cmsg_level, cmptr->cmsg_type);
+#ifdef IP_PKTINFO
+		if(cmptr->cmsg_level == IPPROTO_IP && cmptr->cmsg_type == IP_PKTINFO)
+		{
+			struct in_pktinfo * pi;	/* fields : ifindex, spec_dst, addr */
+			pi = (struct in_pktinfo *)CMSG_DATA(cmptr);
+			syslog(LOG_DEBUG, "ifindex = %u  %s", pi->ipi_ifindex, inet_ntoa(pi->ipi_spec_dst));
+			source_ifindex = pi->ipi_ifindex;
+		}
+#endif /* IP_PKTINFO */
+#if defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO)
+		if(cmptr->cmsg_level == IPPROTO_IPV6 && cmptr->cmsg_type == IPV6_RECVPKTINFO)
+		{
+			struct in6_pktinfo * pi6;	/* fields : ifindex, addr */
+			pi6 = (struct in6_pktinfo *)CMSG_DATA(cmptr);
+			syslog(LOG_DEBUG, "ifindex = %u", pi6->ipi6_ifindex);
+			source_ifindex = pi6->ipi6_ifindex;
+		}
+#endif /* defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO) */
+#ifdef IP_RECVIF
+		if(cmptr->cmsg_level == IPPROTO_IP && cmptr->cmsg_type == IP_RECVIF)
+		{
+			struct sockaddr_dl *sdl;	/* fields : len, family, index, type, nlen, alen, slen, data */
+			sdl = (struct sockaddr_dl *)CMSG_DATA(cmptr);
+			syslog(LOG_DEBUG, "sdl_index = %d  %s", sdl->sdl_index, link_ntoa(sdl));
+			source_ifindex = sdl->sdl_index;
+		}
+#endif /* IP_RECVIF */
+	}
+#endif /* defined(IP_RECVIF) || defined(IP_PKTINFO) */
 #ifdef ENABLE_HTTPS
-	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername,
+	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername, source_ifindex,
 	                http_port, https_port);
 #else
-	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername,
+	ProcessSSDPData(s, bufr, n, (struct sockaddr *)&sendername, source_ifindex,
 	                http_port);
 #endif
 
@@ -850,12 +953,12 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 #ifdef ENABLE_HTTPS
 void
 ProcessSSDPData(int s, const char *bufr, int n,
-                const struct sockaddr * sender,
+                const struct sockaddr * sender, int source_if,
                 unsigned short http_port, unsigned short https_port)
 #else
 void
 ProcessSSDPData(int s, const char *bufr, int n,
-                const struct sockaddr * sender,
+                const struct sockaddr * sender, int source_if,
                 unsigned short http_port)
 #endif
 {
@@ -889,10 +992,31 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	/* get the string representation of the sender address */
 	sockaddr_to_string(sender, sender_str, sizeof(sender_str));
 	lan_addr = get_lan_for_peer(sender);
+	if(source_if >= 0)
+	{
+		if(lan_addr != NULL)
+		{
+			if(lan_addr->index != (unsigned)source_if)
+			{
+				syslog(LOG_WARNING, "interface index not matching %u != %d", lan_addr->index, source_if);
+			}
+		}
+		else
+		{
+			/* use the interface index */
+			for(lan_addr = lan_addrs.lh_first;
+			    lan_addr != NULL;
+			    lan_addr = lan_addr->list.le_next)
+			{
+				if(lan_addr->index == (unsigned)source_if)
+					break;
+			}
+		}
+	}
 	if(lan_addr == NULL)
 	{
-		syslog(LOG_WARNING, "SSDP packet sender %s not from a LAN, ignoring",
-		       sender_str);
+		syslog(LOG_WARNING, "SSDP packet sender %s (if_index=%d) not from a LAN, ignoring",
+		       sender_str, source_if);
 		return;
 	}
 

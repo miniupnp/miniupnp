@@ -1,13 +1,15 @@
-# $Id: Makefile,v 1.9 2014/11/04 22:25:00 nanard Exp $
+# $Id: Makefile,v 1.12 2017/05/26 11:01:37 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
-# (c) 2005-2014 Thomas Bernard
+# (c) 2005-2017 Thomas Bernard
 # to install use :
 # $ PREFIX=/tmp/dummylocation make install
 # or
 # $ INSTALLPREFIX=/usr/local make install
 # or
 # make install (will go to /usr/bin, /usr/lib, etc...)
+OS = $(shell uname -s)
+
 CC ?= gcc
 #AR = gar
 CFLAGS = -O0 -g -DDEBUG
@@ -16,10 +18,15 @@ CFLAGS += -fPIC
 CFLAGS += -ansi
 CFLAGS += -Wall -W
 CFLAGS += -D_BSD_SOURCE
+ifneq ($(OS), FreeBSD)
+ifneq ($(OS), Darwin)
+#CFLAGS += -D_POSIX_C_SOURCE=200112L
+CFLAGS += -D_XOPEN_SOURCE=600
+endif
+endif
 CFLAGS += -DUPNPC_USE_SELECT
 INSTALL = install
 
-OS = $(shell uname -s)
 #following libs are needed on Solaris
 ifeq ($(OS), SunOS)
   LDLIBS += -lsocket -lnsl -lresolv
