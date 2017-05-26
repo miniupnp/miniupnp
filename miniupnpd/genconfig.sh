@@ -4,7 +4,7 @@
 #
 # miniupnp daemon
 # http://miniupnp.free.fr or http://miniupnp.tuxfamily.org/
-# (c) 2006-2016 Thomas Bernard
+# (c) 2006-2017 Thomas Bernard
 # This software is subject to the conditions detailed in the
 # LICENCE file provided within the distribution
 
@@ -617,7 +617,7 @@ EOF
 
 cat >> ${CONFIGFILE} <<EOF
 /* With the following macro defined, a random string is prepended to all URLs */
-#define RANDOMIZE_URLS
+/*#define RANDOMIZE_URLS*/
 
 /* maximum lenght of SSDP packets we are generating
  * (reception is done in a 1500byte buffer) */
