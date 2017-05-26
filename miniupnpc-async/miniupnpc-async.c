@@ -402,6 +402,13 @@ static int upnpc_send_request(upnpc_device_t * p)
 		"Connection: Close\r\n"
 		"User-Agent: MiniUPnPc-async\r\n"
 		"\r\n";
+
+	/* retrieve "our" IP address used to connect to the UPnP device */
+	p->selfaddrlen = sizeof(struct sockaddr_storage);
+	if(getsockname(p->http_socket, (struct sockaddr *)&p->selfaddr, &p->selfaddrlen) < 0) {
+		PRINT_SOCKET_ERROR("getsockname()");
+	}
+
 	if(p->http_request == NULL) {
 		char hostname[MAXHOSTNAMELEN+1];
 		unsigned short port;

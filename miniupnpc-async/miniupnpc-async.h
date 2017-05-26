@@ -17,6 +17,9 @@
 #ifndef MINIUPNPC_ASYNC_H_INCLUDED
 #define MINIUPNPC_ASYNC_H_INCLUDED
 
+/* for struct sockaddr_storage */
+#include <netinet/in.h>
+
 #include "declspec.h"
 #include "upnpreplyparse.h"
 
@@ -64,6 +67,8 @@ typedef struct upnpc_device {
 	int http_response_chunked;
 	int http_response_code;
 	struct NameValueParserData soap_response_data;
+	struct sockaddr_storage selfaddr;
+	socklen_t selfaddrlen;
 } upnpc_device_t;
 
 typedef struct {

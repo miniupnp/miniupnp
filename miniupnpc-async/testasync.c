@@ -17,6 +17,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/select.h>
+/* for getnameinfo() : */
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 /* compile with -DUPNPC_USE_SELECT to enable upnpc_select_fds() function */
 #include "miniupnpc-async.h"
 #include "upnpreplyparse.h"
@@ -30,6 +34,7 @@ enum methods {
 
 int main(int argc, char * * argv)
 {
+	char ip_address[64];
 	int r, n;
 	upnpc_t upnp;
 	const char * multicastif = NULL;
@@ -120,10 +125,15 @@ int main(int argc, char * * argv)
 				next_method_to_call = EAddPortMapping;
 				break;
 			case EAddPortMapping:
+				if(getnameinfo((struct sockaddr *)&upnp.device_list->selfaddr, upnp.device_list->selfaddrlen,
+				               ip_address, sizeof(ip_address), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV) < 0) {
+					fprintf(stderr, "getnameinfo() failed\n");
+				}
+				printf("our IP address is %s\n", ip_address);
 				printf("AddPortMapping\n");
 				upnpc_add_port_mapping(upnp.device_list,	/* XXX */
                            NULL /* remote_host */, 40002 /* ext_port */,
-                           42042 /* int_port */, "192.168.1.202" /* int_client */,
+                           42042 /* int_port */, ip_address /* int_client */,
                            "TCP" /* proto */, "this is a test" /* description */,
                            0 /* lease duration */);
 				next_method_to_call = ENothing;
