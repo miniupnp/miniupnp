@@ -1,9 +1,9 @@
-/* $Id: upnphttp.c,v 1.103 2015/12/16 10:21:49 nanard Exp $ */
-/* vim: tabstop=4 shiftwidth=4 noexpandtab */
-/* Project :  miniupnp
+/* $Id: upnphttp.c,v 1.106 2017/05/27 07:47:57 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2015 Thomas Bernard
+ * Copyright (c) 2005-2017 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */

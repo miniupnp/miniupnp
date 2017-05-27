@@ -1,5 +1,6 @@
-/* $Id: minissdp.c,v 1.87 2017/05/24 22:33:33 nanard Exp $ */
-/* MiniUPnP project
+/* $Id: minissdp.c,v 1.88 2017/05/27 07:47:55 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2017 Thomas Bernard
  * This software is subject to the conditions detailed

@@ -1,9 +1,8 @@
-/* $Id: upnpdescgen.c,v 1.77 2014/03/10 11:04:53 nanard Exp $ */
+/* $Id: upnpdescgen.c,v 1.83 2017/05/27 07:47:57 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
- */
-/* MiniUPnP project
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2016 Thomas Bernard
+ * (c) 2006-2017 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
