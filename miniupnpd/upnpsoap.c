@@ -2116,14 +2116,14 @@ GetSupportedProtocols(struct upnphttp * h, const char * action, const char * ns)
 	char body[1024];
 	int bodylen;
 	const char * ProtocolList =
-		"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-		"<SupportedProtocols xmlns=\"urn:schemas-upnp-org:gw:DeviceProtection\""
-		" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
-		" xsi:schemaLocation=\"urn:schemas-upnp-org:gw:DeviceProtection"
-		" http://www.upnp.org/schemas/gw/DeviceProtection-v1.xsd\">"
-		"<Introduction><Name>WPS</Name></Introduction>"
-		"<Login><Name>PKCS5</Name></Login>"
-		"</SupportedProtocols>";
+		"&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;\n"
+		"&lt;SupportedProtocols xmlns=&quot;urn:schemas-upnp-org:gw:DeviceProtection&quot;"
+		" xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;"
+		" xsi:schemaLocation=&quot;urn:schemas-upnp-org:gw:DeviceProtection"
+		" http://www.upnp.org/schemas/gw/DeviceProtection-v1.xsd&quot;&gt;"
+		"&lt;Introduction&gt;&lt;Name&gt;WPS&lt;/Name&gt;&lt;/Introduction&gt;"
+		"&lt;Login&gt;&lt;Name&gt;PKCS5&lt;/Name&gt;&lt;/Login&gt;"
+		"&lt;/SupportedProtocols&gt;";
 
 	bodylen = snprintf(body, sizeof(body), resp,
 	                   action, ns/*"urn:schemas-upnp-org:service:DeviceProtection:1"*/,
