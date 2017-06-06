@@ -2116,7 +2116,6 @@ GetSupportedProtocols(struct upnphttp * h, const char * action, const char * ns)
 	char body[1024];
 	int bodylen;
 	const char * ProtocolList =
-		"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 		"<SupportedProtocols xmlns=\"urn:schemas-upnp-org:gw:DeviceProtection\""
 		" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
 		" xsi:schemaLocation=\"urn:schemas-upnp-org:gw:DeviceProtection"
