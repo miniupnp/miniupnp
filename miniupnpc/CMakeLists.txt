@@ -44,7 +44,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif ()
 
 # Set compiler specific build flags
-if (CMAKE_COMPILER_IS_GNUC)
+if (CMAKE_COMPILER_IS_GNUCC)
   # Set our own default flags at first run.
   if (NOT CONFIGURED)
 
