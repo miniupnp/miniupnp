@@ -8,6 +8,8 @@
 #ifndef UPNPEVENTS_H_INCLUDED
 #define UPNPEVENTS_H_INCLUDED
 
+/* for fd_set */
+#include <sys/select.h>
 #include "config.h"
 
 #ifdef ENABLE_EVENTS
