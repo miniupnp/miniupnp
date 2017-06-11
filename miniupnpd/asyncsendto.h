@@ -7,6 +7,8 @@
 
 #ifndef ASYNCSENDTO_H_INCLUDED
 #define ASYNCSENDTO_H_INCLUDED
+/* for fd_set */
+#include <sys/select.h>
 
 /* sendto_schedule() : see sendto(2)
  * schedule sendto() call after delay (milliseconds) */

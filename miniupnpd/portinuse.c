@@ -23,6 +23,7 @@
 
 #if defined(__OpenBSD__)
 #include <sys/queue.h>
+#include <sys/select.h>
 #include <kvm.h>
 #include <fcntl.h>
 #include <nlist.h>

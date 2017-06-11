@@ -19,6 +19,8 @@
 
 /* for struct sockaddr_storage */
 #include <netinet/in.h>
+/* for fd_set */
+#include <sys/select.h>
 
 #include "declspec.h"
 #include "upnpreplyparse.h"
