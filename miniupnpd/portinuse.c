@@ -1,6 +1,7 @@
 /* $Id: portinuse.c,v 1.3 2014/04/01 12:52:50 nanard Exp $ */
-/* MiniUPnP project
- * (c) 2007-2014 Thomas Bernard
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
+ * (c) 2007-2017 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
