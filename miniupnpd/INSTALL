@@ -6,7 +6,7 @@ github: https://github.com/miniupnp/miniupnp
 
 miniupnpd is still under active developpement. This documentation is
 likely to be a little outdated when you read it. So please go on the
-web forum http://miniupnp.tuxfamily.org/ if you need more information.
+web forum https://miniupnp.tuxfamily.org/ if you need more information.
 
 ================================ *BSD/pf =================================
 To Build and Install :
@@ -116,7 +116,7 @@ work is in progress. To build :
  > make -f Makefile.linux_nft
 
 see :
-http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=4370
+https://miniupnp.tuxfamily.org/forum/viewtopic.php?p=4370
 https://github.com/miniupnp/miniupnp/pull/114
 
 =========================== Configuration =============================
