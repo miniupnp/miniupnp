@@ -56,7 +56,11 @@
 
 #if defined(USE_NETFILTER)
 /* Hardcoded for now.  Ideally would come from .conf file */
-char *chains_to_check[] = { "PREROUTING" , 0 };
+#	ifdef TOMATO
+		char *chains_to_check[] = { "WANPREROUTING" , 0 };
+#	else
+		char *chains_to_check[] = { "PREROUTING" , 0 };
+#	endif
 #endif
 
 int
