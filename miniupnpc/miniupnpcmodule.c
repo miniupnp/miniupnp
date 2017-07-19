@@ -307,7 +307,7 @@ UPnP_addportmapping(UPnPObject *self, PyObject *args)
 	const char * remoteHost;
 	const char * leaseDuration = "0";
 	int r;
-	if (!PyArg_ParseTuple(args, "HssHss", &ePort, &proto,
+	if (!PyArg_ParseTuple(args, "HssHzz", &ePort, &proto,
 	                                     &host, &iPort, &desc, &remoteHost))
         return NULL;
 Py_BEGIN_ALLOW_THREADS
@@ -349,7 +349,7 @@ UPnP_addanyportmapping(UPnPObject *self, PyObject *args)
 	const char * remoteHost;
 	const char * leaseDuration = "0";
 	int r;
-	if (!PyArg_ParseTuple(args, "HssHss", &ePort, &proto, &host, &iPort, &desc, &remoteHost))
+	if (!PyArg_ParseTuple(args, "HssHzz", &ePort, &proto, &host, &iPort, &desc, &remoteHost))
         return NULL;
 Py_BEGIN_ALLOW_THREADS
 	sprintf(extPort, "%hu", ePort);
