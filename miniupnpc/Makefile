@@ -173,18 +173,18 @@ check:	validateminixml validateminiwget validateupnpreplyparse \
 everything:	all $(EXECUTABLES_ADDTESTS)
 
 pythonmodule:	$(LIBRARY) miniupnpcmodule.c setup.py
-	python setup.py build
+	MAKE=$(MAKE) python setup.py build
 	touch $@
 
 installpythonmodule:	pythonmodule
-	python setup.py install
+	MAKE=$(MAKE) python setup.py install
 
 pythonmodule3:	$(LIBRARY) miniupnpcmodule.c setup.py
-	python3 setup.py build
+	MAKE=$(MAKE) python3 setup.py build
 	touch $@
 
 installpythonmodule3:	pythonmodule3
-	python3 setup.py install
+	MAKE=$(MAKE) python3 setup.py install
 
 validateminixml:	minixmlvalid
 	@echo "minixml validation test"
