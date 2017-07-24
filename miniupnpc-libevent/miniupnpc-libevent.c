@@ -148,7 +148,7 @@ static void upnpc_send_ssdp_msearch(evutil_socket_t s, short events, upnpc_t * p
 	char bufr[1024];
 	struct sockaddr_in addr;
 	unsigned int mx = 2;
-	static const char MSearchMsgFmt[] = 
+	static const char MSearchMsgFmt[] =
 	"M-SEARCH * HTTP/1.1\r\n"
 	"HOST: " SSDP_MCAST_ADDR ":" XSTR(SSDP_PORT) "\r\n"
 	"ST: %s\r\n"
@@ -476,7 +476,7 @@ static void upnpc_soap_response(struct evhttp_request * req, void * pvoid)
 		return;
 
 	ClearNameValueList(&d->soap_response_data);
-	ParseNameValue((char *)data, (int)len, 
+	ParseNameValue((char *)data, (int)len,
 	               &d->soap_response_data);
 	d->state &= ~UPNPC_DEVICE_SOAP_REQ;
 	if(d->state & UPNPC_DEVICE_READY) {
@@ -571,7 +571,7 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 {
 	char action[128];
 	char * body;
-	const char fmt_soap[] = 
+	const char fmt_soap[] =
 		"<?xml version=\"1.0\"?>\r\n"
 		"<" SOAPPREFIX ":Envelope "
 		"xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
@@ -741,7 +741,7 @@ int upnpc_init(upnpc_t * p, struct event_base * base, const char * multicastif,
 		return UPNPC_ERR_SOCKET_FAILED;
 	}
 	/* set multicast TTL */
-	if(setsockopt(p->ssdp_socket, IPPROTO_IP, IP_MULTICAST_TTL, &p->ttl, sizeof(p->ttl) < 0))
+	if(setsockopt(p->ssdp_socket, IPPROTO_IP, IP_MULTICAST_TTL, &p->ttl, sizeof(p->ttl)) < 0)
 	{
 		/* not a fatal error */
 		debug_printf("setsockopt(%d, ..., IP_MULTICAST_TTL, ...) FAILED\n", p->ssdp_socket);
