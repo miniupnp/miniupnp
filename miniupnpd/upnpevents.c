@@ -473,7 +473,8 @@ static void upnp_event_send(struct upnp_event_notify * obj)
 	i = send(obj->s, obj->buffer + obj->sent, obj->tosend - obj->sent, 0);
 	if(i<0) {
 		if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
-			syslog(LOG_NOTICE, "%s: send(): %m", "upnp_event_send");
+			syslog(LOG_NOTICE, "%s: send(%s%s): %m", "upnp_event_send",
+			       obj->addrstr, obj->portstr);
 			obj->state = EError;
 			return;
 		} else {
