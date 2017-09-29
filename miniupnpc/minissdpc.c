@@ -615,8 +615,13 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	}
 
 	if(ipv6) {
+#ifdef _WIN32
+		DWORD mcastHops = ttl;
+		if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char *)&mcastHops, sizeof(mcastHops)) < 0)
+#else  /* _WIN32 */
 		int mcastHops = ttl;
 		if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mcastHops, sizeof(mcastHops)) < 0)
+#endif /* _WIN32 */
 		{
 			PRINT_SOCKET_ERROR("setsockopt(IPV6_MULTICAST_HOPS,...)");
 		}
