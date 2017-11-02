@@ -1,7 +1,7 @@
-/* $Id: minihttptestserver.c,v 1.19 2015/11/17 09:07:17 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.21 2017/11/02 16:52:37 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
- * Copyright (c) 2011-2016 Thomas Bernard
+ * Copyright (c) 2011-2017 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -23,6 +23,8 @@
 #endif
 
 #define CRAP_LENGTH (2048)
+
+static int server(unsigned short port, const char * expected_file_name, int ipv6);
 
 volatile sig_atomic_t quit = 0;
 volatile sig_atomic_t child_to_wait_for = 0;
@@ -485,17 +487,9 @@ void handle_http_connection(int c)
  */
 int main(int argc, char * * argv) {
 	int ipv6 = 0;
-	int s, c, i;
+	int r, i;
 	unsigned short port = 0;
-	struct sockaddr_storage server_addr;
-	socklen_t server_addrlen;
-	struct sockaddr_storage client_addr;
-	socklen_t client_addrlen;
-	pid_t pid;
-	int child = 0;
-	int status;
 	const char * expected_file_name = NULL;
-	struct sigaction sa;
 
 	for(i = 1; i < argc; i++) {
 		if(argv[i][0] == '-') {
@@ -522,6 +516,26 @@ int main(int argc, char * * argv) {
 	}
 
 	srand(time(NULL));
+
+	r = server(port, expected_file_name, ipv6);
+	if(r != 0) {
+		printf("*** ERROR ***\n");
+	}
+	return r;
+}
+
+static int server(unsigned short port, const char * expected_file_name, int ipv6)
+{
+	int s, c;
+	int i;
+	struct sockaddr_storage server_addr;
+	socklen_t server_addrlen;
+	struct sockaddr_storage client_addr;
+	socklen_t client_addrlen;
+	pid_t pid;
+	int child = 0;
+	int status;
+	struct sigaction sa;
 
 	memset(&sa, 0, sizeof(struct sigaction));
 

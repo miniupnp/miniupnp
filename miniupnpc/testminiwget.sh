@@ -1,7 +1,7 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.13 2015/09/03 17:57:44 nanard Exp $
+# $Id: testminiwget.sh,v 1.14 2017/11/02 16:52:37 nanard Exp $
 # project miniupnp : http://miniupnp.free.fr/
-# (c) 2011-2015 Thomas Bernard
+# (c) 2011-2017 Thomas Bernard
 #
 # test program for miniwget.c
 # is usually invoked by "make check"
@@ -44,6 +44,10 @@ while [ -z "$PORT" ]; do
 	sleep 1
 	PORT=`cat $HTTPSERVEROUT | sed 's/Listening on port \([0-9]*\)/\1/' `
 done
+if [ "$PORT" = "*** ERROR ***" ]; then
+	echo "HTTP test server error"
+	exit 2
+fi
 echo "Test HTTP server is listening on $PORT"
 
 URL1="http://$ADDR:$PORT/index.html"
