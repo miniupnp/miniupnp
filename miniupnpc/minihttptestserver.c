@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.21 2017/11/02 16:52:37 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.22 2017/11/02 17:01:36 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011-2017 Thomas Bernard
@@ -160,7 +160,7 @@ char * build_chunked_response(int content_length, int * response_len)
 #else
 #define FAVICON_LENGTH (6 + 16 + 40 + 8 + 32 * 4)
 #endif
-void build_favicon_content(char * p, int n)
+void build_favicon_content(unsigned char * p, int n)
 {
 	int i;
 	if(n < FAVICON_LENGTH)
@@ -450,7 +450,7 @@ void handle_http_connection(int c)
 		             "Content-Length: %d\r\n"
 		             "\r\n", content_length);
 		/* image/x-icon */
-		build_favicon_content(response_buffer + n, content_length);
+		build_favicon_content((unsigned char *)(response_buffer + n), content_length);
 		response_len = content_length + n;
 		break;
 	default:
