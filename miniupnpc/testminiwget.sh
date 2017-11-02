@@ -21,6 +21,10 @@ EXPECTEDFILE="${TMPD}/expectedfile"
 DOWNLOADEDFILE="${TMPD}/downloadedfile"
 PORT=
 RET=0
+IPCONFIG=$(which ifconfig)
+if [ -z "$IPCONFIG" ] ; then
+	IPCONFIG="/sbin/ifconfig"
+fi
 
 case "$HAVE_IPV6" in
     n|no|0)
@@ -46,6 +50,8 @@ while [ -z "$PORT" ]; do
 done
 if [ "$PORT" = "*** ERROR ***" ]; then
 	echo "HTTP test server error"
+	echo "Network config :"
+	$IPCONFIG -a
 	exit 2
 fi
 echo "Test HTTP server is listening on $PORT"
