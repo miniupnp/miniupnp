@@ -26,6 +26,10 @@ if [ -z "$IPCONFIG" ] ; then
 	IPCONFIG="/sbin/ifconfig"
 fi
 
+if ! $IPCONFIG -a | grep inet6 ; then
+	HAVE_IPV6=no
+fi
+
 case "$HAVE_IPV6" in
     n|no|0)
         ADDR=localhost
