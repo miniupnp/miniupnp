@@ -2061,6 +2061,12 @@ main(int argc, char * * argv)
 				upnp_event_var_change_notify(EWanIPC);
 			}
 #endif
+#ifdef ENABLE_PCP
+			if(GETFLAG(ENABLENATPMPMASK))
+			{
+				PCPPublicAddressChanged();
+			}
+#endif
 			should_send_public_address_change_notif = 0;
 		}
 		/* Check if we need to send SSDP NOTIFY messages and do it if

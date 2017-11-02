@@ -52,4 +52,10 @@ int ProcessIncomingPCPPacket(int s, unsigned char *msg_buff, int len,
  */
 int OpenAndConfPCPv6Socket(void);
 
+
+/*
+ * To be called when Public IP address changed (IPv4)
+ */
+void PCPPublicAddressChanged(void);
+
 #endif /* PCPSERVER_H_INCLUDED */

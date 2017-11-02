@@ -101,8 +101,10 @@ struct pcp_server_info {
 };
 
 /* default server settings, highest version supported is the default */
-static struct pcp_server_info this_server_info = {2};
+static const struct pcp_server_info this_server_info = {2};
 
+/* origin for "epoch time" sent into responses */
+time_t epoch_origin = 0;
 
 /* structure holding information from PCP msg*/
 /* all variables are in host byte order except IP addresses */
@@ -1448,7 +1450,10 @@ static void createPCPResponse(unsigned char *response, pcp_info_t *pcp_msg_info)
 
 	response[1] |= 0x80;	/* r_opcode */
 	response[3] = pcp_msg_info->result_code;
-	WRITENU32(response + 8, time(NULL) - startup_time); /* epochtime */
+	if(epoch_origin == 0) {
+		epoch_origin = startup_time;
+	}
+	WRITENU32(response + 8, time(NULL) - epoch_origin); /* epochtime */
 	switch (pcp_msg_info->result_code) {
 	/*long lifetime errors*/
 	case PCP_ERR_UNSUPP_VERSION:
@@ -1633,4 +1638,12 @@ int OpenAndConfPCPv6Socket(void)
 	return s;
 }
 #endif /*ENABLE_IPV6*/
+
+void PCPPublicAddressChanged(void)
+{
+	/* according to RFC 6887  8.5 :
+	 *   if the external IP address(es) of the NAT (controlled by
+	 *   the PCP server) changes, the Epoch time MUST be reset. */
+	epoch_origin = time(NULL);
+}
 #endif /*ENABLE_PCP*/
