@@ -1,7 +1,8 @@
-/* $Id: upnpevents.c,v 1.35 2016/02/11 10:41:44 nanard Exp $ */
-/* MiniUPnP project
+/* $Id: upnpevents.c,v 1.38 2017/11/02 15:50:35 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2008-2016 Thomas Bernard
+ * (c) 2008-2017 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
