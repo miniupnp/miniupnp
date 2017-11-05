@@ -466,8 +466,8 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d): %m",
-			       "SendNATPMPPublicAddressChangeNotification", sockets[j]);
+			syslog(LOG_ERR, "%s: sendto(s_udp=%d, port=%d): %m",
+			       "SendNATPMPPublicAddressChangeNotification", sockets[j], NATPMP_PORT);
 			return;
 		}
 		/* Port to use in 2008 version of the NAT-PMP specification */
@@ -476,8 +476,8 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d): %m",
-			       "SendNATPMPPublicAddressChangeNotification", sockets[j]);
+			syslog(LOG_ERR, "%s: sendto(s_udp=%d, port=%d): %m",
+			       "SendNATPMPPublicAddressChangeNotification", sockets[j], NATPMP_NOTIF_PORT);
 			return;
 		}
 	}
