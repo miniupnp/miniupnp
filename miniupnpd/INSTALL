@@ -189,4 +189,6 @@ SIGINT:  Close gracefully
 SIGTERM: Close gracefully
 SIGPIPE: Ignore
 
-So you may want to send SIGUSR1 to miniupnpd if you public IP address changed...
+There is code to detect change in network interfaces bsd/ifacewatcher.c and
+linux/ifacewatcher.c, but if that code doesn't work for you, you may want to
+send SIGUSR1 to miniupnpd if you public IP address changed.
