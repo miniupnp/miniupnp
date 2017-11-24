@@ -535,16 +535,6 @@ static const struct stateVar WANIPCnVars[] =
 	{"PortMappingEnabled", 1, 0}, /* Required */
 /* 10 */
 	{"PortMappingLeaseDuration", 3, 2, 1}, /* required */
-	/* TODO : for IGD v2 :
-	 * <stateVariable sendEvents="no">
-	 *   <name>PortMappingLeaseDuration</name>
-	 *   <dataType>ui4</dataType>
-	 *   <defaultValue>Vendor-defined</defaultValue>
-	 *   <allowedValueRange>
-	 *      <minimum>0</minimum>
-	 *      <maximum>604800</maximum>
-	 *   </allowedValueRange>
-	 * </stateVariable> */
 	{"RemoteHost", 0, 0},   /* required. Default : empty string */
 	{"ExternalPort", 2, 0}, /* required */
 	{"InternalPort", 2, 0, 3}, /* required */
@@ -894,6 +884,7 @@ static char *
 genXML(char * str, int * len, int * tmplen,
                    const struct XMLElt * p)
 {
+#define GENXML_STACK_SIZE 16
 	unsigned short i, j;
 	unsigned long k;
 	int top;
@@ -903,7 +894,7 @@ genXML(char * str, int * len, int * tmplen,
 		unsigned short i;
 		unsigned short j;
 		const char * eltname;
-	} pile[16]; /* stack */
+	} pile[GENXML_STACK_SIZE]; /* stack */
 	top = -1;
 	i = 0;	/* current node */
 	j = 1;	/* i + number of nodes*/
@@ -914,6 +905,7 @@ genXML(char * str, int * len, int * tmplen,
 			return str;
 		if(eltname[0] == '/')
 		{
+			/* leaf node */
 			if(p[i].data && p[i].data[0])
 			{
 				/*printf("<%s>%s<%s>\n", eltname+1, p[i].data, eltname); */
@@ -957,6 +949,7 @@ genXML(char * str, int * len, int * tmplen,
 		}
 		else
 		{
+			/* node with child(ren) */
 			/*printf("<%s>\n", eltname); */
 			str = strcat_char(str, len, tmplen, '<');
 			str = strcat_str(str, len, tmplen, eltname);
@@ -971,11 +964,17 @@ genXML(char * str, int * len, int * tmplen,
 			k = (unsigned long)p[i].data;
 			i = k & 0xffff;
 			j = i + (k >> 16);
-			top++;	/* TODO : check stack overflow ! */
-			/*printf(" +pile[%d]\t%d %d\n", top, i, j); */
-			pile[top].i = i;
-			pile[top].j = j;
-			pile[top].eltname = eltname;
+			if(top < (GENXML_STACK_SIZE - 1)) {
+				top++;
+				/*printf(" +pile[%d]\t%d %d\n", top, i, j); */
+				pile[top].i = i;
+				pile[top].j = j;
+				pile[top].eltname = eltname;
+#ifdef DEBUG
+			} else {
+				fprintf(stderr, "*** GenXML(): stack OVERFLOW ***\n");
+#endif /* DEBUG */
+			}
 		}
 	}
 }
