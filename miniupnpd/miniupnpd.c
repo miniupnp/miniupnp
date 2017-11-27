@@ -2064,7 +2064,11 @@ main(int argc, char * * argv)
 #ifdef ENABLE_PCP
 			if(GETFLAG(ENABLENATPMPMASK))
 			{
-				PCPPublicAddressChanged();
+#ifdef ENABLE_IPV6
+				PCPPublicAddressChanged(snatpmp, addr_count, spcp_v6);
+#else /* IPv4 only */
+				PCPPublicAddressChanged(snatpmp, addr_count);
+#endif
 			}
 #endif
 			should_send_public_address_change_notif = 0;

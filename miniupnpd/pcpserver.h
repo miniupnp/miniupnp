@@ -56,6 +56,10 @@ int OpenAndConfPCPv6Socket(void);
 /*
  * To be called when Public IP address changed (IPv4)
  */
-void PCPPublicAddressChanged(void);
+#ifdef ENABLE_IPV6
+void PCPPublicAddressChanged(int * sockets, int n_sockets, int socket6);
+#else /* IPV4 Only */
+void PCPPublicAddressChanged(int * sockets, int n_sockets);
+#endif
 
 #endif /* PCPSERVER_H_INCLUDED */
