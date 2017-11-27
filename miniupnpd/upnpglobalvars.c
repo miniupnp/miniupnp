@@ -31,6 +31,11 @@ unsigned long upstream_bitrate = 0;
 /* startup time */
 time_t startup_time = 0;
 
+#if defined(ENABLE_NATPMP) || defined(ENABLE_PCP)
+/* origin for "epoch time" sent into NATPMP and PCP responses */
+time_t epoch_origin = 0;
+#endif /*  defined(ENABLE_NATPMP) || defined(ENABLE_PCP) */
+
 #ifdef ENABLE_PCP
 /* for PCP */
 unsigned long int min_lifetime = 120;

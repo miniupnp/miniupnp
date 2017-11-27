@@ -32,6 +32,10 @@ extern unsigned long upstream_bitrate;
 
 /* statup time */
 extern time_t startup_time;
+#if defined(ENABLE_NATPMP) || defined(ENABLE_PCP)
+/* origin for "epoch time" sent into NATPMP and PCP responses */
+extern time_t epoch_origin;
+#endif /*  defined(ENABLE_NATPMP) || defined(ENABLE_PCP) */
 
 extern unsigned long int min_lifetime;
 extern unsigned long int max_lifetime;

@@ -103,9 +103,6 @@ struct pcp_server_info {
 /* default server settings, highest version supported is the default */
 static const struct pcp_server_info this_server_info = {2};
 
-/* origin for "epoch time" sent into responses */
-time_t epoch_origin = 0;
-
 /* structure holding information from PCP msg*/
 /* all variables are in host byte order except IP addresses */
 typedef struct pcp_info {
