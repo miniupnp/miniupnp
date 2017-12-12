@@ -1,5 +1,11 @@
 $Id: Changelog.txt,v 1.432 2017/05/24 22:47:53 nanard Exp $
 
+2017/12/12:
+  Fix a few buffer overrun in SSDP and SOAP parsing
+
+2017/11/02:
+  PCP : reset epoch after address change
+
 2017/05/26:
   merge https://github.com/miniupnp/miniupnp/tree/randomize_url branch
 
