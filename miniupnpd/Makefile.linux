@@ -1,6 +1,6 @@
-# $Id: Makefile.linux,v 1.93 2016/02/12 14:28:01 nanard Exp $
+# $Id: Makefile.linux,v 1.95 2017/12/12 11:40:14 nanard Exp $
 # MiniUPnP project
-# (c) 2006-2015 Thomas Bernard
+# (c) 2006-2017 Thomas Bernard
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author : Thomas Bernard
 # for use with GNU Make
@@ -167,7 +167,7 @@ TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl testgetifaddr \
               testgetroute testasyncsendto testportinuse \
-              testssdppktgen
+              testssdppktgen testminissdp
 
 .PHONY:	all clean install depend genuuid
 
@@ -245,6 +245,10 @@ testasyncsendto:	testasyncsendto.o asyncsendto.o upnputils.o \
 
 testportinuse:	testportinuse.o portinuse.o getifaddr.o \
 	netfilter/iptcrdr.o
+
+testminissdp:	testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
+	asyncsendto.o linux/getroute.o
+
 
 miniupnpdctl:	miniupnpdctl.o
 
