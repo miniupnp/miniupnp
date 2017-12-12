@@ -27,6 +27,8 @@ matrix:
   exclude:
     - os: osx
       env: PROJECT=miniupnpd
+    - os: osx
+      compiler: gcc
 
 compiler:
   - gcc
