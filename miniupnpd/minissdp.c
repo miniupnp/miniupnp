@@ -40,6 +40,10 @@
 #include "codelength.h"
 #include "macros.h"
 
+#ifndef MIN
+#define MIN(x,y) (((x)<(y))?(x):(y))
+#endif /* MIN */
+
 /* SSDP ip/port */
 #define SSDP_PORT (1900)
 #define SSDP_MCAST_ADDR ("239.255.255.250")
@@ -989,6 +993,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	 * a multiple part response from the device, those multiple part
 	 * responses SHOULD be spread at random intervals through the time period
 	 * from 0 to the number of seconds specified in the MX header field. */
+	char atoi_buffer[8];
 
 	/* get the string representation of the sender address */
 	sockaddr_to_string(sender, sender_str, sizeof(sender_str));
@@ -1040,13 +1045,15 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				st_len = 0;
 				while((*st == ' ' || *st == '\t') && (st < bufr + n))
 					st++;
-				while(st[st_len]!='\r' && st[st_len]!='\n'
-				     && (st + st_len < bufr + n))
+				while((st + st_len < bufr + n)
+				      && (st[st_len]!='\r' && st[st_len]!='\n'))
 					st_len++;
 				l = st_len;
 				while(l > 0 && st[l-1] != ':')
 					l--;
-				st_ver = atoi(st+l);
+				memset(atoi_buffer, 0, sizeof(atoi_buffer));
+				memcpy(atoi_buffer, st + l, MIN((int)(sizeof(atoi_buffer) - 1), st_len - l));
+				st_ver = atoi(atoi_buffer);
 				syslog(LOG_DEBUG, "ST: %.*s (ver=%d)", st_len, st, st_ver);
 				/*j = 0;*/
 				/*while(bufr[i+j]!='\r') j++;*/
@@ -1059,12 +1066,14 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				int mx_len;
 				mx = bufr+i+3;
 				mx_len = 0;
-				while((*mx == ' ' || *mx == '\t') && (mx < bufr + n))
+				while((mx < bufr + n) && (*mx == ' ' || *mx == '\t'))
 					mx++;
-				while(mx[mx_len]!='\r' && mx[mx_len]!='\n'
-				     && (mx + mx_len < bufr + n))
+				while((mx + mx_len < bufr + n)
+				      && (mx[mx_len]!='\r' && mx[mx_len]!='\n'))
 					mx_len++;
-				mx_value = atoi(mx);
+				memset(atoi_buffer, 0, sizeof(atoi_buffer));
+				memcpy(atoi_buffer, mx, MIN((int)(sizeof(atoi_buffer) - 1), mx_len));
+				mx_value = atoi(atoi_buffer);
 				syslog(LOG_DEBUG, "MX: %.*s (value=%d)", mx_len, mx, mx_value);
 			}
 #endif /* defined(UPNP_STRICT) || defined(DELAY_MSEARCH_RESPONSE) */
@@ -1076,12 +1085,12 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				int man_len;
 				man = bufr+i+4;
 				man_len = 0;
-				while((*man == ' ' || *man == '\t') && (man < bufr + n))
+				while((man < bufr + n) && (*man == ' ' || *man == '\t'))
 					man++;
-				while(man[man_len]!='\r' && man[man_len]!='\n'
-				     && (man + man_len < bufr + n))
+				while((man + man_len < bufr + n)
+					  && (man[man_len]!='\r' && man[man_len]!='\n'))
 					man_len++;
-				if(strncmp(man, "\"ssdp:discover\"", 15) != 0) {
+				if((man_len < 15) || (strncmp(man, "\"ssdp:discover\"", 15) != 0)) {
 					syslog(LOG_INFO, "ignoring SSDP packet MAN empty or invalid header");
 					return;
 				}
