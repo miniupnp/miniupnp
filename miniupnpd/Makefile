@@ -139,11 +139,13 @@ TESTGETIFADDROBJS = testgetifaddr.o getifaddr.o
 MINIUPNPDCTLOBJS = miniupnpdctl.o
 TESTASYNCSENDTOOBJS = testasyncsendto.o asyncsendto.o upnputils.o bsd/getroute.o
 TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o
+TESTMINISSDPOBJS = testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
+                   asyncsendto.o bsd/getroute.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
-              testportinuse testssdppktgen
+              testportinuse testssdppktgen testminissdp
 
 .if $(OSNAME) == "Darwin"
 LIBS =
@@ -251,6 +253,9 @@ testasyncsendto:	config.h $(TESTASYNCSENDTOOBJS)
 
 testportinuse:	config.h $(TESTPORTINUSEOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTPORTINUSEOBJS) $(LIBS)
+
+testminissdp:	config.h $(TESTMINISSDPOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTMINISSDPOBJS) $(LIBS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^
