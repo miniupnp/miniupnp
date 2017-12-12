@@ -1,4 +1,4 @@
-/* $Id: upnpreplyparse.c,v 1.19 2015/07/15 10:29:11 nanard Exp $ */
+/* $Id: upnpreplyparse.c,v 1.20 2017/12/12 11:26:25 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -27,12 +27,12 @@ NameValueParserStartElt(void * d, const char * name, int l)
 }
 
 static void
-NameValueParserEndElt(void * d, const char * name, int l)
+NameValueParserEndElt(void * d, const char * name, int namelen)
 {
     struct NameValueParserData * data = (struct NameValueParserData *)d;
     struct NameValue * nv;
 	(void)name;
-	(void)l;
+	(void)namelen;
 	if(!data->topelt)
 		return;
 	if(strcmp(data->curelt, "NewPortListing") != 0)
