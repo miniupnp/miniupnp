@@ -1,7 +1,7 @@
 /* $Id: testupnpreplyparse.c,v 1.4 2014/01/27 11:45:19 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2017 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include <stdio.h>
@@ -55,8 +55,8 @@ test_parsing(const char * buf, int len, FILE * f)
 int main(int argc, char * * argv)
 {
 	FILE * f;
-	char buffer[4096];
-	int l;
+	char * buffer;
+	long l;
 	int ok;
 
 	if(argc<2)
@@ -70,7 +70,25 @@ int main(int argc, char * * argv)
 		fprintf(stderr, "Error : can not open file %s\n", argv[1]);
 		return 2;
 	}
-	l = fread(buffer, 1, sizeof(buffer)-1, f);
+	if(fseek(f, 0, SEEK_END) < 0) {
+		perror("fseek");
+		return 1;
+	}
+	l = (int)ftell(f);
+	if(l < 0) {
+		perror("ftell");
+		return 1;
+	}
+	if(fseek(f, 0, SEEK_SET) < 0) {
+		perror("fseek");
+		return 1;
+	}
+	buffer = malloc(l + 1);
+	if(buffer == NULL) {
+		fprintf(stderr, "Error: failed to allocate %ld bytes\n", l+1);
+		return 1;
+	}
+	l = fread(buffer, 1, l, f);
 	fclose(f);
 	f = NULL;
 	buffer[l] = '\0';
@@ -91,6 +109,7 @@ int main(int argc, char * * argv)
 	{
 		fclose(f);
 	}
+	free(buffer);
 	return ok ? 0 : 3;
 }
 

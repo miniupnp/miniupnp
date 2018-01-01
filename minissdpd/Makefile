@@ -17,7 +17,7 @@ CFLAGS += -Wall
 CFLAGS += -W -Wstrict-prototypes
 CFLAGS += -fno-strict-aliasing -fno-common
 CFLAGS += -D_GNU_SOURCE
-CFLAGS += -ansi
+#CFLAGS += -ansi
 CC ?= gcc
 RM = rm -f
 INSTALL = install
@@ -28,6 +28,12 @@ ifeq ($(OS), Linux)
 endif
 ifeq ($(DEB_BUILD_ARCH_OS), kfreebsd)
 	LDLIBS += -lfreebsd-glue
+endif
+ifeq ($(OS), SunOS)
+	CFLAGS += -D_XOPEN_SOURCE
+	CFLAGS += -D_XOPEN_SOURCE_EXTENDED=1
+	CFLAGS += -D__EXTENSIONS__
+	LDFLAGS += -lsocket -lnsl -lresolv
 endif
 
 #EXECUTABLES = minissdpd testminissdpd listifaces

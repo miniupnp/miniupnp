@@ -4,7 +4,7 @@
 
 OS=`uname -s`
 IF=lo
-if [ "$OS" = "Darwin" ] ; then
+if [ "$OS" = "Darwin" ] || [ "$OS" = "SunOS" ] ; then
 	IF=lo0
 fi
 # if set, 1st argument is network interface

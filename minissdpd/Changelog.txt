@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.45 2016/03/01 18:06:46 nanard Exp $
+$Id: Changelog.txt,v 1.47 2016/12/16 09:22:35 nanard Exp $
+
+2016/11/11:
+	Fix for Solaris build
 
 2016/03/01:
 	Fix broken overflow test (p+l > buf+n) thanks to Salva Peiro

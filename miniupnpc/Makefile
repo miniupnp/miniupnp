@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.133 2016/01/24 17:24:35 nanard Exp $
+# $Id: Makefile,v 1.134 2016/10/07 09:04:36 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2015 Thomas Bernard
+# (c) 2005-2017 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -38,6 +38,9 @@ CFLAGS += -DMINIUPNPC_SET_SOCKET_TIMEOUT
 CFLAGS += -DMINIUPNPC_GET_SRC_ADDR
 CFLAGS += -D_BSD_SOURCE
 CFLAGS += -D_DEFAULT_SOURCE
+ifeq ($(OS), NetBSD)
+CFLAGS += -D_NETBSD_SOURCE
+endif
 ifneq ($(OS), FreeBSD)
 ifneq ($(OS), Darwin)
 #CFLAGS += -D_POSIX_C_SOURCE=200112L
@@ -45,7 +48,7 @@ CFLAGS += -D_XOPEN_SOURCE=600
 endif
 endif
 #CFLAGS += -ansi
-# -DNO_GETADDRINFO
+#CFLAGS += -DNO_GETADDRINFO
 INSTALL = install
 SH = /bin/sh
 JAVA = java
@@ -62,7 +65,9 @@ JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
 JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12
 
 ifeq (SunOS, $(OS))
-  LDFLAGS=-lsocket -lnsl -lresolv
+  LDLIBS=-lsocket -lnsl -lresolv
+  CFLAGS += -D__EXTENSIONS__
+  CFLAGS += -std=c99
 endif
 
 # APIVERSION is used to build SONAME
@@ -82,7 +87,9 @@ LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           connecthostport.o portlistingparse.o receivedata.o upnpdev.o
 
 ifneq ($(OS), AmigaOS)
+ifeq (,$(findstring CYGWIN,$(OS)))
 CFLAGS := -fPIC $(CFLAGS)
+endif
 LIBOBJS := $(LIBOBJS) minissdpc.o
 endif
 
@@ -136,7 +143,11 @@ endif
 
 LIBDIR ?= lib
 # install directories
-INSTALLPREFIX ?= $(PREFIX)/usr
+ifeq ($(strip $(PREFIX)),)
+INSTALLPREFIX ?= /usr
+else
+INSTALLPREFIX ?= $(PREFIX)
+endif
 INSTALLDIRINC = $(INSTALLPREFIX)/include/miniupnpc
 INSTALLDIRLIB = $(INSTALLPREFIX)/$(LIBDIR)
 INSTALLDIRBIN = $(INSTALLPREFIX)/bin
@@ -162,18 +173,18 @@ check:	validateminixml validateminiwget validateupnpreplyparse \
 everything:	all $(EXECUTABLES_ADDTESTS)
 
 pythonmodule:	$(LIBRARY) miniupnpcmodule.c setup.py
-	python setup.py build
+	MAKE=$(MAKE) python setup.py build
 	touch $@
 
 installpythonmodule:	pythonmodule
-	python setup.py install
+	MAKE=$(MAKE) python setup.py install
 
 pythonmodule3:	$(LIBRARY) miniupnpcmodule.c setup.py
-	python3 setup.py build
+	MAKE=$(MAKE) python3 setup.py build
 	touch $@
 
 installpythonmodule3:	pythonmodule3
-	python3 setup.py install
+	MAKE=$(MAKE) python3 setup.py install
 
 validateminixml:	minixmlvalid
 	@echo "minixml validation test"

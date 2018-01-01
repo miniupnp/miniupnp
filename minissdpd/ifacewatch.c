@@ -1,6 +1,6 @@
 /* $Id: ifacewatch.c,v 1.16 2015/09/03 18:31:25 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2011-2012 Thomas Bernard
+ * (c) 2011-2016 Thomas Bernard
  * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -39,7 +39,7 @@ extern struct lan_addr_list lan_addrs;
 #else
 #define SALIGN (sizeof(int32_t) - 1)
 #endif
-#define SA_RLEN(sa) ((sa)->sa_len ? (((sa)->sa_len + SALIGN) & ~SALIGN) : (SALIGN + 1))
+#define SA_RLEN(sa) (SA_LEN(sa) ? ((SA_LEN(sa) + SALIGN) & ~SALIGN) : (SALIGN + 1))
 #endif
 
 int

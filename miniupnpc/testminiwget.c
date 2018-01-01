@@ -1,7 +1,7 @@
-/* $Id: testminiwget.c,v 1.5 2016/01/24 17:24:36 nanard Exp $ */
+/* $Id: testminiwget.c,v 1.6 2017/11/02 16:52:37 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2016 Thomas Bernard
+ * Copyright (c) 2005-2017 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */

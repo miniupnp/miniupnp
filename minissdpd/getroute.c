@@ -30,23 +30,6 @@
 #include "getroute.h"
 #include "upnputils.h"
 
-#if defined(__sun)
-static size_t _sa_len(const struct sockaddr *addr)
-{
-if(addr->sa_family == AF_INET)
-	return (sizeof(struct sockaddr_in));
-else if (addr->sa_family == AF_INET6)
-	return (sizeof(struct sockaddr_in6));
-else
-	return (sizeof(struct sockaddr));
-}
-#define SA_LEN(sa) (_sa_len(sa))
-#else
-#if !defined(SA_LEN)
-#define SA_LEN(sa) ((sa)->sa_len)
-#endif
-#endif
-
 int
 get_src_for_route_to(const struct sockaddr * dst,
                      void * src, size_t * src_len,
