@@ -4,7 +4,7 @@
 # (c) 2005-2015 Thomas Bernard
 # This Makefile is made for MinGW
 #
-CC = gcc
+CC ?= gcc
 #CFLAGS = -Wall -g -DDEBUG -D_WIN32_WINNT=0X501
 CFLAGS = -Wall -Os -DNDEBUG -D_WIN32_WINNT=0X501
 LDLIBS = -lws2_32 -liphlpapi

@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.h,v 1.31 2015/07/21 13:16:55 nanard Exp $ */
+/* $Id: upnpcommands.h,v 1.30 2015/07/15 12:21:28 nanard Exp $ */
 /* Miniupnp project : http://miniupnp.free.fr/
  * Author : Thomas Bernard
  * Copyright (c) 2005-2015 Thomas Bernard
@@ -9,6 +9,8 @@
 
 #include "upnpreplyparse.h"
 #include "portlistingparse.h"
+// #include "miniupnpc_declspec.h"
+// #include "miniupnpctypes.h"
 
 /* MiniUPnPc return codes : */
 #define UPNPCOMMAND_SUCCESS (0)
@@ -206,7 +208,7 @@ UPNP_DeletePortMappingRange(const char * controlURL, const char * servicetype,
 MINIUPNP_LIBSPEC int
 UPNP_GetPortMappingNumberOfEntries(const char* controlURL,
                                    const char* servicetype,
-                                   unsigned int * num);
+                                   unsigned int * numEntries);
 
 /* UPNP_GetSpecificPortMappingEntry()
  *    retrieves an existing port mapping

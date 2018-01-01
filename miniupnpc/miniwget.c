@@ -65,7 +65,7 @@
  * to the length parameter.
  */
 void *
-getHTTPResponse(int s, int * size, int * status_code)
+getHTTPResponse(SOCKET s, int * size, int * status_code)
 {
 	char buf[2048];
 	int n;
@@ -351,7 +351,7 @@ getHTTPResponse(int s, int * size, int * status_code)
 		}
 	}
 end_of_stream:
-	free(header_buf);
+	free(header_buf); // header_buf = NULL;
 	*size = content_buf_used;
 	if(content_buf_used == 0)
 	{
@@ -372,7 +372,7 @@ miniwget3(const char * host,
           int * status_code)
 {
 	char buf[2048];
-    int s;
+	SOCKET s;
 	int n;
 	int len;
 	int sent;
@@ -380,7 +380,7 @@ miniwget3(const char * host,
 
 	*size = 0;
 	s = connecthostport(host, port, scope_id);
-	if(s < 0)
+	if(s == INVALID_SOCKET)
 		return NULL;
 
 	/* get address for caller ! */
@@ -565,7 +565,7 @@ parseURL(const char * url,
 			/* "%25" is just '%' in URL encoding */
 			if(scope[0] == '2' && scope[1] == '5')
 				scope += 2;	/* skip "25" */
-			l = p2 - scope;
+			l = (int)(p2 - scope);
 			if(l >= sizeof(tmp))
 				l = sizeof(tmp) - 1;
 			memcpy(tmp, scope, l);

@@ -36,7 +36,7 @@
 #include "receivedata.h"
 
 int
-receivedata(int socket,
+receivedata(SOCKET socket,
             char * data, int length,
             int timeout, unsigned int * scope_id)
 {
@@ -73,7 +73,7 @@ receivedata(int socket,
     timeval.tv_sec = timeout / 1000;
     timeval.tv_usec = (timeout % 1000) * 1000;
     n = select(FD_SETSIZE, &socketSet, NULL, NULL, &timeval);
-    if(n < 0) {
+    if(n == SOCKET_ERROR) {
         PRINT_SOCKET_ERROR("select");
         return -1;
     } else if(n == 0) {
@@ -87,7 +87,7 @@ receivedata(int socket,
 #else	/* MINIUPNPC_GET_SRC_ADDR */
 	n = recv(socket, data, length, 0);
 #endif	/* MINIUPNPC_GET_SRC_ADDR */
-	if(n<0) {
+	if(n == SOCKET_ERROR) {
 		PRINT_SOCKET_ERROR("recv");
 	}
 #ifdef MINIUPNPC_GET_SRC_ADDR

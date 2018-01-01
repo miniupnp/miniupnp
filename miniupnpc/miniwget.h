@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-MINIUPNP_LIBSPEC void * getHTTPResponse(int s, int * size, int * status_code);
+MINIUPNP_LIBSPEC void * getHTTPResponse(SOCKET s, int * size, int * status_code);
 
 MINIUPNP_LIBSPEC void * miniwget(const char *, int *, unsigned int, int *);
 
