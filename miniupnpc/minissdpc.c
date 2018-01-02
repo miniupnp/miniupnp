@@ -759,7 +759,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		}
 		n = sendto(sudp, bufr, n, 0, &sockudp_w,
 		           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
-		if (n == SOCKET_ERROR) {
+		if (n < 0) {
 			if(error)
 				*error = MINISSDPC_SOCKET_ERROR;
 			PRINT_SOCKET_ERROR("sendto");
@@ -786,7 +786,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		}
 		for(p = servinfo; p; p = p->ai_next) {
 			n = sendto(sudp, bufr, n, 0, p->ai_addr, (int)p->ai_addrlen);
-			if (n == SOCKET_ERROR) {
+			if (n < 0) {
 #ifdef DEBUG
 				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 				if (getnameinfo(p->ai_addr, p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
