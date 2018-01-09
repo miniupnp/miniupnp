@@ -190,7 +190,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 		struct sockaddr_in * saddr = (struct sockaddr_in *)&sockname;
 		saddr->sin_family = AF_INET;
 		saddr->sin_port = htons(SSDP_PORT);
-		/* NOTE : it seems it doesnt work when binding on the specific address */
+		/* NOTE : it seems it doesn't work when binding on the specific address */
 		/*saddr->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);*/
 		saddr->sin_addr.s_addr = htonl(INADDR_ANY);
 		/*saddr->sin_addr.s_addr = inet_addr(ifaddr);*/

@@ -762,7 +762,7 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	p = h->req_buf;
 	if(!p)
 		return;
-	/* note : checking (*p != '\r') is enough to avoid runing off the
+	/* note : checking (*p != '\r') is enough to avoid running off the
 	 * end of the buffer, because h->req_buf is guaranteed to contain
 	 * the \r\n\r\n character sequence */
 	for(i = 0; i<15 && *p != ' ' && *p != '\r'; i++)
@@ -1216,7 +1216,7 @@ SendResp_upnphttp(struct upnphttp * h)
 			} else {
 #endif
 			if(errno == EINTR)
-				continue;	/* try again immediatly */
+				continue;	/* try again immediately */
 			if(errno == EAGAIN || errno == EWOULDBLOCK)
 			{
 				/* try again later */
@@ -1278,7 +1278,7 @@ SendRespAndClose_upnphttp(struct upnphttp * h)
 			} else {
 #endif
 			if(errno == EINTR)
-				continue;	/* try again immediatly */
+				continue;	/* try again immediately */
 			if(errno == EAGAIN || errno == EWOULDBLOCK)
 			{
 				/* try again later */

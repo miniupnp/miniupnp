@@ -984,7 +984,7 @@ int upnpc_process(upnpc_t * p)
 	upnpc_device_t * d;
 /*
 1)	Envoyer les paquets de discovery SSDP
-2)	Recevoir et traiter les reponses
+2)	Recevoir et traiter les responses
 3)	recup les descriptions
 4)	tester les etats
 */

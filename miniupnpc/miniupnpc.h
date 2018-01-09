@@ -23,7 +23,7 @@
 #define MINIUPNPC_API_VERSION	16
 
 /* Source port:
-   Using "1" as an alias for 1900 for backwards compatability
+   Using "1" as an alias for 1900 for backwards compatibility
    (presuming one would have used that for the "sameport" parameter) */
 #define UPNP_LOCAL_PORT_ANY     0
 #define UPNP_LOCAL_PORT_SAME    1

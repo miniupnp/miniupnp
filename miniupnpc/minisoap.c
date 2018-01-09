@@ -55,7 +55,7 @@ httpWrite(int fd, const char * body, int bodysize,
 	  PRINT_SOCKET_ERROR("send");
 	}
 	/* disable send on the socket */
-	/* draytek routers dont seems to like that... */
+	/* draytek routers don't seems to like that... */
 #if 0
 #ifdef _WIN32
 	if(shutdown(fd, SD_SEND)<0) {

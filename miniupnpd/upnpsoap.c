@@ -1370,7 +1370,7 @@ QueryStateVariable(struct upnphttp * h, const char * action, const char * ns)
 		BuildSendAndCloseSoapResp(h, body, bodylen);
 	}
 #if 0
-	/* not usefull */
+	/* not useful */
 	else if(strcmp(var_name, "ConnectionType") == 0)
 	{
 		bodylen = snprintf(body, sizeof(body), resp, "IP_Routed");

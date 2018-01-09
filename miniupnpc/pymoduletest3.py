@@ -17,7 +17,7 @@ print(' multicastif', u.multicastif)
 print(' minissdpdsocket', u.minissdpdsocket)
 u.discoverdelay = 200;
 #u.minissdpdsocket = '../minissdpd/minissdpd.sock'
-# discovery process, it usualy takes several seconds (2 seconds or more)
+# discovery process, it usually takes several seconds (2 seconds or more)
 print('Discovering... delay=%ums' % u.discoverdelay)
 print(u.discover(), 'device(s) detected')
 # select an igd

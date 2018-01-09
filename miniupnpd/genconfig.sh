@@ -619,7 +619,7 @@ cat >> ${CONFIGFILE} <<EOF
 /* With the following macro defined, a random string is prepended to all URLs */
 /*#define RANDOMIZE_URLS*/
 
-/* maximum lenght of SSDP packets we are generating
+/* maximum length of SSDP packets we are generating
  * (reception is done in a 1500byte buffer) */
 #define SSDP_PACKET_MAX_LEN 1024
 
