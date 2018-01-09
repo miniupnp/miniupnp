@@ -18,7 +18,7 @@ int reload_from_lease_file(void);
 #endif
 
 /* upnp_redirect()
- * calls OS/fw dependant implementation of the redirection.
+ * calls OS/fw dependent implementation of the redirection.
  * protocol should be the string "TCP" or "UDP"
  * returns: 0 on success
  *          -1 failed to redirect

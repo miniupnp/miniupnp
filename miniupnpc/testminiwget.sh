@@ -8,7 +8,7 @@
 #
 # This test program :
 #  1 - launches a local HTTP server (minihttptestserver)
-#  2 - uses testminiwget to retreive data from this server
+#  2 - uses testminiwget to retrieve data from this server
 #  3 - compares served and received data
 #  4 - kills the local HTTP server and exits
 #

@@ -14,7 +14,7 @@
 #include "miniupnpdtypes.h"
 #include "config.h"
 
-/* name of the network interface used to acces internet */
+/* name of the network interface used to access internet */
 extern const char * ext_if_name;
 
 /* file to store all leases */

@@ -26,6 +26,6 @@ int main(int argc, char * * argv)
 			return 1;
 		}
 	}
-	printf("Test succesful\n");
+	printf("Test successful\n");
 	return 0;
 }

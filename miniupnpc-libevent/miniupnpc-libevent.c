@@ -65,7 +65,7 @@
 #define debug_printf(...) (void)0
 #endif
 
-/* compare the begining of a string with a constant string */
+/* compare the beginning of a string with a constant string */
 #define COMPARE(str, cstr) (0==memcmp(str, cstr, sizeof(cstr) - 1))
 
 /* stuctures */

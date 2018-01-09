@@ -11,7 +11,7 @@
 
 /**
  * This program uses the miniwget / miniwget_getaddr function
- * from miniwget.c in order to retreive a web ressource using
+ * from miniwget.c in order to retrieve a web ressource using
  * a GET HTTP method, and store it in a file.
  */
 int main(int argc, char * * argv)

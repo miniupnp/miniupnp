@@ -157,7 +157,7 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6)
 					{
 						struct ifa_cacheinfo *cache_info;
 						cache_info = RTA_DATA(rta);
-						snprintf(tmp, sizeof(tmp), "valid=%u prefered=%u",
+						snprintf(tmp, sizeof(tmp), "valid=%u preferred=%u",
 						         cache_info->ifa_valid, cache_info->ifa_prefered);
 					}
 					break;

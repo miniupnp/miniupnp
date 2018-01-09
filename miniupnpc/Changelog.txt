@@ -602,7 +602,7 @@ VERSION 1.0 :
   upnpc now displays external ip address with -s or -l
 
 2007/04/11:
-  changed MINIUPNPC_URL_MAXSIZE to 128 to accomodate the "BT Voyager 210"
+  changed MINIUPNPC_URL_MAXSIZE to 128 to accommodate the "BT Voyager 210"
 
 2007/03/19:
   cleanup in miniwget.c

@@ -49,7 +49,7 @@
 
 #define SET_MAX(max, x)	if((x) > (max)) (max) = (x)
 
-/* current request management stucture */
+/* current request management structure */
 struct reqelem {
 	int socket;
 	int is_notify;	/* has subscribed to notifications */

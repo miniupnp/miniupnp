@@ -35,7 +35,7 @@ POSSIBILITY OF SUCH DAMAGE.
    - IPv6 is always firewalled (this may need some work, NAT6* do exist)
 
    - we make the judgement based on (in order, picking first one available):
-     - third party adress
+     - third party address
      - internal client address
 
    TODO : handle NAT46, NAT64, NPT66. In addition, beyond FW/NAT

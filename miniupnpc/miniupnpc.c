@@ -61,7 +61,7 @@
 #include "upnpcommands.h"
 #include "connecthostport.h"
 
-/* compare the begining of a string with a constant string */
+/* compare the beginning of a string with a constant string */
 #define COMPARE(str, cstr) (0==memcmp(str, cstr, sizeof(cstr) - 1))
 
 #ifndef MAXHOSTNAMELEN
@@ -550,7 +550,7 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
  *     3 = an UPnP device has been found but was not recognized as an IGD
  *
  * In any positive non zero return case, the urls and data structures
- * passed as parameters are set. Dont forget to call FreeUPNPUrls(urls) to
+ * passed as parameters are set. Don't forget to call FreeUPNPUrls(urls) to
  * free allocated memory.
  */
 MINIUPNP_LIBSPEC int
@@ -634,7 +634,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 
 				  GetUPNPUrls(urls, data, dev->descURL, dev->scope_id);
 
-				  /* in state 2 and 3 we dont test if device is connected ! */
+				  /* in state 2 and 3 we don't test if device is connected ! */
 				  if(state >= 2)
 				    goto free_and_return;
 				  is_connected = UPNPIGD_IsConnected(urls, data);

@@ -80,7 +80,7 @@ int test(void)
 		if(now.tv_sec > next_send.tv_sec ||
 		   (now.tv_sec == next_send.tv_sec && now.tv_usec >= next_send.tv_usec)) {
 			if(i > 0) {
-				/* dont wait */
+				/* don't wait */
 				timeout.tv_sec = 0;
 			} else {
 				/* wait 10sec :) */
