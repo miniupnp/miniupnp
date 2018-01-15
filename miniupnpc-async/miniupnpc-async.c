@@ -984,9 +984,10 @@ int upnpc_process(upnpc_t * p)
 	upnpc_device_t * d;
 /*
 1)	Envoyer les paquets de discovery SSDP
-2)	Recevoir et traiter les responses
+2)	Recevoir et traiter les reponses
 3)	recup les descriptions
 4)	tester les etats
+TODO : translate comments to English
 */
 	if(!p) return UPNPC_ERR_INVALID_ARGS;
 	debug_printf("state=%d   socket_flags=0x%04x\n", (int)p->state, p->socket_flags);
