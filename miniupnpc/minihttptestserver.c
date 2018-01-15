@@ -1,7 +1,7 @@
-/* $Id: minihttptestserver.c,v 1.22 2017/11/02 17:01:36 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.23 2018/01/15 16:20:07 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
- * Copyright (c) 2011-2017 Thomas Bernard
+ * Copyright (c) 2011-2018 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -52,7 +52,7 @@ void handle_signal_int(int sig)
 /**
  * build a text/plain content of the specified length
  */
-void build_content(char * p, int n)
+void build_content(char * p, size_t n)
 {
 	char line_buffer[80];
 	int k;
@@ -81,10 +81,10 @@ void build_content(char * p, int n)
 /**
  * build crappy content
  */
-void build_crap(char * p, int n)
+void build_crap(char * p, size_t n)
 {
 	static const char crap[] = "_CRAP_\r\n";
-	int i;
+	size_t i;
 
 	while(n > 0) {
 		i = sizeof(crap) - 1;
@@ -100,12 +100,13 @@ void build_crap(char * p, int n)
  * build chunked response.
  * return a malloc'ed buffer
  */
-char * build_chunked_response(int content_length, int * response_len)
+char * build_chunked_response(size_t content_length, size_t * response_len)
 {
 	char * response_buffer;
 	char * content_buffer;
-	int buffer_length;
-	int i, n;
+	size_t buffer_length;
+	size_t i;
+	unsigned int n;
 
 	/* allocate to have some margin */
 	buffer_length = 256 + content_length + (content_length >> 4);
@@ -149,7 +150,7 @@ char * build_chunked_response(int content_length, int * response_len)
 	*response_len += 5;
 	free(content_buffer);
 
-	printf("resp_length=%d buffer_length=%d content_length=%d\n",
+	printf("resp_length=%lu buffer_length=%lu content_length=%lu\n",
 	       *response_len, buffer_length, content_length);
 	return response_buffer;
 }
@@ -160,7 +161,7 @@ char * build_chunked_response(int content_length, int * response_len)
 #else
 #define FAVICON_LENGTH (6 + 16 + 40 + 8 + 32 * 4)
 #endif
-void build_favicon_content(unsigned char * p, int n)
+void build_favicon_content(unsigned char * p, size_t n)
 {
 	int i;
 	if(n < FAVICON_LENGTH)
@@ -277,12 +278,12 @@ const struct {
 /**
  * write the response with random behaviour !
  */
-void send_response(int c, const char * buffer, int len)
+void send_response(int c, const char * buffer, size_t len)
 {
-	int n;
+	ssize_t n;
 	while(len > 0) {
 		n = (rand() % 99) + 1;
-		if(n > len)
+		if((size_t)n > len)
 			n = len;
 		n = write(c, buffer, n);
 		if(n < 0) {
@@ -294,8 +295,8 @@ void send_response(int c, const char * buffer, int len)
 		} else {
 			len -= n;
 			buffer += n;
+			usleep(10000); /* 10ms */
 		}
-		usleep(10000); /* 10ms */
 	}
 }
 
@@ -305,20 +306,21 @@ void send_response(int c, const char * buffer, int len)
 void handle_http_connection(int c)
 {
 	char request_buffer[2048];
-	int request_len = 0;
+	size_t request_len = 0;
 	int headers_found = 0;
-	int n, i;
+	ssize_t n, m;
+	size_t i;
 	char request_method[16];
 	char request_uri[256];
 	char http_version[16];
 	char * p;
 	char * response_buffer;
-	int response_len;
+	size_t response_len;
 	enum modes mode;
-	int content_length = 16*1024;
+	size_t content_length = 16*1024;
 
 	/* read the request */
-	while(request_len < (int)sizeof(request_buffer) && !headers_found) {
+	while(request_len < sizeof(request_buffer) && !headers_found) {
 		n = read(c,
 		         request_buffer + request_len,
 		         sizeof(request_buffer) - request_len);
@@ -346,10 +348,10 @@ void handle_http_connection(int c)
 		printf("no HTTP header found in the request\n");
 		return;
 	}
-	printf("headers :\n%.*s", request_len, request_buffer);
+	printf("headers :\n%.*s", (int)request_len, request_buffer);
 	/* the request have been received, now parse the request line */
 	p = request_buffer;
-	for(i = 0; i < (int)sizeof(request_method) - 1; i++) {
+	for(i = 0; i < sizeof(request_method) - 1; i++) {
 		if(*p == ' ' || *p == '\r')
 			break;
 		request_method[i] = *p;
@@ -387,15 +389,15 @@ void handle_http_connection(int c)
 		n = sizeof(response405) - 1;
 		pc = response405;
 		while(n > 0) {
-			i = write(c, pc, n);
-			if(i<0) {
+			m = write(c, pc, n);
+			if(m<0) {
 				if(errno != EINTR) {
 					perror("write");
 					return;
 				}
 			} else {
-				n -= i;
-				pc += i;
+				n -= m;
+				pc += m;
 			}
 		}
 		return;
@@ -423,7 +425,7 @@ void handle_http_connection(int c)
 		             "HTTP/1.1 200 OK\r\n"
 		             "Server: minihttptestserver\r\n"
 		             "Content-Type: text/plain\r\n"
-		             "Content-Length: %d\r\n"
+		             "Content-Length: %lu\r\n"
 		             "\r\n", content_length);
 		response_len = content_length+n+CRAP_LENGTH;
 		p = realloc(response_buffer, response_len);
@@ -447,7 +449,7 @@ void handle_http_connection(int c)
 		             "HTTP/1.1 200 OK\r\n"
 		             "Server: minihttptestserver\r\n"
 		             "Content-Type: image/vnd.microsoft.icon\r\n"
-		             "Content-Length: %d\r\n"
+		             "Content-Length: %lu\r\n"
 		             "\r\n", content_length);
 		/* image/x-icon */
 		build_favicon_content((unsigned char *)(response_buffer + n), content_length);
@@ -511,7 +513,7 @@ int main(int argc, char * * argv) {
 				fprintf(stderr, "unknown command line switch '%s'\n", argv[i]);
 			}
 		} else {
-			fprintf(stderr, "unknown command line argument '%s'\n", argv[i]);
+			fprintf(stderr, "unkown command line argument '%s'\n", argv[i]);
 		}
 	}
 
