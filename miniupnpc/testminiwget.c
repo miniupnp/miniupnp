@@ -1,7 +1,8 @@
 /* $Id: testminiwget.c,v 1.6 2017/11/02 16:52:37 nanard Exp $ */
-/* Project : miniupnp
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2017 Thomas Bernard
+ * Copyright (c) 2005-2018 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */

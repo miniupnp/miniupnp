@@ -1,7 +1,8 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.14 2017/11/02 16:52:37 nanard Exp $
+# $Id: testminiwget.sh,v 1.15 2017/11/02 17:36:26 nanard Exp $
+# vim: tabstop=4 shiftwidth=4 noexpandtab
 # project miniupnp : http://miniupnp.free.fr/
-# (c) 2011-2017 Thomas Bernard
+# (c) 2011-2018 Thomas Bernard
 #
 # test program for miniwget.c
 # is usually invoked by "make check"

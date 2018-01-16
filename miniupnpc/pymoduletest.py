@@ -3,7 +3,7 @@
 # MiniUPnP project
 # Author : Thomas Bernard
 # This Sample code is public domain.
-# website : http://miniupnp.tuxfamily.org/
+# website : https://miniupnp.tuxfamily.org/
 
 # import the python miniupnpc module
 import miniupnpc
