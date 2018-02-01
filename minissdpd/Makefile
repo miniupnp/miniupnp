@@ -25,7 +25,8 @@ OS = $(shell $(CC) -dumpmachine)
 
 ifneq (, $(findstring linux, $(OS)))
 	LDLIBS += -lnfnetlink
-else ifneq (, $(findstring freebsd, $(OS)))
+endif
+ifeq ($(DEB_HOST_ARCH_OS), kfreebsd)
 	LDLIBS += -lfreebsd-glue
 else ifneq (, $(findstring sun, $(OS)))
 	CFLAGS += -D_XOPEN_SOURCE
