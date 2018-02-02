@@ -41,12 +41,12 @@ free the list returned by upnpDiscover().
 .IP "int UPNP_GetValidIGD(struct UPNPDev * devlist, struct UPNPUrls * urls, struct IGDdatas * data, char * lanaddr, int lanaddrlen);"
 browse the list of device returned by upnpDiscover(), find
 a live UPnP internet gateway device and fill structures passed as arguments
-with data used for UPNP methods invokation.
+with data used for UPNP methods invocation.
 .IP "int UPNP_GetIGDFromUrl(const char * rootdescurl, struct UPNPUrls * urls, struct IGDdatas * data, char * lanaddr, int lanaddrlen);"
 permit one to bypass the upnpDiscover() call if the xml root description
 URL of the UPnP IGD is known.
 Fill structures passed as arguments
-with data used for UPNP methods invokation.
+with data used for UPNP methods invocation.
 .IP "void GetUPNPUrls(struct UPNPUrls *, struct IGDdatas *, const char *);"
 .IP "void FreeUPNPUrls(struct UPNPUrls *);"
 
