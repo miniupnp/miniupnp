@@ -10,17 +10,15 @@
 # $ INSTALLPREFIX=/usr/local make install
 # or
 # $ make install (default INSTALLPREFIX is /usr)
-OS = $(shell uname -s)
+OS = $(shell $(CC) -dumpmachine)
 VERSION = $(shell cat VERSION)
 
-ifeq ($(OS), Darwin)
+ifneq (, $(findstring darwin, $(OS)))
 JARSUFFIX=mac
 LIBTOOL ?= $(shell which libtool)
-endif
-ifeq ($(OS), Linux)
+else ifneq (, $(findstring linux, $(OS)))
 JARSUFFIX=linux
-endif
-ifneq (,$(findstring NT-5.1,$(OS)))
+else ifneq (, $(findstring mingw, $(OS))$(findstring cygwin, $(OS))$(findstring msys, $(OS)))
 JARSUFFIX=win32
 endif
 
@@ -38,14 +36,12 @@ CFLAGS += -DMINIUPNPC_SET_SOCKET_TIMEOUT
 CFLAGS += -DMINIUPNPC_GET_SRC_ADDR
 CFLAGS += -D_BSD_SOURCE
 CFLAGS += -D_DEFAULT_SOURCE
-ifeq ($(OS), NetBSD)
+ifneq (, $(findstring netbsd, $(OS)))
 CFLAGS += -D_NETBSD_SOURCE
 endif
-ifneq ($(OS), FreeBSD)
-ifneq ($(OS), Darwin)
+ifeq (, $(findstring freebsd, $(OS))$(findstring darwin, $(OS)))
 #CFLAGS += -D_POSIX_C_SOURCE=200112L
 CFLAGS += -D_XOPEN_SOURCE=600
-endif
 endif
 #CFLAGS += -ansi
 #CFLAGS += -DNO_GETADDRINFO
@@ -64,7 +60,7 @@ JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
 #JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
 JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12
 
-ifeq (SunOS, $(OS))
+ifneq (, $(findstring sun, $(OS)))
   LDLIBS=-lsocket -lnsl -lresolv
   CFLAGS += -D__EXTENSIONS__
   CFLAGS += -std=c99
@@ -86,8 +82,8 @@ LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
           connecthostport.o portlistingparse.o receivedata.o upnpdev.o
 
-ifneq ($(OS), AmigaOS)
-ifeq (,$(findstring CYGWIN,$(OS)))
+ifeq (, $(findstring amiga, $(OS)))
+ifeq (, $(findstring mingw, $(OS))$(findstring cygwin, $(OS))$(findstring msys, $(OS)))
 CFLAGS := -fPIC $(CFLAGS)
 endif
 LIBOBJS := $(LIBOBJS) minissdpc.o
@@ -104,18 +100,16 @@ HEADERS = miniupnpc.h miniwget.h upnpcommands.h igd_desc_parse.h \
 
 # library names
 LIBRARY = libminiupnpc.a
-ifeq ($(OS), Darwin)
+ifneq (, $(findstring darwin, $(OS)))
   SHAREDLIBRARY = libminiupnpc.dylib
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
   CFLAGS := -D_DARWIN_C_SOURCE $(CFLAGS)
-else
-ifeq ($(JARSUFFIX), win32)
+else ifeq ($(JARSUFFIX), win32)
   SHAREDLIBRARY = miniupnpc.dll
 else
   # Linux/BSD/etc.
   SHAREDLIBRARY = libminiupnpc.so
   SONAME = $(SHAREDLIBRARY).$(APIVERSION)
-endif
 endif
 
 EXECUTABLES = upnpc-static listdevices
@@ -135,7 +129,7 @@ TESTIGDDESCPARSE = testigddescparse.o igd_desc_parse.o minixml.o \
                    minisoap.o connecthostport.o receivedata.o \
                    portlistingparse.o
 
-ifneq ($(OS), AmigaOS)
+ifeq (, $(findstring amiga, $(OS)))
 EXECUTABLES := $(EXECUTABLES) upnpc-shared
 TESTMINIWGETOBJS := $(TESTMINIWGETOBJS) minissdpc.o
 TESTIGDDESCPARSE := $(TESTIGDDESCPARSE) minissdpc.o
@@ -154,7 +148,7 @@ INSTALLDIRBIN = $(INSTALLPREFIX)/bin
 INSTALLDIRMAN = $(INSTALLPREFIX)/share/man
 
 FILESTOINSTALL = $(LIBRARY) $(EXECUTABLES)
-ifneq ($(OS), AmigaOS)
+ifeq (, $(findstring amiga, $(OS)))
 FILESTOINSTALL := $(FILESTOINSTALL) $(SHAREDLIBRARY)
 endif
 
@@ -237,21 +231,21 @@ install:	updateversion $(FILESTOINSTALL)
 	$(INSTALL) -m 644 $(HEADERS) $(DESTDIR)$(INSTALLDIRINC)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRLIB)
 	$(INSTALL) -m 644 $(LIBRARY) $(DESTDIR)$(INSTALLDIRLIB)
-ifneq ($(OS), AmigaOS)
+ifeq (, $(findstring amiga, $(OS)))
 	$(INSTALL) -m 644 $(SHAREDLIBRARY) $(DESTDIR)$(INSTALLDIRLIB)/$(SONAME)
 	ln -fs $(SONAME) $(DESTDIR)$(INSTALLDIRLIB)/$(SHAREDLIBRARY)
 endif
 	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRBIN)
-ifeq ($(OS), AmigaOS)
+ifneq (, $(findstring amiga, $(OS)))
 	$(INSTALL) -m 755 upnpc-static $(DESTDIR)$(INSTALLDIRBIN)/upnpc
 else
 	$(INSTALL) -m 755 upnpc-shared $(DESTDIR)$(INSTALLDIRBIN)/upnpc
 endif
 	$(INSTALL) -m 755 external-ip.sh $(DESTDIR)$(INSTALLDIRBIN)/external-ip
-ifneq ($(OS), AmigaOS)
+ifeq (, $(findstring amiga, $(OS)))
 	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRMAN)/man3
 	$(INSTALL) -m 644 man3/miniupnpc.3 $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
-ifeq ($(OS), Linux)
+ifneq (, $(findstring linux, $(OS)))
 	gzip -f $(DESTDIR)$(INSTALLDIRMAN)/man3/miniupnpc.3
 endif
 endif
@@ -273,14 +267,14 @@ depend:
 	makedepend -Y -- $(CFLAGS) -- $(SRCS) 2>/dev/null
 
 $(LIBRARY):	$(LIBOBJS)
-ifeq ($(OS), Darwin)
+ifneq (, $(findstring darwin, $(OS)))
 	$(LIBTOOL) -static -o $@ $?
 else
 	$(AR) crs $@ $?
 endif
 
 $(SHAREDLIBRARY):	$(LIBOBJS)
-ifeq ($(OS), Darwin)
+ifneq (, $(findstring darwin, $(OS)))
 #	$(CC) -dynamiclib $(LDFLAGS) -Wl,-install_name,$(SONAME) -o $@ $^
 	$(CC) -dynamiclib $(LDFLAGS) -Wl,-install_name,$(INSTALLDIRLIB)/$(SONAME) -o $@ $^
 else

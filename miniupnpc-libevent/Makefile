@@ -1,6 +1,6 @@
 # $Id: Makefile,v 1.7 2014/11/28 13:14:19 nanard Exp $
 
-OS = $(shell uname -s)
+OS = $(shell $(CC) -dumpmachine)
 PKG_CONFIG ?= pkg-config
 
 CFLAGS = -O0 -g -DDEBUG
@@ -11,10 +11,8 @@ CFLAGS += -fPIC
 CFLAGS += -ansi
 CFLAGS += -Wall -W
 CFLAGS += -D_BSD_SOURCE
-ifneq ($(OS), Darwin)
-ifneq ($(OS), FreeBSD)
+ifeq (, $(findstring darwin, $(OS))$(findstring freebsd, $(OS)))
 CFLAGS += -D_POSIX_C_SOURCE=200112L
-endif
 endif
 #CFLAGS += -I/usr/local/include
 CFLAGS += $(shell $(PKG_CONFIG) --cflags libevent)
@@ -26,7 +24,7 @@ LDLIBS   = $(shell $(PKG_CONFIG) --libs-only-l libevent)
 #LDFLAGS += -L/usr/local/lib
 LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libevent)
 
-ifeq ($(OS), Darwin)
+ifneq (, $(findstring darwin, $(OS)))
 CFLAGS += -D_DARWIN_C_SOURCE
 #CFLAGS += -I/opt/local/include
 #LDFLAGS += -L/opt/local/lib

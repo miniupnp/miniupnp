@@ -21,15 +21,13 @@ CFLAGS += -D_GNU_SOURCE
 CC ?= gcc
 RM = rm -f
 INSTALL = install
-OS = $(shell uname -s)
+OS = $(shell $(CC) -dumpmachine)
 
-ifeq ($(OS), Linux)
+ifneq (, $(findstring linux, $(OS)))
 	LDLIBS += -lnfnetlink
-endif
-ifeq ($(DEB_BUILD_ARCH_OS), kfreebsd)
+else ifneq (, $(findstring freebsd, $(OS)))
 	LDLIBS += -lfreebsd-glue
-endif
-ifeq ($(OS), SunOS)
+else ifneq (, $(findstring sun, $(OS)))
 	CFLAGS += -D_XOPEN_SOURCE
 	CFLAGS += -D_XOPEN_SOURCE_EXTENDED=1
 	CFLAGS += -D__EXTENSIONS__
@@ -67,7 +65,7 @@ install:	minissdpd
 	$(INSTALL) minissdpd $(SBININSTALLDIR)
 	$(INSTALL) -d $(MANINSTALLDIR)/man1
 	$(INSTALL) minissdpd.1 $(MANINSTALLDIR)/man1/minissdpd.1
-ifneq ($(OS), Darwin)
+ifeq (, $(findstring darwin, $(OS)))
 	$(INSTALL) -d $(PREFIX)/etc/init.d
 	$(INSTALL) minissdpd.init.d.script $(PREFIX)/etc/init.d/minissdpd
 endif
