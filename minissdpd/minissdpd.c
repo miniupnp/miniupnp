@@ -883,6 +883,7 @@ error:
 static ssize_t processRequestSub(struct reqelem * req, const unsigned char * buf, ssize_t n)
 {
 	unsigned int l, m;
+	unsigned int baselen;	/* without the version */
 	const unsigned char * p;
 	enum request_type type;
 	struct device * d = devlist;
@@ -925,6 +926,24 @@ static ssize_t processRequestSub(struct reqelem * req, const unsigned char * buf
 	case MINISSDPD_SEARCH_USN:	/* request by USN (unique id) */
 	case MINISSDPD_SEARCH_ALL:	/* everything */
 		rp = rbuf+1;
+		/* From UPnP Device Architecture v1.1 :
+		 * 1.3.2 [...] Updated versions of device and service types
+		 * are REQUIRED to be full backward compatible with
+		 * previous versions. Devices MUST respond to M-SEARCH
+		 * requests for any supported version. For example, if a
+		 * device implements “urn:schemas-upnporg:service:xyz:2”,
+		 * it MUST respond to search requests for both that type
+		 * and “urn:schemas-upnp-org:service:xyz:1”. The response
+		 * MUST specify the same version as was contained in the
+		 * search request. [...] */
+		baselen = l;	/* remove the version */
+		while(baselen > 0) {
+			if(p[baselen-1] == ':')
+				break;
+			if(!(p[baselen-1] >= '0' && p[baselen-1] <= '9'))
+				break;
+			baselen--;
+		}
 		while(d && (nrep < 255)) {
 			if(d->t < t) {
 				syslog(LOG_INFO, "outdated device");
@@ -934,7 +953,7 @@ static ssize_t processRequestSub(struct reqelem * req, const unsigned char * buf
 				  + d->headers[HEADER_USN].l + 6
 				  + (rp - rbuf) >= (int)sizeof(rbuf))
 					break;
-				if( (type==MINISSDPD_SEARCH_TYPE && 0==memcmp(d->headers[HEADER_NT].p, p, l))
+				if( (type==MINISSDPD_SEARCH_TYPE && 0==memcmp(d->headers[HEADER_NT].p, p, baselen))
 				  ||(type==MINISSDPD_SEARCH_USN && 0==memcmp(d->headers[HEADER_USN].p, p, l))
 				  ||(type==MINISSDPD_SEARCH_ALL) ) {
 					/* response :
