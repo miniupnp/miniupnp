@@ -1,5 +1,9 @@
 $Id: Changelog.txt,v 1.47 2016/12/16 09:22:35 nanard Exp $
 
+2018/02/03:
+	Properly parse several requests read() at once
+	Ignore the version of devices while answering to requests
+
 2016/11/11:
 	Fix for Solaris build
 

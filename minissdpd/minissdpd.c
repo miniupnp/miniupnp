@@ -456,11 +456,11 @@ sendNotifications(int notif_type, const struct device * dev, const struct servic
  * build and send response to M-SEARCH SSDP packets. */
 static void
 SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
-                        const char * st, const char * usn,
+                        const char * st, size_t st_len, const char * usn,
                         const char * server, const char * location)
 {
 	int l, n;
-	char buf[512];
+	char buf[1024];
 	socklen_t sockname_len;
 	/*
 	 * follow guideline from document "UPnP Device Architecture 1.0"
@@ -473,7 +473,7 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 	l = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\n"
 		"CACHE-CONTROL: max-age=120\r\n"
 		/*"DATE: ...\r\n"*/
-		"ST: %s\r\n"
+		"ST: %.*s\r\n"
 		"USN: %s\r\n"
 		"EXT:\r\n"
 		"SERVER: %s\r\n"
@@ -483,7 +483,7 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 		"BOOTID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 		"CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 		"\r\n",
-		st, usn,
+		(int)st_len, st, usn,
 		server, location,
 		upnp_bootid, upnp_bootid, upnp_configid);
 #ifdef ENABLE_IPV6
@@ -501,7 +501,7 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 
 /* Process M-SEARCH requests */
 static void
-processMSEARCH(int s, const char * st, int st_len,
+processMSEARCH(int s, const char * st, size_t st_len,
                const struct sockaddr * addr)
 {
 	struct service * serv;
@@ -514,12 +514,12 @@ processMSEARCH(int s, const char * st, int st_len,
 #ifdef ENABLE_IPV6
 	sockaddr_to_string(addr, buf, sizeof(buf));
 	syslog(LOG_INFO, "SSDP M-SEARCH from %s ST:%.*s",
-	       buf, st_len, st);
+	       buf, (int)st_len, st);
 #else	/* ENABLE_IPV6 */
 	syslog(LOG_INFO, "SSDP M-SEARCH from %s:%d ST: %.*s",
 	       inet_ntoa(((const struct sockaddr_in *)addr)->sin_addr),
 	       ntohs(((const struct sockaddr_in *)addr)->sin_port),
-	       st_len, st);
+	       (int)st_len, st);
 #endif	/* ENABLE_IPV6 */
 	if(st_len==8 && (0==memcmp(st, "ssdp:all", 8))) {
 		/* send a response for all services */
@@ -527,7 +527,7 @@ processMSEARCH(int s, const char * st, int st_len,
 		    serv;
 		    serv = serv->entries.le_next) {
 			SendSSDPMSEARCHResponse(s, addr,
-			                        serv->st, serv->usn,
+			                        serv->st, strlen(serv->st), serv->usn,
 			                        serv->server, serv->location);
 		}
 	} else if(st_len > 5 && (0==memcmp(st, "uuid:", 5))) {
@@ -537,12 +537,12 @@ processMSEARCH(int s, const char * st, int st_len,
 		    serv = serv->entries.le_next) {
 			if(0 == strncmp(serv->usn, st, st_len)) {
 				SendSSDPMSEARCHResponse(s, addr,
-				                        serv->st, serv->usn,
+				                        serv->st, strlen(serv->st), serv->usn,
 				                        serv->server, serv->location);
 			}
 		}
 	} else {
-		int l;
+		size_t l;
 		int st_ver = 0;
 		char atoi_buffer[8];
 
@@ -550,12 +550,13 @@ processMSEARCH(int s, const char * st, int st_len,
 		for (l = st_len; l > 0; l--) {
 			if (st[l-1] == ':') {
 				memset(atoi_buffer, 0, sizeof(atoi_buffer));
-				memcpy(atoi_buffer, st + l, MIN((int)(sizeof(atoi_buffer) - 1), st_len - l));
+				memcpy(atoi_buffer, st + l, MIN((sizeof(atoi_buffer) - 1), st_len - l));
 				st_ver = atoi(atoi_buffer);
-				st_len = l - 1;
 				break;
 			}
 		}
+		if (l == 0)
+			l = st_len;
 		/* answer for each matching service */
 		/* From UPnP Device Architecture v1.1 :
 		 * 1.3.2 [...] Updated versions of device and service types
@@ -570,10 +571,10 @@ processMSEARCH(int s, const char * st, int st_len,
 		for(serv = servicelisthead.lh_first;
 		    serv;
 		    serv = serv->entries.le_next) {
-			if(0 == strncmp(serv->st, st, st_len)) {
-				syslog(LOG_DEBUG, "Found matching service : %s %s", serv->st, serv->usn);
+			if(0 == strncmp(serv->st, st, l)) {
+				syslog(LOG_DEBUG, "Found matching service : %s %s", serv->st, serv->location);
 				SendSSDPMSEARCHResponse(s, addr,
-				                        serv->st, serv->usn,
+				                        st, st_len, serv->usn,
 				                        serv->server, serv->location);
 			}
 		}
