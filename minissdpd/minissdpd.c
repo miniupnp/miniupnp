@@ -48,6 +48,9 @@
 #include "asyncsendto.h"
 
 #define SET_MAX(max, x)	if((x) > (max)) (max) = (x)
+#ifndef MIN
+#define MIN(x,y) (((x)<(y))?(x):(y))
+#endif
 
 /* current request management structure */
 struct reqelem {
@@ -539,15 +542,36 @@ processMSEARCH(int s, const char * st, int st_len,
 			}
 		}
 	} else {
-		/* find matching services */
+		int l;
+		int st_ver = 0;
+		char atoi_buffer[8];
+
 		/* remove version at the end of the ST string */
-		if(st[st_len-2]==':' && isdigit(st[st_len-1]))
-			st_len -= 2;
+		for (l = st_len; l > 0; l--) {
+			if (st[l-1] == ':') {
+				memset(atoi_buffer, 0, sizeof(atoi_buffer));
+				memcpy(atoi_buffer, st + l, MIN((int)(sizeof(atoi_buffer) - 1), st_len - l));
+				st_ver = atoi(atoi_buffer);
+				st_len = l - 1;
+				break;
+			}
+		}
 		/* answer for each matching service */
+		/* From UPnP Device Architecture v1.1 :
+		 * 1.3.2 [...] Updated versions of device and service types
+		 * are REQUIRED to be full backward compatible with
+		 * previous versions. Devices MUST respond to M-SEARCH
+		 * requests for any supported version. For example, if a
+		 * device implements “urn:schemas-upnporg:service:xyz:2”,
+		 * it MUST respond to search requests for both that type
+		 * and “urn:schemas-upnp-org:service:xyz:1”. The response
+		 * MUST specify the same version as was contained in the
+		 * search request. [...] */
 		for(serv = servicelisthead.lh_first;
 		    serv;
 		    serv = serv->entries.le_next) {
 			if(0 == strncmp(serv->st, st, st_len)) {
+				syslog(LOG_DEBUG, "Found matching service : %s %s", serv->st, serv->usn);
 				SendSSDPMSEARCHResponse(s, addr,
 				                        serv->st, serv->usn,
 				                        serv->server, serv->location);
@@ -820,22 +844,15 @@ OpenUnixSocket(const char * path)
 	return s;
 }
 
+static ssize_t processRequestSub(struct reqelem * req, const unsigned char * buf, ssize_t n);
+
 /* processRequest() :
  * process the request coming from a unix socket */
 void processRequest(struct reqelem * req)
 {
-	ssize_t n;
-	unsigned int l, m;
+	ssize_t n, r;
 	unsigned char buf[2048];
 	const unsigned char * p;
-	enum request_type type;
-	struct device * d = devlist;
-	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
-	unsigned char * rp;
-	unsigned char nrep = 0;
-	time_t t;
-	struct service * newserv = NULL;
-	struct service * serv;
 
 	n = read(req->socket, buf, sizeof(buf));
 	if(n<0) {
@@ -848,6 +865,34 @@ void processRequest(struct reqelem * req)
 		syslog(LOG_INFO, "(s=%d) request connection closed", req->socket);
 		goto error;
 	}
+	p = buf;
+	while (n > 0)
+	{
+		r = processRequestSub(req, p, n);
+		if (r < 0)
+			goto error;
+		p += r;
+		n -= r;
+	}
+	return;
+error:
+	close(req->socket);
+	req->socket = -1;
+}
+
+static ssize_t processRequestSub(struct reqelem * req, const unsigned char * buf, ssize_t n)
+{
+	unsigned int l, m;
+	const unsigned char * p;
+	enum request_type type;
+	struct device * d = devlist;
+	unsigned char rbuf[RESPONSE_BUFFER_SIZE];
+	unsigned char * rp;
+	unsigned char nrep = 0;
+	time_t t;
+	struct service * newserv = NULL;
+	struct service * serv;
+
 	t = time(NULL);
 	type = buf[0];
 	p = buf + 1;
@@ -874,6 +919,7 @@ void processRequest(struct reqelem * req)
 			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
 			goto error;
 		}
+		p += l;
 		break;
 	case MINISSDPD_SEARCH_TYPE:	/* request by type */
 	case MINISSDPD_SEARCH_USN:	/* request by USN (unique id) */
@@ -949,6 +995,7 @@ void processRequest(struct reqelem * req)
 			syslog(LOG_ERR, "(s=%d) write: %m", req->socket);
 			goto error;
 		}
+		p += l;
 		break;
 	case MINISSDPD_SUBMIT:	/* submit service */
 		newserv = malloc(sizeof(struct service));
@@ -1026,6 +1073,7 @@ void processRequest(struct reqelem * req)
 		}
 		memcpy(newserv->location, p, l);
 		newserv->location[l] = '\0';
+		p += l;
 		/* look in service list for duplicate */
 		for(serv = servicelisthead.lh_first;
 		    serv;
@@ -1041,7 +1089,7 @@ void processRequest(struct reqelem * req)
 				serv->location = newserv->location;
 				free(newserv);
 				newserv = NULL;
-				return;
+				return (p - buf);
 			}
 		}
 		/* Inserting new service */
@@ -1056,6 +1104,7 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 		req->is_notify = 1;
+		p += l;
 		break;
 	default:
 		syslog(LOG_WARNING, "Unknown request type %d", type);
@@ -1065,7 +1114,7 @@ void processRequest(struct reqelem * req)
 			goto error;
 		}
 	}
-	return;
+	return (p - buf);
 error:
 	if(newserv) {
 		free(newserv->st);
@@ -1075,9 +1124,7 @@ error:
 		free(newserv);
 		newserv = NULL;
 	}
-	close(req->socket);
-	req->socket = -1;
-	return;
+	return -1;
 }
 
 static volatile sig_atomic_t quitting = 0;
