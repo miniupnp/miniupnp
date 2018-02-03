@@ -1,7 +1,7 @@
 /* $Id: ifacewatch.c,v 1.16 2015/09/03 18:31:25 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2011-2016 Thomas Bernard
- * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * (c) 2011-2018 Thomas Bernard
+ * website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include "config.h"

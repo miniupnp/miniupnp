@@ -1,7 +1,7 @@
 /* $Id: testcodelength.c,v 1.3 2012/05/02 10:30:26 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
- * copyright (c) 2005-2008 Thomas Bernard
+ * copyright (c) 2005-2018 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <stdio.h>

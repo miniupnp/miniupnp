@@ -1,8 +1,8 @@
 /* $Id: testminissdpd.c,v 1.14 2016/03/01 17:49:51 nanard Exp $ */
 /* Project : miniupnp
- * website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2016 Thomas Bernard
+ * copyright (c) 2005-2018 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 
