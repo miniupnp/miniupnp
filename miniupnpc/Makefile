@@ -16,9 +16,11 @@ VERSION = $(shell cat VERSION)
 ifneq (, $(findstring darwin, $(OS)))
 JARSUFFIX=mac
 LIBTOOL ?= $(shell which libtool)
-else ifneq (, $(findstring linux, $(OS)))
+endif
+ifneq (, $(findstring linux, $(OS)))
 JARSUFFIX=linux
-else ifneq (, $(findstring mingw, $(OS))$(findstring cygwin, $(OS))$(findstring msys, $(OS)))
+endif
+ifneq (, $(findstring mingw, $(OS))$(findstring cygwin, $(OS))$(findstring msys, $(OS)))
 JARSUFFIX=win32
 endif
 
@@ -104,12 +106,14 @@ ifneq (, $(findstring darwin, $(OS)))
   SHAREDLIBRARY = libminiupnpc.dylib
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
   CFLAGS := -D_DARWIN_C_SOURCE $(CFLAGS)
-else ifeq ($(JARSUFFIX), win32)
+else
+ifeq ($(JARSUFFIX), win32)
   SHAREDLIBRARY = miniupnpc.dll
 else
   # Linux/BSD/etc.
   SHAREDLIBRARY = libminiupnpc.so
   SONAME = $(SHAREDLIBRARY).$(APIVERSION)
+endif
 endif
 
 EXECUTABLES = upnpc-static listdevices

@@ -28,11 +28,13 @@ ifneq (, $(findstring linux, $(OS)))
 endif
 ifeq ($(DEB_HOST_ARCH_OS), kfreebsd)
 	LDLIBS += -lfreebsd-glue
-else ifneq (, $(findstring sun, $(OS)))
+else
+ifneq (, $(findstring sun, $(OS)))
 	CFLAGS += -D_XOPEN_SOURCE
 	CFLAGS += -D_XOPEN_SOURCE_EXTENDED=1
 	CFLAGS += -D__EXTENSIONS__
 	LDFLAGS += -lsocket -lnsl -lresolv
+endif
 endif
 
 #EXECUTABLES = minissdpd testminissdpd listifaces
