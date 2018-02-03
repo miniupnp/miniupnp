@@ -54,18 +54,18 @@ int connect_unix_socket(const char * sockpath)
 int
 main(int argc, char * * argv)
 {
-	const char command0[] = { 0x00, 0x00 };
+	const unsigned char command0[] = { 0x00, 0x00 };
 	char command1[] = "\x01\x00urn:schemas-upnp-org:device:InternetGatewayDevice";
 	char command2[] = "\x02\x00uuid:fc4ec57e-b051-11db-88f8-0060085db3f6::upnp:rootdevice";
-	const char command3[] = { 0x03, 0x00 };
+	const unsigned char command3[] = { 0x03, 0x00 };
 	/* old versions of minissdpd would reject a command with
 	 * a zero length string argument */
 	char command3compat[] = "\x03\x00ssdp:all";
 	char command4[] = "\x04\x00test:test:test";
-	const char bad_command[] = { 0xff, 0xff };
-	const char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-	const char command5[] = { 0x05, 0x00 };
-	const char bad_command4[] = { 0x04, 0x01, 0x60, 0x8f, 0xff, 0xff, 0xff, 0x7f};
+	const unsigned char bad_command[] = { 0xff, 0xff };
+	const unsigned char overflow[] = { 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	const unsigned char command5[] = { 0x05, 0x00 };
+	const unsigned char bad_command4[] = { 0x04, 0x01, 0x60, 0x8f, 0xff, 0xff, 0xff, 0x7f};
 	int s;
 	int i;
 	void * tmp;
