@@ -2,3 +2,6 @@
 .vs
 Debug/
 Release/
+*.user
+*.suo
+*.sdf
