@@ -44,6 +44,11 @@ const char * ext_if_name = "eth0";
 
 int runtime_flags = 0;
 
+#ifdef IGD_V2
+struct option * ary_options = NULL;
+unsigned int num_options = 0;
+#endif
+
 int getifaddr(const char * ifname, char * buf, int len, struct in_addr * addr, struct in_addr * mask)
 {
 	UNUSED(ifname);

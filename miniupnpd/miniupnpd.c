@@ -1294,6 +1294,17 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
+#ifdef IGD_V2
+			case UPNPFORCEIGDDESCV1:
+				if (strcmp(ary_options[i].value, "yes")!=0 &&
+					strcmp(ary_options[i].value, "no")!=0 ) {
+					fprintf(stderr, "force_igd_desc_v1 can only be yes or no\n");
+				}
+				/* ary_options is processed by genRootDesc() to find
+				   this because there is apperently no way to pass
+				   options to the http server */
+				break;
+#endif
 			default:
 				fprintf(stderr, "Unknown option in file %s\n",
 				        optionsfile);

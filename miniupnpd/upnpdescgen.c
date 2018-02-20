@@ -17,6 +17,7 @@
 #endif
 #include "upnpdescgen.h"
 #include "miniupnpdpath.h"
+#include "options.h"
 #include "upnpglobalvars.h"
 #include "upnpdescstrings.h"
 #include "upnpurns.h"
@@ -878,6 +879,31 @@ strcat_int(char * str, int * len, int * tmplen, int i)
 	return str;
 }
 
+#ifdef IGD_V2
+int force_igd_desc_v1(void)
+{
+	/* keep a cache so we only do it once */
+	static int force=-1;
+	int i;
+
+	if (force!=-1) return force;
+
+	force=0;
+
+	for(i=0; i<num_options; i++) {
+		if(ary_options[i].id==UPNPFORCEIGDDESCV1)
+		{
+			if (strcmp(ary_options[i].value, "yes")==0)
+				force=1;
+			else if (strcmp(ary_options[i].value, "no")==0)
+				force=0;
+		}
+	}
+
+	return force;
+}
+#endif
+
 /* iterative subroutine using a small stack
  * This way, the progam stack usage is kept low */
 static char *
@@ -921,6 +947,19 @@ genXML(char * str, int * len, int * tmplen,
 				}
 #endif /* RANDOMIZE_URLS */
 				str = strcat_str(str, len, tmplen, p[i].data);
+#ifdef IGD_V2
+				if (force_igd_desc_v1())
+				{
+					if ((strcmp(p[i].data, DEVICE_TYPE_IGD) == 0) ||
+						(strcmp(p[i].data, DEVICE_TYPE_WAN) == 0)  ||
+						(strcmp(p[i].data, DEVICE_TYPE_WANC) == 0) ||
+						(strcmp(p[i].data, SERVICE_TYPE_WANIPC) == 0) )
+					{
+						int pos = strlen(str)-1;
+						if (pos>0) str[pos] = '1';
+					}
+				}
+#endif
 				str = strcat_char(str, len, tmplen, '<');
 				str = strcat_str(str, len, tmplen, eltname);
 				str = strcat_char(str, len, tmplen, '>');
