@@ -299,30 +299,32 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 	/* first try to get infos from minissdpd ! */
 	if(!minissdpdsock)
 		minissdpdsock = "/var/run/minissdpd.sock";
-	for(deviceIndex = 0; deviceTypes[deviceIndex]; deviceIndex++) {
-		struct UPNPDev * minissdpd_devlist;
-		int only_rootdevice = 1;
-		minissdpd_devlist = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
-		                                            minissdpdsock, 0);
-		if(minissdpd_devlist) {
-#ifdef DEBUG
-			printf("returned by MiniSSDPD: %s\t%s\n",
-			       minissdpd_devlist->st, minissdpd_devlist->descURL);
-#endif /* DEBUG */
-			if(!strstr(minissdpd_devlist->st, "rootdevice"))
-				only_rootdevice = 0;
-			for(tmp = minissdpd_devlist; tmp->pNext != NULL; tmp = tmp->pNext) {
+	if(minissdpdsock[0] != '\0') {
+		for(deviceIndex = 0; deviceTypes[deviceIndex]; deviceIndex++) {
+			struct UPNPDev * minissdpd_devlist;
+			int only_rootdevice = 1;
+			minissdpd_devlist = getDevicesFromMiniSSDPD(deviceTypes[deviceIndex],
+			                                            minissdpdsock, 0);
+			if(minissdpd_devlist) {
 #ifdef DEBUG
 				printf("returned by MiniSSDPD: %s\t%s\n",
-				       tmp->pNext->st, tmp->pNext->descURL);
+				       minissdpd_devlist->st, minissdpd_devlist->descURL);
 #endif /* DEBUG */
-				if(!strstr(tmp->st, "rootdevice"))
+				if(!strstr(minissdpd_devlist->st, "rootdevice"))
 					only_rootdevice = 0;
+				for(tmp = minissdpd_devlist; tmp->pNext != NULL; tmp = tmp->pNext) {
+#ifdef DEBUG
+					printf("returned by MiniSSDPD: %s\t%s\n",
+					       tmp->pNext->st, tmp->pNext->descURL);
+#endif /* DEBUG */
+					if(!strstr(tmp->st, "rootdevice"))
+						only_rootdevice = 0;
+				}
+				tmp->pNext = devlist;
+				devlist = minissdpd_devlist;
+				if(!searchalltypes && !only_rootdevice)
+					break;
 			}
-			tmp->pNext = devlist;
-			devlist = minissdpd_devlist;
-			if(!searchalltypes && !only_rootdevice)
-				break;
 		}
 	}
 	for(tmp = devlist; tmp != NULL; tmp = tmp->pNext) {

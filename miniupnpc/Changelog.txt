@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.229 2017/12/12 11:26:25 nanard Exp $
 miniUPnP client Changelog.
 
+2018/02/22:
+  Disable usage of MiniSSDPd when using -m option
+
 2017/12/11:
   Fix buffer over run in minixml.c
   Fix uninitialized variable access in upnpreplyparse.c
