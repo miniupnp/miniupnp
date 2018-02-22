@@ -8,7 +8,7 @@ miniupnpd \- UPnP Internet Gateway Device Daemon
 .RB [ "\-u \fIuuid" "] [" "\-s \fIserial" "] [" "\-m \fImodel_number" ]
 .RB [ "\-t \fInotify_interval" "] [" "\-P \fIpid_filename" ]
 .RB [ "\-B \fIdown up" "] [" "\-w \fIurl" "] [" "\-r \fIclean_ruleset_interval" ]
-.RB [ "\-A \fIpermission rule" "] [" "\-b \fIBOOTID" ]
+.RB [ "\-A \fIpermission rule" "] [" "\-b \fIBOOTID" "] [" \-1 ]
 .SH DESCRIPTION
 miniupnpd act as a UPnP Internet Gateway Device. It is designed
 to run on the gateway between the internet and a NAT'ed LAN. It provides
@@ -81,6 +81,9 @@ examples :
 .TP
 .BI \-b " BOOTID"
 sets the value of BOOTID.UPNP.ORG SSDP header
+.TP
+.B \-1
+force reporting IGDv1 in rootDesc when compiled as IGDv2 *use with care*
 .SH "SEE ALSO"
 minissdpd(1) miniupnpc(3)
 .SH BUGS
