@@ -3,7 +3,7 @@
 # http://miniupnp.free.fr/
 # http://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2017 Thomas Bernard
+# (c) 2005-2018 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -150,10 +150,11 @@ INSTALLDIRINC = $(INSTALLPREFIX)/include/miniupnpc
 INSTALLDIRLIB = $(INSTALLPREFIX)/$(LIBDIR)
 INSTALLDIRBIN = $(INSTALLPREFIX)/bin
 INSTALLDIRMAN = $(INSTALLPREFIX)/share/man
+PKGCONFIGDIR = $(INSTALLDIRLIB)/pkgconfig
 
 FILESTOINSTALL = $(LIBRARY) $(EXECUTABLES)
 ifeq (, $(findstring amiga, $(OS)))
-FILESTOINSTALL := $(FILESTOINSTALL) $(SHAREDLIBRARY)
+FILESTOINSTALL := $(FILESTOINSTALL) $(SHAREDLIBRARY) miniupnpc.pc
 endif
 
 
@@ -238,6 +239,8 @@ install:	updateversion $(FILESTOINSTALL)
 ifeq (, $(findstring amiga, $(OS)))
 	$(INSTALL) -m 644 $(SHAREDLIBRARY) $(DESTDIR)$(INSTALLDIRLIB)/$(SONAME)
 	ln -fs $(SONAME) $(DESTDIR)$(INSTALLDIRLIB)/$(SHAREDLIBRARY)
+	$(INSTALL) -d $(DESTDIR)$(PKGCONFIGDIR)
+	$(INSTALL) -m 644 miniupnpc.pc $(DESTDIR)$(PKGCONFIGDIR)
 endif
 	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRBIN)
 ifneq (, $(findstring amiga, $(OS)))
@@ -266,6 +269,19 @@ cleaninstall:
 	$(RM) -r $(DESTDIR)$(INSTALLDIRINC)
 	$(RM) $(DESTDIR)$(INSTALLDIRLIB)/$(LIBRARY)
 	$(RM) $(DESTDIR)$(INSTALLDIRLIB)/$(SHAREDLIBRARY)
+
+miniupnpc.pc:	VERSION
+	$(RM) $@
+	echo "prefix=$(INSTALLPREFIX)" >> $@
+	echo "exec_prefix=\$${prefix}" >> $@
+	echo "libdir=\$${exec_prefix}/$(LIBDIR)" >> $@
+	echo "includedir=\$${prefix}/include/miniupnpc" >> $@
+	echo "" >> $@
+	echo "Name: miniUPnPc" >> $@
+	echo "Description: UPnP IGD client lightweight library" >> $@
+	echo "Version: $(VERSION)" >> $@
+	echo "Libs: -L\$${libdir} -lminiupnpc" >> $@
+	echo "Cflags: -I\$${includedir}" >> $@
 
 depend:
 	makedepend -Y -- $(CFLAGS) -- $(SRCS) 2>/dev/null
