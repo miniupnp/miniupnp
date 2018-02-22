@@ -65,6 +65,9 @@ extern int runtime_flags;
 #ifdef ENABLE_PCP
 #define PCP_ALLOWTHIRDPARTYMASK	0x0400
 #endif
+#ifdef IGD_V2
+#define FORCEIGDDESCV1MASK 0x0800
+#endif
 
 #define SETFLAG(mask)	runtime_flags |= mask
 #define GETFLAG(mask)	(runtime_flags & mask)

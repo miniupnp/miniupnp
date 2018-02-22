@@ -1,7 +1,7 @@
-/* $Id: ifacewatcher.c,v 1.7 2012/05/27 22:16:10 nanard Exp $ */
+/* $Id: ifacewatcher.c,v 1.9 2018/02/03 22:05:42 nanard Exp $ */
 /* MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
+ * (c) 2006-2018 Thomas Bernard
  *
  * ifacewatcher.c
  *
