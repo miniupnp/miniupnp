@@ -180,13 +180,13 @@ OpenAndConfSSDPReceiveSocket(int ipv6, unsigned char ttl)
     sockname.sin_family = AF_INET;
     sockname.sin_port = htons(SSDP_PORT);
 #ifdef SSDP_LISTEN_ON_SPECIFIC_ADDR
-	if(n_listen_addr == 1)
+	if(lan_addrs.lh_first != NULL && lan_addrs.lh_first->list.le_next == NULL)
 	{
-		sockname.sin_addr.s_addr = GetIfAddrIPv4(listen_addr[0]);
+		sockname.sin_addr.s_addr = lan_addrs.lh_first->addr.s_addr;
 		if(sockname.sin_addr.s_addr == INADDR_NONE)
 		{
 			syslog(LOG_ERR, "no IPv4 address for interface %s",
-			       listen_addr[0]);
+			       lan_addrs.lh_first->ifname);
 			close(s);
 			return -1;
 		}
@@ -231,5 +231,3 @@ OpenAndConfSSDPReceiveSocket(int ipv6, unsigned char ttl)
 
 	return s;
 }
-
-

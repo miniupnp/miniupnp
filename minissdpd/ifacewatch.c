@@ -27,6 +27,7 @@
 #include <syslog.h>
 #include <inttypes.h>
 
+#include "config.h"
 #include "openssdpsocket.h"
 #include "upnputils.h"
 #include "minissdpdtypes.h"
@@ -170,13 +171,20 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6)
 			       is_del ? "RTM_DELADDR" : "RTM_NEWADDR",
 			       address, ifa->ifa_prefixlen, ifname);
 			for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next) {
+#ifdef ENABLE_IPV6
 				if((0 == strcmp(address, lan_addr->str)) ||
 				   (0 == strcmp(ifname, lan_addr->ifname)) ||
 				   (ifa->ifa_index == lan_addr->index)) {
+#else
+				if((0 == strcmp(address, lan_addr->str)) ||
+				   (0 == strcmp(ifname, lan_addr->ifname))) {
+#endif
 					if(ifa->ifa_family == AF_INET)
 						AddDropMulticastMembership(s_ssdp, lan_addr, 0, is_del);
+#ifdef ENABLE_IPV6
 					else if(ifa->ifa_family == AF_INET6)
 						AddDropMulticastMembership(s_ssdp6, lan_addr, 1, is_del);
+#endif
 					break;
 				}
 			}
@@ -303,13 +311,20 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6)
 		       is_del ? "RTM_DELADDR" : "RTM_NEWADDR",
 		       address, prefixlen, ifname);
 		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next) {
+#ifdef ENABLE_IPV6
 			if((0 == strcmp(address, lan_addr->str)) ||
 			   (0 == strcmp(ifname, lan_addr->ifname)) ||
 			   (ifam->ifam_index == lan_addr->index)) {
+#else
+			if((0 == strcmp(address, lan_addr->str)) ||
+			   (0 == strcmp(ifname, lan_addr->ifname))) {
+#endif
 				if(family == AF_INET)
 					AddDropMulticastMembership(s_ssdp, lan_addr, 0, is_del);
+#ifdef ENABLE_IPV6
 				else if(family == AF_INET6)
 					AddDropMulticastMembership(s_ssdp6, lan_addr, 1, is_del);
+#endif
 				break;
 			}
 		}
