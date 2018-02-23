@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.47 2016/12/16 09:22:35 nanard Exp $
+$Id: Changelog.txt,v 1.49 2018/02/23 13:01:23 nanard Exp $
+
+2018/02/23:
+	Fix build with IPv6 disabled and SSDP_LISTEN_ON_SPECIFIC_ADDR enabled
 
 2018/02/03:
 	Properly parse several requests read() at once
