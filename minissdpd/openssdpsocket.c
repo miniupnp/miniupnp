@@ -1,7 +1,7 @@
 /* $Id: openssdpsocket.c,v 1.17 2015/08/06 14:05:37 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2015 Thomas Bernard
+ * (c) 2006-2018 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -159,13 +159,13 @@ OpenAndConfSSDPReceiveSocket(int ipv6, unsigned char ttl)
 		sa->sin_family = AF_INET;
 		sa->sin_port = htons(SSDP_PORT);
 #ifdef SSDP_LISTEN_ON_SPECIFIC_ADDR
-		if(n_listen_addr == 1)
+		if(lan_addrs.lh_first != NULL && lan_addrs.lh_first->list.le_next == NULL)
 		{
-			sa->sin_addr.s_addr = GetIfAddrIPv4(listen_addr[0]);
+			sa->sin_addr.s_addr = lan_addrs.lh_first->addr.s_addr;
 			if(sa->sin_addr.s_addr == INADDR_NONE)
 			{
 				syslog(LOG_ERR, "no IPv4 address for interface %s",
-				       listen_addr[0]);
+				       lan_addrs.lh_first->ifname);
 				close(s);
 				return -1;
 			}
