@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.25 2015/08/06 10:17:52 nanard Exp $
+# $Id: Makefile,v 1.30 2018/02/23 13:59:44 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -92,6 +92,17 @@ showminissdpdnotif:	$(SHOWMINISSDPDNOTIFOBJS)
 testcodelength:	testcodelength.o
 
 listifaces:	listifaces.o upnputils.o
+
+config.h:	VERSION
+	@tmp=`grep -n MINISSDPD_VERSION $@` ; \
+	line=`echo $$tmp | cut -d: -f1` ; \
+	old_version=`echo $$tmp | cut -d\\" -f2` ; \
+	new_version=`cat VERSION` ; \
+	if [ "$$new_version" != "$$old_version" ] ; then \
+		echo "updating VERSION in $@ from $$old_version to $$new_version"; \
+		sed "$${line}s/$${old_version}/$${new_version}/" $@ > $@.temp ; \
+		mv $@.temp $@ ; \
+	fi
 
 depend:
 	makedepend -f$(MAKEFILE_LIST) -Y \
