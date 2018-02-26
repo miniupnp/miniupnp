@@ -9,8 +9,8 @@
 
 #include "upnpreplyparse.h"
 #include "portlistingparse.h"
-#include "miniupnpc_declspec.h"
-#include "miniupnpctypes.h"
+// #include "miniupnpc_declspec.h"
+// #include "miniupnpctypes.h"
 
 /* MiniUPnPc return codes : */
 #define UPNPCOMMAND_SUCCESS (0)
@@ -208,7 +208,7 @@ UPNP_DeletePortMappingRange(const char * controlURL, const char * servicetype,
 MINIUPNP_LIBSPEC int
 UPNP_GetPortMappingNumberOfEntries(const char* controlURL,
                                    const char* servicetype,
-                                   unsigned int * num);
+                                   unsigned int * numEntries);
 
 /* UPNP_GetSpecificPortMappingEntry()
  *    retrieves an existing port mapping

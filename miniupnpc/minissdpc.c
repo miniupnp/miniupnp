@@ -20,7 +20,6 @@
 #include <ws2tcpip.h>
 #include <io.h>
 #include <iphlpapi.h>
-#include <winsock.h>
 #define snprintf _snprintf
 #if !defined(_MSC_VER)
 #include <stdint.h>
@@ -488,7 +487,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	"\r\n";
 	int deviceIndex;
 	char bufr[1536];	/* reception and emission buffer */
-	int sudp;
+	SOCKET sudp;
 	int n;
 	struct sockaddr_storage sockudp_r;
 	unsigned int mx;
@@ -513,10 +512,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 
 #ifdef _WIN32
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (sudp == INVALID_SOCKET)
 #else
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0);
+	if (sudp < 0)
 #endif
-	if(sudp < 0)
 	{
 		if(error)
 			*error = MINISSDPC_SOCKET_ERROR;
@@ -566,18 +566,18 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			dwRetVal = GetIpAddrTable( pIPAddrTable, &dwSize, 0 );
 			if (dwRetVal == NO_ERROR) {
 #ifdef DEBUG
-				printf("\tNum Entries: %ld\n", pIPAddrTable->dwNumEntries);
+				printf("\tNum Entries: %lu\n", pIPAddrTable->dwNumEntries);
 #endif
 				for (i=0; i < (int) pIPAddrTable->dwNumEntries; i++) {
 #ifdef DEBUG
-					printf("\n\tInterface Index[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwIndex);
+					printf("\n\tInterface Index[%d]:\t%lu\n", i, pIPAddrTable->table[i].dwIndex);
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwAddr;
 					printf("\tIP Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwMask;
 					printf("\tSubnet Mask[%d]:    \t%s\n", i, inet_ntoa(IPAddr) );
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwBCastAddr;
-					printf("\tBroadCast[%d]:      \t%s (%ld)\n", i, inet_ntoa(IPAddr), pIPAddrTable->table[i].dwBCastAddr);
-					printf("\tReassembly size[%d]:\t%ld\n", i, pIPAddrTable->table[i].dwReasmSize);
+					printf("\tBroadCast[%d]:      \t%s (%lu)\n", i, inet_ntoa(IPAddr), pIPAddrTable->table[i].dwBCastAddr);
+					printf("\tReassembly size[%d]:\t%lu\n", i, pIPAddrTable->table[i].dwReasmSize);
 					printf("\tType and State[%d]:", i);
 					printf("\n");
 #endif
@@ -586,7 +586,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 						struct in_addr mc_if;
 						memset(&mc_if, 0, sizeof(mc_if));
 						mc_if.s_addr = pIPAddrTable->table[i].dwAddr;
-						if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0) {
+						if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) == SOCKET_ERROR) {
 							PRINT_SOCKET_ERROR("setsockopt");
 						}
 						((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = pIPAddrTable->table[i].dwAddr;
@@ -597,13 +597,13 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				}
 			}
 			free(pIPAddrTable);
-			pIPAddrTable = NULL;
+// 			pIPAddrTable = NULL;
 		}
 	}
 #endif	/* _WIN32 */
 
 #ifdef _WIN32
-	if (setsockopt(sudp, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof (opt)) < 0)
+	if (setsockopt(sudp, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof (opt)) == SOCKET_ERROR)
 #else
 	if (setsockopt(sudp, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof (opt)) < 0)
 #endif
@@ -617,7 +617,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	if(ipv6) {
 #ifdef _WIN32
 		DWORD mcastHops = ttl;
-		if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char *)&mcastHops, sizeof(mcastHops)) < 0)
+		if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char *)&mcastHops, sizeof(mcastHops)) == SOCKET_ERROR)
 #else  /* _WIN32 */
 		int mcastHops = ttl;
 		if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mcastHops, sizeof(mcastHops)) < 0)
@@ -627,7 +627,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		}
 	} else {
 #ifdef _WIN32
-		if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, (const char *)&_ttl, sizeof(_ttl)) < 0)
+		if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, (const char *)&_ttl, sizeof(_ttl)) == SOCKET_ERROR)
 #else  /* _WIN32 */
 		if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
 #endif /* _WIN32 */
@@ -660,7 +660,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			if(mc_if.s_addr != INADDR_NONE)
 			{
 				((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = mc_if.s_addr;
-				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0)
+				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) == SOCKET_ERROR)
 				{
 					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
@@ -670,7 +670,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				struct ip_mreqn reqn;	/* only defined with -D_BSD_SOURCE or -D_GNU_SOURCE */
 				memset(&reqn, 0, sizeof(struct ip_mreqn));
 				reqn.imr_ifindex = if_nametoindex(multicastif);
-				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&reqn, sizeof(reqn)) < 0)
+				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&reqn, sizeof(reqn)) == SOCKET_ERROR)
 				{
 					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
@@ -785,7 +785,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			break;
 		}
 		for(p = servinfo; p; p = p->ai_next) {
-			n = sendto(sudp, bufr, n, 0, p->ai_addr, p->ai_addrlen);
+			n = sendto(sudp, bufr, n, 0, p->ai_addr, (int)p->ai_addrlen);
 			if (n < 0) {
 #ifdef DEBUG
 				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];

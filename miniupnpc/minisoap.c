@@ -34,7 +34,7 @@
 /* httpWrite sends the headers and the body to the socket
  * and returns the number of bytes sent */
 static int
-httpWrite(int fd, const char * body, int bodysize,
+httpWrite(SOCKET fd, const char * body, int bodysize,
           const char * headers, int headerssize)
 {
 	int n = 0;
@@ -71,7 +71,7 @@ httpWrite(int fd, const char * body, int bodysize,
 }
 
 /* self explanatory  */
-int soapPostSubmit(int fd,
+int soapPostSubmit(SOCKET fd,
                    const char * url,
 				   const char * host,
 				   unsigned short port,

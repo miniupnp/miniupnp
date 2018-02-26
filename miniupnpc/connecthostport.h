@@ -11,7 +11,7 @@
 /* connecthostport()
  * return a socket connected (TCP) to the host and port
  * or -1 in case of error */
-int connecthostport(const char * host, unsigned short port,
+SOCKET connecthostport(const char * host, unsigned short port,
                     unsigned int scope_id);
 
 #endif

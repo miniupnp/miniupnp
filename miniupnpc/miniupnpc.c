@@ -114,7 +114,7 @@ MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGD
  * return values :
  *   pointer - OK
  *   NULL - error */
-char * simpleUPnPcommand2(int s, const char * url, const char * service,
+char * simpleUPnPcommand2(SOCKET s, const char * url, const char * service,
 		       const char * action, struct UPNParg * args,
 		       int * bufsize, const char * httpversion)
 {
@@ -213,9 +213,9 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 			return NULL;
 	}
 	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
-	if(s < 0) {
+	if(s == INVALID_SOCKET) {
 		s = connecthostport(hostname, port, 0);
-		if(s < 0) {
+		if(s == INVALID_SOCKET) {
 			/* failed to connect */
 			return NULL;
 		}
@@ -413,7 +413,7 @@ static char *
 build_absolute_url(const char * baseurl, const char * descURL,
                    const char * url, unsigned int scope_id)
 {
-	int l, n;
+	size_t l, n;
 	char * s;
 	const char * base;
 	char * p;
@@ -570,7 +570,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	int ndev = 0;
 	int i;
 	int state = -1; /* state 1 : IGD connected. State 2 : IGD. State 3 : anything */
-	int n_igd = 0;
+//	int n_igd = 0;
 	char extIpAddr[16];
 	char myLanAddr[40];
 	int status_code = -1;
@@ -614,7 +614,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 			           "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:"))
 			{
 				desc[i].is_igd = 1;
-				n_igd++;
+//				n_igd++;
 				if(lanaddr)
 					strncpy(lanaddr, myLanAddr, lanaddrlen);
 			}
@@ -684,9 +684,9 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 free_and_return:
 	if(desc) {
 		for(i = 0; i < ndev; i++) {
-			if(desc[i].xml) {
-				free(desc[i].xml);
-			}
+//			if(desc[i].xml) {
+			free(desc[i].xml);
+//			}
 		}
 		free(desc);
 	}
@@ -708,13 +708,13 @@ UPNP_GetIGDFromUrl(const char * rootdescurl,
 	int descXMLsize = 0;
 
 	descXML = miniwget_getaddr(rootdescurl, &descXMLsize,
-	                           lanaddr, lanaddrlen, 0, NULL);
+	   	                       lanaddr, lanaddrlen, 0, NULL);
 	if(descXML) {
 		memset(data, 0, sizeof(struct IGDdatas));
 		memset(urls, 0, sizeof(struct UPNPUrls));
 		parserootdesc(descXML, descXMLsize, data);
 		free(descXML);
-		descXML = NULL;
+//		descXML = NULL;
 		GetUPNPUrls(urls, data, rootdescurl, 0);
 		return 1;
 	} else {
