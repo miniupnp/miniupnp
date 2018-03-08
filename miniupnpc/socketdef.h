@@ -3,8 +3,12 @@
 #ifdef _MSC_VER
 #define ISINVALID(s) (INVALID_SOCKET==(s))
 #else
-typedef SOCKET int;
-typedef SSIZE_T ssize_t;
+#ifndef
+#define SOCKET int
+#endif
+#ifndef
+#define SSIZE_T ssize_t
+#endif
 #ifndef INVALID_SOCKET
 #define INVALID_SOCKET (-1)
 #endif
