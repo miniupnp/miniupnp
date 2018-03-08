@@ -3,10 +3,10 @@
 #ifdef _MSC_VER
 #define ISINVALID(s) (INVALID_SOCKET==(s))
 #else
-#ifndef
+#ifndef SOCKET
 #define SOCKET int
 #endif
-#ifndef
+#ifndef SSIZE_T
 #define SSIZE_T ssize_t
 #endif
 #ifndef INVALID_SOCKET
