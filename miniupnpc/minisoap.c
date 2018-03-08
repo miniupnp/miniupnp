@@ -34,7 +34,7 @@
 /* httpWrite sends the headers and the body to the socket
  * and returns the number of bytes sent */
 static int
-httpWrite(int fd, const char * body, int bodysize,
+httpWrite(SOCKET fd, const char * body, int bodysize,
           const char * headers, int headerssize)
 {
 	int n = 0;
@@ -56,7 +56,7 @@ httpWrite(int fd, const char * body, int bodysize,
 	  PRINT_SOCKET_ERROR("send");
 	}
 	/* disable send on the socket */
-	/* draytek routers don't seem to like that... */
+	/* draytek routers dont seem to like that... */
 #if 0
 #ifdef _WIN32
 	if(shutdown(fd, SD_SEND)<0) {
@@ -71,7 +71,7 @@ httpWrite(int fd, const char * body, int bodysize,
 }
 
 /* self explanatory  */
-int soapPostSubmit(int fd,
+int soapPostSubmit(SOCKET fd,
                    const char * url,
 				   const char * host,
 				   unsigned short port,

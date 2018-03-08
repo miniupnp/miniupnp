@@ -8,11 +8,12 @@
 #ifndef CONNECTHOSTPORT_H_INCLUDED
 #define CONNECTHOSTPORT_H_INCLUDED
 
+#include "socketdef.h"
+
 /* connecthostport()
  * return a socket connected (TCP) to the host and port
- * or -1 in case of error */
-int connecthostport(const char * host, unsigned short port,
+ * or INVALID_SOCKET in case of error */
+SOCKET connecthostport(const char * host, unsigned short port,
                     unsigned int scope_id);
 
 #endif
-
