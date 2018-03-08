@@ -36,7 +36,7 @@
 #include "receivedata.h"
 
 int
-receivedata(int socket,
+receivedata(SOCKET socket,
             char * data, int length,
             int timeout, unsigned int * scope_id)
 {
@@ -102,4 +102,3 @@ receivedata(int socket,
 #endif	/* MINIUPNPC_GET_SRC_ADDR */
 	return n;
 }
-

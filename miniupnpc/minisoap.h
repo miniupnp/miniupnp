@@ -7,8 +7,10 @@
 #ifndef MINISOAP_H_INCLUDED
 #define MINISOAP_H_INCLUDED
 
+#include "socketdef.h"
+
 /*int httpWrite(int, const char *, int, const char *);*/
-int soapPostSubmit(int, const char *, const char *, unsigned short,
+int soapPostSubmit(SOCKET, const char *, const char *, unsigned short,
 		   const char *, const char *, const char *);
 
 #endif
