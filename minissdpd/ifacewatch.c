@@ -99,6 +99,9 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6)
 	struct rtattr *rta;
 	int ifa_len;
 
+#ifndef ENABLE_IPV6
+	(void)s_ssdp6;
+#endif
 	iov.iov_base = buffer;
 	iov.iov_len = sizeof(buffer);
 
@@ -206,6 +209,9 @@ ProcessInterfaceWatch(int s, int s_ssdp, int s_ssdp6)
 	int family = AF_UNSPEC;
 	int prefixlen = 0;
 
+#ifndef ENABLE_IPV6
+	(void)s_ssdp6;
+#endif
 	address[0] = '\0';
 	ifname[0] = '\0';
 
