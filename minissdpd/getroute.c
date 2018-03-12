@@ -29,6 +29,11 @@
 
 #include "getroute.h"
 #include "upnputils.h"
+#include "config.h"
+
+/* get_src_for_route_to() function is only called in code
+ * enabled with ENABLE_IPV6 */
+#ifdef ENABLE_IPV6
 
 int
 get_src_for_route_to(const struct sockaddr * dst,
@@ -274,3 +279,4 @@ error:
 #endif /* __linux__ */
 }
 
+#endif /* ENABLE_IPV6 */
