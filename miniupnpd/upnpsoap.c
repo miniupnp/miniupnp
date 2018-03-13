@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.149 2018/01/16 00:50:49 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.151 2018/03/13 10:32:53 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -32,6 +32,7 @@
 #include "getifstats.h"
 #include "getconnstatus.h"
 #include "upnpurns.h"
+#include "upnputils.h"
 
 /* utility function */
 static int is_numeric(const char * s)
@@ -274,7 +275,7 @@ GetStatusInfo(struct upnphttp * h, const char * action, const char * ns)
 	 * Disconnecting, Disconnected */
 
 	status = get_wan_connection_status_str(ext_if_name);
-	uptime = (time(NULL) - startup_time);
+	uptime = upnp_get_uptime();
 	bodylen = snprintf(body, sizeof(body), resp,
 		action, ns, /*SERVICE_TYPE_WANIPC,*/
 		status, (long)uptime, action);

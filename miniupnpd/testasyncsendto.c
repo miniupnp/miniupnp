@@ -1,4 +1,4 @@
-/* $Id: testasyncsendto.c,v 1.4 2018/01/16 00:50:49 nanard Exp $ */
+/* $Id: testasyncsendto.c,v 1.5 2018/03/13 10:25:52 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -21,6 +21,8 @@
 #include "asyncsendto.h"
 
 struct lan_addr_list lan_addrs;
+int runtime_flags = 0;
+time_t startup_time = 0;
 
 #define DEST_IP "239.255.255.250"
 #define DEST_PORT 1900

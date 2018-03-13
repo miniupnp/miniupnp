@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.221 2017/05/27 07:47:55 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.226 2018/03/13 10:35:55 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -794,43 +794,39 @@ sigusr1(int sig)
 
 /* record the startup time, for returning uptime */
 static void
-set_startup_time(int sysuptime)
+set_startup_time(void)
 {
-	startup_time = time(NULL);
+	startup_time = upnp_time();
 #ifdef USE_TIME_AS_BOOTID
-	if(startup_time > 60*60*24 && upnp_bootid == 1) {
-		/* We know we are not January the 1st 1970 */
-		upnp_bootid = (unsigned int)startup_time;
+	if(upnp_bootid == 1) {
+		upnp_bootid = (unsigned int)time(NULL);
 		/* from UDA v1.1 :
 		 * A convenient mechanism is to set this field value to the time
 		 * that the device sends its initial announcement, expressed as
 		 * seconds elapsed since midnight January 1, 1970; */
 	}
 #endif /* USE_TIME_AS_BOOTID */
-	if(sysuptime)
+	if(GETFLAG(SYSUPTIMEMASK))
 	{
 		/* use system uptime instead of daemon uptime */
 #if defined(__linux__)
-		char buff[64];
-		int uptime = 0, fd;
-		fd = open("/proc/uptime", O_RDONLY);
-		if(fd < 0)
+		unsigned long uptime = 0;
+		FILE * f = fopen("/proc/uptime", "r");
+		if(f == NULL)
 		{
-			syslog(LOG_ERR, "open(\"/proc/uptime\" : %m");
+			syslog(LOG_ERR, "fopen(\"/proc/uptime\") : %m");
 		}
 		else
 		{
-			memset(buff, 0, sizeof(buff));
-			if(read(fd, buff, sizeof(buff) - 1) < 0)
+			if(fscanf(f, "%lu", &uptime) != 1)
 			{
-				syslog(LOG_ERR, "read(\"/proc/uptime\" : %m");
+				syslog(LOG_ERR, "fscanf(\"/proc/uptime\") : %m");
 			}
 			else
 			{
-				uptime = atoi(buff);
-				syslog(LOG_INFO, "system uptime is %d seconds", uptime);
+				syslog(LOG_INFO, "system uptime is %lu seconds", uptime);
 			}
-			close(fd);
+			fclose(f);
 			startup_time -= uptime;
 		}
 #elif defined(SOLARIS_KSTATS)
@@ -1632,7 +1628,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	syslog(LOG_NOTICE, "version " MINIUPNPD_VERSION " started");
 #endif /* TOMATO */
 
-	set_startup_time(GETFLAG(SYSUPTIMEMASK));
+	set_startup_time();
 
 	/* presentation url */
 	if(presurl)
@@ -2063,11 +2059,13 @@ main(int argc, char * * argv)
 	/* main loop */
 	while(!quitting)
 	{
+#ifdef USE_TIME_AS_BOOTID
 		/* Correct startup_time if it was set with a RTC close to 0 */
-		if((startup_time<60*60*24) && (time(NULL)>60*60*24))
+		if((upnp_bootid<60*60*24) && (time(NULL)>60*60*24))
 		{
-			set_startup_time(GETFLAG(SYSUPTIMEMASK));
+			upnp_bootid = time(NULL);
 		}
+#endif
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
 		{
