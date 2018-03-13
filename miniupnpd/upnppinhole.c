@@ -1,4 +1,4 @@
-/* $Id: upnppinhole.c,v 1.12 2018/03/13 10:24:55 nanard Exp $ */
+/* $Id: upnppinhole.c,v 1.13 2018/03/13 10:49:13 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2018 Thomas Bernard
@@ -23,6 +23,7 @@
 #include "upnpredirect.h"
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
+#include "upnputils.h"
 #include "upnppinhole.h"
 #ifdef __APPLE__
 /* XXX - Apple version of PF API seems to differ from what

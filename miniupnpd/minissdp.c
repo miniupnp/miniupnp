@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.90 2018/01/16 00:50:47 nanard Exp $ */
+/* $Id: minissdp.c,v 1.92 2018/03/13 10:52:39 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -265,7 +265,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 			{
 				syslog(LOG_WARNING,
 				       "Failed to add IPv6 multicast membership for interface %s",
-				       lan_addr->str ? lan_addr->str : "NULL");
+				       strlen(lan_addr->str) ? lan_addr->str : "NULL");
 			}
 		}
 	}
