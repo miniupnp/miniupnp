@@ -1,8 +1,8 @@
-/* $Id: upnpcommands.c,v 1.46 2015/07/15 12:19:00 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.49 2018/03/13 23:34:47 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2017 Thomas Bernard
+ * Copyright (c) 2005-2018 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  * */
@@ -12,6 +12,7 @@
 #include "upnpcommands.h"
 #include "miniupnpc.h"
 #include "portlistingparse.h"
+#include "upnpreplyparse.h"
 
 static UNSIGNED_INTEGER
 my_atoui(const char * s)

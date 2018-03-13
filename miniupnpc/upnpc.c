@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.117 2017/05/26 15:26:55 nanard Exp $ */
+/* $Id: upnpc.c,v 1.119 2018/03/13 23:34:46 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2018 Thomas Bernard
@@ -20,6 +20,7 @@
 #include "miniwget.h"
 #include "miniupnpc.h"
 #include "upnpcommands.h"
+#include "portlistingparse.h"
 #include "upnperrors.h"
 #include "miniupnpcstrings.h"
 

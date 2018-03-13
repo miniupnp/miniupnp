@@ -1,14 +1,12 @@
-/* $Id: upnpcommands.h,v 1.30 2015/07/15 12:21:28 nanard Exp $ */
+/* $Id: upnpcommands.h,v 1.32 2018/03/13 23:34:47 nanard Exp $ */
 /* Miniupnp project : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2015 Thomas Bernard
+ * Copyright (c) 2005-2018 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided within this distribution */
 #ifndef UPNPCOMMANDS_H_INCLUDED
 #define UPNPCOMMANDS_H_INCLUDED
 
-#include "upnpreplyparse.h"
-#include "portlistingparse.h"
 #include "miniupnpc_declspec.h"
 #include "miniupnpctypes.h"
 
@@ -23,6 +21,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct PortMappingParserData;
 
 MINIUPNP_LIBSPEC UNSIGNED_INTEGER
 UPNP_GetTotalBytesSent(const char * controlURL,
