@@ -1,8 +1,8 @@
-/* $Id: miniwget.c,v 1.75 2016/01/24 17:24:36 nanard Exp $ */
+/* $Id: miniwget.c,v 1.78 2018/03/13 23:22:18 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2017 Thomas Bernard
+ * Copyright (c) 2005-2018 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -230,102 +230,69 @@ getHTTPResponse(int s, int * size, int * status_code)
 			memcpy(buf, header_buf + endofheaders, n);
 			/* if(headers) */
 		}
-		if(endofheaders)
+		/* if we get there, endofheaders != 0.
+		 * In the other case, there was a continue above */
+		/* content */
+		if(chunked)
 		{
-			/* content */
-			if(chunked)
+			int i = 0;
+			while(i < n)
 			{
-				int i = 0;
-				while(i < n)
+				if(chunksize == 0)
 				{
+					/* reading chunk size */
+					if(chunksize_buf_index == 0) {
+						/* skipping any leading CR LF */
+						if(i<n && buf[i] == '\r') i++;
+						if(i<n && buf[i] == '\n') i++;
+					}
+					while(i<n && isxdigit(buf[i])
+					     && chunksize_buf_index < (sizeof(chunksize_buf)-1))
+					{
+						chunksize_buf[chunksize_buf_index++] = buf[i];
+						chunksize_buf[chunksize_buf_index] = '\0';
+						i++;
+					}
+					while(i<n && buf[i] != '\r' && buf[i] != '\n')
+						i++; /* discarding chunk-extension */
+					if(i<n && buf[i] == '\r') i++;
+					if(i<n && buf[i] == '\n') {
+						unsigned int j;
+						for(j = 0; j < chunksize_buf_index; j++) {
+						if(chunksize_buf[j] >= '0'
+						   && chunksize_buf[j] <= '9')
+							chunksize = (chunksize << 4) + (chunksize_buf[j] - '0');
+						else
+							chunksize = (chunksize << 4) + ((chunksize_buf[j] | 32) - 'a' + 10);
+						}
+						chunksize_buf[0] = '\0';
+						chunksize_buf_index = 0;
+						i++;
+					} else {
+						/* not finished to get chunksize */
+						continue;
+					}
+#ifdef DEBUG
+					printf("chunksize = %u (%x)\n", chunksize, chunksize);
+#endif
 					if(chunksize == 0)
 					{
-						/* reading chunk size */
-						if(chunksize_buf_index == 0) {
-							/* skipping any leading CR LF */
-							if(i<n && buf[i] == '\r') i++;
-							if(i<n && buf[i] == '\n') i++;
-						}
-						while(i<n && isxdigit(buf[i])
-						     && chunksize_buf_index < (sizeof(chunksize_buf)-1))
-						{
-							chunksize_buf[chunksize_buf_index++] = buf[i];
-							chunksize_buf[chunksize_buf_index] = '\0';
-							i++;
-						}
-						while(i<n && buf[i] != '\r' && buf[i] != '\n')
-							i++; /* discarding chunk-extension */
-						if(i<n && buf[i] == '\r') i++;
-						if(i<n && buf[i] == '\n') {
-							unsigned int j;
-							for(j = 0; j < chunksize_buf_index; j++) {
-							if(chunksize_buf[j] >= '0'
-							   && chunksize_buf[j] <= '9')
-								chunksize = (chunksize << 4) + (chunksize_buf[j] - '0');
-							else
-								chunksize = (chunksize << 4) + ((chunksize_buf[j] | 32) - 'a' + 10);
-							}
-							chunksize_buf[0] = '\0';
-							chunksize_buf_index = 0;
-							i++;
-						} else {
-							/* not finished to get chunksize */
-							continue;
-						}
 #ifdef DEBUG
-						printf("chunksize = %u (%x)\n", chunksize, chunksize);
+						printf("end of HTTP content - %d %d\n", i, n);
+						/*printf("'%.*s'\n", n-i, buf+i);*/
 #endif
-						if(chunksize == 0)
-						{
-#ifdef DEBUG
-							printf("end of HTTP content - %d %d\n", i, n);
-							/*printf("'%.*s'\n", n-i, buf+i);*/
-#endif
-							goto end_of_stream;
-						}
+						goto end_of_stream;
 					}
-					/* it is guaranteed that (n >= i) */
-					bytestocopy = (chunksize < (unsigned int)(n - i))?chunksize:(unsigned int)(n - i);
-					if((content_buf_used + bytestocopy) > content_buf_len)
-					{
-						char * tmp;
-						if((content_length >= 0) && ((unsigned int)content_length >= (content_buf_used + bytestocopy))) {
-							content_buf_len = content_length;
-						} else {
-							content_buf_len = content_buf_used + bytestocopy;
-						}
-						tmp = realloc(content_buf, content_buf_len);
-						if(tmp == NULL) {
-							/* memory allocation error */
-							free(content_buf);
-							free(header_buf);
-							*size = -1;
-							return NULL;
-						}
-						content_buf = tmp;
-					}
-					memcpy(content_buf + content_buf_used, buf + i, bytestocopy);
-					content_buf_used += bytestocopy;
-					i += bytestocopy;
-					chunksize -= bytestocopy;
 				}
-			}
-			else
-			{
-				/* not chunked */
-				if(content_length > 0
-				   && (content_buf_used + n) > (unsigned int)content_length) {
-					/* skipping additional bytes */
-					n = content_length - content_buf_used;
-				}
-				if(content_buf_used + n > content_buf_len)
+				/* it is guaranteed that (n >= i) */
+				bytestocopy = (chunksize < (unsigned int)(n - i))?chunksize:(unsigned int)(n - i);
+				if((content_buf_used + bytestocopy) > content_buf_len)
 				{
 					char * tmp;
-					if(content_length >= 0
-					   && (unsigned int)content_length >= (content_buf_used + n)) {
+					if((content_length >= 0) && ((unsigned int)content_length >= (content_buf_used + bytestocopy))) {
 						content_buf_len = content_length;
 					} else {
-						content_buf_len = content_buf_used + n;
+						content_buf_len = content_buf_used + bytestocopy;
 					}
 					tmp = realloc(content_buf, content_buf_len);
 					if(tmp == NULL) {
@@ -337,9 +304,41 @@ getHTTPResponse(int s, int * size, int * status_code)
 					}
 					content_buf = tmp;
 				}
-				memcpy(content_buf + content_buf_used, buf, n);
-				content_buf_used += n;
+				memcpy(content_buf + content_buf_used, buf + i, bytestocopy);
+				content_buf_used += bytestocopy;
+				i += bytestocopy;
+				chunksize -= bytestocopy;
 			}
+		}
+		else
+		{
+			/* not chunked */
+			if(content_length > 0
+			   && (content_buf_used + n) > (unsigned int)content_length) {
+				/* skipping additional bytes */
+				n = content_length - content_buf_used;
+			}
+			if(content_buf_used + n > content_buf_len)
+			{
+				char * tmp;
+				if(content_length >= 0
+				   && (unsigned int)content_length >= (content_buf_used + n)) {
+					content_buf_len = content_length;
+				} else {
+					content_buf_len = content_buf_used + n;
+				}
+				tmp = realloc(content_buf, content_buf_len);
+				if(tmp == NULL) {
+					/* memory allocation error */
+					free(content_buf);
+					free(header_buf);
+					*size = -1;
+					return NULL;
+				}
+				content_buf = tmp;
+			}
+			memcpy(content_buf + content_buf_used, buf, n);
+			content_buf_used += n;
 		}
 		/* use the Content-Length header value if available */
 		if(content_length > 0 && content_buf_used >= (unsigned int)content_length)
