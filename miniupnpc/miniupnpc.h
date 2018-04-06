@@ -21,7 +21,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"2.0"
-#define MINIUPNPC_API_VERSION	16
+#define MINIUPNPC_API_VERSION	17
 
 /* Source port:
    Using "1" as an alias for 1900 for backwards compatibility

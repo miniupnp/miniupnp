@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.6)
 
 project (miniupnpc C)
 set (MINIUPNPC_VERSION 2.0)
-set (MINIUPNPC_API_VERSION 16)
+set (MINIUPNPC_API_VERSION 17)
 
 if (NOT CMAKE_BUILD_TYPE)
   if (WIN32)
