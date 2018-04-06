@@ -56,6 +56,7 @@
 #include "miniupnpc.h"
 #include "minissdpc.h"
 #include "miniwget.h"
+#include "miniwget_private.h"
 #include "minisoap.h"
 #include "minixml.h"
 #include "upnpcommands.h"
@@ -114,9 +115,10 @@ MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGD
  * return values :
  *   pointer - OK
  *   NULL - error */
-char * simpleUPnPcommand2(int s, const char * url, const char * service,
-		       const char * action, struct UPNParg * args,
-		       int * bufsize, const char * httpversion)
+static char *
+simpleUPnPcommand2(SOCKET s, const char * url, const char * service,
+                   const char * action, struct UPNParg * args,
+                   int * bufsize, const char * httpversion)
 {
 	char hostname[MAXHOSTNAMELEN+1];
 	unsigned short port = 0;
@@ -213,9 +215,9 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
 			return NULL;
 	}
 	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
-	if(s < 0) {
+	if(ISINVALID(s)) {
 		s = connecthostport(hostname, port, 0);
-		if(s < 0) {
+		if(ISINVALID(s)) {
 			/* failed to connect */
 			return NULL;
 		}
@@ -250,22 +252,23 @@ char * simpleUPnPcommand2(int s, const char * url, const char * service,
  * return values :
  *   pointer - OK
  *   NULL    - error */
-char * simpleUPnPcommand(int s, const char * url, const char * service,
-		       const char * action, struct UPNParg * args,
-		       int * bufsize)
+char *
+simpleUPnPcommand(int s, const char * url, const char * service,
+                  const char * action, struct UPNParg * args,
+                  int * bufsize)
 {
 	char * buf;
 
 #if 1
-	buf = simpleUPnPcommand2(s, url, service, action, args, bufsize, "1.1");
+	buf = simpleUPnPcommand2((SOCKET)s, url, service, action, args, bufsize, "1.1");
 #else
-	buf = simpleUPnPcommand2(s, url, service, action, args, bufsize, "1.0");
+	buf = simpleUPnPcommand2((SOCKET)s, url, service, action, args, bufsize, "1.0");
 	if (!buf || *bufsize == 0)
 	{
 #if DEBUG
 	    printf("Error or no result from SOAP request; retrying with HTTP/1.1\n");
 #endif
-		buf = simpleUPnPcommand2(s, url, service, action, args, bufsize, "1.1");
+		buf = simpleUPnPcommand2((SOCKET)s, url, service, action, args, bufsize, "1.1");
 	}
 #endif
 	return buf;

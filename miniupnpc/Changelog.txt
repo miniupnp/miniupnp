@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.229 2017/12/12 11:26:25 nanard Exp $
 miniUPnP client Changelog.
 
+2018/04/06:
+  Use SOCKET type instead of int (for Win64 compilation)
+
 2018/02/22:
   Disable usage of MiniSSDPd when using -m option
 

@@ -14,8 +14,6 @@
 extern "C" {
 #endif
 
-MINIUPNP_LIBSPEC void * getHTTPResponse(int s, int * size, int * status_code);
-
 MINIUPNP_LIBSPEC void * miniwget(const char *, int *, unsigned int, int *);
 
 MINIUPNP_LIBSPEC void * miniwget_getaddr(const char *, int *, char *, int, unsigned int, int *);
@@ -27,4 +25,3 @@ int parseURL(const char *, char *, unsigned short *, char * *, unsigned int *);
 #endif
 
 #endif
-

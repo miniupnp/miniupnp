@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2017 Thomas Bernard
+ * copyright (c) 2005-2018 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 /*#include <syslog.h>*/
@@ -20,7 +20,6 @@
 #include <ws2tcpip.h>
 #include <io.h>
 #include <iphlpapi.h>
-#include <winsock.h>
 #define snprintf _snprintf
 #if !defined(_MSC_VER)
 #include <stdint.h>
@@ -61,11 +60,7 @@ struct sockaddr_un {
 #define closesocket close
 #endif
 
-#ifdef _WIN32
-#define PRINT_SOCKET_ERROR(x)    fprintf(stderr, "Socket error: %s, %d\n", x, WSAGetLastError());
-#else
-#define PRINT_SOCKET_ERROR(x) perror(x)
-#endif
+#include "miniupnpc_socketdef.h"
 
 #if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__APPLE__) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun) && !defined(__GNU__) && !defined(__FreeBSD_kernel__)
 #define HAS_IP_MREQN
@@ -488,7 +483,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	"\r\n";
 	int deviceIndex;
 	char bufr[1536];	/* reception and emission buffer */
-	int sudp;
+	SOCKET sudp;
 	int n;
 	struct sockaddr_storage sockudp_r;
 	unsigned int mx;
@@ -516,7 +511,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #else
 	sudp = socket(ipv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, 0);
 #endif
-	if(sudp < 0)
+	if(ISINVALID(sudp))
 	{
 		if(error)
 			*error = MINISSDPC_SOCKET_ERROR;

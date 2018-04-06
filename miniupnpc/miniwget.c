@@ -65,7 +65,7 @@
  * to the length parameter.
  */
 void *
-getHTTPResponse(int s, int * size, int * status_code)
+getHTTPResponse(SOCKET s, int * size, int * status_code)
 {
 	char buf[2048];
 	int n;
@@ -371,7 +371,7 @@ miniwget3(const char * host,
           int * status_code)
 {
 	char buf[2048];
-    int s;
+    SOCKET s;
 	int n;
 	int len;
 	int sent;
@@ -379,7 +379,7 @@ miniwget3(const char * host,
 
 	*size = 0;
 	s = connecthostport(host, port, scope_id);
-	if(s < 0)
+	if(ISINVALID(s))
 		return NULL;
 
 	/* get address for caller ! */
