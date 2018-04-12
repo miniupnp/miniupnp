@@ -2094,7 +2094,7 @@ main(int argc, char * * argv)
 		}
 		/* Check if we need to send SSDP NOTIFY messages and do it if
 		 * needed */
-		if(gettimeofday(&timeofday, 0) < 0)
+		if(upnp_gettimeofday(&timeofday) < 0)
 		{
 			syslog(LOG_ERR, "gettimeofday(): %m");
 			timeout.tv_sec = v.notify_interval;
