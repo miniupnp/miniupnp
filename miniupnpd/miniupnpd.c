@@ -996,6 +996,11 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		        str);
 		return -1;
 	}
+#else
+	else
+	{
+		syslog(LOG_NOTICE, "it is advised to use network interface name instead of %s", str);
+	}
 #endif
 	return 0;
 parselan_error:
