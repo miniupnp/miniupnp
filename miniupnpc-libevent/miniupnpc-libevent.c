@@ -412,7 +412,7 @@ static void upnpc_desc_received(struct evhttp_request * req, void * pvoid)
 	             d->control_cif_url, d->cif_service_type);
 
 	if((d->cif_service_type == NULL)
-	  || (strlen(d->cif_service_type) == 0)
+	  || (d->cif_service_type[0] == '\0')
 	  || (!COMPARE(d->cif_service_type, "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:"))) {
 		d->parent->ready_cb(UPNPC_ERR_NOT_IGD, d->parent, d, d->parent->cb_data);
 	} else {
