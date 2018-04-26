@@ -1,6 +1,10 @@
 $Id: Changelog.txt,v 1.229 2017/12/12 11:26:25 nanard Exp $
 miniUPnP client Changelog.
 
+2018/04/26:
+  Small fix in miniupnpcmodule.c (python module)
+  Support cross compiling in Makefile.mingw
+
 2018/04/06:
   Use SOCKET type instead of int (for Win64 compilation)
   Increments API_VERSION to 17

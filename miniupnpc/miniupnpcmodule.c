@@ -1,8 +1,8 @@
 /* $Id: miniupnpcmodule.c,v 1.24 2014/06/10 09:48:11 nanard Exp $*/
 /* Project : miniupnp
  * Author : Thomas BERNARD
- * website : http://miniupnp.tuxfamily.org/
- * copyright (c) 2007-2016 Thomas Bernard
+ * website : https://miniupnp.tuxfamily.org/
+ * copyright (c) 2007-2018 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <Python.h>
@@ -405,14 +405,14 @@ UPnP_deleteportmappingrange(UPnPObject *self, PyObject *args)
 	unsigned short ePortEnd;
 	const char * proto;
 	unsigned char manage;
-	char manageStr[1];
+	char manageStr[6];
 	int r;
 	if(!PyArg_ParseTuple(args, "HHsb", &ePortStart, &ePortEnd, &proto, &manage))
 		return NULL;
 Py_BEGIN_ALLOW_THREADS
 	sprintf(extPortStart, "%hu", ePortStart);
 	sprintf(extPortEnd, "%hu", ePortEnd);
-	sprintf(manageStr, "%hhu", manage);
+	sprintf(manageStr, "%hu", (unsigned short)manage);
 	r = UPNP_DeletePortMappingRange(self->urls.controlURL, self->data.first.servicetype,
 					extPortStart, extPortEnd, proto, manageStr);
 Py_END_ALLOW_THREADS
