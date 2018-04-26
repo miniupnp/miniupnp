@@ -3,13 +3,14 @@ install:
 
 build_script:
   - cd miniupnpc
+  - appveyor AddCompilationMessage "Building miniupnpc"
   - mingw32-make -f Makefile.mingw
   - mingw32-make -f Makefile.mingw pythonmodule PYTHON=C:\Python27\python
 #  - upnpc-static.exe -l
 
 after_build:
   - 7z a ..\miniupnpc.zip *.exe *.dll *.a *.lib
-  - 7z a ..\miniupnpc-python.zip build\
+  - 7z a ..\miniupnpc-python.zip build\ dist\
 
 artifacts:
   - path: miniupnpc.zip
