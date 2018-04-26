@@ -1,10 +1,20 @@
 # $Id: Makefile.mingw,v 1.21 2015/09/18 12:45:16 nanard Exp $
 # Miniupnp project.
-# http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
-# (c) 2005-2015 Thomas Bernard
+# http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
+# (c) 2005-2018 Thomas Bernard
 # This Makefile is made for MinGW
 #
+# To cross compile on a *nix machine :
+# make -f Makefile.mingw DLLWRAP=mingw32-dllwrap CC=mingw32-gcc AR=mingw32-ar
+#
 CC ?= gcc
+DLLWRAP = dllwrap
+SH = /bin/sh
+ifeq ($(OS),Windows_NT)
+RM = del
+else
+RM = rm -f
+endif
 #CFLAGS = -Wall -g -DDEBUG -D_WIN32_WINNT=0X501
 CFLAGS = -Wall -Os -DNDEBUG -D_WIN32_WINNT=0X501
 LDLIBS = -lws2_32 -liphlpapi
@@ -26,11 +36,11 @@ init:
 	echo init > init
 
 clean:
-	del upnpc testminixml *.o
-	del dll\*.o
-	del *.exe
-	del miniupnpc.dll
-	del libminiupnpc.a
+	$(RM) upnpc testminixml *.o
+	$(RM) dll\*.o
+	$(RM) *.exe
+	$(RM) miniupnpc.dll
+	$(RM) libminiupnpc.a
 
 libminiupnpc.a:	$(OBJS)
 	$(AR) cr $@ $?
@@ -40,7 +50,7 @@ pythonmodule:	libminiupnpc.a
 	$(PYTHON) setupmingw32.py install --skip-build
 
 miniupnpc.dll:	libminiupnpc.a $(OBJSDLL)
-	dllwrap -k --driver-name gcc \
+	$(DLLWRAP) -k --driver-name $(CC) \
 	--def miniupnpc.def \
 	--output-def miniupnpc.dll.def \
 	--implib miniupnpc.lib -o $@ \
@@ -74,8 +84,17 @@ wingenminiupnpcstrings:	wingenminiupnpcstrings.o
 
 wingenminiupnpcstrings.o:	wingenminiupnpcstrings.c
 
+# To make miniupnpcstrings.h from miniupnpcstrings.h.in we either
+# use a custom executable (if running make under windows) or use
+# sed (if cross compiling from another platform).
+ifeq ($(OS),Windows_NT)
 miniupnpcstrings.h: miniupnpcstrings.h.in wingenminiupnpcstrings
 	wingenminiupnpcstrings $< $@
+else
+miniupnpcstrings.h:	miniupnpcstrings.h.in VERSION
+	sed 's|OS_STRING ".*"|OS_STRING "Windows/Mingw32"|' $< | \
+	sed 's|MINIUPNPC_VERSION_STRING ".*"|MINIUPNPC_VERSION_STRING "$(shell cat VERSION)"|' > $@
+endif
 
 minixml.o:	minixml.c minixml.h
 
