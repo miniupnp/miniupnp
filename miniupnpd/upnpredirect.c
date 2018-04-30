@@ -109,9 +109,12 @@ lease_file_add(unsigned short eport,
 		return -1;
 	}
 
-	/* convert our time to unix time */
+	/* convert our time to unix time
+     * if LEASEFILE_USE_REMAINING_TIME is defined, only the remaining time is stored */
 	timestamp -= upnp_time();
+#ifndef LEASEFILE_USE_REMAINING_TIME
 	timestamp += time(NULL);
+#endif
 
 	fprintf(fd, "%s:%hu:%s:%hu:%u:%s\n",
 	        proto_itoa(proto), eport, iaddr, iport,
@@ -194,7 +197,9 @@ int reload_from_lease_file()
 	unsigned int leaseduration;
 	unsigned int timestamp;
 	time_t current_time;
+#ifndef LEASEFILE_USE_REMAINING_TIME
 	time_t current_unix_time;
+#endif
 	char line[128];
 	int r;
 
@@ -209,7 +214,9 @@ int reload_from_lease_file()
 	}
 
 	current_time = upnp_time();
+#ifndef LEASEFILE_USE_REMAINING_TIME
 	current_unix_time = time(NULL);
+#endif
 	while(fgets(line, sizeof(line), fd)) {
 		syslog(LOG_DEBUG, "parsing lease file line '%s'", line);
 		proto = line;
@@ -257,13 +264,18 @@ int reload_from_lease_file()
 			*(p--) = '\0';
 
 		if(timestamp > 0) {
+#ifdef LEASEFILE_USE_REMAINING_TIME
+			leaseduration = timestamp;
+			timestamp += current_time;	/* convert to our time */
+#else
 			if(timestamp <= (unsigned int)current_unix_time) {
 				syslog(LOG_NOTICE, "already expired lease in lease file");
 				continue;
 			} else {
 				leaseduration = timestamp - current_unix_time;
-				timestamp = lease_duration + current_time;
+				timestamp = lease_duration + current_time; /* convert to our time */
 			}
+#endif
 		} else {
 			leaseduration = 0;	/* default value */
 		}
