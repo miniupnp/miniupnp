@@ -11,8 +11,8 @@ build_script:
 #  - upnpc-static.exe -l
 
 after_build:
-  - 7z a ..\miniupnpc-$(appveyor_build_version).zip *.exe *.dll *.a *.lib
-  - 7z a ..\miniupnpc-python-$(appveyor_build_version).zip build\ dist\
+  - 7z a ..\miniupnpc-%APPVEYOR_BUILD_VERSION%.zip *.exe *.dll *.a *.lib
+  - 7z a ..\miniupnpc-python-%APPVEYOR_BUILD_VERSION%.zip build\ dist\
 
 artifacts:
   - path: miniupnpc-$(appveyor_build_version).zip
