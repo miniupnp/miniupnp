@@ -1,3 +1,5 @@
+version: '2.0.{build}'
+
 install:
   - set PATH=%PATH%;C:\msys64\mingw32\bin
 
@@ -9,11 +11,11 @@ build_script:
 #  - upnpc-static.exe -l
 
 after_build:
-  - 7z a ..\miniupnpc.zip *.exe *.dll *.a *.lib
-  - 7z a ..\miniupnpc-python.zip build\ dist\
+  - 7z a ..\miniupnpc-$(appveyor_build_version).zip *.exe *.dll *.a *.lib
+  - 7z a ..\miniupnpc-python-$(appveyor_build_version).zip build\ dist\
 
 artifacts:
-  - path: miniupnpc.zip
+  - path: miniupnpc-$(appveyor_build_version).zip
     name: miniupnpc binaries
-  - path: miniupnpc-python.zip
+  - path: miniupnpc-python-$(appveyor_build_version).zip
     name: miniupnpc python module
