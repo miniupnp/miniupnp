@@ -42,7 +42,7 @@ void add_device(struct upnp_dev_list * * list_head, struct UPNPDev * dev)
 				elt->allocated_count += ADD_DEVICE_COUNT_STEP;
 				tmp = realloc(elt->array, elt->allocated_count * sizeof(struct UPNPDev *));
 				if(tmp == NULL) {
-					fprintf(stderr, "Failed to realloc(%p, %lu)\n", elt->array, elt->allocated_count * sizeof(struct UPNPDev *));
+					fprintf(stderr, "Failed to realloc(%p, %lu)\n", elt->array, (unsigned long)(elt->allocated_count * sizeof(struct UPNPDev *)));
 					return;
 				}
 				elt->array = tmp;
@@ -53,15 +53,22 @@ void add_device(struct upnp_dev_list * * list_head, struct UPNPDev * dev)
 	}
 	elt = malloc(sizeof(struct upnp_dev_list));
 	if(elt == NULL) {
-		fprintf(stderr, "Failed to malloc(%lu)\n", sizeof(struct upnp_dev_list));
+		fprintf(stderr, "Failed to malloc(%lu)\n", (unsigned long)sizeof(struct upnp_dev_list));
 		return;
 	}
 	elt->next = *list_head;
 	elt->descURL = strdup(dev->descURL);
+	if(elt->descURL == NULL) {
+		fprintf(stderr, "Failed to strdup(%s)\n", dev->descURL);
+		free(elt);
+		return;
+	}
 	elt->allocated_count = ADD_DEVICE_COUNT_STEP;
 	elt->array = malloc(ADD_DEVICE_COUNT_STEP * sizeof(struct UPNPDev *));
 	if(elt->array == NULL) {
-		fprintf(stderr, "Failed to malloc(%lu)\n", ADD_DEVICE_COUNT_STEP * sizeof(struct UPNPDev *));
+		fprintf(stderr, "Failed to malloc(%lu)\n", (unsigned long)(ADD_DEVICE_COUNT_STEP * sizeof(struct UPNPDev *)));
+		free(elt->descURL);
+		free(elt);
 		return;
 	}
 	elt->array[0] = dev;
