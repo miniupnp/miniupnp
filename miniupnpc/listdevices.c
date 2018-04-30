@@ -26,10 +26,17 @@ struct upnp_dev_list {
 void add_device(struct upnp_dev_list * * list_head, struct UPNPDev * dev)
 {
 	struct upnp_dev_list * elt;
+	size_t i;
+
 	if(dev == NULL)
 		return;
 	for(elt = *list_head; elt != NULL; elt = elt->next) {
 		if(strcmp(elt->descURL, dev->descURL) == 0) {
+			for(i = 0; i < elt->count; i++) {
+				if (strcmp(elt->array[i]->st, dev->st) == 0 && strcmp(elt->array[i]->usn, dev->usn) == 0) {
+					return;	/* already found */
+				}
+			}
 			if(elt->count >= elt->allocated_count) {
 				struct UPNPDev * * tmp;
 				elt->allocated_count += ADD_DEVICE_COUNT_STEP;
@@ -162,7 +169,7 @@ int main(int argc, char * * argv)
 		putchar('\n');
 		for (dev_array = sorted_list; dev_array != NULL ; dev_array = dev_array->next) {
 			printf("%s :\n", dev_array->descURL);
-			for(i = 0; i < (unsigned)dev_array->count; i++) {
+			for(i = 0; (unsigned)i < dev_array->count; i++) {
 				printf("%2d: %s\n", i+1, dev_array->array[i]->st);
 				printf("    %s\n", dev_array->array[i]->usn);
 			}
