@@ -109,6 +109,10 @@ lease_file_add(unsigned short eport,
 		return -1;
 	}
 
+	/* convert our time to unix time */
+	timestamp -= upnp_time();
+	timestamp += time(NULL);
+
 	fprintf(fd, "%s:%hu:%s:%hu:%u:%s\n",
 	        proto_itoa(proto), eport, iaddr, iport,
 	        timestamp, desc);
@@ -190,6 +194,7 @@ int reload_from_lease_file()
 	unsigned int leaseduration;
 	unsigned int timestamp;
 	time_t current_time;
+	time_t current_unix_time;
 	char line[128];
 	int r;
 
@@ -204,6 +209,7 @@ int reload_from_lease_file()
 	}
 
 	current_time = upnp_time();
+	current_unix_time = time(NULL);
 	while(fgets(line, sizeof(line), fd)) {
 		syslog(LOG_DEBUG, "parsing lease file line '%s'", line);
 		proto = line;
@@ -251,11 +257,12 @@ int reload_from_lease_file()
 			*(p--) = '\0';
 
 		if(timestamp > 0) {
-			if(timestamp <= (unsigned int)current_time) {
+			if(timestamp <= (unsigned int)current_unix_time) {
 				syslog(LOG_NOTICE, "already expired lease in lease file");
 				continue;
 			} else {
-				leaseduration = timestamp - current_time;
+				leaseduration = timestamp - current_unix_time;
+				timestamp = lease_duration + current_time;
 			}
 		} else {
 			leaseduration = 0;	/* default value */
