@@ -144,8 +144,7 @@ lease_file_remove(unsigned short eport, int proto)
 		return -1;
 	}
 
-	strncpy( tmpfilename, lease_file, sizeof(tmpfilename) );
-	strncat( tmpfilename, "XXXXXX", sizeof(tmpfilename) - strlen(tmpfilename));
+	snprintf( tmpfilename, sizeof(tmpfilename), "%sXXXXXX", lease_file);
 
 	fd = fopen( lease_file, "r");
 	if (fd==NULL) {
