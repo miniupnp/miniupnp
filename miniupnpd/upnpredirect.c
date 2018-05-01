@@ -111,10 +111,12 @@ lease_file_add(unsigned short eport,
 
 	/* convert our time to unix time
      * if LEASEFILE_USE_REMAINING_TIME is defined, only the remaining time is stored */
-	timestamp -= upnp_time();
+	if (timestamp != 0) {
+		timestamp -= upnp_time();
 #ifndef LEASEFILE_USE_REMAINING_TIME
-	timestamp += time(NULL);
+		timestamp += time(NULL);
 #endif
+	}
 
 	fprintf(fd, "%s:%hu:%s:%hu:%u:%s\n",
 	        proto_itoa(proto), eport, iaddr, iport,
