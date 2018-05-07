@@ -1,4 +1,4 @@
-version: '2.0.{build}'
+version: '2.1.{build}'
 
 install:
   - set PATH=%PATH%;C:\msys64\mingw32\bin

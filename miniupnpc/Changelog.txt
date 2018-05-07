@@ -1,5 +1,11 @@
-$Id: Changelog.txt,v 1.229 2017/12/12 11:26:25 nanard Exp $
+$Id: Changelog.txt,v 1.235 2018/05/07 11:05:16 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.1 : released 2018/05/07
+
+2018/05/07:
+  CMake Modernize and cleanup CMakeLists.txt
+  Update MS Visual Studio projects
 
 2018/04/30:
   listdevices: show devices sorted by XML desc URL

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 project (miniupnpc C)
 
-set (MINIUPNPC_VERSION 2.0)
+set (MINIUPNPC_VERSION 2.1)
 set (MINIUPNPC_API_VERSION 17)
 
 option (UPNPC_BUILD_STATIC "Build static library" TRUE)
