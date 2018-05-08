@@ -3,14 +3,21 @@
 # (c) 2017 Thomas Bernard
 
 OS=`uname -s`
-IF=lo
-if [ "$OS" = "Darwin" ] || [ "$OS" = "OpenBSD" ] || [ "$OS" = "SunOS" ] || [ "$OS" = "FreeBSD" ] ; then
-	IF=lo0
-fi
+
 # if set, 1st argument is network interface
 if [ -n "$1" ] ; then
 	IF=$1
+else
+	case $OS in
+		*BSD | Darwin | SunOS)
+			IF=lo0
+			;;
+		*)
+			IF=lo
+			;;
+	esac
 fi
+
 SOCKET=`mktemp -t minissdpdsocketXXXXXX`
 PID="${SOCKET}.pid"
 ./minissdpd -s $SOCKET -p $PID -i $IF  || exit 1
