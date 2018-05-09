@@ -124,7 +124,7 @@ if (UPNPC_BUILD_SHARED)
   target_link_libraries (libminiupnpc-shared PRIVATE miniupnpc-private)
   target_compile_definitions(libminiupnpc-shared PRIVATE MINIUPNP_EXPORTS)
 
-  target_include_directories(libminiupnpc-static INTERFACE ../${CMAKE_CURRENT_SOURCE_DIR})
+  target_include_directories(libminiupnpc-shared INTERFACE ../${CMAKE_CURRENT_SOURCE_DIR})
   if (WIN32)
     target_link_libraries(libminiupnpc-shared INTERFACE ws2_32 iphlpapi)
   endif()
