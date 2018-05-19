@@ -58,6 +58,9 @@ int
 delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
                                  int proto);
 
+int
+delete_filter_rule(const char * ifname, unsigned short port, int proto);
+
 #ifdef TEST
 int
 clear_redirect_rules(void);
