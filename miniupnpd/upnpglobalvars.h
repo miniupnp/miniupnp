@@ -17,6 +17,10 @@
 /* name of the network interface used to access internet */
 extern const char * ext_if_name;
 
+/* stun host/port configuration */
+extern const char * ext_stun_host;
+extern uint16_t ext_stun_port;
+
 /* file to store all leases */
 #ifdef ENABLE_LEASEFILE
 extern const char * lease_file;
@@ -72,6 +76,8 @@ extern int runtime_flags;
 #ifdef IGD_V2
 #define FORCEIGDDESCV1MASK 0x0800
 #endif
+
+#define PERFORMSTUN			0x1000
 
 #define SETFLAG(mask)	runtime_flags |= mask
 #define GETFLAG(mask)	(runtime_flags & mask)

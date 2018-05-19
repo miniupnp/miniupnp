@@ -16,6 +16,10 @@
 /* network interface for internet */
 const char * ext_if_name = 0;
 
+/* stun host/port configuration */
+const char * ext_stun_host = 0;
+uint16_t ext_stun_port = 0;
+
 /* file to store leases */
 #ifdef ENABLE_LEASEFILE
 const char* lease_file = 0;

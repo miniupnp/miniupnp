@@ -17,6 +17,9 @@ enum upnpconfigoptions {
 	UPNP_INVALID = 0,
 	UPNPEXT_IFNAME = 1,		/* ext_ifname */
 	UPNPEXT_IP,				/* ext_ip */
+	UPNPEXT_PERFORM_STUN,		/* ext_perform_stun */
+	UPNPEXT_STUN_HOST,		/* ext_stun_host */
+	UPNPEXT_STUN_PORT,		/* ext_stun_port */
 	UPNPLISTENING_IP,		/* listening_ip */
 #ifdef ENABLE_IPV6
 	UPNPIPV6_LISTENING_IP,		/* listening address for IPv6 */

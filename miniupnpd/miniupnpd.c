@@ -64,6 +64,7 @@
 #include "minissdp.h"
 #include "upnpredirect.h"
 #include "upnppinhole.h"
+#include "upnpstun.h"
 #include "miniupnpdtypes.h"
 #include "daemonize.h"
 #include "upnpevents.h"
@@ -1028,6 +1029,44 @@ parselan_error:
 	return -1;
 }
 
+static char ext_addr_str[INET_ADDRSTRLEN];
+
+int update_ext_ip_addr_from_stun(int init)
+{
+	struct in_addr if_addr, ext_addr;
+	int restrictive_nat;
+	char if_addr_str[INET_ADDRSTRLEN];
+
+	syslog(LOG_INFO, "STUN: Performing with host=%s and port=%u ...", ext_stun_host, (unsigned)ext_stun_port);
+
+	if (getifaddr(ext_if_name, if_addr_str, INET_ADDRSTRLEN, &if_addr, NULL) < 0) {
+		syslog(LOG_ERR, "STUN: Cannot get IP address for ext interface %s", ext_if_name);
+		return 1;
+	}
+	if (perform_stun(ext_if_name, if_addr_str, ext_stun_host, ext_stun_port, &ext_addr, &restrictive_nat) != 0) {
+		syslog(LOG_ERR, "STUN: Performing STUN failed: %s", strerror(errno));
+		return 1;
+	}
+	if (!inet_ntop(AF_INET, &ext_addr, ext_addr_str, sizeof(ext_addr_str))) {
+		syslog(LOG_ERR, "STUN: Function inet_ntop for IP address returned by STUN failed: %s", strerror(errno));
+		return 1;
+	}
+
+	syslog(LOG_INFO, "STUN: ... done");
+
+	if ((init || disable_port_forwarding) && !restrictive_nat) {
+		if (addr_is_reserved(&if_addr))
+			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted NAT 1:1 with public IP address %s: Port forwarding is now enabled", ext_if_name, if_addr_str, ext_addr_str);
+		else
+			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s: Port forwarding is now enabled", ext_if_name, if_addr_str);
+	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
+		syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind restrictive NAT with public IP address %s: Port forwarding is now impossible", ext_if_name, if_addr_str, ext_addr_str);
+	}
+
+	disable_port_forwarding = restrictive_nat;
+	return 0;
+}
+
 /* fill uuidvalue_wan and uuidvalue_wcd based on uuidvalue_igd */
 void complete_uuidvalues(void)
 {
@@ -1140,6 +1179,16 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 			case UPNPEXT_IP:
 				use_ext_ip_addr = ary_options[i].value;
+				break;
+			case UPNPEXT_PERFORM_STUN:
+				if(strcmp(ary_options[i].value, "yes") == 0)
+					SETFLAG(PERFORMSTUN);
+				break;
+			case UPNPEXT_STUN_HOST:
+				ext_stun_host = ary_options[i].value;
+				break;
+			case UPNPEXT_STUN_PORT:
+				ext_stun_port = atoi(ary_options[i].value);
 				break;
 			case UPNPLISTENING_IP:
 				lan_addr = (struct lan_addr_s *) malloc(sizeof(struct lan_addr_s));
@@ -1337,6 +1386,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			return 1;
 		}
 #endif	/* ENABLE_PCP */
+		if (GETFLAG(PERFORMSTUN) && !ext_stun_host) {
+			fprintf(stderr, "You must specify ext_stun_host= when ext_perform_stun=yes\n");
+			return 1;
+		}
 	}
 #endif /* DISABLE_CONFIG_FILE */
 
@@ -1611,6 +1664,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	{
 		/* bad configuration */
 		goto print_usage;
+	}
+
+	if (use_ext_ip_addr && GETFLAG(PERFORMSTUN)) {
+		fprintf(stderr, "Error: options ext_ip= and ext_perform_stun=yes cannot be specified together\n");
+		return 1;
 	}
 
 	if (use_ext_ip_addr) {
@@ -1941,7 +1999,16 @@ main(int argc, char * * argv)
 	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
 	       ext_if_name, upnp_bootid);
 
-	if (!use_ext_ip_addr)
+	if(GETFLAG(PERFORMSTUN))
+	{
+		int ret = update_ext_ip_addr_from_stun(1);
+		if (ret != 0) {
+			syslog(LOG_ERR, "Performing STUN failed. EXITING");
+			return 1;
+		}
+		use_ext_ip_addr = ext_addr_str;
+	}
+	else if (!use_ext_ip_addr)
 	{
 		char if_addr[INET_ADDRSTRLEN];
 		struct in_addr addr;
@@ -1951,6 +2018,7 @@ main(int argc, char * * argv)
 		}
 		if (addr_is_reserved(&addr)) {
 			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
+			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 			disable_port_forwarding = 1;
 		}
 	}
@@ -2146,6 +2214,8 @@ main(int argc, char * * argv)
 		if(should_send_public_address_change_notif)
 		{
 			syslog(LOG_INFO, "should send external iface address change notification(s)");
+			if(GETFLAG(PERFORMSTUN))
+				update_ext_ip_addr_from_stun(0);
 			if (!use_ext_ip_addr)
 			{
 				char if_addr[INET_ADDRSTRLEN];
@@ -2156,6 +2226,7 @@ main(int argc, char * * argv)
 						syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
 					} else if (!disable_port_forwarding && reserved) {
 						syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
+						syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 					}
 					disable_port_forwarding = reserved;
 				}
