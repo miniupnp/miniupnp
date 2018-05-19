@@ -26,6 +26,10 @@ extern const char * lease_file;
  * when NULL, getifaddr() is used */
 extern const char * use_ext_ip_addr;
 
+/* disallow all port forwarding requests when
+ * we are behind restrictive nat */
+extern int disable_port_forwarding;
+
 /* parameters to return to upnp client when asked */
 extern unsigned long downstream_bitrate;
 extern unsigned long upstream_bitrate;

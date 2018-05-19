@@ -25,6 +25,10 @@ const char* lease_file = 0;
  * when NULL, getifaddr() is used */
 const char * use_ext_ip_addr = 0;
 
+/* disallow all port forwarding requests when
+ * we are behind restrictive nat */
+int disable_port_forwarding = 0;
+
 unsigned long downstream_bitrate = 0;
 unsigned long upstream_bitrate = 0;
 
