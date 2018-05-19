@@ -990,6 +990,12 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 			if(!inet_aton(lan_addr->ext_ip_str, &lan_addr->ext_ip_addr)) {
 				/* error */
 				fprintf(stderr, "Error parsing address : %s\n", lan_addr->ext_ip_str);
+				return -1;
+			}
+			if(addr_is_reserved(&lan_addr->ext_ip_addr)) {
+				/* error */
+				fprintf(stderr, "Error: option ext_ip address contains reserved / private address : %s\n", lan_addr->ext_ip_str);
+				return -1;
 			}
 		}
 	}
@@ -1070,6 +1076,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	int pid;
 	int debug_flag = 0;
 	int openlog_option;
+	struct in_addr addr;
 	struct sigaction sa;
 	/*const char * logfilename = 0;*/
 	const char * presurl = 0;
@@ -1604,6 +1611,17 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	{
 		/* bad configuration */
 		goto print_usage;
+	}
+
+	if (use_ext_ip_addr) {
+		if (inet_pton(AF_INET, use_ext_ip_addr, &addr) != 1) {
+			fprintf(stderr, "Error: option ext_ip contains invalid address %s\n", use_ext_ip_addr);
+			return 1;
+		}
+		if (addr_is_reserved(&addr)) {
+			fprintf(stderr, "Error: option ext_ip contains reserved / private address %s, not public routable\n", use_ext_ip_addr);
+			return 1;
+		}
 	}
 
 	if(debug_flag)

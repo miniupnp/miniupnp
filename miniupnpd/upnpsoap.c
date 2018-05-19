@@ -332,17 +332,20 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 	 * There is usually no NAT with IPv6 */
 
 #ifndef MULTIPLE_EXTERNAL_IP
+	struct in_addr addr;
 	if(use_ext_ip_addr)
 	{
 		strncpy(ext_ip_addr, use_ext_ip_addr, INET_ADDRSTRLEN);
 		ext_ip_addr[INET_ADDRSTRLEN - 1] = '\0';
 	}
-	else if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, NULL, NULL) < 0)
+	else if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0)
 	{
 		syslog(LOG_ERR, "Failed to get ip address for interface %s",
 			ext_if_name);
 		strncpy(ext_ip_addr, "0.0.0.0", INET_ADDRSTRLEN);
 	}
+	if (addr_is_reserved(&addr))
+		strncpy(ext_ip_addr, "0.0.0.0", INET_ADDRSTRLEN);
 #else
 	struct lan_addr_s * lan_addr;
 	strncpy(ext_ip_addr, "0.0.0.0", INET_ADDRSTRLEN);
