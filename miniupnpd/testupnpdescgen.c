@@ -54,6 +54,12 @@ int getifaddr(const char * ifname, char * buf, int len, struct in_addr * addr, s
 	return 0;
 }
 
+int addr_is_reserved(struct in_addr * addr)
+{
+	UNUSED(addr);
+	return 0;
+}
+
 int upnp_get_portmapping_number_of_entries(void)
 {
 	return 42;
