@@ -410,7 +410,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	r_host = GetValueFromNameValueList(&data, "NewRemoteHost");
 #ifndef SUPPORT_REMOTEHOST
 #ifdef UPNP_STRICT
-	if (r_host && (strlen(r_host) > 0) && (0 != strcmp(r_host, "*")))
+	if (r_host && (r_host[0] != '\0') && (0 != strcmp(r_host, "*")))
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 726, "RemoteHostOnlySupportsWildcard");
@@ -606,7 +606,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	}
 #ifndef SUPPORT_REMOTEHOST
 #ifdef UPNP_STRICT
-	if (r_host && (strlen(r_host) > 0) && (0 != strcmp(r_host, "*")))
+	if (r_host && (r_host[0] != '\0') && (0 != strcmp(r_host, "*")))
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 726, "RemoteHostOnlySupportsWildcard");
@@ -724,7 +724,7 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 	}
 #ifndef SUPPORT_REMOTEHOST
 #ifdef UPNP_STRICT
-	if (r_host && (strlen(r_host) > 0) && (0 != strcmp(r_host, "*")))
+	if (r_host && (r_host[0] != '\0') && (0 != strcmp(r_host, "*")))
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 726, "RemoteHostOnlySupportsWildcard");
@@ -813,7 +813,7 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 	}
 #ifndef SUPPORT_REMOTEHOST
 #ifdef UPNP_STRICT
-	if (r_host && (strlen(r_host) > 0) && (0 != strcmp(r_host, "*")))
+	if (r_host && (r_host[0] != '\0') && (0 != strcmp(r_host, "*")))
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 726, "RemoteHostOnlySupportsWildcard");
@@ -1618,7 +1618,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	 * - InternalClient value equals to the control point's IP address.
 	 * It is REQUIRED that InternalClient cannot be one of IPv6
 	 * addresses used by the gateway. */
-	if(!int_ip || 0 == strlen(int_ip) || 0 == strcmp(int_ip, "*"))
+	if(!int_ip || int_ip[0] == '\0' || 0 == strcmp(int_ip, "*"))
 	{
 		SoapError(h, 708, "WildCardNotPermittedInSrcIP");
 		goto clear_and_exit;

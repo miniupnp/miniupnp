@@ -380,7 +380,7 @@ OpenAndConfHTTPSocket(unsigned short * port)
 #if defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP)
 	/* One and only one LAN interface */
 	if(lan_addrs.lh_first != NULL && lan_addrs.lh_first->list.le_next == NULL
-	   && strlen(lan_addrs.lh_first->ifname) > 0)
+	   && lan_addrs.lh_first->ifname[0] != '\0')
 	{
 		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
 		              lan_addrs.lh_first->ifname,
