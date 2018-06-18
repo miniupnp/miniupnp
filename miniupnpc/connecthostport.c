@@ -48,6 +48,12 @@
 #define PRINT_SOCKET_ERROR(x) perror(x)
 #endif
 
+#ifdef _MSC_VER
+#define MSC_CAST_INT (int)
+#else
+#define MSC_CAST_INT
+#endif
+
 #if defined(__amigaos__) || defined(__amigaos4__)
 #define herror(A) printf("%s\n", A)
 #endif
@@ -183,7 +189,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #endif
 		return INVALID_SOCKET;
 	}
-	s = -1;
+	s = INVALID_SOCKET;
 	for(p = ai; p; p = p->ai_next)
 	{
 		s = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
@@ -208,7 +214,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 			PRINT_SOCKET_ERROR("setsockopt");
 		}
 #endif /* #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT */
-		n = connect(s, p->ai_addr, p->ai_addrlen);
+		n = connect(s, p->ai_addr, MSC_CAST_INT p->ai_addrlen);
 #ifdef MINIUPNPC_IGNORE_EINTR
 		/* EINTR The system call was interrupted by a signal that was caught
 		 * EINPROGRESS The socket is nonblocking and the connection cannot
@@ -261,4 +267,3 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #endif /* #ifdef USE_GETHOSTBYNAME */
 	return s;
 }
-
