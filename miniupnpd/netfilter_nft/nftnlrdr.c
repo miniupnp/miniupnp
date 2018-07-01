@@ -63,7 +63,7 @@ add_redirect_rule2(const char * ifname,
 		   const char * iaddr, unsigned short iport, int proto,
 		   const char * desc, unsigned int timestamp)
 {
-	struct nft_rule *r;
+	struct nftnl_rule *r;
 	UNUSED(rhost);
 	UNUSED(timestamp);
         d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
@@ -87,7 +87,7 @@ add_peer_redirect_rule2(const char * ifname,
 			const char * iaddr, unsigned short iport, int proto,
 			const char * desc, unsigned int timestamp)
 {
-	struct nft_rule *r;
+	struct nftnl_rule *r;
 	UNUSED(ifname); UNUSED(timestamp);
 
         d_printf(("add peer redirect rule2()!\n"));
@@ -111,7 +111,7 @@ add_filter_rule2(const char * ifname,
 		 unsigned short eport, unsigned short iport,
 		 int proto, const char * desc)
 {
-	struct nft_rule *r = NULL;
+	struct nftnl_rule *r = NULL;
 	in_addr_t rhost_addr = 0;
 
 	d_printf(("add_filter_rule2(%s, %s, %s, %d, %d, %d, %s)\n",
@@ -150,7 +150,7 @@ int
 delete_redirect_and_filter_rules(unsigned short eport, int proto)
 {
 	rule_t *p;
-	struct nft_rule *r = NULL;
+	struct nftnl_rule *r = NULL;
         in_addr_t iaddr = 0;
         uint16_t iport = 0;
         extern void print_rule(rule_t *r) ;
