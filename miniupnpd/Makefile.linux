@@ -342,3 +342,4 @@ testasyncsendto.o: miniupnpdtypes.h config.h upnputils.h asyncsendto.h
 testportinuse.o: macros.h config.h portinuse.h
 miniupnpdctl.o: macros.h
 testssdppktgen.o: macros.h config.h miniupnpdpath.h upnphttp.h
+upnpstun.o: config.h upnpstun.h netfilter/iptcrdr.h
