@@ -1,4 +1,4 @@
-/* $Id: upnpredirect.c,v 1.93 2018/03/12 22:41:53 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.95 2018/07/06 12:05:48 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -781,4 +781,3 @@ write_ruleset_details(int s)
 	}
 }
 #endif
-

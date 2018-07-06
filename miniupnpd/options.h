@@ -1,8 +1,9 @@
-/* $Id: options.h,v 1.21 2012/06/29 19:26:09 nanard Exp $ */
-/* MiniUPnP project
+/* $Id: options.h,v 1.29 2018/07/06 12:05:48 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2018 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -98,4 +99,3 @@ extern unsigned int num_options;
 #endif /* DISABLE_CONFIG_FILE */
 
 #endif /* OPTIONS_H_INCLUDED */
-

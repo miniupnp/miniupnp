@@ -1,4 +1,4 @@
-/* $Id: upnpglobalvars.h,v 1.45 2018/01/16 00:50:49 nanard Exp $ */
+/* $Id: upnpglobalvars.h,v 1.47 2018/07/06 12:05:48 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/

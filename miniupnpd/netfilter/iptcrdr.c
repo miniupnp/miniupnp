@@ -1,7 +1,8 @@
-/* $Id: iptcrdr.c,v 1.59 2016/03/08 09:23:52 nanard Exp $ */
-/* MiniUPnP project
+/* $Id: iptcrdr.c,v 1.60 2018/07/06 12:00:09 nanard Exp $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2016 Thomas Bernard
+ * (c) 2006-2018 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include <stdio.h>

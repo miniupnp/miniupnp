@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.c,v 1.88 2018/04/12 09:27:53 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.90 2018/07/06 12:00:10 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
