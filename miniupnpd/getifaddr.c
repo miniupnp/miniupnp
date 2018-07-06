@@ -1,7 +1,8 @@
 /* $Id: getifaddr.c,v 1.19 2013/12/13 14:28:40 nanard Exp $ */
-/* MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
+ * (c) 2006-2018 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -263,7 +264,7 @@ find_ipv6_addr(const char * ifname,
 /* If interface has IP address from one of this block, then it is either behind NAT or port forwarding is impossible */
 #define IP(a, b, c, d) (((a) << 24) + ((b) << 16) + ((c) << 8) + (d))
 #define MSK(m) (32-(m))
-static struct { uint32_t address; uint32_t rmask; } reserved[] = {
+static const struct { uint32_t address; uint32_t rmask; } reserved[] = {
 	{ IP(  0,   0,   0, 0), MSK( 8) }, /* RFC1122 "This host on this network" */
 	{ IP( 10,   0,   0, 0), MSK( 8) }, /* RFC1918 Private-Use */
 	{ IP(100,  64,   0, 0), MSK(10) }, /* RFC6598 Shared Address Space */
