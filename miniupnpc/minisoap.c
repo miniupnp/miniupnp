@@ -25,12 +25,6 @@
 /* only for malloc */
 #include <stdlib.h>
 
-#ifdef _WIN32
-#define PRINT_SOCKET_ERROR(x)    fprintf(stderr, "Socket error: %s, %d\n", x, WSAGetLastError());
-#else
-#define PRINT_SOCKET_ERROR(x) perror(x)
-#endif
-
 /* httpWrite sends the headers and the body to the socket
  * and returns the number of bytes sent */
 static int

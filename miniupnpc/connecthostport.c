@@ -41,19 +41,6 @@
 #include <sys/select.h>
 #endif /* #else _WIN32 */
 
-/* definition of PRINT_SOCKET_ERROR */
-#ifdef _WIN32
-#define PRINT_SOCKET_ERROR(x)    fprintf(stderr, "Socket error: %s, %d\n", x, WSAGetLastError());
-#else
-#define PRINT_SOCKET_ERROR(x) perror(x)
-#endif
-
-#ifdef _MSC_VER
-#define MSC_CAST_INT (int)
-#else
-#define MSC_CAST_INT
-#endif
-
 #if defined(__amigaos__) || defined(__amigaos4__)
 #define herror(A) printf("%s\n", A)
 #endif

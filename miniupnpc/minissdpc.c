@@ -60,12 +60,6 @@ struct sockaddr_un {
 #define closesocket close
 #endif
 
-#ifdef _MSC_VER
-#define MSC_CAST_INT (int)
-#else
-#define MSC_CAST_INT
-#endif
-
 #include "miniupnpc_socketdef.h"
 
 #if !defined(__DragonFly__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__APPLE__) && !defined(_WIN32) && !defined(__CYGWIN__) && !defined(__sun) && !defined(__GNU__) && !defined(__FreeBSD_kernel__)
