@@ -1052,8 +1052,6 @@ int update_ext_ip_addr_from_stun(int init)
 		return 1;
 	}
 
-	syslog(LOG_INFO, "STUN: ... done");
-
 	if ((init || disable_port_forwarding) && !restrictive_nat) {
 		if (addr_is_reserved(&if_addr))
 			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted NAT 1:1 with public IP address %s: Port forwarding is now enabled", ext_if_name, if_addr_str, ext_addr_str);
@@ -1061,8 +1059,11 @@ int update_ext_ip_addr_from_stun(int init)
 			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s: Port forwarding is now enabled", ext_if_name, if_addr_str);
 	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
 		syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind restrictive NAT with public IP address %s: Port forwarding is now impossible", ext_if_name, if_addr_str, ext_addr_str);
+	} else {
+		syslog(LOG_INFO, "STUN: ... done");
 	}
 
+	use_ext_ip_addr = ext_addr_str;
 	disable_port_forwarding = restrictive_nat;
 	return 0;
 }
@@ -2007,22 +2008,18 @@ main(int argc, char * * argv)
 
 	if(GETFLAG(PERFORMSTUNMASK))
 	{
-		int ret = update_ext_ip_addr_from_stun(1);
-		if (ret != 0) {
+		if (update_ext_ip_addr_from_stun(1) != 0) {
 			syslog(LOG_ERR, "Performing STUN failed. EXITING");
 			return 1;
 		}
-		use_ext_ip_addr = ext_addr_str;
 	}
 	else if (!use_ext_ip_addr)
 	{
 		char if_addr[INET_ADDRSTRLEN];
 		struct in_addr addr;
 		if (getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL) < 0) {
-			syslog(LOG_ERR, "Cannot get IP address for ext interface %s. EXITING", ext_if_name);
-			return 1;
-		}
-		if (addr_is_reserved(&addr)) {
+			syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
+		} else if (addr_is_reserved(&addr)) {
 			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 			disable_port_forwarding = 1;
