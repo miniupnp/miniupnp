@@ -28,5 +28,9 @@ int
 find_ipv6_addr(const char * ifname,
                char * dst, int n);
 
+/* check if address is in private / reserved block (e.g. local area network) */
+int
+addr_is_reserved(struct in_addr * addr);
+
 #endif
 
