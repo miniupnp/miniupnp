@@ -17,11 +17,16 @@ addons:
 sudo: false
 
 env:
-  - 'PROJECT=minissdpd'
-  - 'PROJECT=miniupnpc'
-  - 'PROJECT=miniupnpc-async'
-  - 'PROJECT=miniupnpc-libevent'
-  - 'PROJECT=miniupnpd'
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+     - secure: "R9ake7/rXjxJMlYse39OuW/6oApT7CouFxOQi0QV8FW+ZxnLK4XiDY8TZsk7CMsxtmphFplVUNVgjY57YDL0HKl/QyiX1cfNOf/OJnqRuN6AIXyMlRrWnzyMslKPGKzYG/0VsQHFBfeayPeDC7Jhg3pv3Y6iGye6FMiIpOICybmcW58v1z7aqiq/NmUF8P1fmQpfvh6GfBv95G5BYXM2YzbdUeWrNKbccQdu+YaJDtDzgoY0lyiETo9GoxiBvw+t/D1tUK6hFSHNYNfiGiV/6rglurlDR+cgXxhoURE1pwCEujnjrBf/twiNQPEMRxbVUya9OOnfPYdBk5vs3yNbHrQCLXjYQF7kjKeJlxyYpaBab5Ds9Zl2pyQPabZYjvzI54aRr3bOdM1y01+o741wuCi009RsM4N0Us5F9xZWAOy3xXTsn2+vpkl/l/5ltQdsthh30nqR72BnzwW68rIciiBn5ggpTLzQ0LacIKOuO/W5SPRJf+A/Bnw1bhezPg0X4LubcRylT0MLMH906XSHz4An5HWVdLYpUz0CTPGMJdNYBUmUreX8kVzSnI/8VFEFBT0qyCRgtXKtHXZQ0qaZsuCLAB+6tyk7CoQ8bcBSpSpDMTqVc7GN6lDeDrihgD8DY/cXruc1g2/PFgg4tvac6H/q74aRf63xuXe05t+Q7dM="
+  matrix:
+    - 'PROJECT=minissdpd'
+    - 'PROJECT=miniupnpc'
+    - 'PROJECT=miniupnpc-async'
+    - 'PROJECT=miniupnpc-libevent'
+    - 'PROJECT=miniupnpd'
 
 matrix:
   exclude:
@@ -36,6 +41,7 @@ compiler:
 
 before_install:
   - 'if [ "$TRAVIS_OS_NAME" = "osx" ] && [ "$CC" == "gcc" ] ; then CC=gcc-4.9; fi'
+  - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
@@ -47,3 +53,13 @@ script:
 
 after_success:
   - 'INSTALLPREFIX="$HOME/$PROJECT" make -f $MAKEFILE install'
+
+addons:
+  coverity_scan:
+    project:
+      name: "miniupnp/miniupnp"
+      description: "Miniupnp $PROJECT"
+    notification_email: miniupnp@free.fr
+    build_command_prepend: "cd $TRAVIS_BUILD_DIR && cd $PROJECT"
+    build_command: 'MAKEFILE=Makefile && if [ -f Makefile.linux -a "$TRAVIS_OS_NAME" = "linux" ]; then MAKEFILE=Makefile.linux; elif [ -f Makefile.macosx -a "$TRAVIS_OS_NAME" = "osx" ]; then MAKEFILE=Makefile.macosx; fi; CONFIG_OPTIONS="--ipv6 --igd2" make -f $MAKEFILE -j3'
+    branch_pattern: coverity_scan
