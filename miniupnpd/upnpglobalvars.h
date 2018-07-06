@@ -77,7 +77,7 @@ extern int runtime_flags;
 #define FORCEIGDDESCV1MASK 0x0800
 #endif
 
-#define PERFORMSTUN			0x1000
+#define PERFORMSTUNMASK    0x1000
 
 #define SETFLAG(mask)	runtime_flags |= mask
 #define GETFLAG(mask)	(runtime_flags & mask)

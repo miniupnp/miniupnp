@@ -1182,7 +1182,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 			case UPNPEXT_PERFORM_STUN:
 				if(strcmp(ary_options[i].value, "yes") == 0)
-					SETFLAG(PERFORMSTUN);
+					SETFLAG(PERFORMSTUNMASK);
 				break;
 			case UPNPEXT_STUN_HOST:
 				ext_stun_host = ary_options[i].value;
@@ -1386,7 +1386,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			return 1;
 		}
 #endif	/* ENABLE_PCP */
-		if (GETFLAG(PERFORMSTUN) && !ext_stun_host) {
+		if (GETFLAG(PERFORMSTUNMASK) && !ext_stun_host) {
 			fprintf(stderr, "You must specify ext_stun_host= when ext_perform_stun=yes\n");
 			return 1;
 		}
@@ -1414,9 +1414,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
 		case 'o':
-			if(i+1 < argc)
-				use_ext_ip_addr = argv[++i];
-			else
+			if(i+1 < argc) {
+				i++;
+				if (0 == strncasecmp(argv[i], "STUN:", 5)) {
+					SETFLAG(PERFORMSTUNMASK);
+					ext_stun_host = argv[i] + 5;
+				} else
+					use_ext_ip_addr = argv[i];
+			} else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
 		case 't':
@@ -1666,7 +1671,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		goto print_usage;
 	}
 
-	if (use_ext_ip_addr && GETFLAG(PERFORMSTUN)) {
+	if (use_ext_ip_addr && GETFLAG(PERFORMSTUNMASK)) {
 		fprintf(stderr, "Error: options ext_ip= and ext_perform_stun=yes cannot be specified together\n");
 		return 1;
 	}
@@ -1854,6 +1859,7 @@ print_usage:
 			"\tDefault pid file is '%s'.\n"
 			"\tDefault config file is '%s'.\n"
 			"\tWith -d miniupnpd will run as a standard program.\n"
+			"\t-o argument is either an IPv4 address or \"STUN:xx.xx.xx.xx\".\n"
 #if defined(USE_PF) || defined(USE_IPF)
 			"\t-L sets packet log in pf and ipf on.\n"
 #endif
@@ -1999,7 +2005,7 @@ main(int argc, char * * argv)
 	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
 	       ext_if_name, upnp_bootid);
 
-	if(GETFLAG(PERFORMSTUN))
+	if(GETFLAG(PERFORMSTUNMASK))
 	{
 		int ret = update_ext_ip_addr_from_stun(1);
 		if (ret != 0) {
@@ -2214,7 +2220,7 @@ main(int argc, char * * argv)
 		if(should_send_public_address_change_notif)
 		{
 			syslog(LOG_INFO, "should send external iface address change notification(s)");
-			if(GETFLAG(PERFORMSTUN))
+			if(GETFLAG(PERFORMSTUNMASK))
 				update_ext_ip_addr_from_stun(0);
 			if (!use_ext_ip_addr)
 			{
