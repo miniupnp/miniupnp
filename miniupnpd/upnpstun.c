@@ -45,10 +45,18 @@ static int delete_filter_rule(const char * ifname, unsigned short port, int prot
 /* Generate random STUN Transaction Id */
 static void generate_transaction_id(unsigned char transaction_id[12])
 {
-	int i;
+	size_t i, n;
+	long value;
 
-	for (i = 0; i < 12; ++i)
-		transaction_id[i] = random()%255;
+	i = 0;
+	while (i < 12) {
+		value = random();
+		n = sizeof(value);
+		if (i + n > 12)
+			n = 12 - i;
+		memcpy(transaction_id + i, &value, n);
+		i += n;
+	}
 }
 
 /* Create and fill STUN Binding Request */
