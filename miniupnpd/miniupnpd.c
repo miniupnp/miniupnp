@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.226 2018/03/13 10:35:55 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.232 2018/07/06 12:35:26 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -1058,7 +1058,7 @@ int update_ext_ip_addr_from_stun(int init)
 		else
 			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s: Port forwarding is now enabled", ext_if_name, if_addr_str);
 	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
-		syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind restrictive NAT with public IP address %s: Port forwarding is now impossible", ext_if_name, if_addr_str, ext_addr_str);
+		syslog(LOG_WARNING, "STUN: ext interface %s with IP address %s is now behind restrictive NAT with public IP address %s: Port forwarding is now impossible", ext_if_name, if_addr_str, ext_addr_str);
 	} else {
 		syslog(LOG_INFO, "STUN: ... done");
 	}
