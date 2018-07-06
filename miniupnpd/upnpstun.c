@@ -1,4 +1,6 @@
-/* MiniUPnP project
+/* $Id: $ */
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2018 Pali Rohár
  * This software is subject to the conditions detailed
@@ -8,6 +10,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <stdlib.h>
@@ -97,7 +100,9 @@ static int resolve_stun_host(const char *stun_host, unsigned short stun_port, st
 	struct addrinfo *result, *rp;
 	char service[6];
 
-	snprintf(service, sizeof(service), "%hu", stun_port ? stun_port : (unsigned short)3478);
+	if (stun_port == 0)
+		stun_port = (unsigned short)3478;
+	snprintf(service, sizeof(service), "%hu", stun_port);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -181,35 +186,36 @@ static size_t receive_stun_response(int fd, unsigned char *buffer, unsigned char
 /* Wait for STUN response messages and try to receive them */
 static int wait_for_stun_responses(int fds[4], unsigned char *transaction_ids[4], unsigned char *buffers[4], size_t buffers_lens[4], struct sockaddr_in peer_addrs[4], size_t lens[4])
 {
-	fd_set fd_set;
+	fd_set fdset;
 	struct timeval timeout;
-	int tmp1, tmp2, max_fd;
+	int max_fd;
 	int ret;
 	int i;
 
-	tmp1 = fds[0] > fds[1] ? fds[0] : fds[1];
-	tmp2 = fds[2] > fds[3] ? fds[2] : fds[3];
-	max_fd = tmp1 > tmp2 ? tmp1 : tmp2;
+	max_fd = fds[0];
+	for (i = 1; i < 4; i++) {
+		if (fds[i] > max_fd)
+			max_fd = fds[i];
+	}
 
 	timeout.tv_sec = 3;
 	timeout.tv_usec = 0;
 
 	while (timeout.tv_sec > 0 || timeout.tv_usec > 0) {
 
-		FD_ZERO(&fd_set);
-		FD_SET(fds[0], &fd_set);
-		FD_SET(fds[1], &fd_set);
-		FD_SET(fds[2], &fd_set);
-		FD_SET(fds[3], &fd_set);
+		FD_ZERO(&fdset);
+		for (i = 0; i < 4; i++) {
+			FD_SET(fds[i], &fdset);
+		}
 
-		ret = select(max_fd+1, &fd_set, NULL, NULL, &timeout);
+		ret = select(max_fd+1, &fdset, NULL, NULL, &timeout);
 		if (ret < 0)
 			return -1;
 		if (ret == 0)
 			return 0;
 
 		for (i = 0; i < 4; ++i)
-			if (FD_ISSET(fds[i], &fd_set))
+			if (FD_ISSET(fds[i], &fdset))
 				lens[i] = receive_stun_response(fds[i], buffers[i], transaction_ids[i], buffers_lens[i], &peer_addrs[i]);
 
 		if (lens[0] && lens[1] && lens[2] && lens[3])
@@ -345,13 +351,10 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 	}
 
 	/* Remove unblock for local ports */
-	for (i = 0; i < 4; ++i)
+	for (i = 0; i < 4; ++i) {
 		delete_filter_rule(if_name, local_ports[i], IPPROTO_UDP);
-
-	close(fds[0]);
-	close(fds[1]);
-	close(fds[2]);
-	close(fds[3]);
+		close(fds[i]);
+	}
 
 	/* Parse received STUN messages */
 	have_ext_addr = 0;
