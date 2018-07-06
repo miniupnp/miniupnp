@@ -1418,8 +1418,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			if(i+1 < argc) {
 				i++;
 				if (0 == strncasecmp(argv[i], "STUN:", 5)) {
+					char *ptr;
 					SETFLAG(PERFORMSTUNMASK);
 					ext_stun_host = argv[i] + 5;
+					ptr = strchr(ext_stun_host, ':');
+					if (ptr) {
+						ext_stun_port = atoi(ptr+1);
+						*ptr = 0;
+					}
 				} else
 					use_ext_ip_addr = argv[i];
 			} else
@@ -1860,7 +1866,7 @@ print_usage:
 			"\tDefault pid file is '%s'.\n"
 			"\tDefault config file is '%s'.\n"
 			"\tWith -d miniupnpd will run as a standard program.\n"
-			"\t-o argument is either an IPv4 address or \"STUN:xx.xx.xx.xx\".\n"
+			"\t-o argument is either an IPv4 address or \"STUN:host[:port]\".\n"
 #if defined(USE_PF) || defined(USE_IPF)
 			"\t-L sets packet log in pf and ipf on.\n"
 #endif
