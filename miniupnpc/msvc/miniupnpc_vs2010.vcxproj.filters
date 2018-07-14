@@ -104,5 +104,13 @@
     <Filter Include="headers">
       <UniqueIdentifier>{2b3996de-1bc4-418b-8a83-a5f34fdf0df5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="scripts">
+      <UniqueIdentifier>{45dbc39d-c3ca-4a75-adf0-76070e20415a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="genminiupnpcstrings.vbs">
+      <Filter>scripts</Filter>
+    </None>
   </ItemGroup>
 </Project>

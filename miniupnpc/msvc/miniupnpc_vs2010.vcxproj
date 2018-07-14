@@ -178,6 +178,9 @@
     <ClInclude Include="..\upnperrors.h" />
     <ClInclude Include="..\upnpreplyparse.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="genminiupnpcstrings.vbs" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
