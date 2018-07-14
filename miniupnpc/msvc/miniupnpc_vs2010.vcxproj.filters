@@ -45,9 +45,6 @@
     <ClInclude Include="..\connecthostport.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\declspec.h">
-      <Filter>headers</Filter>
-    </ClInclude>
     <ClInclude Include="..\igd_desc_parse.h">
       <Filter>headers</Filter>
     </ClInclude>

@@ -93,7 +93,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\connecthostport.h" />
-    <ClInclude Include="..\declspec.h" />
     <ClInclude Include="..\igd_desc_parse.h" />
     <ClInclude Include="..\minisoap.h" />
     <ClInclude Include="..\minissdpc.h" />
