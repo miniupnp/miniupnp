@@ -544,8 +544,10 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
  * SSDP multicast traffic */
 /* Get IP associated with the index given in the ip_forward struct
  * in order to give this ip to setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF) */
-	if(!ipv6
-	   && (GetBestRoute(inet_addr("223.255.255.255"), 0, &ip_forward) == NO_ERROR)) {
+	if(!ipv6) {
+	  IN_ADDR addr;
+	  InetPtonA(AF_INET, "223.255.255.255", &addr);
+	  if (GetBestRoute(addr.S_un.S_addr, 0, &ip_forward) == NO_ERROR) {
 		DWORD dwRetVal = 0;
 		PMIB_IPADDRTABLE pIPAddrTable;
 		DWORD dwSize = 0;
@@ -571,13 +573,17 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif
 				for (i=0; i < (int) pIPAddrTable->dwNumEntries; i++) {
 #ifdef DEBUG
+					char buffer[16];
 					printf("\n\tInterface Index[%d]:\t%lu\n", i, pIPAddrTable->table[i].dwIndex);
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwAddr;
-					printf("\tIP Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
+					InetNtopA(AF_INET, &IPAddr, buffer, sizeof(buffer));
+					printf("\tIP Address[%d]:     \t%s\n", i, buffer );
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwMask;
-					printf("\tSubnet Mask[%d]:    \t%s\n", i, inet_ntoa(IPAddr) );
+					InetNtopA(AF_INET, &IPAddr, buffer, sizeof(buffer));
+					printf("\tSubnet Mask[%d]:    \t%s\n", i, buffer );
 					IPAddr.S_un.S_addr = (u_long) pIPAddrTable->table[i].dwBCastAddr;
-					printf("\tBroadCast[%d]:      \t%s (%lu)\n", i, inet_ntoa(IPAddr), pIPAddrTable->table[i].dwBCastAddr);
+					InetNtopA(AF_INET, &IPAddr, buffer, sizeof(buffer));
+					printf("\tBroadCast[%d]:      \t%s (%lu)\n", i, buffer, pIPAddrTable->table[i].dwBCastAddr);
 					printf("\tReassembly size[%d]:\t%lu\n", i, pIPAddrTable->table[i].dwReasmSize);
 					printf("\tType and State[%d]:", i);
 					printf("\n");
@@ -599,6 +605,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			}
 			free(pIPAddrTable);
 		}
+	  }
 	}
 #endif	/* _WIN32 */
 
@@ -656,7 +663,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif
 		} else {
 			struct in_addr mc_if;
+#if defined(_WIN32)
+			InetPtonA(AF_INET, multicastif, &mc_if);
+#else
 			mc_if.s_addr = inet_addr(multicastif); /* ex: 192.168.x.x */
+#endif
 			if(mc_if.s_addr != INADDR_NONE)
 			{
 				((struct sockaddr_in *)&sockudp_r)->sin_addr.s_addr = mc_if.s_addr;
