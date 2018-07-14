@@ -42,6 +42,7 @@ script:
   - 'MAKEFILE=Makefile && if [ -f Makefile.linux -a "$TRAVIS_OS_NAME" = "linux" ]; then MAKEFILE=Makefile.linux; elif [ -f Makefile.macosx -a "$TRAVIS_OS_NAME" = "osx" ]; then MAKEFILE=Makefile.macosx; fi'
   - 'if [ "$MAKEFILE" = "Makefile.macosx" ]; then make -f $MAKEFILE depend; fi'
   - 'CONFIG_OPTIONS="--ipv6 --igd2" make -f $MAKEFILE -j3'
+  - 'if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJECT" = "miniupnpd" ]; then make -f Makefile.linux_nft ; fi'
   - 'if [ "$PROJECT" = "miniupnpc" -o "$PROJECT" = "minissdpd" -o "$PROJECT" = "miniupnpd" ]; then make -f $MAKEFILE check; fi'
   - 'if [ "$PROJECT" = "miniupnpc" ]; then INSTALLPREFIX="$HOME/_pythonmodule" make -f $MAKEFILE pythonmodule; fi'
 
