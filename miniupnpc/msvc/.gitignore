@@ -1,7 +1,9 @@
 *.db
 .vs
 Debug/
+Debug Dll/
 Release/
+Release Dll/
 *.user
 *.suo
 *.sdf
