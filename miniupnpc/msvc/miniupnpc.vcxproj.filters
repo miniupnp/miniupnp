@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
     </Filter>
+    <Filter Include="scripts">
+      <UniqueIdentifier>{508da401-2f8e-4fdb-9a43-95baa95a91e7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\connecthostport.c">
@@ -104,5 +107,10 @@
     <ClInclude Include="..\upnpreplyparse.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="genminiupnpcstrings.vbs">
+      <Filter>scripts</Filter>
+    </None>
   </ItemGroup>
 </Project>
