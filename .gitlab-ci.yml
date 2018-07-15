@@ -11,9 +11,10 @@ job_miniupnpd:
     script:
         - "cd miniupnpd && make -j3 -f Makefile.linux && make -f Makefile.linux check"
 
+# i686-w64-mingw32-gcc
 job_miniupnpc:
     stage: build
     script:
         - "cd miniupnpc && make -j3 && make check"
         - "make clean"
-        - "make -f Makefile.mingw DLLWRAP=mingw32-dllwrap CC=mingw32-gcc AR=mingw32-ar"
+        - "make -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap CC=i686-w64-mingw32-gcc AR=i686-w64-mingw32-ar"
