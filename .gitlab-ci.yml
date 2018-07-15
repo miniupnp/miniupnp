@@ -1,7 +1,7 @@
 before_script:
     - >
       apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev
-      libnfnetlink-dev uuid-dev make gcc
+      libnfnetlink-dev uuid-dev make gcc gcc-mingw-w64-i686 mingw-w64-tools
 
 stages:
     - build
@@ -15,3 +15,4 @@ job_miniupnpc:
     stage: build
     script:
         - "cd miniupnpc && make -j3 && make check"
+        - "make -f Makefile.mingw DLLWRAP=mingw32-dllwrap CC=mingw32-gcc AR=mingw32-ar"
