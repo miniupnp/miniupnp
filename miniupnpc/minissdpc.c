@@ -539,9 +539,14 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 /* Get IP associated with the index given in the ip_forward struct
  * in order to give this ip to setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF) */
 	if(!ipv6) {
+#if _WIN32_WINNT > _WIN32_WINNT_WINXP
 	  IN_ADDR addr;
 	  InetPtonA(AF_INET, "223.255.255.255", &addr);
-	  if (GetBestRoute(addr.S_un.S_addr, 0, &ip_forward) == NO_ERROR) {
+#else
+	  struct in_addr addr;
+	  addr.s_addr = inet_addr("223.255.255.255");
+#endif
+	  if (GetBestRoute(addr.s_addr, 0, &ip_forward) == NO_ERROR) {
 		DWORD dwRetVal = 0;
 		PMIB_IPADDRTABLE pIPAddrTable;
 		DWORD dwSize = 0;
@@ -657,7 +662,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif
 		} else {
 			struct in_addr mc_if;
-#if defined(_WIN32)
+#if defined(_WIN32) && (_WIN32_WINNT > _WIN32_WINNT_WINXP)
 			InetPtonA(AF_INET, multicastif, &mc_if);
 #else
 			mc_if.s_addr = inet_addr(multicastif); /* ex: 192.168.x.x */
