@@ -2,6 +2,7 @@ before_script:
     - >
       apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev
       libnfnetlink-dev uuid-dev make gcc gcc-mingw-w64-i686 mingw-w64-tools
+      libnftnl-dev libmnl-dev libssl-dev
 
 stages:
     - build
@@ -9,7 +10,10 @@ stages:
 job_miniupnpd:
     stage: build
     script:
-        - "cd miniupnpd && make -j3 -f Makefile.linux && make -f Makefile.linux check"
+        - "cd miniupnpd"
+        - "make -j3 -f Makefile.linux && make -f Makefile.linux check"
+        - "make -f Makefile.linux clean"
+        - "make -j3 -f Makefile.linux_nft"
 
 # i686-w64-mingw32-gcc
 job_miniupnpc:
