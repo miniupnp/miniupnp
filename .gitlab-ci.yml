@@ -1,0 +1,15 @@
+before_script:
+    - apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev libnfnetlink-dev uuid-dev
+
+stages:
+    - build
+
+job_miniupnpd:
+    stage: build
+    script:
+        - "cd miniupnpd && make -j3 -f Makefile.linux && make -f Makefile.linux check"
+
+job_miniupnpc:
+    stage: build
+    script:
+        - "cd miniupnpc && make -j3 && make check"
