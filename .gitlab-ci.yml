@@ -15,4 +15,5 @@ job_miniupnpc:
     stage: build
     script:
         - "cd miniupnpc && make -j3 && make check"
+        - "make clean"
         - "make -f Makefile.mingw DLLWRAP=mingw32-dllwrap CC=mingw32-gcc AR=mingw32-ar"
