@@ -1,5 +1,7 @@
 before_script:
-    - apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev libnfnetlink-dev uuid-dev
+    - >
+      apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev
+      libnfnetlink-dev uuid-dev make gcc
 
 stages:
     - build
