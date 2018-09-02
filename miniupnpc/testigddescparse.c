@@ -146,7 +146,7 @@ int main(int argc, char * * argv)
 		fprintf(stderr, "Usage: %s file.xml [file.values]\n", argv[0]);
 		return 1;
 	}
-	f = fopen(argv[1], "r");
+	f = fopen(argv[1], "rb");
 	if(!f) {
 		fprintf(stderr, "Cannot open %s for reading.\n", argv[1]);
 		return 1;
@@ -171,7 +171,7 @@ int main(int argc, char * * argv)
 	fclose(f);
 	f = NULL;
 	if(argc > 2) {
-		f = fopen(argv[2], "r");
+		f = fopen(argv[2], "rb");
 		if(!f) {
 			fprintf(stderr, "Cannot open %s for reading.\n", argv[2]);
 			free(buffer);
