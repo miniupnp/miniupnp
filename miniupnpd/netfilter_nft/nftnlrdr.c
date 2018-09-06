@@ -204,6 +204,26 @@ add_peer_dscp_rule2(const char * ifname,
 	return 0;
 }
 
+int
+delete_filter_rule(const char * ifname, unsigned short port, int proto)
+{
+	rule_t *p;
+	struct nftnl_rule *r;
+	UNUSED(ifname);
+
+	reflesh_nft_cache(NFPROTO_IPV4);
+	LIST_FOREACH(p, &head, entry) {
+		if (p->eport == port && p->proto == proto && p->type == RULE_FILTER) {
+			r = rule_del_handle(p);
+			/* Todo: send bulk request */
+			nft_send_request(r, NFT_MSG_DELRULE);
+			break;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * Clear all rules corresponding eport/proto
  */
