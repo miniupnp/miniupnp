@@ -166,13 +166,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\connecthostport.h" />
-    <ClInclude Include="..\declspec.h" />
     <ClInclude Include="..\igd_desc_parse.h" />
     <ClInclude Include="..\minisoap.h" />
     <ClInclude Include="..\minissdpc.h" />
     <ClInclude Include="..\miniupnpc.h" />
     <ClInclude Include="..\miniupnpcstrings.h" />
     <ClInclude Include="..\miniupnpctypes.h" />
+    <ClInclude Include="..\miniupnpc_declspec.h" />
     <ClInclude Include="..\miniwget.h" />
     <ClInclude Include="..\minixml.h" />
     <ClInclude Include="..\portlistingparse.h" />
