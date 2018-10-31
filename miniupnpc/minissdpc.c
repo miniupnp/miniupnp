@@ -546,14 +546,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		destAddr.sin_port = 0;
 		if (GetBestInterfaceEx((struct sockaddr *)&destAddr, &ifbestidx) == NO_ERROR) {
 			DWORD dwRetVal = 0;
-			unsigned int i = 0;
 			PIP_ADAPTER_ADDRESSES pAddresses = NULL;
 			ULONG outBufLen = 0;
 			ULONG Iterations = 0;
 			PIP_ADAPTER_ADDRESSES pCurrAddresses = NULL;
 			PIP_ADAPTER_UNICAST_ADDRESS pUnicast = NULL;
-			PIP_ADAPTER_ANYCAST_ADDRESS pAnycast = NULL;
-			PIP_ADAPTER_MULTICAST_ADDRESS pMulticast = NULL;
 
 			outBufLen = 15360;
 			do {
@@ -577,6 +574,10 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				pCurrAddresses = pAddresses;
 				while (pCurrAddresses) {
 #ifdef DEBUG
+					int i;
+					PIP_ADAPTER_MULTICAST_ADDRESS pMulticast = NULL;
+					PIP_ADAPTER_ANYCAST_ADDRESS pAnycast = NULL;
+
 					printf("\tIfIndex (IPv4 interface): %u\n", pCurrAddresses->IfIndex);
 					printf("\tAdapter name: %s\n", pCurrAddresses->AdapterName);
 					pUnicast = pCurrAddresses->FirstUnicastAddress;
