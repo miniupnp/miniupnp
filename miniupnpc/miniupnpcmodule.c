@@ -676,6 +676,16 @@ initminiupnpc(void)
     /* initialize Winsock. */
     WSADATA wsaData;
     int nResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if (nResult != 0)
+	{
+		/* error code could be WSASYSNOTREADY WSASYSNOTREADY
+		 * WSASYSNOTREADY WSASYSNOTREADY WSASYSNOTREADY */
+#if PY_MAJOR_VERSION >= 3
+        return 0;
+#else
+        return;
+#endif
+	}
 
     UPnPType.tp_new = PyType_GenericNew;
 #endif
