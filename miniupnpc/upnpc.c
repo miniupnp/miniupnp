@@ -558,6 +558,7 @@ int main(int argc, char ** argv)
 	int commandargc = 0;
 	struct UPNPDev * devlist = 0;
 	char lanaddr[64] = "unset";	/* my ip address on the LAN */
+	//char lanaddr[64] = "192.168.0.20";	/* my ip address on the LAN */
 	int i;
 	const char * rootdescurl = 0;
 	const char * multicastif = 0;
@@ -670,10 +671,13 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 
+	//printf("outside 1 ..., %s, %s, %i, %i, %u  \n", multicastif, minissdpdpath,localport, ipv6, ttl);
+	//printf("outside 1 ...\n");
 	if( rootdescurl
 	  || (devlist = upnpDiscover(2000, multicastif, minissdpdpath,
 	                             localport, ipv6, ttl, &error)))
 	{
+		//printf("inside 1 ...\n");
 		struct UPNPDev * device;
 		struct UPNPUrls urls;
 		struct IGDdatas data;

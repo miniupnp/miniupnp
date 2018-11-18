@@ -290,6 +290,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
                     int * error,
                     int searchalltypes)
 {
+	//printf("inside upnpDiscoverDevices...\n");
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = 0;
 #if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
@@ -352,6 +353,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			tmp->pNext = discovered_devlist;
 		}
 	}
+	//printf("exiting upnpDiscoverDevices...\n");
 	return devlist;
 }
 
@@ -362,6 +364,7 @@ upnpDiscover(int delay, const char * multicastif,
              int ipv6, unsigned char ttl,
              int * error)
 {
+	//printf("inside upnpDiscover ...\n");
 	static const char * const deviceList[] = {
 #if 0
 		"urn:schemas-upnp-org:device:InternetGatewayDevice:2",
