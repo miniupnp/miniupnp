@@ -362,7 +362,6 @@ upnpDiscover(int delay, const char * multicastif,
              int ipv6, unsigned char ttl,
              int * error)
 {
-	//printf("inside upnpDiscover ...\n");
 	static const char * const deviceList[] = {
 #if 0
 		"urn:schemas-upnp-org:device:InternetGatewayDevice:2",
