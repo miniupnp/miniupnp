@@ -671,13 +671,10 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 
-	//printf("outside 1 ..., %s, %s, %i, %i, %u  \n", multicastif, minissdpdpath,localport, ipv6, ttl);
-	//printf("outside 1 ...\n");
 	if( rootdescurl
 	  || (devlist = upnpDiscover(2000, multicastif, minissdpdpath,
 	                             localport, ipv6, ttl, &error)))
 	{
-		//printf("inside 1 ...\n");
 		struct UPNPDev * device;
 		struct UPNPUrls urls;
 		struct IGDdatas data;

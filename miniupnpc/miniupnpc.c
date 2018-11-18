@@ -290,7 +290,6 @@ upnpDiscoverDevices(const char * const deviceTypes[],
                     int * error,
                     int searchalltypes)
 {
-	//printf("inside upnpDiscoverDevices...\n");
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = 0;
 #if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
@@ -353,7 +352,6 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			tmp->pNext = discovered_devlist;
 		}
 	}
-	//printf("exiting upnpDiscoverDevices...\n");
 	return devlist;
 }
 
