@@ -747,7 +747,7 @@ ParseSSDPPacket(int s, const char * p, ssize_t n,
 			}
 		}
 		linestart = lineend;
-		while((*linestart == '\n' || *linestart == '\r') && linestart < p + n)
+		while((linestart < p + n) && (*linestart == '\n' || *linestart == '\r'))
 			linestart++;
 	}
 #if 0
