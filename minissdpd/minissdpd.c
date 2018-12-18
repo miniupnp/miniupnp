@@ -318,6 +318,7 @@ updateDevice(const struct header * headers, time_t t)
 				if(!tmp)	/* allocation error */
 				{
 					syslog(LOG_ERR, "updateDevice() : memory allocation error");
+					*pp = p->next;	/* remove "p" from the list */
 					free(p);
 					return 0;
 				}
