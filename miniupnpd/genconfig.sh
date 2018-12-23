@@ -103,6 +103,12 @@ if [ -f ../shared/tomato_version ]; then
 	OS_VERSION="Tomato $TOMATO_VER"
 fi
 
+# OpenEmbedded special case
+if [ -f ./os.openembedded ]; then
+	OS_NAME=OpenEmbedded
+	OS_VERSION=$(cat ./os.openembedded)
+fi
+
 ${RM} ${CONFIGFILE}
 
 echo "/* MiniUPnP Project" >> ${CONFIGFILE}
@@ -343,6 +349,11 @@ case $OS_NAME in
 		;;
 	OpenWRT)
 		OS_URL=http://www.openwrt.org/
+		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
+		FW=iptables
+		;;
+	OpenEmbedded)
+		OS_URL=http://www.openembedded.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		FW=iptables
 		;;
