@@ -123,10 +123,10 @@ parse_msearch_reply(const char * reply, int size,
 			if(b!=0) {
 				/* skip the colon and white spaces */
 				do { b++; } while(reply[b]==' ' && b<i);
-				if(0==strncasecmp(reply+a, "location", 8)) {
+				if(0==strncasecmp(reply+a, "location:", 9)) {
 					*location = reply+b;
 					*locationsize = i-b;
-				} else if(0==strncasecmp(reply+a, "st", 2)) {
+				} else if(0==strncasecmp(reply+a, "st:", 3)) {
 					*st = reply+b;
 					*stsize = i-b;
 				}

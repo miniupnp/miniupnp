@@ -418,17 +418,17 @@ parseMSEARCHReply(const char * reply, int size,
 					putchar('\n');*/
 					/* skip the colon and white spaces */
 					do { b++; } while(reply[b]==' ');
-					if(0==strncasecmp(reply+a, "location", 8))
+					if(0==strncasecmp(reply+a, "location:", 9))
 					{
 						*location = reply+b;
 						*locationsize = i-b;
 					}
-					else if(0==strncasecmp(reply+a, "st", 2))
+					else if(0==strncasecmp(reply+a, "st:", 3))
 					{
 						*st = reply+b;
 						*stsize = i-b;
 					}
-					else if(0==strncasecmp(reply+a, "usn", 3))
+					else if(0==strncasecmp(reply+a, "usn:", 4))
 					{
 						*usn = reply+b;
 						*usnsize = i-b;
