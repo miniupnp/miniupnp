@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2018 Thomas Bernard
+ * copyright (c) 2005-2019 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 /*#include <syslog.h>*/
@@ -381,6 +381,7 @@ free_tmp_and_return:
  * the last 4 arguments are filled during the parsing :
  *    - location/locationsize : "location:" field of the SSDP reply packet
  *    - st/stsize : "st:" field of the SSDP reply packet.
+ *    - usn/usnsize : "usn:" filed of the SSDP reply packet
  * The strings are NOT null terminated */
 static void
 parseMSEARCHReply(const char * reply, int size,
