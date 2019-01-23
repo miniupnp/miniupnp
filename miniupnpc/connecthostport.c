@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2010-2018 Thomas Bernard
+ * Copyright (c) 2010-2019 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -116,8 +116,22 @@ SOCKET connecthostport(const char * host, unsigned short port,
 		int err;
 		FD_ZERO(&wset);
 		FD_SET(s, &wset);
-		if((n = select(s + 1, NULL, &wset, NULL, NULL)) == -1 && errno == EINTR)
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+		timeout.tv_sec = 3;
+		timeout.tv_usec = 0;
+		n = select(s + 1, NULL, &wset, NULL, &timeout);
+#else
+		n = select(s + 1, NULL, &wset, NULL, NULL);
+#endif
+		if(n == -1 && errno == EINTR)
 			continue;
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+		if(n == 0) {
+			errno = ETIMEDOUT;
+			n = -1;
+			break;
+		}
+#endif
 		/*len = 0;*/
 		/*n = getpeername(s, NULL, &len);*/
 		len = sizeof(err);
@@ -213,8 +227,22 @@ SOCKET connecthostport(const char * host, unsigned short port,
 			int err;
 			FD_ZERO(&wset);
 			FD_SET(s, &wset);
-			if((n = select(s + 1, NULL, &wset, NULL, NULL)) == -1 && errno == EINTR)
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+			timeout.tv_sec = 3;
+			timeout.tv_usec = 0;
+			n = select(s + 1, NULL, &wset, NULL, &timeout);
+#else
+			n = select(s + 1, NULL, &wset, NULL, NULL);
+#endif
+			if(n == -1 && errno == EINTR)
 				continue;
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+			if(n == 0) {
+				errno = ETIMEDOUT;
+				n = -1;
+				break;
+			}
+#endif
 			/*len = 0;*/
 			/*n = getpeername(s, NULL, &len);*/
 			len = sizeof(err);

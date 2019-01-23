@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.235 2018/05/07 11:05:16 nanard Exp $
 miniUPnP client Changelog.
 
+2019/01/23:
+  set timeout for select() in connecthostport()
+
 VERSION 2.1 : released 2018/05/07
 
 2018/05/07:
