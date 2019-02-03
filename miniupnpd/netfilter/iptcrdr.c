@@ -1180,7 +1180,9 @@ addnatrule(int proto, unsigned short eport,
 	} else {
 		match = get_udp_match(eport, 0);
 	}
+#ifdef NFC_UNKNOWN
 	e->nfcache = NFC_UNKNOWN;
+#endif
 	target = get_dnat_target(iaddr, iport);
 #ifdef NFC_IP_DST_PT
 	e->nfcache |= NFC_IP_DST_PT;
@@ -1252,7 +1254,9 @@ addmasqueraderule(int proto,
 	} else {
 		match = get_udp_match(0, iport);
 	}
+#ifdef NFC_UNKNOWN
 	e->nfcache = NFC_UNKNOWN;
+#endif
 	target = get_masquerade_target(eport);
 #ifdef NFC_IP_DST_PT
 	e->nfcache |= NFC_IP_DST_PT;
@@ -1334,7 +1338,9 @@ addpeernatrule(int proto,
 	} else {
 		match = get_udp_match(rport, iport);
 	}
+#ifdef NFC_UNKNOWN
 	e->nfcache = NFC_UNKNOWN;
+#endif
 	target = get_snat_target(eaddr, eport);
 #ifdef NFC_IP_DST_PT
 	e->nfcache |= NFC_IP_DST_PT;
@@ -1410,7 +1416,9 @@ addpeerdscprule(int proto, unsigned char dscp,
 	} else {
 		match = get_udp_match(rport, iport);
 	}
+#ifdef NFC_UNKNOWN
 	e->nfcache = NFC_UNKNOWN;
+#endif
 	target = get_dscp_target(dscp);
 #ifdef NFC_IP_DST_PT
 	e->nfcache |= NFC_IP_DST_PT;
@@ -1500,7 +1508,9 @@ add_filter_rule(int proto, const char * rhost,
 	}
 	e->ip.dst.s_addr = inet_addr(iaddr);
 	e->ip.dmsk.s_addr = INADDR_NONE;
+#ifdef NFC_UNKNOWN
 	e->nfcache = NFC_UNKNOWN;
+#endif
 	target = get_accept_target();
 #ifdef NFC_IP_DST_PT
 	e->nfcache |= NFC_IP_DST_PT;
