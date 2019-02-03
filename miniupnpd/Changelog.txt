@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.441 2018/05/08 21:34:18 nanard Exp $
 
+2019/02/03:
+  netfilter: fix build with linux kernel 5.0
+
 2018/09/07:
   Fix PCP Public address announcement
 
