@@ -1,6 +1,6 @@
 #!/bin/sh
-# $Id: $
-# (c) 2016 Thomas Bernard
+# $Id: testminissdpdnotif.sh,v 1.4 2019/02/10 13:39:18 nanard Exp $
+# (c) 2019 Thomas Bernard
 
 OS=`uname -s`
 

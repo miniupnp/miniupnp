@@ -1,8 +1,19 @@
-$Id: Changelog.txt,v 1.235 2018/05/07 11:05:16 nanard Exp $
+$Id: Changelog.txt,v 1.236 2019/02/10 13:27:24 nanard Exp $
 miniUPnP client Changelog.
 
 2019/01/23:
   set timeout for select() in connecthostport()
+
+2018/10/31:
+  miniupnpcmodule.c: check return of WSAStartup()
+
+2018/07/14:
+  Fix and improve MSVC project :
+    Add Dll configurations
+    improve genminiupnpcstrings.vbs
+
+2018/06/18:
+  Fixes for windows 64-bits.
 
 VERSION 2.1 : released 2018/05/07
 

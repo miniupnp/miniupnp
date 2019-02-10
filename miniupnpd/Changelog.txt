@@ -1,7 +1,11 @@
-$Id: Changelog.txt,v 1.441 2018/05/08 21:34:18 nanard Exp $
+$Id: Changelog.txt,v 1.443 2019/02/10 12:04:52 nanard Exp $
 
 2019/02/03:
   netfilter: fix build with linux kernel 5.0
+
+2018/12/18:
+  upnp_redirect(): accept NULL desc argument (avoid DOS in AddPortMapping)
+  upnp_event_prepare(): check the return value of snprintf()
 
 2018/09/07:
   Fix PCP Public address announcement

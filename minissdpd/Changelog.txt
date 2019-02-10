@@ -1,4 +1,10 @@
-$Id: Changelog.txt,v 1.49 2018/02/23 13:01:23 nanard Exp $
+$Id: Changelog.txt,v 1.50 2019/02/10 13:45:24 nanard Exp $
+
+2018/12/18:
+	updateDevice() remove element from the list when realloc fails
+
+2018/05/08:
+	fix test shell scripts for *BSD
 
 2018/02/23:
 	Fix build with IPv6 disabled and SSDP_LISTEN_ON_SPECIFIC_ADDR enabled
