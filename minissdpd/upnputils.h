@@ -1,7 +1,7 @@
 /* $Id: upnputils.h,v 1.2 2014/11/28 16:20:07 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2011-2016 Thomas Bernard
+ * (c) 2011-2019 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -28,6 +28,12 @@ set_non_blocking(int fd);
  */
 struct lan_addr_s *
 get_lan_for_peer(const struct sockaddr * peer);
+
+/**
+ * get the time for upnp
+ * Similar to a monotonic gettimeofday(tv, NULL)
+ */
+int upnp_gettimeofday(struct timeval * tv);
 
 /**
  * define portability macros

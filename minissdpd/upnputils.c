@@ -1,7 +1,7 @@
 /* $Id: upnputils.c,v 1.2 2014/11/28 16:20:58 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2019 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -170,3 +170,24 @@ get_lan_for_peer(const struct sockaddr * peer)
 	return lan_addr;
 }
 
+#if defined(CLOCK_MONOTONIC_FAST)
+#define UPNP_CLOCKID CLOCK_MONOTONIC_FAST
+#elif defined(CLOCK_MONOTONIC)
+#define UPNP_CLOCKID CLOCK_MONOTONIC
+#endif
+
+int upnp_gettimeofday(struct timeval * tv)
+{
+#if defined(CLOCK_MONOTONIC_FAST) || defined(CLOCK_MONOTONIC)
+	struct timespec ts;
+	int ret_code = clock_gettime(UPNP_CLOCKID, &ts);
+	if (ret_code == 0)
+	{
+		tv->tv_sec = ts.tv_sec;
+		tv->tv_usec = ts.tv_nsec / 1000;
+	}
+	return ret_code;
+#else
+	return gettimeofday(tv, NULL);
+#endif
+}
