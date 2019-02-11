@@ -584,8 +584,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					pUnicast = pCurrAddresses->FirstUnicastAddress;
 					if (pUnicast != NULL) {
 						for (i = 0; pUnicast != NULL; i++) {
-							IPAddr.S_un.S_addr = (u_long) pUnicast->Address;
-							printf("\tIP Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
+							printf("\tIP Address[%d]:     \t%s\n", i, inet_ntoa(((PSOCKADDR_IN)pUnicast->Address.lpSockaddr)->sin_addr) );
 							pUnicast = pUnicast->Next;
 						}
 						printf("\tNumber of Unicast Addresses: %d\n", i);
@@ -593,8 +592,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					pAnycast = pCurrAddresses->FirstAnycastAddress;
 					if (pAnycast) {
 						for (i = 0; pAnycast != NULL; i++) {
-							IPAddr.S_un.S_addr = (u_long) pAnyCast->Address;
-							printf("\tAnycast Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
+							printf("\tAnycast Address[%d]:     \t%s\n", i, inet_ntoa(((PSOCKADDR_IN)pAnycast->Address.lpSockaddr)->sin_addr) );
 							pAnycast = pAnycast->Next;
 						}
 						printf("\tNumber of Anycast Addresses: %d\n", i);
@@ -602,8 +600,8 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					pMulticast = pCurrAddresses->FirstMulticastAddress;
 					if (pMulticast) {
 						for (i = 0; pMulticast != NULL; i++) {
-							IPAddr.S_un.S_addr = (u_long) pMultiCast->Address;
-							printf("\tMulticast Address[%d]:     \t%s\n", i, inet_ntoa(IPAddr) );
+							printf("\tMulticast Address[%d]:     \t%s\n", i, inet_ntoa(((PSOCKADDR_IN)pMulticast->Address.lpSockaddr)->sin_addr) );
+              pMulticast = pMulticast->Next;
 						}
 					}
 					printf("\n");
