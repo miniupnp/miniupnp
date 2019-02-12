@@ -1,0 +1,11 @@
+Here is a basic libuv implementation of minissdp client.
+
+You can find an example find attached to test it.
+
+BUILD
+gcc -luv example.c minissdpc-libuv.c -o minissdpc
+
+EXECUTION
+./minissdpc /var/run/your.sock ssdp:all
+
+This should print all find upnp services.
