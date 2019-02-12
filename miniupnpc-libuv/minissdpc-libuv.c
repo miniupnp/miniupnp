@@ -88,15 +88,22 @@ static void write_cb(uv_write_t* req, int status)
 MINIUPNP_LIBSPEC int
 requestDevicesFromMiniSSDPD(void *session, const char * devtype, void(*requestFinish)(void *connect, int success, void* userdata), void* userdata)
 {
-	char *buffer = malloc(256);
+	char *buffer;
+	char *p;
+	unsigned int stsize;
 
+	if (devtype == NULL)
+	{
+		return MINISSDPC_UNKNOWN_ERROR;
+	}
+	stsize = strlen(devtype);
+
+	buffer = malloc(256);
 	if(buffer == NULL)
 	{
 		return MINISSDPC_MEMORY_ERROR;
 	}
-
-	char *p = buffer;
-	unsigned int stsize = strlen(devtype);
+	p = buffer;
 
 	if(stsize == 8 && 0 == memcmp(devtype, "ssdp:all", 8))
 	{
@@ -155,6 +162,7 @@ requestDevicesFromMiniSSDPD(void *session, const char * devtype, void(*requestFi
 
 static void alloc_cb(uv_handle_t* handle, size_t size, uv_buf_t* buf)
 {
+	(void)handle;
 	buf->base = malloc(size);
 	buf->len = size;
 }

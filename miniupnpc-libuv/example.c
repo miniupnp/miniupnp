@@ -6,19 +6,21 @@
 
 void requestFinish2(void* session, void* userdata, struct UPNPDev* upnpdev)
 {
-  struct UPNPDev* it = upnpdev;
-  while(it != NULL) {
+  struct UPNPDev* it;
+  (void)userdata;
+
+  for(it = upnpdev; it != NULL; it = it->pNext) {
     printf("url = %s\n", it->descURL);
     printf("st = %s\n", it->st);
     printf("usn = %s\n", it->usn);
     printf("\n");
-    it = it->pNext;
   }
   disconnectFromMiniSSDPD((uv_stream_t*)session);
 }
 
 void requestFinish(void* session, int success, void* userdata)
 {
+  (void)userdata;
   if (success == 0)
   {
     printf("Error while requesting results.\n");
@@ -48,8 +50,17 @@ void connect_cb(void* session, void* userdata)
 
 int main(int argc, char *argv[])
 {
-  char* pipeName = argv[1];
-  char* search   = argv[2];
+  char* pipeName;
+  char* search;
+
+  if (argc < 3) {
+    printf("Usage: %s </path/to/minissdpd.socket> <device>\n", argv[0]);
+    printf("       ssdp:all for all devices\n");
+    return 1;
+  }
+  pipeName = argv[1];
+  search = argv[2];
   connectToMiniSSDPD(pipeName, &connect_cb, search);
   uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+  return 0;
 }

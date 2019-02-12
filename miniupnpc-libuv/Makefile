@@ -1,6 +1,7 @@
 # tested with GNU Make
 PKG_CONFIG ?= pkg-config
 
+CFLAGS += -g
 CFLAGS += -Wall -Wextra
 CFLAGS += $(shell $(PKG_CONFIG) libuv --cflags)
 LDFLAGS += $(shell $(PKG_CONFIG) libuv --libs-only-L)
