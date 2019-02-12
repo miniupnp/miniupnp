@@ -472,7 +472,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
                     int searchalltypes)
 {
 	struct UPNPDev * tmp;
-	struct UPNPDev * devlist = 0;
+	struct UPNPDev * devlist = NULL;
 	unsigned int scope_id = 0;
 	int opt = 1;
 	static const char MSearchMsgFmt[] =
@@ -641,7 +641,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		if(error)
 			*error = MINISSDPC_SOCKET_ERROR;
 		PRINT_SOCKET_ERROR("setsockopt(SO_REUSEADDR,...)");
-		return NULL;
+		goto error;
 	}
 
 	if(ipv6) {
@@ -823,7 +823,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			if (n < 0) {
 #ifdef DEBUG
 				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-				if (getnameinfo(p->ai_addr, p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
+				if (getnameinfo(p->ai_addr, (socklen_t)p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
 				                sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
 					fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
 				}
