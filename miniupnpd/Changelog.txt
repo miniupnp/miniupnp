@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.443 2019/02/10 12:04:52 nanard Exp $
 
+2019/03/07:
+  Update portinuse code to reflect changes made in FreeBSD 12.0
+
 2019/02/03:
   netfilter: fix build with linux kernel 5.0
 
