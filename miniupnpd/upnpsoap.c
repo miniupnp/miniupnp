@@ -598,7 +598,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	if(leaseduration == 0)
 		leaseduration = 604800;
 
-	if (!int_ip || !ext_port || !int_port)
+	if (!int_ip || !ext_port || !int_port || !protocol)
 	{
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
