@@ -193,6 +193,8 @@ SOCKET connecthostport(const char * host, unsigned short port,
 	s = INVALID_SOCKET;
 	for(p = ai; p; p = p->ai_next)
 	{
+		if(!ISINVALID(s))
+			closesocket(s);
 		s = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
 		if(ISINVALID(s))
 			continue;
@@ -260,7 +262,6 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #endif /* #ifdef MINIUPNPC_IGNORE_EINTR */
 		if(n < 0)
 		{
-			closesocket(s);
 			continue;
 		}
 		else
@@ -277,6 +278,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 	if(n < 0)
 	{
 		PRINT_SOCKET_ERROR("connect");
+		closesocket(s);
 		return INVALID_SOCKET;
 	}
 #endif /* #ifdef USE_GETHOSTBYNAME */
