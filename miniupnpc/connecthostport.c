@@ -260,14 +260,8 @@ SOCKET connecthostport(const char * host, unsigned short port,
 			}
 		}
 #endif /* #ifdef MINIUPNPC_IGNORE_EINTR */
-		if(n < 0)
-		{
-			continue;
-		}
-		else
-		{
+		if(n >= 0)	/* connect() was successful */
 			break;
-		}
 	}
 	freeaddrinfo(ai);
 	if(ISINVALID(s))
