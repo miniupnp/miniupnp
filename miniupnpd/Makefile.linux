@@ -192,6 +192,8 @@ clean:
 	$(RM) testupnppermissions.o testgetifaddr.o
 	$(RM) testgetroute.o testasyncsendto.o
 	$(RM) testportinuse.o
+	$(RM) testminissdp.o
+	$(RM) testssdppktgen.o
 	$(RM) miniupnpdctl.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
 
