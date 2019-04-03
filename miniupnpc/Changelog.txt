@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.236 2019/02/10 13:27:24 nanard Exp $
+$Id: Changelog.txt,v 1.237 2019/04/03 15:57:43 nanard Exp $
 miniUPnP client Changelog.
+
+2019/03/10:
+  connecthostport.c: Code simplification, error trace fix
 
 2019/01/23:
   set timeout for select() in connecthostport()
