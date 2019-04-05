@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.444 2019/04/03 16:25:53 nanard Exp $
 
+2019/04/05:
+  Fix memory leak in upnpreplyparse.c with NewPortListing element
+
 2019/03/22:
   netfilter: miniupnpd_functions.sh parsing fix.
     fix postrouting chain init.
