@@ -521,6 +521,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	/* possible error codes for AddPortMapping :
 	 * 402 - Invalid Args
 	 * 501 - Action Failed
+	 * 606 - Action not authorized (added in IGD v2)
 	 * 715 - Wildcard not permited in SrcAddr
 	 * 716 - Wildcard not permited in ExtPort
 	 * 718 - ConflictInMappingEntry
@@ -537,7 +538,8 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
      * 728 - NoPortMapsAvailable
              There are not enough free ports available to complete the mapping
              (added in IGD v2)
-	 * 729 - ConflictWithOtherMechanisms (added in IGD v2) */
+	 * 729 - ConflictWithOtherMechanisms (added in IGD v2)
+	 * 732 - WildCardNotPermittedInIntPort (added in IGD v2) */
 	switch(r)
 	{
 	case 0:	/* success */
@@ -550,8 +552,12 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		SoapError(h, 729, "ConflictWithOtherMechanisms");
 		break;
 #endif /* IGD_V2 */
-	case -2:	/* already redirected */
 	case -3:	/* not permitted */
+#ifdef IGD_V2
+		SoapError(h, 606, "Action not authorized");
+		break;
+#endif /* IGD_V2 */
+	case -2:	/* already redirected */
 		SoapError(h, 718, "ConflictInMappingEntry");
 		break;
 	default:
