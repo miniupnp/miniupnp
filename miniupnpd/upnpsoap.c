@@ -1,8 +1,8 @@
-/* $Id: upnpsoap.c,v 1.151 2018/03/13 10:32:53 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.155 2019/04/08 13:31:46 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2018 Thomas Bernard
+ * (c) 2006-2019 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
