@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.32 2016/10/07 09:04:36 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.39 2019/04/10 12:09:17 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -492,7 +492,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	struct sockaddr_storage sockudp_w;
 #else
 	int rv;
-	struct addrinfo hints, *servinfo, *p;
+	struct addrinfo hints, *servinfo;
 #endif
 #ifdef _WIN32
 	unsigned long _ttl = (unsigned long)ttl;
@@ -546,30 +546,25 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		destAddr.sin_addr.s_addr = inet_addr("223.255.255.255");
 		destAddr.sin_port = 0;
 		if (GetBestInterfaceEx((struct sockaddr *)&destAddr, &ifbestidx) == NO_ERROR) {
-			DWORD dwRetVal = 0;
+			DWORD dwRetVal = NO_ERROR;
+			ULONG outBufLen = 15360u;
 			PIP_ADAPTER_ADDRESSES pAddresses = NULL;
-			ULONG outBufLen = 0;
-			ULONG Iterations = 0;
 			PIP_ADAPTER_ADDRESSES pCurrAddresses = NULL;
 			PIP_ADAPTER_UNICAST_ADDRESS pUnicast = NULL;
 
-			outBufLen = 15360;
-			do {
-				pAddresses = (IP_ADAPTER_ADDRESSES *) HeapAlloc(GetProcessHeap(), 0, outBufLen);
+			for (int Iterations = 3; --Iterations >= 0;) {
+				pAddresses = (IP_ADAPTER_ADDRESSES *) malloc(outBufLen);
 				if (pAddresses == NULL) {
 					break;
 				}
 
 				dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_PREFIX, NULL, pAddresses, &outBufLen);
-
-				if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
-					HeapFree(GetProcessHeap(), 0, pAddresses);
-					pAddresses = NULL;
-				} else {
+				if (dwRetVal != ERROR_BUFFER_OVERFLOW) {
 					break;
 				}
-				Iterations++;
-			} while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (Iterations < 3));
+				free(pAddresses);
+				pAddresses = NULL;
+			}
 
 			if (dwRetVal == NO_ERROR) {
 				pCurrAddresses = pAddresses;
@@ -610,8 +605,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					if (pCurrAddresses->IfIndex == ifbestidx && pUnicast != NULL) {
 						SOCKADDR_IN *ipv4 = (SOCKADDR_IN *)(pUnicast->Address.lpSockaddr);
 						/* Set the address of this interface to be used */
-						struct in_addr mc_if;
-						memset(&mc_if, 0, sizeof(mc_if));
+						struct in_addr mc_if = {0};
 						mc_if.s_addr = ipv4->sin_addr.s_addr;
 						if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0) {
 							PRINT_SOCKET_ERROR("setsockopt");
@@ -624,10 +618,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					pCurrAddresses = pCurrAddresses->Next;
 				}
 			}
-			if (pAddresses != NULL) {
-				HeapFree(GetProcessHeap(), 0, pAddresses);
-				pAddresses = NULL;
-			}
+			free(pAddresses);
 		}
 	}
 #endif	/* _WIN32 */
@@ -817,24 +808,26 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 #endif
 			break;
-		}
-		for(p = servinfo; p; p = p->ai_next) {
-			n = sendto(sudp, bufr, n, 0, p->ai_addr, MSC_CAST_INT p->ai_addrlen);
-			if (n < 0) {
+		} else {
+			struct addrinfo *p;
+			for(p = servinfo; p; p = p->ai_next) {
+				n = sendto(sudp, bufr, n, 0, p->ai_addr, MSC_CAST_INT p->ai_addrlen);
+				if (n < 0) {
 #ifdef DEBUG
-				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-				if (getnameinfo(p->ai_addr, (socklen_t)p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
-				                sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-					fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
-				}
+					char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+					if (getnameinfo(p->ai_addr, (socklen_t)p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
+					                sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+						fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
+					}
 #endif
-				PRINT_SOCKET_ERROR("sendto");
-				continue;
-			} else {
-				sentok = 1;
+					PRINT_SOCKET_ERROR("sendto");
+					continue;
+				} else {
+					sentok = 1;
+				}
 			}
+			freeaddrinfo(servinfo);
 		}
-		freeaddrinfo(servinfo);
 		if(!sentok) {
 			if(error)
 				*error = MINISSDPC_SOCKET_ERROR;

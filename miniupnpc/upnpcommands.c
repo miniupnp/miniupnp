@@ -935,7 +935,6 @@ UPNP_GetOutboundPinholeTimeout(const char * controlURL, const char * servicetype
 	int bufsize;
 	struct NameValueParserData pdata;
 	const char * resVal;
-	char * p;
 	int ret;
 
 	if(!intPort || !intClient || !proto || !remotePort || !remoteHost)
@@ -969,10 +968,10 @@ UPNP_GetOutboundPinholeTimeout(const char * controlURL, const char * servicetype
 	}
 	else
 	{
-		ret = UPNPCOMMAND_SUCCESS;
-		p = GetValueFromNameValueList(&pdata, "OutboundPinholeTimeout");
+		char * p = GetValueFromNameValueList(&pdata, "OutboundPinholeTimeout");
 		if(p)
 			*opTimeout = my_atoui(p);
+		ret = UPNPCOMMAND_SUCCESS;
 	}
 	ClearNameValueList(&pdata);
 	return ret;

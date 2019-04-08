@@ -290,15 +290,14 @@ upnpDiscoverDevices(const char * const deviceTypes[],
                     int * error,
                     int searchalltypes)
 {
+#if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
 	struct UPNPDev * tmp;
 	struct UPNPDev * devlist = 0;
-#if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
 	int deviceIndex;
-#endif /* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
 
 	if(error)
 		*error = UPNPDISCOVER_UNKNOWN_ERROR;
-#if !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__)
+
 	/* first try to get infos from minissdpd ! */
 	if(!minissdpdsock)
 		minissdpdsock = "/var/run/minissdpd.sock";
@@ -338,7 +337,6 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			return devlist;
 		}
 	}
-#endif	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
 
 	/* direct discovery if minissdpd responses are not sufficient */
 	{
@@ -353,6 +351,13 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 		}
 	}
 	return devlist;
+#else	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
+	if(error)
+		*error = UPNPDISCOVER_UNKNOWN_ERROR;
+
+	return ssdpDiscoverDevices(deviceTypes, delay, multicastif, localport,
+	                           ipv6, ttl, error, searchalltypes);
+#endif	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
 }
 
 /* upnpDiscover() Discover IGD device */
@@ -426,14 +431,9 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	char scope_str[8];
 #endif	/* defined(IF_NAMESIZE) && !defined(_WIN32) */
 
-	if(  (url[0] == 'h')
-	   &&(url[1] == 't')
-	   &&(url[2] == 't')
-	   &&(url[3] == 'p')
-	   &&(url[4] == ':')
-	   &&(url[5] == '/')
-	   &&(url[6] == '/'))
+	if (0 == strncmp(url, "http://", 7))
 		return strdup(url);
+
 	base = (baseurl[0] == '\0') ? descURL : baseurl;
 	n = strlen(base);
 	if(n > 7) {
@@ -459,7 +459,7 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	memcpy(s, base, n);
 	if(scope_id != 0) {
 		s[n] = '\0';
-		if(0 == memcmp(s, "http://[fe80:", 13)) {
+		if(0 == strncmp(s, "http://[fe80:", 13)) {
 			/* this is a linklocal IPv6 address */
 			p = strchr(s, ']');
 			if(p) {
