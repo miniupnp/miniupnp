@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.444 2019/04/03 16:25:53 nanard Exp $
+$Id: Changelog.txt,v 1.446 2019/04/09 20:04:32 nanard Exp $
+
+2019/04/09:
+  Fix buffer over-read in upnpevents.c with urls in the form http://ip:port
 
 2019/04/05:
   Fix memory leak in upnpreplyparse.c with NewPortListing element
