@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.32 2016/10/07 09:04:36 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.39 2019/04/10 12:09:17 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -492,7 +492,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	struct sockaddr_storage sockudp_w;
 #else
 	int rv;
-	struct addrinfo hints, *servinfo, *p;
+	struct addrinfo hints, *servinfo;
 #endif
 #ifdef _WIN32
 	unsigned long _ttl = (unsigned long)ttl;
@@ -817,24 +817,26 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 #endif
 			break;
-		}
-		for(p = servinfo; p; p = p->ai_next) {
-			n = sendto(sudp, bufr, n, 0, p->ai_addr, MSC_CAST_INT p->ai_addrlen);
-			if (n < 0) {
+		} else {
+			struct addrinfo *p;
+			for(p = servinfo; p; p = p->ai_next) {
+				n = sendto(sudp, bufr, n, 0, p->ai_addr, MSC_CAST_INT p->ai_addrlen);
+				if (n < 0) {
 #ifdef DEBUG
-				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-				if (getnameinfo(p->ai_addr, (socklen_t)p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
-				                sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-					fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
-				}
+					char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+					if (getnameinfo(p->ai_addr, (socklen_t)p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
+					                sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+						fprintf(stderr, "host:%s port:%s\n", hbuf, sbuf);
+					}
 #endif
-				PRINT_SOCKET_ERROR("sendto");
-				continue;
-			} else {
-				sentok = 1;
+					PRINT_SOCKET_ERROR("sendto");
+					continue;
+				} else {
+					sentok = 1;
+				}
 			}
+			freeaddrinfo(servinfo);
 		}
-		freeaddrinfo(servinfo);
 		if(!sentok) {
 			if(error)
 				*error = MINISSDPC_SOCKET_ERROR;
