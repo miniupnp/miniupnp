@@ -10,6 +10,7 @@ option (UPNPC_BUILD_SHARED "Build shared library" TRUE)
 option (UPNPC_BUILD_TESTS "Build test executables" TRUE)
 option (UPNPC_BUILD_SAMPLE "Build sample executables" TRUE)
 option (NO_GETADDRINFO "Define NO_GETADDRINFO" FALSE)
+option (UPNPC_NO_INSTALL "Disable installation" FALSE)
 
 if (NOT UPNPC_BUILD_STATIC AND NOT UPNPC_BUILD_SHARED)
     message (FATAL "Both shared and static libraries are disabled!")
@@ -108,10 +109,12 @@ if (UPNPC_BUILD_STATIC)
   target_include_directories(libminiupnpc-static INTERFACE ../${CMAKE_CURRENT_SOURCE_DIR})
   target_compile_definitions(libminiupnpc-static PUBLIC MINIUPNP_STATICLIB)
 
-  install (TARGETS libminiupnpc-static
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib${LIB_SUFFIX}
-    ARCHIVE DESTINATION lib${LIB_SUFFIX})
+  if (NOT UPNPC_NO_INSTALL)
+    install (TARGETS libminiupnpc-static
+      RUNTIME DESTINATION bin
+      LIBRARY DESTINATION lib${LIB_SUFFIX}
+      ARCHIVE DESTINATION lib${LIB_SUFFIX})
+  endif()
 
   if (UPNPC_BUILD_SAMPLE)
     add_executable (upnpc-static upnpc.c)
@@ -133,10 +136,12 @@ if (UPNPC_BUILD_SHARED)
     target_link_libraries(libminiupnpc-shared INTERFACE ws2_32 iphlpapi)
   endif()
 
-  install (TARGETS libminiupnpc-shared
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib${LIB_SUFFIX}
-    ARCHIVE DESTINATION lib${LIB_SUFFIX})
+  if (NOT UPNPC_NO_INSTALL)
+    install (TARGETS libminiupnpc-shared
+      RUNTIME DESTINATION bin
+      LIBRARY DESTINATION lib${LIB_SUFFIX}
+      ARCHIVE DESTINATION lib${LIB_SUFFIX})
+  endif()
 
   if (UPNPC_BUILD_SAMPLE)
     add_executable (upnpc-shared upnpc.c)
@@ -177,18 +182,20 @@ if (UPNPC_BUILD_TESTS)
 # set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} testminixml minixmlvalid testupnpreplyparse testigddescparse testminiwget)
 endif ()
 
-install (FILES
-	miniupnpc.h
-  miniwget.h
-  upnpcommands.h
-  igd_desc_parse.h
-  upnpreplyparse.h
-  upnperrors.h
-  upnpdev.h
-  miniupnpctypes.h
-  portlistingparse.h
-  miniupnpc_declspec.h
-  DESTINATION include/miniupnpc
-)
+if (NOT UPNPC_NO_INSTALL)
+  install (FILES
+	  miniupnpc.h
+    miniwget.h
+    upnpcommands.h
+    igd_desc_parse.h
+    upnpreplyparse.h
+    upnperrors.h
+    upnpdev.h
+    miniupnpctypes.h
+    portlistingparse.h
+    miniupnpc_declspec.h
+    DESTINATION include/miniupnpc
+  )
+endif()
 
 # vim: ts=2:sw=2
