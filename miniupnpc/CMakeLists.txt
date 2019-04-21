@@ -67,6 +67,7 @@ set (MINIUPNPC_SOURCES
   connecthostport.c
   portlistingparse.c
   receivedata.c
+  listdevices.c
   connecthostport.h
   igd_desc_parse.h
   minisoap.h
@@ -148,6 +149,10 @@ if (UPNPC_BUILD_SHARED)
     target_link_libraries (upnpc-shared PRIVATE libminiupnpc-shared)
     target_include_directories(upnpc-shared PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
   endif ()
+
+  add_executable (listdevices listdevices.c)
+  target_link_libraries (listdevices PRIVATE libminiupnpc-shared)
+  target_include_directories(listdevices PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 endif ()
 
 if (UPNPC_BUILD_TESTS)
