@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.39 2019/04/10 12:09:17 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.40 2019/04/23 12:12:55 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/
@@ -877,11 +877,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					       stsize, st, usnsize, (usn?usn:""), urlsize, descURL);
 #endif /* DEBUG */
 					for(tmp=devlist; tmp; tmp = tmp->pNext) {
-						if(memcmp(tmp->descURL, descURL, urlsize) == 0 &&
+						if(strncmp(tmp->descURL, descURL, urlsize) == 0 &&
 						   tmp->descURL[urlsize] == '\0' &&
-						   memcmp(tmp->st, st, stsize) == 0 &&
+						   strncmp(tmp->st, st, stsize) == 0 &&
 						   tmp->st[stsize] == '\0' &&
-						   (usnsize == 0 || memcmp(tmp->usn, usn, usnsize) == 0) &&
+						   (usnsize == 0 || strncmp(tmp->usn, usn, usnsize) == 0) &&
 						   tmp->usn[usnsize] == '\0')
 							break;
 					}

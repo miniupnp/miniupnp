@@ -1,4 +1,4 @@
-/* $Id: connecthostport.c,v 1.15 2015/10/09 16:26:19 nanard Exp $ */
+/* $Id: connecthostport.c,v 1.21 2019/04/23 12:11:08 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
@@ -170,7 +170,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 		for(i = 0, j = 1; host[j] && (host[j] != ']') && i < MAXHOSTNAMELEN; i++, j++)
 		{
 			tmp_host[i] = host[j];
-			if(0 == memcmp(host+j, "%25", 3))	/* %25 is just url encoding for '%' */
+			if(0 == strncmp(host+j, "%25", 3))	/* %25 is just url encoding for '%' */
 				j+=2;							/* skip "25" */
 		}
 		tmp_host[i] = '\0';
