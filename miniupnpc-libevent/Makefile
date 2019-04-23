@@ -48,6 +48,9 @@ EXECUTABLE = upnpc-libevent
 
 all:	$(EXECUTABLE)
 
+check:
+	@echo "To be implemented"
+
 clean:
 	$(RM) $(OBJS)
 	$(RM) $(EXECUTABLE)

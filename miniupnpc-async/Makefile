@@ -61,6 +61,9 @@ INSTALLDIRBIN = $(INSTALLPREFIX)/bin
 
 all:	$(LIBRARY) $(EXECUTABLES)
 
+check:
+	@echo "To be implemented"
+
 pythonmodule:	$(LIBRARY) miniupnpcmodule.c setup.py
 	python setup.py build
 	touch $@
