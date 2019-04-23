@@ -85,8 +85,7 @@ static int is_rfc1918addr(const char * addr)
 		return 1;
 	/* 172.16.0.0      -   172.31.255.255  (172.16/12 prefix) */
 	if(COMPARE(addr, "172.")) {
-		int i = atoi(addr + 4);
-		if((16 <= i) && (i <= 31))
+		if((atoi(addr + 4) | 0x0f) == 0x1f)
 			return 1;
 	}
 	return 0;
