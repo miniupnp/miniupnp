@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.c,v 1.49 2018/03/13 23:34:47 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.51 2019/04/23 11:45:15 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
@@ -935,7 +935,6 @@ UPNP_GetOutboundPinholeTimeout(const char * controlURL, const char * servicetype
 	int bufsize;
 	struct NameValueParserData pdata;
 	const char * resVal;
-	char * p;
 	int ret;
 
 	if(!intPort || !intClient || !proto || !remotePort || !remoteHost)
@@ -969,10 +968,10 @@ UPNP_GetOutboundPinholeTimeout(const char * controlURL, const char * servicetype
 	}
 	else
 	{
-		ret = UPNPCOMMAND_SUCCESS;
-		p = GetValueFromNameValueList(&pdata, "OutboundPinholeTimeout");
+		const char * p = GetValueFromNameValueList(&pdata, "OutboundPinholeTimeout");
 		if(p)
 			*opTimeout = my_atoui(p);
+		ret = UPNPCOMMAND_SUCCESS;
 	}
 	ClearNameValueList(&pdata);
 	return ret;
