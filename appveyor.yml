@@ -1,4 +1,8 @@
-version: '2.1.{build}'
+environment:
+  APP_VERSION: '2.1'
+
+
+version: '$(APP_VERSION).{build}'
 
 image: Visual Studio 2017
 
@@ -10,14 +14,12 @@ build_script:
   - appveyor AddCompilationMessage "Building miniupnpc"
   - mingw32-make -f Makefile.mingw
   - mingw32-make -f Makefile.mingw pythonmodule PYTHON=C:\Python37\python
-#  - upnpc-static.exe -l
 
 after_build:
   - 7z a ..\miniupnpc-%APPVEYOR_BUILD_VERSION%.zip *.exe *.dll *.a *.lib
-  - 7z a ..\miniupnpc-python-%APPVEYOR_BUILD_VERSION%.zip build\ dist\
 
 artifacts:
   - path: miniupnpc-$(appveyor_build_version).zip
     name: miniupnpc binaries
-  - path: miniupnpc-python-$(appveyor_build_version).zip
+  - path: miniupnpc/dist/miniupnpc-$(APP_VERSION)-py3.7-win32.egg
     name: miniupnpc python module
