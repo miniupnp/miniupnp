@@ -18,6 +18,8 @@ image: Visual Studio 2017
 
 install:
   - set PATH=%PATH%;C:\msys64\mingw32\bin
+  # We need wheel installed to build wheels
+  - "%PYTHON_VER%.exe -m pip install wheel"
 
 build_script:
   - cd miniupnpc
@@ -31,5 +33,7 @@ after_build:
 artifacts:
   - path: miniupnpc-$(appveyor_build_version).zip
     name: miniupnpc binaries
-  - path: miniupnpc/dist/miniupnpc-$(APP_VERSION)-*-win32.egg
-    name: miniupnpc python module
+  - path: miniupnpc/dist/miniupnpc-*.whl
+    name: miniupnpc python wheel (self-contained)
+  - path: miniupnpc/dist/miniupnpc-*.egg
+    name: miniupnpc python egg (self-contained)
