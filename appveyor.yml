@@ -1,5 +1,7 @@
 version: '2.1.{build}'
 
+image: Visual Studio 2017
+
 install:
   - set PATH=%PATH%;C:\msys64\mingw32\bin
 
@@ -7,7 +9,7 @@ build_script:
   - cd miniupnpc
   - appveyor AddCompilationMessage "Building miniupnpc"
   - mingw32-make -f Makefile.mingw
-  - mingw32-make -f Makefile.mingw pythonmodule PYTHON=C:\Python27\python
+  - mingw32-make -f Makefile.mingw pythonmodule PYTHON=C:\Python37\python
 #  - upnpc-static.exe -l
 
 after_build:

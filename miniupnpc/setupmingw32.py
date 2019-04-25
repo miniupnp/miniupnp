@@ -22,7 +22,7 @@ setup(name="miniupnpc",
       description='miniUPnP client',
       ext_modules=[
          Extension(name="miniupnpc", sources=["miniupnpcmodule.c"],
-                   libraries=["ws2_32", "iphlpapi"],
+                   libraries=["ws2_32", "iphlpapi", "legacy_stdio_definitions"],
                    extra_objects=["libminiupnpc.a"])
       ])
 

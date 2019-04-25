@@ -46,7 +46,7 @@ libminiupnpc.a:	$(OBJS)
 	$(AR) cr $@ $?
 
 pythonmodule:	libminiupnpc.a
-	$(PYTHON) setupmingw32.py build --compiler=mingw32
+	$(PYTHON) setupmingw32.py build
 	$(PYTHON) setupmingw32.py install --skip-build
 
 miniupnpc.dll:	libminiupnpc.a $(OBJSDLL)
