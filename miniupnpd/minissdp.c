@@ -1,8 +1,8 @@
-/* $Id: minissdp.c,v 1.92 2018/03/13 10:52:39 nanard Exp $ */
+/* $Id: minissdp.c,v 1.95 2019/05/02 10:08:14 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2018 Thomas Bernard
+ * (c) 2006-2019 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -65,21 +65,21 @@ AddMulticastMembership(int s, struct lan_addr_s * lan_addr)
 	struct ip_mreqn imr;	/* Ip multicast membership */
 #endif	/* HAVE_IP_MREQN */
 
-    /* setting up imr structure */
-    imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
-    /*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
+	/* setting up imr structure */
+	imr.imr_multiaddr.s_addr = inet_addr(SSDP_MCAST_ADDR);
+	/*imr.imr_interface.s_addr = htonl(INADDR_ANY);*/
 #ifndef HAVE_IP_MREQN
 	imr.imr_interface.s_addr = lan_addr->addr.s_addr;
 #else	/* HAVE_IP_MREQN */
-    imr.imr_address.s_addr = lan_addr->addr.s_addr;
+	imr.imr_address.s_addr = lan_addr->addr.s_addr;
 #ifndef MULTIPLE_EXTERNAL_IP
 #ifdef ENABLE_IPV6
 	imr.imr_ifindex = lan_addr->index;
 #else	/* ENABLE_IPV6 */
-    imr.imr_ifindex = if_nametoindex(lan_addr->ifname);
+	imr.imr_ifindex = if_nametoindex(lan_addr->ifname);
 #endif	/* ENABLE_IPV6 */
 #else	/* MULTIPLE_EXTERNAL_IP */
-    imr.imr_ifindex = 0;
+	imr.imr_ifindex = 0;
 #endif	/* MULTIPLE_EXTERNAL_IP */
 #endif	/* HAVE_IP_MREQN */
 
@@ -89,9 +89,9 @@ AddMulticastMembership(int s, struct lan_addr_s * lan_addr)
 	if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&imr, sizeof(struct ip_mreqn)) < 0)
 #endif	/* HAVE_IP_MREQN */
 	{
-        syslog(LOG_ERR, "setsockopt(udp, IP_ADD_MEMBERSHIP): %m");
+		syslog(LOG_ERR, "setsockopt(udp, IP_ADD_MEMBERSHIP): %m");
 		return -1;
-    }
+	}
 
 	return 0;
 }
@@ -340,15 +340,15 @@ OpenAndConfSSDPNotifySocket(in_addr_t addr)
 	 * an unbound socket)
 	 * here it is used to se a specific sending address */
 	memset(&sockname, 0, sizeof(struct sockaddr_in));
-    sockname.sin_family = AF_INET;
-    sockname.sin_addr.s_addr = addr;	/*inet_addr(addr);*/
+	sockname.sin_family = AF_INET;
+	sockname.sin_addr.s_addr = addr;	/*inet_addr(addr);*/
 
-    if (bind(s, (struct sockaddr *)&sockname, sizeof(struct sockaddr_in)) < 0)
+	if (bind(s, (struct sockaddr *)&sockname, sizeof(struct sockaddr_in)) < 0)
 	{
 		syslog(LOG_ERR, "bind(udp_notify): %m");
 		close(s);
 		return -1;
-    }
+	}
 
 	return s;
 }
@@ -1405,10 +1405,10 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 	int ret = 0;
 	const char * dest_str;
 
-    memset(&sockname4, 0, sizeof(struct sockaddr_in));
-    sockname4.sin_family = AF_INET;
-    sockname4.sin_port = htons(SSDP_PORT);
-    sockname4.sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
+	memset(&sockname4, 0, sizeof(struct sockaddr_in));
+	sockname4.sin_family = AF_INET;
+	sockname4.sin_port = htons(SSDP_PORT);
+	sockname4.sin_addr.s_addr = inet_addr(SSDP_MCAST_ADDR);
 #ifdef ENABLE_IPV6
 	memset(&sockname6, 0, sizeof(struct sockaddr_in6));
 	sockname6.sin6_family = AF_INET6;
@@ -1463,7 +1463,7 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 				                      known_service_types[i].uuid, "",	/* NT: */
 				                      known_service_types[i].uuid, "", ""); /* ver_str, USN: */
 			}
-    	}
+		}
 	}
 	return ret;
 }
