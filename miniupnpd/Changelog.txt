@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.446 2019/04/09 20:04:32 nanard Exp $
 
+2019/05/02:
+  Fix ssdp notify on unrelated interfaces
+
 2019/04/09:
   Fix buffer over-read in upnpevents.c with urls in the form http://ip:port
 
