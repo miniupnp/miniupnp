@@ -27,10 +27,14 @@ const char * strupnperror(int err)
 	case UPNPCOMMAND_INVALID_RESPONSE:
 		s = "Miniupnpc Invalid response";
 		break;
+	case UPNPCOMMAND_HTTP_ERROR:
+		s = "Miniupnpc HTTP error";
+		break;
 	case UPNPDISCOVER_SOCKET_ERROR:
 		s = "Miniupnpc Socket error";
 		break;
 	case UPNPDISCOVER_MEMORY_ERROR:
+	case UPNPCOMMAND_MEM_ALLOC_ERROR:
 		s = "Miniupnpc Memory allocation error";
 		break;
 	case 401:
