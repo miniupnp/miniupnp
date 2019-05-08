@@ -546,15 +546,14 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		destAddr.sin_addr.s_addr = inet_addr("223.255.255.255");
 		destAddr.sin_port = 0;
 		if (GetBestInterfaceEx((struct sockaddr *)&destAddr, &ifbestidx) == NO_ERROR) {
-			DWORD dwRetVal = 0;
+			DWORD dwRetVal = NO_ERROR;
 			PIP_ADAPTER_ADDRESSES pAddresses = NULL;
-			ULONG outBufLen = 0;
-			ULONG Iterations = 0;
+			ULONG outBufLen = 15360;
+			int Iterations;
 			PIP_ADAPTER_ADDRESSES pCurrAddresses = NULL;
 			PIP_ADAPTER_UNICAST_ADDRESS pUnicast = NULL;
 
-			outBufLen = 15360;
-			do {
+			for (Iterations = 0; Iterations < 3; Iterations++) {
 				pAddresses = (IP_ADAPTER_ADDRESSES *) HeapAlloc(GetProcessHeap(), 0, outBufLen);
 				if (pAddresses == NULL) {
 					break;
@@ -562,14 +561,12 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 
 				dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_PREFIX, NULL, pAddresses, &outBufLen);
 
-				if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
-					HeapFree(GetProcessHeap(), 0, pAddresses);
-					pAddresses = NULL;
-				} else {
+				if (dwRetVal != ERROR_BUFFER_OVERFLOW) {
 					break;
 				}
-				Iterations++;
-			} while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (Iterations < 3));
+				HeapFree(GetProcessHeap(), 0, pAddresses);
+				pAddresses = NULL;
+			}
 
 			if (dwRetVal == NO_ERROR) {
 				pCurrAddresses = pAddresses;
