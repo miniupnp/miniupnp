@@ -292,7 +292,7 @@ Py_END_ALLOW_THREADS
 }
 
 /* AddPortMapping(externalPort, protocol, internalHost, internalPort, desc,
- *                remoteHost)
+ *                remoteHost, leaseDuration)
  * protocol is 'UDP' or 'TCP' */
 static PyObject *
 UPnP_addportmapping(UPnPObject *self, PyObject *args)
@@ -305,17 +305,24 @@ UPnP_addportmapping(UPnPObject *self, PyObject *args)
 	const char * host;
 	const char * desc;
 	const char * remoteHost;
-	const char * leaseDuration = "0";
+	int intLeaseDuration = 0;
+	/*
+	 * According to the IGD spec, the maximum lease is 604800 seconds, ie one week.
+	 * char leaseDuration[7] is big enough to accommodate "604800\0".
+	 * Cf. spec : http://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v2-Service.pdf
+	*/
+	char strLeaseDuration[7];
 	int r;
-	if (!PyArg_ParseTuple(args, "HssHzz", &ePort, &proto,
-	                                     &host, &iPort, &desc, &remoteHost))
+	if (!PyArg_ParseTuple(args, "HssHzz|i", &ePort, &proto,
+	                                     &host, &iPort, &desc, &remoteHost, &intLeaseDuration))
         return NULL;
 Py_BEGIN_ALLOW_THREADS
 	sprintf(extPort, "%hu", ePort);
 	sprintf(inPort, "%hu", iPort);
+	sprintf(strLeaseDuration, "%hu", intLeaseDuration);
 	r = UPNP_AddPortMapping(self->urls.controlURL, self->data.first.servicetype,
 	                        extPort, inPort, host, desc, proto,
-	                        remoteHost, leaseDuration);
+	                        remoteHost, strLeaseDuration);
 Py_END_ALLOW_THREADS
 	if(r==UPNPCOMMAND_SUCCESS)
 	{
