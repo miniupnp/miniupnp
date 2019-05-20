@@ -1,8 +1,9 @@
-/* $Id: miniupnpcmodule.c,v 1.24 2014/06/10 09:48:11 nanard Exp $*/
-/* Project : miniupnp
+/* $Id: miniupnpcmodule.c,v 1.34 2019/05/20 19:07:16 nanard Exp $*/
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
+ * Project : miniupnp
  * Author : Thomas BERNARD
  * website : https://miniupnp.tuxfamily.org/
- * copyright (c) 2007-2018 Thomas Bernard
+ * copyright (c) 2007-2019 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <Python.h>
@@ -305,21 +306,21 @@ UPnP_addportmapping(UPnPObject *self, PyObject *args)
 	const char * host;
 	const char * desc;
 	const char * remoteHost;
-	int intLeaseDuration = 0;
-	/*
-	 * According to the IGD spec, the maximum lease is 604800 seconds, ie one week.
-	 * char leaseDuration[7] is big enough to accommodate "604800\0".
-	 * Cf. spec : http://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v2-Service.pdf
-	*/
-	char strLeaseDuration[7];
+	unsigned int intLeaseDuration = 0;
+	char strLeaseDuration[12];
 	int r;
-	if (!PyArg_ParseTuple(args, "HssHzz|i", &ePort, &proto,
+#if (PY_MAJOR_VERSION >= 3) || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION > 3)
+	if (!PyArg_ParseTuple(args, "HssHzz|I", &ePort, &proto,
 	                                     &host, &iPort, &desc, &remoteHost, &intLeaseDuration))
+#else
+	if (!PyArg_ParseTuple(args, "HssHzz|i", &ePort, &proto,
+	                                     &host, &iPort, &desc, &remoteHost, (int *)&intLeaseDuration))
+#endif
         return NULL;
 Py_BEGIN_ALLOW_THREADS
 	sprintf(extPort, "%hu", ePort);
 	sprintf(inPort, "%hu", iPort);
-	sprintf(strLeaseDuration, "%hu", intLeaseDuration);
+	sprintf(strLeaseDuration, "%u", intLeaseDuration);
 	r = UPNP_AddPortMapping(self->urls.controlURL, self->data.first.servicetype,
 	                        extPort, inPort, host, desc, proto,
 	                        remoteHost, strLeaseDuration);
