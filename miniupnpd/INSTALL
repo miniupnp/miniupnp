@@ -152,6 +152,10 @@ UPNP requests forwarding is not implemented.
 It is however possible to use STUN. See the ext_perform_stun / ext_stun_host
  / ext_stun_port options.
 
+it is also possible to set a different interface for IPv6 WAN
+ext_ifname=eth0
+ext_ifname6=sit0
+
 miniupnpd supports some kind of security check for allowing or disallowing
 redirection to be made. The UPnP permission rules are read from the
 miniupnpd.conf configuration file.

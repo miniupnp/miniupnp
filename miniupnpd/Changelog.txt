@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.446 2019/04/09 20:04:32 nanard Exp $
+$Id: Changelog.txt,v 1.448 2019/05/21 08:39:42 nanard Exp $
+
+2019/05/21:
+  Allow to use two different network interfaces for IPv4 and IPv6 internet
 
 2019/05/02:
   Fix ssdp notify on unrelated interfaces
