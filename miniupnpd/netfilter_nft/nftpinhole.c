@@ -42,8 +42,6 @@
 
 #include "nftnlrdr_misc.h"
 
-#define DEBUG 1
-
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
 #else
