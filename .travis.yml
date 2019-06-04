@@ -17,6 +17,9 @@ addons:
 # container-based builds
 sudo: false
 
+# https://docs.travis-ci.com/user/reference/xenial/
+dist: xenial
+
 env:
   - 'PROJECT=minissdpd'
   - 'PROJECT=miniupnpc'
