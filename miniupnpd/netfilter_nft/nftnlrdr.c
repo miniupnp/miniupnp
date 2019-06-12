@@ -272,7 +272,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	}
 
 	iaddr = 0;
-    iport = 0;
+	iport = 0;
 
 	reflesh_nft_cache_peer();
 	// Delete Peer Rule
@@ -420,7 +420,7 @@ get_redirect_rule_by_index(int index,
 	rule_t *r;
 	UNUSED(timestamp);
 
-    d_printf(("get_redirect_rule_by_index()\n"));
+	d_printf(("get_redirect_rule_by_index()\n"));
 	reflesh_nft_cache_redirect();
 
 	LIST_FOREACH(r, &head_redirect, entry) {
@@ -543,7 +543,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	unsigned short *array;
 	unsigned short *tmp;
 
-    d_printf(("get_portmappings_in_range()\n"));
+	d_printf(("get_portmappings_in_range()\n"));
 
 	*number = 0;
 	capacity = 128;

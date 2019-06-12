@@ -137,7 +137,7 @@ find_pinhole(const char * ifname,
 	}
 	inet_pton(AF_INET6, int_client, &daddr);
 
-    d_printf(("find_pinhole()\n"));
+	d_printf(("find_pinhole()\n"));
 	reflesh_nft_cache_filter();
 
 	LIST_FOREACH(p, &head_filter, entry) {
@@ -188,7 +188,7 @@ delete_pinhole(unsigned short uid)
 	snprintf(label_start, sizeof(label_start),
 	         "pinhole-%hu", uid);
 
-    d_printf(("find_pinhole()\n"));
+	d_printf(("find_pinhole()\n"));
 	reflesh_nft_cache_filter();
 
 	LIST_FOREACH(p, &head_filter, entry) {
