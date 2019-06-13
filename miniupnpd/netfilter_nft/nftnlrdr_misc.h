@@ -43,7 +43,7 @@ enum rule_chain_type {
 	RULE_CHAIN_REDIRECT,
 };
 
-typedef struct rule_ {
+typedef struct rule_t {
 	LIST_ENTRY(rule_t) entry;
 	char * table;
 	char * chain;
@@ -74,7 +74,7 @@ typedef struct rule_ {
 	int index;
 } rule_t;
 
-LIST_HEAD(rule_list, rule_);
+LIST_HEAD(rule_list, rule_t);
 extern struct rule_list head_filter;
 extern struct rule_list head_redirect;
 extern struct rule_list head_peer;
