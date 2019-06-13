@@ -46,7 +46,8 @@ BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnppinhole.o pcplearndscp.o asyncsendto.o
 
 LNXOBJS = linux/getifstats.o linux/ifacewatcher.o linux/getroute.o
-NETFILTEROBJS = netfilter_nft/nftnlrdr.o netfilter_nft/nftpinhole.o netfilter_nft/nfct_get.o netfilter_nft/nftnlrdr_misc.o
+NETFILTEROBJS = netfilter_nft/nftnlrdr.o netfilter_nft/nftpinhole.o \
+                netfilter_nft/nfct_get.o netfilter_nft/nftnlrdr_misc.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 

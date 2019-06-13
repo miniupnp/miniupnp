@@ -2,7 +2,7 @@
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
- * 
+ *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
  */
@@ -101,8 +101,8 @@ get_verdict_string(uint32_t val)
 	}
 }
 
-void 
-print_rule(rule_t *r) 
+void
+print_rule(rule_t *r)
 {
 	struct in_addr addr;
 	char *iaddr_str = NULL, *rhost_str = NULL, *eaddr_str = NULL;
@@ -128,10 +128,10 @@ print_rule(rule_t *r)
 			printf("%"PRIu64":[%s/%s] iif %s, %s/%s, %d -> "
 			       "%s:%d (%s)\n",
 			       r->handle,
-			       r->table, r->chain, 
+			       r->table, r->chain,
 			       if_indextoname(r->ingress_ifidx, ifname_buf),
 			       get_family_string(r->family),
-			       get_proto_string(r->proto), r->eport, 
+			       get_proto_string(r->proto), r->eport,
 			       iaddr_str, r->iport,
 			       r->desc);
 		} else if (r->nat_type == NFT_NAT_SNAT) {
@@ -143,7 +143,7 @@ print_rule(rule_t *r)
 			       r->handle, r->table, r->chain,
 			       r->nat_type, r->family, r->ingress_ifidx,
 			       eaddr_str, r->eport,
-			       r->proto, iaddr_str, r->iport, 
+			       r->proto, iaddr_str, r->iport,
 			       rhost_str, r->rport,
 			       r->desc);
 		} else {
@@ -172,20 +172,20 @@ print_rule(rule_t *r)
 
 		if ( (r->iaddr != 0) || (r->rhost != 0) ) {
 			printf("%"PRIu64":[%s/%s] %s/%s, %s %s:%d: %s (%s)\n",
-				r->handle, r->table, r->chain, 
-				get_family_string(r->family), get_proto_string(r->proto),
-						rhost_str, 
-				iaddr_str, r->eport, 
-				get_verdict_string(r->filter_action),
-				r->desc);
+			       r->handle, r->table, r->chain,
+			       get_family_string(r->family), get_proto_string(r->proto),
+			       rhost_str,
+			       iaddr_str, r->eport,
+			       get_verdict_string(r->filter_action),
+			       r->desc);
 		} else {
 			printf("%"PRIu64":[%s/%s] %s/%s, %s %s:%d: %s (%s)\n",
-				r->handle, r->table, r->chain, 
-				get_family_string(r->family), get_proto_string(r->proto),
-						rhost6_str, 
-				iaddr6_str, r->eport, 
-				get_verdict_string(r->filter_action),
-				r->desc);
+			       r->handle, r->table, r->chain,
+			       get_family_string(r->family), get_proto_string(r->proto),
+			       rhost6_str,
+			       iaddr6_str, r->eport,
+			       get_verdict_string(r->filter_action),
+			       r->desc);
 		}
 		break;
 	case RULE_COUNTER:
@@ -199,7 +199,7 @@ print_rule(rule_t *r)
 		}
 		printf("%"PRIu64":[%s/%s] %s/%s, %s:%d: "
 		       "packets:%"PRIu64", bytes:%"PRIu64"\n",
-		       r->handle, r->table, r->chain, 
+		       r->handle, r->table, r->chain,
 		       get_family_string(r->family), get_proto_string(r->proto),
 		       iaddr_str, r->eport, r->packets, r->bytes);
 		break;
@@ -209,7 +209,7 @@ print_rule(rule_t *r)
 }
 
 static enum rule_reg_type *
-get_reg_type_ptr(rule_t *r, uint32_t dreg) 
+get_reg_type_ptr(rule_t *r, uint32_t dreg)
 {
 	switch (dreg) {
 	case NFT_REG_1:
@@ -222,7 +222,7 @@ get_reg_type_ptr(rule_t *r, uint32_t dreg)
 }
 
 static uint32_t *
-get_reg_val_ptr(rule_t *r, uint32_t dreg) 
+get_reg_val_ptr(rule_t *r, uint32_t dreg)
 {
 	switch (dreg) {
 	case NFT_REG_1:
@@ -335,7 +335,7 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 		r->iport = proto_min_val;
 	} else if (r->nat_type == NFT_NAT_SNAT) {
 		r->eaddr = (in_addr_t)*get_reg_val_ptr(r, addr_min_reg);
-		if (proto_min_reg == NFT_REG_1) { 
+		if (proto_min_reg == NFT_REG_1) {
 			r->eport = proto_min_val;
 		}
 	}
@@ -349,7 +349,7 @@ static inline void
 parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 {
 	uint32_t  base, dreg, offset, len;
-	uint32_t  *regptr; 
+	uint32_t  *regptr;
 
 	dreg = nftnl_expr_get_u32(e, NFTNL_EXPR_PAYLOAD_DREG);
 	base = nftnl_expr_get_u32(e, NFTNL_EXPR_PAYLOAD_BASE);
@@ -403,7 +403,7 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 			return;
 		}
 	}
-	syslog(LOG_DEBUG, 
+	syslog(LOG_DEBUG,
 	       "Unsupport payload: (dreg:%d, base:%d, offset:%d, len:%d)",
 	       dreg, base, offset, len);
 	return;
@@ -444,6 +444,12 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		} 
+	case RULE_REG_IP6_SRC_ADDR:
+		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
+			r->rhost6 = *(struct in6_addr *)data_val;
+			r->reg1_type = RULE_REG_NONE;
+			return;
+		}
 	case RULE_REG_IP6_SRC_ADDR:
 		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
 			r->rhost6 = *(struct in6_addr *)data_val;
@@ -518,11 +524,10 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 }
 
 static int
-rule_expr_cb(struct nftnl_expr *e, void *data) 
+rule_expr_cb(struct nftnl_expr *e, void *data)
 {
 	rule_t *r = data;
-	const char *attr_name = nftnl_expr_get_str(e, 
-						      NFTNL_EXPR_NAME);
+	const char *attr_name = nftnl_expr_get_str(e, NFTNL_EXPR_NAME);
 
 	if (strncmp("cmp", attr_name, sizeof("cmp")) == 0) {
 		parse_rule_cmp(e, r);
@@ -538,7 +543,7 @@ rule_expr_cb(struct nftnl_expr *e, void *data)
 		parse_rule_immediate(e, r);
 	} else {
 		syslog(LOG_DEBUG, "unknown attr: %s\n", attr_name);
-	} 
+	}
 
 	return MNL_CB_OK;
 }
@@ -559,7 +564,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 
 	index_filter = index_peer = index_redirect = 0;
 
-	r = malloc(sizeof(rule_t)); 
+	r = malloc(sizeof(rule_t));
 
 	memset(r, 0, sizeof(rule_t));
 	t = nftnl_rule_alloc();
@@ -754,7 +759,7 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 
 static void
 expr_add_payload(struct nftnl_rule *r, uint32_t base, uint32_t dreg,
-		 uint32_t offset, uint32_t len)
+                 uint32_t offset, uint32_t len)
 {
 	struct nftnl_expr *e;
 
@@ -860,7 +865,7 @@ expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 }
 
 static void
-expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val) 
+expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 {
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
@@ -929,25 +934,23 @@ rule_set_snat(uint8_t family, uint8_t proto,
 
 	if (descr != NULL) {
 		descr_len = strlen(descr);
-		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA, 
+		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
 				       descr, descr_len);
 	}
 
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-			 offsetof(struct iphdr, daddr), sizeof(uint32_t));
+	                 offsetof(struct iphdr, daddr), sizeof(uint32_t));
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &ihost, sizeof(uint32_t));
 
 	/* Source IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-				offsetof(struct iphdr, saddr),
-				sizeof(in_addr_t));
-	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost,
-				sizeof(in_addr_t));
+	                 offsetof(struct iphdr, saddr), sizeof(in_addr_t));
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost, sizeof(in_addr_t));
 
 	/* Protocol */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-			 offsetof(struct iphdr, protocol), sizeof(uint8_t));
+	                 offsetof(struct iphdr, protocol), sizeof(uint8_t));
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &proto, sizeof(uint8_t));
 
 	/* Source and Destination Port of Protocol */
@@ -955,25 +958,25 @@ rule_set_snat(uint8_t family, uint8_t proto,
 		/* Destination Port */
 		dport = htons(iport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-					offsetof(struct tcphdr, dest), sizeof(uint16_t));
+		                 offsetof(struct tcphdr, dest), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 
 		/* Source Port */
 		sport = htons(rport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-		         offsetof(struct tcphdr, source), sizeof(uint16_t));
+		                 offsetof(struct tcphdr, source), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &sport, sizeof(uint16_t));
 	} else if (proto == IPPROTO_UDP) {
 		/* Destination Port */
 		dport = htons(iport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-					offsetof(struct udphdr, dest), sizeof(uint16_t));
+		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 
 		/* Source Port */
 		sport = htons(rport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-		         offsetof(struct udphdr, source), sizeof(uint16_t));
+		                 offsetof(struct udphdr, source), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &sport, sizeof(uint16_t));
 	}
 
@@ -1017,7 +1020,7 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 
 	if (descr != NULL) {
 		descr_len = strlen(descr);
-		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA, 
+		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
 				       descr, descr_len);
 	}
 
@@ -1029,38 +1032,32 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	if (ifname != NULL) {
 		if_idx = (uint32_t)if_nametoindex(ifname);
 		expr_add_meta(r, NFT_META_IIF, NFT_REG_1);
-		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &if_idx, 
+		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &if_idx,
 			     sizeof(uint32_t));
 	}
 
 	/* Source IP */
 	if (rhost != 0) {
 		expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-				 offsetof(struct iphdr, saddr),
-				 sizeof(in_addr_t));
-		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost,
-			     sizeof(in_addr_t));
+		                 offsetof(struct iphdr, saddr), sizeof(in_addr_t));
+		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost, sizeof(in_addr_t));
 	}
 
 	/* Protocol */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-			 offsetof(struct iphdr, protocol), sizeof(uint8_t));
+	                 offsetof(struct iphdr, protocol), sizeof(uint8_t));
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &proto, sizeof(uint8_t));
 
 	if (proto == IPPROTO_TCP) {
 		dport = htons(eport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-				 offsetof(struct tcphdr, dest), 
-				 sizeof(uint16_t));
-		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, 
-			     sizeof(uint16_t));
+		                 offsetof(struct tcphdr, dest), sizeof(uint16_t));
+		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 	} else if (proto == IPPROTO_UDP) {
 		dport = htons(eport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-				 offsetof(struct udphdr, dest), 
-				 sizeof(uint16_t));
-		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport,
-			     sizeof(uint16_t));
+		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
+		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 	}
 
 	expr_add_nat(r, NFT_NAT_DNAT, family, ihost, htons(iport), 0);
@@ -1076,13 +1073,14 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 struct nftnl_rule *
 rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		in_addr_t rhost, in_addr_t iaddr,
-		unsigned short eport, unsigned short iport, 
+		unsigned short eport, unsigned short iport,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
 	#ifdef DEBUG
 	char buf[8192];
 	#endif
+
 	UNUSED(eport);
 
 	r = nftnl_rule_alloc();
@@ -1095,21 +1093,20 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-			 offsetof(struct iphdr, daddr), sizeof(uint32_t));
+	                 offsetof(struct iphdr, daddr), sizeof(uint32_t));
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &iaddr, sizeof(uint32_t));
 
 	/* Source IP */
 	if (rhost != 0) {
 		expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-				 offsetof(struct iphdr, saddr),
-				 sizeof(in_addr_t));
+		                 offsetof(struct iphdr, saddr), sizeof(in_addr_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost,
 			     sizeof(in_addr_t));
 	}
 
 	/* Protocol */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-			 offsetof(struct iphdr, protocol), sizeof(uint8_t));
+	                 offsetof(struct iphdr, protocol), sizeof(uint8_t));
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &proto, sizeof(uint8_t));
 
 	expr_set_reg_verdict(r, NF_ACCEPT);
@@ -1125,7 +1122,7 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 struct nftnl_rule *
 rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		struct in6_addr *rhost6, struct in6_addr *iaddr6,
-		unsigned short eport, unsigned short iport, 
+		unsigned short eport, unsigned short iport,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
@@ -1144,21 +1141,20 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-			 offsetof(struct ipv6hdr, daddr), sizeof(struct in6_addr));
+	                 offsetof(struct ipv6hdr, daddr), sizeof(struct in6_addr));
+
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, iaddr6, sizeof(struct in6_addr));
 
 	/* Source IP */
 	if (rhost6) {
 		expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-				 offsetof(struct ipv6hdr, saddr),
-				 sizeof(struct in6_addr));
-		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, rhost6,
-			     sizeof(struct in6_addr));
+		                 offsetof(struct ipv6hdr, saddr), sizeof(struct in6_addr));
+		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, rhost6, sizeof(struct in6_addr));
 	}
 
 	/* Protocol */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
-			 offsetof(struct ipv6hdr, nexthdr), sizeof(uint8_t));
+	                 offsetof(struct ipv6hdr, nexthdr), sizeof(uint8_t));
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &proto, sizeof(uint8_t));
 
 	expr_set_reg_verdict(r, NF_ACCEPT);
@@ -1173,7 +1169,7 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 
 struct nftnl_rule *
 rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname,
-		uint8_t proto, unsigned short eport, unsigned short iport, 
+		uint8_t proto, unsigned short eport, unsigned short iport,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	uint16_t dport, sport;
@@ -1208,10 +1204,10 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	dport = htons(iport);
 	if (proto == IPPROTO_TCP) {
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-		         	offsetof(struct tcphdr, dest), sizeof(uint16_t));
+		                 offsetof(struct tcphdr, dest), sizeof(uint16_t));
 	} else if (proto == IPPROTO_UDP) {
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-		         	offsetof(struct udphdr, dest), sizeof(uint16_t));
+		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
 	}
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 
@@ -1220,10 +1216,10 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 		sport = htons(rport);
 		if (proto == IPPROTO_TCP) {
 			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-						offsetof(struct tcphdr, source), sizeof(uint16_t));
+			                 offsetof(struct tcphdr, source), sizeof(uint16_t));
 		} else if (proto == IPPROTO_UDP) {
 			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
-						offsetof(struct udphdr, source), sizeof(uint16_t));
+			                 offsetof(struct udphdr, source), sizeof(uint16_t));
 		}
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &sport, sizeof(uint16_t));
 	}

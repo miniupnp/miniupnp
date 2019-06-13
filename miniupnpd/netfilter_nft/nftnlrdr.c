@@ -133,8 +133,8 @@ add_redirect_rule2(const char * ifname,
 	          ifname, rhost, eport, iaddr, iport, proto, desc));
 
 	r = rule_set_dnat(NFPROTO_IPV4, ifname, proto,
-			  0, eport,
-			  inet_addr(iaddr), iport,  desc, NULL);
+	                  0, eport,
+	                  inet_addr(iaddr), iport,  desc, NULL);
 
 	return nft_send_request(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
 }
@@ -156,10 +156,11 @@ add_peer_redirect_rule2(const char * ifname,
 	UNUSED(ifname); UNUSED(timestamp);
 
 	d_printf(("add peer redirect rule2()!\n"));
+
 	r = rule_set_snat(NFPROTO_IPV4, proto,
-			  inet_addr(rhost), rport,
-			  inet_addr(eaddr), eport,
-			  inet_addr(iaddr), iport, desc, NULL);
+	                  inet_addr(rhost), rport,
+	                  inet_addr(eaddr), eport,
+	                  inet_addr(iaddr), iport, desc, NULL);
 
 	return nft_send_request(r, NFT_MSG_NEWRULE, RULE_CHAIN_PEER);
 }
@@ -185,9 +186,10 @@ add_filter_rule2(const char * ifname,
 	if (rhost != NULL && strcmp(rhost, "") != 0) {
 		rhost_addr = inet_addr(rhost);
 	}
+
 	r = rule_set_filter(NFPROTO_INET, ifname, proto,
 			    rhost_addr, inet_addr(iaddr),
-				eport, iport, 0, desc, 0);
+          eport, iport, 0, desc, 0);
 
 	return nft_send_request(r, NFT_MSG_NEWRULE, RULE_CHAIN_FILTER);
 }
@@ -239,14 +241,14 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	struct nftnl_rule *r = NULL;
 	in_addr_t iaddr = 0;
 	uint16_t iport = 0;
-	extern void print_rule(rule_t *r) ;
+	extern void print_rule(rule_t *r);
 
 	d_printf(("delete_redirect_and_filter_rules(%d %d)\n", eport, proto));
 	reflesh_nft_cache_redirect();
 
 	// Delete Redirect Rule
 	LIST_FOREACH(p, &head_redirect, entry) {
-		if (p->eport == eport && p->proto == proto && 
+		if (p->eport == eport && p->proto == proto &&
 		    (p->type == RULE_NAT && p->nat_type == NFT_NAT_DNAT)) {
 			iaddr = p->iaddr;
 			iport = p->iport;
@@ -262,7 +264,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		reflesh_nft_cache_filter();
 		// Delete Forward Rule
 		LIST_FOREACH(p, &head_filter, entry) {
-			if (p->eport == iport && 
+			if (p->eport == iport &&
 				p->iaddr == iaddr && p->type == RULE_FILTER) {
 				r = rule_del_handle(p);
 				/* Todo: send bulk request */
@@ -294,7 +296,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		reflesh_nft_cache_filter();
 		// Delete Forward Rule
 		LIST_FOREACH(p, &head_filter, entry) {
-			if (p->eport == iport && 
+			if (p->eport == iport &&
 				p->iaddr == iaddr && p->type == RULE_FILTER) {
 				r = rule_del_handle(p);
 				/* Todo: send bulk request */

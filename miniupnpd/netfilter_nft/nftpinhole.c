@@ -341,7 +341,7 @@ get_pinhole_info(unsigned short uid,
 					syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
 					continue;
 				}
-	
+
 				*timestamp = ts;
 			}
 
