@@ -443,12 +443,6 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->rhost = *(in_addr_t *)data_val;
 			r->reg1_type = RULE_REG_NONE;
 			return;
-		} 
-	case RULE_REG_IP6_SRC_ADDR:
-		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
-			r->rhost6 = *(struct in6_addr *)data_val;
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 	case RULE_REG_IP6_SRC_ADDR:
 		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
