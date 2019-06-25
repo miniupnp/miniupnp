@@ -604,15 +604,15 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 
 	if (r->type == RULE_NONE) {
 		free(r);
-	} else if (strcmp(r->chain, miniupnpd_nat_postrouting_chain) == 0) {
+	} else if (r->type == RULE_NAT && r->nat_type == NFT_NAT_SNAT) {
 		r->index = index_peer;
 		LIST_INSERT_HEAD(&head_peer, r, entry);
 		index_peer++;
-	} else if (strcmp(r->chain, miniupnpd_nat_chain) == 0) {
+	} else if (r->type == RULE_NAT && r->nat_type == NFT_NAT_DNAT) {
 		r->index = index_redirect;
 		LIST_INSERT_HEAD(&head_redirect, r, entry);
 		index_redirect++;
-	} else {
+	} else if (r->type == RULE_FILTER) {
 		r->index = index_filter;
 		LIST_INSERT_HEAD(&head_filter, r, entry);
 		index_filter++;

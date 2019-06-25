@@ -1,5 +1,4 @@
-#! /sbin/nft -f
+#!/bin/sh
 
-delete rule nat MINIUPNPD
-delete rule nat MINIUPNPD-POSTROUTING
-delete rule filter MINIUPNPD
+# Remove all rules in nft not just miniupnpd
+nft flush ruleset
