@@ -1,7 +1,7 @@
-/* $Id: upnperrors.c,v 1.5 2011/04/10 11:19:36 nanard Exp $ */
+/* $Id: upnperrors.c,v 1.9 2019/06/25 21:15:46 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
- * copyright (c) 2007 Thomas Bernard
+ * copyright (c) 2007-2019 Thomas Bernard
  * All Right reserved.
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subjet to the conditions detailed in the
