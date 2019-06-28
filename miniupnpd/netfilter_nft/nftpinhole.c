@@ -80,9 +80,6 @@ int add_pinhole(const char * ifname,
 	struct in6_addr rhost_addr, ihost_addr;
 	struct in6_addr *rhost_addr_p;
 
-	UNUSED(rem_host);
-	UNUSED(rem_port);
-
 	uid = next_uid;
 
 	d_printf(("add_pinhole(%s, %s, %s, %d, %d, %d, %s)\n",
@@ -130,7 +127,7 @@ find_pinhole(const char * ifname,
 	unsigned int ts;
 	UNUSED(ifname);
 
-	if (rem_host && (rem_host[0] != '\0')) {
+	if (rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
 		inet_pton(AF_INET6, rem_host, &saddr);
 	} else {
 		memset(&saddr, 0, sizeof(struct in6_addr));
@@ -149,9 +146,9 @@ find_pinhole(const char * ifname,
 		if (p->desc_len == 0)
 			continue;
 
-		if ((proto == p->proto) && (rem_port == ntohs(p->rport))
-		   && (0 == memcmp(&saddr, &p->iaddr6, sizeof(struct in6_addr)))
-		   && (int_port == ntohs(p->eport)) &&
+		if ((proto == p->proto) && (rem_port == p->rport)
+		   && (0 == memcmp(&saddr, &p->rhost6, sizeof(struct in6_addr)))
+		   && (int_port == p->eport) &&
 		   (0 == memcmp(&daddr, &p->iaddr6, sizeof(struct in6_addr)))) {
 
 			if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
@@ -188,7 +185,7 @@ delete_pinhole(unsigned short uid)
 	snprintf(label_start, sizeof(label_start),
 	         "pinhole-%hu", uid);
 
-	d_printf(("find_pinhole()\n"));
+	d_printf(("delete_pinhole()\n"));
 	reflesh_nft_cache_filter();
 
 	LIST_FOREACH(p, &head_filter, entry) {
@@ -220,17 +217,25 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	char tmp_label[NFT_DESCR_SIZE];
 	char desc[NFT_DESCR_SIZE];
 	char ifname[IFNAMSIZ];
+	char comment[NFT_DESCR_SIZE];
 	char * tmp_p;
 	uint32_t ext_if_indx;
-	int proto;
+	int proto, res;
 	unsigned short iport, rport;
 	rule_t *p;
+	struct in6_addr rhost_addr, ihost_addr;
+	struct in6_addr * rhost_addr_p;
+	struct nftnl_rule *r;
 
 	d_printf(("update_pinhole()\n"));
+
+	snprintf(label_start, sizeof(label_start),
+	         "pinhole-%hu", uid);
 
 	reflesh_nft_cache_filter();
 
 	proto = -1;
+	memset(&rhost_addr, 0, sizeof(struct in6_addr));
 
 	LIST_FOREACH(p, &head_filter, entry) {
 		// Only forward entries
@@ -244,16 +249,24 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 		strtok(tmp_label, " ");
 		if (0 == strcmp(tmp_label, label_start)) {
 			/* Source IP Address */
-			inet_ntop(AF_INET6, &p->rhost6, raddr, sizeof(raddr));
+			// Check if empty
+			if (0 == memcmp(&rhost_addr, &p->rhost6, sizeof(struct in6_addr))) {
+				rhost_addr_p = NULL;
+				raddr[0] = '*';
+				raddr[1] = '\0';
+			} else {
+				rhost_addr_p = &p->rhost6;
+				inet_ntop(AF_INET6, rhost_addr_p, raddr, INET6_ADDRSTRLEN);
+			}
 
 			/* Source Port */
-			rport = p->eport;
+			rport = p->iport;
 
 			/* Destination IP Address */
-			inet_ntop(AF_INET6, &p->iaddr6, iaddr, sizeof(iaddr));
+			ihost_addr = p->iaddr6;
 
 			/* Destination Port */
-			iport = p->iport;
+			iport = p->eport;
 
 			proto = p->proto;
 
@@ -275,8 +288,28 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	if (proto == -1)
 		return -2;
 
-	delete_pinhole(uid);
-	add_pinhole(ifname, raddr, rport, iaddr, iport, proto, desc, timestamp);
+	// Delete rule
+	r = rule_del_handle(p);
+	res = nft_send_request(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+
+	if (res < 0)
+		return -1;
+
+	// readd rule with new timestamp
+	snprintf(comment, NFT_DESCR_SIZE,
+		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
+
+	d_printf(("update add_pinhole(%s, %s, %s, %d, %d, %d, %s)\n",
+	          ifname, raddr, inet_ntop(AF_INET6, &ihost_addr, iaddr, INET6_ADDRSTRLEN), rport, iport, proto, comment));
+
+	r = rule_set_filter6(NFPROTO_INET, ifname, proto,
+			    rhost_addr_p, &ihost_addr,
+				0, iport, rport, comment, 0);
+
+	res = nft_send_request(r, NFT_MSG_NEWRULE, RULE_CHAIN_FILTER);
+
+	if (res < 0)
+		return -1;
 
 	return 0;
 }
