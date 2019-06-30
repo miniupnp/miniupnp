@@ -1,7 +1,9 @@
+/* $Id: nftnlrdr_misc.c,v 1.4 2019/06/30 20:00:41 nanard Exp $ */
 /*
  * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
+ * (c) 2019 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
@@ -561,12 +563,12 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	memset(r, 0, sizeof(rule_t));
 	t = nftnl_rule_alloc();
 	if (t == NULL) {
-		perror("OOM");
+		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
 		goto err;
 	}
 
 	if (nftnl_rule_nlmsg_parse(nlh, t) < 0) {
-		perror("nftnl_rule_nlmsg_parse");
+		syslog(LOG_ERR, "nftnl_rule_nlmsg_parse FAILED");
 		goto err_free;
 	}
 
@@ -701,21 +703,21 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 	if (nl == NULL) {
 		nl = mnl_socket_open(NETLINK_NETFILTER);
 		if (nl == NULL) {
-			perror("mnl_socket_open");
-			exit(EXIT_FAILURE);
+			syslog(LOG_ERR, "%s: mnl_socket_open() FAILED: %m", "reflesh_nft_cache()");
+			return;
 		}
 
 		if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-			perror("mnl_socket_bind");
-			exit(EXIT_FAILURE);
+			syslog(LOG_ERR, "%s: mnl_socket_bind() FAILED: %m", "reflesh_nft_cache()");
+			return;
 		}
 	}
 	portid = mnl_socket_get_portid(nl);
 
 	t = nftnl_rule_alloc();
 	if (t == NULL) {
-		perror("OOM");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_rule_alloc() FAILED", "reflesh_nft_cache()");
+		return;
 	}
 
 	seq = time(NULL);
@@ -727,8 +729,8 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 	nftnl_rule_free(t);
 
 	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
-		perror("mnl_socket_send");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: mnl_socket_sendto() FAILED: %m", "reflesh_nft_cache()");
+		return;
 	}
 
 	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
@@ -740,8 +742,7 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 	}
 
 	if (ret == -1) {
-		perror("error");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: mnl_socket_recvfrom() FAILED: %m", "reflesh_nft_cache()");
 	}
 
 	/* mnl_socket_close(nl); */
@@ -757,8 +758,8 @@ expr_add_payload(struct nftnl_rule *r, uint32_t base, uint32_t dreg,
 
 	e = nftnl_expr_alloc("payload");
 	if (e == NULL) {
-		perror("expr payload oom");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_payload()", "payload");
+		return;
 	}
 
 	nftnl_expr_set_u32(e, NFTNL_EXPR_PAYLOAD_BASE, base);
@@ -778,8 +779,8 @@ expr_add_bitwise(struct nftnl_rule *r, uint32_t sreg, uint32_t dreg,
 
 	e = nftnl_expr_alloc("bitwise");
 	if (e == NULL) {
-		perror("expr cmp bitwise");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_bitwise()", "bitwise");
+		return;
 	}
 
 	nftnl_expr_set_u32(e, NFTNL_EXPR_BITWISE_SREG, sreg);
@@ -800,8 +801,8 @@ expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,
 
 	e = nftnl_expr_alloc("cmp");
 	if (e == NULL) {
-		perror("expr cmp oom");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_cmp()", "cmp");
+		return;
 	}
 
 	nftnl_expr_set_u32(e, NFTNL_EXPR_CMP_SREG, sreg);
@@ -818,8 +819,8 @@ expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
 
 	e = nftnl_expr_alloc("meta");
 	if (e == NULL) {
-		perror("expr meta oom");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_meta()", "meta");
+		return;
 	}
 
 	nftnl_expr_set_u32(e, NFTNL_EXPR_META_KEY, meta_key);
@@ -834,8 +835,8 @@ expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
-		perror("expr dreg oom");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_set_reg_val_u32()", "immediate");
+		return;
 	}
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_DREG, dreg);
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_DATA, val);
@@ -848,8 +849,8 @@ expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
-		perror("expr dreg oom");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_set_reg_val_u16()", "immediate");
+		return;
 	}
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_DREG, dreg);
 	nftnl_expr_set_u16(e, NFTNL_EXPR_IMM_DATA, val);
@@ -862,8 +863,8 @@ expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
-		perror("expr dreg oom");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_set_reg_verdict()", "immediate");
+		return;
 	}
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_DREG, NFT_REG_VERDICT);
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_VERDICT, val);
@@ -879,8 +880,8 @@ expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
 
 	e = nftnl_expr_alloc("nat");
 	if (e == NULL) {
-		perror("expr nat oom");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_nat()", "nat");
+		return;
 	}
 	
 	nftnl_expr_set_u32(e, NFTNL_EXPR_NAT_TYPE, t);
@@ -916,8 +917,8 @@ rule_set_snat(uint8_t family, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		perror("OOM");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		return NULL;
 	}
 
 	nftnl_rule_set(r, NFTNL_RULE_TABLE, NFT_TABLE_NAT);
@@ -1002,8 +1003,8 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		perror("OOM");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		return NULL;
 	}
 
 	nftnl_rule_set(r, NFTNL_RULE_TABLE, NFT_TABLE_NAT);
@@ -1076,8 +1077,8 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		perror("OOM");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		return NULL;
 	}
 
 	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, descr, handle);
@@ -1124,8 +1125,8 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		perror("OOM");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		return NULL;
 	}
 
 	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, descr, handle);
@@ -1224,8 +1225,8 @@ rule_del_handle(rule_t *rule)
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		perror("OOM");
-		exit(EXIT_FAILURE);
+		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		return NULL;
 	}
 
 	nftnl_rule_set(r, NFTNL_RULE_TABLE, rule->table);
@@ -1272,12 +1273,12 @@ nft_send_request(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type ch
 	if (nl == NULL) {
 		nl = mnl_socket_open(NETLINK_NETFILTER);
 		if (nl == NULL) {
-			perror("mnl_socket_open");
+			syslog(LOG_ERR, "%s: mnl_socket_open() FAILED: %m", "nft_send_request()");
 			return -1;
 		}
 
 		if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-			perror("mnl_socket_bind");
+			syslog(LOG_ERR, "%s: mnl_socket_bind() FAILED: %m", "nft_send_request()");
 			return -1;
 		}
 	}
@@ -1305,7 +1306,7 @@ nft_send_request(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type ch
 	ret = mnl_socket_sendto(nl, mnl_nlmsg_batch_head(batch),
 				mnl_nlmsg_batch_size(batch));
 	if (ret == -1) {
-		perror("mnl_socket_sendto");
+		syslog(LOG_ERR, "%s: mnl_socket_sendto() FAILED: %m", "nft_send_request()");
 		return -1;
 	}
 
@@ -1313,13 +1314,13 @@ nft_send_request(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type ch
 
 	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
 	if (ret == -1) {
-		perror("mnl_socket_recvfrom");
+		syslog(LOG_ERR, "%s: mnl_socket_recvfrom() FAILED: %m", "nft_send_request()");
 		return -1;	
 	}
 
 	ret = mnl_cb_run(buf, ret, 0, mnl_socket_get_portid(nl), NULL, NULL);
 	if (ret < 0) {
-		perror("mnl_cb_run");
+		syslog(LOG_ERR, "%s: mnl_cb_run() FAILED: %m", "nft_send_request()");
 		return -1;	
 	}
 
