@@ -132,7 +132,7 @@ add_redirect_rule2(const char * ifname,
 	d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
 	          ifname, rhost, eport, iaddr, iport, proto, desc));
 
-	r = rule_set_dnat(NFPROTO_INET, ifname, proto,
+	r = rule_set_dnat(NFPROTO_IPV4, ifname, proto,
 	                  0, eport,
 	                  inet_addr(iaddr), iport,  desc, NULL);
 
@@ -186,7 +186,7 @@ add_filter_rule2(const char * ifname,
 	if (rhost != NULL && strcmp(rhost, "") != 0) {
 		rhost_addr = inet_addr(rhost);
 	}
-	r = rule_set_filter(NFPROTO_IPV4, ifname, proto,
+	r = rule_set_filter(NFPROTO_INET, ifname, proto,
 	                    rhost_addr, inet_addr(iaddr),
 	                    eport, iport, 0,
 	                    desc, 0);
