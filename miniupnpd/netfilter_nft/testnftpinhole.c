@@ -1,7 +1,7 @@
-/* $Id: testiptpinhole.c,v 1.1 2012/04/26 13:50:48 nanard Exp $ */
+/* $Id: testnftpinhole.c,v 1.2 2019/06/30 19:49:18 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2012 Thomas Bernard
+ * (c) 2012-2019 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
