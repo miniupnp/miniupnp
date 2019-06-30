@@ -241,7 +241,6 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	struct nftnl_rule *r = NULL;
 	in_addr_t iaddr = 0;
 	uint16_t iport = 0;
-	extern void print_rule(rule_t *r);
 
 	d_printf(("delete_redirect_and_filter_rules(%d %d)\n", eport, proto));
 	reflesh_nft_cache_redirect();
@@ -625,7 +624,11 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 	return 0;
 }
 
+#ifdef DEBUG
 /* for debug */
+
+extern void print_rule(rule_t *r);
+
 /* read the "filter" and "nat" tables */
 int
 list_redirect_rule(const char * ifname)
@@ -650,6 +653,7 @@ list_redirect_rule(const char * ifname)
 
 	return 0;
 }
+#endif
 
 
 #if 0

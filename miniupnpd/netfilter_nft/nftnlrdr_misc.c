@@ -60,6 +60,7 @@ static uint32_t rule_list_filter_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_redirect_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_peer_validate = RULE_CACHE_INVALID;
 
+#ifdef DEBUG
 static const char *
 get_family_string(uint32_t family)
 {
@@ -207,6 +208,7 @@ print_rule(rule_t *r)
 		printf("nftables: unknown type: %d\n", r->type);
 	}
 }
+#endif
 
 static enum rule_reg_type *
 get_reg_type_ptr(rule_t *r, uint32_t dreg)
