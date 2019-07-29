@@ -71,7 +71,7 @@ const char * strupnperror(int err)
 		s = "ProtocolWildcardingNotAllowed";
 		break;
 	case 708:
-		s = "WildcardNotPermittedInSrcIP";
+		s = "InvalidLayer2Address";
 		break;
 	case 709:
 		s = "NoPacketSent";
