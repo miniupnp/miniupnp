@@ -1,5 +1,9 @@
-$Id: Changelog.txt,v 1.237 2019/04/03 15:57:43 nanard Exp $
+$Id: Changelog.txt,v 1.240 2019/08/24 08:49:52 nanard Exp $
 miniUPnP client Changelog.
+
+2019/08/24:
+  Allow Remote Host on upnpc command line
+  fix error 708 description in strupnperror()
 
 2019/04/05:
   Fix memory leak in upnpreplyparse.c with NewPortListing element
