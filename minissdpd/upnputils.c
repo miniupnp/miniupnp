@@ -1,6 +1,6 @@
 /* $Id: upnputils.c,v 1.2 2014/11/28 16:20:58 nanard Exp $ */
 /* MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2019 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -19,6 +19,8 @@
 #ifdef AF_LINK
 #include <net/if_dl.h>
 #endif
+#include <time.h>
+#include <sys/time.h>
 
 #include "upnputils.h"
 #include "getroute.h"
