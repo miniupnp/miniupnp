@@ -77,7 +77,10 @@ CPPFLAGS += -DIPTABLES_143
 endif
 
 CFLAGS  += $(shell $(PKG_CONFIG) --cflags libiptc)
+#OpenWrt packager passes correct libraries
+ifeq ($(TARGET_OPENWRT),)
 LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l libiptc)
+endif
 LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libiptc)
 LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other libiptc)
 else
@@ -157,6 +160,8 @@ LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libmnl)
 LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libnetfilter_conntrack)
 endif # ($(TEST),1)
 
+# OpenWrt packager disables https server for IGD v2 and hardcodes libuuid support
+ifeq ($(TARGET_OPENWRT),)
 LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libssl)
 
 TEST := $(shell $(PKG_CONFIG) --exists uuid && echo 1)
@@ -165,6 +170,7 @@ LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l uuid)
 else
 $(info please install uuid-dev package / libuuid)
 endif # ($(TEST),1)
+endif # ($(TARGET_OPENWRT,)
 
 GLIBC_VERSION := $(shell ldd --version | head -n 1 | sed 's/^.* //')
 GLIBC_VERSION_MAJOR = $(shell echo $(GLIBC_VERSION) | cut -f 1 -d . )

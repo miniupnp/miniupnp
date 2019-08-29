@@ -379,12 +379,19 @@ case $FW in
 esac
 
 # UUID API
-if grep uuid_create /usr/include/uuid.h > /dev/null 2>&1 ; then
-	echo "#define BSD_UUID" >> ${CONFIGFILE}
-fi
-if grep uuid_generate /usr/include/uuid/uuid.h > /dev/null 2>&1 ; then
-	echo "#define LIB_UUID" >> ${CONFIGFILE}
-fi
+case $OS_NAME in
+	OpenWRT)
+		echo "#define LIB_UUID" >> ${CONFIGFILE}
+		;;
+	*)
+		if grep uuid_create /usr/include/uuid.h > /dev/null 2>&1 ; then
+			echo "#define BSD_UUID" >> ${CONFIGFILE}
+		fi
+		if grep uuid_generate /usr/include/uuid/uuid.h > /dev/null 2>&1 ; then
+			echo "#define LIB_UUID" >> ${CONFIGFILE}
+		fi
+		;;
+esac
 
 # set V6SOCKETS_ARE_V6ONLY to 0 if it was not set above
 if [ -z "$V6SOCKETS_ARE_V6ONLY" ] ; then
