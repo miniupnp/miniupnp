@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.450 2019/08/24 08:42:50 nanard Exp $
+$Id: Changelog.txt,v 1.451 2019/09/01 23:00:29 nanard Exp $
+
+2019/09/01:
+  fix of nftables scripts : https://github.com/miniupnp/miniupnp/pull/395
 
 2019/08/24:
   Small fixes in netfilter code
