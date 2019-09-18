@@ -30,6 +30,7 @@ INSTALL = install
 STRIP ?= strip
 PKG_CONFIG ?= pkg-config
 CP = cp
+DOXYGEN ?= doxygen
 
 
 INSTALLPREFIX ?= $(PREFIX)/usr
@@ -83,13 +84,26 @@ else
 $(info please install uuid-dev package / libuuid)
 endif # ($(TEST),1)
 
+# genuuid uses the uuidgen CLI tool which is part of libuuid
+# from the e2fsprogs
+# 'cat /proc/sys/kernel/random/uuid' could be also used
+#
+ifeq ($(TARGET_OPENWRT),)
+    UUIDEXECDIR=''
+else
+    UUIDEXECDIR="$(STAGING_DIR_HOST)/bin/"
+endif
+UUID=$(shell ($(UUIDEXECDIR)genuuid || $(UUIDEXECDIR)uuidgen || $(UUIDEXECDIR)uuid) 2> /dev/null )
+
+
 TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
-EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
-              testupnppermissions miniupnpdctl testgetifaddr \
+EXECUTABLES = miniupnpd miniupnpdctl \
+              testupnpdescgen testgetifstats \
+              testupnppermissions testgetifaddr \
               testgetroute testasyncsendto testportinuse
 
-.PHONY:	all clean install depend genuuid
+.PHONY:	all clean install depend dox
 
 all:	$(EXECUTABLES)
 
@@ -101,8 +115,9 @@ clean:
 	$(RM) testgetroute.o testasyncsendto.o
 	$(RM) testportinuse.o
 	$(RM) miniupnpdctl.o
+	$(RM) -r dox/
 
-install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
+install:	miniupnpd miniupnpd.8 miniupnpd.conf \
 	netfilter_nft/scripts/nft_init.sh \
 	netfilter_nft/scripts/nft_removeall.sh \
 	netfilter_nft/scripts/nft_flush.sh \
@@ -117,21 +132,13 @@ install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
 	$(INSTALL) netfilter_nft/scripts/nft_flush.sh $(DESTDIR)$(ETCINSTALLDIR)
 	$(INSTALL) netfilter_nft/scripts/nft_delete_chain.sh $(DESTDIR)$(ETCINSTALLDIR)
 	$(INSTALL) --mode=0644 -b miniupnpd.conf $(DESTDIR)$(ETCINSTALLDIR)
+	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=$(UUID)/" $(DESTDIR)$(ETCINSTALLDIR)/miniupnpd.conf
 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/etc/init.d
 	$(INSTALL) linux/miniupnpd.init.d.script $(DESTDIR)$(PREFIX)/etc/init.d/miniupnpd
 	$(INSTALL) -d $(DESTDIR)$(MANINSTALLDIR)
 	$(INSTALL) --mode=0644 miniupnpd.8 $(DESTDIR)$(MANINSTALLDIR)
 	gzip -f $(DESTDIR)$(MANINSTALLDIR)/miniupnpd.8
 
-# genuuid is using the uuidgen CLI tool which is part of libuuid
-# from the e2fsprogs
-# 'cat /proc/sys/kernel/random/uuid' could be also used
-genuuid:
-ifeq ($(TARGET_OPENWRT),)
-	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=`(genuuid||uuidgen||uuid) 2>/dev/null`/" miniupnpd.conf
-else
-	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=`($(STAGING_DIR_HOST)/bin/genuuid||$(STAGING_DIR_HOST)/bin/uuidgen||$(STAGING_DIR_HOST)/bin/uuid) 2>/dev/null`/" miniupnpd.conf
-endif
 
 miniupnpd:	$(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
@@ -162,6 +169,9 @@ depend:	config.h
 	testgetifstats.c testupnppermissions.c testgetifaddr.c \
 	testgetroute.c testasyncsendto.c testportinuse.c \
 	miniupnpdctl.c 2>/dev/null
+
+dox:
+	doxygen miniupnpd.doxyconf
 
 # DO NOT DELETE
 
