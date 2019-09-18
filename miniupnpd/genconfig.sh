@@ -310,18 +310,23 @@ case $OS_NAME in
 			esac
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		FW=netfilter
+		# Would be better to check for actual presence of nftable rules, but that requires root privileges
+		if [ -x "$(command -v nft)" ]; then
+			FW=nftables
+		else
+			FW=iptables
+		fi
 		V6SOCKETS_ARE_V6ONLY=`/sbin/sysctl -n net.ipv6.bindv6only`
 		;;
 	OpenWRT)
 		OS_URL=http://www.openwrt.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		FW=netfilter
+		FW=iptables
 		;;
 	AstLinux)
 		OS_URL=http://www.astlinux.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		FW=netfilter
+		FW=iptables
 		;;
 	Tomato)
 		OS_NAME=UPnP
@@ -337,7 +342,7 @@ case $OS_NAME in
 		echo "#ifdef TCONFIG_IPV6" >> ${CONFIGFILE}
 		echo "#define ENABLE_IPV6" >> ${CONFIGFILE}
 		echo "#endif" >> ${CONFIGFILE}
-		FW=netfilter
+		FW=iptables
 		;;
 	Darwin)
 		MAJORVER=`echo $OS_VERSION | cut -d. -f1`
@@ -368,8 +373,13 @@ case $FW in
 	ipfw)
 		echo "#define USE_IPFW 1" >> ${CONFIGFILE}
 		;;
-	netfilter)
+	iptables)
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
+		echo "#define USE_IPTABLES  1" >> ${CONFIGFILE}
+		;;
+	nftables)
+		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
+		echo "#define USE_NFTABLES  1" >> ${CONFIGFILE}
 		;;
 	*)
 		echo "Unknown Firewall/packet filtering software [$FW]"
