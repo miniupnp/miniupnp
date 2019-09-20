@@ -10,6 +10,12 @@
 
 #define UNUSED(arg)	(void)(arg)
 
+#if __GNUC__
+#define FALL_THROUGH __attribute__((fallthrough))
+#else
+#define FALL_THROUGH
+#endif
+
 #include <stdint.h>
 
 #ifndef INLINE

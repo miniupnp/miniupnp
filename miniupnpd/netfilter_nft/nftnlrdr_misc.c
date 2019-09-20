@@ -210,6 +210,12 @@ print_rule(rule_t *r)
 }
 #endif
 
+/**
+ *
+ * @param r
+ * @param dreg
+ * @return
+ */
 static enum rule_reg_type *
 get_reg_type_ptr(rule_t *r, uint32_t dreg)
 {
@@ -223,6 +229,12 @@ get_reg_type_ptr(rule_t *r, uint32_t dreg)
 	}
 }
 
+/**
+ *
+ * @param r
+ * @param dreg
+ * @return
+ */
 static uint32_t *
 get_reg_val_ptr(rule_t *r, uint32_t dreg)
 {
@@ -236,6 +248,13 @@ get_reg_val_ptr(rule_t *r, uint32_t dreg)
 	}
 }
 
+/**
+ *
+ * @param r
+ * @param dreg
+ * @param type
+ * @param val
+ */
 static void
 set_reg (rule_t *r, uint32_t dreg, enum rule_reg_type type, uint32_t val)
 {
@@ -259,6 +278,11 @@ set_reg (rule_t *r, uint32_t dreg, enum rule_reg_type type, uint32_t val)
 	return ;
 }
 
+/**
+ *
+ * @param e
+ * @param r
+ */
 static inline void
 parse_rule_immediate(struct nftnl_expr *e, rule_t *r)
 {
@@ -278,6 +302,11 @@ parse_rule_immediate(struct nftnl_expr *e, rule_t *r)
 	return;
 }
 
+/**
+ *
+ * @param e
+ * @param r
+ */
 static inline void
 parse_rule_counter(struct nftnl_expr *e, rule_t *r)
 {
@@ -288,6 +317,11 @@ parse_rule_counter(struct nftnl_expr *e, rule_t *r)
 	return;
 }
 
+/**
+ *
+ * @param e
+ * @param r
+ */
 static inline void
 parse_rule_meta(struct nftnl_expr *e, rule_t *r)
 {
@@ -312,6 +346,11 @@ parse_rule_meta(struct nftnl_expr *e, rule_t *r)
 	return;
 }
 
+/**
+ *
+ * @param e
+ * @param r
+ */
 static inline void
 parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 {
@@ -347,6 +386,11 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 	return;
 }
 
+/**
+ *
+ * @param e
+ * @param r
+ */
 static inline void
 parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 {
@@ -394,7 +438,8 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 			*regptr = RULE_REG_IP6_SD_ADDR;
 			return;
 		}
-	case NFT_PAYLOAD_TRANSPORT_HEADER:
+        FALL_THROUGH;
+    case NFT_PAYLOAD_TRANSPORT_HEADER:
 		if (offset == offsetof(struct tcphdr, dest) &&
 		    len == sizeof(uint16_t)) {
 			*regptr = RULE_REG_TCP_DPORT;
@@ -411,9 +456,11 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 	return;
 }
 
-/*
+/**
  *
  * Note: Currently support only NFT_REG_1
+ * @param e
+ * @param r
  */
 static inline void
 parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
@@ -440,18 +487,21 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		FALL_THROUGH;
 	case RULE_REG_IP_SRC_ADDR:
 		if (data_len == sizeof(in_addr_t) && op == NFT_CMP_EQ) {
 			r->rhost = *(in_addr_t *)data_val;
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_IP6_SRC_ADDR:
 		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
 			r->rhost6 = *(struct in6_addr *)data_val;
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_IP_DEST_ADDR:
 		if (data_len == sizeof(in_addr_t) && op == NFT_CMP_EQ) {
 			if (r->type == RULE_FILTER) {
@@ -462,6 +512,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_IP6_DEST_ADDR:
 		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
 			if (r->type == RULE_FILTER) {
@@ -472,6 +523,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_IP_SD_ADDR:
 		if (data_len == sizeof(in_addr_t) * 2 && op == NFT_CMP_EQ) {
 			addrp = (in_addr_t *)data_val;
@@ -480,6 +532,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_IP6_SD_ADDR:
 		if (data_len == sizeof(struct in6_addr) * 2 && op == NFT_CMP_EQ) {
 			addrp6 = (struct in6_addr *)data_val;
@@ -488,6 +541,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_IP_PROTO:
 	case RULE_REG_IP6_PROTO:
 		if (data_len == sizeof(uint8_t) && op == NFT_CMP_EQ) {
@@ -495,12 +549,14 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_TCP_DPORT:
 		if (data_len == sizeof(uint16_t) && op == NFT_CMP_EQ) {
 			r->eport = ntohs(*(uint16_t *)data_val);
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	case RULE_REG_TCP_SD_PORT:
 		if (data_len == sizeof(uint16_t) * 2 && op == NFT_CMP_EQ) {
 			ports = (uint16_t *)data_val;
@@ -509,6 +565,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+        FALL_THROUGH;
 	default:
 		break;
 	}
@@ -519,6 +576,12 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 	return;
 }
 
+/**
+ *
+ * @param e
+ * @param data
+ * @return
+ */
 static int
 rule_expr_cb(struct nftnl_expr *e, void *data)
 {
@@ -544,7 +607,12 @@ rule_expr_cb(struct nftnl_expr *e, void *data)
 	return MNL_CB_OK;
 }
 
-
+/**
+ *
+ * @param nlh
+ * @param data
+ * @return
+ */
 static int
 table_cb(const struct nlmsghdr *nlh, void *data)
 {
@@ -629,6 +697,9 @@ err:
 	return MNL_CB_OK;
 }
 
+/**
+ *
+ */
 void
 reflesh_nft_cache_filter()
 {
@@ -644,6 +715,9 @@ reflesh_nft_cache_filter()
 	return;
 }
 
+/**
+ *
+ */
 void
 reflesh_nft_cache_peer()
 {
@@ -658,6 +732,9 @@ reflesh_nft_cache_peer()
 	return;
 }
 
+/**
+ *
+ */
 void
 reflesh_nft_cache_redirect()
 {
@@ -672,6 +749,13 @@ reflesh_nft_cache_redirect()
 	return;
 }
 
+/**
+ *
+ * @param head
+ * @param table
+ * @param chain
+ * @param family
+ */
 void
 reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32_t family)
 {
@@ -752,6 +836,14 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 	return;
 }
 
+/**
+ *
+ * @param r
+ * @param base
+ * @param dreg
+ * @param offset
+ * @param len
+ */
 static void
 expr_add_payload(struct nftnl_rule *r, uint32_t base, uint32_t dreg,
                  uint32_t offset, uint32_t len)
@@ -773,6 +865,9 @@ expr_add_payload(struct nftnl_rule *r, uint32_t base, uint32_t dreg,
 }
 
 #if 0
+/**
+ *
+ */
 static void
 expr_add_bitwise(struct nftnl_rule *r, uint32_t sreg, uint32_t dreg,
 		 uint32_t len, uint32_t mask, uint32_t xor)
@@ -795,6 +890,14 @@ expr_add_bitwise(struct nftnl_rule *r, uint32_t sreg, uint32_t dreg,
 }
 #endif
 
+/**
+ *
+ * @param r
+ * @param sreg
+ * @param op
+ * @param data
+ * @param data_len
+ */
 static void
 expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,
 	     const void *data, uint32_t data_len)
@@ -814,6 +917,12 @@ expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,
 	nftnl_rule_add_expr(r, e);
 }
 
+/**
+ *
+ * @param r
+ * @param meta_key
+ * @param dreg
+ */
 static void
 expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
 {
@@ -831,6 +940,12 @@ expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
 	nftnl_rule_add_expr(r, e);
 }
 
+/**
+ *
+ * @param r
+ * @param dreg
+ * @param val
+ */
 static void
 expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val)
 {
@@ -845,6 +960,12 @@ expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 	nftnl_rule_add_expr(r, e);
 }
 
+/**
+ *
+ * @param r
+ * @param dreg
+ * @param val
+ */
 static void
 expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val)
 {
@@ -859,6 +980,11 @@ expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 	nftnl_rule_add_expr(r, e);
 }
 
+/**
+ *
+ * @param r
+ * @param val
+ */
 static void
 expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 {
@@ -873,6 +999,15 @@ expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 	nftnl_rule_add_expr(r, e);
 }
 
+/**
+ *
+ * @param r
+ * @param t
+ * @param family
+ * @param addr_min
+ * @param proto_min
+ * @param flags
+ */
 static void
 expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
 	     in_addr_t addr_min, uint32_t proto_min, uint32_t flags)
@@ -901,6 +1036,20 @@ expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
 	nftnl_rule_add_expr(r, e);
 }
 
+/**
+ *
+ * @param family
+ * @param proto
+ * @param rhost
+ * @param rport
+ * @param ehost
+ * @param eport
+ * @param ihost
+ * @param iport
+ * @param descr
+ * @param handle
+ * @return
+ */
 struct nftnl_rule *
 rule_set_snat(uint8_t family, uint8_t proto,
 	      in_addr_t rhost, unsigned short rport,
@@ -985,6 +1134,19 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	return r;
 }
 
+/**
+ *
+ * @param family
+ * @param ifname
+ * @param proto
+ * @param rhost
+ * @param eport
+ * @param ihost
+ * @param iport
+ * @param descr
+ * @param handle
+ * @return
+ */
 struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
@@ -1065,6 +1227,20 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	return r;
 }
 
+/**
+ *
+ * @param family
+ * @param ifname
+ * @param proto
+ * @param rhost
+ * @param iaddr
+ * @param eport
+ * @param iport
+ * @param rport
+ * @param descr
+ * @param handle
+ * @return
+ */
 struct nftnl_rule *
 rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		in_addr_t rhost, in_addr_t iaddr,
@@ -1113,6 +1289,20 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 	return r;
 }
 
+/**
+ *
+ * @param family
+ * @param ifname
+ * @param proto
+ * @param rhost6
+ * @param iaddr6
+ * @param eport
+ * @param iport
+ * @param rport
+ * @param descr
+ * @param handle
+ * @return
+ */
 struct nftnl_rule *
 rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		struct in6_addr *rhost6, struct in6_addr *iaddr6,
@@ -1160,6 +1350,19 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 	return r;
 }
 
+/**
+ *
+ * @param r
+ * @param family
+ * @param ifname
+ * @param proto
+ * @param eport
+ * @param iport
+ * @param rport
+ * @param descr
+ * @param handle
+ * @return
+ */
 struct nftnl_rule *
 rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname,
 		uint8_t proto, unsigned short eport, unsigned short iport,
@@ -1220,6 +1423,11 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	return r;
 }
 
+/**
+ *
+ * @param rule
+ * @return
+ */
 struct nftnl_rule *
 rule_del_handle(rule_t *rule)
 {
@@ -1239,6 +1447,12 @@ rule_del_handle(rule_t *rule)
 	return r;
 }
 
+/**
+ *
+ * @param buf
+ * @param type
+ * @param seq
+ */
 static void
 nft_mnl_batch_put(char *buf, uint16_t type, uint32_t seq)
 {
@@ -1256,8 +1470,15 @@ nft_mnl_batch_put(char *buf, uint16_t type, uint32_t seq)
 	nfg->res_id = NFNL_SUBSYS_NFTABLES;
 }
 
+/**
+ *
+ * @param rule
+ * @param cmd
+ * @param chain_type
+ * @return
+ */
 int
-nft_send_request(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
+nft_send_request(struct nftnl_rule * rule, enum nf_tables_msg_types cmd, enum rule_chain_type chain_type)
 {
 	struct nlmsghdr *nlh;
 	struct mnl_nlmsg_batch *batch;

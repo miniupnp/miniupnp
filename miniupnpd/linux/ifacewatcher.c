@@ -49,6 +49,7 @@
 #include <signal.h>
 
 #include "../config.h"
+#include "../macros.h"
 
 #ifdef USE_IFACEWATCHER
 
@@ -279,7 +280,8 @@ ProcessInterfaceWatchNotify(int s)
 			break;
 		switch(nlhdr->nlmsg_type) {
 		case RTM_DELLINK:
-			is_del = 1;
+		    is_del = 1;
+            FALL_THROUGH;
 		case RTM_NEWLINK:
 #if 0
 /* disabled at the moment */
@@ -293,9 +295,11 @@ ProcessInterfaceWatchNotify(int s)
 			}
 #endif
 			break;
+
 		case RTM_DELADDR:
 			is_del = 1;
-		case RTM_NEWADDR:
+            FALL_THROUGH;
+        case RTM_NEWADDR:
 			/* see /usr/include/linux/netlink.h
 			 * and /usr/include/linux/rtnetlink.h */
 			ifa = (struct ifaddrmsg *) NLMSG_DATA(nlhdr);

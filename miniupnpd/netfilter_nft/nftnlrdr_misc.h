@@ -80,7 +80,7 @@ extern struct rule_list head_redirect;
 extern struct rule_list head_peer;
 
 int
-nft_send_request(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type);
+nft_send_request(struct nftnl_rule * rule, enum nf_tables_msg_types cmd, enum rule_chain_type type);
 struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
