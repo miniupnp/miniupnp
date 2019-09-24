@@ -205,8 +205,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 			syslog(LOG_WARNING, "setsockopt(udp, IP_RECVIF): %m");
 		}
 	}
-#endif /* IP_RECVIF */
-#ifdef IP_PKTINFO
+#elif defined(IP_PKTINFO) /* IP_RECVIF */
 	/* Linux */
 	if(!ipv6) {
 		if(setsockopt(s, IPPROTO_IP, IP_PKTINFO, &on, sizeof(on)) < 0)
@@ -867,24 +866,12 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 	struct sockaddr_in sendername;
 #endif
 	int source_ifindex = -1;
-#ifdef IP_PKTINFO
-	char cmbuf[CMSG_SPACE(sizeof(struct in_pktinfo))];
-	struct iovec iovec = {
-		.iov_base = bufr,
-		.iov_len = sizeof(bufr)
-	};
-	struct msghdr mh = {
-		.msg_name = &sendername,
-		.msg_namelen = sizeof(sendername),
-		.msg_iov = &iovec,
-		.msg_iovlen = 1,
-		.msg_control = cmbuf,
-		.msg_controllen = sizeof(cmbuf)
-	};
-	struct cmsghdr *cmptr;
-#endif /* IP_PKTINFO */
+#if defined(IP_RECVIF) || defined(IP_PKTINFO)
 #ifdef IP_RECVIF
 	char cmbuf[CMSG_SPACE(sizeof(struct sockaddr_dl))];
+#else /* IP_PKTINFO */
+	char cmbuf[CMSG_SPACE(sizeof(struct in_pktinfo))];
+#endif
 	struct iovec iovec = {
 		.iov_base = bufr,
 		.iov_len = sizeof(bufr)
@@ -898,9 +885,7 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 		.msg_controllen = sizeof(cmbuf)
 	};
 	struct cmsghdr *cmptr;
-#endif /* IP_RECVIF */
 
-#if defined(IP_RECVIF) || defined(IP_PKTINFO)
 	n = recvmsg(s, &mh, 0);
 #else
 	socklen_t len_r;
@@ -925,7 +910,15 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 	for(cmptr = CMSG_FIRSTHDR(&mh); cmptr != NULL; cmptr = CMSG_NXTHDR(&mh, cmptr))
 	{
 		syslog(LOG_DEBUG, "level=%d type=%d", cmptr->cmsg_level, cmptr->cmsg_type);
-#ifdef IP_PKTINFO
+#ifdef IP_RECVIF
+		if(cmptr->cmsg_level == IPPROTO_IP && cmptr->cmsg_type == IP_RECVIF)
+		{
+			struct sockaddr_dl *sdl;	/* fields : len, family, index, type, nlen, alen, slen, data */
+			sdl = (struct sockaddr_dl *)CMSG_DATA(cmptr);
+			syslog(LOG_DEBUG, "sdl_index = %d  %s", sdl->sdl_index, link_ntoa(sdl));
+			source_ifindex = sdl->sdl_index;
+		}
+#elif defined(IP_PKTINFO) /* IP_RECVIF */
 		if(cmptr->cmsg_level == IPPROTO_IP && cmptr->cmsg_type == IP_PKTINFO)
 		{
 			struct in_pktinfo * pi;	/* fields : ifindex, spec_dst, addr */
@@ -943,15 +936,6 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 			source_ifindex = pi6->ipi6_ifindex;
 		}
 #endif /* defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO) */
-#ifdef IP_RECVIF
-		if(cmptr->cmsg_level == IPPROTO_IP && cmptr->cmsg_type == IP_RECVIF)
-		{
-			struct sockaddr_dl *sdl;	/* fields : len, family, index, type, nlen, alen, slen, data */
-			sdl = (struct sockaddr_dl *)CMSG_DATA(cmptr);
-			syslog(LOG_DEBUG, "sdl_index = %d  %s", sdl->sdl_index, link_ntoa(sdl));
-			source_ifindex = sdl->sdl_index;
-		}
-#endif /* IP_RECVIF */
 	}
 #endif /* defined(IP_RECVIF) || defined(IP_PKTINFO) */
 #ifdef ENABLE_HTTPS
