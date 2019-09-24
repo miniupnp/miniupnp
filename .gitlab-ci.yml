@@ -2,7 +2,7 @@ before_script:
     - >
       apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev
       libnfnetlink-dev uuid-dev make gcc gcc-mingw-w64-i686 mingw-w64-tools
-      libnftnl-dev libmnl-dev libssl-dev net-tools
+      libnftnl-dev libmnl-dev libssl-dev net-tools doxygen graphviz
 
 stages:
     - build
