@@ -310,12 +310,12 @@ case $OS_NAME in
 			esac
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-        # Would be better to check for actual presence of nftable rules, but that requires root privileges
+		# Would be better to check for actual presence of nftable rules, but that requires root privileges
 		if [ -x "$(command -v nft)" ]; then
-		    FW=nftables
-        else
-    		FW=iptables
-        fi
+			FW=nftables
+		else
+			FW=iptables
+		fi
 		V6SOCKETS_ARE_V6ONLY=`/sbin/sysctl -n net.ipv6.bindv6only`
 		;;
 	OpenWRT)
