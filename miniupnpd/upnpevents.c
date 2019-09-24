@@ -1,4 +1,4 @@
-/* $Id: upnpevents.c,v 1.43 2019/05/20 19:59:21 nanard Exp $ */
+/* $Id: upnpevents.c,v 1.44 2019/09/24 11:47:06 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

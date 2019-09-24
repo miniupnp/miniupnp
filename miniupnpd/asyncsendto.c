@@ -6,6 +6,7 @@
  * in the LICENCE file provided within the distribution */
 
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/queue.h>
