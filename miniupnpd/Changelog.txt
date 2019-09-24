@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.451 2019/09/01 23:00:29 nanard Exp $
+$Id: Changelog.txt,v 1.452 2019/09/24 10:58:36 nanard Exp $
+
+2019/09/24:
+  Distinguish between iptables and nftables in genconfig.sh
 
 2019/09/01:
   fix of nftables scripts : https://github.com/miniupnp/miniupnp/pull/395
