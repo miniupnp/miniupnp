@@ -74,8 +74,8 @@ int test(void)
 		int max_fd;
 		struct timeval timeout;
 		struct timeval now;
-		syslog(LOG_DEBUG, "get_next_scheduled_send : %d next_send=%ld.%06ld",
-		       i, (long)next_send.tv_sec, (long)next_send.tv_usec);
+		syslog(LOG_DEBUG, "get_next_scheduled_send : %d next_send=%lld.%06ld",
+		       i, (long long)next_send.tv_sec, (long)next_send.tv_usec);
 		FD_ZERO(&writefds);
 		max_fd = 0;
 		gettimeofday(&now, NULL);
@@ -100,8 +100,8 @@ int test(void)
 			}
 		}
 		syslog(LOG_DEBUG, "get_sendto_fds() returned %d", i);
-		syslog(LOG_DEBUG, "select(%d, NULL, xx, NULL, %ld.%06ld)",
-		       max_fd, (long)timeout.tv_sec, (long)timeout.tv_usec);
+		syslog(LOG_DEBUG, "select(%d, NULL, xx, NULL, %lld.%06ld)",
+		       max_fd, (long long)timeout.tv_sec, (long)timeout.tv_usec);
 		i = select(max_fd, NULL, &writefds, NULL, &timeout);
 		if(i < 0) {
 			syslog(LOG_ERR, "select: %m");
