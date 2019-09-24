@@ -29,6 +29,7 @@ RM = rm -f
 MV = mv
 INSTALL = install
 STRIP = strip
+DOXYGEN ?= doxygen
 
 # OSNAME and FWNAME are used for building OS or FW dependent code.
 OSNAME != uname -s
@@ -224,6 +225,9 @@ depend:	config.h
     testupnppermissions.c miniupnpdctl.c testgetifaddr.c \
 	testgetroute.c testportinuse.c testasyncsendto.c \
 	testssdppktgen.c
+
+dox:	miniupnpd.doxyconf
+	$(DOXYGEN) $>
 
 miniupnpd: config.h $(ALLOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(ALLOBJS) $(LIBS)
