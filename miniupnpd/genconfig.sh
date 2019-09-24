@@ -162,7 +162,9 @@ case $OS_NAME in
 		FW=pf
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		OS_URL=http://www.openbsd.org/
-		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only`
+		# net.inet6.ip6.v6only has been removed in recent OpenBSD versions
+		# Default to 1 in that case
+		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only || echo 1`
 		;;
 	FreeBSD | GNU/kFreeBSD)
 		VER=`grep '#define __FreeBSD_version' /usr/include/sys/param.h | awk '{print $3}'`
