@@ -1,10 +1,10 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.95 2018/01/16 00:50:46 nanard Exp $
+# $Id: genconfig.sh,v 1.100 2019/09/24 11:50:34 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
 # http://miniupnp.free.fr or https://miniupnp.tuxfamily.org/
-# (c) 2006-2018 Thomas Bernard
+# (c) 2006-2019 Thomas Bernard
 # This software is subject to the conditions detailed in the
 # LICENCE file provided within the distribution
 
