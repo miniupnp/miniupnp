@@ -15,6 +15,7 @@ addons:
     - libnftnl-dev
     - uuid-dev
     - cmake
+    - doxygen
 
 # container-based builds
 sudo: false
