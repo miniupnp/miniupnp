@@ -16,6 +16,7 @@ addons:
     - uuid-dev
     - cmake
     - doxygen
+    - graphviz
 
 # container-based builds
 sudo: false
