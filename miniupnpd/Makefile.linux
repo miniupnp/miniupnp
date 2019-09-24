@@ -39,6 +39,7 @@ INSTALL = install
 STRIP ?= strip
 PKG_CONFIG ?= pkg-config
 CP = cp
+DOXYGEN ?= doxygen
 
 
 INSTALLPREFIX ?= $(PREFIX)/usr
@@ -187,7 +188,7 @@ EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testgetroute testasyncsendto testportinuse \
               testssdppktgen testminissdp
 
-.PHONY:	all clean install depend genuuid
+.PHONY:	all clean install depend genuuid dox
 
 all:	$(EXECUTABLES)
 
@@ -202,6 +203,7 @@ clean:
 	$(RM) testssdppktgen.o
 	$(RM) miniupnpdctl.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
+	$(RM) -r dox/
 
 install:	miniupnpd miniupnpd.8 miniupnpd.conf genuuid \
 	netfilter/iptables_init.sh netfilter/iptables_removeall.sh \
@@ -283,6 +285,9 @@ depend:	config.h
 	testgetifstats.c testupnppermissions.c testgetifaddr.c \
 	testgetroute.c testasyncsendto.c testportinuse.c \
 	miniupnpdctl.c testssdppktgen.c 2>/dev/null
+
+dox:	miniupnpd.doxyconf
+	$(DOXYGEN) $<
 
 # DO NOT DELETE
 
