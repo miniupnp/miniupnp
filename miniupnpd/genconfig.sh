@@ -164,7 +164,11 @@ case $OS_NAME in
 		OS_URL=http://www.openbsd.org/
 		# net.inet6.ip6.v6only has been removed in recent OpenBSD versions
 		# Default to 1 in that case
-		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only || echo 1`
+		if sysctl net.inet6.ip6 | grep net.inet6.ip6.v6only ; then
+			V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only`
+		else
+			V6SOCKETS_ARE_V6ONLY=1
+		fi
 		;;
 	FreeBSD | GNU/kFreeBSD)
 		VER=`grep '#define __FreeBSD_version' /usr/include/sys/param.h | awk '{print $3}'`
