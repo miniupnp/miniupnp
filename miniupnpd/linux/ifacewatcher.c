@@ -49,6 +49,7 @@
 #include <signal.h>
 
 #include "../config.h"
+#include "../macros.h"
 
 #ifdef USE_IFACEWATCHER
 
@@ -280,6 +281,7 @@ ProcessInterfaceWatchNotify(int s)
 		switch(nlhdr->nlmsg_type) {
 		case RTM_DELLINK:
 			is_del = 1;
+			FALL_THROUGH;
 		case RTM_NEWLINK:
 #if 0
 /* disabled at the moment */
@@ -295,6 +297,7 @@ ProcessInterfaceWatchNotify(int s)
 			break;
 		case RTM_DELADDR:
 			is_del = 1;
+			FALL_THROUGH;
 		case RTM_NEWADDR:
 			/* see /usr/include/linux/netlink.h
 			 * and /usr/include/linux/rtnetlink.h */
