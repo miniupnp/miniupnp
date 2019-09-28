@@ -362,35 +362,35 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 	switch (base) {
 	case NFT_PAYLOAD_NETWORK_HEADER:
 		if (offset == offsetof(struct iphdr, daddr) &&
-		    len == sizeof(in_addr_t)) {
+			len == sizeof(in_addr_t)) {
 			*regptr = RULE_REG_IP_DEST_ADDR;
 			return;
 		} else if (offset == offsetof(struct iphdr, saddr) &&
-			       len == sizeof(in_addr_t)) {
+			len == sizeof(in_addr_t)) {
 			*regptr = RULE_REG_IP_SRC_ADDR;
 			return;
 		} else if (offset == offsetof(struct iphdr, saddr) &&
-			       len == sizeof(in_addr_t) * 2) {
+			len == sizeof(in_addr_t) * 2) {
 			*regptr = RULE_REG_IP_SD_ADDR;
 			return;
 		} else if (offset == offsetof(struct iphdr, protocol) &&
-			       len == sizeof(uint8_t)) {
+			len == sizeof(uint8_t)) {
 			*regptr = RULE_REG_IP_PROTO;
 			return;
 		} else if (offset == offsetof(struct ipv6hdr, nexthdr) &&
-			       len == sizeof(uint8_t)) {
+			len == sizeof(uint8_t)) {
 			*regptr = RULE_REG_IP6_PROTO;
 			return;
 		} else if (offset == offsetof(struct ipv6hdr, daddr) &&
-		           len == sizeof(struct in6_addr)) {
+			len == sizeof(struct in6_addr)) {
 			*regptr = RULE_REG_IP6_DEST_ADDR;
 			return;
 		} else if (offset == offsetof(struct ipv6hdr, saddr) &&
-			       len == sizeof(struct in6_addr)) {
+			len == sizeof(struct in6_addr)) {
 			*regptr = RULE_REG_IP6_SRC_ADDR;
 			return;
 		} else if (offset == offsetof(struct ipv6hdr, saddr) &&
-			       len == sizeof(struct in6_addr) * 2) {
+			len == sizeof(struct in6_addr) * 2) {
 			*regptr = RULE_REG_IP6_SD_ADDR;
 			return;
 		}
