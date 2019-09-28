@@ -398,11 +398,11 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 
 	case NFT_PAYLOAD_TRANSPORT_HEADER:
 		if (offset == offsetof(struct tcphdr, dest) &&
-			len == sizeof(uint16_t)) {
+		    len == sizeof(uint16_t)) {
 			*regptr = RULE_REG_TCP_DPORT;
 			return;
 		} else if (offset == offsetof(struct tcphdr, source) &&
-			len == sizeof(uint16_t) * 2) {
+			       len == sizeof(uint16_t) * 2) {
 			*regptr = RULE_REG_TCP_SD_PORT;
 			return;
 		}
