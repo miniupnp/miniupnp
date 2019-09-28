@@ -426,108 +426,96 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 	in_addr_t *addrp;
 	struct in6_addr *addrp6;
 
-	data_val = (void *)nftnl_expr_get(e, NFTNL_EXPR_CMP_DATA, &data_len);
-	sreg = nftnl_expr_get_u32(e, NFTNL_EXPR_CMP_SREG);
 	op = nftnl_expr_get_u32(e, NFTNL_EXPR_CMP_OP);
+
+	if (op != NFT_CMP_EQ) {
+		/* not a cmp expression, so bail out early */
+		return;
+	}
+
+	sreg = nftnl_expr_get_u32(e, NFTNL_EXPR_CMP_SREG);
 
 	if (sreg != NFT_REG_1) {
 		syslog(LOG_ERR, "parse_rule_cmp: Unsupport reg:%d", sreg);
 		return;
 	}
 
+	data_val = (void *)nftnl_expr_get(e, NFTNL_EXPR_CMP_DATA, &data_len);
+
 	switch (r->reg1_type) {
 	case RULE_REG_IIF:
-		if (data_len == sizeof(uint32_t) && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(uint32_t)) {
 			r->ingress_ifidx = *(uint32_t *)data_val;
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_IP_SRC_ADDR:
-		if (data_len == sizeof(in_addr_t) && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(in_addr_t)) {
 			r->rhost = *(in_addr_t *)data_val;
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_IP6_SRC_ADDR:
-		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(struct in6_addr)) {
 			r->rhost6 = *(struct in6_addr *)data_val;
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_IP_DEST_ADDR:
-		if (data_len == sizeof(in_addr_t) && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(in_addr_t)) {
 			if (r->type == RULE_FILTER) {
 				r->iaddr = *(in_addr_t *)data_val;
 			} else {
 				r->rhost = *(in_addr_t *)data_val;
 			}
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_IP6_DEST_ADDR:
-		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(struct in6_addr)) {
 			if (r->type == RULE_FILTER) {
 				r->iaddr6 = *(struct in6_addr *)data_val;
 			} else {
 				r->rhost6 = *(struct in6_addr *)data_val;
 			}
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_IP_SD_ADDR:
-		if (data_len == sizeof(in_addr_t) * 2 && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(in_addr_t) * 2) {
 			addrp = (in_addr_t *)data_val;
 			r->iaddr = addrp[0];
 			r->rhost = addrp[1];
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_IP6_SD_ADDR:
-		if (data_len == sizeof(struct in6_addr) * 2 && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(struct in6_addr) * 2) {
 			addrp6 = (struct in6_addr *)data_val;
 			r->iaddr6 = addrp6[0];
 			r->rhost6 = addrp6[1];
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_IP_PROTO:
 	case RULE_REG_IP6_PROTO:
-		if (data_len == sizeof(uint8_t) && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(uint8_t)) {
 			r->proto = *(uint8_t *)data_val;
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_TCP_DPORT:
-		if (data_len == sizeof(uint16_t) && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(uint16_t)) {
 			r->eport = ntohs(*(uint16_t *)data_val);
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	case RULE_REG_TCP_SD_PORT:
-		if (data_len == sizeof(uint16_t) * 2 && op == NFT_CMP_EQ) {
+		if (data_len == sizeof(uint16_t) * 2) {
 			ports = (uint16_t *)data_val;
 			r->eport = ntohs(ports[0]);
 			r->rport = ntohs(ports[1]);
-			r->reg1_type = RULE_REG_NONE;
-			return;
 		}
 		break;
 	default:
-		break;
+		syslog(LOG_DEBUG, "Unknown cmp (r1type:%d, data_len:%d, op:%d)",
+			   r->reg1_type, data_len, op);
+		/* return early - don't modify r->reg1_type */
+		return;
 	}
 
-	syslog(LOG_DEBUG, "Unknown cmp (r1type:%d, data_len:%d, op:%d)",
-	       r->reg1_type, data_len, op);
-
+	r->reg1_type = RULE_REG_NONE;
 	return;
 }
 
