@@ -394,6 +394,7 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 			*regptr = RULE_REG_IP6_SD_ADDR;
 			return;
 		}
+		break;
 	case NFT_PAYLOAD_TRANSPORT_HEADER:
 		if (offset == offsetof(struct tcphdr, dest) &&
 		    len == sizeof(uint16_t)) {
@@ -404,6 +405,7 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 			*regptr = RULE_REG_TCP_SD_PORT;
 			return;
 		}
+		break;
 	}
 	syslog(LOG_DEBUG,
 	       "Unsupport payload: (dreg:%d, base:%d, offset:%d, len:%d)",
@@ -440,18 +442,21 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_IP_SRC_ADDR:
 		if (data_len == sizeof(in_addr_t) && op == NFT_CMP_EQ) {
 			r->rhost = *(in_addr_t *)data_val;
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_IP6_SRC_ADDR:
 		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
 			r->rhost6 = *(struct in6_addr *)data_val;
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_IP_DEST_ADDR:
 		if (data_len == sizeof(in_addr_t) && op == NFT_CMP_EQ) {
 			if (r->type == RULE_FILTER) {
@@ -462,6 +467,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_IP6_DEST_ADDR:
 		if (data_len == sizeof(struct in6_addr) && op == NFT_CMP_EQ) {
 			if (r->type == RULE_FILTER) {
@@ -472,6 +478,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_IP_SD_ADDR:
 		if (data_len == sizeof(in_addr_t) * 2 && op == NFT_CMP_EQ) {
 			addrp = (in_addr_t *)data_val;
@@ -480,6 +487,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_IP6_SD_ADDR:
 		if (data_len == sizeof(struct in6_addr) * 2 && op == NFT_CMP_EQ) {
 			addrp6 = (struct in6_addr *)data_val;
@@ -488,6 +496,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_IP_PROTO:
 	case RULE_REG_IP6_PROTO:
 		if (data_len == sizeof(uint8_t) && op == NFT_CMP_EQ) {
@@ -495,12 +504,14 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_TCP_DPORT:
 		if (data_len == sizeof(uint16_t) && op == NFT_CMP_EQ) {
 			r->eport = ntohs(*(uint16_t *)data_val);
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	case RULE_REG_TCP_SD_PORT:
 		if (data_len == sizeof(uint16_t) * 2 && op == NFT_CMP_EQ) {
 			ports = (uint16_t *)data_val;
@@ -509,6 +520,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 			r->reg1_type = RULE_REG_NONE;
 			return;
 		}
+		break;
 	default:
 		break;
 	}
