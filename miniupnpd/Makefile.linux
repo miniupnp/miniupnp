@@ -21,6 +21,7 @@
 # ./configure them and build them then miniupnpd will build using :
 # $ IPTABLESPATH=/path/to/iptables-1.4.1 make -f Makefile.linux
 #
+CONFIG_OPTIONS += --firewall=iptables
 #CFLAGS = -O -g -DDEBUG
 CFLAGS ?= -Os
 CFLAGS += -fno-strict-aliasing
@@ -193,6 +194,7 @@ EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
 all:	$(EXECUTABLES)
 
 clean:
+	$(RM) config.h
 	$(RM) $(ALLOBJS)
 	$(RM) $(EXECUTABLES)
 	$(RM) testupnpdescgen.o testgetifstats.o

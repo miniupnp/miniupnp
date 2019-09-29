@@ -32,6 +32,8 @@ case "$argv" in
 			exit 1
 		fi ;;
 	--disable-pppconn) DISABLEPPPCONN=1 ;;
+	--firewall=*)
+	    FW=$(echo $argv | cut -d= -f2) ;;
 	--help|-h)
 		echo "Usage : $0 [options]"
 		echo " --ipv6      enable IPv6"
@@ -43,6 +45,7 @@ case "$argv" in
 		echo " --portinuse enable port in use check"
 		echo " --uda-version=x.x  set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn  disable WANPPPConnection"
+		echo " --firewall=<name>  force the firewall type (only for linux)"
 		exit 1
 		;;
 	*)
@@ -316,11 +319,14 @@ case $OS_NAME in
 			esac
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		# Would be better to check for actual presence of nftable rules, but that requires root privileges
-		if [ -x "$(command -v nft)" ]; then
-			FW=nftables
-		else
-			FW=iptables
+		if [ -z ${FW} ]; then
+			# test the current environment to determine which to use
+			# Would be better to check for actual presence of nftable rules, but that requires root privileges
+			if [ -x "$(command -v nft)" ]; then
+				FW=nftables
+			else
+				FW=iptables
+			fi
 		fi
 		V6SOCKETS_ARE_V6ONLY=`/sbin/sysctl -n net.ipv6.bindv6only`
 		;;
