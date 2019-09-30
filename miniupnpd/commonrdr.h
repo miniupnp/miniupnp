@@ -64,4 +64,20 @@ update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,
                    const char * desc, unsigned int timestamp);
 
+#ifdef USE_NFTABLES
+/* only provided by nftables implementation at the moment */
+
+typedef enum {
+	TABLE_NAME,
+	TABLE4_NAME,
+	TABLE6_NAME,
+	NAT_CHAIN_NAME,
+	NAT_POSTROUTING_CHAIN_NAME,
+	FORWARD_CHAIN_NAME,
+} rdr_name_type;
+
+int set_rdr_name( rdr_name_type param, const char * string );
+
+#endif
+
 #endif

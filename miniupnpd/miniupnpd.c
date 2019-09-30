@@ -1267,6 +1267,17 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 #endif	/* ENABLE_MANUFACTURER_INFO_CONFIGURATION */
 #ifdef USE_NETFILTER
+#ifdef USE_NFTABLES
+			case UPNPFORWARDCHAIN:
+				set_rdr_name(FORWARD_CHAIN_NAME, ary_options[i].value);
+				break;
+			case UPNPNATCHAIN:
+				set_rdr_name(NAT_CHAIN_NAME, ary_options[i].value);
+				break;
+			case UPNPNATPOSTCHAIN:
+				set_rdr_name(NAT_POSTROUTING_CHAIN_NAME, ary_options[i].value);
+				break;
+#else
 			case UPNPFORWARDCHAIN:
 				miniupnpd_forward_chain = ary_options[i].value;
 				break;
@@ -1276,7 +1287,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPNATPOSTCHAIN:
 				miniupnpd_nat_postrouting_chain = ary_options[i].value;
 				break;
-#endif	/* USE_NETFILTER */
+#endif    /* else USE_NFTABLES */
+#endif    /* USE_NETFILTER */
 			case UPNPNOTIFY_INTERVAL:
 				v->notify_interval = atoi(ary_options[i].value);
 				break;
@@ -2900,6 +2912,8 @@ shutdown:
 #ifndef DISABLE_CONFIG_FILE
 	freeoptions();
 #endif
+
+	shutdown_redirect();
 
 	return 0;
 }

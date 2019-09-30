@@ -109,7 +109,7 @@ const char * queue = 0;
 const char * tag = 0;
 #endif
 
-#ifdef USE_NETFILTER
+#ifdef USE_IPTABLES
 /* chain names to use in the nat and filter tables. */
 
 /* iptables -t nat -N MINIUPNPD

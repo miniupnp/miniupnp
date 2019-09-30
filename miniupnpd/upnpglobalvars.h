@@ -142,7 +142,7 @@ extern const char * queue;
 extern const char * tag;
 #endif
 
-#ifdef USE_NETFILTER
+#ifdef USE_IPTABLES
 extern const char * miniupnpd_nat_chain;
 extern const char * miniupnpd_nat_postrouting_chain;
 extern const char * miniupnpd_forward_chain;

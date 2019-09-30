@@ -11,6 +11,7 @@
 #define NFTNLRDR_H_INCLUDED
 
 #include "../commonrdr.h"
+
 int init_redirect(void);
 void shutdown_redirect(void);
 

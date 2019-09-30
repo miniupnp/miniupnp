@@ -32,12 +32,16 @@
 #include <linux/ipv6.h>
 
 #include <libmnl/libmnl.h>
+#include <libnftnl/table.h>
+#include <libnftnl/chain.h>
 #include <libnftnl/rule.h>
 #include <libnftnl/expr.h>
 
+#include "../commonrdr.h"
 #include "nftnlrdr_misc.h"
 #include "../macros.h"
-#include "../upnpglobalvars.h"
+
+#define DEBUG 1
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -45,10 +49,30 @@
 #define d_printf(x)
 #endif
 
+#if defined(DEBUG) && (__STDC_VERSION__ >= 199901L) && (__GNUC__ >= 3)
+/* disambiguate log messages by adding position in source. GNU C99 or later. Pesky trailing comma... */
+#define log_error( msg, ...)	syslog(LOG_ERR, "%s[%d]: " msg, __func__, __LINE__, ##__VA_ARGS__ )
+#define log_debug( msg, ...)	syslog(LOG_DEBUG, "%s[%d]: " msg, __func__, __LINE__, ##__VA_ARGS__ )
+#else
+/* original style */
+#define log_error(args...)	syslog(LOG_ERR, args)
+#define log_debug(args...)	syslog(LOG_DEBUG, args)
+#endif
+
+
 #define RULE_CACHE_INVALID  0
 #define RULE_CACHE_VALID    1
 
+const char * nft_table = "miniupnpd";
+const char * nft_table4 = "miniupnpd4";
+const char * nft_table6 = "miniupnpd6";
+const char * nft_prerouting_chain = "prerouting";
+const char * nft_postrouting_chain = "postrouting";
+const char * nft_forward_chain = "forward";
+
 static struct mnl_socket *nl = NULL;
+static uint32_t nl_seq = 0;
+
 // FILTER
 struct rule_list head_filter = LIST_HEAD_INITIALIZER(head_filter);
 // DNAT
@@ -254,7 +278,7 @@ set_reg (rule_t *r, uint32_t dreg, enum rule_reg_type type, uint32_t val)
 			r->filter_action = val;
 		}
 	} else {
-		syslog(LOG_ERR, "%s: unknown reg:%d", "set_reg", dreg);
+		log_error("unknown reg:%d", dreg);
 	}
 	return ;
 }
@@ -275,7 +299,6 @@ parse_rule_immediate(struct nftnl_expr *e, rule_t *r)
 	}
 
 	set_reg(r, dreg, RULE_REG_IMM_VAL, reg_val);
-	return;
 }
 
 static inline void
@@ -284,8 +307,6 @@ parse_rule_counter(struct nftnl_expr *e, rule_t *r)
 	r->type = RULE_COUNTER;
 	r->bytes = nftnl_expr_get_u64(e, NFTNL_EXPR_CTR_BYTES);
 	r->packets = nftnl_expr_get_u64(e, NFTNL_EXPR_CTR_PACKETS);
-
-	return;
 }
 
 static inline void
@@ -295,21 +316,20 @@ parse_rule_meta(struct nftnl_expr *e, rule_t *r)
 	uint32_t dreg = nftnl_expr_get_u32(e, NFTNL_EXPR_META_DREG);
 	enum rule_reg_type reg_type;
 
+	/* ToDo: body of both cases are identical - bug? */
 	switch (key) {
 	case NFT_META_IIF:
 		reg_type = RULE_REG_IIF;
 		set_reg(r, dreg, reg_type, 0);
-		return ;
-		
+		break;
 	case NFT_META_OIF:
 		reg_type = RULE_REG_IIF;
 		set_reg(r, dreg, reg_type, 0);
-		return ;
-		
+		break;
+	default:
+		log_debug("parse_rule_meta :Not support key %d\n", key);
+		break;
 	}
-	syslog(LOG_DEBUG, "parse_rule_meta :Not support key %d\n", key);
-
-	return;
 }
 
 static inline void
@@ -328,7 +348,7 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 
 	if (addr_min_reg != addr_max_reg ||
 	    proto_min_reg != proto_max_reg) {
-		syslog(LOG_ERR, "Unsupport proto/addr range for NAT");
+		log_error( "Unsupport proto/addr range for NAT");
 	}
 
 	proto_min_val = htons((uint16_t)*get_reg_val_ptr(r, proto_min_reg));
@@ -344,7 +364,6 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 
 	set_reg(r, NFT_REG_1, RULE_REG_NONE, 0);
 	set_reg(r, NFT_REG_2, RULE_REG_NONE, 0);
-	return;
 }
 
 static inline void
@@ -364,53 +383,45 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 		if (offset == offsetof(struct iphdr, daddr) &&
 		    len == sizeof(in_addr_t)) {
 			*regptr = RULE_REG_IP_DEST_ADDR;
-			return;
 		} else if (offset == offsetof(struct iphdr, saddr) &&
 			   len == sizeof(in_addr_t)) {
 			*regptr = RULE_REG_IP_SRC_ADDR;
-			return;
 		} else if (offset == offsetof(struct iphdr, saddr) &&
 			   len == sizeof(in_addr_t) * 2) {
 			*regptr = RULE_REG_IP_SD_ADDR;
-			return;
 		} else if (offset == offsetof(struct iphdr, protocol) &&
 			   len == sizeof(uint8_t)) {
 			*regptr = RULE_REG_IP_PROTO;
-			return;
 		} else if (offset == offsetof(struct ipv6hdr, nexthdr) &&
 			   len == sizeof(uint8_t)) {
 			*regptr = RULE_REG_IP6_PROTO;
-			return;
 		} else if (offset == offsetof(struct ipv6hdr, daddr) &&
 		    len == sizeof(struct in6_addr)) {
 			*regptr = RULE_REG_IP6_DEST_ADDR;
-			return;
 		} else if (offset == offsetof(struct ipv6hdr, saddr) &&
 			   len == sizeof(struct in6_addr)) {
 			*regptr = RULE_REG_IP6_SRC_ADDR;
-			return;
 		} else if (offset == offsetof(struct ipv6hdr, saddr) &&
 			   len == sizeof(struct in6_addr) * 2) {
 			*regptr = RULE_REG_IP6_SD_ADDR;
-			return;
 		}
 		break;
 	case NFT_PAYLOAD_TRANSPORT_HEADER:
 		if (offset == offsetof(struct tcphdr, dest) &&
 		    len == sizeof(uint16_t)) {
 			*regptr = RULE_REG_TCP_DPORT;
-			return;
 		} else if (offset == offsetof(struct tcphdr, source) &&
 			   len == sizeof(uint16_t) * 2) {
 			*regptr = RULE_REG_TCP_SD_PORT;
-			return;
 		}
 		break;
+	default:
+		syslog(LOG_DEBUG,
+			   "Unsupported payload: (dreg:%d, base:%d, offset:%d, len:%d)",
+			   dreg, base, offset, len);
+		break;
 	}
-	syslog(LOG_DEBUG,
-	       "Unsupport payload: (dreg:%d, base:%d, offset:%d, len:%d)",
-	       dreg, base, offset, len);
-	return;
+
 }
 
 /*
@@ -436,7 +447,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 	sreg = nftnl_expr_get_u32(e, NFTNL_EXPR_CMP_SREG);
 
 	if (sreg != NFT_REG_1) {
-		syslog(LOG_ERR, "parse_rule_cmp: Unsupport reg:%d", sreg);
+		log_error( "parse_rule_cmp: Unsupport reg:%d", sreg);
 		return;
 	}
 
@@ -509,7 +520,7 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r) {
 		}
 		break;
 	default:
-		syslog(LOG_DEBUG, "Unknown cmp (r1type:%d, data_len:%d, op:%d)",
+		log_debug("Unknown cmp (r1type:%d, data_len:%d, op:%d)",
 			   r->reg1_type, data_len, op);
 		/* return early - don't modify r->reg1_type */
 		return;
@@ -538,7 +549,7 @@ rule_expr_cb(struct nftnl_expr *e, void *data)
 	} else if (strncmp("immediate", attr_name, sizeof("immediate")) == 0) {
 		parse_rule_immediate(e, r);
 	} else {
-		syslog(LOG_DEBUG, "unknown attr: %s\n", attr_name);
+		log_debug("unknown attr: %s\n", attr_name);
 	}
 
 	return MNL_CB_OK;
@@ -548,6 +559,7 @@ rule_expr_cb(struct nftnl_expr *e, void *data)
 static int
 table_cb(const struct nlmsghdr *nlh, void *data)
 {
+	int result = MNL_CB_OK;
 	struct nftnl_rule *t;
 	uint32_t len;
 	struct nftnl_expr *expr;
@@ -562,130 +574,118 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 
 	r = malloc(sizeof(rule_t));
 
-	memset(r, 0, sizeof(rule_t));
-	t = nftnl_rule_alloc();
-	if (t == NULL) {
-		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
-		goto err;
+	if (r == NULL) {
+		log_error("out of memory: %m");
+	} else {
+		memset(r, 0, sizeof(rule_t));
+		t = nftnl_rule_alloc();
+		if (t == NULL) {
+			log_error("nftnl_rule_alloc() FAILED");
+		} else {
+
+			if (nftnl_rule_nlmsg_parse(nlh, t) < 0) {
+				log_error("nftnl_rule_nlmsg_parse FAILED");
+			} else {
+
+				chain = (char *) nftnl_rule_get_data(t, NFTNL_RULE_CHAIN, &len);
+				if (strcmp(chain, nft_prerouting_chain) == 0 ||
+					strcmp(chain, nft_postrouting_chain) == 0 ||
+					strcmp(chain, nft_forward_chain) == 0) {
+					r->table = strdup(
+							(char *) nftnl_rule_get_data(t, NFTNL_RULE_TABLE, &len));
+					r->chain = strdup(chain);
+					r->family = *(uint32_t *) nftnl_rule_get_data(t, NFTNL_RULE_FAMILY,
+																  &len);
+					descr = (char *) nftnl_rule_get_data(t, NFTNL_RULE_USERDATA,
+														 &r->desc_len);
+					if (r->desc_len > 0)
+						r->desc = strdup(descr);
+
+					r->handle = *(uint32_t *) nftnl_rule_get_data(t,
+																  NFTNL_RULE_HANDLE,
+																  &len);
+					r->type = RULE_NONE;
+					if (strcmp(chain, nft_prerouting_chain) == 0 ||
+						strcmp(chain, nft_postrouting_chain) == 0) {
+						r->type = RULE_NAT;
+					} else if (strcmp(chain, nft_forward_chain) == 0) {
+						r->type = RULE_FILTER;
+					}
+
+					itr = nftnl_expr_iter_create(t);
+
+					while ((expr = nftnl_expr_iter_next(itr)) != NULL) {
+						rule_expr_cb(expr, r);
+					}
+
+					switch (r->type) {
+					case RULE_NAT:
+						switch (r->nat_type) {
+						case NFT_NAT_SNAT:
+							r->index = index_peer;
+							LIST_INSERT_HEAD(&head_peer, r, entry);
+							index_peer++;
+							break;
+						case NFT_NAT_DNAT:
+							r->index = index_redirect;
+							LIST_INSERT_HEAD(&head_redirect, r, entry);
+							index_redirect++;
+							break;
+						}
+						break;
+
+					case RULE_FILTER:
+						r->index = index_filter;
+						LIST_INSERT_HEAD(&head_filter, r, entry);
+						index_filter++;
+						break;
+
+					default:
+						free(r);
+						break;
+					}
+				}
+
+				nftnl_rule_free(t);
+			}
+		}
 	}
-
-	if (nftnl_rule_nlmsg_parse(nlh, t) < 0) {
-		syslog(LOG_ERR, "nftnl_rule_nlmsg_parse FAILED");
-		goto err_free;
-	}
-
-	chain = (char *)nftnl_rule_get_data(t, NFTNL_RULE_CHAIN, &len);
-	if (strcmp(chain, miniupnpd_nat_chain) != 0 &&
-	    strcmp(chain, miniupnpd_nat_postrouting_chain) != 0 &&
-	    strcmp(chain, miniupnpd_forward_chain) != 0) {
-		goto rule_skip;
-	}
-
-	r->table = strdup(
-		(char *)nftnl_rule_get_data(t, NFTNL_RULE_TABLE, &len));
-	r->chain = strdup(chain);
-	r->family = *(uint32_t*)nftnl_rule_get_data(t, NFTNL_RULE_FAMILY,
-						       &len);
-	descr = (char *)nftnl_rule_get_data(t, NFTNL_RULE_USERDATA,
-						 &r->desc_len);
-	if (r->desc_len > 0)
-		r->desc = strdup(descr);
-
-	r->handle = *(uint32_t*)nftnl_rule_get_data(t,
-						       NFTNL_RULE_HANDLE,
-						       &len);
-	if (strcmp(r->table, NFT_TABLE_NAT) == 0) {
-		r->type = RULE_NAT;
-	} else if (strcmp(r->table, NFT_TABLE_FILTER) == 0) {
-		r->type = RULE_FILTER;
-	}
-
-	itr = nftnl_expr_iter_create(t);
-
-	while ((expr = nftnl_expr_iter_next(itr)) != NULL) {
-		rule_expr_cb(expr, r);
-	}
-
-	if (r->type == RULE_NONE) {
-		free(r);
-	} else if (r->type == RULE_NAT && r->nat_type == NFT_NAT_SNAT) {
-		r->index = index_peer;
-		LIST_INSERT_HEAD(&head_peer, r, entry);
-		index_peer++;
-	} else if (r->type == RULE_NAT && r->nat_type == NFT_NAT_DNAT) {
-		r->index = index_redirect;
-		LIST_INSERT_HEAD(&head_redirect, r, entry);
-		index_redirect++;
-	} else if (r->type == RULE_FILTER) {
-		r->index = index_filter;
-		LIST_INSERT_HEAD(&head_filter, r, entry);
-		index_filter++;
-	}
-
-rule_skip:
-err_free:
-	nftnl_rule_free(t);
-err:
-	return MNL_CB_OK;
+	return result;
 }
 
 void
-reflesh_nft_cache_filter()
-{
-
-	if (rule_list_filter_validate == RULE_CACHE_VALID) {
-		return;
+refresh_nft_cache_filter(void) {
+	if (rule_list_filter_validate != RULE_CACHE_VALID) {
+		refresh_nft_cache(&head_filter, nft_table4, nft_forward_chain, NFPROTO_INET);
+		rule_list_filter_validate = RULE_CACHE_VALID;
 	}
-
-	reflesh_nft_cache(&head_filter, NFT_TABLE_FILTER, miniupnpd_forward_chain, NFPROTO_INET);
-
-	rule_list_filter_validate = RULE_CACHE_VALID;
-
-	return;
 }
 
 void
-reflesh_nft_cache_peer()
-{
-	if (rule_list_peer_validate == RULE_CACHE_VALID) {
-		return;
+refresh_nft_cache_peer(void) {
+	if (rule_list_peer_validate != RULE_CACHE_VALID) {
+		refresh_nft_cache(&head_peer, nft_table4, nft_postrouting_chain, NFPROTO_IPV4);
+		rule_list_peer_validate = RULE_CACHE_VALID;
 	}
-
-	reflesh_nft_cache(&head_peer, NFT_TABLE_NAT, miniupnpd_nat_postrouting_chain, NFPROTO_IPV4);
-
-	rule_list_peer_validate = RULE_CACHE_VALID;
-
-	return;
 }
 
 void
-reflesh_nft_cache_redirect()
+refresh_nft_cache_redirect(void)
 {
-	if (rule_list_redirect_validate == RULE_CACHE_VALID) {
-		return;
+	if (rule_list_redirect_validate != RULE_CACHE_VALID) {
+		refresh_nft_cache(&head_redirect, nft_table4, nft_prerouting_chain, NFPROTO_IPV4);
+		rule_list_redirect_validate = RULE_CACHE_VALID;
 	}
-
-	reflesh_nft_cache(&head_redirect, NFT_TABLE_NAT, miniupnpd_nat_chain, NFPROTO_IPV4);
-
-	rule_list_redirect_validate = RULE_CACHE_VALID;
-
-	return;
 }
 
 void
-reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32_t family)
+flush_nft_cache(struct rule_list *head)
 {
-	char buf[MNL_SOCKET_BUFFER_SIZE];
-	struct nlmsghdr *nlh;
-	uint32_t portid, seq, type = NFTNL_OUTPUT_DEFAULT;
-	struct nftnl_rule *t;
 	rule_t *p1, *p2;
-	int ret;
 
-	t = NULL;
 	p1 = LIST_FIRST(head);
 	if (p1 != NULL) {
-		while(p1 != NULL) {
+		while (p1 != NULL) {
 			p2 = (rule_t *)LIST_NEXT(p1, entry);
 			if (p1->desc != NULL) {
 				free(p1->desc);
@@ -701,16 +701,28 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 		}
 	}
 	LIST_INIT(head);
+}
+
+void
+refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family)
+{
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *nlh;
+	uint32_t portid, seq, type = NFTNL_OUTPUT_DEFAULT;
+	struct nftnl_rule *t;
+	int ret;
+
+	flush_nft_cache(head);
 
 	if (nl == NULL) {
 		nl = mnl_socket_open(NETLINK_NETFILTER);
 		if (nl == NULL) {
-			syslog(LOG_ERR, "%s: mnl_socket_open() FAILED: %m", "reflesh_nft_cache()");
+			log_error("mnl_socket_open() FAILED: %m");
 			return;
 		}
 
 		if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-			syslog(LOG_ERR, "%s: mnl_socket_bind() FAILED: %m", "reflesh_nft_cache()");
+			log_error("mnl_socket_bind() FAILED: %m");
 			return;
 		}
 	}
@@ -718,7 +730,7 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 
 	t = nftnl_rule_alloc();
 	if (t == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_rule_alloc() FAILED", "reflesh_nft_cache()");
+		log_error("nftnl_rule_alloc() FAILED");
 		return;
 	}
 
@@ -731,7 +743,7 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 	nftnl_rule_free(t);
 
 	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
-		syslog(LOG_ERR, "%s: mnl_socket_sendto() FAILED: %m", "reflesh_nft_cache()");
+		log_error("mnl_socket_sendto() FAILED: %m");
 		return;
 	}
 
@@ -744,7 +756,7 @@ reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32
 	}
 
 	if (ret == -1) {
-		syslog(LOG_ERR, "%s: mnl_socket_recvfrom() FAILED: %m", "reflesh_nft_cache()");
+		log_error("mnl_socket_recvfrom() FAILED: %m");
 	}
 
 	/* mnl_socket_close(nl); */
@@ -760,7 +772,7 @@ expr_add_payload(struct nftnl_rule *r, uint32_t base, uint32_t dreg,
 
 	e = nftnl_expr_alloc("payload");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_payload()", "payload");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED",   "payload");
 		return;
 	}
 
@@ -781,7 +793,7 @@ expr_add_bitwise(struct nftnl_rule *r, uint32_t sreg, uint32_t dreg,
 
 	e = nftnl_expr_alloc("bitwise");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_bitwise()", "bitwise");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED", "expr_add_bitwise()", "bitwise");
 		return;
 	}
 
@@ -803,7 +815,7 @@ expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,
 
 	e = nftnl_expr_alloc("cmp");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_cmp()", "cmp");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED",   "cmp");
 		return;
 	}
 
@@ -821,7 +833,7 @@ expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
 
 	e = nftnl_expr_alloc("meta");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_meta()", "meta");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED", "meta");
 		return;
 	}
 
@@ -837,7 +849,7 @@ expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_set_reg_val_u32()", "immediate");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED",   "immediate");
 		return;
 	}
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_DREG, dreg);
@@ -851,7 +863,7 @@ expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_set_reg_val_u16()", "immediate");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED",   "immediate");
 		return;
 	}
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_DREG, dreg);
@@ -865,7 +877,7 @@ expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_set_reg_verdict()", "immediate");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED",   "immediate");
 		return;
 	}
 	nftnl_expr_set_u32(e, NFTNL_EXPR_IMM_DREG, NFT_REG_VERDICT);
@@ -882,7 +894,7 @@ expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
 
 	e = nftnl_expr_alloc("nat");
 	if (e == NULL) {
-		syslog(LOG_ERR, "%s: nftnl_expr_alloc(\"%s\") FAILED", "expr_add_nat()", "nat");
+		log_error("nftnl_expr_alloc(\"%s\") FAILED",   "nat");
 		return;
 	}
 	
@@ -919,12 +931,12 @@ rule_set_snat(uint8_t family, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		log_error("nftnl_rule_alloc() FAILED");
 		return NULL;
 	}
 
-	nftnl_rule_set(r, NFTNL_RULE_TABLE, NFT_TABLE_NAT);
-	nftnl_rule_set(r, NFTNL_RULE_CHAIN, miniupnpd_nat_postrouting_chain);
+	nftnl_rule_set(r, NFTNL_RULE_TABLE, family == NFPROTO_IPV6 ? nft_table6 : nft_table4);
+	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_postrouting_chain);
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 
 	if (descr != NULL) {
@@ -1005,12 +1017,12 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		log_error("nftnl_rule_alloc() FAILED");
 		return NULL;
 	}
 
-	nftnl_rule_set(r, NFTNL_RULE_TABLE, NFT_TABLE_NAT);
-	nftnl_rule_set(r, NFTNL_RULE_CHAIN, miniupnpd_nat_chain);
+	nftnl_rule_set(r, NFTNL_RULE_TABLE, family == NFPROTO_IPV6 ? nft_table6 : nft_table4);
+	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_prerouting_chain);
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 
 	if (descr != NULL) {
@@ -1079,7 +1091,7 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		log_error("nftnl_rule_alloc() FAILED");
 		return NULL;
 	}
 
@@ -1127,7 +1139,7 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		log_error("nftnl_rule_alloc() FAILED");
 		return NULL;
 	}
 
@@ -1171,8 +1183,8 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	uint32_t descr_len;
 	UNUSED(eport);
 
-	nftnl_rule_set(r, NFTNL_RULE_TABLE, NFT_TABLE_FILTER);
-	nftnl_rule_set(r, NFTNL_RULE_CHAIN, miniupnpd_forward_chain);
+	nftnl_rule_set(r, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_forward_chain);
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 
 	if (descr != NULL) {
@@ -1227,7 +1239,7 @@ rule_del_handle(rule_t *rule)
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
-		syslog(LOG_ERR, "nftnl_rule_alloc() FAILED");
+		log_error("nftnl_rule_alloc() FAILED");
 		return NULL;
 	}
 
@@ -1257,75 +1269,204 @@ nft_mnl_batch_put(char *buf, uint16_t type, uint32_t seq)
 }
 
 int
-nft_send_request(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
+nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
 {
+    int result = -1;
 	struct nlmsghdr *nlh;
 	struct mnl_nlmsg_batch *batch;
 	char buf[MNL_SOCKET_BUFFER_SIZE];
-	uint32_t seq = time(NULL);
-	int ret;
 
-	if (chain_type == RULE_CHAIN_FILTER)
-		rule_list_filter_validate = RULE_CACHE_INVALID;
-	else if (chain_type == RULE_CHAIN_PEER)
-		rule_list_peer_validate = RULE_CACHE_INVALID;
-	else if (chain_type == RULE_CHAIN_REDIRECT)
-		rule_list_redirect_validate = RULE_CACHE_INVALID;
 
-	if (nl == NULL) {
-		nl = mnl_socket_open(NETLINK_NETFILTER);
-		if (nl == NULL) {
-			syslog(LOG_ERR, "%s: mnl_socket_open() FAILED: %m", "nft_send_request()");
-			return -1;
-		}
+	batch = start_batch(buf, sizeof(buf));
+	if (batch != NULL)
+    {
+        switch (chain_type) {
+        case RULE_CHAIN_FILTER:
+            rule_list_filter_validate = RULE_CACHE_INVALID;
+            break;
+        case RULE_CHAIN_PEER:
+            rule_list_peer_validate = RULE_CACHE_INVALID;
+            break;
+        case RULE_CHAIN_REDIRECT:
+            rule_list_redirect_validate = RULE_CACHE_INVALID;
+            break;
+        }
+        nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+                                         cmd,
+                                         nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
+                                         NLM_F_APPEND|NLM_F_CREATE|NLM_F_ACK,
+                                         nl_seq++);
 
-		if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-			syslog(LOG_ERR, "%s: mnl_socket_bind() FAILED: %m", "nft_send_request()");
-			return -1;
-		}
-	}
+        nftnl_rule_nlmsg_build_payload(nlh, rule);
+        nftnl_rule_free(rule);
 
-	batch = mnl_nlmsg_batch_start(buf, sizeof(buf));
+        result = send_batch(batch);
+    }
 
-	nft_mnl_batch_put(mnl_nlmsg_batch_current(batch),
-			  NFNL_MSG_BATCH_BEGIN, seq++);
-	mnl_nlmsg_batch_next(batch);
+	return result;
+}
 
-	nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
-				       cmd,
-				       nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
-				       NLM_F_APPEND|NLM_F_CREATE|NLM_F_ACK,
-				       seq++);
+int
+table_op( enum nf_tables_msg_types op, uint16_t family, const char * name)
+{
+    int result;
+    struct nlmsghdr *nlh;
+    struct mnl_nlmsg_batch *batch;
+    char buf[MNL_SOCKET_BUFFER_SIZE];
 
-	nftnl_rule_nlmsg_build_payload(nlh, rule);
-	nftnl_rule_free(rule);
-	mnl_nlmsg_batch_next(batch);
+    struct nftnl_table *table;
 
-	nft_mnl_batch_put(mnl_nlmsg_batch_current(batch), NFNL_MSG_BATCH_END,
-			  seq++);
-	mnl_nlmsg_batch_next(batch);
+	log_error("(%d, %d, %s)", op, family, name);
 
-	ret = mnl_socket_sendto(nl, mnl_nlmsg_batch_head(batch),
-				mnl_nlmsg_batch_size(batch));
-	if (ret == -1) {
-		syslog(LOG_ERR, "%s: mnl_socket_sendto() FAILED: %m", "nft_send_request()");
-		return -1;
-	}
+    table = nftnl_table_alloc();
+    if (table == NULL) {
+        log_error("out of memory: %m");
+        result = -1;
+    } else {
+        nftnl_table_set_u32(table, NFTNL_TABLE_FAMILY, family);
+        nftnl_table_set_str(table, NFTNL_TABLE_NAME, name);
 
-	mnl_nlmsg_batch_stop(batch);
+        batch = start_batch( buf, sizeof(buf));
+        if (batch == NULL) {
+            log_error("out of memory: %m");
+            result = -2;
+        } else {
+            nlh = nftnl_table_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+                                              op, family,
+                                              (op == NFT_MSG_NEWTABLE ? NLM_F_CREATE : 0) | NLM_F_ACK,
+                                              nl_seq++);
+            nftnl_table_nlmsg_build_payload(nlh, table);
 
-	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-	if (ret == -1) {
-		syslog(LOG_ERR, "%s: mnl_socket_recvfrom() FAILED: %m", "nft_send_request()");
-		return -1;	
-	}
+            result = send_batch(batch);
+        }
+        nftnl_table_free(table);
+    }
+    return result;
+}
 
-	ret = mnl_cb_run(buf, ret, 0, mnl_socket_get_portid(nl), NULL, NULL);
-	if (ret < 0) {
-		syslog(LOG_ERR, "%s: mnl_cb_run() FAILED: %m", "nft_send_request()");
-		return -1;	
-	}
+int
+chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
+		 const char * name, const char * type, uint32_t hooknum, signed int priority )
+{
+    int result = -1;
+    struct nlmsghdr *nlh;
+    struct mnl_nlmsg_batch *batch;
+    char buf[MNL_SOCKET_BUFFER_SIZE];
 
-	/* mnl_socket_close(nl); */
-	return 0;
+    struct nftnl_chain *chain;
+
+    log_error("(%d, %d, %s, %s, %s, %d, %d)", op, family, table, name, type, hooknum, priority);
+
+    chain = nftnl_chain_alloc();
+    if (chain == NULL) {
+        log_error("out of memory: %m");
+        result = -2;
+    } else {
+        nftnl_chain_set(chain, NFTNL_CHAIN_TABLE, table);
+        nftnl_chain_set(chain, NFTNL_CHAIN_NAME, name);
+		nftnl_chain_set_str(chain, NFTNL_CHAIN_TYPE, type);
+        nftnl_chain_set_u32(chain, NFTNL_CHAIN_HOOKNUM, hooknum);
+        nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, priority);
+
+        batch = start_batch( buf, sizeof(buf));
+        if (batch == NULL) {
+			log_error("out of memory: %m");
+            result = -3;
+        } else {
+            nlh = nftnl_chain_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+                                              op, family,
+                                              (op == NFT_MSG_NEWCHAIN ? NLM_F_CREATE : 0) | NLM_F_ACK,
+                                              nl_seq++);
+            if (nlh == NULL)
+			{
+				log_error("failed to build header: %m");
+				result = -4;
+			} else {
+				nftnl_chain_nlmsg_build_payload(nlh, chain);
+
+				result = send_batch(batch);
+            }
+        }
+        nftnl_chain_free(chain);
+    }
+    return result;
+}
+
+
+struct mnl_nlmsg_batch *
+start_batch( char *buf, size_t buf_size)
+{
+    struct mnl_nlmsg_batch *batch;
+    nl_seq = time(NULL);
+
+    if (nl == NULL) {
+        nl = mnl_socket_open(NETLINK_NETFILTER);
+        if (nl == NULL) {
+            log_error("mnl_socket_open() FAILED: %m");
+            return NULL;
+        }
+
+        if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
+            log_error("mnl_socket_bind() FAILED: %m");
+            return NULL;
+        }
+    }
+
+    batch = mnl_nlmsg_batch_start(buf, buf_size);
+    if (batch != NULL) {
+        nft_mnl_batch_put(mnl_nlmsg_batch_current(batch),
+                          NFNL_MSG_BATCH_BEGIN, nl_seq++);
+        mnl_nlmsg_batch_next(batch);
+    }
+    return batch;
+}
+
+int
+send_batch(struct mnl_nlmsg_batch * batch)
+{
+    int ret;
+    char buf[MNL_SOCKET_BUFFER_SIZE];
+
+    mnl_nlmsg_batch_next(batch);
+
+    nft_mnl_batch_put(mnl_nlmsg_batch_current(batch), NFNL_MSG_BATCH_END,
+                      nl_seq++);
+    mnl_nlmsg_batch_next(batch);
+
+    if (nl == NULL) {
+        log_error("netlink not connected");
+        return -1;
+    } else {
+        ret = mnl_socket_sendto(nl, mnl_nlmsg_batch_head(batch),
+                                mnl_nlmsg_batch_size(batch));
+        if (ret == -1) {
+            log_error("mnl_socket_sendto() FAILED: %m");
+            return -2;
+        }
+
+        mnl_nlmsg_batch_stop(batch);
+
+		do {
+			ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
+			if (ret == -1) {
+				log_error("mnl_socket_recvfrom() FAILED: %m");
+				return -3;
+			} else if (ret > 0) {
+				ret = mnl_cb_run(buf, ret, 0, mnl_socket_get_portid(nl), NULL, NULL);
+				if (ret == -1) {
+					log_error("mnl_cb_run() FAILED: %m");
+					return -4;
+				}
+			}
+		} while (ret > 0);
+    }
+    /* mnl_socket_close(nl); */
+    return 0;
+}
+
+void
+finish_batch(void)
+{
+    mnl_socket_close(nl);
+    nl = NULL;
 }

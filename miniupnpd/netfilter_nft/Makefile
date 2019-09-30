@@ -11,9 +11,9 @@ clean:
 	$(RM) *.o testnftnlcrdr testnftpinhole testnftnlrdr_peer \
 		test_nfct_get testnftnlrdr 
 
-testnftnlrdr:	nftnlrdr.o nftnlrdr_misc.o testnftnlrdr.o upnpglobalvars.o $(LIBS)
+testnftnlrdr:	nftnlrdr.o nftnlrdr_misc.o testnftnlrdr.o $(LIBS)
 
-testnftpinhole:	nftpinhole.o nftnlrdr_misc.o testnftpinhole.o upnpglobalvars.o $(LIBS)
+testnftpinhole:	nftpinhole.o nftnlrdr_misc.o testnftpinhole.o $(LIBS)
 
 test_nfct_get:	test_nfct_get.o test_nfct_get.o -lmnl -lnetfilter_conntrack
 
@@ -29,5 +29,3 @@ nftnlrdr_misc.o:	nftnlrdr_misc.c
 
 nftpinhole.o:		nftpinhole.c nftpinhole.h
 
-upnpglobalvars.o:	../upnpglobalvars.c ../upnpglobalvars.h
-	$(CC) -c -o $@ $<

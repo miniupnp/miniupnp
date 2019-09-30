@@ -8,8 +8,13 @@
  */
 #include <sys/queue.h>
 
-#define NFT_TABLE_NAT  "nat"
-#define NFT_TABLE_FILTER  "filter"
+extern const char * nft_table;
+extern const char * nft_table4;
+extern const char * nft_table6;
+extern const char * nft_prerouting_chain;
+extern const char * nft_postrouting_chain;
+extern const char * nft_forward_chain;
+
 #define NFT_DESCR_SIZE 1024
 
 enum rule_reg_type { 
@@ -80,7 +85,7 @@ extern struct rule_list head_redirect;
 extern struct rule_list head_peer;
 
 int
-nft_send_request(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type);
+nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type);
 struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
@@ -109,8 +114,21 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 		uint8_t proto, unsigned short eport, unsigned short iport, 
 		unsigned short rport, const char *descr, const char *handle);
 struct nftnl_rule *rule_del_handle(rule_t *r);
-void reflesh_nft_cache_filter(void);
-void reflesh_nft_cache_redirect(void);
-void reflesh_nft_cache_peer(void);
-void reflesh_nft_cache(struct rule_list *head, char *table, const char *chain, uint32_t family);
+void refresh_nft_cache_filter(void);
+void refresh_nft_cache_redirect(void);
+void refresh_nft_cache_peer(void);
+void refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family);
 void print_rule(rule_t *r);
+
+int
+table_op(enum nf_tables_msg_types op, uint16_t family, const char * name);
+int
+chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
+         const char * name, const char * type, uint32_t hooknum, signed int priority );
+
+struct mnl_nlmsg_batch *
+start_batch( char *buf, size_t buf_size);
+int
+send_batch(struct mnl_nlmsg_batch * batch);
+void
+finish_batch(void);
