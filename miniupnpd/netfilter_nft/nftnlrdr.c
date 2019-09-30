@@ -72,7 +72,7 @@ init_redirect(void) {
 	result = table_op(NFT_MSG_NEWTABLE, NFPROTO_INET, nft_table);
 	if (result == 0) {
 		result = chain_op(NFT_MSG_NEWCHAIN, NFPROTO_INET, nft_table,
-						  nft_forward_chain, FILTER_CHAIN_TYPE, NF_INET_FORWARD, NF_IP_PRI_FILTER);
+						  nft_forward_chain, FILTER_CHAIN_TYPE, NF_INET_FORWARD, NF_IP_PRI_FILTER - 25);
 	}
 
 	/* 'ip' family */
@@ -110,7 +110,7 @@ shutdown_redirect(void) {
 
 	/* 'inet' family */
 	result = chain_op(NFT_MSG_DELCHAIN, NFPROTO_INET, nft_table,
-					  nft_forward_chain, FILTER_CHAIN_TYPE, NF_INET_FORWARD, NF_IP_PRI_FILTER);
+					  nft_forward_chain, FILTER_CHAIN_TYPE, NF_INET_FORWARD, NF_IP_PRI_FILTER - 25);
 	if (result == 0) {
 		result = table_op(NFT_MSG_DELTABLE, NFPROTO_INET, nft_table);
 	}
