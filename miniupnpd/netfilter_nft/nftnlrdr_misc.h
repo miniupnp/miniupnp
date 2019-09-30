@@ -9,8 +9,6 @@
 #include <sys/queue.h>
 
 extern const char * nft_table;
-extern const char * nft_table4;
-extern const char * nft_table6;
 extern const char * nft_prerouting_chain;
 extern const char * nft_postrouting_chain;
 extern const char * nft_forward_chain;

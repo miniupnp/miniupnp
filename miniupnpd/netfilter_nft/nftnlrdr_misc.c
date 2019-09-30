@@ -64,8 +64,6 @@
 #define RULE_CACHE_VALID    1
 
 const char * nft_table = "miniupnpd";
-const char * nft_table4 = "miniupnpd4";
-const char * nft_table6 = "miniupnpd6";
 const char * nft_prerouting_chain = "prerouting";
 const char * nft_postrouting_chain = "postrouting";
 const char * nft_forward_chain = "forward";
@@ -656,7 +654,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 void
 refresh_nft_cache_filter(void) {
 	if (rule_list_filter_validate != RULE_CACHE_VALID) {
-		refresh_nft_cache(&head_filter, nft_table4, nft_forward_chain, NFPROTO_INET);
+		refresh_nft_cache(&head_filter, nft_table, nft_forward_chain, NFPROTO_INET);
 		rule_list_filter_validate = RULE_CACHE_VALID;
 	}
 }
@@ -664,7 +662,7 @@ refresh_nft_cache_filter(void) {
 void
 refresh_nft_cache_peer(void) {
 	if (rule_list_peer_validate != RULE_CACHE_VALID) {
-		refresh_nft_cache(&head_peer, nft_table4, nft_postrouting_chain, NFPROTO_IPV4);
+		refresh_nft_cache(&head_peer, nft_table, nft_postrouting_chain, NFPROTO_IPV4);
 		rule_list_peer_validate = RULE_CACHE_VALID;
 	}
 }
@@ -673,7 +671,7 @@ void
 refresh_nft_cache_redirect(void)
 {
 	if (rule_list_redirect_validate != RULE_CACHE_VALID) {
-		refresh_nft_cache(&head_redirect, nft_table4, nft_prerouting_chain, NFPROTO_IPV4);
+		refresh_nft_cache(&head_redirect, nft_table, nft_prerouting_chain, NFPROTO_IPV4);
 		rule_list_redirect_validate = RULE_CACHE_VALID;
 	}
 }
@@ -935,9 +933,9 @@ rule_set_snat(uint8_t family, uint8_t proto,
 		return NULL;
 	}
 
-	nftnl_rule_set(r, NFTNL_RULE_TABLE, family == NFPROTO_IPV6 ? nft_table6 : nft_table4);
-	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_postrouting_chain);
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
+	nftnl_rule_set(r, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_postrouting_chain);
 
 	if (descr != NULL) {
 		descr_len = strlen(descr);
@@ -1021,9 +1019,9 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 		return NULL;
 	}
 
-	nftnl_rule_set(r, NFTNL_RULE_TABLE, family == NFPROTO_IPV6 ? nft_table6 : nft_table4);
-	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_prerouting_chain);
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
+	nftnl_rule_set(r, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_prerouting_chain);
 
 	if (descr != NULL) {
 		descr_len = strlen(descr);
@@ -1183,9 +1181,9 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	uint32_t descr_len;
 	UNUSED(eport);
 
+	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 	nftnl_rule_set(r, NFTNL_RULE_TABLE, nft_table);
 	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_forward_chain);
-	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 
 	if (descr != NULL) {
 		descr_len = strlen(descr);
