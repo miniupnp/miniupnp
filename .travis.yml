@@ -56,7 +56,10 @@ script:
       make -f $MAKEFILE depend;
     fi
   - 'CONFIG_OPTIONS="--ipv6 --igd2" make -f $MAKEFILE -j3'
-  - 'if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJECT" = "miniupnpd" ]; then make -f Makefile.linux_nft ; fi'
+  - if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJECT" = "miniupnpd" ]; then
+      make -f Makefile.linux_nft clean ;
+      make -f Makefile.linux_nft ;
+    fi
   - make -f $MAKEFILE check
   - 'if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJECT" = "miniupnpd" ]; then make -f $MAKEFILE dox ; fi'
   - if [ "$PROJECT" = "miniupnpc" ]; then
