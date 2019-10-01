@@ -921,7 +921,6 @@ rule_set_snat(uint8_t family, uint8_t proto,
 {
 	struct nftnl_rule *r = NULL;
 	uint16_t dport, sport;
-	uint32_t descr_len;
 	#ifdef DEBUG
 	char buf[8192];
 	#endif
@@ -937,10 +936,9 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	nftnl_rule_set(r, NFTNL_RULE_TABLE, nft_table);
 	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_postrouting_chain);
 
-	if (descr != NULL) {
-		descr_len = strlen(descr);
+	if (descr != NULL && *descr != '\0') {
 		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
-				       descr, descr_len);
+							descr, strlen(descr));
 	}
 
 	/* Destination IP */
@@ -1006,7 +1004,6 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	uint16_t dport;
 	uint64_t handle_num;
 	uint32_t if_idx;
-	uint32_t descr_len;
 	#ifdef DEBUG
 	char buf[8192];
 	#endif
@@ -1023,10 +1020,9 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	nftnl_rule_set(r, NFTNL_RULE_TABLE, nft_table);
 	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_prerouting_chain);
 
-	if (descr != NULL) {
-		descr_len = strlen(descr);
+	if (descr != NULL && *descr != '\0') {
 		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
-				       descr, descr_len);
+							descr, strlen(descr));
 	}
 
 	if (handle != NULL) {
@@ -1178,17 +1174,15 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	uint16_t dport, sport;
 	uint64_t handle_num;
 	uint32_t if_idx;
-	uint32_t descr_len;
 	UNUSED(eport);
 
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 	nftnl_rule_set(r, NFTNL_RULE_TABLE, nft_table);
 	nftnl_rule_set(r, NFTNL_RULE_CHAIN, nft_forward_chain);
 
-	if (descr != NULL) {
-		descr_len = strlen(descr);
+	if (descr != NULL && *descr != '\0') {
 		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
-				       descr, descr_len);
+							descr, strlen(descr));
 	}
 
 	if (handle != NULL) {
@@ -1362,9 +1356,12 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
     } else {
         nftnl_chain_set(chain, NFTNL_CHAIN_TABLE, table);
         nftnl_chain_set(chain, NFTNL_CHAIN_NAME, name);
-		nftnl_chain_set_str(chain, NFTNL_CHAIN_TYPE, type);
-        nftnl_chain_set_u32(chain, NFTNL_CHAIN_HOOKNUM, hooknum);
-        nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, priority);
+        if (op == NFT_MSG_NEWCHAIN)
+		{
+			nftnl_chain_set_str(chain, NFTNL_CHAIN_TYPE, type);
+			nftnl_chain_set_u32(chain, NFTNL_CHAIN_HOOKNUM, hooknum);
+			nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, priority);
+		}
 
         batch = start_batch( buf, sizeof(buf));
         if (batch == NULL) {
