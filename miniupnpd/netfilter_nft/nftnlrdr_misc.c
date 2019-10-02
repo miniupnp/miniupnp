@@ -4,6 +4,7 @@
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
  * (c) 2019 Thomas Bernard
+ * (c) 2019 Paul Chambers
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
@@ -41,7 +42,6 @@
 #include "nftnlrdr_misc.h"
 #include "../macros.h"
 
-#define DEBUG 1
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -1308,7 +1308,7 @@ table_op( enum nf_tables_msg_types op, uint16_t family, const char * name)
 
     struct nftnl_table *table;
 
-	log_error("(%d, %d, %s)", op, family, name);
+	// log_debug("(%d, %d, %s)", op, family, name);
 
     table = nftnl_table_alloc();
     if (table == NULL) {
@@ -1347,7 +1347,7 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
 
     struct nftnl_chain *chain;
 
-    log_error("(%d, %d, %s, %s, %s, %d, %d)", op, family, table, name, type, hooknum, priority);
+    // log_debug("(%d, %d, %s, %s, %s, %d, %d)", op, family, table, name, type, hooknum, priority);
 
     chain = nftnl_chain_alloc();
     if (chain == NULL) {

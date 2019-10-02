@@ -2,6 +2,7 @@
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
+ * (c) 2019 Paul Chambers
  * 
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
