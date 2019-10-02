@@ -155,16 +155,16 @@ set_rdr_name(rdr_name_type param, const char *string) {
 		return -1;
 	}
 	switch (param) {
-	case TABLE_NAME:
+	case RDR_TABLE_NAME:
 		nft_table = string;
 		break;
-	case NAT_CHAIN_NAME:
+	case RDR_NAT_PREROUTING_CHAIN_NAME:
 		nft_prerouting_chain = string;
 		break;
-	case NAT_POSTROUTING_CHAIN_NAME:
+	case RDR_NAT_POSTROUTING_CHAIN_NAME:
 		nft_postrouting_chain = string;
 		break;
-	case FORWARD_CHAIN_NAME:
+	case RDR_FORWARD_CHAIN_NAME:
 		nft_forward_chain = string;
 		break;
 	default:

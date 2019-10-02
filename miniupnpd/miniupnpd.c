@@ -1269,13 +1269,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #ifdef USE_NETFILTER
 #ifdef USE_NFTABLES
 			case UPNPFORWARDCHAIN:
-				set_rdr_name(FORWARD_CHAIN_NAME, ary_options[i].value);
+				set_rdr_name(RDR_FORWARD_CHAIN_NAME, ary_options[i].value);
 				break;
 			case UPNPNATCHAIN:
-				set_rdr_name(NAT_CHAIN_NAME, ary_options[i].value);
+				set_rdr_name(RDR_NAT_PREROUTING_CHAIN_NAME, ary_options[i].value);
 				break;
 			case UPNPNATPOSTCHAIN:
-				set_rdr_name(NAT_POSTROUTING_CHAIN_NAME, ary_options[i].value);
+				set_rdr_name(RDR_NAT_POSTROUTING_CHAIN_NAME, ary_options[i].value);
 				break;
 #else
 			case UPNPFORWARDCHAIN:
