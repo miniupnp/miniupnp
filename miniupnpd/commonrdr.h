@@ -65,16 +65,22 @@ update_portmapping_desc_timestamp(const char * ifname,
                    const char * desc, unsigned int timestamp);
 
 #ifdef USE_NFTABLES
-/* only provided by nftables implementation at the moment */
+/*
+ * only provided by nftables implementation at the moment.
+ * Should be implemented for iptables too, for consistency
+ */
 
 typedef enum {
-	TABLE_NAME,
-	TABLE4_NAME,
-	TABLE6_NAME,
-	NAT_CHAIN_NAME,
-	NAT_POSTROUTING_CHAIN_NAME,
-	FORWARD_CHAIN_NAME,
+	RDR_TABLE_NAME,
+	RDR_NAT_PREROUTING_CHAIN_NAME,
+	RDR NAT_POSTROUTING_CHAIN_NAME,
+	RDR_FORWARD_CHAIN_NAME,
 } rdr_name_type;
+
+/*
+ * used by the config file parsing in the core
+ * to set
+ */
 
 int set_rdr_name( rdr_name_type param, const char * string );
 
