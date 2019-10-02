@@ -1,4 +1,4 @@
-/* $Id: nftnlrdr_misc.c,v 1.4 2019/06/30 20:00:41 nanard Exp $ */
+/* $Id: nftnlrdr_misc.c,v 1.6 2019/10/02 22:00:10 nanard Exp $ */
 /*
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
