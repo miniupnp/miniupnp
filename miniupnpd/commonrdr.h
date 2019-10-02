@@ -1,6 +1,6 @@
-/* $Id: commonrdr.h,v 1.10 2016/02/12 12:34:39 nanard Exp $ */
+/* $Id: commonrdr.h,v 1.11 2019/10/02 22:12:02 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2006-2016 Thomas Bernard
+ * (c) 2006-2019 Thomas Bernard
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
