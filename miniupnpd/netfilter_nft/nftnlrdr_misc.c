@@ -597,7 +597,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					descr = (char *) nftnl_rule_get_data(t, NFTNL_RULE_USERDATA,
 														 &r->desc_len);
 					if (r->desc_len > 0)
-						r->desc = strdup(descr);
+						r->desc = strndup(descr, r->desc_len);
 
 					r->handle = *(uint32_t *) nftnl_rule_get_data(t,
 																  NFTNL_RULE_HANDLE,
