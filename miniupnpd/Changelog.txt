@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.452 2019/09/24 10:58:36 nanard Exp $
+$Id: Changelog.txt,v 1.453 2019/10/02 22:12:37 nanard Exp $
+
+2019/10/02:
+  Working NFTables implementation thanks to Paul Chambers
 
 2019/09/24:
   Distinguish between iptables and nftables in genconfig.sh
