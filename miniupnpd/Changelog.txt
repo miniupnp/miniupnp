@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.453 2019/10/02 22:12:37 nanard Exp $
+$Id: Changelog.txt,v 1.454 2019/10/03 20:40:37 nanard Exp $
+
+2019/10/03:
+  Use OpenBSD pledge()
 
 2019/10/02:
   Working NFTables implementation thanks to Paul Chambers

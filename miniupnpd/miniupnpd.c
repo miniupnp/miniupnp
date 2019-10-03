@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.235 2019/05/21 08:39:43 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.237 2019/10/03 20:40:40 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -2240,6 +2240,15 @@ main(int argc, char * * argv)
 #endif
 	}
 #endif
+
+	/* drop privileges */
+#ifdef HAS_PLEDGE
+	/* mcast ? unix ? */
+	if (pledge("stdio inet pf", NULL) < 0) {
+		syslog(LOG_ERR, "pledge(): %m");
+		return 1;
+	}
+#endif /* HAS_PLEDGE */
 
 	/* main loop */
 	while(!quitting)

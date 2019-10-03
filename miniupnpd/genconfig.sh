@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.100 2019/09/24 11:50:34 nanard Exp $
+# $Id: genconfig.sh,v 1.103 2019/10/03 20:40:39 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -146,6 +146,10 @@ case $OS_NAME in
 		MAJORVER=`echo $OS_VERSION | cut -d. -f1`
 		MINORVER=`echo $OS_VERSION | cut -d. -f2`
 		#echo "OpenBSD majorversion=$MAJORVER minorversion=$MINORVER"
+		# The pledge() system call first appeared in OpenBSD 5.9.
+		if [ \( $MAJORVER -ge 6 \) -o \( $MAJORVER -eq 5 -a $MINORVER -ge 9 \) ]; then
+			echo "#define HAS_PLEDGE" >> ${CONFIGFILE}
+		fi
 		# rtableid was introduced in OpenBSD 4.0
 		if [ $MAJORVER -ge 4 ]; then
 			echo "#define PFRULE_HAS_RTABLEID" >> ${CONFIGFILE}
