@@ -2241,6 +2241,8 @@ main(int argc, char * * argv)
 	}
 #endif
 
+	/* drop elevated privileges before we start processing external input */
+
 	/* main loop */
 	while(!quitting)
 	{
@@ -2311,7 +2313,7 @@ main(int argc, char * * argv)
 		}
 		else
 		{
-			/* the comparaison is not very precise but who cares ? */
+			/* the comparison is not very precise but who cares ? */
 			if(timeofday.tv_sec >= (lasttimeofday.tv_sec + v.notify_interval))
 			{
 				if (GETFLAG(ENABLEUPNPMASK))

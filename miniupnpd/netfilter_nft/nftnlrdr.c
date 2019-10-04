@@ -66,11 +66,17 @@ static struct timestamp_entry * timestamp_list = NULL;
 
 /* init and shutdown functions */
 int
-init_redirect(void) {
+init_redirect(void)
+{
 	int result;
 
+	/* requires elevated privileges */
+	result = nft_mnl_connect();
+
 	/* 'inet' family */
-	result = table_op(NFT_MSG_NEWTABLE, NFPROTO_INET, nft_table);
+	if (result == 0) {
+		result = table_op(NFT_MSG_NEWTABLE, NFPROTO_INET, nft_table);
+	}
 	if (result == 0) {
 		result = chain_op(NFT_MSG_NEWCHAIN, NFPROTO_INET, nft_table,
 						  nft_forward_chain, FILTER_CHAIN_TYPE, NF_INET_FORWARD, NF_IP_PRI_FILTER - 25);
@@ -106,7 +112,8 @@ init_redirect(void) {
 }
 
 void
-shutdown_redirect(void) {
+shutdown_redirect(void)
+{
 	int result;
 
 	/* 'inet' family */
@@ -140,7 +147,7 @@ shutdown_redirect(void) {
 		result = table_op(NFT_MSG_DELTABLE, NFPROTO_IPV6, nft_table);
 	}
 
-	finish_batch();
+	nft_mnl_disconnect();
 }
 
 /**
@@ -150,7 +157,8 @@ shutdown_redirect(void) {
  * @return 0 if successful
  */
 int
-set_rdr_name(rdr_name_type param, const char *string) {
+set_rdr_name(rdr_name_type param, const char *string)
+{
 	if (string == NULL || strlen(string) > 30) {
 		return -1;
 	}
