@@ -112,7 +112,8 @@ init_redirect(void)
 }
 
 void
-shutdown_redirect(void) {
+shutdown_redirect(void)
+{
 	int result;
 
 	/* 'inet' family */
@@ -156,7 +157,8 @@ shutdown_redirect(void) {
  * @return 0 if successful
  */
 int
-set_rdr_name(rdr_name_type param, const char *string) {
+set_rdr_name(rdr_name_type param, const char *string)
+{
 	if (string == NULL || strlen(string) > 30) {
 		return -1;
 	}
