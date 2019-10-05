@@ -258,7 +258,21 @@ print_rule(rule_t *r)
 	default:
 		printf("nftables: unknown type: %d\n", r->type);
 	}
+
 }
+#else
+void
+print_rule(rule_t *r)
+{
+	char buf[8192];
+
+	nftnl_rule_snprintf(buf, sizeof(buf), r, NFTNL_OUTPUT_DEFAULT, 0);
+	fprintf(stdout, "%s\n", buf);
+}
+#endif
+#define debug_rule(rule)		do { print_rule(rule); } while (0)
+#else
+#define debug_rule(rule)
 #endif
 
 static enum rule_reg_type *
@@ -935,9 +949,6 @@ rule_set_snat(uint8_t family, uint8_t proto,
 {
 	struct nftnl_rule *r = NULL;
 	uint16_t dport, sport;
-	#ifdef DEBUG
-	char buf[8192];
-	#endif
 	UNUSED(handle);
 
 	r = nftnl_rule_alloc();
@@ -999,10 +1010,7 @@ rule_set_snat(uint8_t family, uint8_t proto,
 
 	expr_add_nat(r, NFT_NAT_SNAT, family, ehost, htons(eport), 0);
 
-	#ifdef DEBUG
-	nftnl_rule_snprintf(buf, sizeof(buf), r, NFTNL_OUTPUT_DEFAULT, 0);
-	fprintf(stdout, "%s\n", buf);
-	#endif
+	debug_rule(r);
 
 	return r;
 }
@@ -1018,9 +1026,6 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	uint16_t dport;
 	uint64_t handle_num;
 	uint32_t if_idx;
-	#ifdef DEBUG
-	char buf[8192];
-	#endif
 
 	UNUSED(handle);
 
@@ -1077,10 +1082,7 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 
 	expr_add_nat(r, NFT_NAT_DNAT, family, ihost, htons(iport), 0);
 
-	#ifdef DEBUG
-	nftnl_rule_snprintf(buf, sizeof(buf), r, NFTNL_OUTPUT_DEFAULT, 0);
-	fprintf(stdout, "%s\n", buf);
-	#endif
+	debug_rule(r);
 
 	return r;
 }
@@ -1092,9 +1094,6 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
-	#ifdef DEBUG
-	char buf[8192];
-	#endif
 	UNUSED(eport);
 
 	r = nftnl_rule_alloc();
@@ -1125,10 +1124,7 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 
 	expr_set_reg_verdict(r, NF_ACCEPT);
 
-	#ifdef DEBUG
-	nftnl_rule_snprintf(buf, sizeof(buf), r, NFTNL_OUTPUT_DEFAULT, 0);
-	fprintf(stdout, "%s\n", buf);
-	#endif
+	debug_rule(r);
 
 	return r;
 }
@@ -1140,9 +1136,6 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
-	#ifdef DEBUG
-	char buf[8192];
-	#endif
 	UNUSED(eport);
 
 	r = nftnl_rule_alloc();
@@ -1172,10 +1165,7 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 
 	expr_set_reg_verdict(r, NF_ACCEPT);
 
-	#ifdef DEBUG
-	nftnl_rule_snprintf(buf, sizeof(buf), r, NFTNL_OUTPUT_DEFAULT, 0);
-	fprintf(stdout, "%s\n", buf);
-	#endif
+	debug_rule(r);
 
 	return r;
 }
