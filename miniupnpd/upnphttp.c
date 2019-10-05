@@ -1,9 +1,9 @@
-/* $Id: upnphttp.c,v 1.107 2018/01/16 00:50:49 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.108 2019/10/05 18:05:13 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2018 Thomas Bernard
+ * Copyright (c) 2005-2019 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -67,9 +67,17 @@ int init_ssl(void)
 	const SSL_METHOD *method;
 	SSL_library_init();
 	SSL_load_error_strings();
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	method = TLSv1_server_method();
+#else
+	method = TLS_server_method();
+#endif
 	if(method == NULL) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 		syslog(LOG_ERR, "TLSv1_server_method() failed");
+#else
+		syslog(LOG_ERR, "TLS_server_method() failed");
+#endif
 		syslogsslerr();
 		return -1;
 	}
@@ -111,7 +119,11 @@ void free_ssl(void)
 		SSL_CTX_free(ssl_ctx);
 		ssl_ctx = NULL;
 	}
+#if OPENSSL_VERSION_NUMBER >= 0x10000000L && OPENSSL_VERSION_NUMBER < 0x10100000L
+	ERR_remove_thread_state(NULL);
+#elif OPENSSL_VERSION_NUMBER < 0x10000000L
 	ERR_remove_state(0);
+#endif
 	ENGINE_cleanup();
 	CONF_modules_unload(1);
 	ERR_free_strings();

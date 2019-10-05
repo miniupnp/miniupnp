@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.454 2019/10/03 20:40:37 nanard Exp $
+$Id: Changelog.txt,v 1.455 2019/10/05 18:05:10 nanard Exp $
+
+2019/10/05:
+  Use OpenSSL TLS_server_method() instead of TLSv1_server_method()
 
 2019/10/03:
   Use OpenBSD pledge()
