@@ -83,6 +83,15 @@ extern struct rule_list head_filter;
 extern struct rule_list head_redirect;
 extern struct rule_list head_peer;
 
+/** called at initialization.
+ * establishes persistent connection to mnl/netfilter socket, needs elevated privilege */
+int
+nft_mnl_connect(void);
+
+/** called at shutdown, to release the mnl/netfilter socket */
+void
+nft_mnl_disconnect(void);
+
 int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type);
 struct nftnl_rule *
@@ -129,5 +138,3 @@ struct mnl_nlmsg_batch *
 start_batch( char *buf, size_t buf_size);
 int
 send_batch(struct mnl_nlmsg_batch * batch);
-void
-finish_batch(void);
