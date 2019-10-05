@@ -48,6 +48,8 @@ SBININSTALLDIR = $(INSTALLPREFIX)/sbin
 ETCINSTALLDIR = $(PREFIX)/etc/miniupnpd
 MANINSTALLDIR = $(INSTALLPREFIX)/share/man/man8
 
+include gitrev.mk
+
 BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o portinuse.o \
            upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
