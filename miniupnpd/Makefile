@@ -98,6 +98,13 @@ CFLAGS += -m64 -mcmodel=medlow
 .endif
 .endif
 
+ISGITREPO != git rev-parse --is-inside-work-tree
+.if $(ISGITREPO) == "true"
+GITREF != git rev-parse --short HEAD
+GITBRANCH != git rev-parse --abbrev-ref HEAD
+CFLAGS += -DMINIUPNPD_GIT_REF=\"$(GITBRANCH)-$(GITREF)\"
+.endif
+
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \

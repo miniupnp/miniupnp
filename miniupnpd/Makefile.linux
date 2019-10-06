@@ -48,6 +48,8 @@ SBININSTALLDIR = $(INSTALLPREFIX)/sbin
 ETCINSTALLDIR = $(PREFIX)/etc/miniupnpd
 MANINSTALLDIR = $(INSTALLPREFIX)/share/man/man8
 
+include gitrev.mk
+
 BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o portinuse.o \
            upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
@@ -238,7 +240,13 @@ else
 	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=`($(STAGING_DIR_HOST)/bin/genuuid||$(STAGING_DIR_HOST)/bin/uuidgen||$(STAGING_DIR_HOST)/bin/uuid) 2>/dev/null`/" miniupnpd.conf
 endif
 
-check:	validateupnppermissions validategetifaddr validatessdppktgen
+check:	validateupnppermissions validategetifaddr validatessdppktgen \
+	validateversion
+
+validateversion:	miniupnpd VERSION
+	./miniupnpd --version
+	[ "`./miniupnpd --version | head -1 | cut -d' ' -f-2`" = "miniupnpd `cat VERSION`" ]
+	touch $@
 
 validateupnppermissions:	testupnppermissions testupnppermissions.sh
 	./testupnppermissions.sh
