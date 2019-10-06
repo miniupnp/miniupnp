@@ -234,9 +234,13 @@ linux/ifacewatcher.o: miniupnpdtypes.h getifaddr.h upnpglobalvars.h
 linux/ifacewatcher.o: upnppermissions.h natpmp.h
 linux/getroute.o: getroute.h upnputils.h
 netfilter_nft/nftnlrdr.o: macros.h config.h netfilter_nft/nftnlrdr.h commonrdr.h
+netfilter_nft/nftnlrdr.o: netfilter_nft/nftnlrdr_misc.h
 netfilter_nft/nftnlrdr.o: config.h upnppermissions.h
 netfilter_nft/nftnlrdr.o: miniupnpdtypes.h
+netfilter_nft/nftnlrdr_misc.o: macros.h config.h netfilter_nft/nftnlrdr_misc.h
+netfilter_nft/nftnlrdr_misc.o: commonrdr.h
 netfilter_nft/nftpinhole.o: config.h netfilter_nft/nftpinhole.h
+netfilter_nft/nftpinhole.o: netfilter_nft/nftnlrdr_misc.h
 netfilter_nft/nftpinhole.o: upnppermissions.h config.h miniupnpdtypes.h
 testupnpdescgen.o: macros.h config.h upnpdescgen.h upnpdescstrings.h
 testupnpdescgen.o: getifaddr.h
