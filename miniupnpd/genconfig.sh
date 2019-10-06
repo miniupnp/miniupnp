@@ -18,6 +18,7 @@ case "$argv" in
 	--ipv6) IPV6=1 ;;
 	--igd2) IGD2=1 ;;
 	--strict) STRICT=1 ;;
+	--debug) DEBUG=1 ;;
 	--leasefile) LEASEFILE=1 ;;
 	--vendorcfg) VENDORCFG=1 ;;
 	--pcp-peer) PCP_PEER=1 ;;
@@ -39,6 +40,7 @@ case "$argv" in
 		echo " --ipv6      enable IPv6"
 		echo " --igd2      build an IGDv2 instead of an IGDv1"
 		echo " --strict    be more strict regarding compliance with UPnP specifications"
+		echo " --debug     #define DEBUG 1"
 		echo " --leasefile enable lease file"
 		echo " --vendorcfg enable configuration of manufacturer info"
 		echo " --pcp-peer  enable PCP PEER operation"
@@ -121,6 +123,11 @@ echo "" >> ${CONFIGFILE}
 echo "#define MINIUPNPD_VERSION \"`cat VERSION`\"" >> ${CONFIGFILE}
 echo "#define MINIUPNPD_DATE	\"$MINIUPNPD_DATE\"" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
+
+if [ -n "$DEBUG" ] ; then
+	echo "#define DEBUG 1" >> ${CONFIGFILE}
+	echo "" >> ${CONFIGFILE}
+fi
 
 cat >> ${CONFIGFILE} <<EOF
 #ifndef XSTR

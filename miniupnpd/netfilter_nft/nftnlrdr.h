@@ -81,9 +81,4 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 int get_nat_ext_addr(struct sockaddr* src, struct sockaddr *dst, uint8_t proto,
 		     struct sockaddr* ret_ext);
 
-/* for debug */
-int
-list_redirect_rule(const char * ifname);
-
 #endif
-

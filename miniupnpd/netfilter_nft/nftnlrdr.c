@@ -738,34 +738,3 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 
 	return 0;
 }
-
-#ifdef DEBUG
-/* for debug */
-
-extern void print_rule(rule_t *r);
-
-/* read the "filter" and "nat" tables */
-int
-list_redirect_rule(const char * ifname)
-{
-	rule_t *p;
-	UNUSED(ifname);
-
-	refresh_nft_cache_filter();
-	LIST_FOREACH(p, &head_filter, entry) {
-		print_rule(p);
-	}
-
-	refresh_nft_cache_redirect();
-	LIST_FOREACH(p, &head_redirect, entry) {
-		print_rule(p);
-	}
-
-	refresh_nft_cache_peer();
-	LIST_FOREACH(p, &head_peer, entry) {
-		print_rule(p);
-	}
-
-	return 0;
-}
-#endif
