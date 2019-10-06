@@ -11,6 +11,7 @@
 #include <syslog.h>
 
 #include "nftnlrdr.h"
+#include "nftnlrdr_misc.h"
 #include "../commonrdr.h"
 
 #ifndef PRIu64
@@ -84,7 +85,7 @@ main(int argc, char ** argv)
 		printf("test\n");
 	}
 	printf("trying to list nat rules :\n");
-	list_redirect_rule(argv[1]);
+	print_redirect_rules(argv[1]);
 	printf("deleting\n");
 	delete_redirect_and_filter_rules(eport, IPPROTO_TCP);
 	return 0;

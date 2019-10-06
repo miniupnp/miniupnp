@@ -107,172 +107,48 @@ nft_mnl_connect(void)
 void
 nft_mnl_disconnect(void)
 {
-	mnl_socket_close(mnl_sock);
-	mnl_sock = NULL;
+	if (mnl_sock != NULL) {
+		mnl_socket_close(mnl_sock);
+		mnl_sock = NULL;
+	}
 }
 
 #ifdef DEBUG
 
-#if 0
-static const char *
-get_family_string(uint32_t family)
-{
-	switch (family) {
-	case NFPROTO_INET:
-		return "ipv4/6";
-	case NFPROTO_IPV4:
-		return "ipv4";
-	case NFPROTO_IPV6:
-		return "ipv6";
-	default:
-		return "unknown family";
-	}
-}
-
-static const char *
-get_proto_string(uint32_t proto)
-{
-	switch (proto) {
-	case IPPROTO_TCP:
-		return "tcp";
-	case IPPROTO_UDP:
-		return "udp";
-	default:
-		return "unknown proto";
-	}
-}
-
-static const char *
-get_verdict_string(uint32_t val)
-{
-	switch (val) {
-	case NF_ACCEPT:
-		return "accept";
-	case NF_DROP:
-		return "drop";
-	default:
-		return "unknown verdict";
-	}
-}
-
 void
-print_rule(rule_t *r)
+print_rule(const char *func, int line, const struct nftnl_rule *rule)
 {
-	struct in_addr addr;
-	char *iaddr_str = NULL, *rhost_str = NULL, *eaddr_str = NULL;
-	char iaddr6_str[INET6_ADDRSTRLEN];
-	char rhost6_str[INET6_ADDRSTRLEN];
-	char ifname_buf[IF_NAMESIZE];
+	fprintf(stdout,"%s[%d]: ", func, line);
+	nftnl_rule_fprintf(stdout, rule, NFTNL_OUTPUT_DEFAULT, 0);
+}
 
-	switch (r->type) {
-	case RULE_NAT:
-		if (r->iaddr != 0) {
-			addr.s_addr = r->iaddr;
-			iaddr_str = strdupa(inet_ntoa(addr));
-		}
-		if (r->rhost != 0) {
-			addr.s_addr = r->rhost;
-			rhost_str = strdupa(inet_ntoa(addr));
-		}
-		if (r->eaddr != 0) {
-			addr.s_addr = r->eaddr;
-			eaddr_str = strdupa(inet_ntoa(addr));
-		}
-		if (r->nat_type == NFT_NAT_DNAT) {
-			printf("%"PRIu64":[%s/%s] iif %s, %s/%s, %d -> "
-			       "%s:%d (%s)\n",
-			       r->handle,
-			       r->table, r->chain,
-			       if_indextoname(r->ingress_ifidx, ifname_buf),
-			       get_family_string(r->family),
-			       get_proto_string(r->proto), r->eport,
-			       iaddr_str, r->iport,
-			       r->desc);
-		} else if (r->nat_type == NFT_NAT_SNAT) {
-			printf("%"PRIu64":[%s/%s] "
-			       "nat type:%d, family:%d, ifidx: %d, "
-			       "eaddr: %s, eport:%d, "
-			       "proto:%d, iaddr: %s, "
-			       "iport:%d, rhost:%s rport:%d (%s)\n",
-			       r->handle, r->table, r->chain,
-			       r->nat_type, r->family, r->ingress_ifidx,
-			       eaddr_str, r->eport,
-			       r->proto, iaddr_str, r->iport,
-			       rhost_str, r->rport,
-			       r->desc);
-		} else {
-			printf("%"PRIu64":[%s/%s] "
-			       "nat type:%d, family:%d, ifidx: %d, "
-			       "eaddr: %s, eport:%d, "
-			       "proto:%d, iaddr: %s, iport:%d, rhost:%s (%s)\n",
-			       r->handle, r->table, r->chain,
-			       r->nat_type, r->family, r->ingress_ifidx,
-			       eaddr_str, r->eport,
-			       r->proto, iaddr_str, r->iport, rhost_str,
-			       r->desc);
-		}
-		break;
-	case RULE_FILTER:
-		if (r->iaddr != 0) {
-			addr.s_addr = r->iaddr;
-			iaddr_str = strdupa(inet_ntoa(addr));
-		}
-		if (r->rhost != 0) {
-			addr.s_addr = r->rhost;
-			rhost_str = strdupa(inet_ntoa(addr));
-		}
-		inet_ntop(AF_INET6, &r->iaddr6, iaddr6_str, INET6_ADDRSTRLEN);
-		inet_ntop(AF_INET6, &r->rhost6, rhost6_str, INET6_ADDRSTRLEN);
+/* print out the "filter" and "nat" tables */
+void
+print_redirect_rules(const char * ifname)
+{
+	rule_t *p;
+	int i;
+	UNUSED(ifname);
 
-		if ( (r->iaddr != 0) || (r->rhost != 0) ) {
-			printf("%"PRIu64":[%s/%s] %s/%s, %s %s:%d: %s (%s)\n",
-			       r->handle, r->table, r->chain,
-			       get_family_string(r->family), get_proto_string(r->proto),
-			       rhost_str,
-			       iaddr_str, r->eport,
-			       get_verdict_string(r->filter_action),
-			       r->desc);
-		} else {
-			printf("%"PRIu64":[%s/%s] %s/%s, %s %s:%d: %s (%s)\n",
-			       r->handle, r->table, r->chain,
-			       get_family_string(r->family), get_proto_string(r->proto),
-			       rhost6_str,
-			       iaddr6_str, r->eport,
-			       get_verdict_string(r->filter_action),
-			       r->desc);
-		}
-		break;
-	case RULE_COUNTER:
-		if (r->iaddr != 0) {
-			addr.s_addr = r->iaddr;
-			iaddr_str = strdupa(inet_ntoa(addr));
-		}
-		if (r->rhost != 0) {
-			addr.s_addr = r->iaddr;
-			rhost_str = strdupa(inet_ntoa(addr));
-		}
-		printf("%"PRIu64":[%s/%s] %s/%s, %s:%d: "
-		       "packets:%"PRIu64", bytes:%"PRIu64"\n",
-		       r->handle, r->table, r->chain,
-		       get_family_string(r->family), get_proto_string(r->proto),
-		       iaddr_str, r->eport, r->packets, r->bytes);
-		break;
-	default:
-		printf("nftables: unknown type: %d\n", r->type);
+	refresh_nft_cache_filter();
+	i = 1;
+	LIST_FOREACH(p, &head_filter, entry) {
+		print_rule("filter", i++, p);
 	}
 
-}
-#else
-void
-print_rule(rule_t *r)
-{
-	char buf[8192];
+	refresh_nft_cache_redirect();
+	i = 1;
+	LIST_FOREACH(p, &head_redirect, entry) {
+		print_rule("redirect", i++, p);
+	}
 
-	nftnl_rule_snprintf(buf, sizeof(buf), r, NFTNL_OUTPUT_DEFAULT, 0);
-	fprintf(stdout, "%s\n", buf);
+	refresh_nft_cache_peer();
+	i = 1;
+	LIST_FOREACH(p, &head_peer, entry) {
+		print_rule("peer", 0, p);
+	}
 }
-#endif
-#define debug_rule(rule)		do { print_rule(rule); } while (0)
+
 #else
 #define debug_rule(rule)
 #endif
@@ -604,7 +480,7 @@ static int
 table_cb(const struct nlmsghdr *nlh, void *data)
 {
 	int result = MNL_CB_OK;
-	struct nftnl_rule *t;
+	struct nftnl_rule *rule;
 	uint32_t len;
 	struct nftnl_expr *expr;
 	struct nftnl_expr_iter *itr;
@@ -622,30 +498,29 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 		log_error("out of memory: %m");
 	} else {
 		memset(r, 0, sizeof(rule_t));
-		t = nftnl_rule_alloc();
-		if (t == NULL) {
+		rule = nftnl_rule_alloc();
+		if (rule == NULL) {
 			log_error("nftnl_rule_alloc() FAILED");
 		} else {
 
-			if (nftnl_rule_nlmsg_parse(nlh, t) < 0) {
+			if (nftnl_rule_nlmsg_parse(nlh, rule) < 0) {
 				log_error("nftnl_rule_nlmsg_parse FAILED");
 			} else {
-
-				chain = (char *) nftnl_rule_get_data(t, NFTNL_RULE_CHAIN, &len);
+				chain = (char *) nftnl_rule_get_data(rule, NFTNL_RULE_CHAIN, &len);
 				if (strcmp(chain, nft_prerouting_chain) == 0 ||
 					strcmp(chain, nft_postrouting_chain) == 0 ||
 					strcmp(chain, nft_forward_chain) == 0) {
 					r->table = strdup(
-							(char *) nftnl_rule_get_data(t, NFTNL_RULE_TABLE, &len));
+							(char *) nftnl_rule_get_data(rule, NFTNL_RULE_TABLE, &len));
 					r->chain = strdup(chain);
-					r->family = *(uint32_t *) nftnl_rule_get_data(t, NFTNL_RULE_FAMILY,
+					r->family = *(uint32_t *) nftnl_rule_get_data(rule, NFTNL_RULE_FAMILY,
 																  &len);
-					descr = (char *) nftnl_rule_get_data(t, NFTNL_RULE_USERDATA,
+					descr = (char *) nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA,
 														 &r->desc_len);
 					if (r->desc_len > 0)
 						r->desc = strndup(descr, r->desc_len);
 
-					r->handle = *(uint32_t *) nftnl_rule_get_data(t,
+					r->handle = *(uint32_t *) nftnl_rule_get_data(rule,
 																  NFTNL_RULE_HANDLE,
 																  &len);
 					r->type = RULE_NONE;
@@ -656,7 +531,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 						r->type = RULE_FILTER;
 					}
 
-					itr = nftnl_expr_iter_create(t);
+					itr = nftnl_expr_iter_create(rule);
 
 					while ((expr = nftnl_expr_iter_next(itr)) != NULL) {
 						rule_expr_cb(expr, r);
@@ -690,7 +565,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					}
 				}
 
-				nftnl_rule_free(t);
+				nftnl_rule_free(rule);
 			}
 		}
 	}
@@ -814,29 +689,6 @@ expr_add_payload(struct nftnl_rule *r, uint32_t base, uint32_t dreg,
 
 	nftnl_rule_add_expr(r, e);
 }
-
-#if 0
-static void
-expr_add_bitwise(struct nftnl_rule *r, uint32_t sreg, uint32_t dreg,
-		 uint32_t len, uint32_t mask, uint32_t xor)
-{
-	struct nftnl_expr *e;
-
-	e = nftnl_expr_alloc("bitwise");
-	if (e == NULL) {
-		log_error("nftnl_expr_alloc(\"%s\") FAILED", "expr_add_bitwise()", "bitwise");
-		return;
-	}
-
-	nftnl_expr_set_u32(e, NFTNL_EXPR_BITWISE_SREG, sreg);
-	nftnl_expr_set_u32(e, NFTNL_EXPR_BITWISE_DREG, dreg);
-	nftnl_expr_set_u32(e, NFTNL_EXPR_BITWISE_LEN, len);
-	nftnl_expr_set(e, NFTNL_EXPR_BITWISE_MASK, &mask, sizeof(mask));
-	nftnl_expr_set(e, NFTNL_EXPR_BITWISE_XOR, &xor, sizeof(xor));
-
-	nftnl_rule_add_expr(r, e);
-}
-#endif
 
 static void
 expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,

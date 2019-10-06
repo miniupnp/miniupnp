@@ -92,6 +92,19 @@ nft_mnl_connect(void);
 void
 nft_mnl_disconnect(void);
 
+#ifdef DEBUG
+void
+print_rule(const char *func, int line, const struct nftnl_rule *rule);
+
+void
+print_redirect_rules(const char * ifname);
+
+#define debug_rule(rule)		do { print_rule(__func__, __LINE__, rule); } while (0)
+
+#else
+#define debug_rule(rule)
+#endif
+
 int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type);
 struct nftnl_rule *
@@ -126,7 +139,6 @@ void refresh_nft_cache_filter(void);
 void refresh_nft_cache_redirect(void);
 void refresh_nft_cache_peer(void);
 void refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family);
-void print_rule(rule_t *r);
 
 int
 table_op(enum nf_tables_msg_types op, uint16_t family, const char * name);
