@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.237 2019/10/03 20:40:40 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.239 2019/10/05 20:21:47 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -48,6 +48,9 @@
 /* unix sockets */
 #ifdef USE_MINIUPNPDCTL
 #include <sys/un.h>
+#endif
+#ifdef ENABLE_HTTPS
+#include <openssl/crypto.h>
 #endif
 
 #ifdef TOMATO
@@ -1851,6 +1854,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	return 0;
 print_usage:
 	fprintf(stderr, "Usage:\n\t"
+	        "%s --version\n\t"
 	        "%s "
 #ifndef DISABLE_CONFIG_FILE
 			"[-f config_file] "
@@ -1930,7 +1934,7 @@ print_usage:
 			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
 #endif
 			"\t-h prints this help and quits.\n"
-	        "", argv[0], pidfilename, DEFAULT_CONFIG);
+	        "", argv[0], argv[0], pidfilename, DEFAULT_CONFIG);
 	return 1;
 }
 
@@ -1991,6 +1995,23 @@ main(int argc, char * * argv)
 	unsigned int next_pinhole_ts;
 #endif
 
+	for(i = 0; i < argc; i++) {
+		if(strcmp(argv[i], "version") == 0 || strcmp(argv[i], "--version") == 0) {
+			puts("miniupnpd " MINIUPNPD_VERSION
+#ifdef MINIUPNPD_GIT_REF
+			     " " MINIUPNPD_GIT_REF
+#endif
+			     " " __DATE__ );
+#ifdef ENABLE_HTTPS
+#ifdef OPENSSL_VERSION
+			puts(OpenSSL_version(OPENSSL_VERSION));
+#else
+			puts(SSLeay_version(SSLEAY_VERSION));
+#endif
+#endif
+			return 0;
+		}
+	}
 	if(init(argc, argv, &v) != 0)
 		return 1;
 #ifdef ENABLE_HTTPS

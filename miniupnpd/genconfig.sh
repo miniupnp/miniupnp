@@ -126,7 +126,7 @@ echo "" >> ${CONFIGFILE}
 
 if [ -n "$DEBUG" ] ; then
 	echo "#define DEBUG 1" >> ${CONFIGFILE}
-    echo "" >> ${CONFIGFILE}
+	echo "" >> ${CONFIGFILE}
 fi
 
 cat >> ${CONFIGFILE} <<EOF

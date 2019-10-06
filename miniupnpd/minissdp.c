@@ -1072,7 +1072,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #endif /* defined(UPNP_STRICT) || defined(DELAY_MSEARCH_RESPONSE) */
 #if defined(UPNP_STRICT)
 			/* Fix UDA-1.2.10 Man header empty or invalid */
-			else if((i < n - 4) && (strncasecmp(bufr+i, "man:", 3) == 0))
+			else if((i < n - 4) && (strncasecmp(bufr+i, "man:", 4) == 0))
 			{
 				const char * man;
 				int man_len;
