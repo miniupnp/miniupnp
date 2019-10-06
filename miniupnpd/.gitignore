@@ -19,6 +19,7 @@ validateupnppermissions
 validategetifaddr
 testssdppktgen
 validatessdppktgen
+validateversion
 .depend
 pf/testobsdrdr
 pf/testpfpinhole
