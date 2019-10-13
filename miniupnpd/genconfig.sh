@@ -406,7 +406,7 @@ case $FW in
 		;;
 	*)
 		echo "Unknown Firewall/packet filtering software [$FW]"
-		echo "Please contact the author at http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/."
+		echo "Please contact the author at http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/."
 		exit 1
 		;;
 esac
