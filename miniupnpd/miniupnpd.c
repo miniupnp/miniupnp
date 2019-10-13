@@ -2002,6 +2002,21 @@ main(int argc, char * * argv)
 			     " " MINIUPNPD_GIT_REF
 #endif
 			     " " __DATE__ );
+#ifdef USE_PF
+			puts("using pf backend");
+#endif
+#ifdef USE_IPF
+			puts("using ipf backend");
+#endif
+#ifdef USE_IPFW
+			puts("using ipfw backend");
+#endif
+#ifdef USE_IPTABLES
+			puts("using netfilter(iptables) backend");
+#endif
+#ifdef USE_NFTABLES
+			puts("using netfilter(nftables) backend");
+#endif
 #ifdef ENABLE_HTTPS
 #ifdef OPENSSL_VERSION
 			puts(OpenSSL_version(OPENSSL_VERSION));
