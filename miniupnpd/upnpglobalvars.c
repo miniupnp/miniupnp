@@ -13,6 +13,8 @@
 #include "upnpglobalvars.h"
 #include "upnpdescstrings.h"
 
+int debug_flag;
+
 /* network interface for internet */
 const char * ext_if_name = 0;
 
@@ -109,6 +111,7 @@ const char * queue = 0;
 const char * tag = 0;
 #endif
 
+#ifdef USE_NETFILTER
 #ifdef USE_IPTABLES
 /* chain names to use in the nat and filter tables. */
 
@@ -129,7 +132,8 @@ const char * miniupnpd_forward_chain = "MINIUPNPD";
  * ip6tables -t filter -A FORWARD -i <ext_if_name> ! -o <ext_if_name> -j MINIUPNPD */
 const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
 #endif /* ENABLE_UPNPPINHOLE */
-
+#endif
+const char * runas_user = "nobody";
 #endif /* USE_NETFILTER */
 
 #ifdef ENABLE_NFQUEUE

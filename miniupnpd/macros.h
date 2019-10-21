@@ -16,6 +16,26 @@
 #define FALL_THROUGH
 #endif
 
+#ifdef DEBUG
+#define d_printf(x) do { printf x; } while (0)
+#else
+#define d_printf(x)
+#endif
+
+#if (__STDC_VERSION__ >= 199901L) && (__GNUC__ >= 3)
+/* disambiguate log messages by adding position in source. requires GNU C99 or later. Pesky trailing comma... */
+#define log_error( msg, ...)	syslog(LOG_ERR,   "%s:%d: in %s(); " msg, __FILE__, __LINE__, __func__, ##__VA_ARGS__ )
+#define log_notice( msg, ...)	syslog(LOG_NOTICE,"%s:%d: in %s(); " msg, __FILE__, __LINE__, __func__, ##__VA_ARGS__ )
+#define log_info( msg, ...)		syslog(LOG_INFO,  "%s:%d: in %s(); " msg, __FILE__, __LINE__, __func__, ##__VA_ARGS__ )
+#define log_debug( msg, ...)	syslog(LOG_DEBUG, "%s:%d: in %s(); " msg, __FILE__, __LINE__, __func__, ##__VA_ARGS__ )
+#else
+/* supported by every C preprocessor */
+#define log_error(args...)	syslog(LOG_ERR, args)
+#define log_notice(args...)	syslog(LOG_NOTICE, args)
+#define log_info(args...)	syslog(LOG_INFO, args)
+#define log_debug(args...)	syslog(LOG_DEBUG, args)
+#endif
+
 #include <stdint.h>
 
 #ifndef INLINE

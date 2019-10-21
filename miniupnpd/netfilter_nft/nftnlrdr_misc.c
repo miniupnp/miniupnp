@@ -43,23 +43,6 @@
 #include "../macros.h"
 
 
-#ifdef DEBUG
-#define d_printf(x) do { printf x; } while (0)
-#else
-#define d_printf(x)
-#endif
-
-#if defined(DEBUG) && (__STDC_VERSION__ >= 199901L) && (__GNUC__ >= 3)
-/* disambiguate log messages by adding position in source. GNU C99 or later. Pesky trailing comma... */
-#define log_error( msg, ...)	syslog(LOG_ERR, "%s[%d]: " msg, __func__, __LINE__, ##__VA_ARGS__ )
-#define log_debug( msg, ...)	syslog(LOG_DEBUG, "%s[%d]: " msg, __func__, __LINE__, ##__VA_ARGS__ )
-#else
-/* original style */
-#define log_error(args...)	syslog(LOG_ERR, args)
-#define log_debug(args...)	syslog(LOG_DEBUG, args)
-#endif
-
-
 #define RULE_CACHE_INVALID  0
 #define RULE_CACHE_VALID    1
 
@@ -654,20 +637,14 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		return;
 	}
 
-	ret = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
-	while (ret > 0) {
-		ret = mnl_cb_run(buf, ret, mnl_seq, mnl_portid, table_cb, &type);
-		if (ret > 0)
-		{
-			ret = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+	do {
+		ret = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+		if (ret == -1) log_error("mnl_socket_recvfrom() FAILED: %m");
+		if (ret > 0) {
+			ret = mnl_cb_run(buf, ret, mnl_seq, mnl_portid, table_cb, &type);
+			if (ret == -1) log_error("mnl_cb_run() FAILED: %m");
 		}
-	}
-
-	if (ret == -1) {
-		log_error("mnl_socket_recvfrom() FAILED: %m");
-	}
-
-	return;
+	} while (ret > 0);
 }
 
 static void

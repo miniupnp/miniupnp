@@ -59,6 +59,7 @@ enum upnpconfigoptions {
 	UPNPFORWARDCHAIN,
 	UPNPNATCHAIN,
 	UPNPNATPOSTCHAIN,
+	UPNPUSER,				/* user to switch to, when dropping privileges */
 #endif
 #ifdef USE_PF
 	UPNPANCHOR,				/* anchor */

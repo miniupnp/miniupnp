@@ -14,6 +14,9 @@
 #include "miniupnpdtypes.h"
 #include "config.h"
 
+/* turn on extra debugging support */
+extern int debug_flag;
+
 /* name of the network interface used to access internet */
 extern const char * ext_if_name;
 
@@ -142,6 +145,7 @@ extern const char * queue;
 extern const char * tag;
 #endif
 
+#ifdef USE_NETFILTER
 #ifdef USE_IPTABLES
 extern const char * miniupnpd_nat_chain;
 extern const char * miniupnpd_nat_postrouting_chain;
@@ -149,6 +153,8 @@ extern const char * miniupnpd_forward_chain;
 #ifdef ENABLE_UPNPPINHOLE
 extern const char * miniupnpd_v6_filter_chain;
 #endif
+#endif
+extern const char * runas_user;
 #endif
 
 #ifdef ENABLE_NFQUEUE
