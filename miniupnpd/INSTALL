@@ -112,8 +112,14 @@ How to get libiptc with its headers on debian :
 
 ======================== Linux/netfilter nftables =========================
 
-work is in progress. To build :
+work is in progress.
+install the required development libraries. For debian :
+ > apt-get install libnftnl-dev libmnl-dev
+
+To build :
  > make -f Makefile.linux_nft
+(first clean any old config if you built the netfilter/iptables version
+previoulsy)
 
 see :
 https://miniupnp.tuxfamily.org/forum/viewtopic.php?p=4370
