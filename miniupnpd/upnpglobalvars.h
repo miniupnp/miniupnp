@@ -154,7 +154,6 @@ extern const char * miniupnpd_forward_chain;
 extern const char * miniupnpd_v6_filter_chain;
 #endif
 #endif
-extern const char * runas_user;
 #endif
 
 #ifdef ENABLE_NFQUEUE
