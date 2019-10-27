@@ -1316,7 +1316,7 @@ openAllSockets(struct runtime_vars * v)
 			v->shttpl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
 			if (v->shttpl_v4 < 0)
 			{
-				log_error("Failed to open socket for HTTP on port %d (IPv4). EXITING", v->port);
+				log_error("Failed to open socket for HTTP on port %d (IPv4). EXITING", v->http_port);
 				return 1;
 			}
 		}
@@ -1514,10 +1514,10 @@ closeAllSockets(struct runtime_vars * v)
 	}
 #endif
 #if defined(ENABLE_IPV6) && defined(ENABLE_PCP)
-	if(spcp_v6 >= 0)
+	if(v->spcp_v6 >= 0)
 	{
-		close(spcp_v6);
-		spcp_v6 = -1;
+		close(v->spcp_v6);
+		v->spcp_v6 = -1;
 	}
 #endif
 #ifdef USE_MINIUPNPDCTL
@@ -2438,7 +2438,7 @@ main_loop(struct runtime_vars * v)
 			if(GETFLAG(ENABLENATPMPMASK))
 			{
 #ifdef ENABLE_IPV6
-				PCPPublicAddressChanged(snatpmp, v->addr_count, spcp_v6);
+				PCPPublicAddressChanged(v->snatpmp, v->addr_count, v->spcp_v6);
 #else /* IPv4 only */
 				PCPPublicAddressChanged(v->snatpmp, v->addr_count);
 #endif
@@ -2818,7 +2818,7 @@ main_loop(struct runtime_vars * v)
 					       sender_str);
 					continue;
 				}
-				ProcessIncomingNATPMPPacket(snatpmp[i], msg_buff, len, &senderaddr);
+				ProcessIncomingNATPMPPacket(v->snatpmp[i], msg_buff, len, &senderaddr);
 #endif
 			}
 		}
@@ -2850,7 +2850,7 @@ main_loop(struct runtime_vars * v)
 		{
 			/*log_info("Received UDP Packet");*/
 #ifdef ENABLE_HTTPS
-			ProcessSSDPRequest(v->sudp, (unsigned short)v->port, (unsigned short)v->https_port);
+			ProcessSSDPRequest(v->sudp, (unsigned short)v->http_port, (unsigned short)v->https_port);
 #else
 			ProcessSSDPRequest(v->sudp, (unsigned short)v->http_port);
 #endif
@@ -2860,9 +2860,9 @@ main_loop(struct runtime_vars * v)
 		{
 			log_info("Received UDP Packet (IPv6)");
 #ifdef ENABLE_HTTPS
-			ProcessSSDPRequest(v->sudpv6, (unsigned short)v->port, (unsigned short)v->https_port);
+			ProcessSSDPRequest(v->sudpv6, (unsigned short)v->http_port, (unsigned short)v->https_port);
 #else
-			ProcessSSDPRequest(v->sudpv6, (unsigned short)v->port);
+			ProcessSSDPRequest(v->sudpv6, (unsigned short)v->http_port);
 #endif
 		}
 #endif
@@ -3028,50 +3028,10 @@ main(int argc, char * argv[])
 		log_error("pledge(): %m");
 		return 1;
 	}
-	result = main_loop(&v);
 #endif /* HAS_PLEDGE */
-
-#ifdef HAS_FORK
-
-	/* fork(), so we can regain our original privileges at exit to clean up things like the pid file */
-	switch (child = fork()) {
-	case -1: /* fork failed */
-		log_error("unable to fork: %m");
-		result = 1;
-		break;
-
-	case 0: /* I'm the child process */
-		/* drop privileges */
-		userInfo = getpwnam(runas_user);
-		if (userInfo == NULL) {
-			log_error("invalid user name '%s': %m", runas_user);
-			return 1;
-		} else {
-			/* change the effective group - always do this first */
-			if (setgid(userInfo->pw_gid) == -1) {
-				struct group *groupInfo = getgrgid(userInfo->pw_gid);
-				log_error("unable to switch to group '%s': %m", groupInfo->gr_name);
-				return 1;
-			}
-			/* change the effective user */
-			if (setuid(userInfo->pw_uid) == -1) {
-				log_error("unable to switch to user '%s': %m", userInfo->pw_name);
-				return 1;
-			}
-		}
-		/* execute the main loop with reduced privileges */
-		return main_loop(&v);
-
-	default: /* I'm the parent process */
-		/* do absolutely *nothing* except wait for child to complete */
-		waitpid(child, &result, 0);
-		break;
-	}
-#endif /* HAS_FORK */
-#else
-	result = main_loop(&v);
 #endif /* DROP_PRIVILEGES */
 
+	result = main_loop(&v);
 	if (result != 0)
 		return result;
 
