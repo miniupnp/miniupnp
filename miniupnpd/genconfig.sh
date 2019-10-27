@@ -330,8 +330,6 @@ case $OS_NAME in
 					;;
 			esac
 		fi
-        echo "#define DROP_PRIVILEGES 1" >> ${CONFIGFILE}
-        echo "#define HAS_FORK 1" >>  ${CONFIGFILE}
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		if [ -z ${FW} ]; then
 			# test the current environment to determine which to use
