@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.455 2019/10/05 18:05:10 nanard Exp $
+$Id: Changelog.txt,v 1.457 2019/12/23 23:41:29 nanard Exp $
+
+2019/12/18:
+  Fix PCPSendUnsolicitedAnnounce() when IPv6 is not available
 
 2019/10/05:
   Use OpenSSL TLS_server_method() instead of TLSv1_server_method()
