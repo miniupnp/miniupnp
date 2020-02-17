@@ -12,6 +12,10 @@
 #include "portlistingparse.h"
 #include "minixml.h"
 
+#if defined(__HAIKU__)
+#define atoui atoui2
+#endif 
+
 /* list of the elements */
 static const struct {
 	const portMappingElt code;

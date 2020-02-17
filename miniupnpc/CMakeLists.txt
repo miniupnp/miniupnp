@@ -96,6 +96,12 @@ if (WIN32)
 #  find_library (NSL_LIBRARY NAMES nsl)
 #  find_library (RESOLV_LIBRARY NAMES resolv)
 #  set (LDLIBS ${SOCKET_LIBRARY} ${NSL_LIBRARY} ${RESOLV_LIBRARY} ${LDLIBS})
+elseif (HAIKU)
+  target_link_libraries(miniupnpc-private INTERFACE network)
+  find_library (SOCKET_LIBRARY NAMES network)
+  find_library (NSL_LIBRARY NAMES network)
+  find_library (RESOLV_LIBRARY NAMES network)
+  set (LDLIBS ${SOCKET_LIBRARY} ${NSL_LIBRARY} ${RESOLV_LIBRARY} ${LDLIBS})  
 endif ()
 
 
