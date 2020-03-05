@@ -102,7 +102,7 @@ endif
 ARCH ?= $(shell uname -m | grep -q "x86_64" && echo 64)
 ifdef IPTABLESPATH
 CPPFLAGS := $(CPPFLAGS) -I$(IPTABLESPATH)/include/
-LDFLAGS := $(LDFLAFGS) -L$(IPTABLESPATH)/libiptc/
+LDFLAGS := $(LDFLAGS) -L$(IPTABLESPATH)/libiptc/
 # get iptables version and set IPTABLES_143 macro if needed
 ifeq ($(TARGET_OPENWRT),)
 IPTABLESVERSION := $(shell grep "\#define VERSION" $(IPTABLESPATH)/config.h | tr -d \" |cut -d" " -f3 )
