@@ -333,21 +333,36 @@ add_redirect_rule2(const char * ifname,
 		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);
 		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
 		{
+#ifdef PFVAR_NEW_STYLE
+			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4addr.s_addr);
+		  pcr.rule.src.addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
+#else
 			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4.s_addr);
 			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
+#endif
 		}
 		if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0')
 		{
+#ifdef PFVAR_NEW_STYLE
+			inet_pton(AF_INET, use_ext_ip_addr, &pcr.rule.dst.addr.v.a.addr.v4addr.s_addr);
+			pcr.rule.dst.addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
+#else
 			inet_pton(AF_INET, use_ext_ip_addr, &pcr.rule.dst.addr.v.a.addr.v4.s_addr);
 			pcr.rule.dst.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
+#endif
 		}
 #ifndef PF_NEWSTYLE
 		pcr.rule.rpool.proxy_port[0] = iport;
 		pcr.rule.rpool.proxy_port[1] = iport;
 		TAILQ_INIT(&pcr.rule.rpool.list);
 		a = calloc(1, sizeof(struct pf_pooladdr));
+#ifdef PFVAR_NEW_STYLE
+		inet_pton(AF_INET, iaddr, &a->addr.v.a.addr.v4addr.s_addr);
+		a->addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
+#else
 		inet_pton(AF_INET, iaddr, &a->addr.v.a.addr.v4.s_addr);
 		a->addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
+#endif
 		TAILQ_INSERT_TAIL(&pcr.rule.rpool.list, a, entries);
 
 		memcpy(&pp.addr, a, sizeof(struct pf_pooladdr));
@@ -592,22 +607,36 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 				syslog(LOG_ERR, "ioctl(dev, DIOCGETADDR, ...): %m");
 				goto error;
 			}
+#ifdef PFVAR_NEW_STYLE
+			inet_ntop(AF_INET, &pp.addr.addr.v.a.addr.v4addr.s_addr,
+			          iaddr, iaddrlen);
+#else
 			inet_ntop(AF_INET, &pp.addr.addr.v.a.addr.v4.s_addr,
 			          iaddr, iaddrlen);
+#endif
 #else
 			inet_ntop(AF_INET, &pr.rule.rdr.addr.v.a.addr.v4.s_addr,
 			          iaddr, iaddrlen);
 #endif
 			if(rhost && rhostlen > 0)
 			{
+#ifdef PFVAR_NEW_STYLE
+				if (pr.rule.src.addr.v.a.addr.v4addr.s_addr == 0)
+#else
 				if (pr.rule.src.addr.v.a.addr.v4.s_addr == 0)
+#endif
 				{
 					rhost[0] = '\0'; /* empty string */
 				}
 				else
 				{
+#ifdef PFVAR_NEW_STYLE
+					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4addr.s_addr,
+					          rhost, rhostlen);
+#else
 					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr,
 					          rhost, rhostlen);
+#endif
 				}
 			}
 			if(timestamp)
@@ -698,7 +727,11 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 					syslog(LOG_ERR, "ioctl(dev, DIOCGETADDR, ...): %m");
 					goto error;
 				}
+#ifdef PFVAR_NEW_STYLE
+				*iaddr = pp.addr.addr.v.a.addr.v4addr.s_addr;
+#else
 				*iaddr = pp.addr.addr.v.a.addr.v4.s_addr;
+#endif
 			}
 #else
 			if(iport) *iport = pr.rule.rdr.proxy_port[0];
@@ -710,11 +743,20 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 #endif
 			if(rhost && rhostlen > 0)
 			{
+#ifdef PFVAR_NEW_STYLE
+				if (pr.rule.src.addr.v.a.addr.v4addr.s_addr == 0)
+#else
 				if (pr.rule.src.addr.v.a.addr.v4.s_addr == 0)
+#endif
 					rhost[0] = '\0'; /* empty string */
 				else
+#ifdef PFVAR_NEW_STYLE
+					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4addr.s_addr,
+					          rhost, rhostlen);
+#else
 					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr,
 					          rhost, rhostlen);
+#endif
 			}
 			if(check_desc) {
 				if((desc == NULL && pr.rule.label[0] == '\0') ||
@@ -922,22 +964,36 @@ get_redirect_rule_by_index(int index,
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETADDR, ...): %m");
 		goto error;
 	}
+#ifdef PFVAR_NEW_STYLE
+	inet_ntop(AF_INET, &pp.addr.addr.v.a.addr.v4addr.s_addr,
+	          iaddr, iaddrlen);
+#else
 	inet_ntop(AF_INET, &pp.addr.addr.v.a.addr.v4.s_addr,
 	          iaddr, iaddrlen);
+#endif
 #else
 	inet_ntop(AF_INET, &pr.rule.rdr.addr.v.a.addr.v4.s_addr,
 	          iaddr, iaddrlen);
 #endif
 	if(rhost && rhostlen > 0)
 	{
+#ifdef PFVAR_NEW_STYLE
+		if (pr.rule.src.addr.v.a.addr.v4addr.s_addr == 0)
+#else
 		if (pr.rule.src.addr.v.a.addr.v4.s_addr == 0)
+#endif
 		{
 			rhost[0] = '\0'; /* empty string */
 		}
 		else
 		{
+#ifdef PFVAR_NEW_STYLE
+			inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4addr.s_addr,
+			          rhost, rhostlen);
+#else
 			inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr,
 			          rhost, rhostlen);
+#endif
 		}
 	}
 	if(timestamp)

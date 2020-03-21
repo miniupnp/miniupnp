@@ -61,7 +61,10 @@ also bsdmake is not available anymore.
 Make sure you have installed the Xcode commande line tools (from the
 Xcode Preferences menu or using 'xcode-select --install' command)
 
-You'll need to download xnu sources : https://github.com/opensource-apple/xnu
+You need to download xnu sources : https://opensource.apple.com/tarballs/xnu/
+- If version of xnu >= 4570,
+  > ./genconfig.sh
+  Then edit config.h, adding line "#define PFVAR_NEW_STYLE" to it.
 > INCLUDES="-I.../xnu/bsd -I.../xnu/libkern" make -f Makefile.macosx
 
 ============================ Linux/netfilter ==============================
