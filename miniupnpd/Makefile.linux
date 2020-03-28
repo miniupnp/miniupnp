@@ -63,40 +63,48 @@ NETFILTEROBJS = netfilter/iptcrdr.o netfilter/iptpinhole.o netfilter/nfct_get.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
-PCFILE_FOUND := $(shell $(PKG_CONFIG) --exists libiptc; echo $$?)
+XTABLES_FOUND := $(shell $(PKG_CONFIG) --exists xtables libip4tc libip6tc; echo $$?)
+IPTC_FOUND := $(shell $(PKG_CONFIG) --exists libiptc; echo $$?)
 
-ifeq (${PCFILE_FOUND},0)
+ifeq (${XTABLES_FOUND},0)
+  CPPFLAGS += -DIPTABLES_143
 
-IPTABLESVERSION := $(shell $(PKG_CONFIG) --modversion libiptc)
-IPTVER1 := $(shell echo $(IPTABLESVERSION) | cut -d. -f1 )
-IPTVER2 := $(shell echo $(IPTABLESVERSION) | cut -d. -f2 )
-IPTVER3 := $(shell echo $(IPTABLESVERSION) | cut -d. -f3 )
-# test if iptables version >= 1.4.3
-TEST := $(shell [ $(IPTVER1) -gt 1 ] || \
-	[ \( $(IPTVER1) -eq 1 \) -a \
-	  \( \( $(IPTVER2) -gt 4 \) -o \
-	     \( \( $(IPTVER2) -eq 4 \) -a \( $(IPTVER3) -ge 3 \) \) \) ] && echo 1 )
-ifeq ($(TEST), 1)
-CPPFLAGS += -DIPTABLES_143
-endif
+  CFLAGS  += $(shell $(PKG_CONFIG) --cflags xtables libip4tc libip6tc)
+  #OpenWrt packager passes correct libraries
+  ifeq ($(TARGET_OPENWRT),)
+    LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l xtables libip4tc libip6tc)
+  endif
+  LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L xtables libip4tc libip6tc)
+  LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other xtables libip4tc libip6tc)
+else ifeq (${IPTC_FOUND},0)
+  IPTABLESVERSION := $(shell $(PKG_CONFIG) --modversion libiptc)
+  IPTVER1 := $(shell echo $(IPTABLESVERSION) | cut -d. -f1 )
+  IPTVER2 := $(shell echo $(IPTABLESVERSION) | cut -d. -f2 )
+  IPTVER3 := $(shell echo $(IPTABLESVERSION) | cut -d. -f3 )
+  # test if iptables version >= 1.4.3
+  TEST := $(shell [ $(IPTVER1) -gt 1 ] || \
+    [ \( $(IPTVER1) -eq 1 \) -a \
+      \( \( $(IPTVER2) -gt 4 \) -o \
+         \( \( $(IPTVER2) -eq 4 \) -a \( $(IPTVER3) -ge 3 \) \) \) ] && echo 1 )
+  ifeq ($(TEST), 1)
+    CPPFLAGS += -DIPTABLES_143
+  endif
 
-CFLAGS  += $(shell $(PKG_CONFIG) --cflags libiptc)
-#OpenWrt packager passes correct libraries
-ifeq ($(TARGET_OPENWRT),)
-LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l libiptc)
-endif
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libiptc)
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other libiptc)
-else
-
-ifeq "$(wildcard /etc/gentoo-release )" ""
-LDLIBS ?= -liptc
+  CFLAGS  += $(shell $(PKG_CONFIG) --cflags libiptc)
+  #OpenWrt packager passes correct libraries
+  ifeq ($(TARGET_OPENWRT),)
+    LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l libiptc)
+  endif
+  LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libiptc)
+  LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other libiptc)
+else ifeq "$(wildcard /etc/gentoo-release )" ""
+  LDLIBS ?= -liptc
 else # gentoo
-# the following is better, at least on gentoo with iptables 1.4.6
-# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=1618
-# and http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=2183
-LDLIBS ?= -lip4tc
-CPPFLAGS := -DIPTABLES_143 $(CPPFLAGS)
+  # the following is better, at least on gentoo with iptables 1.4.6
+  # see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=1618
+  # and http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=2183
+  LDLIBS ?= -lip4tc
+  CPPFLAGS := -DIPTABLES_143 $(CPPFLAGS)
 endif
 
 ARCH ?= $(shell uname -m | grep -q "x86_64" && echo 64)
