@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.457 2019/12/23 23:41:29 nanard Exp $
+$Id: Changelog.txt,v 1.458 2020/03/29 09:07:37 nanard Exp $
+
+2020/03/29:
+  Fix FreeBSD build
 
 2019/12/18:
   Fix PCPSendUnsolicitedAnnounce() when IPv6 is not available
