@@ -5,6 +5,9 @@ LIBRARY
 EXPORTS
 ; miniupnpc
    upnpDiscover
+   upnpDiscoverDevice
+   upnpDiscoverDevices
+   upnpDiscoverAll
    freeUPNPDevlist
    parserootdesc
    UPNP_GetValidIGD
