@@ -67,7 +67,7 @@ dll-%.o:	%.c
 
 # --enable-stdcall-fixup
 %-static.exe:	%.o libminiupnpc.a
-	$(CC) -o $@ $^ $(LDLIBS)
+	$(CC) -static -o $@ $^ $(LDLIBS)
 
 %-shared.exe:	%-shared.o miniupnpc.lib
 	$(CC) -o $@ $^ $(LDLIBS)
