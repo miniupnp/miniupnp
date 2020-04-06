@@ -28,7 +28,7 @@ build_script:
   - mingw32-make -f Makefile.mingw pythonmodule PYTHON=%PYTHON_VER%
 
 after_build:
-  - 7z a ..\miniupnpc-%APPVEYOR_BUILD_VERSION%.zip *.exe *.dll *.a *.lib
+  - 7z a -x!wingenminiupnpcstrings.exe ..\miniupnpc-%APPVEYOR_BUILD_VERSION%.zip *.exe *.dll *.a *.lib
 
 artifacts:
   - path: miniupnpc-$(appveyor_build_version).zip

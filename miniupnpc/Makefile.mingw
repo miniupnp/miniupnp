@@ -27,20 +27,16 @@ OBJS=miniwget.o minixml.o igd_desc_parse.o minisoap.o \
      miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
      connecthostport.o portlistingparse.o receivedata.o \
      upnpdev.o
-OBJSDLL=$(addprefix dll/, $(OBJS))
+OBJSDLL=$(addprefix dll-, $(OBJS))
 
-all:	init upnpc-static upnpc-shared testminixml libminiupnpc.a \
-	miniupnpc.dll listdevices
-
-init:
-	mkdir dll
-	echo init > init
+all:	upnpc-static.exe upnpc-shared.exe testminixml.exe libminiupnpc.a \
+	miniupnpc.dll listdevices-static.exe listdevices-shared.exe
 
 clean:
-	$(RM) upnpc testminixml *.o
-	$(RM) dll\*.o
+	$(RM) miniupnpcstrings.h
+	$(RM) *.o
 	$(RM) *.exe
-	$(RM) miniupnpc.dll
+	$(RM) miniupnpc.dll miniupnpc.lib miniupnpc.dll.def
 	$(RM) libminiupnpc.a
 
 libminiupnpc.a:	$(OBJS)
@@ -51,7 +47,7 @@ pythonmodule:	libminiupnpc.a
 	$(PYTHON) setupmingw32.py install --skip-build
 	$(PYTHON) setupmingw32.py bdist_wheel --skip-build
 
-miniupnpc.dll:	libminiupnpc.a $(OBJSDLL)
+miniupnpc.dll:	miniupnpc.def $(OBJSDLL)
 	$(DLLWRAP) -k --driver-name $(CC) \
 	--def miniupnpc.def \
 	--output-def miniupnpc.dll.def \
@@ -59,39 +55,31 @@ miniupnpc.dll:	libminiupnpc.a $(OBJSDLL)
 	$(OBJSDLL) $(LDLIBS)
 
 miniupnpc.lib:	miniupnpc.dll
-#	echo $@ generated with $<
 
-dll/upnpc.o:	upnpc.o
-#	echo $@ generated with $<
-
-.c.o:
+%.o:	%.c
 	$(CC) $(CFLAGS) -DMINIUPNP_STATICLIB -c -o $@ $<
-	$(CC) $(CFLAGS) -DMINIUPNP_EXPORTS -c -o dll/$@ $<
 
-upnpc.o:	upnpc.c
-	$(CC) $(CFLAGS) -DMINIUPNP_STATICLIB -c -o $@ $<
-	$(CC) $(CFLAGS) -c -o dll/$@ $<
+dll-%.o:	%.c
+	$(CC) $(CFLAGS) -DMINIUPNP_EXPORTS -c -o $@ $<
+
+%-shared.o:	%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 # --enable-stdcall-fixup
-upnpc-static:	upnpc.o libminiupnpc.a
+%-static.exe:	%.o libminiupnpc.a
+	$(CC) -static -o $@ $^ $(LDLIBS)
+
+%-shared.exe:	%-shared.o miniupnpc.lib
 	$(CC) -o $@ $^ $(LDLIBS)
-
-upnpc-shared:	dll/upnpc.o miniupnpc.lib
-	$(CC) -o $@ $^ $(LDLIBS)
-
-listdevices: listdevices.o libminiupnpc.a
-	$(CC) -o $@ $^ $(LDLIBS)
-
-wingenminiupnpcstrings:	wingenminiupnpcstrings.o
-
-wingenminiupnpcstrings.o:	wingenminiupnpcstrings.c
 
 # To make miniupnpcstrings.h from miniupnpcstrings.h.in we either
 # use a custom executable (if running make under windows) or use
 # sed (if cross compiling from another platform).
 ifeq ($(OS),Windows_NT)
-miniupnpcstrings.h: miniupnpcstrings.h.in wingenminiupnpcstrings
-	wingenminiupnpcstrings $< $@
+wingenminiupnpcstrings.exe:	wingenminiupnpcstrings.c
+	$(CC) $(CFLAGS) -o $@ $^
+miniupnpcstrings.h: miniupnpcstrings.h.in wingenminiupnpcstrings.exe
+	wingenminiupnpcstrings.exe $< $@
 else
 miniupnpcstrings.h:	miniupnpcstrings.h.in VERSION
 	sed 's|OS_STRING ".*"|OS_STRING "Windows/Mingw32"|' $< | \
@@ -111,7 +99,7 @@ miniupnpc.o:	miniupnpc.c miniupnpc.h minisoap.h miniwget.h minixml.h
 
 igd_desc_parse.o:	igd_desc_parse.c igd_desc_parse.h
 
-testminixml:	minixml.o igd_desc_parse.o testminixml.c
+testminixml.exe:	minixml.o igd_desc_parse.o testminixml.c
 
 upnpreplyparse.o:	upnpreplyparse.c upnpreplyparse.h minixml.h
 
