@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 # vim: tabstop=2 shiftwidth=2 expandtab
 # MiniUPnP project
 # Author : Thomas Bernard

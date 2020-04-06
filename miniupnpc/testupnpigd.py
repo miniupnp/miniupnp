@@ -1,9 +1,9 @@
-#! /usr/bin/python
-# $Id: testupnpigd.py,v 1.4 2008/10/11 10:27:20 nanard Exp $
+#! /usr/bin/env python
+# $Id: testupnpigd.py,v 1.7 2020/04/06 10:23:02 nanard Exp $
 # MiniUPnP project
 # Author : Thomas Bernard
 # This Sample code is public domain.
-# website : http://miniupnp.tuxfamily.org/
+# website : https://miniupnp.tuxfamily.org/
 
 # import the python miniupnpc module
 import miniupnpc

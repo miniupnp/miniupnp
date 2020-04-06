@@ -1,8 +1,8 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 # vim: tabstop=8 shiftwidth=8 expandtab
-# $Id: setup.py,v 1.9 2012/05/23 08:50:10 nanard Exp $
-# the MiniUPnP Project (c) 2007-2017 Thomas Bernard
-# http://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/
+# $Id: setup.py,v 1.14 2020/04/06 10:23:02 nanard Exp $
+# the MiniUPnP Project (c) 2007-2020 Thomas Bernard
+# https://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/
 #
 # python script to build the miniupnpc module under unix
 #
