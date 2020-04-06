@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.88 2016/02/10 20:32:43 nanard Exp $
+# $Id: Makefile,v 1.96 2020/04/06 09:56:53 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -47,8 +47,9 @@ FWNAME = pf
 
 # better way to find if we are using ipf or pf
 .if $(OSNAME) == "FreeBSD"
-.if exists(/etc/rc.subr) && exists(/etc/default/rc.conf)
-FWNAME != . /etc/rc.subr; . /etc/default/rc.conf; \
+.if exists(/etc/rc.subr) && exists(/etc/defaults/rc.conf)
+FWNAME != . /etc/rc.subr; . /etc/defaults/rc.conf; \
+          if [ -f /etc/rc.conf ] ; then . /etc/rc.conf ; fi ; \
           if checkyesno ipfilter_enable; then \
           echo "ipf"; elif checkyesno pf_enable; then \
           echo "pf"; elif checkyesno firewall_enable; then \
@@ -98,7 +99,7 @@ CFLAGS += -m64 -mcmodel=medlow
 .endif
 .endif
 
-ISGITREPO != git rev-parse --is-inside-work-tree
+ISGITREPO != git rev-parse --is-inside-work-tree 2> /dev/null || echo "false"
 .if $(ISGITREPO) == "true"
 GITREF != git rev-parse --short HEAD
 GITBRANCH != git rev-parse --abbrev-ref HEAD
