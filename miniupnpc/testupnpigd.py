@@ -29,7 +29,7 @@ class handler_class(BaseHTTPRequestHandler):
 	def do_GET(self):
 		self.send_response(200)
 		self.end_headers()
-		self.wfile.write("OK MON GARS")
+		self.wfile.write(b"OK MON GARS")
 
 # create the object
 u = miniupnpc.UPnP()
