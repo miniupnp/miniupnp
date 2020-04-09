@@ -1,8 +1,8 @@
-/* $Id: miniupnpd.c,v 1.239 2019/10/05 20:21:47 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.242 2020/04/09 18:38:14 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -1225,6 +1225,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					fprintf(stderr, "can't parse \"%s\" as valid IPv6 listening address", ary_options[i].value);
 				}
 				break;
+			case UPNPIPV6_DISABLE:
+				if(strcmp(ary_options[i].value, "yes") == 0)
+					SETFLAG(IPV6DISABLEDMASK);
+				break;
 #endif /* ENABLE_IPV6 */
 			case UPNPPORT:
 				v->port = atoi(ary_options[i].value);
@@ -1423,6 +1427,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 		else switch(argv[i][1])
 		{
+#ifdef ENABLE_IPV6
+		case '4':
+			SETFLAG(IPV6DISABLEDMASK);
+			break;
+#endif
 #ifdef IGD_V2
 		case '1':
 			SETFLAG(FORCEIGDDESCV1MASK);
@@ -1861,7 +1870,7 @@ print_usage:
 #endif
 			"[-i ext_ifname] "
 #ifdef ENABLE_IPV6
-			"[-I ext_ifname6] "
+			"[-I ext_ifname6] [-4] "
 #endif
 			"[-o ext_ip]\n"
 #ifndef MULTIPLE_EXTERNAL_IP
@@ -1905,6 +1914,9 @@ print_usage:
 			"\tDefault config file is '%s'.\n"
 			"\tWith -d miniupnpd will run as a standard program.\n"
 			"\t-o argument is either an IPv4 address or \"STUN:host[:port]\".\n"
+#ifdef ENABLE_IPV6
+			"\t-4 disable IPv6\n"
+#endif
 #if defined(USE_PF) || defined(USE_IPF)
 			"\t-L sets packet log in pf and ipf on.\n"
 #endif
@@ -2113,7 +2125,7 @@ main(int argc, char * * argv)
 		listen_port = (v.port > 0) ? v.port : 0;
 		/* open socket for HTTP connections. Listen on the 1st LAN address */
 #ifdef ENABLE_IPV6
-		shttpl = OpenAndConfHTTPSocket(&listen_port, 1);
+		shttpl = OpenAndConfHTTPSocket(&listen_port, !GETFLAG(IPV6DISABLEDMASK));
 #else /* ENABLE_IPV6 */
 		shttpl = OpenAndConfHTTPSocket(&listen_port);
 #endif /* ENABLE_IPV6 */
@@ -2139,7 +2151,7 @@ main(int argc, char * * argv)
 		/* https */
 		listen_port = (v.https_port > 0) ? v.https_port : 0;
 #ifdef ENABLE_IPV6
-		shttpsl = OpenAndConfHTTPSocket(&listen_port, 1);
+		shttpsl = OpenAndConfHTTPSocket(&listen_port, !GETFLAG(IPV6DISABLEDMASK));
 #else /* ENABLE_IPV6 */
 		shttpsl = OpenAndConfHTTPSocket(&listen_port);
 #endif /* ENABLE_IPV6 */
