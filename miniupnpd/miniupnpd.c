@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.242 2020/04/09 18:38:14 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.243 2020/04/12 17:43:13 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -2115,6 +2115,7 @@ main(int argc, char * * argv)
 		} else if (addr_is_reserved(&addr)) {
 			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
+			syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
 			disable_port_forwarding = 1;
 		}
 	}
