@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: genconfig.sh,v 1.103 2019/10/03 20:40:39 nanard Exp $
+# $Id: genconfig.sh,v 1.107 2020/04/12 17:27:33 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -499,6 +499,12 @@ echo "" >> ${CONFIGFILE}
 echo "/* Uncomment the following line to enable generation of" >> ${CONFIGFILE}
 echo " * filter rules with pf */" >> ${CONFIGFILE}
 echo "/*#define PF_ENABLE_FILTER_RULES*/">> ${CONFIGFILE}
+echo "" >> ${CONFIGFILE}
+
+echo "/* Uncomment the following line to set dst address in rdr rules with pf." >> ${CONFIGFILE}
+echo " * It is disabled by default because of" >> ${CONFIGFILE}
+echo " * https://github.com/miniupnp/miniupnp/issues/433 */" >> ${CONFIGFILE}
+echo "/*#define PF_SET_DST_ADDR*/">> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
 echo "/* Uncomment the following line to enable caching of results of" >> ${CONFIGFILE}

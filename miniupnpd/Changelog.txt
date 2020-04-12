@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.459 2020/04/09 18:06:17 nanard Exp $
+$Id: Changelog.txt,v 1.460 2020/04/12 17:27:31 nanard Exp $
+
+2020/04/12:
+  pf: disabled setting dst address in rule by default
 
 2020/04/09:
   Option to disable IPv6 at runtime : -4 / ipv6_disable=yes

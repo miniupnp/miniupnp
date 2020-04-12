@@ -1,8 +1,8 @@
-/* $Id: obsdrdr.c,v 1.90 2018/07/06 12:00:10 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.93 2020/04/12 17:29:56 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2018 Thomas Bernard
+ * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -341,6 +341,9 @@ add_redirect_rule2(const char * ifname,
 			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
 #endif
 		}
+#ifdef PF_SET_DST_ADDR
+		/* set dst address
+		 * see https://github.com/miniupnp/miniupnp/issues/231 */
 		if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0')
 		{
 #ifdef PFVAR_NEW_STYLE
@@ -351,6 +354,7 @@ add_redirect_rule2(const char * ifname,
 			pcr.rule.dst.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
 #endif
 		}
+#endif /* PF_SET_DST_ADDR */
 #ifndef PF_NEWSTYLE
 		pcr.rule.rpool.proxy_port[0] = iport;
 		pcr.rule.rpool.proxy_port[1] = iport;
