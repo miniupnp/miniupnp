@@ -44,6 +44,9 @@
 /* for BSD's sysctl */
 #include <sys/sysctl.h>
 #endif
+#ifdef HAS_LIBCAP
+#include <sys/capability.h>
+#endif
 
 /* unix sockets */
 #ifdef USE_MINIUPNPDCTL
@@ -2325,6 +2328,49 @@ main(int argc, char * * argv)
 		return 1;
 	}
 #endif /* HAS_PLEDGE */
+#ifdef HAS_LIBCAP
+	{
+		cap_t caps = cap_get_proc();
+		if (caps == NULL) {
+			syslog(LOG_ERR, "cap_get_proc(): %m");
+		} else {
+			static const cap_value_t cap_list[3] = { CAP_NET_BROADCAST, CAP_NET_ADMIN, CAP_NET_RAW };
+			char * txt_caps = cap_to_text(caps, NULL);
+			if (txt_caps == NULL) {
+				syslog(LOG_ERR, "cap_to_text(): %m");
+			} else {
+				syslog(LOG_DEBUG, "capabilities %s", txt_caps);
+				if (cap_free(txt_caps) < 0) {
+					syslog(LOG_ERR, "cap_free(): %m");
+				}
+			}
+			if (cap_clear(caps) < 0) {
+				syslog(LOG_ERR, "cap_clear(): %m");
+			}
+			if (cap_set_flag(caps, CAP_PERMITTED, sizeof(cap_list)/sizeof(cap_list[0]), cap_list, CAP_SET) < 0) {
+				syslog(LOG_ERR, "cap_set_flag(): %m");
+			}
+			if (cap_set_flag(caps, CAP_EFFECTIVE, sizeof(cap_list)/sizeof(cap_list[0]), cap_list, CAP_SET) < 0) {
+				syslog(LOG_ERR, "cap_set_flag(): %m");
+			}
+			txt_caps = cap_to_text(caps, NULL);
+			if (txt_caps == NULL) {
+				syslog(LOG_ERR, "cap_to_text(): %m");
+			} else {
+				syslog(LOG_DEBUG, "capabilities %s", txt_caps);
+				if (cap_free(txt_caps) < 0) {
+					syslog(LOG_ERR, "cap_free(): %m");
+				}
+			}
+			if (cap_set_proc(caps) < 0) {
+				syslog(LOG_ERR, "cap_set_proc(): %m");
+			}
+			if (cap_free(caps) < 0) {
+				syslog(LOG_ERR, "cap_free(): %m");
+			}
+		}
+	}
+#endif /* HAS_LIBCAP */
 
 	/* main loop */
 	while(!quitting)
