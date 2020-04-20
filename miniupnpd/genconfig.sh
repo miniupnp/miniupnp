@@ -75,8 +75,8 @@ LOG_MINIUPNPD="LOG_DAEMON"
 # detecting the OS name and version
 OS_NAME=`uname -s`
 OS_VERSION=`uname -r`
-# set BSDMAKE to 1 to use BSD make, to 0 to use GNU make
-BSDMAKE=0
+# Makefile to use
+MAKEFILE=
 
 # pfSense special case
 if [ -f /etc/platform ]; then
@@ -158,7 +158,7 @@ echo "" >> ${CONFIGFILE}
 # OS Specific stuff
 case $OS_NAME in
 	OpenBSD)
-		BSDMAKE=1
+		MAKEFILE=Makefile.bsd
 		MAJORVER=`echo $OS_VERSION | cut -d. -f1`
 		MINORVER=`echo $OS_VERSION | cut -d. -f2`
 		#echo "OpenBSD majorversion=$MAJORVER minorversion=$MINORVER"
@@ -194,7 +194,7 @@ case $OS_NAME in
 		fi
 		;;
 	FreeBSD | GNU/kFreeBSD)
-		BSDMAKE=1
+		MAKEFILE=Makefile.bsd
 		VER=`grep '#define __FreeBSD_version' /usr/include/sys/param.h | awk '{print $3}'`
 		if [ $VER -ge 700049 ]; then
 			echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
@@ -230,7 +230,7 @@ case $OS_NAME in
 		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only`
 		;;
 	pfSense)
-		BSDMAKE=1
+		MAKEFILE=Makefile.bsd
 		# we need to detect if PFRULE_INOUT_COUNTS macro is needed
 		FW=pf
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
@@ -238,7 +238,7 @@ case $OS_NAME in
 		V6SOCKETS_ARE_V6ONLY=`sysctl -n net.inet6.ip6.v6only`
 		;;
 	NetBSD)
-		BSDMAKE=1
+		MAKEFILE=Makefile.bsd
 		if [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
 			. /etc/rc.subr
@@ -258,7 +258,7 @@ case $OS_NAME in
 		OS_URL=http://www.netbsd.org/
 		;;
 	DragonFly)
-		BSDMAKE=1
+		MAKEFILE=Makefile.bsd
 		if [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
 			. /etc/rc.subr
@@ -284,7 +284,7 @@ case $OS_NAME in
 		OS_URL=http://www.dragonflybsd.org/
 		;;
 	SunOS)
-		BSDMAKE=1
+		MAKEFILE=Makefile.bsd
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		FW=ipf
 		echo "#define LOG_PERROR 0" >> ${CONFIGFILE}
@@ -390,6 +390,7 @@ case $OS_NAME in
 		FW=iptables
 		;;
 	Darwin)
+		MAKEFILE=Makefile.macosx
 		MAJORVER=`echo $OS_VERSION | cut -d. -f1`
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		# OS X switched to pf since 10.7 Lion (Darwin 11.0)
@@ -419,10 +420,12 @@ case $FW in
 		echo "#define USE_IPFW 1" >> ${CONFIGFILE}
 		;;
 	iptables)
+		MAKEFILE=Makefile.linux
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
 		echo "#define USE_IPTABLES  1" >> ${CONFIGFILE}
 		;;
 	nftables)
+		MAKEFILE=Makefile.linux_nft
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
 		echo "#define USE_NFTABLES  1" >> ${CONFIGFILE}
 		;;
@@ -433,8 +436,11 @@ case $FW in
 		;;
 esac
 
-if [ $BSDMAKE -ne 0 ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME" = "SunOS" ] ; then
+if [ "$MAKEFILE" = "Makefile.bsd" ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME" = "SunOS" ] ; then
 	echo "FWNAME = $FW" > bsdmake.inc
+fi
+if [ "$MAKEFILE" ] ; then
+	cp -v $MAKEFILE Makefile
 fi
 
 # UUID API

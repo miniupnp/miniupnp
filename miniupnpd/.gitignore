@@ -28,3 +28,4 @@ testminissdp
 dox/
 bsdmake.inc
 upnpstun
+Makefile
