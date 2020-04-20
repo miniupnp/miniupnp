@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.460 2020/04/12 17:27:31 nanard Exp $
 
+2020/04/21:
+  Remove FW API detecting code from Makefile (BSD). generate bsdmake.inc
+
 2020/04/20:
   Fix "IGD2 Port Triggering" in update_portmapping()
 

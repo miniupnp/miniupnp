@@ -26,3 +26,5 @@ pf/testpfpinhole
 netfilter/test_nfct_get
 testminissdp
 dox/
+bsdmake.inc
+upnpstun

@@ -1,6 +1,6 @@
 # $Id: Makefile,v 1.96 2020/04/06 09:56:53 nanard Exp $
 # MiniUPnP project
-# http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+# http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
 #
 # Makefile for miniupnpd (MiniUPnP daemon)
@@ -34,59 +34,9 @@ DOXYGEN ?= doxygen
 # OSNAME and FWNAME are used for building OS or FW dependent code.
 OSNAME != uname -s
 ARCH != uname -m
+
 .ifndef FWNAME
-#.if exists(/usr/include/net/pfvar.h)
-#FWNAME = pf
-#.else
-#FWNAME = ipf
-#.endif
-
-.if $(OSNAME) == "OpenBSD"
-FWNAME = pf
-.endif
-
-# better way to find if we are using ipf or pf
-.if $(OSNAME) == "FreeBSD"
-.if exists(/etc/rc.subr) && exists(/etc/defaults/rc.conf)
-FWNAME != . /etc/rc.subr; . /etc/defaults/rc.conf; \
-          if [ -f /etc/rc.conf ] ; then . /etc/rc.conf ; fi ; \
-          if checkyesno ipfilter_enable; then \
-          echo "ipf"; elif checkyesno pf_enable; then \
-          echo "pf"; elif checkyesno firewall_enable; then \
-          echo "ipfw"; else echo "pf"; fi
-.else
-FWNAME = pf
-.endif
-.endif
-
-.if $(OSNAME) == "NetBSD"
-.if exists(/etc/rc.subr) && exists(/etc/rc.conf)
-FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
-          if checkyesno pf; then \
-          echo "pf"; elif checkyesno ipfilter; then \
-          echo "ipf"; else echo "pf"; fi
-.else
-FWNAME = pf
-.endif
-.endif
-
-.if $(OSNAME) == "DragonFly"
-.if exists(/etc/rc.subr) && exists(/etc/rc.conf)
-FWNAME != . /etc/rc.subr; . /etc/rc.conf; \
-          if checkyesno pf; then \
-          echo "pf"; elif checkyesno ipfilter; then \
-          echo "ipf"; else echo "pf"; fi
-.else
-FWNAME = pf
-.endif
-.endif
-
-.if $(OSNAME) == "Darwin"
-# Firewall is ipfw up to OS X 10.6 Snow Leopard
-# and pf since OS X 10.7 Lion (Darwin 11.0)
-FWNAME != [ `uname -r | cut -d. -f1` -ge 11  ] && echo "pf" || echo "ipfw"
-.endif
-
+.include "bsdmake.inc"
 .endif
 
 # Solaris specific CFLAGS
@@ -283,5 +233,4 @@ config.h:	genconfig.sh VERSION
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 #	$(CC) $(CFLAGS) -c -o $(.TARGET) $(.IMPSRC)
-
 
