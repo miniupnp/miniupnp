@@ -224,17 +224,13 @@ add_redirect_rule2(const char * ifname,
 	if(r >= 0) {
 		add_redirect_desc(eport, proto, desc, timestamp);
 #ifdef ENABLE_PORT_TRIGGERING
-		/* http://www.netfilter.org/documentation/HOWTO/NAT-HOWTO-6.html#ss6.3
-		 * The default behavior is to alter the connection as little
-		 * as possible, within the constraints of the rule given by
-		 * the user.
-		 * This means we won't remap ports unless we have to. */
-		if(iport != eport) {
-			/* TODO : check if this should be done only with UDP */
-			r = addmasqueraderule(proto, eport, iaddr, iport, rhost/*, ifname*/);
-			if(r < 0) {
-				syslog(LOG_NOTICE, "add_redirect_rule2(): addmasqueraderule returned %d", r);
-			}
+		/* we now always setup SNAT to support bidirectional mapping
+		 * we cannot expect that iport == eport on all the firewall.
+		 */
+		/* TODO : check if this should be done only with UDP */
+		r = addmasqueraderule(proto, eport, iaddr, iport, rhost/*, ifname*/);
+		if(r < 0) {
+			syslog(LOG_NOTICE, "add_redirect_rule2(): addmasqueraderule returned %d", r);
 		}
 #endif /* ENABLE_PORT_TRIGGERING */
 	}
