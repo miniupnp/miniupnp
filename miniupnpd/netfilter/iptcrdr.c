@@ -1887,6 +1887,105 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 	if(r < 0)
 		return r;
 
+#ifdef ENABLE_PORT_TRIGGERING
+	/* update snat rule */
+	h = iptc_init("nat");
+	if(!h)
+	{
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "update_portmapping", iptc_strerror(errno));
+		goto skip;
+	}
+	i = 0; found = 0;
+	if(!iptc_is_chain(miniupnpd_nat_postrouting_chain, h))
+	{
+		syslog(LOG_ERR, "chain %s not found", miniupnpd_nat_postrouting_chain);
+	}
+	else
+	{
+		/* we must find the right index for the filter rule */
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, h);
+		    e;
+			e = iptc_next_rule(e, h), i++)
+#else
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, &h);
+		    e;
+			e = iptc_next_rule(e, &h), i++)
+#endif
+		{
+			if(proto==e->ip.proto)
+			{
+				target = (void *)e + e->target_offset;
+				mr = (struct ip_nat_multi_range *)&target->data[0];
+				syslog(LOG_DEBUG, "postrouting rule #%u: %s %s %hu",
+						i, target->u.user.name, inet_ntoa(e->ip.src), ntohs(mr->range[0].min.all));
+				/* target->u.user.name SNAT / MASQUERADE */
+				if (eport != ntohs(mr->range[0].min.all)) {
+					continue;
+				}
+				match = (const struct ipt_entry_match *)&e->elems;
+				if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+				{
+					const struct ipt_tcp * info;
+					info = (const struct ipt_tcp *)match->data;
+					if(old_iport != info->spts[0])
+						continue;
+				}
+				else
+				{
+					const struct ipt_udp * info;
+					info = (const struct ipt_udp *)match->data;
+					if(old_iport != info->spts[0])
+						continue;
+				}
+				if (iaddr != e->ip.src.s_addr) {
+					continue;
+				}
+				index = i;
+				found = 1;
+				entry_len = sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size;
+				new_e = malloc(entry_len);
+				if(new_e == NULL) {
+					syslog(LOG_ERR, "%s: malloc(%u) error",
+							"update_portmapping", (unsigned)entry_len);
+					r = -1;
+				} else {
+					memcpy(new_e, e, entry_len);
+				}
+				break;
+			}
+		}
+	}
+#ifdef IPTABLES_143
+	iptc_free(h);
+#else
+	iptc_free(&h);
+#endif
+	if(!found || r < 0)
+		goto skip;
+
+	syslog(LOG_INFO, "Trying to update snat rule at index %u", index);
+	match = (struct ipt_entry_match *)&new_e->elems;
+	if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+	{
+		struct ipt_tcp * info;
+		info = (struct ipt_tcp *)match->data;
+		info->spts[0] = info->spts[1] = iport;
+	}
+	else
+	{
+		struct ipt_udp * info;
+		info = (struct ipt_udp *)match->data;
+		info->spts[0] = info->spts[1] = iport;
+	}
+	r = update_rule_and_commit("nat", miniupnpd_nat_postrouting_chain, index, new_e);
+	free(new_e); new_e = NULL;
+	if(r < 0)
+		syslog(LOG_INFO, "Trying to update snat rule at index %u fail!", index);
+
+skip:
+#endif /* ENABLE_PORT_TRIGGERING */
 	return update_portmapping_desc_timestamp(ifname, eport, proto, desc, timestamp);
 }
 
