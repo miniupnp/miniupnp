@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.460 2020/04/12 17:27:31 nanard Exp $
 
+2020/04/20:
+  Fix "IGD2 Port Triggering" in update_portmapping()
+
 2020/04/12:
   pf: disabled setting dst address in rule by default
 
