@@ -47,7 +47,7 @@ case "$argv" in
 		echo " --portinuse enable port in use check"
 		echo " --uda-version=x.x  set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn  disable WANPPPConnection"
-		echo " --firewall=<name>  force the firewall type (only for linux)"
+		echo " --firewall=<name>  force the firewall type (nftables, iptables, pf, ipf, ipfw)"
 		exit 1
 		;;
 	*)
@@ -202,7 +202,7 @@ case $OS_NAME in
 		HAVE_IP_MREQN=1
 		# new way to see which one to use PF or IPF.
 		# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=957
-		if [ -f /etc/rc.subr ] && [ -f /etc/defaults/rc.conf ] ; then
+		if [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/defaults/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
 			. /etc/rc.subr
 			# source config file so we can probe vars
@@ -239,7 +239,7 @@ case $OS_NAME in
 		;;
 	NetBSD)
 		BSDMAKE=1
-		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
+		if [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
 			. /etc/rc.subr
 			# source config file so we can probe vars
@@ -259,7 +259,7 @@ case $OS_NAME in
 		;;
 	DragonFly)
 		BSDMAKE=1
-		if [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
+		if [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
 			. /etc/rc.subr
 			# source config file so we can probe vars
