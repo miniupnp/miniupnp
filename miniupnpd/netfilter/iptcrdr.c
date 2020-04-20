@@ -858,7 +858,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				{
 					const struct ipt_udp * info;
 					info = (const struct ipt_udp *)match->data;
-					iport = info->dpts[0];
+					iport = info->spts[0];
 				}
 
 				index = i;
