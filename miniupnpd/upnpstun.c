@@ -314,6 +314,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 
 		switch (attr_type) {
 		case 0x0001:	/* MAPPED-ADDRESS */
+		case 0x0020:	/* XOR-MAPPED-ADDRESS (RFC 5389) */
 		case 0x8020:	/* XOR-MAPPED-ADDRESS (2005 draft) */
 			/* Mapped Address or XOR Mapped Address */
 			if (attr_len == 8 && ptr[1] == 1) {
@@ -337,6 +338,22 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 					return 0;
 
 				have_address = 1;
+			}
+			break;
+		case 0x0009:	/* ERROR-CODE */
+			if (attr_len >= 4) {
+				syslog(LOG_WARNING, "%s: ERROR-CODE %u %.*s",
+			       "parse_stun_response", (unsigned)ptr[2] * 100 + ptr[3],
+			       attr_len - 4, ptr + 4);
+			}
+			break;
+		case 0x802b:	/* RESPONSE-ORIGIN (RFC 5780) */
+		case 0x802c:	/* OTHER-ADDRESS (RFC 5780) */
+			if (attr_len == 8 && ptr[1] == 1) {
+				syslog(LOG_DEBUG, "%s: %s %hhu.%hhu.%hhu.%hhu:%hu",
+				       "parse_stun_response",
+				       (attr_type == 0x802b) ? "RESPONSE-ORIGIN" : "OTHER-ADDRESS",
+				       ptr[4], ptr[5], ptr[6], ptr[7], ((uint16_t)ptr[2] << 8) + ptr[3]);
 			}
 			break;
 		default:
