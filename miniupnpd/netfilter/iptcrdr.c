@@ -1710,7 +1710,7 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 	const struct ipt_entry * e;
 	struct ipt_entry * new_e = NULL;
 	size_t entry_len;
-	const struct ipt_entry_target * target;
+	struct ipt_entry_target * target;
 	struct ip_nat_multi_range * mr;
 	const struct ipt_entry_match *match;
 	uint32_t iaddr = 0;
@@ -1853,6 +1853,10 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 				r = -1;
 			} else {
 				memcpy(new_e, e, entry_len);
+				target = (void *)new_e + new_e->target_offset;
+				if (target->u.user.name[0] == '\0' && iptc_get_target(e, h)) {
+					strncpy(target->u.user.name, iptc_get_target(e, h), sizeof(target->u.user.name));
+				}
 			}
 			break;
 		}
