@@ -1,7 +1,8 @@
 /* $Id: upnpstun.c,v 1.5 2020/04/21 21:21:59 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
+ * (c) 2020 Thomas Bernard
  * (c) 2018 Pali Rohár
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -284,7 +285,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 
 	syslog(LOG_DEBUG, "%s: Type 0x%04x, Length %hu, Magic Cookie %02x%02x%02x%02x",
 	       "parse_stun_response", ((uint16_t)buffer[0] << 8) + buffer[1],
-	       ((uint16_t)buffer[2] << 8) + buffer[3],
+	       (uint16_t)((buffer[2] << 8) + buffer[3]),
 	       buffer[4], buffer[5], buffer[6], buffer[7]);
 
 	/* Check that buffer is STUN message with class Response and Binding method */
@@ -353,7 +354,8 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 				syslog(LOG_DEBUG, "%s: %s %hhu.%hhu.%hhu.%hhu:%hu",
 				       "parse_stun_response",
 				       (attr_type == 0x802b) ? "RESPONSE-ORIGIN" : "OTHER-ADDRESS",
-				       ptr[4], ptr[5], ptr[6], ptr[7], ((uint16_t)ptr[2] << 8) + ptr[3]);
+				       ptr[4], ptr[5], ptr[6], ptr[7],
+				       (uint16_t)((ptr[2] << 8) + ptr[3]));
 			}
 			break;
 		default:
