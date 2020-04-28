@@ -912,7 +912,7 @@ static int
 parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 {
 	const char * p;
-	int n;
+	unsigned int n;
 	char tmp[16];
 
 	memset(lan_addr, 0, sizeof(struct lan_addr_s));
@@ -958,7 +958,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 			while(*p && (*p=='.' || isdigit(*p)))
 				p++;
 			n = p - q;
-			if(n>15)
+			if(n >= sizeof(tmp))
 				goto parselan_error;
 			memcpy(tmp, q, n);
 			tmp[n] = '\0';
@@ -1003,12 +1003,39 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 			}
 		}
 	}
+#else
+	while(*p) {
+		/* skip spaces */
+		while(*p && isspace(*p))
+			p++;
+		if(*p) {
+			unsigned int index;
+			n = 0;
+			while(p[n] && !isspace(p[n]) && n < sizeof(tmp)) {
+				tmp[n] = p[n];
+				n++;
+			}
+			if(n >= sizeof(tmp)) {
+				fprintf(stderr, "Cannot parse '%s'\n", p);
+				break;
+			}
+			tmp[n] = '\0';
+			index = if_nametoindex(tmp);
+			if(index == 0) {
+				fprintf(stderr, "Cannot get index for network interface %s\n",
+				        tmp);
+			} else {
+				lan_addr->add_indexes |= (1UL << (index - 1));
+			}
+			p += n;
+		}
+	}
 #endif
 	if(lan_addr->ifname[0] != '\0')
 	{
 		lan_addr->index = if_nametoindex(lan_addr->ifname);
 		if(lan_addr->index == 0)
-			fprintf(stderr, "Cannot get index for network interface %s",
+			fprintf(stderr, "Cannot get index for network interface %s\n",
 			        lan_addr->ifname);
 	}
 #ifdef ENABLE_IPV6

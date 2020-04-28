@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -991,11 +991,16 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	/* get the string representation of the sender address */
 	sockaddr_to_string(sender, sender_str, sizeof(sender_str));
 	lan_addr = get_lan_for_peer(sender);
-	if(source_if >= 0)
+	if(source_if > 0)
 	{
 		if(lan_addr != NULL)
 		{
+#ifndef MULTIPLE_EXTERNAL_IP
+			if(lan_addr->index != (unsigned)source_if && lan_addr->index != 0
+			   && !(lan_addr->add_indexes & (1UL << (source_if - 1))))
+#else
 			if(lan_addr->index != (unsigned)source_if && lan_addr->index != 0)
+#endif
 			{
 				syslog(LOG_WARNING, "interface index not matching %u != %d", lan_addr->index, source_if);
 			}
