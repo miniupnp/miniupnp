@@ -20,7 +20,9 @@
 
 #include <linux/version.h>
 
-#if IPTABLES_143
+#include "../config.h"
+
+#ifdef IPTABLES_143
 /* IPTABLES API version >= 1.4.3 */
 
 /* added in order to compile on gentoo :

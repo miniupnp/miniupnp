@@ -29,3 +29,4 @@ dox/
 bsdmake.inc
 upnpstun
 Makefile
+config.mk

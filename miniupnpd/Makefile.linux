@@ -48,7 +48,7 @@ SBININSTALLDIR = $(INSTALLPREFIX)/sbin
 ETCINSTALLDIR = $(PREFIX)/etc/miniupnpd
 MANINSTALLDIR = $(INSTALLPREFIX)/share/man/man8
 
-include gitrev.mk
+include gitrev.mk config.mk
 
 BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o portinuse.o \
@@ -63,31 +63,7 @@ NETFILTEROBJS = netfilter/iptcrdr.o netfilter/iptpinhole.o netfilter/nfct_get.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
-PCFILE_FOUND := $(shell $(PKG_CONFIG) --exists libiptc; echo $$?)
-
-ifeq (${PCFILE_FOUND},0)
-
-IPTABLESVERSION := $(shell $(PKG_CONFIG) --modversion libiptc)
-IPTVER1 := $(shell echo $(IPTABLESVERSION) | cut -d. -f1 )
-IPTVER2 := $(shell echo $(IPTABLESVERSION) | cut -d. -f2 )
-IPTVER3 := $(shell echo $(IPTABLESVERSION) | cut -d. -f3 )
-# test if iptables version >= 1.4.3
-TEST := $(shell [ $(IPTVER1) -gt 1 ] || \
-	[ \( $(IPTVER1) -eq 1 \) -a \
-	  \( \( $(IPTVER2) -gt 4 \) -o \
-	     \( \( $(IPTVER2) -eq 4 \) -a \( $(IPTVER3) -ge 3 \) \) \) ] && echo 1 )
-ifeq ($(TEST), 1)
-CPPFLAGS += -DIPTABLES_143
-endif
-
-CFLAGS  += $(shell $(PKG_CONFIG) --cflags libiptc)
-#OpenWrt packager passes correct libraries
-ifeq ($(TARGET_OPENWRT),)
-LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l libiptc)
-endif
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L libiptc)
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other libiptc)
-else
+ifneq ($(IPTABLES_PCFILE_FOUND),1)
 
 ifeq "$(wildcard /etc/gentoo-release )" ""
 LDLIBS ?= -liptc
@@ -153,16 +129,9 @@ LDLIBS := $(LDLIBS) -lip6tc
 endif # ($(TESTIP6TC), 1)
 endif # ($(TEST), 1)
 endif # ifdef IPTABLESPATH
-endif # ifdef PCFILE_FOUND
+endif # ifneq ($(IPTABLES_PCFILE_FOUND),1)
 
 #LDLIBS += -lnfnetlink
-
-TEST := $(shell $(PKG_CONFIG) --atleast-version=1.0.2 libnetfilter_conntrack && $(PKG_CONFIG) --atleast-version=1.0.3 libmnl && echo 1)
-ifeq ($(TEST),1)
-CPPFLAGS += -DUSE_NFCT
-LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libmnl)
-LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libnetfilter_conntrack)
-endif # ($(TEST),1)
 
 # OpenWrt packager disables https server for IGD v2 and hardcodes libuuid support
 ifeq ($(TARGET_OPENWRT),)
