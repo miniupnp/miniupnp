@@ -8,10 +8,9 @@
 # This Makefile should work for *BSD and SunOS/Solaris.
 # On Mac OS X, use "bsdmake" to build.
 # This Makefile is NOT compatible with GNU Make.
-# Linux users, please use Makefile.linux :
-#  make -f Makefile.linux
+# Linux users, please use Makefile.linux
 #
-# options can be passed to genconfig.sh through CONFIG_OPTIONS :
+# options can be passed to configure through CONFIG_OPTIONS :
 # $ CONFIG_OPTIONS="--ipv6 --igd2" make
 #
 
@@ -225,8 +224,8 @@ testminissdp:	config.h $(TESTMINISSDPOBJS)
 # BSDmake :
 #	$(CC) $(CFLAGS) -o $@ $>
 
-config.h:	genconfig.sh VERSION
-	./genconfig.sh $(CONFIG_OPTIONS)
+config.h:	configure VERSION
+	./configure $(CONFIG_OPTIONS)
 
 .SUFFIXES:	.o .c
 .c.o:

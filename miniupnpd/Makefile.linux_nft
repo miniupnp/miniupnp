@@ -1,18 +1,18 @@
 # MiniUPnP project
 # (c) 2015 Tomofumi Hayashi
-# http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+# http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author : Tomofumi Hayashi
 # for use with GNU Make
 #
-# options can be passed to genconfig.sh through CONFIG_OPTIONS :
-# $ CONFIG_OPTIONS="--ipv6 --igd2" make -f Makefile.linux
+# options can be passed to configure through CONFIG_OPTIONS :
+# $ CONFIG_OPTIONS="--ipv6 --igd2" make
 #
 # To install use :
-# $ DESTDIR=/dummyinstalldir make -f Makefile.linux_nft install
+# $ DESTDIR=/dummyinstalldir make install
 # or :
-# $ INSTALLPREFIX=/usr/local make -f Makefile.linux_nft install
+# $ INSTALLPREFIX=/usr/local make install
 # or :
-# $ make -f Makefile.linux install
+# $ make install
 # (default INSTALLPREFIX is /usr)
 #
 #
@@ -163,8 +163,8 @@ testportinuse:	testportinuse.o portinuse.o getifaddr.o \
 
 miniupnpdctl:	miniupnpdctl.o
 
-config.h:	genconfig.sh VERSION
-	./genconfig.sh $(CONFIG_OPTIONS)
+config.h:	configure VERSION
+	./configure $(CONFIG_OPTIONS)
 
 depend:	config.h
 	makedepend -f$(MAKEFILE_LIST) -Y \
