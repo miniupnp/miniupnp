@@ -82,7 +82,8 @@ To Build and install :
 - Build the daemon
   > make
   If not using iptables from your system,
-  > IPTABLESPATH=/path/to/iptables-1.4.1 make
+  > ./configure --iptablespath=/path/to/iptables-1.4.1
+  > make
 - install as root using :
   > make install
 - A miniupnpd script should be installed to /etc/init.d
@@ -108,7 +109,8 @@ How to get libiptc with its headers on debian :
   > ./configure --enable-static
   > make
 - it is now possible to compile miniupnpd using the following command :
-  > IPTABLESPATH=/path/to/iptables-x.x.x make
+  > ./configure --iptablespath=/path/to/iptables-x.x.x
+  > make
 
 ======================== Linux/netfilter nftables =========================
 
