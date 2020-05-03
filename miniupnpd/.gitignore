@@ -1,4 +1,5 @@
 *.o
+*.d
 *.bak
 config.h
 ipfw/testipfwrdr

@@ -1,7 +1,7 @@
 /* $Id: ifacewatcher.c,v 1.10 2019/10/02 22:02:02 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * (c) 2006-2020 Thomas Bernard
  *
  * ifacewatcher.c
  *
@@ -48,7 +48,7 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#include "../config.h"
+#include "config.h"
 #include "../macros.h"
 
 #ifdef USE_IFACEWATCHER

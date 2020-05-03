@@ -11,7 +11,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "../config.h"
+#include "config.h"
 #include "../getifstats.h"
 
 #ifdef GET_WIRELESS_STATS

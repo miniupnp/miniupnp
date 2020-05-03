@@ -20,7 +20,7 @@
 
 #include <linux/version.h>
 
-#include "../config.h"
+#include "config.h"
 
 #ifdef IPTABLES_143
 /* IPTABLES API version >= 1.4.3 */
@@ -61,7 +61,6 @@
 #endif
 
 #include "../macros.h"
-#include "../config.h"
 #include "iptcrdr.h"
 #include "../upnpglobalvars.h"
 

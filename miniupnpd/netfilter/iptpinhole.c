@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 #include <sys/queue.h>
 
-#include "../config.h"
+#include "config.h"
 #include "../macros.h"
 #include "iptpinhole.h"
 #include "../upnpglobalvars.h"
