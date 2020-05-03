@@ -529,6 +529,25 @@ case $FW in
 		;;
 esac
 
+if [ "$FW" = "iptables" ] || [ "$FW" = "nftables" ] ; then
+	# linux
+	if [ "$PKG_CONFIG" ] ; then
+		if ${PKG_CONFIG} --exists libcap-ng ; then
+			echo "detected libcap-ng `${PKG_CONFIG} --modversion libcap-ng`"
+			echo "CFLAGS += `${PKG_CONFIG} --cflags libcap-ng`" >> config.mk
+			echo "LDLIBS += `${PKG_CONFIG} --static --libs-only-l libcap-ng`" >> config.mk
+			echo "LDFLAGS += `${PKG_CONFIG} --libs-only-L --libs-only-other libcap-ng`" >> config.mk
+			echo "#define HAS_LIBCAP_NG" >> ${CONFIGFILE}
+		elif ${PKG_CONFIG} --exists libcap ; then
+			echo "detected libcap `${PKG_CONFIG} --modversion libcap`"
+			echo "CFLAGS += `${PKG_CONFIG} --cflags libcap`" >> config.mk
+			echo "LDLIBS += `${PKG_CONFIG} --static --libs-only-l libcap`" >> config.mk
+			echo "LDFLAGS += `${PKG_CONFIG} --libs-only-L --libs-only-other libcap`" >> config.mk
+			echo "#define HAS_LIBCAP" >> ${CONFIGFILE}
+		fi
+	fi
+fi
+
 if [ "$MAKEFILE" = "Makefile.bsd" ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME" = "SunOS" ] ; then
 	echo "FWNAME = $FW" > bsdmake.inc
 fi
