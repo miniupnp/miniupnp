@@ -38,8 +38,8 @@
 
 #include "tiny_nf_nat.h"
 
+#include "config.h"
 #include "../macros.h"
-#include "../config.h"
 #include "../commonrdr.h"
 #include "nftnlrdr.h"
 

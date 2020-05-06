@@ -35,8 +35,8 @@
 
 #include "tiny_nf_nat.h"
 
+#include "config.h"
 #include "../macros.h"
-#include "../config.h"
 #include "nftnlrdr.h"
 #include "../upnpglobalvars.h"
 
