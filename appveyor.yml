@@ -4,15 +4,19 @@ environment:
     - PYTHON_VER: C:\Python27\python
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       SETUP_COMPILER_FLAG: --compiler=mingw32
+      ARCH_BITS: 32
     - PYTHON_VER: C:\Python35\python
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       SETUP_COMPILER_FLAG:
+      ARCH_BITS: 32
     - PYTHON_VER: C:\Python37\python
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       SETUP_COMPILER_FLAG:
+      ARCH_BITS: 32
     - PYTHON_VER: C:\Python37-x64\python
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       SETUP_COMPILER_FLAG:
+      ARCH_BITS: 64
 
 
 version: '$(APP_VERSION).{build}'
@@ -20,7 +24,7 @@ version: '$(APP_VERSION).{build}'
 image: Visual Studio 2017
 
 install:
-  - set PATH=%PATH%;C:\msys64\mingw32\bin
+  - set PATH=%PATH%;C:\msys64\mingw%ARCH_BITS%\bin
   # We need wheel installed to build wheels
   - "%PYTHON_VER%.exe -m pip install wheel"
 
