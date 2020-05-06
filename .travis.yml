@@ -47,14 +47,15 @@ before_install:
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
-  - 'if [ "$PROJECT" = "miniupnpd" ] ; then ./configure --ipv6 --igd2 ; fi'
+  - 'if [ "$PROJECT" = "miniupnpd" ] ; then mkdir build && cd build && ../configure --ipv6 --igd2 ; fi'
   - 'make -j3'
   - 'make check'
+  - 'if [ "$PROJECT" = "miniupnpd" ] ; then make dox ; cd .. ; fi'
   - if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJECT" = "miniupnpd" ]; then
-      make dox ;
-      make clean ;
-      ./configure --ipv6 --igd2 --firewall=nftables ;
-      make -j3 ;
+      mkdir build-nft && cd build-nft && ../configure --ipv6 --igd2 --firewall=nftables ;
+    fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJECT" = "miniupnpd" ]; then
+      make -j3 && make check ;
     fi
   - if [ "$PROJECT" = "miniupnpc" ]; then
       INSTALLPREFIX="$HOME/_pythonmodule" make pythonmodule;
