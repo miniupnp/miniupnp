@@ -10,6 +10,9 @@ environment:
     - PYTHON_VER: C:\Python37\python
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       SETUP_COMPILER_FLAG:
+    - PYTHON_VER: C:\Python37-x64\python
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      SETUP_COMPILER_FLAG:
 
 
 version: '$(APP_VERSION).{build}'
