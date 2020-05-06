@@ -47,6 +47,9 @@
 #ifdef HAS_LIBCAP
 #include <sys/capability.h>
 #endif
+#ifdef HAS_LIBCAP_NG
+#include <cap-ng.h>
+#endif
 
 /* unix sockets */
 #ifdef USE_MINIUPNPDCTL
@@ -2371,6 +2374,17 @@ main(int argc, char * * argv)
 		}
 	}
 #endif /* HAS_LIBCAP */
+#ifdef HAS_LIBCAP_NG
+	capng_setpid(getpid());
+	capng_clear(CAPNG_SELECT_BOTH);
+	if (capng_updatev(CAPNG_ADD, CAPNG_EFFECTIVE|CAPNG_PERMITTED, CAP_NET_BROADCAST, CAP_NET_ADMIN, CAP_NET_RAW, -1) < 0) {
+		syslog(LOG_ERR, "capng_updatev() failed");
+	} else {
+		if (capng_apply(CAPNG_SELECT_BOTH) < 0) {
+			syslog(LOG_ERR, "capng_apply() failed");
+		}
+	}
+#endif /* HAS_LIBCAP_NG */
 
 	/* main loop */
 	while(!quitting)
