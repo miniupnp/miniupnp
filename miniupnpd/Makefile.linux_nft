@@ -130,6 +130,7 @@ install:	miniupnpd $(SRCDIR)/miniupnpd.8 $(SRCDIR)/miniupnpd.conf \
 	$(INSTALL) --mode=0644 miniupnpd.8 $(DESTDIR)$(MANINSTALLDIR)
 	gzip -f $(DESTDIR)$(MANINSTALLDIR)/miniupnpd.8
 
+include $(SRCDIR)/check.mk
 
 miniupnpd:	$(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
