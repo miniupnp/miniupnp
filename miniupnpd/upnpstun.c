@@ -279,6 +279,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 	uint16_t attr_type;
 	uint16_t attr_len;
 	int have_address;
+	int have_xor_mapped_address;
 
 	if (len < 20)
 		return -1;
@@ -301,6 +302,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 	ptr = buffer + 20;
 	end = buffer + len;
 	have_address = 0;
+	have_xor_mapped_address = 0;
 
 	while (ptr + 4 <= end) {
 
@@ -330,13 +332,15 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 					ptr[7] ^= buffer[7];
 				}
 
-				mapped_addr->sin_family = AF_INET;
-				mapped_addr->sin_port = htons(((uint16_t)ptr[2] << 8) + ptr[3]);
-				mapped_addr->sin_addr.s_addr = htonl(((uint32_t)ptr[4] << 24) + (ptr[5] << 16) + (ptr[6] << 8) + ptr[7]);
-
 				/* Prefer XOR Mapped Address, some NATs change IP addresses in UDP packets */
+				if (!have_xor_mapped_address) {
+					mapped_addr->sin_family = AF_INET;
+					mapped_addr->sin_port = htons(((uint16_t)ptr[2] << 8) + ptr[3]);
+					mapped_addr->sin_addr.s_addr = htonl(((uint32_t)ptr[4] << 24) + (ptr[5] << 16) + (ptr[6] << 8) + ptr[7]);
+				}
+
 				if ((attr_type & 0x7fff) == 0x0020)
-					return 0;
+					have_xor_mapped_address = 1;
 
 				have_address = 1;
 			}
