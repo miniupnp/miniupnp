@@ -251,6 +251,7 @@ static int wait_for_stun_responses(int fds[4], unsigned char *transaction_ids[4]
 			FD_SET(fds[i], &fdset);
 		}
 
+		syslog(LOG_DEBUG, "%s: waiting %ld secs and %ld usecs", "wait_for_stun_responses", timeout.tv_sec, timeout.tv_usec);
 		ret = select(max_fd+1, &fdset, NULL, NULL, &timeout);
 		if (ret < 0) {
 			if (errno == EINTR)
@@ -258,12 +259,16 @@ static int wait_for_stun_responses(int fds[4], unsigned char *transaction_ids[4]
 			syslog(LOG_ERR, "%s: select(): %m", "wait_for_stun_responses");
 			return -1;
 		}
-		if (ret == 0)
+		if (ret == 0) {
+			syslog(LOG_DEBUG, "%s: select(): no more responses", "wait_for_stun_responses");
 			return 0;
+		}
 
 		for (i = 0; i < 4; ++i)
 			if (FD_ISSET(fds[i], &fdset))
 				lens[i] = receive_stun_response(fds[i], buffers[i], transaction_ids[i], buffers_lens[i], &peer_addrs[i]);
+
+		syslog(LOG_DEBUG, "%s: received responses: %u", "wait_for_stun_responses", (unsigned)(!!lens[0] + !!lens[1] + !!lens[2] + !!lens[3]));
 
 		if (lens[0] && lens[1] && lens[2] && lens[3])
 			return 0;
@@ -331,6 +336,12 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 					ptr[6] ^= buffer[6];
 					ptr[7] ^= buffer[7];
 				}
+
+				syslog(LOG_DEBUG, "%s: %s %hhu.%hhu.%hhu.%hhu:%hu",
+				       "parse_stun_response",
+				       ((attr_type & 0x7fff) == 0x0020) ? "XOR-MAPPED-ADDRESS" : "MAPPED-ADDRESS",
+				       ptr[4], ptr[5], ptr[6], ptr[7],
+				       (uint16_t)((ptr[2] << 8) + ptr[3]));
 
 				/* Prefer XOR Mapped Address, some NATs change IP addresses in UDP packets */
 				if (!have_xor_mapped_address) {
