@@ -43,6 +43,7 @@
 #ifdef TEST_LINUX_DEBUG_APP
 static int add_filter_rule2(const char *ifname, const char *rhost, const char *iaddr, unsigned short eport, unsigned short iport, int proto, const char *desc);
 static int delete_filter_rule(const char * ifname, unsigned short port, int proto);
+#define syslog(priority, format, ...) do { switch(priority) { case LOG_ERR: printf("Error: "); break; case LOG_WARNING: printf("Warning: "); } printf(format, ##__VA_ARGS__); putchar('\n'); } while (0)
 #endif
 
 /* Generate random STUN Transaction Id */
@@ -580,7 +581,6 @@ int main(int argc, char *argv[])
 
 	srandom(time(NULL) * getpid());
 
-	openlog("upnpstun", LOG_CONS|LOG_PERROR, LOG_USER);
 	ret = perform_stun(NULL, NULL, argv[1], atoi(argv[2]), &ext_addr, &restrictive_nat);
 	if (ret != 0) {
 		printf("STUN Failed: %s\n", strerror(errno));
