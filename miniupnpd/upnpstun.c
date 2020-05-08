@@ -576,6 +576,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (geteuid() != 0) {
+		printf("You need to run this application as root\n");
+		return 1;
+	}
+
 	if (argc == 2)
 		argv[2] = "0";
 
