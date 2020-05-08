@@ -352,15 +352,22 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 			       attr_len - 4, ptr + 4);
 			}
 			break;
+		case 0x0004:	/* SOURCE-ADDRESS (RFC 3489) */
+		case 0x0005:	/* CHANGED-ADDRESS (RFC 3489) */
 		case 0x802b:	/* RESPONSE-ORIGIN (RFC 5780) */
 		case 0x802c:	/* OTHER-ADDRESS (RFC 5780) */
 			if (attr_len == 8 && ptr[1] == 1) {
 				syslog(LOG_DEBUG, "%s: %s %hhu.%hhu.%hhu.%hhu:%hu",
 				       "parse_stun_response",
+				       (attr_type == 0x0004) ? "SOURCE-ADDRESS" :
+				       (attr_type == 0x0005) ? "CHANGED-ADDRESS" :
 				       (attr_type == 0x802b) ? "RESPONSE-ORIGIN" : "OTHER-ADDRESS",
 				       ptr[4], ptr[5], ptr[6], ptr[7],
 				       (uint16_t)((ptr[2] << 8) + ptr[3]));
 			}
+			break;
+		case 0x8022:	/* SOFTWARE (RFC 5780) */
+			syslog(LOG_DEBUG, "%s: SOFTWARE %.*s", "parse_stun_response", attr_len, ptr);
 			break;
 		default:
 			syslog(LOG_WARNING, "%s: unknown attribute type 0x%04x (len=%hu)",
