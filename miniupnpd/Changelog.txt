@@ -1,7 +1,14 @@
-$Id: Changelog.txt,v 1.463 2020/04/21 21:20:04 nanard Exp $
+$Id: Changelog.txt,v 1.464 2020/05/10 17:57:56 nanard Exp $
+
+2020/05/07:
+  Linux: use libcap or libcap-ng to drop unnecessary capabilities
 
 2020/05/04:
   Move configuration detection from Makefiles to configure (was genconfig.sh)
+  update linux Makefiles
+
+2020/04/29:
+  fix for bridges
 
 2020/04/21:
   Remove FW API detecting code from Makefile (BSD). generate bsdmake.inc
