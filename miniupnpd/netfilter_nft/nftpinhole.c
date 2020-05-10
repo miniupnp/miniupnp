@@ -1,7 +1,7 @@
-/* $Id: nftpinhole.c,v 1.3 2019/10/06 20:50:48 nanard Exp $ */
+/* $Id: nftpinhole.c,v 1.4 2020/05/10 17:01:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2012-2019 Thomas Bernard
+ * (c) 2012-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 

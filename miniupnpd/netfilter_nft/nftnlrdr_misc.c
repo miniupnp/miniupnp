@@ -1,10 +1,10 @@
-/* $Id: nftnlrdr_misc.c,v 1.6 2019/10/02 22:00:10 nanard Exp $ */
+/* $Id: nftnlrdr_misc.c,v 1.8 2020/05/10 17:04:46 nanard Exp $ */
 /*
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
- * (c) 2019 Thomas Bernard
  * (c) 2019 Paul Chambers
+ * (c) 2019-2020 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.

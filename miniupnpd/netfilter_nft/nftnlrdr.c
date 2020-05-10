@@ -1,8 +1,9 @@
 /*
  * vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
+ * (c) 2019 Sven Auhagen
  * (c) 2019 Paul Chambers
  *
  * This software is subject to the conditions detailed
