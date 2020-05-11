@@ -560,7 +560,7 @@ if [ "$MAKEFILE" = "Makefile.bsd" ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME"
 	echo "CPPFLAGS += -I." >> bsdmake.inc
 fi
 if [ "$MAKEFILE" ] ; then
-	cp -v "${BASEDIR}/${MAKEFILE}" Makefile
+	cp "${BASEDIR}/${MAKEFILE}" Makefile && echo "${BASEDIR}/${MAKEFILE} -> Makefile"
 fi
 
 # UUID API
