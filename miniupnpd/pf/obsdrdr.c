@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.c,v 1.93 2020/04/12 17:29:56 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.94 2020/05/10 22:23:18 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
@@ -64,7 +64,7 @@
 #include <stdlib.h>
 
 #include "../macros.h"
-#include "../config.h"
+#include "config.h"
 #include "obsdrdr.h"
 #include "../upnpglobalvars.h"
 
