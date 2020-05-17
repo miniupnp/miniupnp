@@ -1,7 +1,7 @@
-/* $Id: obsdrdr.c,v 1.94 2020/05/10 22:23:18 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.95 2020/05/17 20:22:01 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -135,7 +135,7 @@ add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
 }
 
 /* /dev/pf when opened */
-int dev = -1;
+static int dev = -1;
 
 /* shutdown_redirect() :
  * close the /dev/pf device */
@@ -335,7 +335,7 @@ add_redirect_rule2(const char * ifname,
 		{
 #ifdef PFVAR_NEW_STYLE
 			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4addr.s_addr);
-		  pcr.rule.src.addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
+			pcr.rule.src.addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
 #else
 			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4.s_addr);
 			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
