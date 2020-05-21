@@ -447,12 +447,12 @@ add_redirect_rule2(const char * ifname,
 	if(1)
 	{
 		pcr.rule.direction = PF_IN;
-		/*pcr.rule.src.addr.type = PF_ADDR_NONE;*/
-		pcr.rule.src.addr.type = PF_ADDR_ADDRMASK;
-		pcr.rule.dst.addr.type = PF_ADDR_ADDRMASK;
 		pcr.rule.nat.addr.type = PF_ADDR_NONE;
 		pcr.rule.rdr.addr.type = PF_ADDR_ADDRMASK;
 #endif
+		/*pcr.rule.src.addr.type = PF_ADDR_NONE;*/
+		pcr.rule.src.addr.type = PF_ADDR_ADDRMASK;
+		pcr.rule.dst.addr.type = PF_ADDR_ADDRMASK;
 
 #ifdef __APPLE__
 		pcr.rule.dst.xport.range.op = PF_OP_EQ;
@@ -550,9 +550,9 @@ add_redirect_rule2(const char * ifname,
 		{
 #endif
 			pcr.action = PF_CHANGE_GET_TICKET;
-        	if(ioctl(dev, DIOCCHANGERULE, &pcr) < 0)
+			if(ioctl(dev, DIOCCHANGERULE, &pcr) < 0)
 			{
-            	syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
+				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
 				r = -1;
 			}
 			else
