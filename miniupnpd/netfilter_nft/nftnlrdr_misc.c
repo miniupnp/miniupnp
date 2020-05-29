@@ -1,4 +1,4 @@
-/* $Id: nftnlrdr_misc.c,v 1.8 2020/05/10 17:04:46 nanard Exp $ */
+/* $Id: nftnlrdr_misc.c,v 1.9 2020/05/29 16:09:21 nanard Exp $ */
 /*
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -482,7 +482,6 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	struct nftnl_expr_iter *itr;
 	rule_t *r;
 	char *chain;
-	char *descr;
 	int index_filter, index_peer, index_redirect;
 	UNUSED(data);
 
@@ -511,10 +510,13 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					r->chain = strdup(chain);
 					r->family = *(uint32_t *) nftnl_rule_get_data(rule, NFTNL_RULE_FAMILY,
 																  &len);
-					descr = (char *) nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA,
-														 &r->desc_len);
-					if (r->desc_len > 0)
-						r->desc = strndup(descr, r->desc_len);
+					if (nftnl_rule_is_set(rule, NFTNL_RULE_USERDATA)) {
+						char *descr;
+						descr = (char *) nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA,
+															 &r->desc_len);
+						if (r->desc_len > 0)
+							r->desc = strndup(descr, r->desc_len);
+					}
 
 					r->handle = *(uint32_t *) nftnl_rule_get_data(rule,
 																  NFTNL_RULE_HANDLE,
