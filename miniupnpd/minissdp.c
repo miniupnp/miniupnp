@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.95 2019/05/02 10:08:14 nanard Exp $ */
+/* $Id: minissdp.c,v 1.99 2020/05/10 17:55:32 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -798,7 +798,8 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 			               known_service_types[i].s, /* ver_str,	USN: */
 			               lifetime);
 			/* for devices, also send NOTIFY on the uuid */
-			if(0==memcmp(known_service_types[i].s,
+			if(i > 0 &&	/* only known_service_types[0].s is shorter than "urn:schemas-upnp-org:device" */
+			   0==memcmp(known_service_types[i].s,
 			             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1)) {
 				SendSSDPNotify(s, (struct sockaddr *)&sockname, sockname_len, dest_str,
 				               host, http_port,
