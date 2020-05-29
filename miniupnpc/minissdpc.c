@@ -1,12 +1,11 @@
-/* $Id: minissdpc.c,v 1.40 2019/04/23 12:12:55 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.43 2020/05/29 15:57:42 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
- * Web : http://miniupnp.free.fr/
+ * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2019 Thomas Bernard
+ * copyright (c) 2005-2020 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
-/*#include <syslog.h>*/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -886,7 +885,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					 * no duplicate device was found */
 					if(tmp)
 						continue;
-					tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize+usnsize);
+					tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize+usnsize+3);
 					if(!tmp) {
 						/* memory allocation error */
 						if(error)
