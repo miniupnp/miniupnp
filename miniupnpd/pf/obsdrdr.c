@@ -1,4 +1,4 @@
-/* $Id: obsdrdr.c,v 1.96 2020/05/21 00:18:04 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.98 2020/05/29 22:29:11 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -245,6 +245,41 @@ error:
 	return -1;
 #endif
 }
+
+int
+clear_nat_rules(void)
+{
+	struct pfioc_trans io;
+	struct pfioc_trans_e ioe;
+	if(dev<0) {
+		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	memset(&ioe, 0, sizeof(ioe));
+	io.size = 1;
+	io.esize = sizeof(ioe);
+	io.array = &ioe;
+#ifndef PF_NEWSTYLE
+	ioe.rs_num = PF_RULESET_NAT;
+#else
+	/* ? */
+	ioe.type = PF_TRANS_RULESET;
+#endif
+	strlcpy(ioe.anchor, anchor_name, MAXPATHLEN);
+	if(ioctl(dev, DIOCXBEGIN, &io) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCXBEGIN, ...): %m");
+		goto error;
+	}
+	if(ioctl(dev, DIOCXCOMMIT, &io) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCXCOMMIT, ...): %m");
+		goto error;
+	}
+	return 0;
+error:
+	return -1;
+}
 #endif
 
 #ifdef ENABLE_PORT_TRIGGERING
@@ -406,6 +441,63 @@ int add_nat_rule(const char * ifname,
 #endif
 	}
 	return r;
+}
+
+static int
+delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t iaddr)
+{
+	int i, n;
+	struct pfioc_rule pr;
+	UNUSED(ifname);
+	if(dev<0) {
+		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+	pr.rule.action = PF_NAT;
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
+		goto error;
+	}
+	n = pr.nr;
+	for(i=0; i<n; i++)
+	{
+		pr.nr = i;
+		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
+		{
+			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
+			goto error;
+		}
+#ifdef TEST
+		syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x    %8x",
+		       i, ntohs(pr.rule.src.port[0]), pr.rule.proto,
+		       pr.rule.src.addr.v.a.addr.v4.s_addr, iaddr);
+#endif /* TEST */
+		if(iport == ntohs(pr.rule.src.port[0])
+		 && pr.rule.proto == proto
+		 && iaddr == pr.rule.src.addr.v.a.addr.v4.s_addr)
+		{
+			pr.action = PF_CHANGE_GET_TICKET;
+			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
+			{
+				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
+				goto error;
+			}
+			pr.action = PF_CHANGE_REMOVE;
+			pr.nr = i;
+			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
+			{
+				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				goto error;
+			}
+			return 0;
+		}
+	}
+	syslog(LOG_NOTICE, "could not find nat rule to delete iport=%hu addr=%8x", iport, ntohl(iaddr));
+error:
+	return -1;
 }
 #endif
 
@@ -956,6 +1048,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 			return 0;
 		}
 	}
+	syslog(LOG_NOTICE, "could not find redirect rule to delete eport=%hu", eport);
 error:
 	return -1;
 }
@@ -1026,6 +1119,7 @@ syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
 			return 0;
 		}
 	}
+	syslog(LOG_NOTICE, "could not find filter rule to delete iport=%hu addr=%8x", iport, ntohl(iaddr));
 error:
 	return -1;
 #endif
@@ -1047,6 +1141,11 @@ delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
 	r = priv_delete_redirect_rule(ifname, eport, proto, &iport, &iaddr, NULL, 0);
 	if(r == 0)
 	{
+#ifdef ENABLE_PORT_TRIGGERING
+		if (proto == IPPROTO_UDP) {
+			delete_nat_rule(ifname, iport, proto, iaddr);
+		}
+#endif
 		r = priv_delete_filter_rule(ifname, iport, proto, iaddr);
 	}
 	return r;
