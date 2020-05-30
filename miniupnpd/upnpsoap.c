@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.155 2019/04/08 13:31:46 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.157 2020/05/30 08:28:22 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -673,7 +673,8 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	 * have some smart strategy to choose the port */
 	for(;;) {
 		r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
-		if(r==-2 && eport < 65535) {
+		if((r==-2 || r==-3) && eport < 65535) {
+			/* next port if -2 already redirected or -3 permission check failed */
 			eport++;
 		} else {
 			break;
