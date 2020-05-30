@@ -189,10 +189,13 @@ get_timestamp(unsigned short eport, int proto)
 	struct timestamp_entry * e;
 	e = timestamp_list;
 	while(e) {
-		if(e->eport == eport && e->protocol == (short)proto)
+		if(e->eport == eport && e->protocol == (short)proto) {
+			syslog(LOG_DEBUG, "timestamp entry found (%hu, %d, %u)", eport, proto, e->timestamp);
 			return e->timestamp;
+		}
 		e = e->next;
 	}
+	syslog(LOG_WARNING, "get_timestamp(%hu, %d) no entry found", eport, proto);
 	return 0;
 }
 
@@ -205,6 +208,7 @@ remove_timestamp_entry(unsigned short eport, int proto)
 	e = *p;
 	while(e) {
 		if(e->eport == eport && e->protocol == (short)proto) {
+			syslog(LOG_DEBUG, "timestamp entry removed (%hu, %d, %u)", eport, proto, e->timestamp);
 			/* remove the entry */
 			*p = e->next;
 			free(e);
@@ -213,6 +217,7 @@ remove_timestamp_entry(unsigned short eport, int proto)
 		p = &(e->next);
 		e = *p;
 	}
+	syslog(LOG_WARNING, "remove_timestamp_entry(%hu, %d) no entry found", eport, proto);
 }
 
 static void
@@ -227,6 +232,7 @@ add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
 		tmp->eport = eport;
 		tmp->protocol = (short)proto;
 		timestamp_list = tmp;
+		syslog(LOG_DEBUG, "timestamp entry added (%hu, %d, %u)", eport, proto, timestamp);
 	}
 	else
 	{
@@ -614,7 +620,6 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 	UNUSED(nat_chain_name);
 	UNUSED(ifname);
 	UNUSED(iaddrlen);
-	UNUSED(timestamp);
 	UNUSED(packets);
 	UNUSED(bytes);
 	UNUSED(rhost);

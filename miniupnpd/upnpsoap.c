@@ -775,10 +775,10 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 	}
 	else
 	{
-		syslog(LOG_INFO, "%s: rhost='%s' %s %s found => %s:%u desc='%s'",
+		syslog(LOG_INFO, "%s: rhost='%s' %s %s found => %s:%u desc='%s' duration=%u",
 		       action,
 		       r_host ? r_host : "NULL", ext_port, protocol, int_ip,
-		       (unsigned int)iport, desc);
+		       (unsigned int)iport, desc, leaseduration);
 		bodylen = snprintf(body, sizeof(body), resp,
 				action, ns/*SERVICE_TYPE_WANIPC*/,
 				(unsigned int)iport, int_ip, desc, leaseduration,
