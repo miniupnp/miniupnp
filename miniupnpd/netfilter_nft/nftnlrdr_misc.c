@@ -514,8 +514,15 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 						char *descr;
 						descr = (char *) nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA,
 															 &r->desc_len);
-						if (r->desc_len > 0)
-							r->desc = strndup(descr, r->desc_len);
+						if (r->desc_len > 0) {
+							r->desc = malloc(r->desc_len + 1);
+							if (r->desc != NULL) {
+								memcpy(r->desc, descr, r->desc_len);
+								r->desc[r->desc_len + 1] = '\0';
+							} else {
+								syslog(LOG_ERR, "failed to allocate %u bytes for desc", r->desc_len);
+							}
+						}
 					}
 
 					r->handle = *(uint32_t *) nftnl_rule_get_data(rule,
