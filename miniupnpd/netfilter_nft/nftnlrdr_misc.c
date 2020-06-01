@@ -365,6 +365,10 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r)
 	}
 
 	data_val = nftnl_expr_get(e, NFTNL_EXPR_CMP_DATA, &data_len);
+	if (data_val == NULL) {
+		log_error( "parse_rule_cmp: nftnl_expr_get(NFTNL_EXPR_CMP_DATA) returned NULL");
+		return;
+	}
 
 	switch (r->reg1_type) {
 	case RULE_REG_IIF:
