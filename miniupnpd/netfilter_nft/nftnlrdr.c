@@ -462,9 +462,13 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (iaddr != NULL) {
+				/* TODO : use inet_ntop() instead of inet_ntoa() */
+				/* char * inet_ntoa(struct in_addr in); */
+				/* const char * inet_ntop(int af, const void * restrict src, char * restrict dst, socklen_t size) */
 				addr.s_addr = r->iaddr;
 				addr_str = inet_ntoa(addr);
 				strncpy(iaddr , addr_str, iaddrlen);
+				/* inet_ntop(AF_INET, &r->iaddr, iaddr, iaddrlen) */
 			}
 
 			if (iport != NULL) {
@@ -478,7 +482,7 @@ get_peer_rule_by_index(int index,
 			if (rhost != NULL) {
 				addr.s_addr = r->rhost;
 				addr_str = inet_ntoa(addr);
-				strncpy(iaddr , addr_str, rhostlen);
+				strncpy(rhost, addr_str, rhostlen);
 			}
 
 			if (rport != NULL) {
@@ -574,7 +578,7 @@ get_redirect_rule_by_index(int index,
 			if (rhost != NULL) {
 				addr.s_addr = r->rhost;
 				addr_str = inet_ntoa(addr);
-				strncpy(iaddr , addr_str, rhostlen);
+				strncpy(rhost, addr_str, rhostlen);
 			}
 
 			if (desc != NULL && r->desc) {
