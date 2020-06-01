@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 
 #include "config.h"
 #ifdef ENABLE_EVENTS
@@ -816,7 +817,10 @@ strcat_str(char * str, int * len, int * tmplen, const char * s2)
 			newlen = *tmplen + s2len + 1;
 		p = (char *)realloc(str, newlen);
 		if(p == NULL) /* handle a failure of realloc() */
+		{
+			syslog(LOG_ERR, "strcat_str: Failed to realloc %d bytes", newlen);
 			return str;
+		}
 		str = p;
 		*tmplen = newlen;
 	}
@@ -840,6 +844,7 @@ strcat_char(char * str, int * len, int * tmplen, char c)
 		p = (char *)realloc(str, *tmplen);
 		if(p == NULL) /* handle a failure of realloc() */
 		{
+			syslog(LOG_ERR, "strcat_char: Failed to realloc %d bytes", *tmplen);
 			*tmplen -= 256;
 			return str;
 		}
