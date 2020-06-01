@@ -1133,10 +1133,9 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
     int result = -1;
 	struct nlmsghdr *nlh;
 	struct mnl_nlmsg_batch *batch;
-	char buf[MNL_SOCKET_BUFFER_SIZE];
+	char buf[MNL_SOCKET_BUFFER_SIZE*2];
 
-
-	batch = start_batch(buf, sizeof(buf));
+	batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
 	if (batch != NULL)
     {
         switch (chain_type) {
@@ -1171,7 +1170,7 @@ table_op( enum nf_tables_msg_types op, uint16_t family, const char * name)
     int result;
     struct nlmsghdr *nlh;
     struct mnl_nlmsg_batch *batch;
-    char buf[MNL_SOCKET_BUFFER_SIZE];
+    char buf[MNL_SOCKET_BUFFER_SIZE*2];
 
     struct nftnl_table *table;
 
@@ -1185,7 +1184,7 @@ table_op( enum nf_tables_msg_types op, uint16_t family, const char * name)
         nftnl_table_set_u32(table, NFTNL_TABLE_FAMILY, family);
         nftnl_table_set_str(table, NFTNL_TABLE_NAME, name);
 
-        batch = start_batch( buf, sizeof(buf));
+        batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
         if (batch == NULL) {
             log_error("out of memory: %m");
             result = -2;
@@ -1210,7 +1209,7 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
     int result = -1;
     struct nlmsghdr *nlh;
     struct mnl_nlmsg_batch *batch;
-    char buf[MNL_SOCKET_BUFFER_SIZE];
+    char buf[MNL_SOCKET_BUFFER_SIZE*2];
 
     struct nftnl_chain *chain;
 
@@ -1230,7 +1229,7 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
 			nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, priority);
 		}
 
-        batch = start_batch(buf, sizeof(buf));
+        batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
         if (batch == NULL) {
 			log_error("out of memory: %m");
             result = -3;
@@ -1254,9 +1253,13 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
     return result;
 }
 
-
+/**
+ * the buffer that you have to use to store the batch must be double
+ * of MNL_SOCKET_BUFFER_SIZE
+ * @see https://www.netfilter.org/projects/libmnl/doxygen/html/group__batch.html
+ */
 struct mnl_nlmsg_batch *
-start_batch( char *buf, size_t buf_size)
+start_batch(char *buf, size_t buf_size)
 {
     struct mnl_nlmsg_batch *result;
     mnl_seq = time(NULL);
