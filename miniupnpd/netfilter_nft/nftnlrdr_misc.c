@@ -1279,6 +1279,14 @@ start_batch(char *buf, size_t buf_size)
     return result;
 }
 
+/**
+ * return codes :
+ * 0  : OK
+ * -1 : netlink not connected
+ * -2 : mnl_socket_sendto() error
+ * -3 : mnl_socket_recvfrom() error
+ * -4 : mnl_cb_run() error
+ */
 int
 send_batch(struct mnl_nlmsg_batch *batch)
 {

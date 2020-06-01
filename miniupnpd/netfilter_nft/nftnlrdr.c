@@ -247,9 +247,9 @@ add_redirect_rule2(const char * ifname,
 		   const char * iaddr, unsigned short iport, int proto,
 		   const char * desc, unsigned int timestamp)
 {
+	int ret;
 	struct nftnl_rule *r;
 	UNUSED(rhost);
-	UNUSED(timestamp);
 
 	d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
 	          ifname, rhost, eport, iaddr, iport, proto, desc));
@@ -258,7 +258,11 @@ add_redirect_rule2(const char * ifname,
 	                  0, eport,
 	                  inet_addr(iaddr), iport,  desc, NULL);
 
-	return nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
+	ret = nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
+	if (ret >= 0) {
+		add_timestamp_entry(eport, proto, timestamp);
+	}
+	return ret;
 }
 
 /*
@@ -493,13 +497,16 @@ get_peer_rule_by_index(int index,
 				strncpy(desc, r->desc, desclen);
 			}
 
-			if (packets || bytes) {
-				if (packets)
-					*packets = r->packets;
-				if (bytes)
-					*bytes = r->bytes;
+			if (packets) {
+				*packets = r->packets;
+			}
+			if (bytes) {
+				*bytes = r->bytes;
 			}
 
+			if (timestamp) {
+				*timestamp = get_timestamp(r->eport, r->proto);
+			}
 			/*
 			 * TODO: Implement counter in case of add {nat,filter}
 			 */
@@ -546,7 +553,6 @@ get_redirect_rule_by_index(int index,
 	struct in_addr addr;
 	char *addr_str;
 	rule_t *r;
-	UNUSED(timestamp);
 
 	d_printf(("get_redirect_rule_by_index()\n"));
 	refresh_nft_cache_redirect();
