@@ -519,7 +519,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 							r->desc = malloc(r->desc_len + 1);
 							if (r->desc != NULL) {
 								memcpy(r->desc, descr, r->desc_len);
-								r->desc[r->desc_len + 1] = '\0';
+								r->desc[r->desc_len] = '\0';
 							} else {
 								syslog(LOG_ERR, "failed to allocate %u bytes for desc", r->desc_len);
 							}
