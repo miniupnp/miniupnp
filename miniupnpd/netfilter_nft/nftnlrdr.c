@@ -5,6 +5,7 @@
  * (c) 2015 Tomofumi Hayashi
  * (c) 2019 Sven Auhagen
  * (c) 2019 Paul Chambers
+ * (c) 2020 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
@@ -309,7 +310,7 @@ add_filter_rule2(const char * ifname,
 	d_printf(("add_filter_rule2(%s, %s, %s, %d, %d, %d, %s)\n",
 	          ifname, rhost, iaddr, eport, iport, proto, desc));
 
-	if (rhost != NULL && strcmp(rhost, "") != 0) {
+	if (rhost != NULL && strcmp(rhost, "") != 0 && strcmp(rhost, "*") != 0) {
 		rhost_addr = inet_addr(rhost);
 	}
 	r = rule_set_filter(NFPROTO_INET, ifname, proto,
@@ -447,10 +448,7 @@ get_peer_rule_by_index(int index,
 		       unsigned int * timestamp,
 		       u_int64_t * packets, u_int64_t * bytes)
 {
-	struct in_addr addr;
-	char *addr_str;
 	rule_t *r;
-	UNUSED(timestamp);
 
 	d_printf(("get_peer_rule_by_index()\n"));
 	refresh_nft_cache_peer();
@@ -466,13 +464,10 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (iaddr != NULL) {
-				/* TODO : use inet_ntop() instead of inet_ntoa() */
-				/* char * inet_ntoa(struct in_addr in); */
-				/* const char * inet_ntop(int af, const void * restrict src, char * restrict dst, socklen_t size) */
-				addr.s_addr = r->iaddr;
-				addr_str = inet_ntoa(addr);
-				strncpy(iaddr , addr_str, iaddrlen);
-				/* inet_ntop(AF_INET, &r->iaddr, iaddr, iaddrlen) */
+				if (inet_ntop(AF_INET, &r->iaddr, iaddr, iaddrlen) == NULL) {
+					syslog(LOG_ERR, "%s: inet_ntop: %m",
+					       "get_peer_rule_by_index");
+				}
 			}
 
 			if (iport != NULL) {
@@ -484,9 +479,14 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (rhost != NULL) {
-				addr.s_addr = r->rhost;
-				addr_str = inet_ntoa(addr);
-				strncpy(rhost, addr_str, rhostlen);
+				if (r->rhost) {
+					if (inet_ntop(AF_INET, &r->rhost, rhost, rhostlen) == NULL) {
+						syslog(LOG_ERR, "%s: inet_ntop: %m",
+						       "get_peer_rule_by_index");
+					}
+				} else {
+					rhost[0] = '\0';
+				}
 			}
 
 			if (rport != NULL) {
@@ -550,8 +550,6 @@ get_redirect_rule_by_index(int index,
 			   unsigned int * timestamp,
 			   u_int64_t * packets, u_int64_t * bytes)
 {
-	struct in_addr addr;
-	char *addr_str;
 	rule_t *r;
 
 	d_printf(("get_redirect_rule_by_index()\n"));
@@ -568,9 +566,10 @@ get_redirect_rule_by_index(int index,
 			}
 
 			if (iaddr != NULL) {
-				addr.s_addr = r->iaddr;
-				addr_str = inet_ntoa(addr);
-				strncpy(iaddr , addr_str, iaddrlen);
+				if (inet_ntop(AF_INET, &r->iaddr, iaddr, iaddrlen) == NULL) {
+					syslog(LOG_ERR, "%s: inet_ntop: %m",
+					       "get_redirect_rule_by_index");
+				}
 			}
 
 			if (iport != NULL) {
@@ -582,9 +581,14 @@ get_redirect_rule_by_index(int index,
 			}
 
 			if (rhost != NULL) {
-				addr.s_addr = r->rhost;
-				addr_str = inet_ntoa(addr);
-				strncpy(rhost, addr_str, rhostlen);
+				if (r->rhost) {
+					if (inet_ntop(AF_INET, &r->rhost, rhost, rhostlen) == NULL) {
+						syslog(LOG_ERR, "%s: inet_ntop: %m",
+						       "get_redirect_rule_by_index");
+					}
+				} else {
+					rhost[0] = '\0';
+				}
 			}
 
 			if (desc != NULL && r->desc) {
@@ -629,7 +633,6 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 	struct in_addr addr;
 	UNUSED(nat_chain_name);
 	UNUSED(ifname);
-	UNUSED(iaddrlen);
 	UNUSED(packets);
 	UNUSED(bytes);
 	UNUSED(rhost);
@@ -641,9 +644,12 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 		if (p->proto == proto &&
 		    p->eport == eport) {
 
-			if (p->iaddr) {
+			if (p->iaddr && iaddr) {
 				addr.s_addr = p->iaddr;
-				inet_ntop(AF_INET, &addr, iaddr, INET_ADDRSTRLEN);
+				if (inet_ntop(AF_INET, &addr, iaddr, iaddrlen) == NULL) {
+					syslog(LOG_ERR, "%s: inet_ntop: %m",
+					       "get_nat_redirect_rule");
+				}
 			}
 
 			if (desc != NULL && p->desc) {
