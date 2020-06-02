@@ -449,12 +449,13 @@ get_peer_rule_by_index(int index,
 		       u_int64_t * packets, u_int64_t * bytes)
 {
 	rule_t *r;
+	int i = 0;
 
 	d_printf(("get_peer_rule_by_index()\n"));
 	refresh_nft_cache_peer();
 
 	LIST_FOREACH(r, &head_peer, entry) {
-		if (r->index == index) {
+		if (i++ == index) {
 			if (ifname != NULL) {
 				if_indextoname(r->ingress_ifidx, ifname);
 			}
@@ -551,12 +552,13 @@ get_redirect_rule_by_index(int index,
 			   u_int64_t * packets, u_int64_t * bytes)
 {
 	rule_t *r;
+	int i = 0;
 
 	d_printf(("get_redirect_rule_by_index()\n"));
 	refresh_nft_cache_redirect();
 
 	LIST_FOREACH(r, &head_redirect, entry) {
-		if (r->index == index) {
+		if (i++ == index) {
 			if (ifname != NULL) {
 				if_indextoname(r->ingress_ifidx, ifname);
 			}

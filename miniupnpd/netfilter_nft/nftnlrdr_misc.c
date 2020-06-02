@@ -483,10 +483,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	struct nftnl_expr_iter *itr;
 	rule_t *r;
 	char *chain;
-	int index_filter, index_peer, index_redirect;
 	UNUSED(data);
-
-	index_filter = index_peer = index_redirect = 0;
 
 	r = malloc(sizeof(rule_t));
 
@@ -547,22 +544,16 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					case RULE_NAT:
 						switch (r->nat_type) {
 						case NFT_NAT_SNAT:
-							r->index = index_peer;
 							LIST_INSERT_HEAD(&head_peer, r, entry);
-							index_peer++;
 							break;
 						case NFT_NAT_DNAT:
-							r->index = index_redirect;
 							LIST_INSERT_HEAD(&head_redirect, r, entry);
-							index_redirect++;
 							break;
 						}
 						break;
 
 					case RULE_FILTER:
-						r->index = index_filter;
 						LIST_INSERT_HEAD(&head_filter, r, entry);
-						index_filter++;
 						break;
 
 					default:

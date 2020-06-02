@@ -75,7 +75,6 @@ typedef struct rule_t {
 	uint64_t bytes;
 	char * desc;
 	uint32_t desc_len;
-	int index;
 } rule_t;
 
 LIST_HEAD(rule_list, rule_t);
