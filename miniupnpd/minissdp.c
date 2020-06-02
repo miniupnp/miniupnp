@@ -1449,7 +1449,8 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 			                      known_service_types[i].s, ver_str,	/* NT: */
 			                      known_service_types[i].uuid, "::",
 			                      known_service_types[i].s); /* ver_str, USN: */
-			if(0==memcmp(known_service_types[i].s,
+			if(i > 0 &&	/* only known_service_types[0].s is shorter than "urn:schemas-upnp-org:device" */
+			   0==memcmp(known_service_types[i].s,
 			             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1))
 			{
 				ret += SendSSDPbyebye(sockets[j],
