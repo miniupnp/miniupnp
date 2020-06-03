@@ -16,7 +16,7 @@ UPNP_VERSION_MINOR=1
 # input environment variables :
 # IPV6, IGD2, STRICT, DEBUG, LEASFILE, VENDORCFG, PCP_PEER,
 # PORTINUSE, DISABLEPPPCONN, FW, IPTABLESPATH, TARGET_OPENWRT,
-# PKG_CONFIG
+# PKG_CONFIG, NO_BACKGROUND_NO_PIDFILE
 
 for argv; do
 case "$argv" in
@@ -38,6 +38,7 @@ case "$argv" in
 			exit 1
 		fi ;;
 	--disable-pppconn) DISABLEPPPCONN=1 ;;
+	--disable-fork) NO_BACKGROUND_NO_PIDFILE=1 ;;
 	--firewall=*)
 	    FW=$(echo $argv | cut -d= -f2) ;;
 	--iptablespath=*)
@@ -56,6 +57,7 @@ case "$argv" in
 		echo " --disable-pppconn  disable WANPPPConnection"
 		echo " --firewall=<name>  force the firewall type (nftables, iptables, pf, ipf, ipfw)"
 		echo " --iptablespath=/path/to/iptables use a specific version of iptables"
+		echo " --disable-fork     Do not go to background and do not write pid file"
 		exit 1
 		;;
 	*)
@@ -826,6 +828,13 @@ cat >> ${CONFIGFILE} <<EOF
 #define SSDP_PACKET_MAX_LEN 1024
 
 EOF
+
+echo "/* disable forking to the background and writing the pid file */" >> ${CONFIGFILE}
+if [ -n "$NO_BACKGROUND_NO_PIDFILE" ] && [ $NO_BACKGROUND_NO_PIDFILE -eq 1 ] ; then
+	echo "#define NO_BACKGROUND_NO_PIDFILE" >> ${CONFIGFILE}
+else
+	echo "/*#define NO_BACKGROUND_NO_PIDFILE*/" >> ${CONFIGFILE}
+fi
 
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}
 

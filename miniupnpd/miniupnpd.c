@@ -1,7 +1,7 @@
 /* $Id: miniupnpd.c,v 1.243 2020/04/12 17:43:13 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -1149,7 +1149,9 @@ static int
 init(int argc, char * * argv, struct runtime_vars * v)
 {
 	int i;
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	int pid;
+#endif
 	int debug_flag = 0;
 	int openlog_option;
 	struct in_addr addr;
@@ -1621,12 +1623,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 			break;
 #endif	/* ENABLE_NFQUEUE */
+#ifndef NO_BACKGROUND_NO_PIDFILE
 		case 'P':
 			if(i+1 < argc)
 				pidfilename = argv[++i];
 			else
 				fprintf(stderr, "Option -%c takes one argument.\n", argv[i][1]);
 			break;
+#endif
 		case 'd':
 			debug_flag = 1;
 			break;
@@ -1769,6 +1773,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 	}
 
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	if(debug_flag)
 	{
 		pid = getpid();
@@ -1784,6 +1789,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		pid = daemonize();
 #endif
 	}
+#endif
 
 	openlog_option = LOG_PID|LOG_CONS;
 	if(debug_flag)
@@ -1799,11 +1805,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		setlogmask(LOG_UPTO(LOG_NOTICE));
 	}
 
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	if(checkforrunning(pidfilename) < 0)
 	{
 		syslog(LOG_ERR, "MiniUPnPd is already running. EXITING");
 		return 1;
 	}
+#endif
 
 #ifdef TOMATO
 	syslog(LOG_NOTICE, "version " MINIUPNPD_VERSION " started");
@@ -1880,8 +1888,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #endif
 #endif
 
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	if(writepidfile(pidfilename, pid) < 0)
 		pidfilename = NULL;
+#endif
 
 #ifdef ENABLE_LEASEFILE
 	/*remove(lease_file);*/
@@ -1925,7 +1935,10 @@ print_usage:
 			"\n"
 			/*"[-l logfile] " not functionnal */
 			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
-			"\t\t[-t notify_interval] [-P pid_filename] "
+			"\t\t[-t notify_interval] "
+#ifndef NO_BACKGROUND_NO_PIDFILE
+			"[-P pid_filename] "
+#endif
 #ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 			"[-z fiendly_name]"
 #endif
@@ -1943,7 +1956,9 @@ print_usage:
 			"\n"
 	        "\nNotes:\n\tThere can be one or several listening_ips.\n"
 	        "\tNotify interval is in seconds. Default is 30 seconds.\n"
+#ifndef NO_BACKGROUND_NO_PIDFILE
 			"\tDefault pid file is '%s'.\n"
+#endif
 			"\tDefault config file is '%s'.\n"
 			"\tWith -d miniupnpd will run as a standard program.\n"
 			"\t-o argument is either an IPv4 address or \"STUN:host[:port]\".\n"
@@ -1979,7 +1994,11 @@ print_usage:
 			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
 #endif
 			"\t-h prints this help and quits.\n"
-	        "", argv[0], argv[0], pidfilename, DEFAULT_CONFIG);
+	        "", argv[0], argv[0],
+#ifndef NO_BACKGROUND_NO_PIDFILE
+			pidfilename,
+#endif
+			DEFAULT_CONFIG);
 	return 1;
 }
 
@@ -3033,10 +3052,12 @@ shutdown:
 	}
 
 	/* remove pidfile */
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	if(pidfilename && (unlink(pidfilename) < 0))
 	{
 		syslog(LOG_ERR, "Failed to remove pidfile %s: %m", pidfilename);
 	}
+#endif
 
 	/* delete lists */
 	while(lan_addrs.lh_first != NULL)
