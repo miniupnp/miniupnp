@@ -543,7 +543,9 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 int
 get_redirect_rule_count(const char * ifname)
 {
+	rule_t *r;
 	int n = 0;
+	UNUSED(ifname);
 
 	refresh_nft_cache_redirect();
 	LIST_FOREACH(r, &head_redirect, entry) {
