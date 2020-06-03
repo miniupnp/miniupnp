@@ -177,7 +177,9 @@ case $OS_NAME in
 		#echo "OpenBSD majorversion=$MAJORVER minorversion=$MINORVER"
 		# The pledge() system call first appeared in OpenBSD 5.9.
 		if [ \( $MAJORVER -ge 6 \) -o \( $MAJORVER -eq 5 -a $MINORVER -ge 9 \) ]; then
-			echo "#define HAS_PLEDGE" >> ${CONFIGFILE}
+			# as of writing (OpenBSD 6.7) DIOCGETRULES is not included in the
+			# operations allowed by the "pf" pledge.
+			#echo "#define HAS_PLEDGE" >> ${CONFIGFILE}
 		fi
 		# rtableid was introduced in OpenBSD 4.0
 		if [ $MAJORVER -ge 4 ]; then
