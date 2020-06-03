@@ -583,7 +583,7 @@ upnp_delete_redirection(unsigned short eport, const char * protocol)
 int
 upnp_get_portmapping_number_of_entries()
 {
-#if defined(USE_PF)
+#if defined(USE_PF) || defined(USE_NFTABLES)
 	return get_redirect_rule_count(ext_if_name);
 #else
 	int n = 0, r = 0;
