@@ -17,6 +17,7 @@
 # (default INSTALLPREFIX is /usr)
 #
 #
+CONFIG_OPTIONS ?= $(cat .configure.cache)
 CONFIG_OPTIONS += --firewall=nftables
 #CFLAGS = -O -g #-DDEBUG
 CFLAGS ?= -Os

@@ -68,6 +68,7 @@ case "$argv" in
 esac
 done
 
+echo $* > .configure.cache
 BASEDIR=`dirname "$0"`
 RM="rm -f"
 MV="mv"
