@@ -522,6 +522,31 @@ add_filter_rule2(const char * ifname,
 #endif
 }
 
+/* get_redirect_rule_count()
+ * return value : -1 for error or the number of rdr rules */
+int
+get_redirect_rule_count(const char * ifname)
+{
+	struct pfioc_rule pr;
+	UNUSED(ifname);
+
+	if(dev<0) {
+		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+#ifndef PF_NEWSTYLE
+	pr.rule.action = PF_RDR;
+#endif
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
+		return -1;
+	}
+	return pr.nr;
+}
+
 /* get_redirect_rule()
  * return value : 0 success (found)
  * -1 = error or rule not found */

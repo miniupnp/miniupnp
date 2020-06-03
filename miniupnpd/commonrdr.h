@@ -1,7 +1,7 @@
 /* $Id: commonrdr.h,v 1.11 2019/10/02 22:12:02 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2006-2019 Thomas Bernard
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * (c) 2006-2020 Thomas Bernard
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #ifndef COMMONRDR_H_INCLUDED
@@ -18,6 +18,11 @@ init_redirect(void);
 
 void
 shutdown_redirect(void);
+
+/* get_redirect_rule_count()
+ * return value : -1 for error or the number of redirection rules */
+int
+get_redirect_rule_count(const char * ifname);
 
 /* get_redirect_rule() gets internal IP and port from
  * interface, external port and protocol
