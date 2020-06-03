@@ -135,7 +135,8 @@ add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
 }
 
 /* /dev/pf when opened */
-static int dev = -1;
+extern int dev;	/* global also used in pfpinhole.c */
+int dev = -1;
 
 /* shutdown_redirect() :
  * close the /dev/pf device */
