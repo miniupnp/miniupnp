@@ -45,6 +45,8 @@ compiler:
 
 before_install:
   - 'if [ "$TRAVIS_OS_NAME" = "osx" ] && [ "$CC" == "gcc" ] ; then CC=gcc-4.9; fi'
+  - export CFLAGS="-fsanitize=address"
+  - export LDFLAGS="-fsanitize=address"
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
