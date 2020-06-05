@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Author : Thomas BERNARD
  * website : https://miniupnp.tuxfamily.org/
- * copyright (c) 2007-2019 Thomas Bernard
+ * copyright (c) 2007-2020 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <Python.h>
@@ -644,8 +644,9 @@ static PyTypeObject UPnPType = {
 #ifndef _WIN32
     PyType_GenericNew,/*UPnP_new,*/      /* tp_new */
 #else
-    0,
+    0,                         /* tp_new */
 #endif
+    0,                         /* tp_free */
 };
 
 /* module methods */
