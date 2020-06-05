@@ -1555,14 +1555,15 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 			freeaddrinfo(ai);
 			if (!found)
 			{
-				syslog(LOG_ERR, "Failed to convert hostname '%s' to IPv6 address", int_ip);
+				syslog(LOG_NOTICE, "No IPv6 address for hostname '%s'", int_ip);
 				SoapError(h, 402, "Invalid Args");
 				return -1;
 			}
 		}
 		else
 		{
-			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip);
+			syslog(LOG_WARNING, "Failed to convert hostname '%s' to IP address : %s",
+			       int_ip, gai_strerror(n));
 			SoapError(h, 402, "Invalid Args");
 			return -1;
 		}
