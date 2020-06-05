@@ -45,6 +45,10 @@ compiler:
 
 before_install:
   - 'if [ "$TRAVIS_OS_NAME" = "osx" ] && [ "$CC" == "gcc" ] ; then CC=gcc-4.9; fi'
+  - 'if [ "$TRAVIS_OS_NAME" != "osx" ] || [ "$PROJECT" != "miniupnpc" ] ; then
+      export CFLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer" ;
+      export LDFLAGS="-fsanitize=address -g" ;
+	fi'
 
 script:
   - 'cd $TRAVIS_BUILD_DIR && cd $PROJECT'
