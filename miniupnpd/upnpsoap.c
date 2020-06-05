@@ -1538,14 +1538,26 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 	if (inet_pton(AF_INET6, int_ip, &result_ip) <= 0)
 	{
 		n = getaddrinfo(int_ip, NULL, &hints, &ai);
-		if(!n && ai->ai_family == AF_INET6)
+		if (n == 0)
 		{
+			int found = 0;
 			for(p = ai; p; p = p->ai_next)
 			{
-				inet_ntop(AF_INET6, (struct in6_addr *) p, int_ip, sizeof(struct in6_addr));
-				result_ip = *((struct in6_addr *) p);
-				/* TODO : deal with more than one ip per hostname */
-				break;
+				if(p->ai_family == AF_INET6)
+				{
+					inet_ntop(AF_INET6, (struct in6_addr *) p, int_ip, sizeof(struct in6_addr));
+					result_ip = *((struct in6_addr *) p);
+					found = 1;
+					/* TODO : deal with more than one ip per hostname */
+					break;
+				}
+			}
+			freeaddrinfo(ai);
+			if (!found)
+			{
+				syslog(LOG_ERR, "Failed to convert hostname '%s' to IPv6 address", int_ip);
+				SoapError(h, 402, "Invalid Args");
+				return -1;
 			}
 		}
 		else
@@ -1554,7 +1566,6 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 			SoapError(h, 402, "Invalid Args");
 			return -1;
 		}
-        freeaddrinfo(p);
 	}
 
 	if(inet_ntop(AF_INET6, &(h->clientaddr_v6), senderAddr, INET6_ADDRSTRLEN) == NULL)
