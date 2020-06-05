@@ -370,7 +370,8 @@ get_pinhole_info(unsigned short uid,
 				*proto = p->proto;
 
 			if (timestamp) {
-				if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC,(int *) &uid, &ts) != 2) {
+				int uid_temp;
+				if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid_temp, &ts) != 2) {
 					syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
 					continue;
 				}
