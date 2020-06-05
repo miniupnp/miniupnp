@@ -1126,7 +1126,13 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			syslog(LOG_INFO, "SSDP M-SEARCH from %s ST: %.*s",
 			       sender_str, st_len, st);
 			/* find in which sub network the client is */
+#ifdef ENABLE_IPV6
+			if((sender->sa_family == AF_INET) ||
+			   (sender->sa_family == AF_INET6 &&
+			    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)sender)->sin6_addr)))
+#else
 			if(sender->sa_family == AF_INET)
+#endif
 			{
 				if (lan_addr == NULL)
 				{
@@ -1138,7 +1144,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				announced_host = lan_addr->str;
 			}
 #ifdef ENABLE_IPV6
-			else
+			else if(sender->sa_family == AF_INET6)
 			{
 				/* IPv6 address with brackets */
 #ifdef UPNP_STRICT
@@ -1178,6 +1184,13 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #endif
 			}
 #endif
+			else
+			{
+				syslog(LOG_ERR,
+				       "Unknown address family %d for client %s",
+				       sender->sa_family, sender_str);
+				return;
+			}
 			/* Responds to request with a device as ST header */
 			for(i = 0; known_service_types[i].s; i++)
 			{

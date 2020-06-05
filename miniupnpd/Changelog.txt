@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.464 2020/05/10 17:57:56 nanard Exp $
 
+2020/06/05:
+  fix handling of ipv4 M-SEARCH received on ipv6 sockets
+
 2020/06/03:
   configure --disable-fork to disable going to background
   improve upnp_get_portmapping_number_of_entries()
