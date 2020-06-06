@@ -1,4 +1,4 @@
-/* $Id: config.h,v 1.11 2020/06/06 19:53:10 nanard Exp $ */
+/* $Id: config.h,v 1.12 2020/06/06 20:20:47 nanard Exp $ */
 /*  MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2020 Thomas Bernard
@@ -33,5 +33,10 @@
 /* When NO_BACKGROUND_NO_PIDFILE is defined, minissdpd does not go to
  * background and does not create any pidfile */
 /*#define NO_BACKGROUND_NO_PIDFILE*/
+
+/* define HAVE_IP_MREQN to use struct ip_mreqn instead of struct ip_mreq
+ * for setsockopt(IP_MULTICAST_IF). Available with Linux 2.4+,
+ * FreeBSD, etc. */
+#define HAVE_IP_MREQN
 
 #endif

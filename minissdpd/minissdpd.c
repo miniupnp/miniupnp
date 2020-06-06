@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.57 2020/06/06 19:53:10 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.58 2020/06/06 20:20:47 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * (c) 2007-2020 Thomas Bernard
@@ -1449,8 +1449,30 @@ int main(int argc, char * * argv)
 #endif
 
 	/* send M-SEARCH ssdp:all Requests */
-	if(s_ssdp >= 0)
-		ssdpDiscover(s_ssdp, 0, searched_device);
+	if(s_ssdp >= 0) {
+		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next) {
+#ifndef HAVE_IP_MREQN
+			struct in_addr mc_if;
+
+			mc_if.s_addr = lan_addr->addr.s_addr;	/*inet_addr(addr);*/
+#else
+			struct ip_mreqn mc_if;
+
+			mc_if.imr_address.s_addr = lan_addr->addr.s_addr;	/*inet_addr(addr);*/
+#ifdef ENABLE_IPV6
+			mc_if.imr_ifindex = lan_addr->index;
+#else	/* ENABLE_IPV6 */
+			mc_if.imr_ifindex = if_nametoindex(lan_addr->ifname);
+#endif	/* ENABLE_IPV6 */
+#endif	/* HAVE_IP_MREQN */
+			if(setsockopt(s_ssdp, IPPROTO_IP, IP_MULTICAST_IF, &mc_if, sizeof(mc_if)) < 0) {
+				syslog(LOG_WARNING, "setsockopt(IP_MULTICAST_IF): %m");
+			}
+			ssdpDiscover(s_ssdp, 0, searched_device);
+			/* XXX if ssdpDiscover() doesn't send the SSDP packet at once,
+			 * we should wait here */
+		}
+	}
 	if(s_ssdp6 >= 0)
 		ssdpDiscover(s_ssdp6, 1, searched_device);
 
