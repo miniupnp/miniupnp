@@ -7,6 +7,9 @@ $Id: Changelog.txt,v 1.464 2020/05/10 17:57:56 nanard Exp $
   configure --disable-fork to disable going to background
   improve upnp_get_portmapping_number_of_entries()
 
+2020/05/30:
+  "IGD2 Port Triggering" pf implementation (adding a nat rule)
+
 2020/05/07:
   Linux: use libcap or libcap-ng to drop unnecessary capabilities
 
