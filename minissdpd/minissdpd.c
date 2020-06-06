@@ -1,7 +1,7 @@
-/* $Id: minissdpd.c,v 1.53 2016/03/01 18:06:46 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.57 2020/06/06 19:53:10 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * (c) 2007-2018 Thomas Bernard
+ * (c) 2007-2020 Thomas Bernard
  * website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -1224,7 +1224,9 @@ static void ssdpDiscover(int s, int ipv6, const char * search)
 int main(int argc, char * * argv)
 {
 	int ret = 0;
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	int pid;
+#endif
 	struct sigaction sa;
 	char buf[1500];
 	ssize_t n;
@@ -1245,7 +1247,9 @@ int main(int argc, char * * argv)
 	struct lan_addr_s * lan_addr;
 	int i;
 	const char * sockpath = "/var/run/minissdpd.sock";
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	const char * pidfilename = "/var/run/minissdpd.pid";
+#endif
 	int debug_flag = 0;
 #ifdef ENABLE_IPV6
 	int ipv6 = 0;
@@ -1291,8 +1295,10 @@ int main(int argc, char * * argv)
 				}
 			} else if(0==strcmp(argv[i], "-s"))
 				sockpath = argv[++i];
+#ifndef NO_BACKGROUND_NO_PIDFILE
 			else if(0==strcmp(argv[i], "-p"))
 				pidfilename = argv[++i];
+#endif
 			else if(0==strcmp(argv[i], "-t"))
 				ttl = (unsigned char)atoi(argv[++i]);
 			else if(0==strcmp(argv[i], "-f"))
@@ -1308,7 +1314,11 @@ int main(int argc, char * * argv)
 #ifdef ENABLE_IPV6
 		        "[-6] "
 #endif /* ENABLE_IPV6 */
-		        "[-s socket] [-p pidfile] [-t TTL] "
+		        "[-s socket] "
+#ifndef NO_BACKGROUND_NO_PIDFILE
+				"[-p pidfile] "
+#endif
+				"[-t TTL] "
 		        "[-f device] "
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
@@ -1317,8 +1327,13 @@ int main(int argc, char * * argv)
 		        "  192.168.1.42/255.255.255.0, or an interface name such as eth0.\n");
 		fprintf(stderr,
 		        "\n  By default, socket will be open as %s\n"
+#ifndef NO_BACKGROUND_NO_PIDFILE
 		        "  and pid written to file %s\n",
-		        sockpath, pidfilename);
+		        sockpath, pidfilename
+#else
+				,sockpath
+#endif
+				);
 		return 1;
 	}
 
@@ -1329,11 +1344,13 @@ int main(int argc, char * * argv)
 	if(!debug_flag) /* speed things up and ignore LOG_INFO and LOG_DEBUG */
 		setlogmask(LOG_UPTO(LOG_NOTICE));
 
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	if(checkforrunning(pidfilename) < 0)
 	{
 		syslog(LOG_ERR, "MiniSSDPd is already running. EXITING");
 		return 1;
 	}
+#endif
 
 	upnp_bootid = (unsigned int)time(NULL);
 
@@ -1414,6 +1431,7 @@ int main(int argc, char * * argv)
 	}
 #endif
 
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	/* daemonize or in any case get pid ! */
 	if(debug_flag)
 		pid = getpid();
@@ -1428,6 +1446,7 @@ int main(int argc, char * * argv)
 	}
 
 	writepidfile(pidfilename, pid);
+#endif
 
 	/* send M-SEARCH ssdp:all Requests */
 	if(s_ssdp >= 0)
@@ -1639,8 +1658,10 @@ quit:
 		free(serv->location);
 		free(serv);
 	}
+#ifndef NO_BACKGROUND_NO_PIDFILE
 	if(unlink(pidfilename) < 0)
 		syslog(LOG_ERR, "unlink(%s): %m", pidfilename);
+#endif
 	closelog();
 	return ret;
 }
