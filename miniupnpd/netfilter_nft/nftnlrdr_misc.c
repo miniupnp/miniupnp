@@ -84,24 +84,24 @@ static uint32_t rule_list_redirect_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_peer_validate = RULE_CACHE_INVALID;
 
 
+/*
+ * return : 0 for OK, -1 for error
+ */
 int
 nft_mnl_connect(void)
 {
-	int result = 0;
-
 	mnl_sock = mnl_socket_open(NETLINK_NETFILTER);
 	if (mnl_sock == NULL) {
 		log_error("mnl_socket_open() FAILED: %m");
-		result = errno;
-	} else {
-		if (mnl_socket_bind(mnl_sock, 0, MNL_SOCKET_AUTOPID) < 0) {
-			log_error("mnl_socket_bind() FAILED: %m");
-			result = errno;
-		} else {
-			mnl_portid = mnl_socket_get_portid(mnl_sock);
-		}
+		return -1;
 	}
-	return result;
+	if (mnl_socket_bind(mnl_sock, 0, MNL_SOCKET_AUTOPID) < 0) {
+		log_error("mnl_socket_bind() FAILED: %m");
+		return -1;
+	}
+	mnl_portid = mnl_socket_get_portid(mnl_sock);
+	syslog(LOG_INFO, "mnl_socket bound, port_id=%u", mnl_portid);
+	return 0;
 }
 
 void
