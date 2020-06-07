@@ -1,5 +1,5 @@
 /* $Id: nftnlrdr_misc.c,v 1.9 2020/05/29 16:09:21 nanard Exp $ */
-/*
+/* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
@@ -621,7 +621,10 @@ flush_nft_cache(struct rule_list *head)
 	LIST_INIT(head);
 }
 
-void
+/*
+ * return -1 in case of error, 0 if OK
+ */
+int
 refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
@@ -629,13 +632,18 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	uint32_t type = NFTNL_OUTPUT_DEFAULT;
 	struct nftnl_rule *rule;
 	int ret;
+	ssize_t n;
 
+	if (mnl_sock == NULL) {
+		log_error("netlink not connected");
+		return -1;
+	}
 	flush_nft_cache(head);
 
 	rule = nftnl_rule_alloc();
 	if (rule == NULL) {
 		log_error("nftnl_rule_alloc() FAILED");
-		return;
+		return -1;
 	}
 
 	mnl_seq = time(NULL);
@@ -648,23 +656,28 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 
 	if (mnl_socket_sendto(mnl_sock, nlh, nlh->nlmsg_len) < 0) {
 		log_error("mnl_socket_sendto() FAILED: %m");
-		return;
+		return -1;
 	}
 
-	ret = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
-	while (ret > 0) {
-		ret = mnl_cb_run(buf, ret, mnl_seq, mnl_portid, table_cb, &type);
-		if (ret > 0)
-		{
-			ret = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+	do {
+		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+		if (n < 0) {
+			syslog(LOG_ERR, "%s: mnl_socket_recvfrom: %m",
+			       "refresh_nft_cache");
+			return -1;
+		} else if (n == 0) {
+			break;
 		}
-	}
+		ret = mnl_cb_run(buf, n, mnl_seq, mnl_portid, table_cb, &type);
+		if (ret <= -1 /*== MNL_CB_ERROR*/) {
+			syslog(LOG_ERR, "%s: mnl_cb_run: %m",
+			       "refresh_nft_cache");
+			return -1;
+		}
+	} while(ret >= 1 /*== MNL_CB_OK*/);
+	/* ret == MNL_CB_STOP */
 
-	if (ret == -1) {
-		log_error("mnl_socket_recvfrom() FAILED: %m");
-	}
-
-	return;
+	return 0;
 }
 
 static void
@@ -1121,36 +1134,36 @@ nft_mnl_batch_put(char *buf, uint16_t type, uint32_t seq)
 int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
 {
-    int result = -1;
+	int result = -1;
 	struct nlmsghdr *nlh;
 	struct mnl_nlmsg_batch *batch;
 	char buf[MNL_SOCKET_BUFFER_SIZE*2];
 
 	batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
 	if (batch != NULL)
-    {
-        switch (chain_type) {
-        case RULE_CHAIN_FILTER:
-            rule_list_filter_validate = RULE_CACHE_INVALID;
-            break;
-        case RULE_CHAIN_PEER:
-            rule_list_peer_validate = RULE_CACHE_INVALID;
-            break;
-        case RULE_CHAIN_REDIRECT:
-            rule_list_redirect_validate = RULE_CACHE_INVALID;
-            break;
-        }
-        nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
-                                         cmd,
-                                         nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
-                                         NLM_F_APPEND|NLM_F_CREATE|NLM_F_ACK,
-                                         mnl_seq++);
+	{
+		switch (chain_type) {
+			case RULE_CHAIN_FILTER:
+				rule_list_filter_validate = RULE_CACHE_INVALID;
+				break;
+			case RULE_CHAIN_PEER:
+				rule_list_peer_validate = RULE_CACHE_INVALID;
+				break;
+			case RULE_CHAIN_REDIRECT:
+				rule_list_redirect_validate = RULE_CACHE_INVALID;
+				break;
+		}
+		nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+		                                 cmd,
+		                                 nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
+		                                 NLM_F_APPEND|NLM_F_CREATE|NLM_F_ACK,
+		                                 mnl_seq++);
 
-        nftnl_rule_nlmsg_build_payload(nlh, rule);
-        nftnl_rule_free(rule);
+		nftnl_rule_nlmsg_build_payload(nlh, rule);
+		nftnl_rule_free(rule);
 
-        result = send_batch(batch);
-    }
+		result = send_batch(batch);
+	}
 
 	return result;
 }
@@ -1158,59 +1171,65 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 int
 table_op( enum nf_tables_msg_types op, uint16_t family, const char * name)
 {
-    int result;
-    struct nlmsghdr *nlh;
-    struct mnl_nlmsg_batch *batch;
-    char buf[MNL_SOCKET_BUFFER_SIZE*2];
+	int result;
+	struct nlmsghdr *nlh;
+	struct mnl_nlmsg_batch *batch;
+	char buf[MNL_SOCKET_BUFFER_SIZE*2];
 
-    struct nftnl_table *table;
+	struct nftnl_table *table;
 
 	// log_debug("(%d, %d, %s)", op, family, name);
 
-    table = nftnl_table_alloc();
-    if (table == NULL) {
-        log_error("out of memory: %m");
-        result = -1;
-    } else {
-        nftnl_table_set_u32(table, NFTNL_TABLE_FAMILY, family);
-        nftnl_table_set_str(table, NFTNL_TABLE_NAME, name);
+	table = nftnl_table_alloc();
+	if (table == NULL) {
+		log_error("out of memory: %m");
+		result = -1;
+	} else {
+		nftnl_table_set_u32(table, NFTNL_TABLE_FAMILY, family);
+		nftnl_table_set_str(table, NFTNL_TABLE_NAME, name);
 
-        batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
-        if (batch == NULL) {
-            log_error("out of memory: %m");
-            result = -2;
-        } else {
-            nlh = nftnl_table_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
-                                              op, family,
-                                              (op == NFT_MSG_NEWTABLE ? NLM_F_CREATE : 0) | NLM_F_ACK,
-                                              mnl_seq++);
-            nftnl_table_nlmsg_build_payload(nlh, table);
+		batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
+		if (batch == NULL) {
+			log_error("out of memory: %m");
+			result = -2;
+		} else {
+			nlh = nftnl_table_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+			                                  op, family,
+			                                  (op == NFT_MSG_NEWTABLE ? NLM_F_CREATE : 0) | NLM_F_ACK,
+			                                  mnl_seq++);
+			nftnl_table_nlmsg_build_payload(nlh, table);
 
-            result = send_batch(batch);
-        }
-        nftnl_table_free(table);
-    }
-    return result;
+			result = send_batch(batch);
+		}
+		nftnl_table_free(table);
+	}
+	return result;
 }
 
+/*
+ * return values :
+ *  -2 : out of memory (nftnl_chain_alloc)
+ *  -3 : out of memory (start batch)
+ *  -4 : failed to build header
+ */
 int
 chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
 		 const char * name, const char * type, uint32_t hooknum, signed int priority )
 {
-    int result = -1;
-    struct nlmsghdr *nlh;
-    struct mnl_nlmsg_batch *batch;
-    char buf[MNL_SOCKET_BUFFER_SIZE*2];
+	int result = -1;
+	struct nlmsghdr *nlh;
+	struct mnl_nlmsg_batch *batch;
+	char buf[MNL_SOCKET_BUFFER_SIZE*2];
 
-    struct nftnl_chain *chain;
+	struct nftnl_chain *chain;
 
-    // log_debug("(%d, %d, %s, %s, %s, %d, %d)", op, family, table, name, type, hooknum, priority);
+	// log_debug("(%d, %d, %s, %s, %s, %d, %d)", op, family, table, name, type, hooknum, priority);
 
-    chain = nftnl_chain_alloc();
-    if (chain == NULL) {
-        log_error("out of memory: %m");
-        result = -2;
-    } else {
+	chain = nftnl_chain_alloc();
+	if (chain == NULL) {
+		log_error("out of memory: %m");
+		result = -2;
+	} else {
 		nftnl_chain_set_u32(chain, NFTNL_CHAIN_FAMILY, family);
 		nftnl_chain_set(chain, NFTNL_CHAIN_TABLE, table);
 		nftnl_chain_set(chain, NFTNL_CHAIN_NAME, name);
@@ -1220,16 +1239,16 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
 			nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, priority);
 		}
 
-        batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
-        if (batch == NULL) {
+		batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
+		if (batch == NULL) {
 			log_error("out of memory: %m");
-            result = -3;
-        } else {
-            nlh = nftnl_chain_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
-                                              op, family,
-                                              (op == NFT_MSG_NEWCHAIN ? NLM_F_CREATE : 0) | NLM_F_ACK,
-                                              mnl_seq++);
-            if (nlh == NULL)
+			result = -3;
+		} else {
+			nlh = nftnl_chain_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+			                                  op, family,
+			                                  (op == NFT_MSG_NEWCHAIN ? NLM_F_CREATE : 0) | NLM_F_ACK,
+			                                  mnl_seq++);
+			if (nlh == NULL)
 			{
 				log_error("failed to build header: %m");
 				result = -4;
@@ -1237,11 +1256,11 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
 				nftnl_chain_nlmsg_build_payload(nlh, chain);
 
 				result = send_batch(batch);
-            }
-        }
-        nftnl_chain_free(chain);
-    }
-    return result;
+			}
+		}
+		nftnl_chain_free(chain);
+	}
+	return result;
 }
 
 /**
@@ -1252,8 +1271,8 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
 struct mnl_nlmsg_batch *
 start_batch(char *buf, size_t buf_size)
 {
-    struct mnl_nlmsg_batch *result;
-    mnl_seq = time(NULL);
+	struct mnl_nlmsg_batch *result;
+	mnl_seq = time(NULL);
 
 	if (mnl_sock == NULL) {
 		log_error("netlink not connected");
@@ -1265,9 +1284,9 @@ start_batch(char *buf, size_t buf_size)
 							  NFNL_MSG_BATCH_BEGIN, mnl_seq++);
 			mnl_nlmsg_batch_next(result);
 		}
-    }
+	}
 
-    return result;
+	return result;
 }
 
 /**
@@ -1308,7 +1327,7 @@ send_batch(struct mnl_nlmsg_batch *batch)
 					return -3;
 				} else if (ret > 0) {
 					ret = mnl_cb_run(buf, ret, 0, mnl_portid, NULL, NULL);
-					if (ret == -1) {
+					if (ret <= -1 /*== MNL_CB_ERROR*/) {
 						log_error("mnl_cb_run() FAILED: %m");
 						return -4;
 					}
