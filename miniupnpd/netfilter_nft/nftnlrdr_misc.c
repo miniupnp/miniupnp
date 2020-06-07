@@ -703,8 +703,8 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		}
 		ret = mnl_cb_run(buf, n, mnl_seq, mnl_portid, table_cb, &type);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
-			syslog(LOG_ERR, "%s: mnl_cb_run: %m",
-			       "refresh_nft_cache");
+			syslog(LOG_ERR, "%s: mnl_cb_run returned %d",
+			       "refresh_nft_cache", ret);
 			return -1;
 		}
 	} while(ret >= 1 /*== MNL_CB_OK*/);
@@ -1334,6 +1334,7 @@ int
 send_batch(struct mnl_nlmsg_batch *batch)
 {
 	int ret;
+	ssize_t n;
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 
 	mnl_nlmsg_batch_next(batch);
@@ -1344,29 +1345,31 @@ send_batch(struct mnl_nlmsg_batch *batch)
 	if (mnl_sock == NULL) {
 		log_error("netlink not connected");
 		return -1;
-	} else {
-		ret = mnl_socket_sendto(mnl_sock, mnl_nlmsg_batch_head(batch),
-								mnl_nlmsg_batch_size(batch));
-		if (ret == -1) {
-			log_error("mnl_socket_sendto() FAILED: %m");
-			return -2;
-		} else {
-			mnl_nlmsg_batch_stop(batch);
-
-			do {
-				ret = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
-				if (ret == -1) {
-					log_error("mnl_socket_recvfrom() FAILED: %m");
-					return -3;
-				} else if (ret > 0) {
-					ret = mnl_cb_run(buf, ret, 0, mnl_portid, NULL, NULL);
-					if (ret <= -1 /*== MNL_CB_ERROR*/) {
-						log_error("mnl_cb_run() FAILED: %m");
-						return -4;
-					}
-				}
-			} while (ret > 0);
-		}
 	}
+
+	n = mnl_socket_sendto(mnl_sock, mnl_nlmsg_batch_head(batch),
+	                      mnl_nlmsg_batch_size(batch));
+	if (n == -1) {
+		log_error("mnl_socket_sendto() FAILED: %m");
+		return -2;
+	}
+	mnl_nlmsg_batch_stop(batch);
+
+	do {
+		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+		if (n == -1) {
+			log_error("mnl_socket_recvfrom() FAILED: %m");
+			return -3;
+		} else if (n == 0) {
+			break;
+		}
+		ret = mnl_cb_run(buf, n, 0, mnl_portid, NULL, NULL);
+		if (ret <= -1 /*== MNL_CB_ERROR*/) {
+			syslog(LOG_ERR, "%s: mnl_cb_run returned %d",
+			       "send_batch", ret);
+			return -4;
+		}
+	} while (ret >= 1 /*== MNL_CB_OK*/);
+	/* ret == MNL_CB_STOP */
 	return 0;
 }
