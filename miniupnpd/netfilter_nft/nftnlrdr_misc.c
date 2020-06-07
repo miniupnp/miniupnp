@@ -472,7 +472,12 @@ rule_expr_cb(struct nftnl_expr *e, void *data)
 	return MNL_CB_OK;
 }
 
-
+/* callback.
+ * return values :
+ *   MNL_CB_ERROR : an error has occurred. Stop callback runqueue.
+ *   MNL_CB_STOP : top callback runqueue.
+ *   MNL_CB_OK : no problems has occurred.
+ */
 static int
 table_cb(const struct nlmsghdr *nlh, void *data)
 {
@@ -482,90 +487,90 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	struct nftnl_expr *expr;
 	struct nftnl_expr_iter *itr;
 	rule_t *r;
-	char *chain;
 	UNUSED(data);
 
-	r = malloc(sizeof(rule_t));
-
-	if (r == NULL) {
-		log_error("out of memory: %m");
+	rule = nftnl_rule_alloc();
+	if (rule == NULL) {
+		log_error("nftnl_rule_alloc() FAILED");
+		return MNL_CB_ERROR;
+	}
+	if (nftnl_rule_nlmsg_parse(nlh, rule) < 0) {
+		log_error("nftnl_rule_nlmsg_parse FAILED");
+		result = MNL_CB_ERROR;
 	} else {
-		memset(r, 0, sizeof(rule_t));
-		rule = nftnl_rule_alloc();
-		if (rule == NULL) {
-			log_error("nftnl_rule_alloc() FAILED");
+		r = malloc(sizeof(rule_t));
+		if (r == NULL) {
+			syslog(LOG_ERR, "%s: failed to allocate %u bytes",
+			       "table_cb", (unsigned)sizeof(rule_t));
+			result = MNL_CB_ERROR;
 		} else {
+			const char *chain;
+			memset(r, 0, sizeof(rule_t));
 
-			if (nftnl_rule_nlmsg_parse(nlh, rule) < 0) {
-				log_error("nftnl_rule_nlmsg_parse FAILED");
-			} else {
-				chain = (char *) nftnl_rule_get_data(rule, NFTNL_RULE_CHAIN, &len);
-				if (strcmp(chain, nft_prerouting_chain) == 0 ||
-					strcmp(chain, nft_postrouting_chain) == 0 ||
-					strcmp(chain, nft_forward_chain) == 0) {
-					r->table = strdup(
-							(char *) nftnl_rule_get_data(rule, NFTNL_RULE_TABLE, &len));
-					r->chain = strdup(chain);
-					r->family = *(uint32_t *) nftnl_rule_get_data(rule, NFTNL_RULE_FAMILY,
+			chain = (const char *) nftnl_rule_get_data(rule, NFTNL_RULE_CHAIN, &len);
+			if (strcmp(chain, nft_prerouting_chain) == 0 ||
+				strcmp(chain, nft_postrouting_chain) == 0 ||
+				strcmp(chain, nft_forward_chain) == 0) {
+				r->table = strdup((const char *) nftnl_rule_get_data(rule, NFTNL_RULE_TABLE, &len));
+				r->chain = strdup(chain);
+				r->family = *(uint32_t *) nftnl_rule_get_data(rule, NFTNL_RULE_FAMILY,
 																  &len);
-					if (nftnl_rule_is_set(rule, NFTNL_RULE_USERDATA)) {
-						char *descr;
-						descr = (char *) nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA,
+				if (nftnl_rule_is_set(rule, NFTNL_RULE_USERDATA)) {
+					const char *descr;
+					descr = (const char *) nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA,
 															 &r->desc_len);
-						if (r->desc_len > 0) {
-							r->desc = malloc(r->desc_len + 1);
-							if (r->desc != NULL) {
-								memcpy(r->desc, descr, r->desc_len);
-								r->desc[r->desc_len] = '\0';
-							} else {
-								syslog(LOG_ERR, "failed to allocate %u bytes for desc", r->desc_len);
-							}
+					if (r->desc_len > 0) {
+						r->desc = malloc(r->desc_len + 1);
+						if (r->desc != NULL) {
+							memcpy(r->desc, descr, r->desc_len);
+							r->desc[r->desc_len] = '\0';
+						} else {
+							syslog(LOG_ERR, "failed to allocate %u bytes for desc", r->desc_len);
 						}
-					}
-
-					r->handle = *(uint32_t *) nftnl_rule_get_data(rule,
-																  NFTNL_RULE_HANDLE,
-																  &len);
-					r->type = RULE_NONE;
-					if (strcmp(chain, nft_prerouting_chain) == 0 ||
-						strcmp(chain, nft_postrouting_chain) == 0) {
-						r->type = RULE_NAT;
-					} else if (strcmp(chain, nft_forward_chain) == 0) {
-						r->type = RULE_FILTER;
-					}
-
-					itr = nftnl_expr_iter_create(rule);
-
-					while ((expr = nftnl_expr_iter_next(itr)) != NULL) {
-						rule_expr_cb(expr, r);
-					}
-
-					switch (r->type) {
-					case RULE_NAT:
-						switch (r->nat_type) {
-						case NFT_NAT_SNAT:
-							LIST_INSERT_HEAD(&head_peer, r, entry);
-							break;
-						case NFT_NAT_DNAT:
-							LIST_INSERT_HEAD(&head_redirect, r, entry);
-							break;
-						}
-						break;
-
-					case RULE_FILTER:
-						LIST_INSERT_HEAD(&head_filter, r, entry);
-						break;
-
-					default:
-						free(r);
-						break;
 					}
 				}
 
-				nftnl_rule_free(rule);
+				r->handle = *(uint32_t *) nftnl_rule_get_data(rule,
+															  NFTNL_RULE_HANDLE,
+															  &len);
+				r->type = RULE_NONE;
+				if (strcmp(chain, nft_prerouting_chain) == 0 ||
+					strcmp(chain, nft_postrouting_chain) == 0) {
+					r->type = RULE_NAT;
+				} else if (strcmp(chain, nft_forward_chain) == 0) {
+					r->type = RULE_FILTER;
+				}
+
+				itr = nftnl_expr_iter_create(rule);
+
+				while ((expr = nftnl_expr_iter_next(itr)) != NULL) {
+					rule_expr_cb(expr, r);
+				}
+
+				switch (r->type) {
+				case RULE_NAT:
+					switch (r->nat_type) {
+					case NFT_NAT_SNAT:
+						LIST_INSERT_HEAD(&head_peer, r, entry);
+						break;
+					case NFT_NAT_DNAT:
+						LIST_INSERT_HEAD(&head_redirect, r, entry);
+						break;
+					}
+					break;
+
+				case RULE_FILTER:
+					LIST_INSERT_HEAD(&head_filter, r, entry);
+					break;
+
+				default:
+					free(r);
+					break;
+				}
 			}
 		}
 	}
+	nftnl_rule_free(rule);
 	return result;
 }
 
