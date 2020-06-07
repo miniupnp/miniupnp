@@ -569,31 +569,37 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	return result;
 }
 
-void
+int
 refresh_nft_cache_filter(void)
 {
 	if (rule_list_filter_validate != RULE_CACHE_VALID) {
-		refresh_nft_cache(&head_filter, nft_table, nft_forward_chain, NFPROTO_INET);
+		if (refresh_nft_cache(&head_filter, nft_table, nft_forward_chain, NFPROTO_INET) < 0)
+			return -1;
 		rule_list_filter_validate = RULE_CACHE_VALID;
 	}
+	return 0;
 }
 
-void
+int
 refresh_nft_cache_peer(void)
 {
 	if (rule_list_peer_validate != RULE_CACHE_VALID) {
-		refresh_nft_cache(&head_peer, nft_table, nft_postrouting_chain, NFPROTO_IPV4);
+		if (refresh_nft_cache(&head_peer, nft_table, nft_postrouting_chain, NFPROTO_IPV4) < 0)
+			return -1;
 		rule_list_peer_validate = RULE_CACHE_VALID;
 	}
+	return 0;
 }
 
-void
+int
 refresh_nft_cache_redirect(void)
 {
 	if (rule_list_redirect_validate != RULE_CACHE_VALID) {
-		refresh_nft_cache(&head_redirect, nft_table, nft_prerouting_chain, NFPROTO_IPV4);
+		if (refresh_nft_cache(&head_redirect, nft_table, nft_prerouting_chain, NFPROTO_IPV4) < 0)
+			return -1;
 		rule_list_redirect_validate = RULE_CACHE_VALID;
 	}
+	return 0;
 }
 
 void

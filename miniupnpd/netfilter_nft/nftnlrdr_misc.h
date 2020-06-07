@@ -134,10 +134,10 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 		uint8_t proto, unsigned short eport, unsigned short iport, 
 		unsigned short rport, const char *descr, const char *handle);
 struct nftnl_rule *rule_del_handle(rule_t *r);
-void refresh_nft_cache_filter(void);
-void refresh_nft_cache_redirect(void);
-void refresh_nft_cache_peer(void);
-void refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family);
+int refresh_nft_cache_filter(void);
+int refresh_nft_cache_redirect(void);
+int refresh_nft_cache_peer(void);
+int refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family);
 
 int
 table_op(enum nf_tables_msg_types op, uint16_t family, const char * name);
