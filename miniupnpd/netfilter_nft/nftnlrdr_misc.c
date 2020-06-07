@@ -271,10 +271,10 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 	if (reg_val_ptr != NULL) {
 		proto_min_val = htons((uint16_t)*reg_val_ptr);
 	} else {
-		syslog(LOG_ERR, "%s: invalid proto_min_reg %u", proto_min_reg);
+		syslog(LOG_ERR, "%s: invalid proto_min_reg %u", "parse_rule_nat", proto_min_reg);
 	}
 	reg_val_ptr = get_reg_val_ptr(r, addr_min_reg);
-	if (reg_val_prtr != NULL) {
+	if (reg_val_ptr != NULL) {
 		if (r->nat_type == NFT_NAT_DNAT) {
 			r->iaddr = (in_addr_t)*reg_val_ptr;
 			r->iport = proto_min_val;
@@ -285,7 +285,7 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 			}
 		}
 	} else {
-		syslog(LOG_ERR, "%s: invalid addr_min_reg %u", addr_min_reg);
+		syslog(LOG_ERR, "%s: invalid addr_min_reg %u", "parse_rule_nat", addr_min_reg);
 	}
 
 	set_reg(r, NFT_REG_1, RULE_REG_NONE, 0);
@@ -346,9 +346,9 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 		}
 		break;
 	default:
-		syslog(LOG_DEBUG,
-			   "Unsupported payload: (dreg:%d, base:%d, offset:%d, len:%d)",
-			   dreg, base, offset, len);
+		syslog(LOG_WARNING,
+			   "%s: Unsupported payload: (dreg:%u, base:%u, offset:%u, len:%u)",
+			   "parse_rule_payload", dreg, base, offset, len);
 		break;
 	}
 
