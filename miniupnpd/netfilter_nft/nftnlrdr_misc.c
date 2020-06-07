@@ -251,7 +251,7 @@ static void
 parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 {
 	uint32_t addr_min_reg, addr_max_reg, proto_min_reg, proto_max_reg;
-	uint16_t proto_min_val;
+	uint16_t proto_min_val = 0;
 	uint32_t * reg_val_ptr;
 	r->type = RULE_NAT;
 
