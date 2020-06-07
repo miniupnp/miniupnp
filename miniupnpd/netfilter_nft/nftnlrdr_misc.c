@@ -608,21 +608,19 @@ flush_nft_cache(struct rule_list *head)
 	rule_t *p1, *p2;
 
 	p1 = LIST_FIRST(head);
-	if (p1 != NULL) {
-		while (p1 != NULL) {
-			p2 = (rule_t *)LIST_NEXT(p1, entry);
-			if (p1->desc != NULL) {
-				free(p1->desc);
-			}
-			if (p1->table != NULL) {
-				free(p1->table);
-			}
-			if (p1->chain != NULL) {
-				free(p1->chain);
-			}
-			free(p1);
-			p1 = p2;
+	while (p1 != NULL) {
+		p2 = (rule_t *)LIST_NEXT(p1, entry);
+		if (p1->desc != NULL) {
+			free(p1->desc);
 		}
+		if (p1->table != NULL) {
+			free(p1->table);
+		}
+		if (p1->chain != NULL) {
+			free(p1->chain);
+		}
+		free(p1);
+		p1 = p2;
 	}
 	LIST_INIT(head);
 }
