@@ -483,10 +483,8 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 {
 	int result = MNL_CB_OK;
 	struct nftnl_rule *rule;
-	uint32_t len;
 	struct nftnl_expr *expr;
 	struct nftnl_expr_iter *itr;
-	rule_t *r;
 	UNUSED(data);
 
 	rule = nftnl_rule_alloc();
@@ -498,13 +496,15 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 		log_error("nftnl_rule_nlmsg_parse FAILED");
 		result = MNL_CB_ERROR;
 	} else {
-		r = malloc(sizeof(rule_t));
+		rule_t *r = malloc(sizeof(rule_t));
 		if (r == NULL) {
 			syslog(LOG_ERR, "%s: failed to allocate %u bytes",
 			       "table_cb", (unsigned)sizeof(rule_t));
 			result = MNL_CB_ERROR;
 		} else {
 			const char *chain;
+			uint32_t len;
+
 			memset(r, 0, sizeof(rule_t));
 
 			chain = (const char *) nftnl_rule_get_data(rule, NFTNL_RULE_CHAIN, &len);
@@ -552,21 +552,31 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					switch (r->nat_type) {
 					case NFT_NAT_SNAT:
 						LIST_INSERT_HEAD(&head_peer, r, entry);
+						r = NULL;
 						break;
 					case NFT_NAT_DNAT:
 						LIST_INSERT_HEAD(&head_redirect, r, entry);
+						r = NULL;
 						break;
+					default:
+						syslog(LOG_WARNING, "unknown nat type %d", r->nat_type);
 					}
 					break;
 
 				case RULE_FILTER:
 					LIST_INSERT_HEAD(&head_filter, r, entry);
+					r = NULL;
 					break;
 
 				default:
-					free(r);
+					syslog(LOG_WARNING, "unknown rule type %d", r->type);
 					break;
 				}
+			} else {
+				syslog(LOG_WARNING, "unknown chain '%s'", chain);
+			}
+			if (r != NULL) {
+				free(r);
 			}
 		}
 	}
