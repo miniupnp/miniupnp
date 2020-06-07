@@ -252,6 +252,7 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 {
 	uint32_t addr_min_reg, addr_max_reg, proto_min_reg, proto_max_reg;
 	uint16_t proto_min_val;
+	uint32_t * reg_val_ptr;
 	r->type = RULE_NAT;
 
 	r->nat_type = nftnl_expr_get_u32(e, NFTNL_EXPR_NAT_TYPE);
@@ -266,15 +267,25 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 		log_error( "Unsupport proto/addr range for NAT");
 	}
 
-	proto_min_val = htons((uint16_t)*get_reg_val_ptr(r, proto_min_reg));
-	if (r->nat_type == NFT_NAT_DNAT) {
-		r->iaddr = (in_addr_t)*get_reg_val_ptr(r, addr_min_reg);
-		r->iport = proto_min_val;
-	} else if (r->nat_type == NFT_NAT_SNAT) {
-		r->eaddr = (in_addr_t)*get_reg_val_ptr(r, addr_min_reg);
-		if (proto_min_reg == NFT_REG_1) {
-			r->eport = proto_min_val;
+	reg_val_ptr = get_reg_val_ptr(r, proto_min_reg);
+	if (reg_val_ptr != NULL) {
+		proto_min_val = htons((uint16_t)*reg_val_ptr);
+	} else {
+		syslog(LOG_ERR, "%s: invalid proto_min_reg %u", proto_min_reg);
+	}
+	reg_val_ptr = get_reg_val_ptr(r, addr_min_reg);
+	if (reg_val_prtr != NULL) {
+		if (r->nat_type == NFT_NAT_DNAT) {
+			r->iaddr = (in_addr_t)*reg_val_ptr;
+			r->iport = proto_min_val;
+		} else if (r->nat_type == NFT_NAT_SNAT) {
+			r->eaddr = (in_addr_t)*reg_val_ptr;
+			if (proto_min_reg == NFT_REG_1) {
+				r->eport = proto_min_val;
+			}
 		}
+	} else {
+		syslog(LOG_ERR, "%s: invalid addr_min_reg %u", addr_min_reg);
 	}
 
 	set_reg(r, NFT_REG_1, RULE_REG_NONE, 0);
@@ -292,6 +303,10 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 	offset = nftnl_expr_get_u32(e, NFTNL_EXPR_PAYLOAD_OFFSET);
 	len = nftnl_expr_get_u32(e, NFTNL_EXPR_PAYLOAD_LEN);
 	regptr = get_reg_type_ptr(r, dreg);
+	if (regptr == NULL) {
+		syslog(LOG_ERR, "%s: unsupported dreg %u", "parse_rule_payload", dreg);
+		return;
+	}
 
 	switch (base) {
 	case NFT_PAYLOAD_NETWORK_HEADER:
@@ -448,9 +463,8 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r)
 }
 
 static int
-rule_expr_cb(struct nftnl_expr *e, void *data)
+rule_expr_cb(struct nftnl_expr *e, rule_t *r)
 {
-	rule_t *r = data;
 	const char *attr_name = nftnl_expr_get_str(e, NFTNL_EXPR_NAME);
 
 	if (strncmp("cmp", attr_name, sizeof("cmp")) == 0) {
