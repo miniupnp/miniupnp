@@ -1215,7 +1215,7 @@ static void ssdpDiscover(int s, int ipv6, const char * search)
 		n = sendto_or_schedule(s, bufr, n, 0, (const struct sockaddr *)&sockudp_w,
 		                       ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
 		if (n < 0) {
-			syslog(LOG_ERR, "%s: sendto: %m", __func__);
+			syslog(LOG_ERR, "%s: sendto(s=%d, ipv6=%d): %m", __func__, s, ipv6);
 		}
 	}
 }
