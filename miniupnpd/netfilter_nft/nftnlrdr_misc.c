@@ -497,7 +497,6 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 {
 	int result = MNL_CB_OK;
 	struct nftnl_rule *rule;
-	struct nftnl_expr *expr;
 	struct nftnl_expr_iter *itr;
 	UNUSED(data);
 
@@ -556,9 +555,16 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 				}
 
 				itr = nftnl_expr_iter_create(rule);
+				if (itr == NULL) {
+					syslog(LOG_ERR, "%s: nftnl_expr_iter_create() FAILED",
+					       "table_cb");
+				} else {
+					struct nftnl_expr *expr;
 
-				while ((expr = nftnl_expr_iter_next(itr)) != NULL) {
-					rule_expr_cb(expr, r);
+					while ((expr = nftnl_expr_iter_next(itr)) != NULL) {
+						rule_expr_cb(expr, r);
+					}
+					nftnl_expr_iter_destroy(itr);
 				}
 
 				switch (r->type) {
