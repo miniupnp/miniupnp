@@ -122,7 +122,7 @@ LIBS = -lkvm
 LIBS += -lsocket -lnsl -lkstat -lresolv
 .endif
 
-LIBS += -lssl -lcrypto
+LIBS += $(LDFLAGS) -lssl -lcrypto
 
 # set PREFIX variable to install in the wanted place
 
