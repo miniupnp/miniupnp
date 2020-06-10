@@ -128,8 +128,8 @@ LIBS += -lssl -lcrypto
 
 INSTALLBINDIR = $(PREFIX)/sbin
 INSTALLETCDIR = $(PREFIX)/etc
-# INSTALLMANDIR = $(PREFIX)/man
-INSTALLMANDIR = /usr/share/man
+MANPREFIX ?= $(PREFIX)
+INSTALLMANDIR = $(MANPREFIX)/man
 
 all:	$(EXECUTABLES)
 
@@ -151,9 +151,8 @@ install:	miniupnpd genuuid
 	$(INSTALL) -m 755 miniupnpd $(DESTDIR)$(INSTALLBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLETCDIR)
 	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)
-	# TODO : install man page correctly
-#	$(INSTALL) -d $(INSTALLMANDIR)
-#	$(INSTALL) miniupnpd.8 $(INSTALLMANDIR)/cat8/miniupnpd.0
+	$(INSTALL) -d $(DESTDIR)$(INSTALLMANDIR)
+	$(INSTALL) -m miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
 
 # genuuid is using the uuid cli tool available under OpenBSD 4.0 in
 # the uuid-1.5.0 package
