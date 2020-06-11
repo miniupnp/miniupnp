@@ -1,7 +1,8 @@
-$Id: Changelog.txt,v 1.464 2020/05/10 17:57:56 nanard Exp $
+$Id: Changelog.txt,v 1.465 2020/06/06 18:02:19 nanard Exp $
 
 2020/06/05:
   fix handling of ipv4 M-SEARCH received on ipv6 sockets
+  numerous fixes in linux/nftables implementation
 
 2020/06/03:
   configure --disable-fork to disable going to background
