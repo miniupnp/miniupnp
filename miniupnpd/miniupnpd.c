@@ -2112,6 +2112,7 @@ main(int argc, char * * argv)
 			return 0;
 		}
 	}
+	memset(&v, 0, sizeof(v));
 	if(init(argc, argv, &v) != 0)
 		return 1;
 #ifdef ENABLE_HTTPS
