@@ -1,4 +1,11 @@
-$Id: Changelog.txt,v 1.465 2020/06/06 18:02:19 nanard Exp $
+$Id: Changelog.txt,v 1.467 2020/06/20 15:45:30 nanard Exp $
+
+2020/06/20:
+  -v/-vv to output more log (LOG_INFO / LOG_DEBUG)
+  AddAnyPortMapping() tries all possible ports
+
+2020/06/10:
+  improvements and bug fixes in netfilter_nft/nftnlrdr_misc.c
 
 2020/06/05:
   fix handling of ipv4 M-SEARCH received on ipv6 sockets
