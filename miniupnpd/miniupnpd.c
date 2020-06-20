@@ -1169,7 +1169,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	/* only print usage if -h is used */
 	for(i=1; i<argc; i++)
 	{
-		if(0 == strcmp(argv[i], "-h"))
+		if(0 == strcmp(argv[i], "-h") || 0 == strcmp(argv[i], "--help"))
 			goto print_usage;
 	}
 #ifndef DISABLE_CONFIG_FILE
@@ -1926,6 +1926,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 print_usage:
 	fprintf(stderr, "Usage:\n\t"
 	        "%s --version\n\t"
+	        "%s --help\n\t"
 	        "%s "
 #ifndef DISABLE_CONFIG_FILE
 			"[-f config_file] "
@@ -2012,9 +2013,9 @@ print_usage:
 #ifdef IGD_V2
 			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
 #endif
-			"\t-h prints this help and quits.\n"
 			"\t-v enables LOG_INFO messages, -vv LOG_DEBUG as well (default with -d)\n"
-	        "", argv[0], argv[0],
+			"\t-h / --help prints this help and quits.\n"
+	        "", argv[0], argv[0], argv[0],
 #ifndef NO_BACKGROUND_NO_PIDFILE
 			pidfilename,
 #endif
