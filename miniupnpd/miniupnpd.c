@@ -1153,6 +1153,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	int pid;
 #endif
 	int debug_flag = 0;
+	int verbosity_level = 0;	/* for determining setlogmask() */
 	int openlog_option;
 	struct in_addr addr;
 	struct sigaction sa;
@@ -1462,6 +1463,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 		else switch(argv[i][1])
 		{
+		case 'v':
+			{
+				int j;
+				for (j = 1; argv[i][j] != '\0'; j++)
+					verbosity_level++;
+			}
+			break;
 #ifdef ENABLE_IPV6
 		case '4':
 			SETFLAG(IPV6DISABLEDMASK);
@@ -1801,8 +1809,19 @@ init(int argc, char * * argv, struct runtime_vars * v)
 
 	if(!debug_flag)
 	{
-		/* speed things up and ignore LOG_INFO and LOG_DEBUG */
-		setlogmask(LOG_UPTO(LOG_NOTICE));
+		switch (verbosity_level)
+		{
+		case 0:
+			/* speed things up and ignore LOG_INFO and LOG_DEBUG */
+			setlogmask(LOG_UPTO(LOG_NOTICE));
+			break;
+		case 1:
+			/* ignore LOG_DEBUG */
+			setlogmask(LOG_UPTO(LOG_INFO));
+			break;
+		case 2:
+			setlogmask(LOG_UPTO(LOG_DEBUG));
+		}
 	}
 
 #ifndef NO_BACKGROUND_NO_PIDFILE
@@ -1924,7 +1943,7 @@ print_usage:
 #ifdef ENABLE_HTTPS
 			" [-H https_port]"
 #endif
-			" [-p port] [-d]"
+			" [-p port] [-d] [-v]"
 #if defined(USE_PF) || defined(USE_IPF)
 			" [-L]"
 #endif
@@ -1994,6 +2013,7 @@ print_usage:
 			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
 #endif
 			"\t-h prints this help and quits.\n"
+			"\t-v enables LOG_INFO messages, -vv LOG_DEBUG as well (default with -d)\n"
 	        "", argv[0], argv[0],
 #ifndef NO_BACKGROUND_NO_PIDFILE
 			pidfilename,
