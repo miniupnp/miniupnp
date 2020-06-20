@@ -586,7 +586,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	struct NameValueParserData data;
 	const char * int_ip, * int_port, * ext_port, * protocol, * desc;
 	const char * r_host;
-	unsigned short iport, eport;
+	unsigned short iport, eport, eport_below, eport_above;
 	const char * leaseduration_str;
 	unsigned int leaseduration;
 
@@ -669,22 +669,37 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		}
 	}
 
-	/* TODO : accept a different external port
-	 * have some smart strategy to choose the port */
+	/* first try the port asked in request, then
+	 * try +1, -1, +2, -2, etc. */
+	eport_above = eport_below = eport;
 	for(;;) {
 		r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
-		if((r==-2 || r==-3) && eport < 65535) {
-			/* next port if -2 already redirected or -3 permission check failed */
-			eport++;
-		} else {
+		if (r == 0 || r == -1) {
+			/* OK or failure : Stop */
 			break;
 		}
+		/* r : -2 / -4 already redirected or -3 permission check failed */
+		if (eport_below <= 1 && eport_above == 65535) {
+			/* all possible ports tried */
+			r = 1;
+			break;
+		}
+		if (eport_above == 65535 || (eport > eport_below && eport_below > 1)) {
+			eport = --eport_below;
+		} else {
+			eport = ++eport_above;
+		}
+		/* loop invariant :
+		 * eport is equal to either eport_below or eport_above (or both) */
 	}
 
 	ClearNameValueList(&data);
 
 	switch(r)
 	{
+	case 1:	/* exhausted possible mappings */
+		SoapError(h, 728, "NoPortMapsAvailable");
+		break;
 	case 0:	/* success */
 		bodylen = snprintf(body, sizeof(body), resp,
 		              action, ns, /*SERVICE_TYPE_WANIPC,*/
