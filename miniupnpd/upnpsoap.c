@@ -615,9 +615,12 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		return;
 	}
 
-	eport = (unsigned short)atoi(ext_port);
+	eport = (0 == strcmp(ext_port, "*")) ? 0 : (unsigned short)atoi(ext_port);
+	if (eport == 0) {
+		eport = 1024 + ((random() & 0x7ffffffL) % (65536-1024));
+	}
 	iport = (unsigned short)atoi(int_port);
-	if(iport == 0 || !is_numeric(ext_port)) {
+	if(iport == 0 || (!is_numeric(ext_port) && 0 != strcmp(ext_port, "*"))) {
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
