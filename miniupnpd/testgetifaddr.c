@@ -13,6 +13,8 @@
 #include "config.h"
 #include "getifaddr.h"
 
+int runtime_flags = 0;
+
 #if defined(__sun)
 /* solaris 10 does not define LOG_PERROR */
 #define LOG_PERROR 0

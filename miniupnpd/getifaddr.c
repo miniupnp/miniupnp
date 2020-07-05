@@ -25,6 +25,7 @@
 #if defined(USE_GETIFADDRS) || defined(ENABLE_IPV6) || defined(ENABLE_PCP)
 #include <ifaddrs.h>
 #endif
+#include "upnpglobalvars.h"
 
 int
 getifaddr(const char * ifname, char * buf, int len,
@@ -294,6 +295,11 @@ addr_is_reserved(struct in_addr * addr)
 {
 	uint32_t address = ntohl(addr->s_addr);
 	size_t i;
+
+	if(GETFLAG(EXTIPRESERVEDIGNOREMASK)) {
+		syslog(LOG_NOTICE, "private/reserved address checking is ignore");
+		return 0;
+	}
 
 	for (i = 0; i < sizeof(reserved)/sizeof(reserved[0]); ++i) {
 		if ((address >> reserved[i].rmask) == (reserved[i].address >> reserved[i].rmask))

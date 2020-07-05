@@ -1225,6 +1225,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPEXT_IP:
 				use_ext_ip_addr = ary_options[i].value;
 				break;
+			case UPNPEXT_IP_RESERVED_IGNORE:
+				if(strcmp(ary_options[i].value, "yes") == 0)
+					SETFLAG(EXTIPRESERVEDIGNOREMASK);
+				break;
 			case UPNPEXT_PERFORM_STUN:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(PERFORMSTUNMASK);
