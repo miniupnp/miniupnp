@@ -1202,6 +1202,10 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		nftnl_rule_free(rule);
 
 		result = send_batch(batch);
+		if (result < 0) {
+			syslog(LOG_ERR, "%s(%p, %d, %s) send_batch failed %d",
+			       "nft_send_rule", rule, (int)cmd, (int)chain_type, result);
+		}
 	}
 
 	return result;
@@ -1239,6 +1243,10 @@ table_op( enum nf_tables_msg_types op, uint16_t family, const char * name)
 			nftnl_table_nlmsg_build_payload(nlh, table);
 
 			result = send_batch(batch);
+			if (result < 0) {
+				syslog(LOG_ERR, "%s(%d, %d, %s) send_batch failed %d",
+				       "table_op", (int)op, (int)family, name, result);
+			}
 		}
 		nftnl_table_free(table);
 	}
@@ -1295,6 +1303,11 @@ chain_op(enum nf_tables_msg_types op, uint16_t family, const char * table,
 				nftnl_chain_nlmsg_build_payload(nlh, chain);
 
 				result = send_batch(batch);
+				if (result < 0) {
+					syslog(LOG_ERR, "%s(%d, %d, %s, %s, %s, %u, %d) send_batch failed %d",
+					       "chain_op", (int)op, (int)family, table, name, type,
+						   hooknum, priority, result);
+				}
 			}
 		}
 		nftnl_chain_free(chain);
