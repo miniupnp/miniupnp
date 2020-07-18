@@ -17,6 +17,11 @@
 #include <iphlpapi.h>
 #define snprintf _snprintf
 #define strdup _strdup
+#if !defined(_MSC_VER)
+#include <stdint.h>
+#else /* !defined(_MSC_VER) */
+typedef unsigned long uint32_t;
+#endif /* !defined(_MSC_VER) */
 #ifndef strncasecmp
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
 #define strncasecmp _memicmp
@@ -73,21 +78,49 @@
 #define SERVICEPREFIX "u"
 #define SERVICEPREFIX2 'u'
 
-/* check if an ip address is a private (LAN) address
- * see https://tools.ietf.org/html/rfc1918 */
-static int is_rfc1918addr(const char * addr)
+/* List of IP address blocks which are private / reserved and therefore not suitable for public external IP addresses */
+#define IP(a, b, c, d) (((a) << 24) + ((b) << 16) + ((c) << 8) + (d))
+#define MSK(m) (32-(m))
+static const struct { uint32_t address; uint32_t rmask; } reserved[] = {
+	{ IP(  0,   0,   0, 0), MSK( 8) }, /* RFC1122 "This host on this network" */
+	{ IP( 10,   0,   0, 0), MSK( 8) }, /* RFC1918 Private-Use */
+	{ IP(100,  64,   0, 0), MSK(10) }, /* RFC6598 Shared Address Space */
+	{ IP(127,   0,   0, 0), MSK( 8) }, /* RFC1122 Loopback */
+	{ IP(169, 254,   0, 0), MSK(16) }, /* RFC3927 Link-Local */
+	{ IP(172,  16,   0, 0), MSK(12) }, /* RFC1918 Private-Use */
+	{ IP(192,   0,   0, 0), MSK(24) }, /* RFC6890 IETF Protocol Assignments */
+	{ IP(192,   0,   2, 0), MSK(24) }, /* RFC5737 Documentation (TEST-NET-1) */
+	{ IP(192,  31, 196, 0), MSK(24) }, /* RFC7535 AS112-v4 */
+	{ IP(192,  52, 193, 0), MSK(24) }, /* RFC7450 AMT */
+	{ IP(192,  88,  99, 0), MSK(24) }, /* RFC7526 6to4 Relay Anycast */
+	{ IP(192, 168,   0, 0), MSK(16) }, /* RFC1918 Private-Use */
+	{ IP(192, 175,  48, 0), MSK(24) }, /* RFC7534 Direct Delegation AS112 Service */
+	{ IP(198,  18,   0, 0), MSK(15) }, /* RFC2544 Benchmarking */
+	{ IP(198,  51, 100, 0), MSK(24) }, /* RFC5737 Documentation (TEST-NET-2) */
+	{ IP(203,   0, 113, 0), MSK(24) }, /* RFC5737 Documentation (TEST-NET-3) */
+	{ IP(224,   0,   0, 0), MSK( 4) }, /* RFC1112 Multicast */
+	{ IP(240,   0,   0, 0), MSK( 4) }, /* RFC1112 Reserved for Future Use + RFC919 Limited Broadcast */
+};
+#undef IP
+#undef MSK
+
+static int addr_is_reserved(const char * addr_str)
 {
-	/* 192.168.0.0     -   192.168.255.255 (192.168/16 prefix) */
-	if(COMPARE(addr, "192.168."))
+	unsigned long addr_n;
+	uint32_t address;
+	size_t i;
+
+	addr_n = inet_addr(addr_str);
+	if (addr_n == INADDR_NONE)
 		return 1;
-	/* 10.0.0.0        -   10.255.255.255  (10/8 prefix) */
-	if(COMPARE(addr, "10."))
-		return 1;
-	/* 172.16.0.0      -   172.31.255.255  (172.16/12 prefix) */
-	if(COMPARE(addr, "172.")) {
-		if((atoi(addr + 4) | 0x0f) == 0x1f)
+
+	address = ntohl(addr_n);
+
+	for (i = 0; i < sizeof(reserved)/sizeof(reserved[0]); ++i) {
+		if ((address >> reserved[i].rmask) == (reserved[i].address >> reserved[i].rmask))
 			return 1;
 	}
+
 	return 0;
 }
 
@@ -643,8 +676,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				  /* checks that status is connected AND there is a external IP address assigned */
 				  if(is_connected &&
 				     (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
-					if(!is_rfc1918addr(extIpAddr) && (extIpAddr[0] != '\0')
-					   && (0 != strcmp(extIpAddr, "0.0.0.0")))
+					if(!addr_is_reserved(extIpAddr))
 					  goto free_and_return;
 				  }
 				  FreeUPNPUrls(urls);
@@ -665,8 +697,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 #endif
 				    if(is_connected &&
 				       (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
-					  if(!is_rfc1918addr(extIpAddr) && (extIpAddr[0] != '\0')
-					     && (0 != strcmp(extIpAddr, "0.0.0.0")))
+					  if(!addr_is_reserved(extIpAddr))
 					    goto free_and_return;
 				    }
 				    FreeUPNPUrls(urls);
