@@ -38,6 +38,7 @@ extern struct lan_addr_list lan_addrs;
 int
 AddDropMulticastMembership(int s, struct lan_addr_s * lan_addr, int ipv6, int drop)
 {
+	int ret = 0;
 	struct ip_mreq imr;	/* Ip multicast membership */
 #ifdef ENABLE_IPV6
 	struct ipv6_mreq mr;
@@ -56,21 +57,21 @@ AddDropMulticastMembership(int s, struct lan_addr_s * lan_addr, int ipv6, int dr
 		if(setsockopt(s, IPPROTO_IPV6, drop ? IPV6_LEAVE_GROUP : IPV6_JOIN_GROUP,
 		   &mr, sizeof(struct ipv6_mreq)) < 0)
 		{
-			syslog(LOG_ERR, "setsockopt(udp, %s)(%s, %s): %m",
-			       drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
+			syslog(LOG_ERR, "setsockopt(s=%d, %s)(%s, %s): %m",
+			       s, drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
 			       LL_SSDP_MCAST_ADDR,
 			       lan_addr->ifname);
-			return -1;
+			ret = -1;
 		}
 		inet_pton(AF_INET6, SL_SSDP_MCAST_ADDR, &mr.ipv6mr_multiaddr);
 		if(setsockopt(s, IPPROTO_IPV6, drop ? IPV6_LEAVE_GROUP : IPV6_JOIN_GROUP,
 		   &mr, sizeof(struct ipv6_mreq)) < 0)
 		{
-			syslog(LOG_ERR, "setsockopt(udp, %s)(%s, %s): %m",
-			       drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
+			syslog(LOG_ERR, "setsockopt(s=%d, %s)(%s, %s): %m",
+			       s, drop ? "IPV6_LEAVE_GROUP" : "IPV6_JOIN_GROUP",
 			       SL_SSDP_MCAST_ADDR,
 			       lan_addr->ifname);
-			return -1;
+			ret = -1;
 		}
 	}
 	else
@@ -89,8 +90,8 @@ AddDropMulticastMembership(int s, struct lan_addr_s * lan_addr, int ipv6, int dr
 		if (setsockopt(s, IPPROTO_IP, drop ? IP_DROP_MEMBERSHIP : IP_ADD_MEMBERSHIP,
 		    (void *)&imr, sizeof(struct ip_mreq)) < 0)
 		{
-			syslog(LOG_ERR, "setsockopt(udp, %s)(%s): %m",
-			       drop ? "IP_DROP_MEMBERSHIP" : "IP_ADD_MEMBERSHIP",
+			syslog(LOG_ERR, "setsockopt(s=%d, %s)(%s): %m",
+			       s, drop ? "IP_DROP_MEMBERSHIP" : "IP_ADD_MEMBERSHIP",
 			       lan_addr->ifname);
 			return -1;
 		}
@@ -98,7 +99,7 @@ AddDropMulticastMembership(int s, struct lan_addr_s * lan_addr, int ipv6, int dr
 	}
 #endif /* ENABLE_IPV6 */
 
-	return 0;
+	return ret;
 }
 
 int

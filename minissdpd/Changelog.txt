@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.50 2019/02/10 13:45:24 nanard Exp $
+$Id: Changelog.txt,v 1.52 2020/06/06 20:20:47 nanard Exp $
+
+2020/06/06:
+	define NO_BACKGROUND_NO_PIDFILE for a systemd friendly mode
+	send the startup M-SEARCH message on the right interface(s)
 
 2018/12/18:
 	updateDevice() remove element from the list when realloc fails
