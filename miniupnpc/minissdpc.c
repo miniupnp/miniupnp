@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include <sys/types.h>
-#include <sys/time.h>
 #if defined (__NetBSD__)
 #include <net/if.h>
 #endif
@@ -445,6 +445,27 @@ parseMSEARCHReply(const char * reply, int size,
 	}
 }
 
+#if defined(CLOCK_MONOTONIC_FAST)
+#define UPNP_CLOCKID CLOCK_MONOTONIC_FAST
+#elif defined(CLOCK_MONOTONIC)
+#define UPNP_CLOCKID CLOCK_MONOTONIC
+#endif
+
+static int upnp_gettimeofday(struct timeval * tv)
+{
+#if defined(CLOCK_MONOTONIC_FAST) || defined(CLOCK_MONOTONIC)
+	struct timespec ts;
+	int ret_code = clock_gettime(UPNP_CLOCKID, &ts);
+	if (ret_code == 0)
+	{
+		tv->tv_sec = ts.tv_sec;
+		tv->tv_usec = ts.tv_nsec / 1000;
+	}
+	return ret_code;
+#else
+	return gettimeofday(tv, NULL);
+#endif
+}
 /* port upnp discover : SSDP protocol */
 #define SSDP_PORT 1900
 #define XSTR(s) STR(s)
@@ -844,7 +865,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		 * when the last deviceType is reached */
 		if((sentok && !searchalltypes) || !deviceTypes[deviceIndex + 1]) {
 			struct timeval start, current;
-			if (gettimeofday(&start, NULL) < 0) {
+			if (upnp_gettimeofday(&start) < 0) {
 				start.tv_sec = 0;
 				start.tv_usec = 0;
 			}
@@ -913,7 +934,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 						tmp->scope_id = scope_id;
 						devlist = tmp;
 					}
-					if (gettimeofday(&current, NULL) >= 0) {
+					if (upnp_gettimeofday(&current) >= 0) {
 						/* exit the loop if delay is reached */
 						long interval = (current.tv_sec - start.tv_sec) * 1000;
 						interval += (current.tv_usec - start.tv_usec) / 1000;
