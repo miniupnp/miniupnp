@@ -453,7 +453,16 @@ parseMSEARCHReply(const char * reply, int size,
 
 static int upnp_gettimeofday(struct timeval * tv)
 {
-#if defined(CLOCK_MONOTONIC_FAST) || defined(CLOCK_MONOTONIC)
+#if defined(_WIN32)
+#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+	ULONGLONG ts = GetTickCount64();
+#else
+	DWORD ts = GetTickCount();
+#endif
+	tv->tv_sec = ts / 1000;
+	tv->tv_usec = (ts % 1000) * 1000;
+	return 0; /* success */
+#elif defined(CLOCK_MONOTONIC_FAST) || defined(CLOCK_MONOTONIC)
 	struct timespec ts;
 	int ret_code = clock_gettime(UPNP_CLOCKID, &ts);
 	if (ret_code == 0)
