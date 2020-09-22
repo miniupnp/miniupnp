@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #if defined (__NetBSD__)
 #include <net/if.h>
 #endif
@@ -841,73 +842,87 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		/* Waiting for SSDP REPLY packet to M-SEARCH
 		 * if searchalltypes is set, enter the loop only
 		 * when the last deviceType is reached */
-		if((sentok && !searchalltypes) || !deviceTypes[deviceIndex + 1]) do {
-			n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
-			if (n < 0) {
-				/* error */
-				if(error)
-					*error = MINISSDPC_SOCKET_ERROR;
-				goto error;
-			} else if (n == 0) {
-				/* no data or Time Out */
-#ifdef DEBUG
-				printf("NODATA or TIMEOUT\n");
-#endif /* DEBUG */
-				if (devlist && !searchalltypes) {
-					/* found some devices, stop now*/
+		if((sentok && !searchalltypes) || !deviceTypes[deviceIndex + 1]) {
+			struct timeval start, current;
+			if (gettimeofday(&start, NULL) < 0) {
+				start.tv_sec = 0;
+				start.tv_usec = 0;
+			}
+			do {
+				n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
+				if (n < 0) {
+					/* error */
 					if(error)
-						*error = MINISSDPC_SUCCESS;
+						*error = MINISSDPC_SOCKET_ERROR;
 					goto error;
-				}
-			} else {
-				const char * descURL=NULL;
-				int urlsize=0;
-				const char * st=NULL;
-				int stsize=0;
-				const char * usn=NULL;
-				int usnsize=0;
-				parseMSEARCHReply(bufr, n, &descURL, &urlsize, &st, &stsize, &usn, &usnsize);
-				if(st&&descURL) {
+				} else if (n == 0) {
+					/* no data or Time Out */
 #ifdef DEBUG
-					printf("M-SEARCH Reply:\n  ST: %.*s\n  USN: %.*s\n  Location: %.*s\n",
-					       stsize, st, usnsize, (usn?usn:""), urlsize, descURL);
+					printf("NODATA or TIMEOUT\n");
 #endif /* DEBUG */
-					for(tmp=devlist; tmp; tmp = tmp->pNext) {
-						if(strncmp(tmp->descURL, descURL, urlsize) == 0 &&
-						   tmp->descURL[urlsize] == '\0' &&
-						   strncmp(tmp->st, st, stsize) == 0 &&
-						   tmp->st[stsize] == '\0' &&
-						   (usnsize == 0 || strncmp(tmp->usn, usn, usnsize) == 0) &&
-						   tmp->usn[usnsize] == '\0')
-							break;
-					}
-					/* at the exit of the loop above, tmp is null if
-					 * no duplicate device was found */
-					if(tmp)
-						continue;
-					tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize+usnsize+3);
-					if(!tmp) {
-						/* memory allocation error */
+					if (devlist && !searchalltypes) {
+						/* found some devices, stop now*/
 						if(error)
-							*error = MINISSDPC_MEMORY_ERROR;
+							*error = MINISSDPC_SUCCESS;
 						goto error;
 					}
-					tmp->pNext = devlist;
-					tmp->descURL = tmp->buffer;
-					tmp->st = tmp->buffer + 1 + urlsize;
-					tmp->usn = tmp->st + 1 + stsize;
-					memcpy(tmp->buffer, descURL, urlsize);
-					tmp->buffer[urlsize] = '\0';
-					memcpy(tmp->st, st, stsize);
-					tmp->buffer[urlsize+1+stsize] = '\0';
-					if(usn != NULL)
-						memcpy(tmp->usn, usn, usnsize);
-					tmp->buffer[urlsize+1+stsize+1+usnsize] = '\0';
-					tmp->scope_id = scope_id;
-					devlist = tmp;
+				} else {
+					const char * descURL=NULL;
+					int urlsize=0;
+					const char * st=NULL;
+					int stsize=0;
+					const char * usn=NULL;
+					int usnsize=0;
+					parseMSEARCHReply(bufr, n, &descURL, &urlsize, &st, &stsize, &usn, &usnsize);
+					if(st&&descURL) {
+#ifdef DEBUG
+						printf("M-SEARCH Reply:\n  ST: %.*s\n  USN: %.*s\n  Location: %.*s\n",
+						       stsize, st, usnsize, (usn?usn:""), urlsize, descURL);
+#endif /* DEBUG */
+						for(tmp=devlist; tmp; tmp = tmp->pNext) {
+							if(strncmp(tmp->descURL, descURL, urlsize) == 0 &&
+							   tmp->descURL[urlsize] == '\0' &&
+							   strncmp(tmp->st, st, stsize) == 0 &&
+							   tmp->st[stsize] == '\0' &&
+							   (usnsize == 0 || strncmp(tmp->usn, usn, usnsize) == 0) &&
+							   tmp->usn[usnsize] == '\0')
+								break;
+						}
+						/* at the exit of the loop above, tmp is null if
+						 * no duplicate device was found */
+						if(tmp)
+							continue;
+						tmp = (struct UPNPDev *)malloc(sizeof(struct UPNPDev)+urlsize+stsize+usnsize+3);
+						if(!tmp) {
+							/* memory allocation error */
+							if(error)
+								*error = MINISSDPC_MEMORY_ERROR;
+							goto error;
+						}
+						tmp->pNext = devlist;
+						tmp->descURL = tmp->buffer;
+						tmp->st = tmp->buffer + 1 + urlsize;
+						tmp->usn = tmp->st + 1 + stsize;
+						memcpy(tmp->buffer, descURL, urlsize);
+						tmp->buffer[urlsize] = '\0';
+						memcpy(tmp->st, st, stsize);
+						tmp->buffer[urlsize+1+stsize] = '\0';
+						if(usn != NULL)
+							memcpy(tmp->usn, usn, usnsize);
+						tmp->buffer[urlsize+1+stsize+1+usnsize] = '\0';
+						tmp->scope_id = scope_id;
+						devlist = tmp;
+					}
+					if (gettimeofday(&current, NULL) >= 0) {
+						/* exit the loop if delay is reached */
+						long interval = (current.tv_sec - start.tv_sec) * 1000;
+						interval += (current.tv_usec - start.tv_usec) / 1000;
+						if (interval > (long)delay)
+							break;
+					}
 				}
-			}
-		} while(n > 0);
+			} while(n > 0);
+		}
 		if(ipv6) {
 			/* switch linklocal flag */
 			if(linklocal) {
