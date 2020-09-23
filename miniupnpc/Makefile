@@ -1,9 +1,9 @@
 # $Id: Makefile,v 1.134 2016/10/07 09:04:36 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
-# http://miniupnp.tuxfamily.org/
+# https://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2018 Thomas Bernard
+# (c) 2005-2020 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -77,12 +77,13 @@ SRCS = igd_desc_parse.c miniupnpc.c minixml.c minisoap.c miniwget.c \
        upnperrors.c testigddescparse.c testminiwget.c \
        connecthostport.c portlistingparse.c receivedata.c \
        upnpdev.c testportlistingparse.c miniupnpcmodule.c \
-       minihttptestserver.c \
+       minihttptestserver.c addr_is_reserved.c testaddr_is_reserved.c \
        listdevices.c
 
 LIBOBJS = miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
-          connecthostport.o portlistingparse.o receivedata.o upnpdev.o
+          connecthostport.o portlistingparse.o receivedata.o upnpdev.o \
+          addr_is_reserved.o
 
 ifeq (, $(findstring amiga, $(OS)))
 ifeq (, $(findstring mingw, $(OS))$(findstring cygwin, $(OS))$(findstring msys, $(OS)))
@@ -128,10 +129,12 @@ TESTUPNPREPLYPARSE = testupnpreplyparse.o minixml.o upnpreplyparse.o
 
 TESTPORTLISTINGPARSE = testportlistingparse.o minixml.o portlistingparse.o
 
+TESTADDR_IS_RESERVED = testaddr_is_reserved.o addr_is_reserved.o
+
 TESTIGDDESCPARSE = testigddescparse.o igd_desc_parse.o minixml.o \
                    miniupnpc.o miniwget.o upnpcommands.o upnpreplyparse.o \
                    minisoap.o connecthostport.o receivedata.o \
-                   portlistingparse.o
+                   portlistingparse.o addr_is_reserved.o
 
 ifeq (, $(findstring amiga, $(OS)))
 EXECUTABLES := $(EXECUTABLES) upnpc-shared
@@ -167,7 +170,7 @@ all:	$(LIBRARY) $(EXECUTABLES)
 test:	check
 
 check:	validateminixml validateminiwget validateupnpreplyparse \
-	validateportlistingparse validateigddescparse
+	validateportlistingparse validateigddescparse validateaddr_is_reserved
 
 everything:	all $(EXECUTABLES_ADDTESTS)
 
@@ -209,6 +212,11 @@ validateigddescparse:	testigddescparse
 	@echo "igd desc parse validation test"
 	./testigddescparse testdesc/new_LiveBox_desc.xml testdesc/new_LiveBox_desc.values
 	./testigddescparse testdesc/linksys_WAG200G_desc.xml testdesc/linksys_WAG200G_desc.values
+	touch $@
+
+validateaddr_is_reserved:	testaddr_is_reserved
+	@echo "addr_is_reserved() validation test"
+	./testaddr_is_reserved
 	touch $@
 
 clean:
@@ -320,6 +328,8 @@ testupnpreplyparse:	$(TESTUPNPREPLYPARSE)
 testigddescparse:	$(TESTIGDDESCPARSE)
 
 testportlistingparse:	$(TESTPORTLISTINGPARSE)
+
+testaddr_is_reserved:	$(TESTADDR_IS_RESERVED)
 
 miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh VERSION
 	$(SH) updateminiupnpcstrings.sh

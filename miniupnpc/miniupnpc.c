@@ -1,9 +1,9 @@
 /* $Id: miniupnpc.c,v 1.154 2019/04/23 12:12:13 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
- * Web : http://miniupnp.free.fr/
+ * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2019 Thomas Bernard
+ * copyright (c) 2005-2020 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #include <stdlib.h>
@@ -66,6 +66,7 @@ typedef unsigned long uint32_t;
 #include "minixml.h"
 #include "upnpcommands.h"
 #include "connecthostport.h"
+#include "addr_is_reserved.h"
 
 /* compare the beginning of a string with a constant string */
 #define COMPARE(str, cstr) (0==strncmp(str, cstr, sizeof(cstr) - 1))
@@ -77,52 +78,6 @@ typedef unsigned long uint32_t;
 #define SOAPPREFIX "s"
 #define SERVICEPREFIX "u"
 #define SERVICEPREFIX2 'u'
-
-/* List of IP address blocks which are private / reserved and therefore not suitable for public external IP addresses */
-#define IP(a, b, c, d) (((a) << 24) + ((b) << 16) + ((c) << 8) + (d))
-#define MSK(m) (32-(m))
-static const struct { uint32_t address; uint32_t rmask; } reserved[] = {
-	{ IP(  0,   0,   0, 0), MSK( 8) }, /* RFC1122 "This host on this network" */
-	{ IP( 10,   0,   0, 0), MSK( 8) }, /* RFC1918 Private-Use */
-	{ IP(100,  64,   0, 0), MSK(10) }, /* RFC6598 Shared Address Space */
-	{ IP(127,   0,   0, 0), MSK( 8) }, /* RFC1122 Loopback */
-	{ IP(169, 254,   0, 0), MSK(16) }, /* RFC3927 Link-Local */
-	{ IP(172,  16,   0, 0), MSK(12) }, /* RFC1918 Private-Use */
-	{ IP(192,   0,   0, 0), MSK(24) }, /* RFC6890 IETF Protocol Assignments */
-	{ IP(192,   0,   2, 0), MSK(24) }, /* RFC5737 Documentation (TEST-NET-1) */
-	{ IP(192,  31, 196, 0), MSK(24) }, /* RFC7535 AS112-v4 */
-	{ IP(192,  52, 193, 0), MSK(24) }, /* RFC7450 AMT */
-	{ IP(192,  88,  99, 0), MSK(24) }, /* RFC7526 6to4 Relay Anycast */
-	{ IP(192, 168,   0, 0), MSK(16) }, /* RFC1918 Private-Use */
-	{ IP(192, 175,  48, 0), MSK(24) }, /* RFC7534 Direct Delegation AS112 Service */
-	{ IP(198,  18,   0, 0), MSK(15) }, /* RFC2544 Benchmarking */
-	{ IP(198,  51, 100, 0), MSK(24) }, /* RFC5737 Documentation (TEST-NET-2) */
-	{ IP(203,   0, 113, 0), MSK(24) }, /* RFC5737 Documentation (TEST-NET-3) */
-	{ IP(224,   0,   0, 0), MSK( 4) }, /* RFC1112 Multicast */
-	{ IP(240,   0,   0, 0), MSK( 4) }, /* RFC1112 Reserved for Future Use + RFC919 Limited Broadcast */
-};
-#undef IP
-#undef MSK
-
-static int addr_is_reserved(const char * addr_str)
-{
-	unsigned long addr_n;
-	uint32_t address;
-	size_t i;
-
-	addr_n = inet_addr(addr_str);
-	if (addr_n == INADDR_NONE)
-		return 1;
-
-	address = ntohl(addr_n);
-
-	for (i = 0; i < sizeof(reserved)/sizeof(reserved[0]); ++i) {
-		if ((address >> reserved[i].rmask) == (reserved[i].address >> reserved[i].rmask))
-			return 1;
-	}
-
-	return 0;
-}
 
 /* root description parsing */
 MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
