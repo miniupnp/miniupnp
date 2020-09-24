@@ -35,3 +35,5 @@ dist/
 miniupnpc.egg-info/
 init
 miniupnpc.pc
+testaddr_is_reserved
+validateaddr_is_reserved

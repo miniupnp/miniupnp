@@ -26,7 +26,7 @@ OBJS=miniwget.o minixml.o igd_desc_parse.o minisoap.o \
      minissdpc.o \
      miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
      connecthostport.o portlistingparse.o receivedata.o \
-     upnpdev.o
+     upnpdev.o addr_is_reserved.o
 OBJSDLL=$(addprefix dll-, $(OBJS))
 
 all:	upnpc-static.exe upnpc-shared.exe testminixml.exe libminiupnpc.a \
@@ -95,7 +95,8 @@ miniwget.o:	miniwget.c miniwget.h miniupnpcstrings.h connecthostport.h
 
 minisoap.o:	minisoap.c minisoap.h miniupnpcstrings.h
 
-miniupnpc.o:	miniupnpc.c miniupnpc.h minisoap.h miniwget.h minixml.h
+miniupnpc.o:	miniupnpc.c miniupnpc.h minisoap.h miniwget.h minixml.h \
+	addr_is_reserved.h
 
 igd_desc_parse.o:	igd_desc_parse.c igd_desc_parse.h
 
