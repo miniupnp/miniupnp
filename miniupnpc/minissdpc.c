@@ -873,11 +873,8 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		 * if searchalltypes is set, enter the loop only
 		 * when the last deviceType is reached */
 		if((sentok && !searchalltypes) || !deviceTypes[deviceIndex + 1]) {
-			struct timeval start, current;
-			if (upnp_gettimeofday(&start) < 0) {
-				start.tv_sec = 0;
-				start.tv_usec = 0;
-			}
+			struct timeval start = {0, 0}, current = {0, 0};
+			upnp_gettimeofday(&start);
 			do {
 				n = receivedata(sudp, bufr, sizeof(bufr), delay, &scope_id);
 				if (n < 0) {
