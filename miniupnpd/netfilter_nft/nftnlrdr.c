@@ -1,4 +1,4 @@
-/*
+/* $Id: $
  * vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -161,7 +161,8 @@ shutdown_redirect(void)
 int
 set_rdr_name(rdr_name_type param, const char *string)
 {
-	if (string == NULL || strlen(string) > 30) {
+	if (string == NULL || strlen(string) > 30 || string[0] == '\0') {
+		syslog(LOG_ERR, "%s(): invalid string argument '%s'", "set_rdr_name", string)
 		return -1;
 	}
 	switch (param) {
@@ -178,7 +179,7 @@ set_rdr_name(rdr_name_type param, const char *string)
 		nft_forward_chain = string;
 		break;
 	default:
-		syslog(LOG_ERR, "tried to set invalid string parameter: %d", param);
+		syslog(LOG_ERR, "%s(): tried to set invalid string parameter: %d", "set_rdr_name", param);
 		return -2;
 	}
 	return 0;
