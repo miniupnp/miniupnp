@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: testminiwget.sh,v 1.15 2017/11/02 17:36:26 nanard Exp $
+# $Id: testminiwget.sh,v 1.18 2020/05/29 21:14:22 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 # project miniupnp : http://miniupnp.free.fr/
 # (c) 2011-2019 Thomas Bernard
@@ -71,6 +71,7 @@ echo "Test HTTP server is listening on $PORT"
 URL1="http://$ADDR:$PORT/index.html"
 URL2="http://$ADDR:$PORT/chunked"
 URL3="http://$ADDR:$PORT/addcrap"
+URL4="http://$ADDR:$PORT/malformed"
 
 echo "standard test ..."
 ./testminiwget $URL1 "${DOWNLOADEDFILE}.1"
@@ -98,6 +99,9 @@ else
 	echo "response too long test FAILED"
 	RET=1
 fi
+
+echo "malformed response test ..."
+./testminiwget $URL4 "${DOWNLOADEDFILE}.4"
 
 # kill the test HTTP server
 kill $SERVERPID

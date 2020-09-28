@@ -1,4 +1,4 @@
-/* $Id: minihttptestserver.c,v 1.23 2018/01/15 16:20:07 nanard Exp $ */
+/* $Id: minihttptestserver.c,v 1.25 2020/05/29 21:14:22 nanard Exp $ */
 /* Project : miniUPnP
  * Author : Thomas Bernard
  * Copyright (c) 2011-2018 Thomas Bernard
@@ -261,7 +261,7 @@ void build_favicon_content(unsigned char * p, size_t n)
 }
 
 enum modes {
-	MODE_INVALID, MODE_CHUNKED, MODE_ADDCRAP, MODE_NORMAL, MODE_FAVICON
+	MODE_INVALID, MODE_CHUNKED, MODE_ADDCRAP, MODE_NORMAL, MODE_FAVICON, MODE_MALFORMED
 };
 
 const struct {
@@ -272,6 +272,7 @@ const struct {
 	{MODE_ADDCRAP, "addcrap"},
 	{MODE_NORMAL, "normal"},
 	{MODE_FAVICON, "favicon.ico"},
+	{MODE_MALFORMED, "malformed"},
 	{MODE_INVALID, NULL}
 };
 
@@ -413,6 +414,20 @@ void handle_http_connection(int c)
 	}
 
 	switch(mode) {
+	case MODE_MALFORMED:
+		response_len = 2048;
+		response_buffer = malloc(response_len);
+		if(!response_buffer)
+			break;
+		n = snprintf(response_buffer, response_len,
+		             "HTTP/1.1 \r\n"
+					 "\r\n"
+					 /*"0000\r\n"*/);
+		for (i = n; i < response_len; i++) {
+			response_buffer[i] = ' ';
+		}
+		response_len = n;
+		break;
 	case MODE_CHUNKED:
 		response_buffer = build_chunked_response(content_length, &response_len);
 		break;
