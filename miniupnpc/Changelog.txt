@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.242 2019/12/23 23:35:40 nanard Exp $
 miniUPnP client Changelog.
 
+2020/09/24:
+  Check properly for reserved IP addresses
+
 2020/09/23:
   prevent infinite loop in upnpDiscover()
 
