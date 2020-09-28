@@ -162,7 +162,7 @@ int
 set_rdr_name(rdr_name_type param, const char *string)
 {
 	if (string == NULL || strlen(string) > 30 || string[0] == '\0') {
-		syslog(LOG_ERR, "%s(): invalid string argument '%s'", "set_rdr_name", string)
+		syslog(LOG_ERR, "%s(): invalid string argument '%s'", "set_rdr_name", string);
 		return -1;
 	}
 	switch (param) {
