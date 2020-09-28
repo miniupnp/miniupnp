@@ -1,8 +1,8 @@
 /* $Id: upnpglobalvars.c,v 1.45 2019/10/02 22:02:58 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
+ * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -108,29 +108,6 @@ const char * anchor_name = "miniupnpd";
 const char * queue = 0;
 const char * tag = 0;
 #endif
-
-#ifdef USE_IPTABLES
-/* chain names to use in the nat and filter tables. */
-
-/* iptables -t nat -N MINIUPNPD
- * iptables -t nat -A PREROUTING -i <ext_if_name> -j MINIUPNPD */
-const char * miniupnpd_nat_chain = "MINIUPNPD";
-
-/* iptables -t nat -N MINIUPNPD-POSTROUTING
- * iptables -t nat -A POSTROUTING -o <ext_if_name> -j MINIUPNPD-POSTROUTING */
-const char * miniupnpd_nat_postrouting_chain = "MINIUPNPD-POSTROUTING";
-
-/* iptables -t filter -N MINIUPNPD
- * iptables -t filter -A FORWARD -i <ext_if_name> ! -o <ext_if_name> -j MINIUPNPD */
-const char * miniupnpd_forward_chain = "MINIUPNPD";
-
-#ifdef ENABLE_UPNPPINHOLE
-/* ip6tables -t filter -N MINIUPNPD
- * ip6tables -t filter -A FORWARD -i <ext_if_name> ! -o <ext_if_name> -j MINIUPNPD */
-const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
-#endif /* ENABLE_UPNPPINHOLE */
-
-#endif /* USE_NETFILTER */
 
 #ifdef ENABLE_NFQUEUE
 int nfqueue = -1;

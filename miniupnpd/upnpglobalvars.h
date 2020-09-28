@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -140,15 +140,6 @@ extern const char * anchor_name;
 /* queue and tag for PF rules */
 extern const char * queue;
 extern const char * tag;
-#endif
-
-#ifdef USE_IPTABLES
-extern const char * miniupnpd_nat_chain;
-extern const char * miniupnpd_nat_postrouting_chain;
-extern const char * miniupnpd_forward_chain;
-#ifdef ENABLE_UPNPPINHOLE
-extern const char * miniupnpd_v6_filter_chain;
-#endif
 #endif
 
 #ifdef ENABLE_NFQUEUE

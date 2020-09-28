@@ -69,7 +69,7 @@ update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,
                    const char * desc, unsigned int timestamp);
 
-#ifdef USE_NFTABLES
+#if defined(USE_NETFILTER)
 /*
  * only provided by nftables implementation at the moment.
  * Should be implemented for iptables too, for consistency

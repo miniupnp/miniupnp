@@ -64,6 +64,50 @@
 #include "iptcrdr.h"
 #include "../upnpglobalvars.h"
 
+/* chain names to use in the nat and filter tables. */
+
+/* iptables -t nat -N MINIUPNPD
+ * iptables -t nat -A PREROUTING -i <ext_if_name> -j MINIUPNPD */
+static const char * miniupnpd_nat_chain = "MINIUPNPD";
+
+/* iptables -t nat -N MINIUPNPD-POSTROUTING
+ * iptables -t nat -A POSTROUTING -o <ext_if_name> -j MINIUPNPD-POSTROUTING */
+static const char * miniupnpd_nat_postrouting_chain = "MINIUPNPD-POSTROUTING";
+
+/* iptables -t filter -N MINIUPNPD
+ * iptables -t filter -A FORWARD -i <ext_if_name> ! -o <ext_if_name> -j MINIUPNPD */
+static const char * miniupnpd_forward_chain = "MINIUPNPD";
+
+/**
+ * used by the core to override default chain names if specified in config file
+ * @param param which string to set
+ * @param string the new name to use. Do not dispose after setting (i.e. use strdup if not static).
+ * @return 0 if successful
+ */
+int
+set_rdr_name(rdr_name_type param, const char *string)
+{
+	if (string == NULL || strlen(string) > 30 || string[0] == '\0') {
+		syslog(LOG_ERR, "%s(): invalid string argument '%s'", "set_rdr_name", string);
+		return -1;
+	}
+	switch (param) {
+		case RDR_NAT_PREROUTING_CHAIN_NAME:
+			miniupnpd_nat_chain = string;
+			break;
+		case RDR_NAT_POSTROUTING_CHAIN_NAME:
+			miniupnpd_nat_postrouting_chain = string;
+			break;
+		case RDR_FORWARD_CHAIN_NAME:
+			miniupnpd_forward_chain = string;
+			break;
+		default:
+			syslog(LOG_ERR, "%s(): tried to set invalid string parameter: %d", "set_rdr_name", param);
+			return -2;
+	}
+	return 0;
+}
+
 /* local functions declarations */
 static int
 addnatrule(int proto, unsigned short eport,
