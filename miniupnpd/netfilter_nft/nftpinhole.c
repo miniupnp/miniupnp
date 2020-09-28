@@ -211,7 +211,9 @@ delete_pinhole(unsigned short uid)
 int
 update_pinhole(unsigned short uid, unsigned int timestamp)
 {
+#ifdef DEBUG
 	char iaddr[INET6_ADDRSTRLEN];
+#endif
 	char raddr[INET6_ADDRSTRLEN];
 	char label_start[NFT_DESCR_SIZE];
 	char tmp_label[NFT_DESCR_SIZE];
