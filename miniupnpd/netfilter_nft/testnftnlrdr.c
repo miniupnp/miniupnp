@@ -50,6 +50,10 @@ main(int argc, char ** argv)
 		return -1;
 	}
 	openlog("testnftnlrdr", LOG_PERROR|LOG_CONS, LOG_LOCAL0);
+	if (init_redirect() < 0) {
+		fprintf(stderr, "init_redirect() FAILED\n");
+		return -1;
+	}
 	eport = (unsigned short)atoi(argv[1]);
 	iaddr = argv[2];
 	iport = (unsigned short)atoi(argv[3]);
@@ -94,5 +98,6 @@ main(int argc, char ** argv)
 	print_redirect_rules(argv[1]);
 	printf("deleting\n");
 	delete_redirect_and_filter_rules(eport, IPPROTO_TCP);
+	shutdown_redirect();
 	return 0;
 }
