@@ -1203,7 +1203,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 
 		result = send_batch(batch);
 		if (result < 0) {
-			syslog(LOG_ERR, "%s(%p, %d, %s) send_batch failed %d",
+			syslog(LOG_ERR, "%s(%p, %d, %d) send_batch failed %d",
 			       "nft_send_rule", rule, (int)cmd, (int)chain_type, result);
 		}
 	}
