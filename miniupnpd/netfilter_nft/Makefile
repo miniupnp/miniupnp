@@ -1,4 +1,5 @@
 CFLAGS?=-Wall -g -D_GNU_SOURCE -DDEBUG -Wstrict-prototypes -Wdeclaration-after-statement
+CFLAGS += -I..
 CC = gcc
 
 LIBS = -lnftnl -lmnl
@@ -13,7 +14,8 @@ clean:
 
 testnftnlrdr:	nftnlrdr.o nftnlrdr_misc.o testnftnlrdr.o $(LIBS)
 
-testnftpinhole:	nftpinhole.o nftnlrdr_misc.o testnftpinhole.o $(LIBS)
+testnftpinhole:	nftpinhole.o nftnlrdr_misc.o testnftpinhole.o \
+	../upnputils.o ../linux/getroute.o $(LIBS)
 
 test_nfct_get:	test_nfct_get.o test_nfct_get.o -lmnl -lnetfilter_conntrack
 

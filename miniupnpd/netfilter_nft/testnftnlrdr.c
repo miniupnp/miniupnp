@@ -10,6 +10,12 @@
 #include <netinet/in.h>
 #include <syslog.h>
 
+#include <linux/netfilter/nf_tables.h>
+#include <libnftnl/table.h>
+#include <libnftnl/chain.h>
+#include <libnftnl/rule.h>
+#include <libnftnl/expr.h>
+
 #include "nftnlrdr.h"
 #include "nftnlrdr_misc.h"
 #include "../commonrdr.h"

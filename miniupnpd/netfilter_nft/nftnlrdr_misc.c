@@ -117,8 +117,16 @@ nft_mnl_disconnect(void)
 void
 print_rule(const char *func, int line, const struct nftnl_rule *rule)
 {
-	fprintf(stdout,"%s[%d]: ", func, line);
+	fprintf(stdout, "%s[%d]: ", func, line);
 	nftnl_rule_fprintf(stdout, rule, NFTNL_OUTPUT_DEFAULT, 0);
+}
+
+void
+print_rule_t(const char *func, int line, const rule_t *r)
+{
+	fprintf(stdout, "%s[%d]: ", func, line);
+	printf("%s %s %d %hu => %hu\n", r->table, r->chain, (int)r->type,
+	       r->eport, r->iport);
 }
 
 /* print out the "filter" and "nat" tables */
@@ -132,19 +140,19 @@ print_redirect_rules(const char * ifname)
 	refresh_nft_cache_filter();
 	i = 1;
 	LIST_FOREACH(p, &head_filter, entry) {
-		print_rule("filter", i++, p);
+		print_rule_t("filter", i++, p);
 	}
 
 	refresh_nft_cache_redirect();
 	i = 1;
 	LIST_FOREACH(p, &head_redirect, entry) {
-		print_rule("redirect", i++, p);
+		print_rule_t("redirect", i++, p);
 	}
 
 	refresh_nft_cache_peer();
 	i = 1;
 	LIST_FOREACH(p, &head_peer, entry) {
-		print_rule("peer", 0, p);
+		print_rule_t("peer", 0, p);
 	}
 }
 #endif
