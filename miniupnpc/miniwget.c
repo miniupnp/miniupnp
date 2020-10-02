@@ -15,7 +15,11 @@
 #include <ws2tcpip.h>
 #include <io.h>
 #define MAXHOSTNAMELEN 64
-#define snprintf _snprintf
+/* snprintf is supported by Visual Studio 2015, mingw-w64 8.0.0, mingw-w64 with ucrt, mingw-w64 or mingw32 with ansi stdio */
+#if (defined(_MSC_VER) && _MSC_VER < 1900) || (defined(__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR < 8 && !defined(_UCRT) && !defined(__USE_MINGW_ANSI_STDIO)) || (defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR) && !defined(__USE_MINGW_ANSI_STDIO))
+/* _snprintf does not fill nul byte at the end of buffer and returns -1 on overflow */
+#define snprintf(buf, size, fmt, ...) ((_snprintf((buf), (size), (fmt), __VA_ARGS__), (((char *)buf)[(size_t)(size)-1] = 0), _scprintf((fmt), __VA_ARGS__)))
+#endif
 #define socklen_t int
 #ifndef strncasecmp
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
