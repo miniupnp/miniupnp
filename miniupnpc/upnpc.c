@@ -571,6 +571,7 @@ int main(int argc, char ** argv)
 	int retcode = 0;
 	int error = 0;
 	int ipv6 = 0;
+	int ignore = 0;
 	unsigned char ttl = 2;	/* defaulting to 2 */
 	const char * description = 0;
 
@@ -624,6 +625,8 @@ int main(int argc, char ** argv)
 				description = argv[++i];
 			else if(argv[i][1] == 't')
 				ttl = (unsigned char)atoi(argv[++i]);
+			else if(argv[i][1] == 'i')
+				ignore = 1;
 			else
 			{
 				command = argv[i][1];
@@ -672,6 +675,7 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "  -z localport : SSDP packets local (source) port (1024-65535).\n");
 		fprintf(stderr, "  -p path : use this path for MiniSSDPd socket.\n");
 		fprintf(stderr, "  -t ttl : set multicast TTL. Default value is 2.\n");
+		fprintf(stderr, "  -i : ignore errors and try to use also disconnected IGD or non-IGD device.\n");
 		return 1;
 	}
 
@@ -705,16 +709,18 @@ int main(int argc, char ** argv)
 				break;
 			case 2:
 				printf("Found a (not connected?) IGD : %s\n", urls.controlURL);
-				printf("Trying to continue anyway\n");
+				if (ignore) printf("Trying to continue anyway\n");
 				break;
 			case 3:
 				printf("UPnP device found. Is it an IGD ? : %s\n", urls.controlURL);
-				printf("Trying to continue anyway\n");
+				if (ignore) printf("Trying to continue anyway\n");
 				break;
 			default:
 				printf("Found device (igd ?) : %s\n", urls.controlURL);
-				printf("Trying to continue anyway\n");
+				if (ignore) printf("Trying to continue anyway\n");
 			}
+			if(i==1 || ignore) {
+
 			printf("Local LAN ip address : %s\n", lanaddr);
 			#if 0
 			printf("getting \"%s\"\n", urls.ipcondescURL);
@@ -843,6 +849,10 @@ int main(int argc, char ** argv)
 				retcode = 1;
 			}
 
+			} else {
+				fprintf(stderr, "No valid UPNP Internet Gateway Device found.\n");
+				retcode = 1;
+			}
 			FreeUPNPUrls(&urls);
 		}
 		else
