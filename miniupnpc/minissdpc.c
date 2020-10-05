@@ -459,7 +459,7 @@ static int upnp_gettimeofday(struct timeval * tv)
 #else
 	DWORD ts = GetTickCount();
 #endif
-	tv->tv_sec = ts / 1000;
+	tv->tv_sec = (long)(ts / 1000);
 	tv->tv_usec = (ts % 1000) * 1000;
 	return 0; /* success */
 #elif defined(CLOCK_MONOTONIC_FAST) || defined(CLOCK_MONOTONIC)
