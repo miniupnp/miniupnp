@@ -709,16 +709,15 @@ int main(int argc, char ** argv)
 				break;
 			case 2:
 				printf("Found a (not connected?) IGD : %s\n", urls.controlURL);
-				printf("Trying to continue anyway\n");
+				if (ignore) printf("Trying to continue anyway\n");
 				break;
 			case 3:
 				printf("UPnP device found. Is it an IGD ? : %s\n", urls.controlURL);
-				printf("Trying to continue anyway\n");
+				if (ignore) printf("Trying to continue anyway\n");
 				break;
 			default:
 				printf("Found device (igd ?) : %s\n", urls.controlURL);
-				printf("Trying to continue anyway\n");
-				break;
+				if (ignore) printf("Trying to continue anyway\n");
 			}
 			printf("Local LAN ip address : %s\n", lanaddr);
 			#if 0
@@ -731,7 +730,9 @@ int main(int argc, char ** argv)
 			}
 			#endif
 
-			if (ignore || i == 1) switch(command)
+			if (!ignore && i != 1)
+				retcode = 1;
+			else switch(command)
 			{
 			case 'l':
 				DisplayInfos(&urls, &data);
