@@ -709,17 +709,14 @@ int main(int argc, char ** argv)
 				break;
 			case 2:
 				printf("Found a (not connected?) IGD : %s\n", urls.controlURL);
-				if (!ignore) goto invalid;
 				printf("Trying to continue anyway\n");
 				break;
 			case 3:
 				printf("UPnP device found. Is it an IGD ? : %s\n", urls.controlURL);
-				if (!ignore) goto invalid;
 				printf("Trying to continue anyway\n");
 				break;
 			default:
 				printf("Found device (igd ?) : %s\n", urls.controlURL);
-				if (!ignore) goto invalid;
 				printf("Trying to continue anyway\n");
 				break;
 			}
@@ -734,7 +731,7 @@ int main(int argc, char ** argv)
 			}
 			#endif
 
-			switch(command)
+			if (ignore || i == 1) switch(command)
 			{
 			case 'l':
 				DisplayInfos(&urls, &data);
@@ -855,7 +852,6 @@ int main(int argc, char ** argv)
 		}
 		else
 		{
-invalid:
 			fprintf(stderr, "No valid UPNP Internet Gateway Device found.\n");
 			retcode = 1;
 		}
