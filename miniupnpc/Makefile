@@ -62,7 +62,7 @@ JNAERATORARGS = -mode StandaloneJar -runtime JNAerator -library miniupnpc
 #JNAERATORBASEURL = http://jnaerator.googlecode.com/files/
 JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/0.12
 
-ifneq (, $(findstring sun, $(OS)))
+ifneq (, $(findstring sun, $(OS))$(findstring solaris, $(OS)))
   LDLIBS=-lsocket -lnsl -lresolv
   CFLAGS += -D__EXTENSIONS__
   CFLAGS += -std=c99
