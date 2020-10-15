@@ -1,4 +1,4 @@
-/* $Id: $ */
+/* $Id: addr_is_reserved.c,v 1.2 2020/10/15 22:16:13 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -16,6 +16,7 @@
 typedef unsigned long uint32_t;
 #endif /* !defined(_MSC_VER) */
 #else /* _WIN32 */
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
