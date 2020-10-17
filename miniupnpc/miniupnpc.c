@@ -21,11 +21,6 @@
 #define snprintf(buf, size, fmt, ...) ((_snprintf((buf), (size), (fmt), __VA_ARGS__), (((char *)buf)[(size_t)(size)-1] = 0), _scprintf((fmt), __VA_ARGS__)))
 #endif
 #define strdup _strdup
-#if !defined(_MSC_VER)
-#include <stdint.h>
-#else /* !defined(_MSC_VER) */
-typedef unsigned long uint32_t;
-#endif /* !defined(_MSC_VER) */
 #ifndef strncasecmp
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
 #define strncasecmp _memicmp
