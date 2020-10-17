@@ -52,11 +52,14 @@ static const struct { uint32_t address; uint32_t rmask; } reserved[] = {
  */
 int addr_is_reserved(const char * addr_str)
 {
-	unsigned long addr_n;
-	uint32_t address;
+	uint32_t addr_n, address;
 	size_t i;
 
-	addr_n = inet_addr(addr_str);
+	/* was : addr_n = inet_addr(addr_str); */
+	if (inet_pton(AF_INET, addr_str, &addr_n) < 0) {
+		/* error */
+		return 0;
+	}
 	if (addr_n == INADDR_NONE)
 		return 1;
 

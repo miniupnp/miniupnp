@@ -720,7 +720,10 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #if defined(_WIN32) && (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 			InetPtonA(AF_INET, multicastif, &mc_if);
 #else
-			mc_if.s_addr = inet_addr(multicastif); /* ex: 192.168.x.x */
+			/* was : mc_if.s_addr = inet_addr(multicastif); */ /* ex: 192.168.x.x */
+			if (inet_pton(AF_INET, multicastif, &mc_if.s_addr) < 0) {
+				mc_if.s_addr = INADDR_NONE;
+			}
 #endif
 			if(mc_if.s_addr != INADDR_NONE)
 			{
