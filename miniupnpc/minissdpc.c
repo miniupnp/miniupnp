@@ -717,8 +717,12 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif
 		} else {
 			struct in_addr mc_if;
-#if defined(_WIN32) && (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+#if defined(_WIN32)
+#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 			InetPtonA(AF_INET, multicastif, &mc_if);
+#else
+			mc_if.s_addr = inet_addr(multicastif); /* old Windows SDK do not support InetPtoA() */
+#endif
 #else
 			/* was : mc_if.s_addr = inet_addr(multicastif); */ /* ex: 192.168.x.x */
 			if (inet_pton(AF_INET, multicastif, &mc_if.s_addr) < 0) {
