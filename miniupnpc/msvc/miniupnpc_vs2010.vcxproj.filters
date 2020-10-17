@@ -40,6 +40,9 @@
     <ClCompile Include="..\upnperrors.c">
       <Filter>sources</Filter>
     </ClCompile>
+    <ClCompile Include="..\addr_is_reserved.c">
+      <Filter>sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\connecthostport.h">
@@ -94,6 +97,9 @@
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\miniwget_private.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\addr_is_reserved.h">
       <Filter>headers</Filter>
     </ClInclude>
   </ItemGroup>
