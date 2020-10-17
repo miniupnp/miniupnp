@@ -1,7 +1,7 @@
 /* $Id: testnftpinhole.c,v 1.2 2019/06/30 19:49:18 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2012-2019 Thomas Bernard
+ * (c) 2012-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <syslog.h>
 
-#include "../config.h"
+#include "config.h"
 #include "../miniupnpdtypes.h"
 #include "nftpinhole.h"
 #include "../commonrdr.h"

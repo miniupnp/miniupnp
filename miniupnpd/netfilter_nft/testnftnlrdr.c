@@ -1,7 +1,7 @@
 /* $Id: testnftnlrdr.c,v 1.2 2019/06/30 19:49:18 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * (c) 2006-2020 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <syslog.h>
+/* for PRIu64 */
+#include <inttypes.h>
 
 #include <linux/netfilter/nf_tables.h>
 #include <libnftnl/table.h>

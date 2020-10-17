@@ -1,5 +1,9 @@
-CFLAGS?=-Wall -g -D_GNU_SOURCE -DDEBUG -Wstrict-prototypes -Wdeclaration-after-statement
-CFLAGS += -I..
+CFLAGS?=-Wall -g -Wstrict-prototypes -Wdeclaration-after-statement
+CPPFLAGS += -I.
+CPPFLAGS += -D_GNU_SOURCE -DDEBUG
+CPPFLAGS += -DUSE_NETFILTER -DUSE_NFTABLES
+CPPFLAGS += -DENABLE_UPNPPINHOLE
+CPPFLAGS += -DUSE_NFCT
 CC = gcc
 
 LIBS = -lnftnl -lmnl
@@ -9,8 +13,11 @@ ARCH := $(shell uname -m | grep -q "x86_64" && echo 64)
 all:	test_nfct_get testnftnlrdr testnftpinhole
 
 clean:
-	$(RM) *.o testnftnlcrdr testnftpinhole testnftnlrdr_peer \
+	$(RM) *.o config.h testnftnlcrdr testnftpinhole testnftnlrdr_peer \
 		test_nfct_get testnftnlrdr 
+
+config.h:
+	touch $@
 
 testnftnlrdr:	nftnlrdr.o nftnlrdr_misc.o testnftnlrdr.o $(LIBS)
 
@@ -25,9 +32,12 @@ testnftnlrdr_peer.o:	testnftnlrdr_peer.c
 
 testnftnlrdr_dscp.o:	testnftnlrdr_dscp.c
 
-nftnlrdr.o:		nftnlrdr.c nftnlrdr.h 
+nftnlrdr.o:		nftnlrdr.c nftnlrdr.h config.h
 
 nftnlrdr_misc.o:	nftnlrdr_misc.c
 
-nftpinhole.o:		nftpinhole.c nftpinhole.h
+nftpinhole.o:		nftpinhole.c nftpinhole.h config.h
 
+testnftnlrdr.o:		config.h nftnlrdr.h nftnlrdr_misc.h
+
+testnftpinhole.o:	config.h nftpinhole.h
