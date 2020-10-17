@@ -494,6 +494,12 @@ rule_expr_cb(struct nftnl_expr *e, rule_t *r)
 	return MNL_CB_OK;
 }
 
+struct table_cb_data {
+	const char * table;
+	const char * chain;
+	enum rule_type type;
+};
+
 /* callback.
  * return values :
  *   MNL_CB_ERROR : an error has occurred. Stop callback runqueue.
@@ -506,8 +512,9 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	int result = MNL_CB_OK;
 	struct nftnl_rule *rule;
 	struct nftnl_expr_iter *itr;
-	UNUSED(data);
+#define CB_DATA(field) ((struct table_cb_data *)data)->field
 
+	syslog(LOG_DEBUG, "table_cb(%p, %p) %s %s %d", nlh, data, CB_DATA(table), CB_DATA(chain), CB_DATA(type));
 	rule = nftnl_rule_alloc();
 	if (rule == NULL) {
 		log_error("nftnl_rule_alloc() FAILED");
@@ -554,13 +561,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 				r->handle = *(uint32_t *) nftnl_rule_get_data(rule,
 															  NFTNL_RULE_HANDLE,
 															  &len);
-				r->type = RULE_NONE;
-				if (strcmp(chain, nft_prerouting_chain) == 0 ||
-					strcmp(chain, nft_postrouting_chain) == 0) {
-					r->type = RULE_NAT;
-				} else if (strcmp(chain, nft_forward_chain) == 0) {
-					r->type = RULE_FILTER;
-				}
+				r->type = CB_DATA(type);
 
 				itr = nftnl_expr_iter_create(rule);
 				if (itr == NULL) {
@@ -611,12 +612,13 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	nftnl_rule_free(rule);
 	return result;
 }
+#undef CB_DATA
 
 int
 refresh_nft_cache_filter(void)
 {
 	if (rule_list_filter_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_filter, nft_table, nft_forward_chain, NFPROTO_INET) < 0)
+		if (refresh_nft_cache(&head_filter, nft_table, nft_forward_chain, NFPROTO_INET, RULE_FILTER) < 0)
 			return -1;
 		rule_list_filter_validate = RULE_CACHE_VALID;
 	}
@@ -627,7 +629,7 @@ int
 refresh_nft_cache_peer(void)
 {
 	if (rule_list_peer_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_peer, nft_table, nft_postrouting_chain, NFPROTO_IPV4) < 0)
+		if (refresh_nft_cache(&head_peer, nft_table, nft_postrouting_chain, NFPROTO_IPV4, RULE_NAT) < 0)
 			return -1;
 		rule_list_peer_validate = RULE_CACHE_VALID;
 	}
@@ -638,7 +640,7 @@ int
 refresh_nft_cache_redirect(void)
 {
 	if (rule_list_redirect_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_redirect, nft_table, nft_prerouting_chain, NFPROTO_IPV4) < 0)
+		if (refresh_nft_cache(&head_redirect, nft_table, nft_prerouting_chain, NFPROTO_IPV4, RULE_NAT) < 0)
 			return -1;
 		rule_list_redirect_validate = RULE_CACHE_VALID;
 	}
@@ -672,11 +674,11 @@ flush_nft_cache(struct rule_list *head)
  * return -1 in case of error, 0 if OK
  */
 int
-refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family)
+refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family, enum rule_type type)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *nlh;
-	uint32_t type = NFTNL_OUTPUT_DEFAULT;
+	struct table_cb_data data;
 	struct nftnl_rule *rule;
 	int ret;
 	ssize_t n;
@@ -706,6 +708,9 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		return -1;
 	}
 
+	data.table = table;
+	data.chain = chain;
+	data.type = type;
 	do {
 		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
 		if (n < 0) {
@@ -715,7 +720,7 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		} else if (n == 0) {
 			break;
 		}
-		ret = mnl_cb_run(buf, n, mnl_seq, mnl_portid, table_cb, &type);
+		ret = mnl_cb_run(buf, n, mnl_seq, mnl_portid, table_cb, &data);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
 			syslog(LOG_ERR, "%s: mnl_cb_run returned %d",
 			       "refresh_nft_cache", ret);

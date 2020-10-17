@@ -3,6 +3,7 @@
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
  * (c) 2019 Paul Chambers
+ * (c) 2020 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
@@ -137,7 +138,7 @@ struct nftnl_rule *rule_del_handle(rule_t *r);
 int refresh_nft_cache_filter(void);
 int refresh_nft_cache_redirect(void);
 int refresh_nft_cache_peer(void);
-int refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family);
+int refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, uint32_t family, enum rule_type type);
 
 int
 table_op(enum nf_tables_msg_types op, uint16_t family, const char * name);
