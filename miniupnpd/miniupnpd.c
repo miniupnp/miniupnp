@@ -3084,13 +3084,14 @@ shutdown:
 	free(snatpmp);
 #endif
 	free(snotify);
-	closelog();
-#ifndef DISABLE_CONFIG_FILE
-	freeoptions();
-#endif
 
 	shutdown_redirect();
 
+#ifndef DISABLE_CONFIG_FILE
+	/* in some case shutdown_redirect() may need the option values */
+	freeoptions();
+#endif
+	closelog();
 	return 0;
 }
 
