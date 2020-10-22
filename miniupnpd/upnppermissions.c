@@ -283,19 +283,22 @@ get_permitted_ext_ports(uint32_t * allowed,
 		{
 			if ((j % 32) == 0 && ((int)permary[i].eport_max >= (j + 31)))
 			{
+				/* 32bits at once */
 				allowed[j / 32] = (permary[i].type == UPNPPERM_ALLOW) ? 0xffffffff : 0;
 				j += 32;
 			}
 			else
 			{
-				while ((j % 32) != 0 && (j <= (int)permary[i].eport_max))
+				do
 				{
+					/* one bit at once */
 					if (permary[i].type == UPNPPERM_ALLOW)
 						allowed[j / 32] |= (1 << (j % 32));
 					else
 						allowed[j / 32] &= ~(1 << (j % 32));
 					j++;
 				}
+				while ((j % 32) != 0 && (j <= (int)permary[i].eport_max));
 			}
 		}
 	}
