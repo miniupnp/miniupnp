@@ -31,7 +31,7 @@ enum rule_reg_type {
 	RULE_REG_IP6_PROTO,
 	RULE_REG_TCP_DPORT,
 	RULE_REG_TCP_SD_PORT, /* source & dest */
-	RULE_REG_IMM_VAL,
+	RULE_REG_IMM_VAL,     /* immediate */
 	RULE_REG_MAX,
 };
 
