@@ -190,7 +190,7 @@ dox:	miniupnpd.doxyconf
 	$(DOXYGEN) $>
 
 miniupnpd: $(ALLOBJS)
-	$(CC) $(LDFLAGS) -o $@ $(ALLOBJS) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(ALLOBJS) $(LIBS)
 
 # BSDmake :
 #	$(CC) $(LDFLAGS) -o $@ $> $(LIBS)
