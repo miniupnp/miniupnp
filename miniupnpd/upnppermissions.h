@@ -51,7 +51,7 @@ check_upnp_rule_against_permissions(const struct upnpperm * permary,
 void
 get_permitted_ext_ports(uint32_t * allowed,
                         const struct upnpperm * permary, int n_perms,
-                        struct in_addr address, u_short iport);
+                        in_addr_t addr, u_short iport);
 
 #ifdef USE_MINIUPNPDCTL
 void

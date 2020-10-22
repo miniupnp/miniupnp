@@ -685,7 +685,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 			syslog(LOG_ERR, "inet_aton(%s) FAILED", int_ip);
 		}
 		get_permitted_ext_ports(allowed_eports, upnppermlist, num_upnpperm,
-		                        address, iport);
+		                        address.s_addr, iport);
 		eport_above = eport_below = eport;
 		for(;;) {
 			/* loop invariant

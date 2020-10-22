@@ -265,7 +265,7 @@ check_upnp_rule_against_permissions(const struct upnpperm * permary,
 void
 get_permitted_ext_ports(uint32_t * allowed,
                         const struct upnpperm * permary, int n_perms,
-                        struct in_addr address, u_short iport)
+                        in_addr_t addr, u_short iport)
 {
 	int i, j;
 
@@ -274,7 +274,7 @@ get_permitted_ext_ports(uint32_t * allowed,
 
 	for (i = n_perms - 1; i >= 0; i--)
 	{
-		if( (address.s_addr & permary[i].mask.s_addr)
+		if( (addr & permary[i].mask.s_addr)
 		  != (permary[i].address.s_addr & permary[i].mask.s_addr) )
 			continue;
 		if( (iport < permary[i].iport_min) || (permary[i].iport_max < iport))
