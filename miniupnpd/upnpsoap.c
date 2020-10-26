@@ -700,7 +700,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 			} else {
 				eport = ++eport_above;
 			}
-			if (!(allowed_eports[eport / 32] & (1 << eport % 32)))
+			if (!(allowed_eports[eport / 32] & ((uint32_t)1U << (eport % 32))))
 				continue;	/* not allowed */
 			r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
 			if (r == 0 || r == -1) {
