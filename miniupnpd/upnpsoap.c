@@ -27,6 +27,7 @@
 #include "upnpsoap.h"
 #include "upnpreplyparse.h"
 #include "upnpredirect.h"
+#include "upnppermissions.h"
 #include "upnppinhole.h"
 #include "getifaddr.h"
 #include "getifstats.h"
@@ -586,7 +587,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	struct NameValueParserData data;
 	const char * int_ip, * int_port, * ext_port, * protocol, * desc;
 	const char * r_host;
-	unsigned short iport, eport, eport_below, eport_above;
+	unsigned short iport, eport;
 	const char * leaseduration_str;
 	unsigned int leaseduration;
 
@@ -674,26 +675,41 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 
 	/* first try the port asked in request, then
 	 * try +1, -1, +2, -2, etc. */
-	eport_above = eport_below = eport;
-	for(;;) {
-		r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
-		if (r == 0 || r == -1) {
-			/* OK or failure : Stop */
-			break;
+	r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
+	if (r != 0 && r != -1) {
+		unsigned short eport_below, eport_above;
+		struct in_addr address;
+		uint32_t allowed_eports[65536 / 32];
+
+		if(inet_aton(int_ip, &address) <= 0) {
+			syslog(LOG_ERR, "inet_aton(%s) FAILED", int_ip);
 		}
-		/* r : -2 / -4 already redirected or -3 permission check failed */
-		if (eport_below <= 1 && eport_above == 65535) {
-			/* all possible ports tried */
-			r = 1;
-			break;
+		get_permitted_ext_ports(allowed_eports, upnppermlist, num_upnpperm,
+		                        address.s_addr, iport);
+		eport_above = eport_below = eport;
+		for(;;) {
+			/* loop invariant
+			 * eport is equal to either eport_below or eport_above (or both) */
+			if (eport_below <= 1 && eport_above == 65535) {
+				/* all possible ports tried */
+				r = 1;
+				break;
+			}
+			if (eport_above == 65535 || (eport > eport_below && eport_below > 1)) {
+				eport = --eport_below;
+			} else {
+				eport = ++eport_above;
+			}
+			if (!(allowed_eports[eport / 32] & ((uint32_t)1U << (eport % 32))))
+				continue;	/* not allowed */
+			r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
+			if (r == 0 || r == -1) {
+				/* OK or failure : Stop */
+				break;
+			}
+			/* r : -2 / -4 already redirected or -3 permission check failed :
+			 * continue */
 		}
-		if (eport_above == 65535 || (eport > eport_below && eport_below > 1)) {
-			eport = --eport_below;
-		} else {
-			eport = ++eport_above;
-		}
-		/* loop invariant :
-		 * eport is equal to either eport_below or eport_above (or both) */
 	}
 
 	ClearNameValueList(&data);
