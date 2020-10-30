@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: configure,v 1.111 2020/05/10 22:26:13 nanard Exp $
+# $Id: configure,v 1.113 2020/10/30 21:11:52 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -199,6 +199,10 @@ case $OS_NAME in
 		# onrdomain was introduced in OpenBSD 5.0
 		if [ $MAJORVER -ge 5 ]; then
 			echo "#define PFRULE_HAS_ONRDOMAIN" >> ${CONFIGFILE}
+		fi
+		# before OpenBSD 5.5 inpt_queue was CIRCLEQ
+		if [ $MAJORVER -lt 5 ] || [ $MAJORVER -eq 5 -a $MINORVER -lt 5 ]; then
+			echo "#define INPT_QUEUE_IS_CIRCLEQ" >> ${CONFIGFILE}
 		fi
 		FW=pf
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}

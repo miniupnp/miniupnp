@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.467 2020/06/20 15:45:30 nanard Exp $
+$Id: Changelog.txt,v 1.469 2020/10/30 21:11:50 nanard Exp $
+
+2020/10/30:
+  OpenBSD: portinuse.c compatible with OpenBSD 5.5+
 
 2020/10/22:
   netfilter_nft: fix rule-cache update when using the same chain name in

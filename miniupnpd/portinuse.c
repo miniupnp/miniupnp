@@ -1,7 +1,7 @@
-/* $Id: portinuse.c,v 1.9 2019/09/24 11:49:28 nanard Exp $ */
+/* $Id: portinuse.c,v 1.11 2020/10/30 21:11:52 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * (c) 2007-2019 Thomas Bernard
+ * (c) 2007-2020 Thomas Bernard
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -163,7 +163,12 @@ static struct nlist list[] = {
 		kvm_close(kd);
 		return -1;
 	}
-	next = CIRCLEQ_FIRST(&table.inpt_queue); /*TAILQ_FIRST(&table.inpt_queue);*/
+	/* inpt_queue was CIRCLEQ_HEAD, it is TAILQ_HEAD since OpenBSD 5.5 */
+#ifdef INPT_QUEUE_IS_CIRCLEQ
+	next = CIRCLEQ_FIRST(&table.inpt_queue);
+#else
+	next = TAILQ_FIRST(&table.inpt_queue);
+#endif
 	while(next != NULL) {
 		if(((u_long)next & 3) != 0) break;
 		n = kvm_read(kd, (u_long)next, &inpcb, sizeof(inpcb));
@@ -171,7 +176,11 @@ static struct nlist list[] = {
 			syslog(LOG_ERR, "kvm_read(): %s", kvm_geterr(kd));
 			break;
 		}
-		next = CIRCLEQ_NEXT(&inpcb, inp_queue);	/*TAILQ_NEXT(&inpcb, inp_queue);*/
+#ifdef INPT_QUEUE_IS_CIRCLEQ
+		next = CIRCLEQ_NEXT(&inpcb, inp_queue);
+#else
+		next = TAILQ_NEXT(&inpcb, inp_queue);
+#endif
 		/* skip IPv6 sockets */
 		if((inpcb.inp_flags & INP_IPV6) != 0)
 			continue;
