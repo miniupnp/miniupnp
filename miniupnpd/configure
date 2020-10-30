@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: configure,v 1.113 2020/10/30 21:11:52 nanard Exp $
+# $Id: configure,v 1.114 2020/10/30 22:10:26 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -378,7 +378,7 @@ case $OS_NAME in
 				FW=iptables
 			fi
 		fi
-		V6SOCKETS_ARE_V6ONLY=`/sbin/sysctl -n net.ipv6.bindv6only`
+		V6SOCKETS_ARE_V6ONLY=`$(find /sbin /bin /usr/sbin /usr/bin -name /sysctl) -n net.ipv6.bindv6only`
 		;;
 	OpenWRT)
 		OS_URL=http://www.openwrt.org/
