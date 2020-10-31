@@ -54,9 +54,8 @@ CFLAGS += -m64 -mcmodel=medlow
 
 ISGITREPO != git rev-parse --is-inside-work-tree 2> /dev/null || echo "false"
 .if $(ISGITREPO) == "true"
-GITREF != git rev-parse --short HEAD
-GITBRANCH != git rev-parse --abbrev-ref HEAD
-CPPFLAGS += -DMINIUPNPD_GIT_REF=\"$(GITBRANCH)-$(GITREF)\"
+GITREF != git describe --exact-match --tags 2> /dev/null || echo "`git rev-parse --abbrev-ref HEAD`-`git rev-parse --short HEAD`"
+CPPFLAGS += -DMINIUPNPD_GIT_REF=\"$(GITREF)\"
 .endif
 
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
