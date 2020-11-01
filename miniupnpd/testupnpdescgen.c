@@ -37,7 +37,7 @@ char model_description[] = ROOTDEV_MODELDESCRIPTION;
 char model_url[] = ROOTDEV_MODELURL;
 #endif /* ENABLE_MANUFACTURER_INFO_CONFIGURATION */
 #ifdef RANDOMIZE_URLS
-char random_url[] = "RANDOM";
+char random_url[RANDOM_URL_MAX_LEN] = "RANDOM";
 #endif /* RANDOMIZE_URLS */
 unsigned int upnp_configid = 666;
 
