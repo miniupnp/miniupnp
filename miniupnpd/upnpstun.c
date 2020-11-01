@@ -252,7 +252,7 @@ static int wait_for_stun_responses(int fds[4], unsigned char *transaction_ids[4]
 			FD_SET(fds[i], &fdset);
 		}
 
-		syslog(LOG_DEBUG, "%s: waiting %ld secs and %ld usecs", "wait_for_stun_responses", timeout.tv_sec, timeout.tv_usec);
+		syslog(LOG_DEBUG, "%s: waiting %ld secs and %ld usecs", "wait_for_stun_responses", (long)timeout.tv_sec, (long)timeout.tv_usec);
 		ret = select(max_fd+1, &fdset, NULL, NULL, &timeout);
 		if (ret < 0) {
 			if (errno == EINTR)

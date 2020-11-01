@@ -367,7 +367,7 @@ static struct nlist list[] = {
 		/* no support for IPv6 */
 		if ((xip->inp_vflag & INP_IPV6) != 0)
 			continue;
-		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu <=> %hu %08lx:%hu",
+		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu <=> %u %08lx:%u",
 		       (u_long)inc->inc_laddr.s_addr, ntohs(inc->inc_lport),
 		       (u_long)inc->inc_faddr.s_addr, ntohs(inc->inc_fport),
 		       eport, (u_long)ip_addr.s_addr, iport
