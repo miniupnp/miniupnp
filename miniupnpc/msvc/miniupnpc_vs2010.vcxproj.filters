@@ -102,6 +102,9 @@
     <ClInclude Include="..\addr_is_reserved.h">
       <Filter>headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\win32_snprintf.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="sources">
