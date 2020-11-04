@@ -1,4 +1,4 @@
-/* $Id: portinuse.c,v 1.11 2020/10/30 21:11:52 nanard Exp $ */
+/* $Id: portinuse.c,v 1.12 2020/11/04 21:29:50 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * (c) 2007-2020 Thomas Bernard
@@ -268,7 +268,7 @@ static struct nlist list[] = {
 		/* no support for IPv6 */
 		if (INP_ISIPV6(inp) != 0)
 			continue;
-		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu <=> %hu %08lx:%hu",
+		syslog(LOG_DEBUG, "%08lx:%hu %08lx:%hu <=> %u %08lx:%u",
 		       (u_long)inp->inp_laddr.s_addr, ntohs(inp->inp_lport),
 		       (u_long)inp->inp_faddr.s_addr, ntohs(inp->inp_fport),
 		       eport, (u_long)ip_addr.s_addr, iport
