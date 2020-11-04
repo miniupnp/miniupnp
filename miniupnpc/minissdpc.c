@@ -454,7 +454,7 @@ parseMSEARCHReply(const char * reply, int size,
 static int upnp_gettimeofday(struct timeval * tv)
 {
 #if defined(_WIN32)
-#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+#if defined(_WIN32_WINNT_VISTA) && (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 	ULONGLONG ts = GetTickCount64();
 #else
 	DWORD ts = GetTickCount();
@@ -714,7 +714,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		} else {
 			struct in_addr mc_if;
 #if defined(_WIN32)
-#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+#if defined(_WIN32_WINNT_VISTA) && (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 			InetPtonA(AF_INET, multicastif, &mc_if);
 #else
 			mc_if.s_addr = inet_addr(multicastif); /* old Windows SDK do not support InetPtoA() */
