@@ -22,8 +22,12 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      - name: build miniupnpc
-        run: make -C miniupnpc all check
+      - name: install packages
+        run: sudo apt-get install iptables-dev libnfnetlink-dev libnftnl-dev libmnl-dev libssl-dev
 
-      - name: build minissdpd
-        run: make -C minissdpd all check
+      - name: build miniupnpd
+        run: |
+          mkdir -p miniupnpd/build
+          cd miniupnpd/build
+          ../configure
+          make all check
