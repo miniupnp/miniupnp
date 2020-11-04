@@ -179,6 +179,7 @@
     <ClInclude Include="..\upnpdev.h" />
     <ClInclude Include="..\upnperrors.h" />
     <ClInclude Include="..\upnpreplyparse.h" />
+    <ClInclude Include="..\win32_snprintf.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="genminiupnpcstrings.vbs" />
