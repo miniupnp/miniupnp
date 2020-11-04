@@ -9,6 +9,7 @@ on:
     paths:
     - 'miniupnpc/**'
     - 'miniupnpd/**'
+    - '.github/workflows/main.yml'
   pull_request:
     branches: [ master ]
 
