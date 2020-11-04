@@ -25,9 +25,16 @@ jobs:
       - name: install packages
         run: sudo apt-get install iptables-dev libnfnetlink-dev libnftnl-dev libmnl-dev libssl-dev
 
-      - name: build miniupnpd
+      - name: build miniupnpd(iptables)
         run: |
-          mkdir -p miniupnpd/build
-          cd miniupnpd/build
-          ../configure
+          mkdir -p miniupnpd/build-ipt
+          cd miniupnpd/build/ipt
+          ../configure --ipv6 --igd2 --strict --portinuse --firewall=iptables
+          make all check
+
+      - name: build miniupnpd(nftables)
+        run: |
+          mkdir -p miniupnpd/build-ipt
+          cd miniupnpd/build/ipt
+          ../configure --ipv6 --igd2 --strict --portinuse --firewall=nftables
           make all check
