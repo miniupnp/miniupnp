@@ -454,7 +454,7 @@ parseMSEARCHReply(const char * reply, int size,
 static int upnp_gettimeofday(struct timeval * tv)
 {
 #if defined(_WIN32)
-#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+#if defined(_WIN32_WINNT_VISTA) && (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 	ULONGLONG ts = GetTickCount64();
 #else
 	DWORD ts = GetTickCount();
@@ -570,12 +570,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
  * in order to give this ip to setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF) */
 	if(!ipv6) {
 		DWORD ifbestidx;
-		SOCKADDR_IN destAddr;
-		memset(&destAddr, 0, sizeof(destAddr));
-		destAddr.sin_family = AF_INET;
-		destAddr.sin_addr.s_addr = inet_addr("223.255.255.255");
-		destAddr.sin_port = 0;
-		if (GetBestInterfaceEx((struct sockaddr *)&destAddr, &ifbestidx) == NO_ERROR) {
+		if (GetBestInterface(inet_addr("223.255.255.255"), &ifbestidx) == NO_ERROR) {
 			DWORD dwRetVal = NO_ERROR;
 			PIP_ADAPTER_ADDRESSES pAddresses = NULL;
 			ULONG outBufLen = 15360;
@@ -714,7 +709,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		} else {
 			struct in_addr mc_if;
 #if defined(_WIN32)
-#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+#if defined(_WIN32_WINNT_VISTA) && (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 			InetPtonA(AF_INET, multicastif, &mc_if);
 #else
 			mc_if.s_addr = inet_addr(multicastif); /* old Windows SDK do not support InetPtoA() */

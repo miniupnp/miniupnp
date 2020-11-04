@@ -35,6 +35,39 @@ jobs:
       env: PROJECT=miniupnpd
     - os: osx
       compiler: gcc
+  include:
+    - os: linux
+      dist: trusty
+      env: PROJECT=miniupnpc
+      compiler: i586-mingw32msvc-gcc
+      addons:
+        apt:
+          packages:
+            - mingw32
+      before_install: true
+      after_success: true
+      before_script: i586-mingw32msvc-gcc -v 2>&1 | grep -q -x 'Target: i586-mingw32msvc'
+      script: make -C miniupnpc -f Makefile.mingw CC=i586-mingw32msvc-gcc DLLWRAP=i586-mingw32msvc-dllwrap AR=i586-mingw32msvc-ar
+    - os: linux
+      env: PROJECT=miniupnpc
+      compiler: i686-w64-mingw32-gcc
+      addons:
+        apt:
+          packages:
+            - gcc-mingw-w64-i686
+      before_install: true
+      after_success: true
+      script: make -C miniupnpc -f Makefile.mingw CC=i686-w64-mingw32-gcc DLLWRAP=i686-w64-mingw32-dllwrap AR=i686-w64-mingw32-ar
+    - os: linux
+      env: PROJECT=miniupnpc
+      compiler: x86_64-w64-mingw32-gcc
+      addons:
+        apt:
+          packages:
+            - gcc-mingw-w64-x86-64
+      before_install: true
+      after_success: true
+      script: make -C miniupnpc -f Makefile.mingw CC=x86_64-w64-mingw32-gcc DLLWRAP=x86_64-w64-mingw32-dllwrap AR=x86_64-w64-mingw32-ar
 
 compiler:
   - gcc
