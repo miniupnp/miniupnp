@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: miniupnpd
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -28,13 +28,13 @@ jobs:
       - name: build miniupnpd(iptables)
         run: |
           mkdir -p miniupnpd/build-ipt
-          cd miniupnpd/build/ipt
+          cd miniupnpd/build-ipt
           ../configure --ipv6 --igd2 --strict --portinuse --firewall=iptables
           make all check
 
       - name: build miniupnpd(nftables)
         run: |
-          mkdir -p miniupnpd/build-ipt
-          cd miniupnpd/build/ipt
+          mkdir -p miniupnpd/build-nft
+          cd miniupnpd/build-nft
           ../configure --ipv6 --igd2 --strict --portinuse --firewall=nftables
           make all check

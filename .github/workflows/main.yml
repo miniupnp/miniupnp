@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: miniupnpc, minissdpd
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -24,6 +24,9 @@ jobs:
 
       - name: build miniupnpc
         run: make -C miniupnpc all check
+
+      - name: install packages
+        run: sudo apt-get install libnfnetlink-dev
 
       - name: build minissdpd
         run: make -C minissdpd all check
