@@ -31,7 +31,7 @@ jobs:
       - name: upload binaries
         uses: actions/upload-artifact@v2
         with:
-          name: miniupnpc-win32-binaries-$(GITHUB_SHA)
+          name: miniupnpc-win32-binaries-${{github.sha}}
           path: |
             miniupnpc/*.exe
             miniupnpc/*.dll
