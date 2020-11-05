@@ -3,7 +3,7 @@
  * Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2019 Thomas Bernard
+ * Copyright (c) 2005-2020 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -949,7 +949,19 @@ Process_upnphttp(struct upnphttp * h)
 		}
 		else if(n==0)
 		{
-			syslog(LOG_WARNING, "HTTP Connection from %s closed unexpectedly", inet_ntoa(h->clientaddr));
+#ifdef ENABLE_IPV6
+			if (h->ipv6)
+			{
+				char clientaddr_str[INET6_ADDRSTRLEN];
+				if(inet_ntop(AF_INET6, &(h->clientaddr_v6), clientaddr_str, INET6_ADDRSTRLEN) == NULL)
+					strncpy(clientaddr_str, "*inet_ntop error*", sizeof(clientaddr_str));
+				syslog(LOG_WARNING, "HTTP Connection from %s closed unexpectedly", clientaddr_str);
+			}
+			else
+#endif
+			{
+				syslog(LOG_WARNING, "HTTP Connection from %s closed unexpectedly", inet_ntoa(h->clientaddr));
+			}
 			h->state = EToDelete;
 		}
 		else
@@ -1019,7 +1031,19 @@ Process_upnphttp(struct upnphttp * h)
 		}
 		else if(n==0)
 		{
-			syslog(LOG_WARNING, "HTTP Connection from %s closed unexpectedly", inet_ntoa(h->clientaddr));
+#ifdef ENABLE_IPV6
+			if (h->ipv6)
+			{
+				char clientaddr_str[INET6_ADDRSTRLEN];
+				if(inet_ntop(AF_INET6, &(h->clientaddr_v6), clientaddr_str, INET6_ADDRSTRLEN) == NULL)
+					strncpy(clientaddr_str, "*inet_ntop error*", sizeof(clientaddr_str));
+				syslog(LOG_WARNING, "HTTP Connection from %s closed unexpectedly", clientaddr_str);
+			}
+			else
+#endif
+			{
+				syslog(LOG_WARNING, "HTTP Connection from %s closed unexpectedly", inet_ntoa(h->clientaddr));
+			}
 			h->state = EToDelete;
 		}
 		else
