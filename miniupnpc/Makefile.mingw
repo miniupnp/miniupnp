@@ -1,7 +1,7 @@
 # $Id: Makefile.mingw,v 1.21 2015/09/18 12:45:16 nanard Exp $
 # Miniupnp project.
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
-# (c) 2005-2018 Thomas Bernard
+# (c) 2005-2020 Thomas Bernard
 # This Makefile is made for MinGW
 #
 # To cross compile on a *nix machine :
@@ -11,6 +11,7 @@ CC ?= gcc
 SETUP_COMPILER_FLAG?=
 DLLWRAP = dllwrap
 SH = /bin/sh
+ZIP = zip
 ifeq ($(OS),Windows_NT)
 RM = del
 else
@@ -28,9 +29,22 @@ OBJS=miniwget.o minixml.o igd_desc_parse.o minisoap.o \
      connecthostport.o portlistingparse.o receivedata.o \
      upnpdev.o addr_is_reserved.o
 OBJSDLL=$(addprefix dll-, $(OBJS))
+BINARIES=upnpc-static.exe upnpc-shared.exe \
+         listdevices-static.exe listdevices-shared.exe \
+         miniupnpc.dll libminiupnpc.a \
+         testminixml.exe
+ifneq ($(GITHUB_SHA),)
+COMMITREF=$(GITHUB_SHA)
+else
+COMMITREF=$(shell git rev-parse --short HEAD)
+endif
+DISTFILE:=$(shell echo "miniupnpc-bin-win32-`cat VERSION`-$(COMMITREF).zip")
 
-all:	upnpc-static.exe upnpc-shared.exe testminixml.exe libminiupnpc.a \
-	miniupnpc.dll listdevices-static.exe listdevices-shared.exe
+.PHONY:	all dist clean
+
+all:	$(BINARIES)
+
+dist:	$(DISTFILE)
 
 clean:
 	$(RM) miniupnpcstrings.h
@@ -38,6 +52,9 @@ clean:
 	$(RM) *.exe
 	$(RM) miniupnpc.dll miniupnpc.lib miniupnpc.dll.def
 	$(RM) libminiupnpc.a
+
+$(DISTFILE):	$(BINARIES)
+	$(ZIP) $@ *.exe *.dll *.lib *.def *.a LICENSE README Changelog.txt
 
 libminiupnpc.a:	$(OBJS)
 	$(AR) cr $@ $?
@@ -86,6 +103,9 @@ miniupnpcstrings.h:	miniupnpcstrings.h.in VERSION
 	sed 's|MINIUPNPC_VERSION_STRING ".*"|MINIUPNPC_VERSION_STRING "$(shell cat VERSION)"|' > $@
 endif
 
+testminixml.exe:	testminixml.o minixml.o igd_desc_parse.o
+	$(CC) -static -o $@ $^
+
 minixml.o:	minixml.c minixml.h
 
 upnpc.o:	miniwget.h minisoap.h miniupnpc.h igd_desc_parse.h
@@ -99,8 +119,6 @@ miniupnpc.o:	miniupnpc.c miniupnpc.h minisoap.h miniwget.h minixml.h \
 	addr_is_reserved.h
 
 igd_desc_parse.o:	igd_desc_parse.c igd_desc_parse.h
-
-testminixml.exe:	minixml.o igd_desc_parse.o testminixml.c
 
 upnpreplyparse.o:	upnpreplyparse.c upnpreplyparse.h minixml.h
 
