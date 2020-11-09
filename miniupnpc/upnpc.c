@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.119 2018/03/13 23:34:46 nanard Exp $ */
+/* $Id: upnpc.c,v 1.126 2020/11/09 19:38:06 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2020 Thomas Bernard
@@ -173,7 +173,7 @@ static void ListRedirections(struct UPNPUrls * urls,
 			printf("GetGenericPortMappingEntry() returned %d (%s)\n",
 			       r, strupnperror(r));
 		i++;
-	} while(r==0);
+	} while(r == 0 && i < 65536);
 }
 
 static void NewListRedirections(struct UPNPUrls * urls,
