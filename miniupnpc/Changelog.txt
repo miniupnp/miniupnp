@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.242 2019/12/23 23:35:40 nanard Exp $
+$Id: Changelog.txt,v 1.245 2020/11/09 19:49:02 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.2.0 : released 2020/11/09
 
 2020/09/24:
   Check properly for reserved IP addresses

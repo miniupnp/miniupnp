@@ -1,8 +1,8 @@
-/* $Id: connecthostport.c,v 1.22 2019/10/13 17:22:08 nanard Exp $ */
+/* $Id: connecthostport.c,v 1.24 2020/11/09 19:26:53 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2010-2019 Thomas Bernard
+ * Copyright (c) 2010-2020 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
