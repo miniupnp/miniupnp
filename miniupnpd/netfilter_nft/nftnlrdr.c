@@ -1,4 +1,4 @@
-/* $Id: $
+/* $Id: nftnlrdr.c,v 1.10 2020/11/11 12:08:43 nanard Exp $
  * vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>

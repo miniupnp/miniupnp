@@ -1,4 +1,4 @@
-/* $Id: nftpinhole.c,v 1.4 2020/05/10 17:01:49 nanard Exp $ */
+/* $Id: nftpinhole.c,v 1.7 2020/11/11 12:08:43 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2012-2020 Thomas Bernard
@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>

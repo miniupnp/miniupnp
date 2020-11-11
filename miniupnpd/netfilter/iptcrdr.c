@@ -1,4 +1,4 @@
-/* $Id: iptcrdr.c,v 1.62 2019/08/24 07:06:22 nanard Exp $ */
+/* $Id: iptcrdr.c,v 1.67 2020/11/11 12:09:05 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
