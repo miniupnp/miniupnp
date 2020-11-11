@@ -6,8 +6,8 @@
 | ------- | ------- | ------------------ |
 | miniupnpd | 2.2.x | :white_check_mark: |
 | miniupnpd | < 2.2 | :x:                |
-| miniupnpc | 2.1   | :white_check_mark: |
-| miniupnpc | < 2.1   | :x:                |
+| miniupnpc | 2.2.x | :white_check_mark: |
+| miniupnpc | < 2.2 | :x:                |
 
 ## Reporting a Vulnerability
 
