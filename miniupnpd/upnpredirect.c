@@ -588,7 +588,7 @@ upnp_get_portmapping_number_of_entries()
 #else
 	int n = 0, r = 0;
 	unsigned short eport, iport;
-	char protocol[4], iaddr[32], desc[64], rhost[32];
+	char protocol[8], iaddr[32], desc[64], rhost[32];
 	unsigned int leaseduration;
 	do {
 		protocol[0] = '\0'; iaddr[0] = '\0'; desc[0] = '\0';
