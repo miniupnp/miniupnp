@@ -283,7 +283,7 @@ miniupnpc.pc:	VERSION
 	echo "prefix=$(INSTALLPREFIX)" >> $@
 	echo "exec_prefix=\$${prefix}" >> $@
 	echo "libdir=\$${exec_prefix}/$(LIBDIR)" >> $@
-	echo "includedir=\$${prefix}/include/miniupnpc" >> $@
+	echo "includedir=\$${prefix}/include" >> $@
 	echo "" >> $@
 	echo "Name: miniUPnPc" >> $@
 	echo "Description: UPnP IGD client lightweight library" >> $@
