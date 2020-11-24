@@ -16,6 +16,8 @@ if (NOT UPNPC_BUILD_STATIC AND NOT UPNPC_BUILD_SHARED)
     message (FATAL "Both shared and static libraries are disabled!")
 endif ()
 
+include(GNUInstallDirs)
+
 # Interface library for compile definitions, flags and option
 add_library(miniupnpc-private INTERFACE)
 
@@ -121,9 +123,9 @@ if (UPNPC_BUILD_STATIC)
 
   if (NOT UPNPC_NO_INSTALL)
     install (TARGETS libminiupnpc-static
-      RUNTIME DESTINATION bin
-      LIBRARY DESTINATION lib${LIB_SUFFIX}
-      ARCHIVE DESTINATION lib${LIB_SUFFIX})
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
 
   if (UPNPC_BUILD_SAMPLE)
@@ -148,9 +150,9 @@ if (UPNPC_BUILD_SHARED)
 
   if (NOT UPNPC_NO_INSTALL)
     install (TARGETS libminiupnpc-shared
-      RUNTIME DESTINATION bin
-      LIBRARY DESTINATION lib${LIB_SUFFIX}
-      ARCHIVE DESTINATION lib${LIB_SUFFIX})
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
 
   if (UPNPC_BUILD_SAMPLE)
