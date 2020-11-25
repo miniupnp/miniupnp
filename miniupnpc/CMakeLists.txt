@@ -53,7 +53,7 @@ if (MSVC)
 endif()
 
 configure_file (${CMAKE_CURRENT_SOURCE_DIR}/miniupnpcstrings.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/miniupnpcstrings.h)
-target_include_directories(miniupnpc-private INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(miniupnpc-private INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 
 set (MINIUPNPC_SOURCES
   igd_desc_parse.c
@@ -112,19 +112,35 @@ endif ()
 
 if (UPNPC_BUILD_STATIC)
   add_library (libminiupnpc-static STATIC ${MINIUPNPC_SOURCES})
+  if (NOT UPNPC_BUILD_SHARED)
+    add_library (miniupnpc::miniupnpc ALIAS libminiupnpc-static)
+  endif()
+  set_target_properties (libminiupnpc-static PROPERTIES EXPORT_NAME miniupnpc)
   if (WIN32)
     set_target_properties (libminiupnpc-static PROPERTIES OUTPUT_NAME "libminiupnpc")
   else()
     set_target_properties (libminiupnpc-static PROPERTIES OUTPUT_NAME "miniupnpc")
   endif()
   target_link_libraries (libminiupnpc-static PRIVATE miniupnpc-private)
+  target_include_directories(libminiupnpc-static INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   target_compile_definitions(libminiupnpc-static PUBLIC MINIUPNP_STATICLIB)
 
   if (NOT UPNPC_NO_INSTALL)
+    install (TARGETS miniupnpc-private EXPORT miniupnpc-private)
+
+    install (EXPORT miniupnpc-private
+      DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/miniupnpc"
+      NAMESPACE miniupnpc::)
+
     install (TARGETS libminiupnpc-static
+      EXPORT libminiupnpc-static
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    install (EXPORT libminiupnpc-static
+      DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/miniupnpc"
+      NAMESPACE miniupnpc::)
   endif()
 
   if (UPNPC_BUILD_SAMPLE)
@@ -136,21 +152,29 @@ endif ()
 
 if (UPNPC_BUILD_SHARED)
   add_library (libminiupnpc-shared SHARED ${MINIUPNPC_SOURCES})
+  add_library (miniupnpc::miniupnpc ALIAS libminiupnpc-shared)
+  set_target_properties (libminiupnpc-shared PROPERTIES EXPORT_NAME miniupnpc)
   set_target_properties (libminiupnpc-shared PROPERTIES OUTPUT_NAME "miniupnpc")
   set_target_properties (libminiupnpc-shared PROPERTIES VERSION ${MINIUPNPC_VERSION})
   set_target_properties (libminiupnpc-shared PROPERTIES SOVERSION ${MINIUPNPC_API_VERSION})
   target_link_libraries (libminiupnpc-shared PRIVATE miniupnpc-private)
   target_compile_definitions(libminiupnpc-shared PRIVATE MINIUPNP_EXPORTS)
 
+  target_include_directories(libminiupnpc-shared INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   if (WIN32)
     target_link_libraries(libminiupnpc-shared INTERFACE ws2_32 iphlpapi)
   endif()
 
   if (NOT UPNPC_NO_INSTALL)
     install (TARGETS libminiupnpc-shared
+      EXPORT libminiupnpc-shared
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    install (EXPORT libminiupnpc-shared
+      DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/miniupnpc"
+      NAMESPACE miniupnpc::)
   endif()
 
   if (UPNPC_BUILD_SAMPLE)
@@ -214,6 +238,10 @@ if (NOT UPNPC_NO_INSTALL)
     portlistingparse.h
     miniupnpc_declspec.h
     DESTINATION include/miniupnpc
+  )
+
+  install(FILES miniupnpc-config.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/miniupnpc
   )
 endif()
 
