@@ -24,8 +24,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      - name: build miniupnpc
+      - name: build miniupnpc with make
         run: make -C miniupnpc all check
+
+      - name: build miniupnpc with cmake
+        run: mkdir miniupnpc/cmake-build && cd miniupnpc/cmake-build && cmake .. && make
 
   build-minissdpd:
     # The type of runner that the job will run on
