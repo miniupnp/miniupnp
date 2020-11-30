@@ -5,6 +5,7 @@ Set FSO = CreateObject("Scripting.FileSystemObject")
 versionfile = "..\version"
 infile = "..\miniupnpcstrings.h.in"
 outfile = "..\miniupnpcstrings.h"
+outfilerc = "..\rc_version.h"
 
 On Error Resume Next
 
@@ -101,3 +102,11 @@ If Err.Number = 0 Then
 	f_in.Close
 	f_out.Close
 End If
+
+Set f_out = FSO.OpenTextFile(outfilerc, 2, True) ' 2 = Write
+f_out.WriteLine "#define LIBMINIUPNPC_DOTTED_VERSION " & Chr(34) & version & Chr(34)
+ver = Split(version, ".")
+f_out.WriteLine "#define LIBMINIUPNPC_MAJOR_VERSION " & ver(0)
+f_out.WriteLine "#define LIBMINIUPNPC_MINOR_VERSION " & ver(1)
+f_out.WriteLine "#define LIBMINIUPNPC_MICRO_VERSION " & ver(2)
+f_out.Close
