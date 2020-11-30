@@ -26,7 +26,7 @@ jobs:
         run: sudo apt-get install gcc-mingw-w64-i686 mingw-w64-tools
 
       - name: build miniupnpc for win32
-        run: make -C miniupnpc -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap CC=i686-w64-mingw32-gcc AR=i686-w64-mingw32-ar all dist
+        run: make -C miniupnpc -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap CC=i686-w64-mingw32-gcc WINDRES=i686-w64-mingw32-windres AR=i686-w64-mingw32-ar all dist
 
       - name: upload binaries
         uses: actions/upload-artifact@v2

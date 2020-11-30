@@ -1,5 +1,5 @@
 #include <winver.h>
-#include "rcVersion.h"
+#include "rc_version.h"
 
 VS_VERSION_INFO		VERSIONINFO
   FILEVERSION		LIBMINIUPNPC_MAJOR_VERSION,LIBMINIUPNPC_MINOR_VERSION,LIBMINIUPNPC_MICRO_VERSION,0
@@ -18,15 +18,15 @@ BEGIN
   BEGIN
     BLOCK "04090000"  /* Lang = US English, Charset = ASCII */
     BEGIN
-      VALUE "FileDescription",	"MiniUPnP library\0"
+      VALUE "FileDescription",	"MiniUPnPc library\0"
       VALUE "FileVersion",	LIBMINIUPNPC_DOTTED_VERSION "\0"
       VALUE "InternalName",	INTERNAL_NAME
       VALUE "LegalCopyright",	"Copyright (C) Thomas Bernard\0"
       VALUE "LegalTrademarks",	"\0"
       VALUE "OriginalFilename",	INTERNAL_NAME
-      VALUE "ProductName",	"MiniUPnP\0"
+      VALUE "ProductName",	"MiniUPnPc\0"
       VALUE "ProductVersion",	LIBMINIUPNPC_DOTTED_VERSION "\0"
-      VALUE "Comments",		"For more information visit http://xmlsoft.org/\0"
+      VALUE "Comments",		"For more information visit https://miniupnp.tuxfamil.org/\0"
     END
   END
   BLOCK "VarFileInfo"

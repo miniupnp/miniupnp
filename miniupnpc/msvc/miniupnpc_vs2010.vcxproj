@@ -180,13 +180,13 @@
     <ClInclude Include="..\upnperrors.h" />
     <ClInclude Include="..\upnpreplyparse.h" />
     <ClInclude Include="..\win32_snprintf.h" />
-	<ClInclude Include="rcVersion.h" />
+	<ClInclude Include="..\rc_version.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="genminiupnpcstrings.vbs" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="miniupnpc.rc" />
+    <ResourceCompile Include="../miniupnpc.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

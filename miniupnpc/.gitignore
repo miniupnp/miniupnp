@@ -1,5 +1,6 @@
 deb_dist/
 build/
+.*.swp
 *.o
 *.a
 *.so
@@ -10,6 +11,7 @@ build/
 *.dylib
 Makefile.bak
 miniupnpcstrings.h
+rc_version.h
 pythonmodule
 pythonmodule3
 upnpc-shared

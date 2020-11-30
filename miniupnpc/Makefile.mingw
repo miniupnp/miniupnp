@@ -10,6 +10,7 @@
 CC ?= gcc
 SETUP_COMPILER_FLAG?=
 DLLWRAP = dllwrap
+WINDRES = windres
 SH = /bin/sh
 ZIP = zip
 ifeq ($(OS),Windows_NT)
@@ -28,7 +29,7 @@ OBJS=miniwget.o minixml.o igd_desc_parse.o minisoap.o \
      miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
      connecthostport.o portlistingparse.o receivedata.o \
      upnpdev.o addr_is_reserved.o
-OBJSDLL=$(addprefix dll-, $(OBJS))
+OBJSDLL=$(addprefix dll-, $(OBJS)) winres.o
 BINARIES=upnpc-static.exe upnpc-shared.exe \
          listdevices-static.exe listdevices-shared.exe \
          miniupnpc.dll libminiupnpc.a \
@@ -101,7 +102,17 @@ else
 miniupnpcstrings.h:	miniupnpcstrings.h.in VERSION
 	sed 's|OS_STRING ".*"|OS_STRING "Windows/Mingw32"|' $< | \
 	sed 's|MINIUPNPC_VERSION_STRING ".*"|MINIUPNPC_VERSION_STRING "$(shell cat VERSION)"|' > $@
+
+rc_version.h:	VERSION
+	echo "#define LIBMINIUPNPC_DOTTED_VERSION \"$(shell cat VERSION)\"" > $@.tmp
+	echo "#define LIBMINIUPNPC_MAJOR_VERSION $(shell cat VERSION|cut -d. -f1)" >> $@.tmp
+	echo "#define LIBMINIUPNPC_MINOR_VERSION $(shell cat VERSION|cut -d. -f2)" >> $@.tmp
+	echo "#define LIBMINIUPNPC_MICRO_VERSION $(shell cat VERSION|cut -d. -f3)" >> $@.tmp
+	mv $@.tmp $@
 endif
+
+winres.o:	miniupnpc.rc rc_version.h
+	$(WINDRES) -D INTERNAL_NAME=\\\"miniupnpc.dll\\0\\\" -i $< -o $@
 
 testminixml.exe:	testminixml.o minixml.o igd_desc_parse.o
 	$(CC) -static -o $@ $^
