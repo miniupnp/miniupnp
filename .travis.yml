@@ -46,7 +46,7 @@ jobs:
             - mingw32
       before_install: true
       after_success: true
-      before_script: i586-mingw32msvc-gcc -v 2>&1 | grep -q -x 'Target: i586-mingw32msvc'
+      before_script: "i586-mingw32msvc-gcc -v 2>&1 | grep -q -x 'Target: i586-mingw32msvc'"
       script: make -C miniupnpc -f Makefile.mingw CC=i586-mingw32msvc-gcc DLLWRAP=i586-mingw32msvc-dllwrap AR=i586-mingw32msvc-ar
     - os: linux
       env: PROJECT=miniupnpc
