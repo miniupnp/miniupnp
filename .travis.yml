@@ -47,7 +47,7 @@ jobs:
       before_install: true
       after_success: true
       before_script: "i586-mingw32msvc-gcc -v 2>&1 | grep -q -x 'Target: i586-mingw32msvc'"
-      script: make -C miniupnpc -f Makefile.mingw CC=i586-mingw32msvc-gcc DLLWRAP=i586-mingw32msvc-dllwrap AR=i586-mingw32msvc-ar
+      script: make -C miniupnpc -f Makefile.mingw CC=i586-mingw32msvc-gcc DLLWRAP=i586-mingw32msvc-dllwrap WINDRES=i586-mingw32msvc-windres AR=i586-mingw32msvc-ar
     - os: linux
       env: PROJECT=miniupnpc
       compiler: i686-w64-mingw32-gcc
@@ -57,7 +57,7 @@ jobs:
             - gcc-mingw-w64-i686
       before_install: true
       after_success: true
-      script: make -C miniupnpc -f Makefile.mingw CC=i686-w64-mingw32-gcc DLLWRAP=i686-w64-mingw32-dllwrap AR=i686-w64-mingw32-ar
+      script: make -C miniupnpc -f Makefile.mingw CC=i686-w64-mingw32-gcc DLLWRAP=i686-w64-mingw32-dllwrap WINDRES=i686-w64-mingw32-windres AR=i686-w64-mingw32-ar
     - os: linux
       env: PROJECT=miniupnpc
       compiler: x86_64-w64-mingw32-gcc
@@ -67,7 +67,7 @@ jobs:
             - gcc-mingw-w64-x86-64
       before_install: true
       after_success: true
-      script: make -C miniupnpc -f Makefile.mingw CC=x86_64-w64-mingw32-gcc DLLWRAP=x86_64-w64-mingw32-dllwrap AR=x86_64-w64-mingw32-ar
+      script: make -C miniupnpc -f Makefile.mingw CC=x86_64-w64-mingw32-gcc DLLWRAP=x86_64-w64-mingw32-dllwrap WINDRES=x86_64-w64-mingw32-windres AR=x86_64-w64-mingw32-ar
 
 compiler:
   - gcc
