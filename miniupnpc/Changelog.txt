@@ -1,5 +1,10 @@
-$Id: Changelog.txt,v 1.245 2020/11/09 19:49:02 nanard Exp $
+$Id: Changelog.txt,v 1.247 2020/12/20 18:07:34 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.2.1 : released 2020/12/20
+
+2020/11/30:
+  Add miniupnpc.rc for .dll description
 
 VERSION 2.2.0 : released 2020/11/09
 
