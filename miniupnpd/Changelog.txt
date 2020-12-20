@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.472 2020/10/31 09:16:14 nanard Exp $
+$Id: Changelog.txt,v 1.473 2020/12/20 18:06:36 nanard Exp $
+
+VERSION 2.2.1 : released on 2020/12/20
+ (only minor build corrections)
 
 VERSION 2.2.0 : released on 2020/10/31
 
