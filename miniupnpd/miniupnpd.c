@@ -1090,11 +1090,20 @@ int update_ext_ip_addr_from_stun(int init)
 
 	if ((init || disable_port_forwarding) && !restrictive_nat) {
 		if (addr_is_reserved(&if_addr))
-			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted NAT 1:1 with public IP address %s: Port forwarding is now enabled", ext_if_name, if_addr_str, ext_addr_str);
+			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniunnpd", ext_if_name, if_addr_str, ext_addr_str);
 		else
-			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s: Port forwarding is now enabled", ext_if_name, if_addr_str);
+			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s and firewall does not blocks incoming connections set by miniunnpd", ext_if_name, if_addr_str);
+		syslog(LOG_INFO, "Port forwarding is now enabled");
 	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
-		syslog(LOG_WARNING, "STUN: ext interface %s with IP address %s is now behind restrictive NAT with public IP address %s: Port forwarding is now impossible", ext_if_name, if_addr_str, ext_addr_str);
+		if (addr_is_reserved(&if_addr)) {
+			syslog(LOG_WARNING, "STUN: ext interface %s with private IP address %s is now behind restrictive or symmetric NAT with public IP address %s which does not support port forwarding", ext_if_name, if_addr_str, ext_addr_str);
+			syslog(LOG_WARNING, "NAT on upstream router blocks incoming connections set by miniupnpd");
+			syslog(LOG_WARNING, "Turn off NAT on upstream router or change it to full-cone NAT 1:1 type");
+		} else {
+			syslog(LOG_WARNING, "STUN: ext interface %s has now public IP address %s but firewall filters incoming connections set by miniunnpd", ext_if_name, if_addr_str);
+			syslog(LOG_WARNING, "Check configuration of firewall on local machine and also on upstream router");
+		}
+		syslog(LOG_WARNING, "Port forwarding is now disabled");
 	} else {
 		syslog(LOG_INFO, "STUN: ... done");
 	}
@@ -2178,6 +2187,7 @@ main(int argc, char * * argv)
 			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 			syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
+			syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
 			disable_port_forwarding = 1;
 		}
 	}
@@ -2449,6 +2459,8 @@ main(int argc, char * * argv)
 					} else if (!disable_port_forwarding && reserved) {
 						syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 						syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
+						syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
+						syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
 					}
 					disable_port_forwarding = reserved;
 				}
