@@ -953,6 +953,13 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 		if(!inet_aton(lan_addr->str, &lan_addr->addr))
 			goto parselan_error;
 	}
+	if(!addr_is_reserved(&lan_addr->addr)) {
+		fprintf(stderr, "Error: LAN address contains public ip address : %s\n", lan_addr->str);
+		fprintf(stderr, "Public ip address can be configured via ext_ip= option\n");
+		fprintf(stderr, "LAN address should contain private address, e.g. from 192.168. block\n");
+		fprintf(stderr, "Listening on public ip address is a security issue\n");
+		return -1;
+	}
 	if(*p == '/')
 	{
 		const char * q = ++p;
