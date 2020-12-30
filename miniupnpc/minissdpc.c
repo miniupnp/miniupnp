@@ -697,6 +697,13 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			 * MS Windows Vista and MS Windows Server 2008.
 			 * http://msdn.microsoft.com/en-us/library/bb408409%28v=vs.85%29.aspx */
 			unsigned int ifindex = if_nametoindex(multicastif); /* eth0, etc. */
+			if(ifindex == 0)
+			{
+				if(error)
+					*error = MINISSDPC_INVALID_INPUT;
+				fprintf(stderr, "Invalid multicast interface name %s\n", multicastif);
+				goto error;
+			}
 			if(setsockopt(sudp, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex, sizeof(ifindex)) < 0)
 			{
 				PRINT_SOCKET_ERROR("setsockopt IPV6_MULTICAST_IF");
@@ -733,6 +740,13 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				struct ip_mreqn reqn;	/* only defined with -D_BSD_SOURCE or -D_GNU_SOURCE */
 				memset(&reqn, 0, sizeof(struct ip_mreqn));
 				reqn.imr_ifindex = if_nametoindex(multicastif);
+				if(reqn.imr_ifindex == 0)
+				{
+					if(error)
+						*error = MINISSDPC_INVALID_INPUT;
+					fprintf(stderr, "Invalid multicast ip address / interface name %s\n", multicastif);
+					goto error;
+				}
 				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&reqn, sizeof(reqn)) < 0)
 				{
 					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
