@@ -716,7 +716,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif
 #else
 			/* was : mc_if.s_addr = inet_addr(multicastif); */ /* ex: 192.168.x.x */
-			if (inet_pton(AF_INET, multicastif, &mc_if.s_addr) < 0) {
+			if (inet_pton(AF_INET, multicastif, &mc_if.s_addr) <= 0) {
 				mc_if.s_addr = INADDR_NONE;
 			}
 #endif

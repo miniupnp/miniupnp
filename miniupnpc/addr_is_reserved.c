@@ -62,7 +62,7 @@ int addr_is_reserved(const char * addr_str)
 		return 1;
 #else
 	/* was : addr_n = inet_addr(addr_str); */
-	if (inet_pton(AF_INET, addr_str, &addr_n) < 0) {
+	if (inet_pton(AF_INET, addr_str, &addr_n) <= 0) {
 		/* error */
 		return 1;
 	}
