@@ -66,7 +66,7 @@ struct sockaddr_un {
 #define HAS_IP_MREQN
 #endif
 
-#if !defined(HAS_IP_MREQN) && !defined(_WIN32)
+#ifndef _WIN32
 #include <sys/ioctl.h>
 #if defined(__sun) || defined(__HAIKU__)
 #include <sys/sockio.h>
@@ -735,10 +735,24 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
 			} else {
-#ifdef HAS_IP_MREQN
 				/* was not an ip address, try with an interface name */
+#ifndef _WIN32
+#ifdef HAS_IP_MREQN
 				struct ip_mreqn reqn;	/* only defined with -D_BSD_SOURCE or -D_GNU_SOURCE */
+#endif
+				struct ifreq ifr;
+				int ifrlen = sizeof(ifr);
+				strncpy(ifr.ifr_name, multicastif, IFNAMSIZ);
+				ifr.ifr_name[IFNAMSIZ-1] = '\0';
+				if(ioctl(sudp, SIOCGIFADDR, &ifr, &ifrlen) < 0)
+				{
+					PRINT_SOCKET_ERROR("ioctl(...SIOCGIFADDR...)");
+					goto error;
+				}
+				mc_if.s_addr = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr;
+#ifdef HAS_IP_MREQN
 				memset(&reqn, 0, sizeof(struct ip_mreqn));
+				reqn.imr_address.s_addr = mc_if.s_addr;
 				reqn.imr_ifindex = if_nametoindex(multicastif);
 				if(reqn.imr_ifindex == 0)
 				{
@@ -751,20 +765,12 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 				{
 					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
-#elif !defined(_WIN32)
-				struct ifreq ifr;
-				int ifrlen = sizeof(ifr);
-				strncpy(ifr.ifr_name, multicastif, IFNAMSIZ);
-				ifr.ifr_name[IFNAMSIZ-1] = '\0';
-				if(ioctl(sudp, SIOCGIFADDR, &ifr, &ifrlen) < 0)
-				{
-					PRINT_SOCKET_ERROR("ioctl(...SIOCGIFADDR...)");
-				}
-				mc_if.s_addr = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr;
+#else
 				if(setsockopt(sudp, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&mc_if, sizeof(mc_if)) < 0)
 				{
 					PRINT_SOCKET_ERROR("setsockopt IP_MULTICAST_IF");
 				}
+#endif
 #else /* _WIN32 */
 #ifdef DEBUG
 				printf("Setting of multicast interface not supported with interface name.\n");
