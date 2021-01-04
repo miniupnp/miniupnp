@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.247 2020/12/20 18:07:34 nanard Exp $
 miniUPnP client Changelog.
 
+2020/12/30:
+  Fix usage of IP_MULTICAST_IF with struct ip_mreqn
+
 VERSION 2.2.1 : released 2020/12/20
 
 2020/11/30:
