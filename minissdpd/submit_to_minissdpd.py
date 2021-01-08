@@ -4,6 +4,7 @@
 # Python 3 : code sample
 import socket
 
+
 def codelength(s):
     l = len(s)
     if l == 0:
@@ -15,7 +16,8 @@ def codelength(s):
         encodedlen = c.to_bytes(1, 'little') + encodedlen
     return encodedlen + s
 
-def SubmitServicesToMiniSSDPD(st, usn, server, url, sockpath = "/var/run/minissdpd.sock"):
+
+def SubmitServicesToMiniSSDPD(st, usn, server, url, sockpath="/var/run/minissdpd.sock"):
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         sock.connect(sockpath)
@@ -27,4 +29,10 @@ def SubmitServicesToMiniSSDPD(st, usn, server, url, sockpath = "/var/run/minissd
         sock.close()
     return 0
 
-SubmitServicesToMiniSSDPD(b'urn:schemas-upnp-org:device:InternetGatewayDevice:1', b'uuid:73616d61-6a6b-7a74-650a-0d24d4a5d636::urn:schemas-upnp-org:device:InternetGatewayDevice:1', b'MyServer/0.0', b'http://192.168.0.1:1234/rootDesc.xml')
+
+SubmitServicesToMiniSSDPD(
+    b'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
+    b'uuid:73616d61-6a6b-7a74-650a-0d24d4a5d636::urn:schemas-upnp-org:device:InternetGatewayDevice:1',
+    b'MyServer/0.0',
+    b'http://192.168.0.1:1234/rootDesc.xml',
+)
