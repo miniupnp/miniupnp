@@ -6,7 +6,7 @@ import socket, os
 
 
 def codelength(s):
-    """ returns the given bytearray prepended with the 7-bit-encoded length """
+    """ returns the given bytearray, prepended with the 7-bit-encoded length """
     l = len(s)
     if l == 0:
         return b"\x00"
@@ -20,7 +20,7 @@ def codelength(s):
     return encodedlen + s
 
 
-def SubmitServicesToMiniSSDPD(st, usn, server, url, sockpath="/var/run/minissdpd.sock"):
+def submit_services_to_minissdpd(st, usn, server, url, sockpath="/var/run/minissdpd.sock"):
     """ submits the specified service to MiniSSDPD (if running)"""
     # First check if sockpath exists i.e. MiniSSDPD is running
     if not os.path.exists(sockpath):
@@ -40,7 +40,7 @@ def SubmitServicesToMiniSSDPD(st, usn, server, url, sockpath="/var/run/minissdpd
 
 if __name__ == "__main__":
     # Example usage
-    rc, message = SubmitServicesToMiniSSDPD(
+    rc, message = submit_services_to_minissdpd(
         b"urn:schemas-upnp-org:device:InternetGatewayDevice:1",
         b"uuid:73616d61-6a6b-7a74-650a-0d24d4a5d636::urn:schemas-upnp-org:device:InternetGatewayDevice:1",
         b"MyServer/0.0",
