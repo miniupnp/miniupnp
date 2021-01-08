@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # vim: sw=4 ts=4 expandtab
 # (c) 2021 Thomas BERNARD
-# Python 3 : code sample
+# Python3 module to submit service to running MiniSSDPd
+# MiniSSDPd: See http://miniupnp.free.fr/minissdpd.html
 import socket, os
 
 
@@ -11,7 +12,7 @@ def codelength(s):
     if not isinstance(s, bytes):
         # Not bytes. Let's try to convert to bytes, but only plain ASCII
         try:
-            s = str.encode(s,"ascii")
+            s = str.encode(s, "ascii")
         except:
             s = b''
     l = len(s)
