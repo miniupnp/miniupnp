@@ -6,7 +6,14 @@ import socket, os
 
 
 def codelength(s):
-    """ returns the given bytearray, prepended with the 7-bit-encoded length """
+    """ returns the given string/bytes as bytes, prepended with the 7-bit-encoded length """
+    # We want bytes
+    if not isinstance(s, bytes):
+        # Not bytes. Let's try to convert to bytes, but only plain ASCII
+        try:
+            s = str.encode(s,"ascii")
+        except:
+            s = b""
     l = len(s)
     if l == 0:
         return b"\x00"
