@@ -8,12 +8,10 @@ def codelength(s):
     l = len(s)
     if l == 0:
         return b'\x00'
-    encodedlen = b''
-    while l > 0:
-        c = l & 0x7F
+    encodedlen = (l & 0x7F).to_bytes(1, 'little')
+    while l > 0x7F:
         l = l >> 7
-        if l > 0:
-            c = c + 128
+        c = (l & 0x7F) | 0x80
         encodedlen = c.to_bytes(1, 'little') + encodedlen
     return encodedlen + s
 
