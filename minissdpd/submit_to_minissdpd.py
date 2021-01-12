@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # vim: sw=4 ts=4 expandtab
 # (c) 2021 Thomas BERNARD
 # Python 3 : code sample
