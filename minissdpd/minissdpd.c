@@ -573,7 +573,7 @@ processMSEARCH(int s, const char * st, size_t st_len,
 		    serv;
 		    serv = serv->entries.le_next) {
 			if(0 == strncmp(serv->st, st, l)) {
-				syslog(LOG_DEBUG, "Found matching service : %s %s", serv->st, serv->location);
+				syslog(LOG_DEBUG, "Found matching service : %s %s (v %d)", serv->st, serv->location, st_ver);
 				SendSSDPMSEARCHResponse(s, addr,
 				                        st, st_len, serv->usn,
 				                        serv->server, serv->location);
