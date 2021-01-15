@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2021 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -799,7 +799,7 @@ sigusr1(int sig)
 #if 0
 	/* calling syslog() is forbidden in signal handler according to
 	 * signal(3) */
-	syslog(LOG_INFO, "received signal %d, public ip address change", sig);
+	syslog(LOG_INFO, "received signal %d, public IP address change", sig);
 #endif
 
 	should_send_public_address_change_notif = 1;
@@ -905,7 +905,7 @@ struct runtime_vars {
 /* parselanaddr()
  * parse address with mask
  * ex: 192.168.1.1/24 or 192.168.1.1/255.255.255.0
- * When MULTIPLE_EXTERNAL_IP is enabled, the ip address of the
+ * When MULTIPLE_EXTERNAL_IP is enabled, the IP address of the
  * external interface associated with the lan subnet follows.
  * ex : 192.168.1.1/24 81.21.41.11
  *
@@ -954,10 +954,10 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 			goto parselan_error;
 	}
 	if(!addr_is_reserved(&lan_addr->addr)) {
-		fprintf(stderr, "Error: LAN address contains public ip address : %s\n", lan_addr->str);
-		fprintf(stderr, "Public ip address can be configured via ext_ip= option\n");
+		fprintf(stderr, "Error: LAN address contains public IP address : %s\n", lan_addr->str);
+		fprintf(stderr, "Public IP address can be configured via ext_ip= option\n");
 		fprintf(stderr, "LAN address should contain private address, e.g. from 192.168. block\n");
-		fprintf(stderr, "Listening on public ip address is a security issue\n");
+		fprintf(stderr, "Listening on public IP address is a security issue\n");
 		return -1;
 	}
 	if(*p == '/')
@@ -997,7 +997,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 	while(*p && isspace(*p))
 		p++;
 	if(*p) {
-		/* parse the exteral ip address to associate with this subnet */
+		/* parse the exteral IP address to associate with this subnet */
 		n = 0;
 		while(p[n] && !isspace(*p))
 			n++;
@@ -1099,7 +1099,7 @@ int update_ext_ip_addr_from_stun(int init)
 		if (addr_is_reserved(&if_addr))
 			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniunnpd", ext_if_name, if_addr_str, ext_addr_str);
 		else
-			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s and firewall does not blocks incoming connections set by miniunnpd", ext_if_name, if_addr_str);
+			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s and firewall does not block incoming connections set by miniunnpd", ext_if_name, if_addr_str);
 		syslog(LOG_INFO, "Port forwarding is now enabled");
 	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
 		if (addr_is_reserved(&if_addr)) {
