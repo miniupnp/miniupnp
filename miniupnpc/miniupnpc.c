@@ -320,6 +320,8 @@ upnpDiscoverDevices(const char * const deviceTypes[],
 			return devlist;
 		}
 	}
+#else	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
+	(void)minissdpdsock; /* unused */
 #endif	/* !defined(_WIN32) && !defined(__amigaos__) && !defined(__amigaos4__) */
 
 	/* direct discovery if minissdpd responses are not sufficient */
