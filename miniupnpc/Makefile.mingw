@@ -19,7 +19,7 @@ else
 RM = rm -f
 endif
 #CFLAGS = -Wall -g -DDEBUG -D_WIN32_WINNT=0X501
-CFLAGS = -Wall -Os -DNDEBUG -D_WIN32_WINNT=0X501
+CFLAGS = -Wall -W -Wstrict-prototypes -Os -DNDEBUG -D_WIN32_WINNT=0X501
 LDLIBS = -lws2_32 -liphlpapi
 # -lwsock32
 # -liphlpapi is needed for GetBestRoute() and GetIpAddrTable()
