@@ -92,7 +92,13 @@ receivedata(SOCKET socket,
 #endif	/* DEBUG */
 		if(scope_id)
 			*scope_id = src_addr6->sin6_scope_id;
+	} else {
+		if(scope_id)
+			*scope_id = 0;
 	}
+#else	/* MINIUPNPC_GET_SRC_ADDR */
+	if(scope_id)
+		*scope_id = 0;
 #endif	/* MINIUPNPC_GET_SRC_ADDR */
 	return n;
 }
