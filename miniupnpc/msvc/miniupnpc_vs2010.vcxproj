@@ -88,6 +88,9 @@
     <PreBuildEvent>
       <Command>genminiupnpcstrings.vbs</Command>
     </PreBuildEvent>
+    <ResourceCompile>
+      <PreprocessorDefinitions>INTERNAL_NAME="\"miniupnpc.dll\0\"";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug Dll|Win32'">
     <ClCompile>
@@ -107,6 +110,9 @@
     <Link>
       <AdditionalDependencies>ws2_32.lib;IPHlpApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>INTERNAL_NAME="\"miniupnpc.dll\0\"";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -123,6 +129,9 @@
     <PreBuildEvent>
       <Command>genminiupnpcstrings.vbs</Command>
     </PreBuildEvent>
+    <ResourceCompile>
+      <PreprocessorDefinitions>INTERNAL_NAME="\"miniupnpc.dll\0\"";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release Dll|Win32'">
     <ClCompile>
@@ -142,6 +151,9 @@
     <Link>
       <AdditionalDependencies>ws2_32.lib;IPHlpApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>INTERNAL_NAME="\"miniupnpc.dll\0\"";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\addr_is_reserved.c" />
