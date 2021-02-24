@@ -32,11 +32,11 @@ if [ "$MDIRTY" = "${CHAIN}Chain" ]; then
 	echo "Mangle table dirty; Cleaning..."
 elif [ "$MDIRTY" = "Chain" ]; then
 	echo "Dirty Mangle chain but no reference..? Fixing..."
-	$IPTABLES -t mangle $ADDCMD PREROUTING -i $EXTIF -j $CHAIN
+	$IPTABLES -t mangle $ADDCMD FORWARD -i $EXTIF -j $CHAIN
 else
 	echo "Mangle table clean..initializing..."
 	$IPTABLES -t mangle -N $CHAIN
-	$IPTABLES -t mangle $ADDCMD PREROUTING -i $EXTIF -j $CHAIN
+	$IPTABLES -t mangle $ADDCMD FORWARD -i $EXTIF -j $CHAIN
 fi
 if [ "$CLEAN" = "yes" ]; then
 	$IPTABLES -t mangle -F $CHAIN
