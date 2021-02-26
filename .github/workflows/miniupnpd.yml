@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: install packages
-        run: sudo apt-get install iptables-dev libnfnetlink-dev libnftnl-dev libmnl-dev libssl-dev
+        run: sudo apt-get install libiptc-dev libxtables-dev libnfnetlink-dev libnftnl-dev libmnl-dev libssl-dev
 
       - name: build miniupnpd(iptables)
         run: |
