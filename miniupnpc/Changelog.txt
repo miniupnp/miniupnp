@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.247 2020/12/20 18:07:34 nanard Exp $
+$Id: Changelog.txt,v 1.248 2021/03/02 23:40:55 nanard Exp $
 miniUPnP client Changelog.
+
+2021/01/15:
+  miniupnpcmodule.c: throw an exception in UPnP_discover()
 
 2020/12/30:
   Fix usage of IP_MULTICAST_IF with struct ip_mreqn

@@ -1,9 +1,9 @@
-/* $Id: addr_is_reserved.c,v 1.2 2020/10/15 22:16:13 nanard Exp $ */
+/* $Id: addr_is_reserved.c,v 1.4 2021/03/02 23:40:32 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2020 Thomas Bernard
+ * copyright (c) 2005-2021 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #ifdef _WIN32

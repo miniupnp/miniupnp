@@ -1,8 +1,8 @@
-/* $Id: receivedata.c,v 1.7 2015/11/09 21:51:41 nanard Exp $ */
+/* $Id: receivedata.c,v 1.10 2021/03/02 23:33:07 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2011-2014 Thomas Bernard
+ * Copyright (c) 2011-2021 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
