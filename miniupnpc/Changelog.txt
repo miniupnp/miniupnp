@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.248 2021/03/02 23:40:55 nanard Exp $
+$Id: Changelog.txt,v 1.249 2021/03/02 23:47:36 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.2.2 : released 2021/03/03
 
 2021/01/15:
   miniupnpcmodule.c: throw an exception in UPnP_discover()
