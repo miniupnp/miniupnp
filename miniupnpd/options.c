@@ -307,6 +307,10 @@ freeoptions(void)
 	}
 	if(upnppermlist)
 	{
+		unsigned int i;
+		for (i = 0; i < num_upnpperm; i++) {
+			free_permission_line(upnppermlist + i);
+		}
 		free(upnppermlist);
 		upnppermlist = NULL;
 		num_upnpperm = 0;

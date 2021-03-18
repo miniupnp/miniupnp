@@ -6,6 +6,7 @@
  * in the LICENCE file provided within the distribution */
 
 #include <ctype.h>
+#include <regex.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -172,13 +173,54 @@ read_permission_line(struct upnpperm * perm,
 	{
 		return -1;
 	}
+
+	/* fifth token: (optional) regex */
+	while(isspace(*p))
+		p++;
+	if(*p == '\0')
+		perm->re = NULL;
+	else
+	{
+		int err;
+		perm->re = strdup(p);
+		if(!perm->re)
+		{
+			fprintf(stderr, "err when copying regex \"%s\": out of memory\n", p);
+			perm->re = NULL;
+			return -1;
+		}
+		/* icase: if case matters, it must be someone doing something nasty */
+		err = regcomp(&perm->regex, p, REG_EXTENDED | REG_ICASE | REG_NOSUB);
+		if(err)
+		{
+			char errbuf[256];
+			regerror(err, &perm->regex, errbuf, sizeof(errbuf));
+			fprintf(stderr, "err when compiling regex \"%s\": %s\n", p, errbuf);
+			free(perm->re);
+			perm->re = NULL;
+			return -1;
+		}
+	}
+
 #ifdef DEBUG
-	printf("perm rule added : %s %hu-%hu %08x/%08x %hu-%hu\n",
+	printf("perm rule added : %s %hu-%hu %08x/%08x %hu-%hu %s\n",
 	       (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
 	       perm->eport_min, perm->eport_max, ntohl(perm->address.s_addr),
-	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max);
+	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max,
+	       (perm->re)?re:"");
 #endif
 	return 0;
+}
+
+void
+free_permission_line(struct upnpperm * perm)
+{
+	if(perm->re)
+	{
+		free(&perm->re);
+		perm->re = NULL;
+		regfree(&perm->regex);
+	}
 }
 
 #ifdef USE_MINIUPNPDCTL
@@ -194,14 +236,20 @@ write_permlist(int fd, const struct upnpperm * permary,
 	for(i = 0; i<nperms; i++)
 	{
 		perm = permary + i;
-		l = snprintf(buf, sizeof(buf), "%02d %s %hu-%hu %08x/%08x %hu-%hu\n",
+		l = snprintf(buf, sizeof(buf), "%02d %s %hu-%hu %08x/%08x %hu-%hu",
 	       i,
-    	   (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
+	       (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
 	       perm->eport_min, perm->eport_max, ntohl(perm->address.s_addr),
 	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max);
 		if(l<0)
 			return;
 		write(fd, buf, l);
+		if(perm->re)
+		{
+			write(fd, " ", 1);
+			write(fd, perm->re, strlen(perm->re));
+		}
+		write(fd, "\n", 1);
 	}
 }
 #endif
@@ -211,7 +259,8 @@ write_permlist(int fd, const struct upnpperm * permary,
  *          0 if no match */
 static int
 match_permission(const struct upnpperm * perm,
-                 u_short eport, struct in_addr address, u_short iport)
+                 u_short eport, struct in_addr address, u_short iport,
+                 const char * desc)
 {
 	if( (eport < perm->eport_min) || (perm->eport_max < eport))
 		return 0;
@@ -219,6 +268,8 @@ match_permission(const struct upnpperm * perm,
 		return 0;
 	if( (address.s_addr & perm->mask.s_addr)
 	   != (perm->address.s_addr & perm->mask.s_addr) )
+		return 0;
+	if(desc && perm->re && regexec(&perm->regex, desc, 0, NULL, 0) == REG_NOMATCH)
 		return 0;
 	return 1;
 }
@@ -244,12 +295,12 @@ int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     int n_perms,
                                     u_short eport, struct in_addr address,
-                                    u_short iport)
+                                    u_short iport, const char * desc)
 {
 	int i;
 	for(i=0; i<n_perms; i++)
 	{
-		if(match_permission(permary + i, eport, address, iport))
+		if(match_permission(permary + i, eport, address, iport, desc))
 		{
 			syslog(LOG_DEBUG,
 			       "UPnP permission rule %d matched : port mapping %s",
