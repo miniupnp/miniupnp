@@ -17,6 +17,138 @@
 #include "config.h"
 #include "upnppermissions.h"
 
+static int
+isodigit(char c)
+{
+	return '0' <= c && c >= '7';
+}
+
+static char
+hex2chr(char c)
+{
+	if(c >= 'a')
+		return c - 'a';
+	if(c >= 'A')
+		return c - 'A';
+	return c - '0';
+}
+
+static char
+unescape_char(const char * s, int * seqlen)
+{
+	char c;
+	int len;
+
+	if(s[0] != '\\')
+	{
+		c = s[0];
+		len = 1;
+	}
+	else
+	{
+		s++;
+		c = s[0];
+		len = 2;
+		switch(s[0])
+		{
+		case 'a':  c = '\a'; break;
+		case 'b':  c = '\b'; break;
+		case 'f':  c = '\f'; break;
+		case 'n':  c = '\n'; break;
+		case 'r':  c = '\r'; break;
+		case 't':  c = '\t'; break;
+		case 'v':  c = '\v'; break;
+		/* no need: escape the char itself
+		case '\\': c = '\\'; break;
+		case '\'': c = '\''; break;
+		case '"':  c = '"';  break;
+		case '?':  c = '?';  break;
+		*/
+		case 'x':
+			if(isxdigit(s[1]) && isxdigit(s[2]))
+			{
+				c = hex2chr(s[1]) * 0x10 + hex2chr(s[2]);
+				len = 4;
+			}
+			break;
+		default:
+			if(isodigit(s[1]) && isodigit(s[2]) && isodigit(s[3]))
+			{
+				c = hex2chr(s[0]) * 0100 + hex2chr(s[1]) * 010 + hex2chr(s[2]);
+				len = 4;
+			}
+		}
+	}
+
+	if(seqlen)
+		*seqlen = len;
+	return c;
+}
+
+static char *
+get_next_token(const char * s, char ** token, char raw)
+{
+	char deli;
+	const char *end;
+
+	while(isspace(*s))
+		s++;
+	if(*s == '\0')
+	{
+		if(token)
+			*token = NULL;
+		return (char *) s;
+	}
+
+	if(*s == '"' || *s == '\'')
+	{
+		deli = *s;
+		s++;
+	}
+	else
+		deli = 0;
+	end = s;
+	for(; *end != '\0' && (deli ? *end != deli : !isspace(*end)); end++)
+		if(*end == '\\')
+		{
+			end++;
+			if(*end == '\0')
+				break;
+		}
+
+	if(token)
+	{
+		unsigned int token_len;
+		unsigned int i;
+
+		token_len = end - s;
+		*token = strndup(s, token_len);
+		if(!*token)
+			return NULL;
+
+		for(i = 0; (*token)[i] != '\0'; i++)
+		{
+			int sequence_len;
+
+			if((*token)[i] != '\\')
+				continue;
+
+			if(raw && deli && (*token)[i + 1] != deli)
+				continue;
+			(*token)[i] = unescape_char(*token + i, &sequence_len);
+			memmove(*token + i + 1, *token + i + sequence_len,
+			        token_len - i - sequence_len);
+		}
+		*token = realloc(*token, i);
+	}
+
+	if(deli && *end == deli)
+		end++;
+	while(isspace(*end))
+		end++;
+	return (char *) end;
+}
+
 /* read_permission_line()
  * parse the a permission line which format is :
  * (deny|allow) [0-9]+(-[0-9]+) ip/mask [0-9]+(-[0-9]+)
@@ -175,30 +307,35 @@ read_permission_line(struct upnpperm * perm,
 	}
 
 	/* fifth token: (optional) regex */
-	while(isspace(*p))
-		p++;
-	if(*p == '\0')
-		perm->re = NULL;
-	else
+	p = get_next_token(p, &perm->re, 1);
+	if(!p)
 	{
-		int err;
-		perm->re = strdup(p);
-		if(!perm->re)
+		fprintf(stderr, "err when copying regex: out of memory\n");
+		return -1;
+	}
+	if(perm->re)
+	{
+		if(perm->re[0] == '\0')
 		{
-			fprintf(stderr, "err when copying regex \"%s\": out of memory\n", p);
-			perm->re = NULL;
-			return -1;
-		}
-		/* icase: if case matters, it must be someone doing something nasty */
-		err = regcomp(&perm->regex, p, REG_EXTENDED | REG_ICASE | REG_NOSUB);
-		if(err)
-		{
-			char errbuf[256];
-			regerror(err, &perm->regex, errbuf, sizeof(errbuf));
-			fprintf(stderr, "err when compiling regex \"%s\": %s\n", p, errbuf);
 			free(perm->re);
 			perm->re = NULL;
-			return -1;
+		}
+		else
+		{
+			/* icase: if case matters, it must be someone doing something nasty */
+			int err;
+			err = regcomp(&perm->regex, perm->re,
+			              REG_EXTENDED | REG_ICASE | REG_NOSUB);
+			if(err)
+			{
+				char errbuf[256];
+				regerror(err, &perm->regex, errbuf, sizeof(errbuf));
+				fprintf(stderr, "err when compiling regex \"%s\": %s\n",
+				        perm->re, errbuf);
+				free(perm->re);
+				perm->re = NULL;
+				return -1;
+			}
 		}
 	}
 
