@@ -24,4 +24,4 @@ job_miniupnpc:
     script:
         - "cd miniupnpc && make -j3 && make check"
         - "make clean"
-        - "make -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap CC=i686-w64-mingw32-gcc AR=i686-w64-mingw32-ar"
+        - "make -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap WINDRES=i686-w64-mingw32-windres CC=i686-w64-mingw32-gcc AR=i686-w64-mingw32-ar"
