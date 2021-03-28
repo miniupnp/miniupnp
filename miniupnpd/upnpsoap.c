@@ -365,10 +365,7 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 	}
 #endif
 	if (strcmp(ext_ip_addr, "0.0.0.0") == 0)
-	{
-		SoapError(h, 501, "Action Failed");
-		return;
-	}
+		ext_ip_addr[0] = '\0';
 	bodylen = snprintf(body, sizeof(body), resp,
 	              action, ns, /*SERVICE_TYPE_WANIPC,*/
 				  ext_ip_addr, action);
