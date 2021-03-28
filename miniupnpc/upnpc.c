@@ -111,6 +111,8 @@ static void DisplayInfos(struct UPNPUrls * urls,
 							  externalIPAddress);
 	if(r != UPNPCOMMAND_SUCCESS) {
 		printf("GetExternalIPAddress failed. (errorcode=%d)\n", r);
+	} else if(!externalIPAddress[0]) {
+		printf("GetExternalIPAddress failed. (empty string)\n");
 	} else {
 		printf("ExternalIPAddress = %s\n", externalIPAddress);
 	}
