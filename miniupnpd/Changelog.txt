@@ -1,5 +1,9 @@
 $Id: Changelog.txt,v 1.473 2020/12/20 18:06:36 nanard Exp $
 
+2020/03/31:
+  GetExternalIPAddress returns empty string when the External IP address can
+    not be retrieved.
+
 VERSION 2.2.1 : released on 2020/12/20
  (only minor build corrections)
 
