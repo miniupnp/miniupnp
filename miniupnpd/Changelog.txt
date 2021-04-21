@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.475 2021/05/11 21:57:18 nanard Exp $
 
+2021/04/22:
+  Add SO_REUSEPORT option for SSDP receive sockets
+
 2021/03/31:
   GetExternalIPAddress returns empty string when the External IP address can
     not be retrieved.
