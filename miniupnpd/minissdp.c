@@ -196,6 +196,10 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 	if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
 	{
 		syslog(LOG_WARNING, "setsockopt(udp, SO_REUSEADDR): %m");
+	}	
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0)
+	{
+		syslog(LOG_WARNING, "setsockopt(udp, SO_REUSEPORT): %m");
 	}
 #ifdef IP_RECVIF
 	/* BSD */
