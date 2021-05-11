@@ -1,8 +1,11 @@
-$Id: Changelog.txt,v 1.473 2020/12/20 18:06:36 nanard Exp $
+$Id: Changelog.txt,v 1.475 2021/05/11 21:57:18 nanard Exp $
 
-2020/03/31:
+2021/03/31:
   GetExternalIPAddress returns empty string when the External IP address can
     not be retrieved.
+
+2021/02/26:
+  iptables_removeall.sh: fix the cleanup of PREROUTING mangle chain
 
 VERSION 2.2.1 : released on 2020/12/20
  (only minor build corrections)
