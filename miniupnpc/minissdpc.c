@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.47 2021/03/02 23:38:30 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.49 2021/05/13 11:00:36 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -720,7 +720,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 		}
 	}
 
-	if(multicastif)
+	if(multicastif && multicastif[0] != '\0')
 	{
 		if(ipv6) {
 #if !defined(_WIN32)
