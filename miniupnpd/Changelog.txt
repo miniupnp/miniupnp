@@ -1,4 +1,6 @@
-$Id: Changelog.txt,v 1.475 2021/05/11 21:57:18 nanard Exp $
+$Id: Changelog.txt,v 1.477 2021/05/13 11:31:18 nanard Exp $
+
+VERSION 2.2.2 : released on 2021/05/13
 
 2021/04/22:
   Add SO_REUSEPORT option for SSDP receive sockets
