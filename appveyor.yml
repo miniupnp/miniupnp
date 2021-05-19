@@ -1,5 +1,5 @@
 environment:
-  APP_VERSION: '2.1'
+  APP_VERSION: '2.2'
   matrix:
     - PYTHON_VER: C:\Python27
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
