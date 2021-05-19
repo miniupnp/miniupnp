@@ -21,8 +21,6 @@ environment:
 
 version: '$(APP_VERSION).{build}'
 
-image: Visual Studio 2017
-
 install:
   - set PATH=%PYTHON_VER%;%PYTHON_VER%\Scripts;%PATH%;C:\msys64\mingw%ARCH_BITS%\bin
   # We need wheel installed to build wheels
