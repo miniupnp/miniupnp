@@ -17,6 +17,14 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       SETUP_COMPILER_FLAG:
       ARCH_BITS: 64
+    - PYTHON_VER: C:\Python39
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      SETUP_COMPILER_FLAG:
+      ARCH_BITS: 32
+    - PYTHON_VER: C:\Python39-x64
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      SETUP_COMPILER_FLAG:
+      ARCH_BITS: 64
 
 
 version: '$(APP_VERSION).{build}'
