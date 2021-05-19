@@ -2,7 +2,7 @@
 /* Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2020 Thomas Bernard
+ * Copyright (c) 2005-2021 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENSE file provided within this distribution */
 #include <stdio.h>
@@ -44,7 +44,7 @@ int main(int argc, char * * argv) {
 	fin = fopen("VERSION", "r");
 	fgets(miniupnpcVersion, sizeof(miniupnpcVersion), fin);
 	fclose(fin);
-	for(n = 0; n < sizeof(miniupnpcVersion); n++) {
+	for(n = 0; n < (int)sizeof(miniupnpcVersion); n++) {
 		if(miniupnpcVersion[n] < ' ')
 			miniupnpcVersion[n] = '\0';
 	}
