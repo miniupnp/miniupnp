@@ -89,7 +89,7 @@ LOG_MINIUPNPD="LOG_DAEMON"
 
 # detecting the OS name and version
 OS_NAME=`uname -s`
-OS_VERSION=`uname -r`
+OS_VERSION='unknown'
 OS_MACHINE=`uname -m`
 # Makefile to use
 MAKEFILE=
@@ -364,7 +364,7 @@ case $OS_NAME in
 					;;
 				arch)
 					OS_URL=http://www.archlinux.org/
-					OS_VERSION=`uname -r`
+					OS_VERSION='rolling'
 					;;
 			esac
 		fi

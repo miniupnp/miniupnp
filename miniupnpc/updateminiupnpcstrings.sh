@@ -9,7 +9,7 @@ TEMPLATE_FILE=${FILE}.in
 
 # detecting the OS name and version
 OS_NAME=`uname -s`
-OS_VERSION=`uname -r`
+OS_VERSION='unknown'
 if [ -f /etc/debian_version ]; then
 	OS_NAME=Debian
 	OS_VERSION=`cat /etc/debian_version`
