@@ -1,8 +1,8 @@
-/* $Id: upnpglobalvars.c,v 1.45 2019/10/02 22:02:58 nanard Exp $ */
+/* $Id: upnpglobalvars.c,v 1.47 2021/05/21 22:03:38 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2021 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -157,3 +157,7 @@ unsigned int upnp_configid = 1337; /* CONFIGID.UPNP.ORG */
 #ifdef RANDOMIZE_URLS
 char random_url[RANDOM_URL_MAX_LEN] = "random";
 #endif /* RANDOMIZE_URLS */
+
+#ifdef DYNAMIC_OS_VERSION
+char * os_version = NULL;
+#endif /* DYNAMIC_OS_VERSION */

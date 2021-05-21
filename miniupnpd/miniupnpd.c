@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.243 2020/04/12 17:43:13 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.250 2021/05/21 22:04:34 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -57,6 +57,10 @@
 #endif
 #ifdef ENABLE_HTTPS
 #include <openssl/crypto.h>
+#endif
+
+#ifdef DYNAMIC_OS_VERSION
+#include <sys/utsname.h>
 #endif
 
 #ifdef TOMATO
@@ -2199,6 +2203,18 @@ main(int argc, char * * argv)
 		}
 	}
 
+#ifdef DYNAMIC_OS_VERSION
+	{
+		struct utsname utsname;
+		if (uname(&utsname) < 0) {
+			syslog(LOG_ERR, "uname(): %m");
+			os_version = strdup("unknown");
+		} else {
+			os_version = strdup(utsname.release);
+		}
+	}
+#endif /* DYNAMIC_OS_VERSION */
+
 	if(GETFLAG(ENABLEUPNPMASK))
 	{
 		unsigned short listen_port;
@@ -3109,6 +3125,9 @@ shutdown:
 #ifndef DISABLE_CONFIG_FILE
 	/* in some case shutdown_redirect() may need the option values */
 	freeoptions();
+#endif
+#ifdef DYNAMIC_OS_VERSION
+	free(os_version);
 #endif
 	closelog();
 	return 0;

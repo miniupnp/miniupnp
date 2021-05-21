@@ -1,9 +1,9 @@
-/* $Id: upnphttp.c,v 1.108 2019/10/05 18:05:13 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.110 2021/05/21 22:03:14 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project :  miniupnp
- * Website :  http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * Website :  http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2020 Thomas Bernard
+ * Copyright (c) 2005-2021 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -29,7 +29,7 @@
 #include "upnpsoap.h"
 #include "upnpevents.h"
 #include "upnputils.h"
-#ifdef RANDOMIZE_URLS
+#if defined(RANDOMIZE_URLS) || defined(DYNAMIC_OS_VERSION)
 #include "upnpglobalvars.h"
 #endif /* RANDOMIZE_URLS */
 
@@ -1103,12 +1103,11 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
                      const char * respmsg,
                      int bodylen)
 {
-	int templen;
+	int templen = sizeof(httpresphead) + 256 + bodylen;
 	if(!h->res_buf ||
-	   h->res_buf_alloclen < ((int)sizeof(httpresphead) + 256 + bodylen)) {
+	   h->res_buf_alloclen < templen) {
 		if(h->res_buf)
 			free(h->res_buf);
-		templen = sizeof(httpresphead) + 256 + bodylen;
 		h->res_buf = (char *)malloc(templen);
 		if(!h->res_buf) {
 			syslog(LOG_ERR, "malloc error in BuildHeader_upnphttp()");
@@ -1121,7 +1120,11 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 	                         httpresphead, h->HttpVer,
 	                         respcode, respmsg,
 	                         (h->respflags&FLAG_HTML)?"text/html":"text/xml; charset=\"utf-8\"",
-							 bodylen);
+	                         bodylen
+#ifdef DYNAMIC_OS_VERSION
+	                         , os_version
+#endif
+	                        );
 	/* Content-Type MUST be 'text/xml; charset="utf-8"' according to UDA v1.1 */
 	/* Content-Type MUST be 'text/xml' according to UDA v1.0 */
 	/* Additional headers */

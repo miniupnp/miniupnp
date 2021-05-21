@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.99 2020/05/10 17:55:32 nanard Exp $ */
+/* $Id: minissdp.c,v 1.103 2021/05/21 22:05:17 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -558,6 +558,9 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 		st_len, st, suffix,
 		uuidvalue, st_is_uuid ? "" : "::",
 		st_is_uuid ? 0 : st_len, st, suffix,
+#ifdef DYNAMIC_OS_VERSION
+		os_version,
+#endif
 		host, (unsigned int)http_port,
 #ifdef RANDOMIZE_URLS
 		random_url,
@@ -687,6 +690,9 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 		random_url,
 #endif	/* RANDOMIZE_URLS */
 #endif	/* ENABLE_HTTPS */
+#ifdef DYNAMIC_OS_VERSION
+		os_version,
+#endif
 		nt, suffix,						/* NT: */
 		usn1, usn2, usn3, suffix,		/* USN: */
 		upnp_bootid,					/* 01-NLS: */
@@ -1541,9 +1547,22 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 		CODELENGTH(l, p);
 		memcpy(p, strbuf, l);
 		p += l;
+#ifdef DYNAMIC_OS_VERSION
+		l = snprintf(strbuf, sizeof(strbuf), MINIUPNPD_SERVER_STRING,
+		             os_version);
+		if(l<0) {
+			syslog(LOG_WARNING, "SubmitServicesToMiniSSDPD: snprintf %m");
+			continue;
+		} else if((unsigned)l>=sizeof(strbuf)) {
+			l = sizeof(strbuf) - 1;
+		}
+		CODELENGTH(l, p);
+		memcpy(p, strbuf, l);
+#else
 		l = (int)strlen(MINIUPNPD_SERVER_STRING);
 		CODELENGTH(l, p);
 		memcpy(p, MINIUPNPD_SERVER_STRING, l);
+#endif
 		p += l;
 		l = snprintf(strbuf, sizeof(strbuf), "http://%s:%u" ROOTDESC_PATH,
 		             host, (unsigned int)port);
