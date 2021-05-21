@@ -69,7 +69,7 @@ set (MINIUPNPC_SOURCES
   connecthostport.c
   portlistingparse.c
   receivedata.c
-	addr_is_reserved.c
+  addr_is_reserved.c
   connecthostport.h
   igd_desc_parse.h
   minisoap.h
@@ -84,7 +84,7 @@ set (MINIUPNPC_SOURCES
   upnpdev.h
   upnperrors.h
   upnpreplyparse.h
-	addr_is_reserved.h
+  addr_is_reserved.h
   ${CMAKE_CURRENT_BINARY_DIR}/miniupnpcstrings.h
 )
 
@@ -217,8 +217,8 @@ if (UPNPC_BUILD_TESTS)
   target_link_libraries (testminiwget PRIVATE miniupnpc-tests)
 
   add_executable (testaddr_is_reserved testaddr_is_reserved.c
-	                                     addr_is_reserved.c
-	)
+                                       addr_is_reserved.c
+  )
   target_link_libraries (testaddr_is_reserved PRIVATE miniupnpc-tests)
 
 # set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} testminixml minixmlvalid testupnpreplyparse testigddescparse testminiwget)
@@ -226,7 +226,7 @@ endif ()
 
 if (NOT UPNPC_NO_INSTALL)
   install (FILES
-	  miniupnpc.h
+    miniupnpc.h
     miniwget.h
     upnpcommands.h
     igd_desc_parse.h
@@ -244,4 +244,4 @@ if (NOT UPNPC_NO_INSTALL)
   )
 endif()
 
-# vim: ts=2:sw=2
+# vim: ts=2:sw=2:expandtab
