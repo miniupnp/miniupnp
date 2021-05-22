@@ -34,19 +34,19 @@ CFLAGS ?= -O
 CFLAGS += -Wall
 CFLAGS += -W -Wstrict-prototypes
 CFLAGS += -fno-common
-CFLAGS += -DMINIUPNPC_SET_SOCKET_TIMEOUT
-CFLAGS += -DMINIUPNPC_GET_SRC_ADDR
-CFLAGS += -D_BSD_SOURCE
-CFLAGS += -D_DEFAULT_SOURCE
+CPPFLAGS += -DMINIUPNPC_SET_SOCKET_TIMEOUT
+CPPFLAGS += -DMINIUPNPC_GET_SRC_ADDR
+CPPFLAGS += -D_BSD_SOURCE
+CPPFLAGS += -D_DEFAULT_SOURCE
 ifneq (, $(findstring netbsd, $(OS)))
-CFLAGS += -D_NETBSD_SOURCE
+CPPFLAGS += -D_NETBSD_SOURCE
 endif
 ifeq (, $(findstring freebsd, $(OS))$(findstring darwin, $(OS)))
-#CFLAGS += -D_POSIX_C_SOURCE=200112L
-CFLAGS += -D_XOPEN_SOURCE=600
+#CPPFLAGS += -D_POSIX_C_SOURCE=200112L
+CPPFLAGS += -D_XOPEN_SOURCE=600
 endif
 #CFLAGS += -ansi
-#CFLAGS += -DNO_GETADDRINFO
+#CPPFLAGS += -DNO_GETADDRINFO
 INSTALL = install
 SH = /bin/sh
 JAVA = java
@@ -64,7 +64,7 @@ JNAERATORBASEURL = https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/
 
 ifneq (, $(findstring sun, $(OS))$(findstring solaris, $(OS)))
   LDLIBS=-lsocket -lnsl -lresolv
-  CFLAGS += -D__EXTENSIONS__
+  CPPFLAGS += -D__EXTENSIONS__
   CFLAGS += -std=c99
 endif
 
@@ -106,7 +106,7 @@ LIBRARY = libminiupnpc.a
 ifneq (, $(findstring darwin, $(OS)))
   SHAREDLIBRARY = libminiupnpc.dylib
   SONAME = $(basename $(SHAREDLIBRARY)).$(APIVERSION).dylib
-  CFLAGS := -D_DARWIN_C_SOURCE $(CFLAGS)
+  CPPFLAGS += -D_DARWIN_C_SOURCE
 else
 ifeq ($(JARSUFFIX), win32)
   SHAREDLIBRARY = miniupnpc.dll
@@ -292,7 +292,7 @@ miniupnpc.pc:	VERSION
 	echo "Cflags: -I\$${includedir}" >> $@
 
 depend:
-	makedepend -Y -- $(CFLAGS) -- $(SRCS) 2>/dev/null
+	makedepend -Y -- $(CFLAGS) $(CPPFLAGS) -- $(SRCS) 2>/dev/null
 
 $(LIBRARY):	$(LIBOBJS)
 ifneq (, $(findstring darwin, $(OS)))
