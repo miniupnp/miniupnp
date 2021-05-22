@@ -18,8 +18,11 @@ RM = del
 else
 RM = rm -f
 endif
-#CFLAGS = -Wall -g -DDEBUG -D_WIN32_WINNT=0X501
-CFLAGS = -Wall -W -Wstrict-prototypes -Os -DNDEBUG -D_WIN32_WINNT=0X501
+#CFLAGS = -Wall -g
+#CPPFLAGS = -DDEBUG -D_WIN32_WINNT=0X501
+CFLAGS = -Wall -W -Wstrict-prototypes -Os
+CPPFLAGS = -DNDEBUG -D_WIN32_WINNT=0X501
+CPPFLAGS += -Iinclude
 LDLIBS = -lws2_32 -liphlpapi
 # -lwsock32
 # -liphlpapi is needed for GetBestRoute() and GetIpAddrTable()
@@ -75,13 +78,13 @@ miniupnpc.dll:	miniupnpc.def $(OBJSDLL)
 miniupnpc.lib:	miniupnpc.dll
 
 %.o:	%.c
-	$(CC) $(CFLAGS) -DMINIUPNP_STATICLIB -c -o $@ $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -DMINIUPNP_STATICLIB -c -o $@ $<
 
 dll-%.o:	%.c
-	$(CC) $(CFLAGS) -DMINIUPNP_EXPORTS -c -o $@ $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -DMINIUPNP_EXPORTS -c -o $@ $<
 
 %-shared.o:	%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 # --enable-stdcall-fixup
 %-static.exe:	%.o libminiupnpc.a
@@ -95,7 +98,7 @@ dll-%.o:	%.c
 # sed (if cross compiling from another platform).
 ifeq ($(OS),Windows_NT)
 wingenminiupnpcstrings.exe:	wingenminiupnpcstrings.c
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $^
 
 miniupnpcstrings.h: miniupnpcstrings.h.in wingenminiupnpcstrings.exe VERSION
 	.\wingenminiupnpcstrings.exe $< $@ rc_version.h
@@ -122,23 +125,24 @@ testminixml.exe:	testminixml.o minixml.o igd_desc_parse.o
 
 minixml.o:	minixml.c minixml.h
 
-upnpc.o:	miniwget.h minisoap.h miniupnpc.h igd_desc_parse.h
-upnpc.o:	upnpreplyparse.h upnpcommands.h upnperrors.h miniupnpcstrings.h
+upnpc.o:	include/miniwget.h minisoap.h include/miniupnpc.h include/igd_desc_parse.h
+upnpc.o:	include/upnpreplyparse.h include/upnpcommands.h include/upnperrors.h miniupnpcstrings.h
 
-miniwget.o:	miniwget.c miniwget.h miniupnpcstrings.h connecthostport.h
+miniwget.o:	miniwget.c include/miniwget.h miniupnpcstrings.h connecthostport.h
 
 minisoap.o:	minisoap.c minisoap.h miniupnpcstrings.h
 
-miniupnpc.o:	miniupnpc.c miniupnpc.h minisoap.h miniwget.h minixml.h \
+miniupnpc.o:	miniupnpc.c include/miniupnpc.h minisoap.h include/miniwget.h minixml.h \
 	addr_is_reserved.h
 
-igd_desc_parse.o:	igd_desc_parse.c igd_desc_parse.h
+igd_desc_parse.o:	igd_desc_parse.c include/igd_desc_parse.h
 
-upnpreplyparse.o:	upnpreplyparse.c upnpreplyparse.h minixml.h
+upnpreplyparse.o:	upnpreplyparse.c include/upnpreplyparse.h minixml.h
 
-upnpcommands.o:	upnpcommands.c upnpcommands.h upnpreplyparse.h miniupnpc.h portlistingparse.h
+upnpcommands.o:	upnpcommands.c include/upnpcommands.h include/upnpreplyparse.h \
+	include/miniupnpc.h include/portlistingparse.h
 
 minissdpc.o:	minissdpc.c minissdpc.h receivedata.h
 
-upnpdev.o:	upnpdev.c upnpdev.h
+upnpdev.o:	upnpdev.c include/upnpdev.h
 

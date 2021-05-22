@@ -70,21 +70,6 @@ set (MINIUPNPC_SOURCES
   portlistingparse.c
   receivedata.c
   addr_is_reserved.c
-  connecthostport.h
-  igd_desc_parse.h
-  minisoap.h
-  minissdpc.h
-  miniupnpc.h
-  miniupnpctypes.h
-  miniwget.h
-  minixml.h
-  portlistingparse.h
-  receivedata.h
-  upnpcommands.h
-  upnpdev.h
-  upnperrors.h
-  upnpreplyparse.h
-  addr_is_reserved.h
   ${CMAKE_CURRENT_BINARY_DIR}/miniupnpcstrings.h
 )
 
@@ -105,12 +90,15 @@ elseif (HAIKU)
   find_library (SOCKET_LIBRARY NAMES network)
   find_library (NSL_LIBRARY NAMES network)
   find_library (RESOLV_LIBRARY NAMES network)
-  set (LDLIBS ${SOCKET_LIBRARY} ${NSL_LIBRARY} ${RESOLV_LIBRARY} ${LDLIBS})  
+  set (LDLIBS ${SOCKET_LIBRARY} ${NSL_LIBRARY} ${RESOLV_LIBRARY} ${LDLIBS})
 endif ()
 
 
 if (UPNPC_BUILD_STATIC)
   add_library (libminiupnpc-static STATIC ${MINIUPNPC_SOURCES})
+  target_include_directories (libminiupnpc-static PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/miniupnpc>)
   if (NOT UPNPC_BUILD_SHARED)
     add_library (miniupnpc::miniupnpc ALIAS libminiupnpc-static)
   endif()
@@ -151,6 +139,9 @@ endif ()
 
 if (UPNPC_BUILD_SHARED)
   add_library (libminiupnpc-shared SHARED ${MINIUPNPC_SOURCES})
+  target_include_directories (libminiupnpc-shared PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/miniupnpc>)
   add_library (miniupnpc::miniupnpc ALIAS libminiupnpc-shared)
   set_target_properties (libminiupnpc-shared PROPERTIES EXPORT_NAME miniupnpc)
   set_target_properties (libminiupnpc-shared PROPERTIES OUTPUT_NAME "miniupnpc")
@@ -193,6 +184,8 @@ if (UPNPC_BUILD_TESTS)
   target_compile_definitions(miniupnpc-tests INTERFACE MINIUPNP_STATICLIB)
 
   add_executable (testminixml testminixml.c minixml.c igd_desc_parse.c)
+  target_include_directories (testminixml PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
   target_link_libraries (testminixml PRIVATE miniupnpc-tests)
 
   add_executable (minixmlvalid minixmlvalid.c minixml.c)
@@ -200,6 +193,8 @@ if (UPNPC_BUILD_TESTS)
 
   add_executable (testupnpreplyparse testupnpreplyparse.c
                                      minixml.c upnpreplyparse.c)
+  target_include_directories (testupnpreplyparse PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
   target_link_libraries (testupnpreplyparse PRIVATE miniupnpc-tests)
 
   add_executable (testigddescparse testigddescparse.c
@@ -207,6 +202,8 @@ if (UPNPC_BUILD_TESTS)
                                    upnpcommands.c upnpreplyparse.c minisoap.c connecthostport.c
                                    portlistingparse.c receivedata.c addr_is_reserved.c
   )
+  target_include_directories (testigddescparse PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
   target_link_libraries (testigddescparse PRIVATE miniupnpc-tests)
 
   add_executable (testminiwget testminiwget.c
@@ -214,6 +211,8 @@ if (UPNPC_BUILD_TESTS)
                                upnpreplyparse.c minixml.c igd_desc_parse.c connecthostport.c
                                portlistingparse.c receivedata.c addr_is_reserved.c
   )
+  target_include_directories (testminiwget PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
   target_link_libraries (testminiwget PRIVATE miniupnpc-tests)
 
   add_executable (testaddr_is_reserved testaddr_is_reserved.c

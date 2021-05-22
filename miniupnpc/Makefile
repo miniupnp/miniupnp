@@ -3,7 +3,7 @@
 # http://miniupnp.free.fr/
 # https://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2020 Thomas Bernard
+# (c) 2005-2021 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -101,11 +101,8 @@ endif
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 # HEADERS to install
-HEADERS = miniupnpc.h miniwget.h upnpcommands.h igd_desc_parse.h \
-          upnpreplyparse.h upnperrors.h miniupnpctypes.h \
-          portlistingparse.h \
-          upnpdev.h \
-          miniupnpc_declspec.h
+CPPFLAGS += -Iinclude/
+HEADERS = $(wildcard include/*.h)
 
 # library names
 LIBRARY = libminiupnpc.a
@@ -241,9 +238,9 @@ clean:
 distclean: clean
 	$(RM) $(JNAERATOR) java/*.jar java/*.class out.errors.txt
 
-updateversion:	miniupnpc.h
-	cp miniupnpc.h miniupnpc.h.bak
-	sed 's/\(.*MINIUPNPC_API_VERSION\s\+\)[0-9]\+/\1$(APIVERSION)/' < miniupnpc.h.bak > miniupnpc.h
+updateversion:	include/miniupnpc.h
+	cp $< $<.bak
+	sed 's/\(.*MINIUPNPC_API_VERSION\s\+\)[0-9]\+/\1$(APIVERSION)/' < $<.bak > $<
 
 install:	updateversion $(FILESTOINSTALL)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLDIRINC)
@@ -380,41 +377,49 @@ minihttptestserver:	minihttptestserver.o
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
-igd_desc_parse.o: igd_desc_parse.h
-miniupnpc.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h upnpdev.h
-miniupnpc.o: minissdpc.h miniwget.h minisoap.h minixml.h upnpcommands.h
-miniupnpc.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
-miniupnpc.o: connecthostport.h
+igd_desc_parse.o: include/igd_desc_parse.h
+miniupnpc.o: include/miniupnpc.h include/miniupnpc_declspec.h
+miniupnpc.o: include/igd_desc_parse.h include/upnpdev.h minissdpc.h
+miniupnpc.o: include/miniwget.h miniwget_private.h miniupnpc_socketdef.h
+miniupnpc.o: minisoap.h minixml.h include/upnpcommands.h
+miniupnpc.o: include/miniupnpctypes.h connecthostport.h addr_is_reserved.h
 minixml.o: minixml.h
-minisoap.o: minisoap.h miniupnpcstrings.h
-miniwget.o: miniupnpcstrings.h miniwget.h miniupnpc_declspec.h
-miniwget.o: connecthostport.h receivedata.h
-upnpc.o: miniwget.h miniupnpc_declspec.h miniupnpc.h igd_desc_parse.h
-upnpc.o: upnpdev.h upnpcommands.h upnpreplyparse.h portlistingparse.h
-upnpc.o: miniupnpctypes.h upnperrors.h miniupnpcstrings.h
-upnpcommands.o: upnpcommands.h upnpreplyparse.h portlistingparse.h
-upnpcommands.o: miniupnpc_declspec.h miniupnpctypes.h miniupnpc.h
-upnpcommands.o: igd_desc_parse.h upnpdev.h
-upnpreplyparse.o: upnpreplyparse.h minixml.h
-testminixml.o: minixml.h igd_desc_parse.h
+minisoap.o: minisoap.h miniupnpc_socketdef.h miniupnpcstrings.h
+miniwget.o: miniupnpcstrings.h include/miniwget.h
+miniwget.o: include/miniupnpc_declspec.h connecthostport.h
+miniwget.o: miniupnpc_socketdef.h receivedata.h
+upnpc.o: include/miniwget.h include/miniupnpc_declspec.h include/miniupnpc.h
+upnpc.o: include/igd_desc_parse.h include/upnpdev.h include/upnpcommands.h
+upnpc.o: include/miniupnpctypes.h include/portlistingparse.h
+upnpc.o: include/upnperrors.h miniupnpcstrings.h
+upnpcommands.o: include/upnpcommands.h include/miniupnpc_declspec.h
+upnpcommands.o: include/miniupnpctypes.h include/miniupnpc.h
+upnpcommands.o: include/igd_desc_parse.h include/upnpdev.h
+upnpcommands.o: include/portlistingparse.h include/upnpreplyparse.h
+upnpreplyparse.o: include/upnpreplyparse.h minixml.h
+testminixml.o: minixml.h include/igd_desc_parse.h
 minixmlvalid.o: minixml.h
-testupnpreplyparse.o: upnpreplyparse.h
-minissdpc.o: minissdpc.h miniupnpc_declspec.h upnpdev.h miniupnpc.h
-minissdpc.o: igd_desc_parse.h receivedata.h codelength.h
-upnperrors.o: upnperrors.h miniupnpc_declspec.h upnpcommands.h
-upnperrors.o: upnpreplyparse.h portlistingparse.h miniupnpctypes.h
-upnperrors.o: miniupnpc.h igd_desc_parse.h upnpdev.h
-testigddescparse.o: igd_desc_parse.h minixml.h miniupnpc.h
-testigddescparse.o: miniupnpc_declspec.h upnpdev.h
-testminiwget.o: miniwget.h miniupnpc_declspec.h
-connecthostport.o: connecthostport.h
-portlistingparse.o: portlistingparse.h miniupnpc_declspec.h miniupnpctypes.h
-portlistingparse.o: minixml.h
-receivedata.o: receivedata.h
-upnpdev.o: upnpdev.h miniupnpc_declspec.h
-testportlistingparse.o: portlistingparse.h miniupnpc_declspec.h
-testportlistingparse.o: miniupnpctypes.h
-miniupnpcmodule.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h
-miniupnpcmodule.o: upnpdev.h upnpcommands.h upnpreplyparse.h
-miniupnpcmodule.o: portlistingparse.h miniupnpctypes.h upnperrors.h
-listdevices.o: miniupnpc.h miniupnpc_declspec.h igd_desc_parse.h upnpdev.h
+testupnpreplyparse.o: include/upnpreplyparse.h
+minissdpc.o: miniupnpc_socketdef.h minissdpc.h include/miniupnpc_declspec.h
+minissdpc.o: include/upnpdev.h include/miniupnpc.h include/igd_desc_parse.h
+minissdpc.o: receivedata.h codelength.h
+upnperrors.o: include/upnperrors.h include/miniupnpc_declspec.h
+upnperrors.o: include/upnpcommands.h include/miniupnpctypes.h
+upnperrors.o: include/miniupnpc.h include/igd_desc_parse.h include/upnpdev.h
+testigddescparse.o: include/igd_desc_parse.h minixml.h include/miniupnpc.h
+testigddescparse.o: include/miniupnpc_declspec.h include/upnpdev.h
+testminiwget.o: include/miniwget.h include/miniupnpc_declspec.h
+connecthostport.o: connecthostport.h miniupnpc_socketdef.h
+portlistingparse.o: include/portlistingparse.h include/miniupnpc_declspec.h
+portlistingparse.o: include/miniupnpctypes.h minixml.h
+receivedata.o: receivedata.h miniupnpc_socketdef.h
+upnpdev.o: include/upnpdev.h include/miniupnpc_declspec.h
+testportlistingparse.o: include/portlistingparse.h
+testportlistingparse.o: include/miniupnpc_declspec.h include/miniupnpctypes.h
+miniupnpcmodule.o: include/miniupnpc.h include/miniupnpc_declspec.h
+miniupnpcmodule.o: include/igd_desc_parse.h include/upnpdev.h
+miniupnpcmodule.o: include/upnpcommands.h include/miniupnpctypes.h
+miniupnpcmodule.o: include/upnperrors.h
+testaddr_is_reserved.o: addr_is_reserved.h
+listdevices.o: include/miniupnpc.h include/miniupnpc_declspec.h
+listdevices.o: include/igd_desc_parse.h include/upnpdev.h
