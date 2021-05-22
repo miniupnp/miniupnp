@@ -1,4 +1,4 @@
-/* $Id: upnphttp.c,v 1.110 2021/05/21 22:03:14 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.111 2021/05/22 21:34:12 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -1284,63 +1284,8 @@ SendResp_upnphttp(struct upnphttp * h)
 void
 SendRespAndClose_upnphttp(struct upnphttp * h)
 {
-	ssize_t n;
-
-	while (h->res_sent < h->res_buflen)
-	{
-#ifdef ENABLE_HTTPS
-		if(h->ssl) {
-			n = SSL_write(h->ssl, h->res_buf + h->res_sent,
-			         h->res_buflen - h->res_sent);
-		} else {
-			n = send(h->socket, h->res_buf + h->res_sent,
-			         h->res_buflen - h->res_sent, 0);
-		}
-#else
-		n = send(h->socket, h->res_buf + h->res_sent,
-		         h->res_buflen - h->res_sent, 0);
-#endif
-		if(n<0)
-		{
-#ifdef ENABLE_HTTPS
-			if(h->ssl) {
-				int err;
-				err = SSL_get_error(h->ssl, n);
-				if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
-					/* try again later */
-					h->state = ESendingAndClosing;
-					return;
-				}
-				syslog(LOG_ERR, "SSL_write() failed");
-				syslogsslerr();
-				break; /* avoid infinite loop */
-			} else {
-#endif
-			if(errno == EINTR)
-				continue;	/* try again immediately */
-			if(errno == EAGAIN || errno == EWOULDBLOCK)
-			{
-				/* try again later */
-				h->state = ESendingAndClosing;
-				return;
-			}
-			syslog(LOG_ERR, "send(res_buf): %m");
-			break; /* avoid infinite loop */
-#ifdef ENABLE_HTTPS
-			}
-#endif
-		}
-		else if(n == 0)
-		{
-			syslog(LOG_ERR, "send(res_buf): %d bytes sent (out of %d)",
-							h->res_sent, h->res_buflen);
-			break;
-		}
-		else
-		{
-			h->res_sent += n;
-		}
-	}
-	CloseSocket_upnphttp(h);
+	if (SendResp_upnphttp(h))
+		CloseSocket_upnphttp(h);
+	else
+		h->state = ESendingAndClosing;
 }
-
