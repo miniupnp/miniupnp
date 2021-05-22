@@ -1117,12 +1117,12 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 	}
 	h->res_sent = 0;
 	h->res_buflen = snprintf(h->res_buf, h->res_buf_alloclen,
-	                         httpresphead, h->HttpVer,
+	                         httpresphead, h->HttpVer,	/* HTTP/x.x */
 	                         respcode, respmsg,
-	                         (h->respflags&FLAG_HTML)?"text/html":"text/xml; charset=\"utf-8\"",
-	                         bodylen
+	                         (h->respflags&FLAG_HTML)?"text/html":"text/xml; charset=\"utf-8\"",	/* Content-Type: */
+	                         bodylen		/* Content-Length: */
 #ifdef DYNAMIC_OS_VERSION
-	                         , os_version
+	                         , os_version	/* Server: */
 #endif
 	                        );
 	/* Content-Type MUST be 'text/xml; charset="utf-8"' according to UDA v1.1 */

@@ -553,25 +553,27 @@ SendSSDPResponse(int s, const struct sockaddr * addr,
 		"CONFIGID.UPNP.ORG: %u\r\n" /* UDA v1.1 */
 		"\r\n",
 #ifdef ENABLE_HTTP_DATE
-		http_date,
+		http_date,								/* DATE: */
 #endif
-		st_len, st, suffix,
-		uuidvalue, st_is_uuid ? "" : "::",
-		st_is_uuid ? 0 : st_len, st, suffix,
+		st_len, st, suffix,						/* ST: */
+		uuidvalue, st_is_uuid ? "" : "::",		/* USN: 2/5 */
+		st_is_uuid ? 0 : st_len, st, suffix,	/* USN: 3/5 */
 #ifdef DYNAMIC_OS_VERSION
-		os_version,
+		os_version,								/* SERVER: */
 #endif
-		host, (unsigned int)http_port,
+		host, (unsigned int)http_port,			/* LOCATION: */
 #ifdef RANDOMIZE_URLS
-		random_url,
+		random_url,								/* LOCATION: 3/3 */
 #endif	/* RANDOMIZE_URLS */
 #ifdef ENABLE_HTTPS
-		host, (unsigned int)https_port,
+		host, (unsigned int)https_port,			/* SECURELOCATION.UPNP.ORG */
 #ifdef RANDOMIZE_URLS
-		random_url,
+		random_url,								/* SECURELOCATION.UPNP.ORG 3/3 */
 #endif	/* RANDOMIZE_URLS */
 #endif	/* ENABLE_HTTPS */
-		upnp_bootid, upnp_bootid, upnp_configid);
+		upnp_bootid,							/* 01-NLS: */
+		upnp_bootid,							/* BOOTID.UPNP.ORG: */
+		upnp_configid);							/* CONFIGID.UPNP.ORG: */
 	if(l<0)
 	{
 		syslog(LOG_ERR, "%s: snprintf failed %m",
@@ -691,7 +693,7 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 #endif	/* RANDOMIZE_URLS */
 #endif	/* ENABLE_HTTPS */
 #ifdef DYNAMIC_OS_VERSION
-		os_version,
+		os_version,						/* SERVER: */
 #endif
 		nt, suffix,						/* NT: */
 		usn1, usn2, usn3, suffix,		/* USN: */
@@ -1384,7 +1386,9 @@ SendSSDPbyebye(int s, const struct sockaddr * dest, socklen_t destlen,
 	             dest_str, SSDP_PORT,		/* HOST : */
 	             nt, suffix,				/* NT: */
 	             usn1, usn2, usn3, suffix,	/* USN: */
-	             upnp_bootid, upnp_bootid, upnp_configid);
+	             upnp_bootid,				/* 01-NLS: */
+	             upnp_bootid,				/* BOOTID.UPNP.ORG: */
+	             upnp_configid);			/* CONFIGID.UPNP.ORG: */
 	if(l<0)
 	{
 		syslog(LOG_ERR, "%s: snprintf error", "SendSSDPbyebye()");
