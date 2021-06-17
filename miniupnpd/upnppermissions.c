@@ -6,6 +6,7 @@
  * in the LICENCE file provided within the distribution */
 
 #include <ctype.h>
+#include <regex.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,6 +16,138 @@
 #include <unistd.h>
 #include "config.h"
 #include "upnppermissions.h"
+
+static int
+isodigit(char c)
+{
+	return '0' <= c && c >= '7';
+}
+
+static char
+hex2chr(char c)
+{
+	if(c >= 'a')
+		return c - 'a';
+	if(c >= 'A')
+		return c - 'A';
+	return c - '0';
+}
+
+static char
+unescape_char(const char * s, int * seqlen)
+{
+	char c;
+	int len;
+
+	if(s[0] != '\\')
+	{
+		c = s[0];
+		len = 1;
+	}
+	else
+	{
+		s++;
+		c = s[0];
+		len = 2;
+		switch(s[0])
+		{
+		case 'a':  c = '\a'; break;
+		case 'b':  c = '\b'; break;
+		case 'f':  c = '\f'; break;
+		case 'n':  c = '\n'; break;
+		case 'r':  c = '\r'; break;
+		case 't':  c = '\t'; break;
+		case 'v':  c = '\v'; break;
+		/* no need: escape the char itself
+		case '\\': c = '\\'; break;
+		case '\'': c = '\''; break;
+		case '"':  c = '"';  break;
+		case '?':  c = '?';  break;
+		*/
+		case 'x':
+			if(isxdigit(s[1]) && isxdigit(s[2]))
+			{
+				c = hex2chr(s[1]) * 0x10 + hex2chr(s[2]);
+				len = 4;
+			}
+			break;
+		default:
+			if(isodigit(s[1]) && isodigit(s[2]) && isodigit(s[3]))
+			{
+				c = hex2chr(s[0]) * 0100 + hex2chr(s[1]) * 010 + hex2chr(s[2]);
+				len = 4;
+			}
+		}
+	}
+
+	if(seqlen)
+		*seqlen = len;
+	return c;
+}
+
+static char *
+get_next_token(const char * s, char ** token, char raw)
+{
+	char deli;
+	const char *end;
+
+	while(isspace(*s))
+		s++;
+	if(*s == '\0')
+	{
+		if(token)
+			*token = NULL;
+		return (char *) s;
+	}
+
+	if(*s == '"' || *s == '\'')
+	{
+		deli = *s;
+		s++;
+	}
+	else
+		deli = 0;
+	end = s;
+	for(; *end != '\0' && (deli ? *end != deli : !isspace(*end)); end++)
+		if(*end == '\\')
+		{
+			end++;
+			if(*end == '\0')
+				break;
+		}
+
+	if(token)
+	{
+		unsigned int token_len;
+		unsigned int i;
+
+		token_len = end - s;
+		*token = strndup(s, token_len);
+		if(!*token)
+			return NULL;
+
+		for(i = 0; (*token)[i] != '\0'; i++)
+		{
+			int sequence_len;
+
+			if((*token)[i] != '\\')
+				continue;
+
+			if(raw && deli && (*token)[i + 1] != deli)
+				continue;
+			(*token)[i] = unescape_char(*token + i, &sequence_len);
+			memmove(*token + i + 1, *token + i + sequence_len,
+			        token_len - i - sequence_len);
+		}
+		*token = realloc(*token, i);
+	}
+
+	if(deli && *end == deli)
+		end++;
+	while(isspace(*end))
+		end++;
+	return (char *) end;
+}
 
 /* read_permission_line()
  * parse the a permission line which format is :
@@ -172,13 +305,59 @@ read_permission_line(struct upnpperm * perm,
 	{
 		return -1;
 	}
+
+	/* fifth token: (optional) regex */
+	p = get_next_token(p, &perm->re, 1);
+	if(!p)
+	{
+		fprintf(stderr, "err when copying regex: out of memory\n");
+		return -1;
+	}
+	if(perm->re)
+	{
+		if(perm->re[0] == '\0')
+		{
+			free(perm->re);
+			perm->re = NULL;
+		}
+		else
+		{
+			/* icase: if case matters, it must be someone doing something nasty */
+			int err;
+			err = regcomp(&perm->regex, perm->re,
+			              REG_EXTENDED | REG_ICASE | REG_NOSUB);
+			if(err)
+			{
+				char errbuf[256];
+				regerror(err, &perm->regex, errbuf, sizeof(errbuf));
+				fprintf(stderr, "err when compiling regex \"%s\": %s\n",
+				        perm->re, errbuf);
+				free(perm->re);
+				perm->re = NULL;
+				return -1;
+			}
+		}
+	}
+
 #ifdef DEBUG
-	printf("perm rule added : %s %hu-%hu %08x/%08x %hu-%hu\n",
+	printf("perm rule added : %s %hu-%hu %08x/%08x %hu-%hu %s\n",
 	       (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
 	       perm->eport_min, perm->eport_max, ntohl(perm->address.s_addr),
-	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max);
+	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max,
+	       (perm->re)?re:"");
 #endif
 	return 0;
+}
+
+void
+free_permission_line(struct upnpperm * perm)
+{
+	if(perm->re)
+	{
+		free(&perm->re);
+		perm->re = NULL;
+		regfree(&perm->regex);
+	}
 }
 
 #ifdef USE_MINIUPNPDCTL
@@ -194,14 +373,20 @@ write_permlist(int fd, const struct upnpperm * permary,
 	for(i = 0; i<nperms; i++)
 	{
 		perm = permary + i;
-		l = snprintf(buf, sizeof(buf), "%02d %s %hu-%hu %08x/%08x %hu-%hu\n",
+		l = snprintf(buf, sizeof(buf), "%02d %s %hu-%hu %08x/%08x %hu-%hu",
 	       i,
-    	   (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
+	       (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
 	       perm->eport_min, perm->eport_max, ntohl(perm->address.s_addr),
 	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max);
 		if(l<0)
 			return;
 		write(fd, buf, l);
+		if(perm->re)
+		{
+			write(fd, " ", 1);
+			write(fd, perm->re, strlen(perm->re));
+		}
+		write(fd, "\n", 1);
 	}
 }
 #endif
@@ -211,7 +396,8 @@ write_permlist(int fd, const struct upnpperm * permary,
  *          0 if no match */
 static int
 match_permission(const struct upnpperm * perm,
-                 u_short eport, struct in_addr address, u_short iport)
+                 u_short eport, struct in_addr address, u_short iport,
+                 const char * desc)
 {
 	if( (eport < perm->eport_min) || (perm->eport_max < eport))
 		return 0;
@@ -219,6 +405,8 @@ match_permission(const struct upnpperm * perm,
 		return 0;
 	if( (address.s_addr & perm->mask.s_addr)
 	   != (perm->address.s_addr & perm->mask.s_addr) )
+		return 0;
+	if(desc && perm->re && regexec(&perm->regex, desc, 0, NULL, 0) == REG_NOMATCH)
 		return 0;
 	return 1;
 }
@@ -244,12 +432,12 @@ int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     int n_perms,
                                     u_short eport, struct in_addr address,
-                                    u_short iport)
+                                    u_short iport, const char * desc)
 {
 	int i;
 	for(i=0; i<n_perms; i++)
 	{
-		if(match_permission(permary + i, eport, address, iport))
+		if(match_permission(permary + i, eport, address, iport, desc))
 		{
 			syslog(LOG_DEBUG,
 			       "UPnP permission rule %d matched : port mapping %s",
