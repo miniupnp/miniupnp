@@ -201,7 +201,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			{
 				dscp_values_list = tmp;
 				/* parse the rule */
-				if(read_learn_dscp_line(dscp_values_list + num_dscp_values, name) >= 0)
+				if(read_learn_dscp_line(dscp_values_list + num_dscp_values, name, debug_flag) >= 0)
 				{
 					num_dscp_values++;
 				}
