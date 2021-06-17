@@ -20,7 +20,7 @@ struct UPNPDev {
 	char * st;
 	char * usn;
 	unsigned int scope_id;
-#if defined(__STDC_VERSION) && __STDC_VERSION__ >= 199901L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
 	/* C99 flexible array member */
 	char buffer[];
 #elif defined(__GNUC__)
