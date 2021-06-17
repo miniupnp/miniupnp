@@ -49,7 +49,7 @@
 #define d_printf(x)
 #endif
 
-#if defined(DEBUG) && (__STDC_VERSION__ >= 199901L) && (__GNUC__ >= 3)
+#if defined(DEBUG) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) && (__GNUC__ >= 3)
 /* disambiguate log messages by adding position in source. GNU C99 or later. Pesky trailing comma... */
 #define log_error( msg, ...)	syslog(LOG_ERR, "%s[%d]: " msg, __func__, __LINE__, ##__VA_ARGS__ )
 #define log_debug( msg, ...)	syslog(LOG_DEBUG, "%s[%d]: " msg, __func__, __LINE__, ##__VA_ARGS__ )
