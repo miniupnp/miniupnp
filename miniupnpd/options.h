@@ -3,7 +3,7 @@
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2021 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -84,7 +84,7 @@ enum upnpconfigoptions {
  * parse and store the option file values
  * returns: 0 success, -1 failure */
 int
-readoptionsfile(const char * fname);
+readoptionsfile(const char * fname, int debug_flag);
 
 /* freeoptions()
  * frees memory allocated to option values */

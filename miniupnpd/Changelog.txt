@@ -1,5 +1,9 @@
 $Id: Changelog.txt,v 1.478 2021/05/21 22:03:13 nanard Exp $
 
+2021/06/18:
+  Fails on config parsing and init errors.
+  print errors during init to both syslog and stderr.
+
 2021/05/22:
   dynamically retrieve `uname -r`
 

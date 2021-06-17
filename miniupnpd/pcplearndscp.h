@@ -46,6 +46,6 @@ struct dscp_values {
 
 /* #set_learn_dscp "Webex" 1 1 1 34 */
 int
-read_learn_dscp_line(struct dscp_values *dscpvalues, char *p);
+read_learn_dscp_line(struct dscp_values *dscpvalues, char *p, int debug_flag);
 
 #endif /* PCPLEARNDSCP_H_INCLUDED */

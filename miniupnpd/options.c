@@ -19,6 +19,7 @@
 #include "pcplearndscp.h"
 #endif /* PCP_SADSPC */
 #include "upnpglobalvars.h"
+#include "macros.h"
 
 #ifndef DISABLE_CONFIG_FILE
 struct option * ary_options = NULL;
@@ -99,7 +100,7 @@ static const struct {
 };
 
 int
-readoptionsfile(const char * fname)
+readoptionsfile(const char * fname, int debug_flag)
 {
 	FILE *hfile = NULL;
 	char buffer[1024];
@@ -164,8 +165,9 @@ readoptionsfile(const char * fname)
 			tmp = realloc(upnppermlist, sizeof(struct upnpperm) * (num_upnpperm+1));
 			if(tmp == NULL)
 			{
-				fprintf(stderr, "memory allocation error. Permission line in file %s line %d\n",
+				INIT_PRINT_ERR("memory allocation error. Permission line in file %s line %d\n",
 				        fname, linenum);
+				return -1;
 			}
 			else
 			{
@@ -177,8 +179,9 @@ readoptionsfile(const char * fname)
 				}
 				else
 				{
-					fprintf(stderr, "parsing error file %s line %d : %s\n",
+					INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 					        fname, linenum, name);
+					return -1;
 				}
 			}
 			continue;
@@ -190,8 +193,9 @@ readoptionsfile(const char * fname)
 			tmp = realloc(dscp_values_list, sizeof(struct dscp_values) * (num_dscp_values+1));
 			if(tmp == NULL)
 			{
-				fprintf(stderr, "memory allocation error. DSCP line in file %s line %d\n",
+				INIT_PRINT_ERR("memory allocation error. DSCP line in file %s line %d\n",
 				        fname, linenum);
+				return -1;
 			}
 			else
 			{
@@ -203,8 +207,9 @@ readoptionsfile(const char * fname)
 				}
 				else
 				{
-					fprintf(stderr, "parsing error file %s line %d : %s\n",
+					INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 					        fname, linenum, name);
+					return -1;
 				}
 			}
 			continue;
@@ -212,9 +217,9 @@ readoptionsfile(const char * fname)
 #endif /* PCP_SADSCP */
 		if(!(equals = strchr(name, '=')))
 		{
-			fprintf(stderr, "parsing error file %s line %d : %s\n",
+			INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 			        fname, linenum, name);
-			continue;
+			return -1;
 		}
 
 		/* remove ending whitespaces */
@@ -243,16 +248,18 @@ readoptionsfile(const char * fname)
 
 		if(id == UPNP_INVALID)
 		{
-			fprintf(stderr, "invalid option in file %s line %d : %s=%s\n",
+			INIT_PRINT_ERR("invalid option in file %s line %d : %s=%s\n",
 			        fname, linenum, name, value);
+			return -1;
 		}
 		else
 		{
 			tmp = realloc(ary_options, (num_options + 1) * sizeof(struct option));
 			if(tmp == NULL)
 			{
-				fprintf(stderr, "memory allocation error. Option in file %s line %d.\n",
+				INIT_PRINT_ERR("memory allocation error. Option in file %s line %d.\n",
 				        fname, linenum);
+				return -1;
 			}
 			else
 			{
@@ -261,8 +268,9 @@ readoptionsfile(const char * fname)
 				tmp = realloc(string_repo, string_repo_len + len);
 				if(tmp == NULL)
 				{
-					fprintf(stderr, "memory allocation error, Option value in file %s line %d : %s=%s\n",
+					INIT_PRINT_ERR("memory allocation error, Option value in file %s line %d : %s=%s\n",
 					        fname, linenum, name, value);
+					return -1;
 				}
 				else
 				{
