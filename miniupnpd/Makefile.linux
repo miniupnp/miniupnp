@@ -95,6 +95,7 @@ $(info please install uuid-dev package / libuuid)
 endif # ($(TEST),1)
 endif # ($(TARGET_OPENWRT,)
 
+ifneq ($(shell ldd --version | grep GLIBC),)
 GLIBC_VERSION := $(shell ldd --version | head -n 1 | sed 's/^.* //')
 GLIBC_VERSION_MAJOR = $(shell echo $(GLIBC_VERSION) | cut -f 1 -d . )
 GLIBC_VERSION_MINOR = $(shell echo $(GLIBC_VERSION) | cut -f 2 -d . )
@@ -102,6 +103,7 @@ GLIBC_VERSION_MINOR = $(shell echo $(GLIBC_VERSION) | cut -f 2 -d . )
 LDLIBS += $(shell if [ $(GLIBC_VERSION_MAJOR) -lt 2 ] \
   || [ \( $(GLIBC_VERSION_MAJOR) -eq 2 \) -a \( $(GLIBC_VERSION_MINOR) -lt 17 \) ] ; \
   then echo "-lrt" ; fi )
+endif
 
 TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
