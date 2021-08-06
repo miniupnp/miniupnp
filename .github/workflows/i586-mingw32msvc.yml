@@ -1,0 +1,25 @@
+name: i586-mingw32msvc
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: download packages
+        run: wget -c https://launchpad.net/ubuntu/+archive/primary/+files/mingw32-binutils_2.20-0.2ubuntu1_amd64.deb https://launchpad.net/ubuntu/+archive/primary/+files/mingw32-runtime_3.15.2-0ubuntu1_all.deb https://launchpad.net/ubuntu/+archive/primary/+files/mingw32_4.2.1.dfsg-2ubuntu1_amd64.deb
+
+      - name: install packages
+        run: sudo dpkg -i mingw32-binutils_2.20-0.2ubuntu1_amd64.deb mingw32-runtime_3.15.2-0ubuntu1_all.deb mingw32_4.2.1.dfsg-2ubuntu1_amd64.deb
+
+      - name: check for correct compiler target
+        run: "i586-mingw32msvc-gcc -v 2>&1 | grep -q -x 'Target: i586-mingw32msvc'"
+
+      - name: build miniupnpc via i586-mingw32msvc
+        run: make -C miniupnpc -f Makefile.mingw CC=i586-mingw32msvc-gcc DLLWRAP=i586-mingw32msvc-dllwrap WINDRES=i586-mingw32msvc-windres AR=i586-mingw32msvc-ar
