@@ -1,0 +1,32 @@
+name: x86_64-w64-mingw32
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: install packages
+        run: sudo apt-get install gcc-mingw-w64-x86-64 mingw-w64-tools
+
+      - name: build miniupnpc via x86_64-w64-mingw32
+        run: make -C miniupnpc -f Makefile.mingw DLLWRAP=x86_64-w64-mingw32-dllwrap CC=x86_64-w64-mingw32-gcc WINDRES=x86_64-w64-mingw32-windres AR=x86_64-w64-mingw32-ar all dist
+
+      - name: upload binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: miniupnpc-win64-binaries-${{github.sha}}
+          path: |
+            miniupnpc/*.exe
+            miniupnpc/*.dll
+            miniupnpc/*.def
+            miniupnpc/*.a
+            miniupnpc/LICENSE
+            miniupnpc/README
+            miniupnpc/Changelog.txt
