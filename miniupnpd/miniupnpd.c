@@ -2243,6 +2243,7 @@ main(int argc, char * * argv)
 		struct in_addr addr;
 		if (getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL) < 0) {
 			syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
+			disable_port_forwarding = 1;
 		} else if (addr_is_reserved(&addr)) {
 			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
