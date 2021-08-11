@@ -13,7 +13,7 @@ from setuptools.command import build_ext
 import subprocess
 import os
 
-EXT = ['libminiupnpc.a']
+EXT = ['build/libminiupnpc.a']
 
 class make_then_build_ext(build_ext.build_ext):
       def run(self):
@@ -29,7 +29,7 @@ setup(name="miniupnpc",
       description='miniUPnP client',
       cmdclass={'build_ext': make_then_build_ext},
       ext_modules=[
-         Extension(name="miniupnpc", sources=["miniupnpcmodule.c"],
+         Extension(name="miniupnpc", sources=["src/miniupnpcmodule.c"],
                    include_dirs=['include'], extra_objects=EXT)
       ])
 
