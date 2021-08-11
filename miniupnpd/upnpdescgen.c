@@ -943,6 +943,7 @@ genXML(char * str, int * len, int * tmplen,
 				str = strcat_str(str, len, tmplen, eltname);
 				str = strcat_char(str, len, tmplen, '>');
 			}
+unstack:
 			for(;;)
 			{
 				if(top < 0)
@@ -968,6 +969,14 @@ genXML(char * str, int * len, int * tmplen,
 		else
 		{
 			unsigned long k = (unsigned long)p[i].data;
+#ifdef IGD_V2
+			if((force_igd1 && (p[k & 0xffff].eltname[0] == '/')) &&
+			   (strcmp(p[k & 0xffff].data, "urn:schemas-upnp-org:service:DeviceProtection:1") == 0 ||
+			    strcmp(p[k & 0xffff].data, "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1") == 0)) {
+				/* Skip the child element */
+				goto unstack;
+			}
+#endif
 			/* node with child(ren) */
 			/*printf("<%s>\n", eltname); */
 			str = strcat_char(str, len, tmplen, '<');
