@@ -1818,9 +1818,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	if(!ext_if_name || !lan_addrs.lh_first) {
 		/* bad configuration */
 		if(!ext_if_name)
-		    INIT_PRINT_ERR(stderr, "Error: Option -i missing and ext_ifname is not set in config file\n");
+		    INIT_PRINT_ERR("Error: Option -i missing and ext_ifname is not set in config file\n");
 		if (!lan_addrs.lh_first)
-		    INIT_PRINT_ERR(stderr, "Error: Option -a missing and listening_ip is not set in config file\n");
+		    INIT_PRINT_ERR("Error: Option -a missing and listening_ip is not set in config file\n");
 		goto print_usage;
 	}
 
