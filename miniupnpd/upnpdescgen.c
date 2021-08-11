@@ -892,7 +892,6 @@ genXML(char * str, int * len, int * tmplen,
 {
 #define GENXML_STACK_SIZE 16
 	unsigned short i, j;
-	unsigned long k;
 	int top;
 	const char * eltname, *s;
 	char c;
@@ -968,6 +967,7 @@ genXML(char * str, int * len, int * tmplen,
 		}
 		else
 		{
+			unsigned long k = (unsigned long)p[i].data;
 			/* node with child(ren) */
 			/*printf("<%s>\n", eltname); */
 			str = strcat_char(str, len, tmplen, '<');
@@ -980,7 +980,6 @@ genXML(char * str, int * len, int * tmplen,
 				str = strcat_str(str, len, tmplen, configid_str);
 			}
 			str = strcat_char(str, len, tmplen, '>');
-			k = (unsigned long)p[i].data;
 			i = k & 0xffff;
 			j = i + (k >> 16);
 			if(top < (GENXML_STACK_SIZE - 1)) {
