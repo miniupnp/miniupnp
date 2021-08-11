@@ -308,6 +308,11 @@ ParseHttpHeaders(struct upnphttp * h)
 					syslog(LOG_DEBUG, "\"Expect: 100-Continue\" header detected");
 				}
 			}
+			else if(strncasecmp(line, "user-agent:", 11) == 0)
+			{
+				if(strcasestr(line + 11, "microsoft") != NULL)
+					h->respflags |= FLAG_MS_CLIENT;
+			}
 #ifdef ENABLE_EVENTS
 			else if(strncasecmp(line, "Callback:", 9)==0)
 			{
@@ -463,7 +468,11 @@ sendXMLdesc(struct upnphttp * h, char * (f)(int *, int))
 	char * desc;
 	int len;
 #ifdef IGD_V2
-	desc = f(&len, GETFLAG(FORCEIGDDESCV1MASK));
+#ifdef DEBUG
+	if(h->respflags & FLAG_MS_CLIENT)
+		syslog(LOG_DEBUG, "MS Client, forcing IGD v1");
+#endif /* DEBUG */
+	desc = f(&len, GETFLAG(FORCEIGDDESCV1MASK) || (h->respflags & FLAG_MS_CLIENT));
 #else
 	desc = f(&len, 0);
 #endif
