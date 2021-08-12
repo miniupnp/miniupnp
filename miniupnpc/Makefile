@@ -283,7 +283,7 @@ cleaninstall:
 	$(RM) $(DESTDIR)$(INSTALLDIRLIB)/$(SHAREDLIBRARY)
 
 $(BUILD)/miniupnpc.pc:	VERSION
-	@$(MKDIR) $(BUILD)
+	@$(MKDIR) $(@D)
 	$(RM) $@
 	echo "prefix=$(INSTALLPREFIX)" >> $@
 	echo "exec_prefix=\$${prefix}" >> $@
@@ -345,6 +345,7 @@ $(BUILD)/testportlistingparse:	$(TESTPORTLISTINGPARSE)
 $(BUILD)/testaddr_is_reserved:	$(TESTADDR_IS_RESERVED)
 
 $(BUILD)/miniupnpcstrings.h:	miniupnpcstrings.h.in updateminiupnpcstrings.sh VERSION
+	@$(MKDIR) $(@D)
 	$(SH) updateminiupnpcstrings.sh $@ $<
 
 # ftp tool supplied with OpenBSD can download files from http.
