@@ -12,7 +12,11 @@ fi
 if [ -n "$2" ] ; then
   TEMPLATE_FILE="$2"
 fi
-TMPFILE=`mktemp -t miniupnpcstrings`
+TMPFILE=`mktemp -t miniupnpcstringsXXXXXX`
+if [ ! -f "$TMPFILE" ] ; then
+	echo "mktemp failure"
+	exit 1
+fi
 
 # detecting the OS name and version
 OS_NAME=`uname -s`
