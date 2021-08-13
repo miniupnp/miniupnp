@@ -28,7 +28,7 @@ setup(name="miniupnpc",
       url='http://miniupnp.free.fr/',
       description='miniUPnP client',
       ext_modules=[
-         Extension(name="miniupnpc", sources=["miniupnpcmodule.c"],
+         Extension(name="miniupnpc", sources=["src/miniupnpcmodule.c"],
                    libraries=["ws2_32", "iphlpapi"] + compat_lib,
                    include_dirs=['include'], extra_objects=["miniupnpc.lib"])
       ])
