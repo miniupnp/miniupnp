@@ -98,7 +98,7 @@ wingenminiupnpcstrings.exe:	wingenminiupnpcstrings.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 miniupnpcstrings.h: miniupnpcstrings.h.in wingenminiupnpcstrings.exe VERSION
-	wingenminiupnpcstrings.exe $< $@ rc_version.h
+	.\wingenminiupnpcstrings.exe $< $@ rc_version.h
 
 rc_version.h:	miniupnpcstrings.h
 else
