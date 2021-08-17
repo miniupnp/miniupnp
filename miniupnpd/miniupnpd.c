@@ -1441,6 +1441,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPLEASEFILE:
 				lease_file = ary_options[i].value;
 				break;
+#ifdef ENABLE_UPNPPINHOLE
+			case UPNPLEASEFILE6:
+				lease_file6 = ary_options[i].value;
+				break;
+#endif	/* ENABLE_UPNPPINHOLE */
 #endif	/* ENABLE_LEASEFILE */
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
@@ -1973,6 +1978,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	/*remove(lease_file);*/
 	syslog(LOG_INFO, "Reloading rules from lease file");
 	reload_from_lease_file();
+#ifdef ENABLE_UPNPPINHOLE
+	reload_from_lease_file6();
+#endif
 #endif
 
 #ifdef TOMATO

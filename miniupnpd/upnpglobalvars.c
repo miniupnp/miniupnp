@@ -28,6 +28,9 @@ uint16_t ext_stun_port = 0;
 /* file to store leases */
 #ifdef ENABLE_LEASEFILE
 const char* lease_file = 0;
+#ifdef ENABLE_UPNPPINHOLE
+const char* lease_file6 = 0;
+#endif
 #endif
 
 /* forced ip address to use for this interface

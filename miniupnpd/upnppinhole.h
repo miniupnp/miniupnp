@@ -13,6 +13,11 @@
 
 #ifdef ENABLE_UPNPPINHOLE
 
+#ifdef ENABLE_LEASEFILE
+int reload_from_lease_file6(void);
+int lease_file6_expire(void);
+#endif
+
 /* functions to be used by WANIPv6_FirewallControl implementation
  * and PCP (IPv6) */
 
