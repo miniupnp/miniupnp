@@ -5,40 +5,31 @@
 # Do not disturb other existing structures in nftables, e.g. those created by firewalld
 #
 
-nft --check list table nat > /dev/null 2>&1
+nft --check list table inet miniupnpd > /dev/null 2>&1
 if [ $? -eq "0" ]; then
 {
-	# nat table exists, so first remove the chains we added
-	nft --check list chain nat MINIUPNPD > /dev/null 2>&1
+	# table exists, so first remove the nat chains we added
+	nft --check list chain inet miniupnpd prerouting > /dev/null 2>&1
 	if [ $? -eq "0" ]; then
-		echo "Remove chain from nat table"
-		nft delete chain nat MINIUPNPD
+		echo "Remove nat chain from miniupnpd table"
+		nft delete chain inet miniupnpd prerouting
 	fi
 
-	nft --check list chain nat MINIUPNPD-POSTROUTING > /dev/null 2>&1
+	nft --check list chain inet miniupnpd postrouting > /dev/null 2>&1
 	if [ $? -eq "0" ]; then
-		echo "Remove pcp peer chain from nat table"
-		nft delete chain nat MINIUPNPD-POSTROUTING
+		echo "Remove pcp peer chain from miniupnpd table"
+		nft delete chain inet miniupnpd postrouting
+	fi
+
+	# remove the filter chain we added
+	nft --check list chain inet miniupnpd forward > /dev/null 2>&1
+	if [ $? -eq "0" ]; then
+		echo "Remove filter chain from miniupnpd table"
+		nft delete chain inet miniupnpd forward
 	fi
 
 	# then remove the table itself
-	echo "Remove nat table"
-	nft delete table nat
-}
-fi
-
-nft --check list table inet filter > /dev/null 2>&1
-if [ $? -eq "0" ]; then
-{
-	# filter table exists, so first remove the chain we added
-	nft --check list chain inet filter MINIUPNPD > /dev/null 2>&1
-	if [ $? -eq "0" ]; then
-		echo "Remove chain from filter table"
-		nft delete chain inet filter MINIUPNPD
-	fi
-
-	# then remove the table itself
-	echo "Remove filter table"
-	nft delete table inet filter
+	echo "Remove miniupnpd table"
+	nft delete table inet miniupnpd
 }
 fi

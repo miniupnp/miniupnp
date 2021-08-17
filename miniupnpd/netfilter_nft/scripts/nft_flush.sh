@@ -1,5 +1,5 @@
 #!/bin/sh
 
-nft flush chain ip nat MINIUPNPD
-nft flush chain ip nat MINIUPNPD-POSTROUTING
-nft flush chain inet filter MINIUPNPD
+nft flush chain inet miniupnpd prerouting
+nft flush chain inet miniupnpd postrouting
+nft flush chain inet miniupnpd filter

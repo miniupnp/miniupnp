@@ -7,17 +7,14 @@
 
 #opts="--echo"
 
-echo "create nat table"
-nft ${opts} add table nat
+echo "create table"
+nft ${opts} add table inet miniupnpd
 
-echo "create chain in nat table"
-nft ${opts} add chain nat MINIUPNPD
+echo "create NAT chain table"
+nft ${opts} add chain inet miniupnpd preouting
 
-echo "create pcp peer chain in nat table"
-nft ${opts} add chain nat MINIUPNPD-POSTROUTING
+echo "create pcp peer chain in table"
+nft ${opts} add chain inet miniupnpd postrouting
 
-echo "create filter table"
-nft ${opts} add table inet filter
-
-echo "create chain in filter table"
-nft ${opts} add chain inet filter MINIUPNPD
+echo "create filter chain in table"
+nft ${opts} add chain inet miniupnpd forward
