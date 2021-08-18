@@ -84,12 +84,16 @@ init_redirect(void)
 						  nft_forward_chain, FILTER_CHAIN_TYPE, NF_INET_FORWARD, NF_IP_PRI_FILTER - 25);
 	}
 
+	if (result == 0 && strcmp(nft_nat_table, nft_table) != 0) {
+		result = table_op(NFT_MSG_NEWTABLE, NFPROTO_INET, nft_nat_table);
+ 	}
+
 	if (result == 0) {
-		result = chain_op(NFT_MSG_NEWCHAIN, NFPROTO_INET, nft_table,
+		result = chain_op(NFT_MSG_NEWCHAIN, NFPROTO_INET, nft_nat_table,
 						  nft_prerouting_chain, NAT_CHAIN_TYPE, NF_INET_PRE_ROUTING, NF_IP_PRI_NAT_DST);
 	}
 	if (result == 0) {
-		result = chain_op(NFT_MSG_NEWCHAIN, NFPROTO_INET, nft_table,
+		result = chain_op(NFT_MSG_NEWCHAIN, NFPROTO_INET, nft_nat_table,
 						  nft_postrouting_chain, NAT_CHAIN_TYPE, NF_INET_POST_ROUTING, NF_IP_PRI_NAT_SRC);
 	}
 
@@ -109,12 +113,15 @@ shutdown_redirect(void)
 					  nft_prerouting_chain, NAT_CHAIN_TYPE, NF_INET_PRE_ROUTING, NF_IP_PRI_NAT_DST);
 	}
 	if (result == 0) {
-		result = chain_op(NFT_MSG_DELCHAIN, NFPROTO_INET, nft_table,
+		result = chain_op(NFT_MSG_DELCHAIN, NFPROTO_INET, nft_nat_table,
 						  nft_postrouting_chain, NAT_CHAIN_TYPE, NF_INET_POST_ROUTING, NF_IP_PRI_NAT_SRC);
 	}
 	if (result == 0) {
-		result = table_op(NFT_MSG_DELTABLE, NFPROTO_INET, nft_table);
+		result = table_op(NFT_MSG_DELTABLE, NFPROTO_INET, nft_nat_table);
 	}
+	if (result == 0 && strcmp(nft_nat_table, nft_table) != 0) {
+		result = table_op(NFT_MSG_DELTABLE, NFPROTO_INET, nft_nat_table);
+ 	}
 
 	nft_mnl_disconnect();
 }
@@ -135,6 +142,9 @@ set_rdr_name(rdr_name_type param, const char *string)
 	switch (param) {
 	case RDR_TABLE_NAME:
 		nft_table = string;
+		break;
+	case RDR_NAT_TABLE_NAME:
+		nft_nat_table = string;
 		break;
 	case RDR_NAT_PREROUTING_CHAIN_NAME:
 		nft_prerouting_chain = string;
