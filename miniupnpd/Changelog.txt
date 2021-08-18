@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.478 2021/05/21 22:03:13 nanard Exp $
 
+2021/08/18:
+  lease file for IPv6 pinholes
+
 2021/08/11:
   Detect Microsoft User-Agent: and force IGDv1 in that case
 
