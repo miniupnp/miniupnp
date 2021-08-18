@@ -63,11 +63,11 @@
 #define RULE_CACHE_INVALID  0
 #define RULE_CACHE_VALID    1
 
-const char * nft_table = "miniupnpd";
-const char * nft_nat_table = "miniupnpd";
-const char * nft_prerouting_chain = "prerouting";
-const char * nft_postrouting_chain = "postrouting";
-const char * nft_forward_chain = "forward";
+const char * nft_table = "filter";
+const char * nft_nat_table = "filter";
+const char * nft_prerouting_chain = "prerouting_miniupnpd";
+const char * nft_postrouting_chain = "postrouting_miniupnpd";
+const char * nft_forward_chain = "miniupnpd";
 
 static struct mnl_socket *mnl_sock = NULL;
 static uint32_t mnl_portid = 0;

@@ -5,16 +5,71 @@
 # 'add' doesn't raise an error if the object already exists. 'create' does.
 #
 
-#opts="--echo"
+. $(dirname "$0")/miniupnpd_functions.sh
 
-echo "create table"
-nft ${opts} add table inet miniupnpd
+$NFT --check list table inet $TABLE > /dev/null 2>&1
+if [ $? -eq "0" ]
+then
+echo "Table $TABLE already exists"
+exit 0
+fi
 
-echo "create NAT chain table"
-nft ${opts} add chain inet miniupnpd preouting
+echo "Creating nftables structure"
 
-echo "create pcp peer chain in table"
-nft ${opts} add chain inet miniupnpd postrouting
+cat > /tmp/miniupnpd.nft <<EOF
+table inet $TABLE {
+    chain forward { 
+        type filter hook forward priority 0;
+        policy drop;
 
-echo "create filter chain in table"
-nft ${opts} add chain inet miniupnpd forward
+        # miniupnpd
+        jump $CHAIN
+
+        # Add other rules here
+    }
+
+    # miniupnpd
+    chain $CHAIN {
+    }
+
+EOF
+
+if [ "$TABLE" != "$NAT_TABLE" ]
+then
+cat >> /tmp/miniupnpd.nft <<EOF
+}
+
+table inet $NAT_TABLE {
+EOF
+fi
+
+cat >> /tmp/miniupnpd.nft <<EOF
+    chain prerouting {
+        type nat hook prerouting priority -100;
+        policy accept;
+
+        # miniupnpd
+        jump $PREROUTEING_CHAIN
+
+        # Add other rules here
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority 100;
+        policy accept;
+
+        # miniupnpd
+        jump $POSTROUTEING_CHAIN
+
+        # Add other rules here
+    }
+
+    chain $PREROUTEING_CHAIN {
+    }
+
+    chain $POSTROUTEING_CHAIN {
+    }
+}
+EOF
+
+$NFT -f /tmp/miniupnpd.nft
