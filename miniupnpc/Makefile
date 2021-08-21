@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.134 2016/10/07 09:04:36 nanard Exp $
+# $Id: Makefile,v 1.144 2021/08/21 10:43:37 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # https://miniupnp.tuxfamily.org/
@@ -29,7 +29,12 @@ export HAVE_IPV6
 
 CC ?= gcc
 #AR = gar
-#CFLAGS = -O -g -DDEBUG
+#CFLAGS = -O -g
+# to debug :
+ASANFLAGS = -fsanitize=address -fsanitize=undefined -fsanitize=leak
+#CFLAGS = -g -ggdb -O0 $(ASANFLAGS) -fno-omit-frame-pointer
+#CPPFLAGS += -DDEBUG
+#LDFLAGS += $(ASANFLAGS)
 CFLAGS ?= -O
 CFLAGS += -Wall
 CFLAGS += -W -Wstrict-prototypes
@@ -47,6 +52,7 @@ CPPFLAGS += -D_XOPEN_SOURCE=600
 endif
 #CFLAGS += -ansi
 #CPPFLAGS += -DNO_GETADDRINFO
+
 INSTALL = install
 SH = /bin/sh
 JAVA = java
