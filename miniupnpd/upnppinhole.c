@@ -1,8 +1,8 @@
-/* $Id: upnppinhole.c,v 1.14 2019/05/21 08:39:45 nanard Exp $ */
+/* $Id: upnppinhole.c,v 1.15 2021/08/21 08:12:49 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * (c) 2006-2021 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
