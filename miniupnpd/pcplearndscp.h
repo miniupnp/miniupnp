@@ -1,6 +1,6 @@
-/* $Id: pcplearndscp.h,v 1.2 2013/12/13 15:47:23 nanard Exp $ */
+/* $Id: pcplearndscp.h,v 1.3 2021/08/21 08:20:11 nanard Exp $ */
 /* MiniUPnP project
- * Website : http://miniupnp.free.fr/
+ * Website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Miroslav Bagljas
 
 Copyright (c) 2013 by Cisco Systems, Inc.
