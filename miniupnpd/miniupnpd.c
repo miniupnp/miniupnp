@@ -2528,22 +2528,32 @@ main(int argc, char * * argv)
 		{
 			syslog(LOG_INFO, "should send external iface address change notification(s)");
 			if(GETFLAG(PERFORMSTUNMASK))
-				update_ext_ip_addr_from_stun(0);
-			if (!use_ext_ip_addr)
+			{
+				if (update_ext_ip_addr_from_stun(0) != 0) {
+					/* if stun succeed it updates disable_port_forwarding;
+					 * if stun failed (non-zero return value) then port forwarding would not work, so disable it */
+					disable_port_forwarding = 1;
+				}
+			}
+			else if (!use_ext_ip_addr)
 			{
 				char if_addr[INET_ADDRSTRLEN];
 				struct in_addr addr;
-				if (getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL) == 0) {
+				if (getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL) < 0) {
+					syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
+					disable_port_forwarding = 1;
+				} else {
 					int reserved = addr_is_reserved(&addr);
-					if (disable_port_forwarding && !reserved) {
-						syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
-					} else if (!disable_port_forwarding && reserved) {
+					if (!disable_port_forwarding && reserved) {
 						syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 						syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 						syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
 						syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+						disable_port_forwarding = 1;
+					} else if (disable_port_forwarding && !reserved) {
+						syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
+						disable_port_forwarding = 0;
 					}
-					disable_port_forwarding = reserved;
 				}
 			}
 #ifdef ENABLE_NATPMP
