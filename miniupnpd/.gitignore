@@ -29,6 +29,7 @@ testminissdp
 dox/
 bsdmake.inc
 upnpstun
+upnpforwardcheck
 Makefile
 config.mk
 netfilter_nft/testnftnlrdr

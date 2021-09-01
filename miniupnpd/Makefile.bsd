@@ -63,7 +63,7 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
 		  pcplearndscp.o \
           upnpevents.o upnputils.o getconnstatus.o \
-          upnpstun.o \
+          upnpstun.o upnpforwardcheck.o \
           upnppinhole.o asyncsendto.o portinuse.o
 OS_OBJS = getifstats.o ifacewatcher.o getroute.o
 PFOBJS = obsdrdr.o pfpinhole.o
