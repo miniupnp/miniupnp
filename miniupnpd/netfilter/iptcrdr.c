@@ -810,6 +810,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		if(h)
 		{
 			r = delete_rule_and_commit(index, h, miniupnpd_nat_chain, "delete_redirect_rule");
+			h = NULL;
 		}
 		if((r == 0) && (h = iptc_init("filter")))
 		{
