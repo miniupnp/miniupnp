@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.144 2021/08/21 10:43:37 nanard Exp $
+# $Id: Makefile,v 1.145 2021/09/28 20:42:25 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # https://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2020 Thomas Bernard
+# (c) 2005-2021 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -233,6 +233,7 @@ clean:
 	$(RM) validateminixml validateminiwget validateupnpreplyparse
 	$(RM) validateigddescparse
 	$(RM) minihttptestserver
+	$(RM) testaddr_is_reserved
 	$(RM) -r build/ dist/
 	#python setup.py clean
 	# clean jnaerator stuff
