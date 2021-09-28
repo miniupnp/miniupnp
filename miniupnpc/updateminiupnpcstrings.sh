@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: updateminiupnpcstrings.sh,v 1.7 2011/01/04 11:41:53 nanard Exp $
+# $Id: updateminiupnpcstrings.sh,v 1.9 2021/09/28 21:37:53 nanard Exp $
 # project miniupnp : http://miniupnp.free.fr/
 # (c) 2009-2021 Thomas Bernard
 
@@ -60,5 +60,5 @@ sed -e "$EXPR" < $TEMPLATE_FILE > $TMPFILE
 EXPR="s|MINIUPNPC_VERSION_STRING \".*\"|MINIUPNPC_VERSION_STRING \"${MINIUPNPC_VERSION}\"|"
 echo "setting MINIUPNPC_VERSION_STRING macro value to ${MINIUPNPC_VERSION} in $FILE."
 sed -e "$EXPR" < $TMPFILE > $FILE
-rm -v $TMPFILE
+rm $TMPFILE && echo "$TMPFILE deleted"
 
