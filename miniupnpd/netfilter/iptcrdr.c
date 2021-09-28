@@ -627,7 +627,8 @@ get_peer_rule_by_index(int index,
 }
 
 /* delete_rule_and_commit() :
- * subfunction used in delete_redirect_and_filter_rules() */
+ * subfunction used in delete_redirect_and_filter_rules()
+ * always call iptc_free(h) */
 static int
 delete_rule_and_commit(unsigned int index, IPTC_HANDLE h,
                        const char * miniupnpd_chain,
@@ -853,13 +854,15 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 					break;
 				}
 			}
-		}
-		if(h)
+			/* in case the filter rule has not been found, delete_rule_and_commit() is not called
+			 * so we neet to free h */
+			if(h)
 #ifdef IPTABLES_143
-			iptc_free(h);
+				iptc_free(h);
 #else
-			iptc_free(&h);
+				iptc_free(&h);
 #endif
+		}
 	}
 
 	/*delete PEER rule*/
@@ -961,12 +964,12 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				break;
 			}
 		}
-	if (h)
-	#ifdef IPTABLES_143
-		iptc_free(h);
-	#else
-		iptc_free(&h);
-	#endif
+		if (h)
+#ifdef IPTABLES_143
+			iptc_free(h);
+#else
+			iptc_free(&h);
+#endif
 	}
 
 	del_redirect_desc(eport, proto);
