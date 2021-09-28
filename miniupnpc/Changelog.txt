@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.249 2021/03/02 23:47:36 nanard Exp $
 miniUPnP client Changelog.
 
+2021/08/13:
+  Change directory structure : include/ and src/ directories.
+
 VERSION 2.2.2 : released 2021/03/03
 
 2021/01/15:
