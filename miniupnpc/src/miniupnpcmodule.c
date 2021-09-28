@@ -1,4 +1,4 @@
-/* $Id: miniupnpcmodule.c,v 1.34 2019/05/20 19:07:16 nanard Exp $*/
+/* $Id: miniupnpcmodule.c,v 1.37 2021/09/28 21:38:30 nanard Exp $*/
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas BERNARD
@@ -8,7 +8,7 @@
  * provided LICENCE file. */
 #include <Python.h>
 #define MINIUPNP_STATICLIB
-#include "structmember.h"
+#include <structmember.h>
 #include "miniupnpc.h"
 #include "upnpcommands.h"
 #include "upnperrors.h"
