@@ -1,14 +1,13 @@
-before_script:
-    - >
-      apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev
-      libnfnetlink-dev uuid-dev make gcc gcc-mingw-w64-i686 mingw-w64-tools
-      libnftnl-dev libmnl-dev libssl-dev net-tools doxygen graphviz
-
 stages:
     - build
 
 job_miniupnpd:
     stage: build
+    before_script:
+        - >
+          apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev
+          libnfnetlink-dev uuid-dev make gcc
+          libnftnl-dev libmnl-dev libssl-dev net-tools doxygen graphviz
     script:
         - "cd miniupnpd"
         - "./configure"
@@ -21,6 +20,11 @@ job_miniupnpd:
 # i686-w64-mingw32-gcc
 job_miniupnpc:
     stage: build
+    before_script:
+        - >
+          apt-get update -qq && apt-get install -y -qq libevent-dev
+          uuid-dev make gcc gcc-mingw-w64-i686 mingw-w64-tools
+          libssl-dev net-tools doxygen graphviz
     script:
         - "cd miniupnpc && make -j3 && make check"
         - "make clean"
