@@ -80,7 +80,7 @@ CONFIGFILE=`mktemp tmp.config.h.XXXXXXXXXX`
 CONFIGFILE_FINAL="config.h"
 CONFIGMACRO="CONFIG_H_INCLUDED"
 if [ -z "$PKG_CONFIG" ] ; then
-	PKG_CONFIG=`which pkg-config`
+	PKG_CONFIG=`command -v pkg-config`
 fi
 
 MINIUPNPD_DATE=`date +"%Y%m%d"`
@@ -350,7 +350,7 @@ case $OS_NAME in
 			OS_URL=https://www.clearos.com/
 		fi
 		# use lsb_release (Linux Standard Base) when available
-		LSB_RELEASE=`which lsb_release`
+		LSB_RELEASE=`command -v lsb_release`
 		if [ 0 -eq $? ]; then
 			OS_NAME=`${LSB_RELEASE} -i -s`
 			OS_VERSION=`${LSB_RELEASE} -r -s`
