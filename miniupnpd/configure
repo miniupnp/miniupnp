@@ -492,7 +492,7 @@ case $FW in
 				     -o \( \( $IPTVER2 -eq 4 \) -a \( $IPTVER3 -ge 3 \) \) \) ] ; then
 					IPTABLES_143=1
 				fi
-				if [ "$IPTABLES_143" -eq 1 ] ; then
+				if [ "$IPTABLES_143" = "1" ] ; then
 					echo "LDLIBS += ${IPTABLESPATH}/libiptc/.libs/libip4tc.o" >> config.mk
 				else
 					echo "LDLIBS += ${IPTABLESPATH}/libiptc/libiptc.a" >> config.mk
@@ -527,7 +527,7 @@ case $FW in
 		fi
 		echo "/* when IPTABLES_143 is defined, miniupnpd uses the new API" >> ${CONFIGFILE}
 		echo " * from libiptc 1.4.3+ */ " >> ${CONFIGFILE}
-		if [ "$IPTABLES_143" -eq 1 ] ; then
+		if [ "$IPTABLES_143" = "1" ] ; then
 			echo "#define IPTABLES_143" >> ${CONFIGFILE}
 		else
 			echo "#undef IPTABLES_143" >> ${CONFIGFILE}
