@@ -5,7 +5,8 @@ job_miniupnpd:
     stage: build
     before_script:
         - >
-          apt-get update -qq && apt-get install -y -qq iptables-dev libevent-dev
+          apt-get update -qq && apt-get install -y -qq iproute2
+          libip4tc-dev libip6tc-dev libiptc-dev libxtables-dev
           libnfnetlink-dev uuid-dev make gcc
           libnftnl-dev libmnl-dev libssl-dev net-tools doxygen graphviz
     script:
