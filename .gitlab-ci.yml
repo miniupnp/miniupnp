@@ -1,22 +1,36 @@
 stages:
     - build
 
-job_miniupnpd:
+# iproute2 : /bin/ip
+# net-tools : /sbin/ifconfig
+
+job_miniupnpd_iptables:
     stage: build
     before_script:
         - >
           apt-get update -qq && apt-get install -y -qq iproute2
           libip4tc-dev libip6tc-dev libiptc-dev libxtables-dev
           libnfnetlink-dev uuid-dev make gcc
-          libnftnl-dev libmnl-dev libssl-dev net-tools doxygen graphviz
+          libmnl-dev libssl-dev net-tools doxygen graphviz
     script:
         - "cd miniupnpd"
-        - "./configure"
-        - "make -j3 && make check"
+        - "./configure || exit 1"
+        - "make -j3 && make check || exit 1"
         - "make dox"
-        - "make clean"
-        - "./configure --firewall=nftables"
-        - "make -j3"
+
+job_miniupnpd_nftables:
+    stage: build
+    before_script:
+        - >
+          apt-get update -qq && apt-get install -y -qq iproute2
+          libnftables-dev libnftnl-dev
+          libnfnetlink-dev uuid-dev make gcc
+          libmnl-dev libssl-dev net-tools doxygen graphviz
+    script:
+        - "cd miniupnpd"
+        - "./configure --firewall=nftables || exit 1"
+        - "make -j3 && make check || exit 1"
+        - "make dox"
 
 # i686-w64-mingw32-gcc
 job_miniupnpc:
@@ -25,8 +39,9 @@ job_miniupnpc:
         - >
           apt-get update -qq && apt-get install -y -qq libevent-dev
           uuid-dev make gcc gcc-mingw-w64-i686 mingw-w64-tools
-          libssl-dev net-tools doxygen graphviz
+          net-tools doxygen graphviz
     script:
-        - "cd miniupnpc && make -j3 && make check"
-        - "make clean"
+        - "cd miniupnpc"
+        - "make -j3 && make check || exit 1"
+        - "make clean || exit 1"
         - "make -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap WINDRES=i686-w64-mingw32-windres CC=i686-w64-mingw32-gcc AR=i686-w64-mingw32-ar"
