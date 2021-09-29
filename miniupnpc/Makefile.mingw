@@ -44,7 +44,11 @@ BINARIES=upnpc-static.exe upnpc-shared.exe \
 ifneq ($(GITHUB_SHA),)
 COMMITREF=$(GITHUB_SHA)
 else
+ifneq ($(CI_COMMIT_SHORT_SHA),)
+COMMITREF=$(CI_COMMIT_SHORT_SHA)
+else
 COMMITREF=$(shell git rev-parse --short HEAD)
+endif
 endif
 DISTFILE:=$(shell echo "miniupnpc-bin-win32-`cat VERSION`-$(COMMITREF).zip")
 
