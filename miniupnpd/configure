@@ -469,6 +469,8 @@ case $FW in
 				echo "CFLAGS += `${PKG_CONFIG} --cflags libiptc`" >> config.mk
 				echo "LDLIBS += `${PKG_CONFIG} --static --libs-only-l libiptc`" >> config.mk
 				echo "LDFLAGS += `${PKG_CONFIG} --libs-only-L --libs-only-other libiptc`" >> config.mk
+			else
+				echo "Warning: no libiptc pkg-config found"
 			fi
 			if ${PKG_CONFIG} --atleast-version=1.0.2 libnetfilter_conntrack \
 			   && ${PKG_CONFIG} --atleast-version=1.0.3 libmnl ; then
