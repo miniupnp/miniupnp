@@ -16,6 +16,7 @@ miniupnpd_iptables:
         - "cd miniupnpd"
         - "./configure || exit 1"
         - "make -j3 && make check || exit 1"
+        - "make install DESTDIR=/tmp/miniupnpd_iptables_install || exit 1"
         - "make dox"
 
 miniupnpd_nftables:
@@ -30,6 +31,7 @@ miniupnpd_nftables:
         - "cd miniupnpd"
         - "./configure --firewall=nftables || exit 1"
         - "make -j3 && make check || exit 1"
+        - "make install DESTDIR=/tmp/miniupnpd_nftables_install || exit 1"
         - "make dox"
 
 # i686-w64-mingw32-gcc
@@ -43,5 +45,6 @@ miniupnpc:
     script:
         - "cd miniupnpc"
         - "make -j3 && make check || exit 1"
+        - "make install DESTDIR=/tmp/miniupnpc_install || exit 1"
         - "make clean || exit 1"
         - "make -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap WINDRES=i686-w64-mingw32-windres CC=i686-w64-mingw32-gcc AR=i686-w64-mingw32-ar"
