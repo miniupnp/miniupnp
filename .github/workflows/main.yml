@@ -27,8 +27,14 @@ jobs:
       - name: build miniupnpc with make
         run: make -C miniupnpc all check
 
+      - name: install miniupnpc with make
+        run: make -C miniupnpc install DESTDIR=/tmp/miniupnpc_install
+
       - name: build miniupnpc with cmake
         run: mkdir miniupnpc/cmake-build && cd miniupnpc/cmake-build && cmake .. && make
+
+      - name: install miniupnpc with cmake
+        run: cd miniupnpc/cmake-build && make DESTDIR=/tmp/miniupnpc_cmake_install install
 
   build-minissdpd:
     # The type of runner that the job will run on
@@ -44,3 +50,6 @@ jobs:
 
       - name: build minissdpd
         run: make -C minissdpd all check
+
+      - name: install minissdpd
+        run: make -C minissdpd DESTDIR=/tmp/minissdpd_install install

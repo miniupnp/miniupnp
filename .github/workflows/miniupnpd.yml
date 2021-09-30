@@ -32,9 +32,15 @@ jobs:
           ../configure --ipv6 --igd2 --strict --portinuse --firewall=iptables
           make all check
 
+      - name: install miniupnpd(iptables)
+        run: cd miniupnpd/build-ipt && make DESTDIR=/tmp/miniupnpd_iptables install
+
       - name: build miniupnpd(nftables)
         run: |
           mkdir -p miniupnpd/build-nft
           cd miniupnpd/build-nft
           ../configure --ipv6 --igd2 --strict --portinuse --firewall=nftables
           make all check
+
+      - name: install miniupnpd(nftables)
+        run: cd miniupnpd/build-nft && make DESTDIR=/tmp/miniupnpd_iptables install
