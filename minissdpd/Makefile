@@ -4,7 +4,7 @@
 # website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
 # for use with GNU Make (gmake)
 # install with :
-# $ PREFIX=/tmp/dummylocation make install
+# $ DESTDIR=/tmp/dummylocation make install
 # or
 # $ INSTALLPREFIX=/usr/local make install
 # or
@@ -49,7 +49,12 @@ ALLOBJS = $(MINISSDPDOBJS) $(TESTMINISSDPDOBJS) \
           $(SHOWMINISSDPDNOTIFOBJS) \
           testcodelength.o
 
-INSTALLPREFIX ?= $(PREFIX)/usr
+# install directories
+ifeq ($(strip $(PREFIX)),)
+INSTALLPREFIX ?= /usr
+else
+INSTALLPREFIX ?= $(PREFIX)
+endif
 SBININSTALLDIR = $(INSTALLPREFIX)/sbin
 MANINSTALLDIR = $(INSTALLPREFIX)/share/man
 
@@ -64,13 +69,13 @@ clean:
 	$(RM) $(ALLOBJS) $(EXECUTABLES)
 
 install:	minissdpd
-	$(INSTALL) -d $(SBININSTALLDIR)
-	$(INSTALL) minissdpd $(SBININSTALLDIR)
-	$(INSTALL) -d $(MANINSTALLDIR)/man1
-	$(INSTALL) minissdpd.1 $(MANINSTALLDIR)/man1/minissdpd.1
+	$(INSTALL) -d $(DESTDIR)$(SBININSTALLDIR)
+	$(INSTALL) minissdpd $(DESTDIR)$(SBININSTALLDIR)
+	$(INSTALL) -d $(DESTDIR)$(MANINSTALLDIR)/man1
+	$(INSTALL) minissdpd.1 $(DESTDIR)$(MANINSTALLDIR)/man1/minissdpd.1
 ifeq (, $(findstring darwin, $(OS)))
-	$(INSTALL) -d $(PREFIX)/etc/init.d
-	$(INSTALL) minissdpd.init.d.script $(PREFIX)/etc/init.d/minissdpd
+	$(INSTALL) -d $(DESTDIR)/etc/init.d
+	$(INSTALL) minissdpd.init.d.script $(DESTDIR)/etc/init.d/minissdpd
 endif
 
 check:	validateminissdpd validatecodelength
