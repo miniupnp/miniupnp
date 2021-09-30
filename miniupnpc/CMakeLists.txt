@@ -221,16 +221,16 @@ endif ()
 
 if (NOT UPNPC_NO_INSTALL)
   install (FILES
-    miniupnpc.h
-    miniwget.h
-    upnpcommands.h
-    igd_desc_parse.h
-    upnpreplyparse.h
-    upnperrors.h
-    upnpdev.h
-    miniupnpctypes.h
-    portlistingparse.h
-    miniupnpc_declspec.h
+    include/miniupnpc.h
+    include/miniwget.h
+    include/upnpcommands.h
+    include/igd_desc_parse.h
+    include/upnpreplyparse.h
+    include/upnperrors.h
+    include/upnpdev.h
+    include/miniupnpctypes.h
+    include/portlistingparse.h
+    include/miniupnpc_declspec.h
     DESTINATION include/miniupnpc
   )
 
