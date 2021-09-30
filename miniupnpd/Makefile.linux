@@ -1,6 +1,6 @@
 # $Id: Makefile.linux,v 1.95 2017/12/12 11:40:14 nanard Exp $
 # MiniUPnP project
-# (c) 2006-2020 Thomas Bernard
+# (c) 2006-2021 Thomas Bernard
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author : Thomas Bernard
 # for use with GNU Make
@@ -131,7 +131,7 @@ clean:
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
 	$(RM) -r dox/
 
-install:	miniupnpd $(SRCDIR)/miniupnpd.8 miniupnpd.conf \
+install:	miniupnpd $(SRCDIR)/miniupnpd.8 $(SRCDIR)/miniupnpd.conf \
 	$(NETFILTER_SCRIPTS) \
 	$(SRCDIR)/linux/miniupnpd.init.d.script
 	$(STRIP) miniupnpd
