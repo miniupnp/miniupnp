@@ -4,7 +4,7 @@ stages:
 # iproute2 : /bin/ip
 # net-tools : /sbin/ifconfig
 
-job_miniupnpd_iptables:
+miniupnpd_iptables:
     stage: build
     before_script:
         - >
@@ -18,7 +18,7 @@ job_miniupnpd_iptables:
         - "make -j3 && make check || exit 1"
         - "make dox"
 
-job_miniupnpd_nftables:
+miniupnpd_nftables:
     stage: build
     before_script:
         - >
@@ -33,7 +33,7 @@ job_miniupnpd_nftables:
         - "make dox"
 
 # i686-w64-mingw32-gcc
-job_miniupnpc:
+miniupnpc:
     stage: build
     before_script:
         - >
