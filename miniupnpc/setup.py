@@ -26,7 +26,12 @@ setup(name='miniupnpc',
       author_email='miniupnp@free.fr',
       license=open('LICENSE').read(),
       url='http://miniupnp.free.fr/',
-      description='miniUPnP client',
+      description="""miniUPnP client
+      Step2 of installation for Windows:
+      - locate architecture+python version,
+      - download zip https://github.com/mrx23dot/miniupnp/releases/tag/miniupnpd_2_2_24
+      - extract to python/Scripts
+      """,
       cmdclass={'build_ext': make_then_build_ext},
       ext_modules=[
          Extension(name='miniupnpc', sources=['src/miniupnpcmodule.c'],
