@@ -20,7 +20,7 @@ class make_then_build_ext(build_ext.build_ext):
             subprocess.check_call([os.environ.get('MAKE', 'make')] + EXT)
             build_ext.build_ext.run(self)
 
-setup(name="miniupnpc",
+setup(name='miniupnpc',
       version=open('VERSION').read().strip(),
       author='Thomas BERNARD',
       author_email='miniupnp@free.fr',
@@ -29,7 +29,12 @@ setup(name="miniupnpc",
       description='miniUPnP client',
       cmdclass={'build_ext': make_then_build_ext},
       ext_modules=[
-         Extension(name="miniupnpc", sources=["src/miniupnpcmodule.c"],
+         Extension(name='miniupnpc', sources=['src/miniupnpcmodule.c'],
                    include_dirs=['include'], extra_objects=EXT)
-      ])
+      ],
+      )
 
+# deploying scripts didn't work
+#      scripts=['miniupnpc.dll'],
+#      scripts=glob('*.exe') + glob('*.dll') + glob('*.a') + glob('*.lib'),
+# Specifying the files to distribute: https://docs.python.org/3/distutils/sourcedist.html#manifest

@@ -1,31 +1,56 @@
+# tutorial:
+# https://packaging.python.org/tutorials/packaging-projects/
+# https://packaging.python.org/guides/supporting-windows-using-appveyor/
+# https://stackoverflow.com/questions/45630032/valueerror-no-pkg-info-in-archive
+
 environment:
   APP_VERSION: '2.2'
+
+  # for pypi/twine
+  USER: 'mrx23dot'
+  PASS:
+    secure: 'dBm6KX6qkLRKmz98VShiTUhn8lLwOn+Y3INBEaGkE4E='
+
   matrix:
     - PYTHON_VER: C:\Python27
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       SETUP_COMPILER_FLAG: --compiler=mingw32
       ARCH_BITS: 32
+
     - PYTHON_VER: C:\Python35
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       SETUP_COMPILER_FLAG:
       ARCH_BITS: 32
+
+    - PYTHON_VER: C:\Python36
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      SETUP_COMPILER_FLAG:
+      ARCH_BITS: 32
+
+    - PYTHON_VER: C:\Python36-x64
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      SETUP_COMPILER_FLAG:
+      ARCH_BITS: 64
+
     - PYTHON_VER: C:\Python37
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       SETUP_COMPILER_FLAG:
       ARCH_BITS: 32
+
     - PYTHON_VER: C:\Python37-x64
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       SETUP_COMPILER_FLAG:
       ARCH_BITS: 64
+
     - PYTHON_VER: C:\Python39
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       SETUP_COMPILER_FLAG:
       ARCH_BITS: 32
+
     - PYTHON_VER: C:\Python39-x64
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       SETUP_COMPILER_FLAG:
       ARCH_BITS: 64
-
 
 version: '$(APP_VERSION).{build}'
 
@@ -33,6 +58,7 @@ install:
   - set PATH=%PYTHON_VER%;%PYTHON_VER%\Scripts;%PATH%;C:\msys64\mingw%ARCH_BITS%\bin
   # We need wheel installed to build wheels
   - "%PYTHON_VER%\\python.exe -m pip install wheel"
+  - echo "using twine login %USER% %PASS%"
   - echo %PATH%
   - cc -v
 
@@ -49,7 +75,14 @@ after_build:
 artifacts:
   - path: miniupnpc*-$(appveyor_build_version).zip
     name: miniupnpc binaries
+
   - path: miniupnpc/dist/miniupnpc-*.whl
     name: miniupnpc python wheel (self-contained)
+
   - path: miniupnpc/dist/miniupnpc-*.egg
     name: miniupnpc python egg (self-contained)
+
+deploy_script:
+  - appveyor AddCompilationMessage "Deploying to PyPI"
+  - '%PYTHON_VER%\\python.exe -m pip install twine'
+  - '%PYTHON_VER%\\python.exe -m twine upload -u %USER% -p %PASS% --skip-existing dist/*.whl dist/*.egg'
