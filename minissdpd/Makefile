@@ -1,7 +1,7 @@
-# $Id: Makefile,v 1.30 2018/02/23 13:59:44 nanard Exp $
+# $Id: Makefile,v 1.31 2021/11/04 22:58:22 nanard Exp $
 # MiniUPnP project
 # author: Thomas Bernard
-# website: http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+# website: http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # for use with GNU Make (gmake)
 # install with :
 # $ DESTDIR=/tmp/dummylocation make install
