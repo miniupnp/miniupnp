@@ -1288,7 +1288,11 @@ int main(int argc, char * * argv)
 					break;
 				}
 				if(parselanaddr(lan_addr, argv[++i]) != 0) {
-					fprintf(stderr, "can't parse \"%s\" as a valid address or interface name\n", argv[i]);
+					fprintf(stderr, "can't parse \"%s\" as a valid "
+#ifndef ENABLE_IPV6
+					        "address or "
+#endif
+					        "interface name\n", argv[i]);
 					free(lan_addr);
 				} else {
 					LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
@@ -1323,8 +1327,12 @@ int main(int argc, char * * argv)
 		        "-i <interface> [-i <interface2>] ...\n",
 		        argv[0]);
 		fprintf(stderr,
-		        "\n  <interface> is either an IPv4 address with mask such as\n"
-		        "  192.168.1.42/255.255.255.0, or an interface name such as eth0.\n");
+		        "\n  <interface> is "
+#ifndef ENABLE_IPV6
+		        "either an IPv4 address with mask such as\n"
+		        "  192.168.1.42/255.255.255.0, or "
+#endif
+				"an interface name such as eth0.\n");
 		fprintf(stderr,
 		        "\n  By default, socket will be open as %s\n"
 #ifndef NO_BACKGROUND_NO_PIDFILE
