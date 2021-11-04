@@ -22,6 +22,8 @@
 #include "asyncsendto.h"
 #include "upnputils.h"
 
+enum send_state {ESCHEDULED=1, EWAITREADY=2, ESENDNOW=3} state;
+
 /* state diagram for a packet :
  *
  *                     |
@@ -34,7 +36,7 @@
 struct scheduled_send {
 	LIST_ENTRY(scheduled_send) entries;
 	struct timeval ts;
-	enum {ESCHEDULED=1, EWAITREADY=2, ESENDNOW=3} state;
+	enum send_state state;
 	int sockfd;
 	const void * buf;
 	size_t len;
@@ -96,7 +98,7 @@ sendto_schedule2(int sockfd, const void *buf, size_t len, int flags,
                  const struct sockaddr_in6 *src_addr,
                  unsigned int delay)
 {
-	enum {ESCHEDULED, EWAITREADY, ESENDNOW} state;
+	enum send_state state;
 	ssize_t n;
 	size_t alloc_len;
 	struct timeval tv;
