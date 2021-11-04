@@ -1,6 +1,6 @@
 $Id: Changelog.txt,v 1.52 2020/06/06 20:20:47 nanard Exp $
 
-2020/01/15:
+2021/01/15:
 	Add submit_to_minissdpd.py
 
 2020/06/06:
