@@ -1,4 +1,4 @@
-/* $Id: minissdpd.c,v 1.58 2020/06/06 20:20:47 nanard Exp $ */
+/* $Id: minissdpd.c,v 1.61 2021/11/04 23:27:28 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * (c) 2007-2021 Thomas Bernard
@@ -1263,52 +1263,64 @@ int main(int argc, char * * argv)
 #endif	/* ENABLE_IPV6 */
 	unsigned char ttl = 2;	/* UDA says it should default to 2 */
 	const char * searched_device = NULL;	/* if not NULL, search/filter a specific device type */
+	int opt;
 
 	LIST_INIT(&reqlisthead);
 	LIST_INIT(&servicelisthead);
 	LIST_INIT(&lan_addrs);
 	/* process command line */
-	for(i=1; i<argc; i++)
-	{
- 		if(0==strcmp(argv[i], "-d"))
-			debug_flag = 1;
+#define OPTSTRING "d6i:s:p:t:f:"
+	while ((opt = getopt(argc, argv, "di:s:t:f:"
 #ifdef ENABLE_IPV6
-		else if(0==strcmp(argv[i], "-6"))
+	                                 "6"
+#endif
+#ifndef NO_BACKGROUND_NO_PIDFILE
+	                                 "p:"
+#endif
+
+	                     )) != -1)
+	{
+		switch(opt)
+		{
+		case 'd':
+			debug_flag = 1;
+			break;
+#ifdef ENABLE_IPV6
+		case '6':
 			ipv6 = 1;
+			break;
 #endif	/* ENABLE_IPV6 */
-		else {
-			if((i + 1) >= argc) {
-				fprintf(stderr, "option %s needs an argument.\n", argv[i]);
+		case 'i':
+			lan_addr = malloc(sizeof(struct lan_addr_s));
+			if(lan_addr == NULL) {
+				fprintf(stderr, "malloc(%d) FAILED\n", (int)sizeof(struct lan_addr_s));
 				break;
 			}
-			if(0==strcmp(argv[i], "-i")) {
-				lan_addr = malloc(sizeof(struct lan_addr_s));
-				if(lan_addr == NULL) {
-					fprintf(stderr, "malloc(%d) FAILED\n", (int)sizeof(struct lan_addr_s));
-					break;
-				}
-				if(parselanaddr(lan_addr, argv[++i]) != 0) {
-					fprintf(stderr, "can't parse \"%s\" as a valid "
+			if(parselanaddr(lan_addr, optarg) != 0) {
+				fprintf(stderr, "can't parse \"%s\" as a valid "
 #ifndef ENABLE_IPV6
-					        "address or "
+				        "address or "
 #endif
-					        "interface name\n", argv[i]);
-					free(lan_addr);
-				} else {
-					LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
-				}
-			} else if(0==strcmp(argv[i], "-s"))
-				sockpath = argv[++i];
+				        "interface name\n", optarg);
+				free(lan_addr);
+			} else {
+				LIST_INSERT_HEAD(&lan_addrs, lan_addr, list);
+			}
+			break;
+		case 's':
+			sockpath = optarg;
+			break;
 #ifndef NO_BACKGROUND_NO_PIDFILE
-			else if(0==strcmp(argv[i], "-p"))
-				pidfilename = argv[++i];
+		case 'p':
+			pidfilename = optarg;
+			break;
 #endif
-			else if(0==strcmp(argv[i], "-t"))
-				ttl = (unsigned char)atoi(argv[++i]);
-			else if(0==strcmp(argv[i], "-f"))
-				searched_device = argv[++i];
-			else
-				fprintf(stderr, "unknown commandline option %s.\n", argv[i]);
+		case 't':
+			ttl = (unsigned char)atoi(optarg);
+			break;
+		case 'f':
+			searched_device = optarg;
+			break;
 		}
 	}
 	if(lan_addrs.lh_first == NULL)
