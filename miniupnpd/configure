@@ -387,7 +387,6 @@ case $OS_NAME in
 	OpenWrt)
 		OS_URL=http://www.openwrt.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		FW=iptables
 		;;
 	OpenEmbedded)
 		OS_URL=http://www.openembedded.org/
