@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.251 2021/09/28 21:53:38 nanard Exp $
+$Id: Changelog.txt,v 1.252 2021/11/09 18:34:41 nanard Exp $
 miniUPnP client Changelog.
+
+2021/11/09:
+  python module : Allow to specify the root description url
 
 VERSION 2.2.3 : released 2021/09/28
 

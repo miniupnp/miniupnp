@@ -1,4 +1,4 @@
-/* $Id: miniupnpcmodule.c,v 1.37 2021/09/28 21:38:30 nanard Exp $*/
+/* $Id: miniupnpcmodule.c,v 1.38 2021/11/09 18:46:49 nanard Exp $*/
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas BERNARD
@@ -69,7 +69,7 @@ static PyMemberDef UPnP_members[] = {
 	    "port, any other value will be attempted as the "
 	    "source port"
 	},
-	/* T_STRING is allways readonly :( */
+	/* T_STRING is always readonly :( */
 	{"multicastif", T_STRING, offsetof(UPnPObject, multicastif),
 	 0, "IP of the network interface to be used for multicast operations"
 	},
@@ -155,12 +155,20 @@ UPnP_discover(UPnPObject *self)
 }
 
 static PyObject *
-UPnP_selectigd(UPnPObject *self)
+UPnP_selectigd(UPnPObject *self, PyObject *args)
 {
+	const char * rootDescUrl = NULL;
 	int r;
+	if(!PyArg_ParseTuple(args, "|z", &rootDescUrl))
+		return NULL;
 Py_BEGIN_ALLOW_THREADS
-	r = UPNP_GetValidIGD(self->devlist, &self->urls, &self->data,
-	                     self->lanaddr, sizeof(self->lanaddr));
+	if (rootDescUrl == NULL) {
+		r = UPNP_GetValidIGD(self->devlist, &self->urls, &self->data,
+		                     self->lanaddr, sizeof(self->lanaddr));
+	} else {
+		r = UPNP_GetIGDFromUrl(rootDescUrl, &self->urls, &self->data,
+		                       self->lanaddr, sizeof(self->lanaddr));
+	}
 Py_END_ALLOW_THREADS
 	if(r)
 	{
@@ -562,7 +570,7 @@ static PyMethodDef UPnP_methods[] = {
     {"discover", (PyCFunction)UPnP_discover, METH_NOARGS,
      "discover UPnP IGD devices on the network"
     },
-	{"selectigd", (PyCFunction)UPnP_selectigd, METH_NOARGS,
+	{"selectigd", (PyCFunction)UPnP_selectigd, METH_VARARGS,
 	 "select a valid UPnP IGD among discovered devices"
 	},
 	{"totalbytesent", (PyCFunction)UPnP_totalbytesent, METH_NOARGS,
