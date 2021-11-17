@@ -1,5 +1,9 @@
 $Id: Changelog.txt,v 1.480 2021/08/21 08:34:57 nanard Exp $
 
+2021/11/17:
+  NFTables : use the nat chain for inet rules (Sven Auhagen)
+  (see https://github.com/miniupnp/miniupnp/pull/562)
+
 VERSION 2.2.3 : released on 2021/08/21
 
 2021/08/18:
