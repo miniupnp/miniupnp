@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Prerouting
-nft list chain ip nat MINIUPNPD
+nft list chain inet miniupnpd prerouting
 # Postrouting
-nft list chain ip nat MINIUPNPD-POSTROUTING
+nft list chain inet miniupnpd postrouting
 # Filter
-nft list chain inet filter MINIUPNPD
+nft list chain inet miniupnpd forward

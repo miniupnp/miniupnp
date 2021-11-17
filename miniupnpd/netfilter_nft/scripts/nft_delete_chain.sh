@@ -1,5 +1,5 @@
 #!/bin/sh
 
-nft delete chain nat MINIUPNPD
-nft delete chain nat MINIUPNPD-POSTROUTING
-nft delete chain filter MINIUPNPD
+nft delete chain miniupnpd forward
+nft delete chain miniupnpd postrouting
+nft delete chain miniupnpd prerouting
