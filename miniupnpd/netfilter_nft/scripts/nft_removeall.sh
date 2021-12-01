@@ -22,5 +22,5 @@ then
 		# then remove the table itself
 		echo "Remove miniupnpd nat table"
 		$NFT delete table inet $NAT_TABLE
-	fi	
+	fi
 fi

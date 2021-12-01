@@ -18,7 +18,7 @@ echo "Creating nftables structure"
 
 cat > /tmp/miniupnpd.nft <<EOF
 table inet $TABLE {
-    chain forward { 
+    chain forward {
         type filter hook forward priority 0;
         policy drop;
 
