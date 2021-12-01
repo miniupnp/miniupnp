@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.480 2021/08/21 08:34:57 nanard Exp $
+$Id: Changelog.txt,v 1.483 2021/12/01 23:00:53 nanard Exp $
+
+2021/12/01:
+  NFTables : use scripts to create table and chains
+  (see https://github.com/miniupnp/miniupnp/pull/584)
 
 2021/11/17:
   NFTables : use the nat chain for inet rules (Sven Auhagen)
