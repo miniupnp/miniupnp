@@ -1,26 +1,23 @@
 Miniupnpd nftables support by Tomofumi Hayashi (s1061123@gmail.com).
 
-##Current Status
-nftables support is 'alpha' version, not "so much" stable.
-
-##Supported Features
+## Supported Features
 - IPv4 NAT/Filter add/del.
 
-##How to build miniupnpd with nftables:
-Run 'make' command with 'Makefile.linux_nft',
+## How to build miniupnpd with nftables:
+Run 'configure' command with '--firewall=nftables',
 
-`make -f Makefile.linux_nft`
+`./configure --firewall=nftables && make`
 
-##How to Run
+## How to Run
 Please run 'netfilter_nft/scripts/nft_init.sh' to add miniupnpd chain.
 
 `sudo ./netfilter_nft/scripts/nft_init.sh`
 
-##FAQ
+## FAQ
 I will add this section when I get question.
 Comments and Questions are welcome ;)
 
-###Custom Chains
+### Custom Chains
 NFTables is very flexible but it comes with some restrictions because of that. If there is a second filter chain than all packets that were passed before with the miniupnpd chain will be reevaluated. This also means that if the chain is a drop chain you loose the packets. In that case you really want to use a custom chain and jump to it in your filter chain. miniupnpd should save all accept rules in that custom chain.
 For NAT it is the same, a second chain will also evaluate the packets again and therefore it is possible that a second SNAT or DNAT is performed.
 
