@@ -26,52 +26,52 @@ For NAT it is the same, a second chain will also evaluate the packets again and 
 
 The following is used in miniupnpd for a table setup but it can be customized:
 
-table inet filter {
-    chain forward { 
-        type filter hook forward priority 0;
-        policy drop;
+    table inet filter {
+        chain forward {
+            type filter hook forward priority 0;
+            policy drop;
+
+            # miniupnpd
+            jump miniupnpd
+
+            # Add other rules here
+        }
 
         # miniupnpd
-        jump miniupnpd
+        chain miniupnpd {
+        }
 
-        # Add other rules here
+        chain prerouting {
+            type nat hook prerouting priority -100;
+            policy accept;
+
+            # miniupnpd
+            jump prerouting_miniupnpd
+
+            # Add other rules here
+        }
+
+        chain postrouting {
+            type nat hook postrouting priority 100;
+            policy accept;
+
+            # miniupnpd
+            jump postrouting_miniupnpd
+
+            # Add other rules here
+        }
+
+        chain prerouting_miniupnpd {
+        }
+
+        chain postrouting_miniupnpd {
+        }
     }
 
-    # miniupnpd
-    chain miniupnpd {
-    }
+and the following config settings can be used to change the tables and chains :
 
-    chain prerouting {
-        type nat hook prerouting priority -100;
-        policy accept;
-
-        # miniupnpd
-        jump prerouting_miniupnpd
-
-        # Add other rules here
-    }
-
-    chain postrouting {
-        type nat hook postrouting priority 100;
-        policy accept;
-
-        # miniupnpd
-        jump postrouting_miniupnpd
-
-        # Add other rules here
-    }
-
-    chain prerouting_miniupnpd {
-    }
-
-    chain postrouting_miniupnpd {
-    }
-}
-
-and the following config settings can be used to change the tables and chains
-
-upnp_table_name=filter
-upnp_nattable_name=filter
-upnp_forward_chain=miniupnpd
-upnp_nat_chain=prerouting_miniupnpd
-upnp_nat_postrouting_chain=postrouting_miniupnpd
+    upnp_table_name=filter
+    upnp_nattable_name=filter
+    upnp_forward_chain=miniupnpd
+    upnp_nat_chain=prerouting_miniupnpd
+    upnp_nat_postrouting_chain=postrouting_miniupnpd
