@@ -49,7 +49,7 @@ cat >> /tmp/miniupnpd.nft <<EOF
         policy accept;
 
         # miniupnpd
-        jump $PREROUTEING_CHAIN
+        jump $PREROUTING_CHAIN
 
         # Add other rules here
     }
@@ -59,15 +59,15 @@ cat >> /tmp/miniupnpd.nft <<EOF
         policy accept;
 
         # miniupnpd
-        jump $POSTROUTEING_CHAIN
+        jump $POSTROUTING_CHAIN
 
         # Add other rules here
     }
 
-    chain $PREROUTEING_CHAIN {
+    chain $PREROUTING_CHAIN {
     }
 
-    chain $POSTROUTEING_CHAIN {
+    chain $POSTROUTING_CHAIN {
     }
 }
 EOF
