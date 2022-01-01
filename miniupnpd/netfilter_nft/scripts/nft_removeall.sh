@@ -17,7 +17,7 @@ fi
 
 if [ "$TABLE" != "$NAT_TABLE" ]
 then
-	$NFT --check list table inet $TABLE > /dev/null 2>&1
+	$NFT --check list table inet $NAT_TABLE > /dev/null 2>&1
 	if [ $? -eq "0" ]; then
 		# then remove the table itself
 		echo "Remove miniupnpd nat table"
