@@ -5,7 +5,7 @@
 # This Makefile is made for MinGW
 #
 # To cross compile on a *nix machine :
-# make -f Makefile.mingw DLLWRAP=mingw32-dllwrap CC=mingw32-gcc AR=mingw32-ar
+# make -f Makefile.mingw DLLWRAP=mingw32-dllwrap CC=mingw32-gcc AR=mingw32-ar WINDRES=mingw32-windres
 #
 SRCDIR = src
 INCDIR = include
