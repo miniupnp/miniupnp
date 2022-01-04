@@ -49,7 +49,7 @@ endif ()
 
 # Suppress noise warnings
 if (MSVC)
-  target_compile_definitions(miniupnpc-private INTERFACE _CRT_SECURE_NO_WARNINGS)
+  target_compile_definitions(miniupnpc-private INTERFACE _CRT_SECURE_NO_WARNINGS _WINSOCK_DEPRECATED_NO_WARNINGS)
 endif()
 
 configure_file (${CMAKE_CURRENT_SOURCE_DIR}/miniupnpcstrings.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/miniupnpcstrings.h)
