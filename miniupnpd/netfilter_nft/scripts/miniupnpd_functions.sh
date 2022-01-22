@@ -8,8 +8,8 @@ NFT=$(which nft) || {
 TABLE="filter"
 NAT_TABLE="filter"
 CHAIN="miniupnpd"
-PREROUTEING_CHAIN="prerouting_miniupnpd"
-POSTROUTEING_CHAIN="postrouting_miniupnpd"
+PREROUTING_CHAIN="prerouting_miniupnpd"
+POSTROUTING_CHAIN="postrouting_miniupnpd"
 
 while getopts ":t:n:c:p:r:" opt; do
 	case $opt in
@@ -23,10 +23,10 @@ while getopts ":t:n:c:p:r:" opt; do
 			CHAIN=$OPTARG
 			;;
 		p)
-			PREROUTEING_CHAIN=$OPTARG
+			PREROUTING_CHAIN=$OPTARG
 			;;
 		r)
-			POSTROUTEING_CHAIN=$OPTARG
+			POSTROUTING_CHAIN=$OPTARG
 			;;
 		\?)
 			echo "Invalid option: -$OPTARG" >&2

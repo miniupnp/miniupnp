@@ -68,7 +68,7 @@ The following is used in miniupnpd for a table setup but it can be customized:
 and the following config settings can be used to change the tables and chains :
 
     upnp_table_name=filter
-    upnp_nattable_name=filter
+    upnp_nat_table_name=filter
     upnp_forward_chain=miniupnpd
     upnp_nat_chain=prerouting_miniupnpd
     upnp_nat_postrouting_chain=postrouting_miniupnpd
