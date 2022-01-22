@@ -219,6 +219,8 @@ if (UPNPC_BUILD_TESTS)
 # set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} testminixml minixmlvalid testupnpreplyparse testigddescparse testminiwget)
 endif ()
 
+configure_file(miniupnpc.pc.in miniupnpc.pc @ONLY)
+
 if (NOT UPNPC_NO_INSTALL)
   install (FILES
     include/miniupnpc.h
@@ -236,6 +238,10 @@ if (NOT UPNPC_NO_INSTALL)
 
   install(FILES miniupnpc-config.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/miniupnpc
+  )
+
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/miniupnpc.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
   )
 endif()
 
