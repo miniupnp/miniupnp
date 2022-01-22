@@ -52,6 +52,14 @@ endif
 endif
 DISTFILE:=$(shell echo "miniupnpc-bin-win32-`cat VERSION`-$(COMMITREF).zip")
 
+LIBDIR ?= lib
+# install directories
+ifeq ($(strip $(PREFIX)),)
+INSTALLPREFIX ?= /usr
+else
+INSTALLPREFIX ?= $(PREFIX)
+endif
+
 .PHONY:	all dist clean
 
 all:	$(BINARIES)
@@ -124,6 +132,19 @@ rc_version.h:	VERSION
 	echo "#define LIBMINIUPNPC_MICRO_VERSION $(shell cat VERSION|cut -d. -f3)" >> $@.tmp
 	mv $@.tmp $@
 endif
+
+miniupnpc.pc:	VERSION
+	$(RM) $@
+	echo "prefix=$(INSTALLPREFIX)" >> $@
+	echo "exec_prefix=\$${prefix}" >> $@
+	echo "libdir=\$${exec_prefix}/$(LIBDIR)" >> $@
+	echo "includedir=\$${prefix}/include" >> $@
+	echo "" >> $@
+	echo "Name: miniUPnPc" >> $@
+	echo "Description: UPnP IGD client lightweight library" >> $@
+	echo "Version: $(shell cat VERSION)" >> $@
+	echo "Libs: -L\$${libdir} -lminiupnpc" >> $@
+	echo "Cflags: -I\$${includedir}" >> $@
 
 winres.o:	miniupnpc.rc rc_version.h
 	$(WINDRES) -D INTERNAL_NAME=\\\"miniupnpc.dll\\0\\\" -i $< -o $@
