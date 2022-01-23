@@ -4,7 +4,7 @@
  * Author: Thomas Bernard
  * Copyright (c) 2005-2021 Thomas Bernard
  * This software is subjects to the conditions detailed
- * in the LICENSE file provided within this distribution */
+ * in the LICENSE.txt file provided within this distribution */
 #include <stdio.h>
 #include <windows.h>
 

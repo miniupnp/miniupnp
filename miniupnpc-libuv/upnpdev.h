@@ -4,7 +4,7 @@
  * Author : Thomas BERNARD
  * copyright (c) 2005-2018 Thomas Bernard
  * This software is subjet to the conditions detailed in the
- * provided LICENSE file. */
+ * provided LICENSE.txt file. */
 #ifndef UPNPDEV_H_INCLUDED
 #define UPNPDEV_H_INCLUDED
 

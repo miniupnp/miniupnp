@@ -5,7 +5,7 @@
  * Author : Thomas BERNARD
  * copyright (c) 2005-2021 Thomas Bernard
  * This software is subjet to the conditions detailed in the
- * provided LICENSE file. */
+ * provided LICENSE.txt file. */
 #ifdef _WIN32
 /* Win32 Specific includes and defines */
 #include <winsock2.h>

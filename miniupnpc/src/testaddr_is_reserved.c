@@ -5,7 +5,7 @@
  * Author : Thomas BERNARD
  * copyright (c) 2005-2020 Thomas Bernard
  * This software is subjet to the conditions detailed in the
- * provided LICENSE file. */
+ * provided LICENSE.txt file. */
 #include <stdio.h>
 #include "addr_is_reserved.h"
 
