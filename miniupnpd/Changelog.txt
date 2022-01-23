@@ -1,4 +1,6 @@
-$Id: Changelog.txt,v 1.483 2021/12/01 23:00:53 nanard Exp $
+$Id: Changelog.txt,v 1.484 2022/01/23 00:14:39 nanard Exp $
+
+VERSION 2.3.0 : released on 2022/01/23
 
 2021/12/01:
   NFTables : use scripts to create table and chains
