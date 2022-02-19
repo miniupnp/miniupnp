@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.484 2022/01/23 00:14:39 nanard Exp $
+$Id: Changelog.txt,v 1.485 2022/02/19 18:58:23 nanard Exp $
+
+2022/02/19:
+  prefer non-reserved over reserved addresses in getifaddr()
 
 VERSION 2.3.0 : released on 2022/01/23
 
