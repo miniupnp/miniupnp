@@ -1,8 +1,8 @@
-/* $Id: obsdrdr.c,v 1.98 2020/05/29 22:29:11 nanard Exp $ */
+/* $Id: obsdrdr.c,v 1.101 2022/02/19 19:15:24 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2022 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -302,19 +302,28 @@ int add_nat_rule(const char * ifname,
 #endif
 	const char * extaddr;
 	char extaddr_buf[INET_ADDRSTRLEN];
+	struct in_addr wan_addr;
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
-	if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0') {
-		extaddr = use_ext_ip_addr;
-	} else {
-		if(getifaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, NULL, NULL) < 0) {
-			syslog(LOG_WARNING, "failed to get address for interface %s", ifname);
-			return -1;
+	if(getifaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, &wan_addr, NULL) < 0) {
+		syslog(LOG_WARNING, "failed to get address for interface %s", ifname);
+		if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0') {
+			extaddr = use_ext_ip_addr;
+		} else {
+			return -1;	/* no address to use => failure */
 		}
-		extaddr = extaddr_buf;
+	} else {
+		if (addr_is_reserved(&wan_addr)) {
+			syslog(LOG_DEBUG, "WAN IP is reserved, it will be used for NAT");
+			extaddr = extaddr_buf;
+		} else if (use_ext_ip_addr && use_ext_ip_addr[0] != '\0') {
+			extaddr = use_ext_ip_addr;
+		} else {
+			extaddr = extaddr_buf;
+		}
 	}
 	syslog(LOG_DEBUG, "use external ip %s", extaddr);
 	r = 0;
