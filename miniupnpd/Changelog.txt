@@ -1,8 +1,9 @@
-$Id: Changelog.txt,v 1.486 2022/02/19 19:15:24 nanard Exp $
+$Id: Changelog.txt,v 1.487 2022/02/19 22:45:06 nanard Exp $
 
 2022/02/19:
   prefer non-reserved over reserved addresses in getifaddr()
   pf: use external IP for NAT in double NAT setups
+  miniupnpd.init.d.script: support nftables
 
 VERSION 2.3.0 : released on 2022/01/23
 
