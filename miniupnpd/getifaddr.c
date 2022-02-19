@@ -101,6 +101,7 @@ getifaddr(const char * ifname, char * buf, int len,
 	/* Works for all address families (both ip v4 and ip v6) */
 	struct ifaddrs * ifap;
 	struct ifaddrs * ife;
+	struct ifaddrs * candidate = NULL;
 
 	if(!ifname || ifname[0]=='\0')
 		return -1;
@@ -119,14 +120,10 @@ getifaddr(const char * ifname, char * buf, int len,
 		switch(ife->ifa_addr->sa_family)
 		{
 		case AF_INET:
-			if(buf)
-			{
-				inet_ntop(ife->ifa_addr->sa_family,
-				          &((struct sockaddr_in *)ife->ifa_addr)->sin_addr,
-				          buf, len);
-			}
-			if(addr) *addr = ((struct sockaddr_in *)ife->ifa_addr)->sin_addr;
-			if(mask) *mask = ((struct sockaddr_in *)ife->ifa_netmask)->sin_addr;
+			if(!candidate ||
+			   (addr_is_reserved(&((struct sockaddr_in *)candidate->ifa_addr)->sin_addr) &&
+			    !addr_is_reserved(&((struct sockaddr_in *)ife->ifa_addr)->sin_addr)))
+				candidate = ife;
 			break;
 /*
 		case AF_INET6:
@@ -135,6 +132,17 @@ getifaddr(const char * ifname, char * buf, int len,
 			          buf, len);
 */
 		}
+	}
+	if(candidate)
+	{
+		if(buf)
+		{
+			inet_ntop(candidate->ifa_addr->sa_family,
+			          &((struct sockaddr_in *)candidate->ifa_addr)->sin_addr,
+			          buf, len);
+		}
+		if(addr) *addr = ((struct sockaddr_in *)candidate->ifa_addr)->sin_addr;
+		if(mask) *mask = ((struct sockaddr_in *)candidate->ifa_netmask)->sin_addr;
 	}
 	freeifaddrs(ifap);
 #endif

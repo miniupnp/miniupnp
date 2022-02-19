@@ -47,6 +47,7 @@ case "$argv" in
 	    FW=$(echo $argv | cut -d= -f2) ;;
 	--iptablespath=*)
 		IPTABLESPATH=$(echo $argv | cut -d= -f2) ;;
+	--getifaddrs) GETIFADDRS=1 ;;
 	--help|-h)
 		echo "Usage : $0 [options]"
 		echo " --ipv6      enable IPv6"
@@ -62,6 +63,7 @@ case "$argv" in
 		echo " --firewall=<name>  force the firewall type (nftables, iptables, pf, ipf, ipfw)"
 		echo " --iptablespath=/path/to/iptables use a specific version of iptables"
 		echo " --disable-fork     Do not go to background and do not write pid file"
+		echo " --getifaddrs       Force use getifaddrs() to obtain interface addresses"
 		exit 1
 		;;
 	*)
@@ -387,6 +389,7 @@ case $OS_NAME in
 	OpenWrt)
 		OS_URL=http://www.openwrt.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
+		GETIFADDRS=1
 		;;
 	OpenEmbedded)
 		OS_URL=http://www.openembedded.org/
@@ -848,6 +851,13 @@ if [ -n "$NO_BACKGROUND_NO_PIDFILE" ] && [ $NO_BACKGROUND_NO_PIDFILE -eq 1 ] ; t
 	echo "#define NO_BACKGROUND_NO_PIDFILE" >> ${CONFIGFILE}
 else
 	echo "/*#define NO_BACKGROUND_NO_PIDFILE*/" >> ${CONFIGFILE}
+fi
+
+echo "/* Whether to use getifaddrs() to determine interface addresses */" >> ${CONFIGFILE}
+if [ -n "$GETIFADDRS" ] && [ $GETIFADDRS -eq 1 ] ; then
+	echo "#define USE_GETIFADDRS" >> ${CONFIGFILE}
+else
+	echo "/*#define USE_GETIFADDRS*/" >> ${CONFIGFILE}
 fi
 
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}
