@@ -1,10 +1,10 @@
 #! /bin/sh
-# $Id: configure,v 1.116 2021/05/21 22:04:34 nanard Exp $
+# $Id: configure,v 1.119 2022/02/19 21:44:50 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
 # http://miniupnp.free.fr or https://miniupnp.tuxfamily.org/
-# (c) 2006-2021 Thomas Bernard
+# (c) 2006-2022 Thomas Bernard
 # This software is subject to the conditions detailed in the
 # LICENCE file provided within the distribution
 
@@ -252,6 +252,10 @@ case $OS_NAME in
 		if [ -z $FW ] ; then
 			echo "Could not detect usage of ipf, pf, ipfw. Compiling for pf by default"
 			FW=pf
+		fi
+		if [ "$FW" = "ipfw" ] ; then
+			echo "!!! ipfw is known to not work with FreeBSD, please contribute !!!"
+			echo "!!! see https://github.com/miniupnp/miniupnp/issues/596       !!!"
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		OS_URL=http://www.freebsd.org/
