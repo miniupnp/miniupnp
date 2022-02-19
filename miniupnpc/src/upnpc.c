@@ -1,7 +1,7 @@
-/* $Id: upnpc.c,v 1.129 2021/05/10 20:51:29 nanard Exp $ */
+/* $Id: upnpc.c,v 1.131 2022/02/19 23:22:54 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2021 Thomas Bernard
+ * Copyright (c) 2005-2022 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -583,7 +583,7 @@ int main(int argc, char ** argv)
 	}
 #endif
     printf("upnpc : miniupnpc library test client, version %s.\n", MINIUPNPC_VERSION_STRING);
-	printf(" (c) 2005-2021 Thomas Bernard.\n");
+	printf(" (c) 2005-2022 Thomas Bernard.\n");
     printf("Go to http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/\n"
 	       "for more information.\n");
 	/* command line processing */
@@ -665,6 +665,7 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "       \t%s [options] -G remote_ip remote_port internal_ip internal_port protocol\n\t\tGet Outbound Pinhole Timeout (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -P\n\t\tGet Presentation url\n", argv[0]);
 		fprintf(stderr, "\nprotocol is UDP or TCP\n");
+		fprintf(stderr, "@ can be used in option -a, -n, -A and -G to represent local LAN address.\n");
 		fprintf(stderr, "Options:\n");
 		fprintf(stderr, "  -e description : set description for port mapping.\n");
 		fprintf(stderr, "  -6 : use ip v6 instead of ip v4.\n");
@@ -729,6 +730,12 @@ int main(int argc, char ** argv)
 				free(descXML); descXML = NULL;
 			}
 			#endif
+
+			/* replace '@' with the local LAN ip address */
+			if ((command == 'a' || command == 'n') && 0 == strcmp(commandargv[0], "@"))
+				commandargv[0] = lanaddr;
+			else if ((command == 'A' || command == 'G') && 0 == strcmp(commandargv[2], "@"))
+				commandargv[2] = lanaddr;
 
 			switch(command)
 			{
