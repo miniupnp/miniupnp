@@ -693,10 +693,12 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
                    unsigned int timestamp)
 {
 	char iaddr_str[INET_ADDRSTRLEN];
-	char rhost[INET_ADDRSTRLEN];
+	char *rhost;
 	int r;
 
 	d_printf(("update_portmapping()\n"));
+
+	rhost = NULL;
 
 	if (get_redirect_rule(NULL, eport, proto, iaddr_str, INET_ADDRSTRLEN, NULL, NULL, 0, rhost, INET_ADDRSTRLEN, NULL, 0, 0) < 0)
 		return -1;
