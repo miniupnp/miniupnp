@@ -363,7 +363,7 @@ jar: $(SHAREDLIBRARY)  $(JNAERATOR)
 
 mvn_install:
 	mvn install:install-file -Dfile=java/miniupnpc_$(JARSUFFIX).jar \
-	 -DgroupId=com.github \
+	 -DgroupId=com.GitHub \
 	 -DartifactId=miniupnp \
 	 -Dversion=$(VERSION) \
 	 -Dpackaging=jar \
