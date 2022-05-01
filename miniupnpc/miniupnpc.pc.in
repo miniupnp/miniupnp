@@ -11,8 +11,8 @@ libdir="${prefix}/lib"
 includedir="${prefix}/include"
 
 Name: @PROJECT_NAME@
-Description: @CMAKE_PROJECT_DESCRIPTION@
-URL: @CMAKE_PROJECT_HOMEPAGE_URL@
-Version: @PROJECT_VERSION@
+Description: @MINIUPNPC_DESCRIPTION@
+URL: @MINIUPNPC_HOMEPAGE_URL@
+Version: @MINIUPNPC_VERSION@
 Libs: -L"${libdir}" -lminiupnpc
 Cflags: -I"${includedir}"

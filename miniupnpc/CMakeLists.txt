@@ -4,6 +4,8 @@ project (miniupnpc C)
 
 set (MINIUPNPC_VERSION 2.2.3)
 set (MINIUPNPC_API_VERSION 17)
+set (MINIUPNPC_DESCRIPTION "UPnP IGD client lightweight library")
+set (MINIUPNPC_HOMEPAGE_URL https://miniupnp.tuxfamily.org/)
 
 option (UPNPC_BUILD_STATIC "Build static library" TRUE)
 option (UPNPC_BUILD_SHARED "Build shared library" TRUE)
