@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.487 2022/02/19 22:45:06 nanard Exp $
+$Id: Changelog.txt,v 1.488 2022/05/18 07:50:46 nanard Exp $
+
+2022/05/18:
+  improve configure script for cross builds
 
 2022/02/19:
   prefer non-reserved over reserved addresses in getifaddr()
