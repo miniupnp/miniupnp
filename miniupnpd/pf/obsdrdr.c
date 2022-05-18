@@ -350,7 +350,12 @@ int add_nat_rule(const char * ifname,
 		pcr.rule.src.addr.type = PF_ADDR_ADDRMASK;
 		pcr.rule.dst.addr.type = PF_ADDR_ADDRMASK;
 
+#ifndef PF_NEWSTYLE
 		pcr.rule.action = PF_NAT;
+#else
+		pcr.rule.action = PF_PASS;	/* or PF_MATCH as we dont expect outbound packets to be blocked */
+		pcr.rule.direction = PF_OUT;
+#endif
 		pcr.rule.af = AF_INET;
 #ifdef USE_IFNAME_IN_RULES
 		if(ifname)
@@ -465,7 +470,12 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 	}
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+#ifndef PF_NEWSTYLE
 	pr.rule.action = PF_NAT;
+#else
+	pr.rule.action = PF_PASS;	/* or PF_MATCH as we dont expect outbound packets to be blocked */
+	pr.rule.direction = PF_OUT;
+#endif
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
 	{
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
