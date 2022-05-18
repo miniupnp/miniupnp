@@ -33,11 +33,12 @@
  * - USE_IFNAME_IN_RULES
  *   If set the interface name is set in the rule.
  * - PFRULE_INOUT_COUNTS
- *   Must be set with OpenBSD version 3.8 and up.
+ *   Must be set with OpenBSD version 3.8 and up, FreeBSD 7.0+, DragonFly 2.8+
+ *   and OS X with pf.
  * - PFRULE_HAS_RTABLEID
  *   Must be set with OpenBSD version 4.0 and up.
- * - PF_NEWSSTYLE
- *   Must be set with OpenBSD version 4.7 and up.
+ * - PF_NEWSTYLE
+ *   Must be set with OpenBSD version 4.7 and up. FreeBSD/pfSense is old style.
  */
 
 #include <sys/types.h>
