@@ -1147,8 +1147,8 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 		syslog(LOG_INFO, "PCP: %s port %hu mapping removed",
 		       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
 	} else {
-		syslog(LOG_ERR, "Failed to remove PCP mapping internal port %hu, protocol %s",
-		       iport, (pcp_msg_info->protocol == IPPROTO_TCP)?"TCP":"UDP");
+		syslog(LOG_ERR, "Failed to remove PCP mapping to %s:%hu %s",
+		       pcp_msg_info->mapped_str, iport, (pcp_msg_info->protocol == IPPROTO_TCP)?"TCP":"UDP");
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 	}
 }
