@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.488 2022/05/18 07:50:46 nanard Exp $
+$Id: Changelog.txt,v 1.489 2022/06/01 23:21:11 nanard Exp $
+
+2022/06/02:
+  Fixes "Port Triggering" with OpenBSD 4.7+
 
 2022/05/18:
   improve configure script for cross builds
