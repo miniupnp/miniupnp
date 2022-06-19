@@ -1105,6 +1105,8 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	int uid = -1;
 #endif /* ENABLE_UPNPPINHOLE */
 
+	syslog(LOG_DEBUG, "is_fw=%d addr=%s iport=%hu proto=%d",
+	       pcp_msg_info->is_fw,  pcp_msg_info->mapped_str, iport, (int)proto);
 	/* iterate through all rules and delete the requested ones */
 	for (index = 0 ;
 	     (!pcp_msg_info->is_fw &&
@@ -1124,7 +1126,8 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				    &timestamp, NULL) >= 0)
 #endif /* ENABLE_UPNPPINHOLE */
 		     ;
-	     index++)
+	     index++) {
+		syslog(LOG_DEBUG, "%d: %s %hu %d", index, iaddr2, iport2, proto2);
 		if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
 		   && (proto2==proto)
 		   && ((iport2==iport) || (iport==0))) {
@@ -1143,6 +1146,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			}
 			break;
 		}
+	}
 	if (r >= 0) {
 		syslog(LOG_INFO, "PCP: %s port %hu mapping removed",
 		       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
