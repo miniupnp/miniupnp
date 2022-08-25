@@ -1153,7 +1153,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			}
 		}
 #else
-		syslog(LOG_WARN, "ENABLE_UPNPPINHOLE was not enabled at compile time");
+		syslog(LOG_WARNING, "ENABLE_UPNPPINHOLE was not enabled at compile time");
 #endif /* ENABLE_UPNPPINHOLE */
 	}
 	if (r >= 0) {
