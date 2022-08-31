@@ -75,6 +75,7 @@ clean:
 	$(RM) *.exe
 	$(RM) miniupnpc.dll miniupnpc.lib miniupnpc.dll.def
 	$(RM) libminiupnpc.a
+	$(RM) $(DISTFILE)
 
 $(DISTFILE):	$(BINARIES)
 	$(ZIP) $@ *.exe *.dll *.lib *.def *.a LICENSE README Changelog.txt
