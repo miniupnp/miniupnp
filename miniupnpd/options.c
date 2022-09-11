@@ -20,6 +20,7 @@
 #endif /* PCP_SADSPC */
 #include "upnpglobalvars.h"
 #include "macros.h"
+#include "configlocations.h"
 
 #ifndef DISABLE_CONFIG_FILE
 struct option * ary_options = NULL;
@@ -107,7 +108,7 @@ static const struct {
 int
 readoptionsfile(const char * fname, int debug_flag)
 {
-	FILE *hfile = NULL;
+	struct ConfigLocatons *configfiles;
 	char buffer[1024];
 	char *equals;
 	char *name;
@@ -128,9 +129,8 @@ readoptionsfile(const char * fname, int debug_flag)
 #ifdef DEBUG
 	printf("Reading configuration from file %s\n", fname);
 #endif
-
-	if(!(hfile = fopen(fname, "r")))
-		return -1;
+	if (!(configfiles=ConfigLocations_create())) return -1;
+	if (ConfigLocations_open_file(configfiles, fname, debug_flag)) return -1;
 
 	if(ary_options != NULL)
 	{
@@ -138,9 +138,8 @@ readoptionsfile(const char * fname, int debug_flag)
 		num_options = 0;
 	}
 
-	while(fgets(buffer, sizeof(buffer), hfile))
+	while(ConfigLocations_fgets(configfiles, buffer, sizeof(buffer), &fname, &linenum, debug_flag))
 	{
-		linenum++;
 		t = strchr(buffer, '\n');
 		if(t)
 		{
@@ -161,6 +160,27 @@ readoptionsfile(const char * fname, int debug_flag)
 
 		/* check for comments or empty lines */
 		if(name[0] == '#' || name[0] == '\0') continue;
+		if (0 == memcmp(name,"include ", sizeof("include ")-1))
+		{
+			name += sizeof("include ");
+			while(isspace(*name))
+				name++;
+			if (!*name)
+			{
+				INIT_PRINT_ERR("Missing include pattern/path in file %s line %d\n",
+					fname, linenum);
+				ConfigLocations_free(configfiles);
+				return -1;
+			}
+			if (ConfigLocations_open_glob(configfiles, name, debug_flag))
+			{
+				INIT_PRINT_ERR("Error opening config file patternpattern/path in file %s line %d\n",
+					fname, linenum);
+				ConfigLocations_free(configfiles);
+				return -1;
+			}
+			continue;
+		}
 
 		len = strlen(name); /* length of the whole line excluding leading
 		                     * and ending white spaces */
@@ -172,6 +192,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			{
 				INIT_PRINT_ERR("memory allocation error. Permission line in file %s line %d\n",
 				        fname, linenum);
+				ConfigLocations_free(configfiles);
 				return -1;
 			}
 			else
@@ -186,6 +207,7 @@ readoptionsfile(const char * fname, int debug_flag)
 				{
 					INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 					        fname, linenum, name);
+					ConfigLocations_free(configfiles);
 					return -1;
 				}
 			}
@@ -200,6 +222,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			{
 				INIT_PRINT_ERR("memory allocation error. DSCP line in file %s line %d\n",
 				        fname, linenum);
+				ConfigLocations_free(configfiles);
 				return -1;
 			}
 			else
@@ -214,6 +237,7 @@ readoptionsfile(const char * fname, int debug_flag)
 				{
 					INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 					        fname, linenum, name);
+					ConfigLocations_free(configfiles);
 					return -1;
 				}
 			}
@@ -224,6 +248,7 @@ readoptionsfile(const char * fname, int debug_flag)
 		{
 			INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 			        fname, linenum, name);
+			ConfigLocations_free(configfiles);
 			return -1;
 		}
 
@@ -255,6 +280,7 @@ readoptionsfile(const char * fname, int debug_flag)
 		{
 			INIT_PRINT_ERR("invalid option in file %s line %d : %s=%s\n",
 			        fname, linenum, name, value);
+			ConfigLocations_free(configfiles);
 			return -1;
 		}
 		else
@@ -264,6 +290,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			{
 				INIT_PRINT_ERR("memory allocation error. Option in file %s line %d.\n",
 				        fname, linenum);
+				ConfigLocations_free(configfiles);
 				return -1;
 			}
 			else
@@ -275,6 +302,7 @@ readoptionsfile(const char * fname, int debug_flag)
 				{
 					INIT_PRINT_ERR("memory allocation error, Option value in file %s line %d : %s=%s\n",
 					        fname, linenum, name, value);
+					ConfigLocations_free(configfiles);
 					return -1;
 				}
 				else
@@ -292,8 +320,8 @@ readoptionsfile(const char * fname, int debug_flag)
 		}
 
 	}
+	ConfigLocations_free(configfiles);
 
-	fclose(hfile);
 
 	for(i = 0; i < num_options; i++)
 	{
