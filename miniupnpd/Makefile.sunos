@@ -51,7 +51,7 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o \
-          upnppinhole.o asyncsendto.o portinuse.o
+          upnppinhole.o asyncsendto.o portinuse.o configlocations.o
 BSDOBJS = bsd/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
 SUNOSOBJS = solaris/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
 MACOBJS = mac/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
