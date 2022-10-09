@@ -947,8 +947,6 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	uint64_t handle_num;
 	uint32_t if_idx;
 
-	UNUSED(handle);
-
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
 		log_error("nftnl_rule_alloc() FAILED");
@@ -1014,7 +1012,6 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
-	UNUSED(eport);
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
@@ -1056,7 +1053,6 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
-	UNUSED(eport);
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
