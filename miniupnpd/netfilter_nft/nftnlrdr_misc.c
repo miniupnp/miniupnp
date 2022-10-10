@@ -816,7 +816,7 @@ expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 }
 
 static void
-expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val)
+expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint16_t val)
 {
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
@@ -845,7 +845,7 @@ expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 
 static void
 expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
-	     in_addr_t addr_min, uint32_t proto_min, uint32_t flags)
+	     in_addr_t addr_min, uint16_t proto_min, uint32_t flags)
 {
 	struct nftnl_expr *e;
 	UNUSED(flags);
@@ -855,7 +855,7 @@ expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "nat");
 		return;
 	}
-	
+
 	nftnl_expr_set_u32(e, NFTNL_EXPR_NAT_TYPE, t);
 	nftnl_expr_set_u32(e, NFTNL_EXPR_NAT_FAMILY, family);
 
