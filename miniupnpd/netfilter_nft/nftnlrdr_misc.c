@@ -217,9 +217,21 @@ parse_rule_immediate(struct nftnl_expr *e, rule_t *r)
 	if (dreg == NFT_REG_VERDICT) {
 		reg_val = nftnl_expr_get_u32(e, NFTNL_EXPR_IMM_VERDICT);
 	} else {
-		reg_val = *(uint32_t *)nftnl_expr_get(e,
-							 NFTNL_EXPR_IMM_DATA,
-							 &reg_len);
+		const void * p = nftnl_expr_get(e, NFTNL_EXPR_IMM_DATA, &reg_len);
+		if (p == NULL) {
+			log_error("nftnl_expr_get() failed for reg:%u", dreg);
+			return;
+		} else switch(reg_len) {
+			case sizeof(uint32_t):
+				reg_val = *(const uint32_t *)p;
+				break;
+			case sizeof(uint16_t):
+				reg_val = *(const uint16_t *)p;
+				break;
+			default:
+				log_error("nftnl_expr_get() reg_len=%u", reg_len);
+				return;
+		}
 	}
 
 	set_reg(r, dreg, RULE_REG_IMM_VAL, reg_val);
