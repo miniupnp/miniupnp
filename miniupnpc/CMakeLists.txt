@@ -1,11 +1,12 @@
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
-project (miniupnpc C)
+project (miniupnpc
+         VERSION 2.2.3
+         DESCRIPTION "UPnP IGD client lightweight library"
+         HOMEPAGE_URL https://miniupnp.tuxfamily.org/
+         LANGUAGES C)
 
-set (MINIUPNPC_VERSION 2.2.3)
 set (MINIUPNPC_API_VERSION 17)
-set (MINIUPNPC_DESCRIPTION "UPnP IGD client lightweight library")
-set (MINIUPNPC_HOMEPAGE_URL https://miniupnp.tuxfamily.org/)
 
 option (UPNPC_BUILD_STATIC "Build static library" TRUE)
 option (UPNPC_BUILD_SHARED "Build shared library" TRUE)
@@ -143,7 +144,7 @@ if (UPNPC_BUILD_SHARED)
   add_library (miniupnpc::miniupnpc ALIAS libminiupnpc-shared)
   set_target_properties (libminiupnpc-shared PROPERTIES EXPORT_NAME miniupnpc)
   set_target_properties (libminiupnpc-shared PROPERTIES OUTPUT_NAME "miniupnpc")
-  set_target_properties (libminiupnpc-shared PROPERTIES VERSION ${MINIUPNPC_VERSION})
+  set_target_properties (libminiupnpc-shared PROPERTIES VERSION ${PROJECT_VERSION})
   set_target_properties (libminiupnpc-shared PROPERTIES SOVERSION ${MINIUPNPC_API_VERSION})
   target_link_libraries (libminiupnpc-shared PRIVATE miniupnpc-private)
   target_compile_definitions(libminiupnpc-shared PRIVATE MINIUPNP_EXPORTS)
