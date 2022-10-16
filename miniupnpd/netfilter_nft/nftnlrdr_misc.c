@@ -217,9 +217,21 @@ parse_rule_immediate(struct nftnl_expr *e, rule_t *r)
 	if (dreg == NFT_REG_VERDICT) {
 		reg_val = nftnl_expr_get_u32(e, NFTNL_EXPR_IMM_VERDICT);
 	} else {
-		reg_val = *(uint32_t *)nftnl_expr_get(e,
-							 NFTNL_EXPR_IMM_DATA,
-							 &reg_len);
+		const void * p = nftnl_expr_get(e, NFTNL_EXPR_IMM_DATA, &reg_len);
+		if (p == NULL) {
+			log_error("nftnl_expr_get() failed for reg:%u", dreg);
+			return;
+		} else switch(reg_len) {
+			case sizeof(uint32_t):
+				reg_val = *(const uint32_t *)p;
+				break;
+			case sizeof(uint16_t):
+				reg_val = *(const uint16_t *)p;
+				break;
+			default:
+				log_error("nftnl_expr_get() reg_len=%u", reg_len);
+				return;
+		}
 	}
 
 	set_reg(r, dreg, RULE_REG_IMM_VAL, reg_val);
@@ -804,7 +816,7 @@ expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 }
 
 static void
-expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val)
+expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint16_t val)
 {
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
@@ -833,7 +845,7 @@ expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 
 static void
 expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
-	     in_addr_t addr_min, uint32_t proto_min, uint32_t flags)
+	     in_addr_t addr_min, uint16_t proto_min, uint32_t flags)
 {
 	struct nftnl_expr *e;
 	UNUSED(flags);
@@ -843,7 +855,7 @@ expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "nat");
 		return;
 	}
-	
+
 	nftnl_expr_set_u32(e, NFTNL_EXPR_NAT_TYPE, t);
 	nftnl_expr_set_u32(e, NFTNL_EXPR_NAT_FAMILY, family);
 
@@ -947,8 +959,6 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	uint64_t handle_num;
 	uint32_t if_idx;
 
-	UNUSED(handle);
-
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
 		log_error("nftnl_rule_alloc() FAILED");
@@ -1014,7 +1024,6 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
-	UNUSED(eport);
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
@@ -1056,7 +1065,6 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		unsigned short rport, const char *descr, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
-	UNUSED(eport);
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
