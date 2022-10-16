@@ -15,7 +15,7 @@ UPNP_VERSION_MINOR=1
 
 # input environment variables :
 # IPV6, IGD2, STRICT, DEBUG, LEASFILE, VENDORCFG, PCP_PEER,
-# PORTINUSE, DISABLEPPPCONN, FW, IPTABLESPATH, TARGET_OPENWRT,
+# PORTINUSE, REGEX, DISABLEPPPCONN, FW, IPTABLESPATH, TARGET_OPENWRT,
 # PKG_CONFIG, NO_BACKGROUND_NO_PIDFILE, DYNAMIC_OS_VERSION
 # OS_NAME, OS_VERSION, OS_MACHINE, V6SOCKETS_ARE_V6ONLY
 
@@ -33,6 +33,7 @@ case "$argv" in
 	--vendorcfg) VENDORCFG=1 ;;
 	--pcp-peer) PCP_PEER=1 ;;
 	--portinuse) PORTINUSE=1 ;;
+	--regex) REGEX=1 ;;
 	--uda-version=*)
 		UPNP_VERSION=$(echo $argv | cut -d= -f2)
 		UPNP_VERSION_MAJOR=$(echo $UPNP_VERSION | cut -s -d. -f1)
@@ -67,6 +68,7 @@ case "$argv" in
 		echo " --vendorcfg enable configuration of manufacturer info"
 		echo " --pcp-peer  enable PCP PEER operation"
 		echo " --portinuse enable port in use check"
+		echo " --regex     enable description regex filter"
 		echo " --uda-version=x.x  set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn  disable WANPPPConnection"
 		echo " --firewall=<name>  force the firewall type (nftables, iptables, pf, ipf, ipfw)"
@@ -750,6 +752,14 @@ if [ -n "$PORTINUSE" ]; then
 	echo "#define CHECK_PORTINUSE" >> ${CONFIGFILE}
 else
 	echo "/*#define CHECK_PORTINUSE*/" >> ${CONFIGFILE}
+fi
+echo "" >> ${CONFIGFILE}
+
+echo "/* Uncomment the following line to enable description regex filter */" >> ${CONFIGFILE}
+if [ -n "$REGEX" ]; then
+	echo "#define ENABLE_REGEX" >> ${CONFIGFILE}
+else
+	echo "/*#define ENABLE_REGEX*/" >> ${CONFIGFILE}
 fi
 echo "" >> ${CONFIGFILE}
 

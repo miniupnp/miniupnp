@@ -11,6 +11,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+
+#ifdef ENABLE_REGEX
+#include <regex.h>
+#endif
+
 #include "config.h"
 
 /* UPnP permission rule samples:
@@ -22,6 +27,10 @@ struct upnpperm {
 	u_short eport_min, eport_max;	/* external port range */
 	struct in_addr address, mask;	/* ip/mask */
 	u_short iport_min, iport_max;	/* internal port range */
+	char * re;
+#ifdef ENABLE_REGEX
+	regex_t regex;	/* matching regex */
+#endif
 };
 
 /* read_permission_line()
@@ -36,6 +45,9 @@ int
 read_permission_line(struct upnpperm * perm,
                      char * p);
 
+void
+free_permission_line(struct upnpperm * perm);
+
 /* check_upnp_rule_against_permissions()
  * returns: 0 if the upnp rule should be rejected,
  *          1 if it could be accepted */
@@ -43,7 +55,7 @@ int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     int n_perms,
                                     u_short eport, struct in_addr address,
-                                    u_short iport);
+                                    u_short iport, const char * desc);
 
 /**
  * Build an array of all allowed external ports (for the address and internal port)
