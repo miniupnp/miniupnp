@@ -1,4 +1,4 @@
-/* $Id: upnpdescgen.c,v 1.87 2020/05/30 09:05:46 nanard Exp $ */
+/* $Id: upnpdescgen.c,v 1.91 2022/10/16 05:49:41 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -22,6 +22,7 @@
 #include "upnpdescstrings.h"
 #include "upnpurns.h"
 #include "getconnstatus.h"
+#include "macros.h"
 
 
 /* Event magical values codes */
