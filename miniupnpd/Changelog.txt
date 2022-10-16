@@ -1,4 +1,6 @@
-$Id: Changelog.txt,v 1.489 2022/06/01 23:21:11 nanard Exp $
+$Id: Changelog.txt,v 1.492 2022/10/16 06:12:33 nanard Exp $
+
+VERSION 2.3.1 : released on 2022/10/16
 
 2022/10/10:
   NFTables : fix for Big Endian. iport was always read as 0
