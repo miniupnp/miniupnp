@@ -1162,12 +1162,24 @@ int check_port_forwarding_setup(void)
 		syslog(LOG_WARNING, "CHECK: Firewall on local machine is blocking port forwarding");
 		syslog(LOG_WARNING, "Verify configuration of firewall on local machine and also on upstream router");
 		syslog(LOG_WARNING, "Enable option ext_perform_stun=yes for detailed output");
+#ifdef DISABLE_FIREWALL_CHECKS
+		/* When DISABLE_FIREWALL_CHECKS is enabled then do not disable port forwarding.
+		 * Beware that miniupnpd in this case may report incorrect status of port. */
+		syslog(LOG_WARNING, "WARNING: miniupnpd may report incorrect status of port forwarding");
+#else
 		disable_port_forwarding = 1;
+#endif
 	} else {
 		syslog(LOG_WARNING, "CHECK: Firewall on upstream router %s is blocking port forwarding", ext_addr_str);
 		syslog(LOG_WARNING, "Verify configuration of firewall on upstream router %s", ext_addr_str);
 		syslog(LOG_WARNING, "Enable option ext_perform_stun=yes for detailed output");
+#ifdef DISABLE_FIREWALL_CHECKS
+		/* When DISABLE_FIREWALL_CHECKS is enabled then do not disable port forwarding.
+		 * Beware that miniupnpd in this case may report incorrect status of port. */
+		syslog(LOG_WARNING, "WARNING: miniupnpd may report incorrect status of port forwarding");
+#else
 		disable_port_forwarding = 1;
+#endif
 	}
 
 	return 0;
