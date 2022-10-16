@@ -1,7 +1,7 @@
-/* $Id: natpmp.c,v 1.57 2019/09/24 11:48:01 nanard Exp $ */
+/* $Id: natpmp.c,v 1.58 2022/10/16 06:03:56 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2019 Thomas Bernard
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * (c) 2007-2022 Thomas Bernard
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include <stdio.h>
@@ -17,6 +17,7 @@
 #include <sys/uio.h>
 
 #include "macros.h"
+#include "rw_unaligned.h"
 #include "config.h"
 #include "natpmp.h"
 #include "upnpglobalvars.h"

@@ -1,4 +1,4 @@
-/* $Id: pcpserver.c,v 1.51 2019/05/21 08:39:44 nanard Exp $ */
+/* $Id: pcpserver.c,v 1.56 2022/10/16 06:03:56 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * Website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -73,6 +73,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "pcpserver.h"
 #include "natpmp.h"
 #include "macros.h"
+#include "rw_unaligned.h"
 #include "upnpglobalvars.h"
 #include "pcplearndscp.h"
 #include "upnpredirect.h"
