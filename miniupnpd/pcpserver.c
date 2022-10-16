@@ -934,7 +934,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		     (!check_upnp_rule_against_permissions(upnppermlist,
 							   num_upnpperm, pcp_msg_info->ext_port,
 							   ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
-							   pcp_msg_info->int_port)))) {
+							   pcp_msg_info->int_port, pcp_msg_info->desc)))) {
 			if (pcp_msg_info->pfailure_present) {
 				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			}

@@ -351,9 +351,9 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	}
 
 	if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm,
-	                                        eport, address, iport)) {
+	                                        eport, address, iport, desc)) {
 		syslog(LOG_INFO, "redirection permission check failed for "
-		                 "%hu->%s:%hu %s", eport, iaddr, iport, protocol);
+		                 "%hu->%s:%hu %s %s", eport, iaddr, iport, protocol, desc);
 		return -3;
 	}
 
