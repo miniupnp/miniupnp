@@ -1,8 +1,11 @@
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
-project (miniupnpc C)
+project (miniupnpc
+         VERSION 2.2.3
+         DESCRIPTION "UPnP IGD client lightweight library"
+         HOMEPAGE_URL https://miniupnp.tuxfamily.org/
+         LANGUAGES C)
 
-set (MINIUPNPC_VERSION 2.2.3)
 set (MINIUPNPC_API_VERSION 17)
 
 option (UPNPC_BUILD_STATIC "Build static library" TRUE)
@@ -141,7 +144,7 @@ if (UPNPC_BUILD_SHARED)
   add_library (miniupnpc::miniupnpc ALIAS libminiupnpc-shared)
   set_target_properties (libminiupnpc-shared PROPERTIES EXPORT_NAME miniupnpc)
   set_target_properties (libminiupnpc-shared PROPERTIES OUTPUT_NAME "miniupnpc")
-  set_target_properties (libminiupnpc-shared PROPERTIES VERSION ${MINIUPNPC_VERSION})
+  set_target_properties (libminiupnpc-shared PROPERTIES VERSION ${PROJECT_VERSION})
   set_target_properties (libminiupnpc-shared PROPERTIES SOVERSION ${MINIUPNPC_API_VERSION})
   target_link_libraries (libminiupnpc-shared PRIVATE miniupnpc-private)
   target_compile_definitions(libminiupnpc-shared PRIVATE MINIUPNP_EXPORTS)
@@ -219,6 +222,8 @@ if (UPNPC_BUILD_TESTS)
 # set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} testminixml minixmlvalid testupnpreplyparse testigddescparse testminiwget)
 endif ()
 
+configure_file(miniupnpc.pc.in miniupnpc.pc @ONLY)
+
 if (NOT UPNPC_NO_INSTALL)
   install (FILES
     include/miniupnpc.h
@@ -236,6 +241,10 @@ if (NOT UPNPC_NO_INSTALL)
 
   install(FILES miniupnpc-config.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/miniupnpc
+  )
+
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/miniupnpc.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
   )
 endif()
 
