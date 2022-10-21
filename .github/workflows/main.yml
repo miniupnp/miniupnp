@@ -8,7 +8,7 @@ on:
   push:
     paths:
     - 'miniupnpc/**'
-    - 'miniupnpd/**'
+    - 'minissdpd/**'
     - '.github/workflows/main.yml'
   pull_request:
     branches: [ master ]

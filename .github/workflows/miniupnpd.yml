@@ -6,7 +6,9 @@ name: miniupnpd
 # events but only for the master branch
 on:
   push:
-    branches: [ master ]
+    paths:
+    - 'miniupnpd/**'
+    - '.githib/workflows/miniupnpd.yml'
   pull_request:
     branches: [ master ]
 
