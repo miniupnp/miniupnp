@@ -31,7 +31,7 @@ jobs:
         run: make -C miniupnpc install DESTDIR=/tmp/miniupnpc_install
 
       - name: build miniupnpc with cmake
-        run: mkdir miniupnpc/cmake-build && cd miniupnpc/cmake-build && cmake .. && make
+        run: mkdir miniupnpc/cmake-build && cd miniupnpc/cmake-build && cmake .. && make && make test
 
       - name: install miniupnpc with cmake
         run: cd miniupnpc/cmake-build && make DESTDIR=/tmp/miniupnpc_cmake_install install

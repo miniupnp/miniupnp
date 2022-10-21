@@ -219,7 +219,41 @@ if (UPNPC_BUILD_TESTS)
   )
   target_link_libraries (testaddr_is_reserved PRIVATE miniupnpc-tests)
 
+  add_executable (testportlistingparse src/testportlistingparse.c
+                                       src/minixml.c src/portlistingparse.c)
+  target_include_directories (testportlistingparse PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+  target_link_libraries (testportlistingparse PRIVATE miniupnpc-tests)
+
+  add_executable (minihttptestserver src/minihttptestserver.c)
+
 # set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} testminixml minixmlvalid testupnpreplyparse testigddescparse testminiwget)
+  include(CTest)
+  add_test(NAME validateminixml
+           COMMAND minixmlvalid)
+  add_test(NAME validateminiwget
+           COMMAND ${CMAKE_SOURCE_DIR}/testminiwget.sh)
+  set_property(TEST validateminiwget
+               PROPERTY ENVIRONMENT
+               TESTSERVER=${CMAKE_BINARY_DIR}/minihttptestserver
+               TESTMINIWGET=${CMAKE_BINARY_DIR}/testminiwget)
+  add_test(NAME validateupnpreplyparse
+           COMMAND ${CMAKE_SOURCE_DIR}/testupnpreplyparse.sh
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  set_property(TEST validateupnpreplyparse
+               PROPERTY ENVIRONMENT
+               TESTUPNPREPLYPARSE=${CMAKE_BINARY_DIR}/testupnpreplyparse)
+  add_test(NAME validateportlistingparse
+           COMMAND testportlistingparse)
+  add_test(NAME validateigddescparse1
+           COMMAND testigddescparse new_LiveBox_desc.xml new_LiveBox_desc.values
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/testdesc)
+  add_test(NAME validateigddescparse2
+           COMMAND testigddescparse linksys_WAG200G_desc.xml linksys_WAG200G_desc.values
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/testdesc)
+  add_test(NAME validateaddr_is_reserved
+           COMMAND testaddr_is_reserved)
+
 endif ()
 
 configure_file(miniupnpc.pc.in miniupnpc.pc @ONLY)
