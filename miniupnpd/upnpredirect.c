@@ -1,8 +1,8 @@
-/* $Id: upnpredirect.c,v 1.97 2020/06/06 17:55:24 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.99 2022/10/21 19:44:59 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2022 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
