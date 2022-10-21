@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.253 2022/02/19 23:21:56 nanard Exp $
+$Id: Changelog.txt,v 1.254 2022/10/21 21:13:12 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.2.4 : released 2022/10/21
 
 2022/02/20:
   upnpc: use of @ to replace local lan address
