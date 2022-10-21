@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.492 2022/10/16 06:12:33 nanard Exp $
+$Id: Changelog.txt,v 1.493 2022/10/21 19:43:28 nanard Exp $
+
+2022/10/21:
+  Add option to match rules description with regex
 
 VERSION 2.3.1 : released on 2022/10/16
 
