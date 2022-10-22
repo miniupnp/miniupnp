@@ -1,4 +1,6 @@
-$Id: Changelog.txt,v 1.52 2020/06/06 20:20:47 nanard Exp $
+$Id: Changelog.txt,v 1.54 2022/10/22 18:54:16 nanard Exp $
+
+VERSION 1.6.0:
 
 2021/01/15:
 	Add submit_to_minissdpd.py

@@ -1,4 +1,4 @@
-/* $Id: config.h,v 1.12 2020/06/06 20:20:47 nanard Exp $ */
+/* $Id: config.h,v 1.13 2022/10/22 18:52:25 nanard Exp $ */
 /*  MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2020 Thomas Bernard
@@ -7,7 +7,7 @@
 #ifndef CONFIG_H_INCLUDED
 #define CONFIG_H_INCLUDED
 
-#define MINISSDPD_VERSION "1.5"
+#define MINISSDPD_VERSION "1.6.0"
 
 /* use BSD daemon() ? */
 #define USE_DAEMON
