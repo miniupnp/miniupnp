@@ -1,7 +1,7 @@
 /* $Id: minissdpd.c,v 1.61 2021/11/04 23:27:28 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * (c) 2007-2021 Thomas Bernard
+ * (c) 2007-2022 Thomas Bernard
  * website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -193,7 +193,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str)
 	if(lan_addr->ifname[0] != '\0') {
 		lan_addr->index = if_nametoindex(lan_addr->ifname);
 		if(lan_addr->index == 0)
-			fprintf(stderr, "Cannot get index for network interface %s",
+			fprintf(stderr, "Cannot get index for network interface %s\n",
 			        lan_addr->ifname);
 	} else {
 		fprintf(stderr,
