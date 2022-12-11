@@ -1261,7 +1261,7 @@ int main(int argc, char * * argv)
 	struct sockaddr_in6 sendername6;
 	socklen_t sendername6_len;
 #endif	/* ENABLE_IPV6 */
-	unsigned char ttl = 2;	/* UDA says it should default to 2 */
+	unsigned char ttl = 10;	/* UDA says it should default to 2 */
 	const char * searched_device = NULL;	/* if not NULL, search/filter a specific device type */
 
 	LIST_INIT(&reqlisthead);
