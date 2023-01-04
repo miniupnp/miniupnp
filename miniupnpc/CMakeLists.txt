@@ -292,6 +292,10 @@ if (NOT UPNPC_NO_INSTALL)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/miniupnpc.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
   )
+
+  install(FILES man3/miniupnpc.3
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/man3
+  )
 endif()
 
 # vim: ts=2:sw=2:expandtab
