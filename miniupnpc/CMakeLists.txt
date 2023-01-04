@@ -296,6 +296,10 @@ if (NOT UPNPC_NO_INSTALL)
   install(FILES man3/miniupnpc.3
     DESTINATION ${CMAKE_INSTALL_MANDIR}/man3
   )
+
+  install(FILES external-ip.sh
+    TYPE BIN
+  )
 endif()
 
 # vim: ts=2:sw=2:expandtab
