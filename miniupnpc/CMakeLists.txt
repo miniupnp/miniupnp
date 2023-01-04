@@ -282,7 +282,7 @@ if (NOT UPNPC_NO_INSTALL)
     include/miniupnpctypes.h
     include/portlistingparse.h
     include/miniupnpc_declspec.h
-    DESTINATION include/miniupnpc
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/miniupnpc
   )
 
   install(FILES miniupnpc-config.cmake
