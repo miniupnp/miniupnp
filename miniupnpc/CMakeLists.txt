@@ -133,6 +133,10 @@ if (UPNPC_BUILD_STATIC)
     add_executable (upnpc-static src/upnpc.c)
     target_link_libraries (upnpc-static PRIVATE libminiupnpc-static)
     target_include_directories(upnpc-static PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    if (NOT UPNPC_NO_INSTALL)
+      install (TARGETS upnpc-static
+               RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
   endif ()
 endif ()
 
@@ -170,11 +174,19 @@ if (UPNPC_BUILD_SHARED)
     add_executable (upnpc-shared src/upnpc.c)
     target_link_libraries (upnpc-shared PRIVATE libminiupnpc-shared)
     target_include_directories(upnpc-shared PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    if (NOT UPNPC_NO_INSTALL)
+      install (TARGETS upnpc-shared
+               RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
   endif ()
 
   add_executable (listdevices src/listdevices.c)
   target_link_libraries (listdevices PRIVATE libminiupnpc-shared)
   target_include_directories(listdevices PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+  if (NOT UPNPC_NO_INSTALL)
+    install (TARGETS listdevices
+             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif ()
 
 if (UPNPC_BUILD_TESTS)
