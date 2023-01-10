@@ -1,0 +1,172 @@
+name: "build miniupnpc wheels"
+
+on:
+  push:
+    branches:
+    - master
+    tags:
+    - '**'
+  pull_request:
+    branches:
+    - '**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || format('{0}-{1}-{2}', github.ref, github.event_name, github.ref == 'refs/heads/main' && github.sha || '') }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.os.emoji }} 📦 Build ${{ matrix.arch.name }} ${{ matrix.python.major-dot-minor }}
+    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: macOS
+            matrix: macos
+            emoji: 🍎
+            runs-on:
+              arm: [macOS, ARM64]
+              intel: [macos-latest]
+            cibw-archs-macos:
+              arm: arm64
+              intel: x86_64
+            macosx-deployment-target:
+              arm: 11.0
+              intel: 10.14
+          - name: Linux
+            matrix: linux
+            emoji: 🐧
+            runs-on:
+              arm: [Linux, ARM64]
+              intel: [ubuntu-latest]
+          - name: Windows
+            matrix: windows
+            emoji: 🪟
+            runs-on:
+              intel: [windows-latest]
+        python:
+          - major-dot-minor: '3.7'
+            cibw-build: 'cp37-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
+            matrix: '3.7'
+          - major-dot-minor: '3.8'
+            cibw-build: 'cp38-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
+            matrix: '3.8'
+          - major-dot-minor: '3.9'
+            cibw-build: 'cp39-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
+            matrix: '3.9'
+          - major-dot-minor: '3.10'
+            cibw-build: 'cp310-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
+            matrix: '3.10'
+          - major-dot-minor: '3.11'
+            cibw-build: 'cp311-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2014
+            matrix: '3.11'
+        arch:
+          - name: ARM
+            matrix: arm
+          - name: Intel
+            matrix: intel
+        exclude:
+          - os:
+              matrix: windows
+            arch:
+              matrix: arm
+          - os:
+              matrix: macos
+            arch:
+              matrix: arm
+            python:
+              matrix: '3.7'
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python.major-dot-minor }}
+
+      - uses: Chia-Network/actions/create-venv@main
+        id: create-venv
+
+      - uses: Chia-Network/actions/activate-venv@main
+        with:
+          directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
+
+      - uses: actions/checkout@v3
+        with:
+          path: cloned
+
+      - name: Copy out miniupnpc
+        run: |
+          cp -R cloned/miniupnpc source
+
+      - name: Install tools
+        if: matrix.os.matrix != 'windows'
+        run: |
+          pip install cibuildwheel==2.11.2
+
+      - name: Build and test
+        if: matrix.os.matrix != 'windows'
+        env:
+          CIBW_ARCHS_MACOS: ${{ matrix.os.cibw-archs-macos[matrix.arch.matrix] }}
+          CIBW_BUILD: ${{ matrix.python.cibw-build }}
+          CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
+          CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
+          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.python.manylinux['intel'] }}
+          CIBW_PRERELEASE_PYTHONS: True
+          CIBW_SKIP: '*-manylinux_i686 *-win32 *-musllinux_*'
+        run: |
+          cibuildwheel source --output-dir dist
+
+      - name: Build (Windows)
+        if: matrix.os.matrix == 'windows'
+        run: |
+          cd source
+          mingw32-make -f Makefile.mingw CC=gcc
+          python -m pip install wheel
+          mingw32-make -f Makefile.mingw pythonmodule PYTHON=python
+          7z a dist/*.whl miniupnpc.dll
+          mkdir ../dist
+          cp dist/*.whl ../dist
+
+      - uses: Chia-Network/actions/create-venv@main
+        id: create-test-venv
+
+      - uses: Chia-Network/actions/activate-venv@main
+        with:
+          directories: ${{ steps.create-test-venv.outputs.activate-venv-directories }}
+
+      - name: Install
+        run: |
+          pip install --no-index --only-binary :all: --find-links dist miniupnpc
+
+      - name: Import
+        run: |
+          python -c 'import miniupnpc; print(miniupnpc)'
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: wheel
+          path: ./dist
+          if-no-files-found: error
