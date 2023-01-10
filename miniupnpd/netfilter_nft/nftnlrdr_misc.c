@@ -571,7 +571,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					}
 				}
 
-				r->handle = *(uint32_t *) nftnl_rule_get_data(rule,
+				r->handle = *(uint64_t *) nftnl_rule_get_data(rule,
 															  NFTNL_RULE_HANDLE,
 															  &len);
 				r->type = CB_DATA(type);
