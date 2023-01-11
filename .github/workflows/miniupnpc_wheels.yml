@@ -126,7 +126,7 @@ jobs:
           pip install cibuildwheel==2.11.2
 
       - name: Set up QEMU
-        if: matrix.arch.matrix == 'arm'
+        if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
         uses: docker/setup-qemu-action@v2
 
       - name: Build and test
