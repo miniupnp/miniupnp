@@ -46,7 +46,8 @@ jobs:
             matrix: linux
             emoji: 🐧
             runs-on:
-              arm: [Linux, ARM64]
+#              arm: [Linux, ARM64]
+              arm: [ubuntu-latest]
               intel: [ubuntu-latest]
           - name: Windows
             matrix: windows
@@ -124,6 +125,10 @@ jobs:
         if: matrix.os.matrix != 'windows'
         run: |
           pip install cibuildwheel==2.11.2
+
+      - name: Set up QEMU
+        if: matrix.arch.matrix == 'arm'
+        uses: docker/setup-qemu-action@v2
 
       - name: Build and test
         if: matrix.os.matrix != 'windows'
