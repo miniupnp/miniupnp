@@ -36,7 +36,7 @@ jobs:
             runs-on:
               arm: [macos-latest]
               intel: [macos-latest]
-            cibw-archs-macos:
+            cibw-archs:
               arm: arm64
               intel: x86_64
             macosx-deployment-target:
@@ -48,11 +48,17 @@ jobs:
             runs-on:
               arm: [ubuntu-latest]
               intel: [ubuntu-latest]
+            cibw-archs:
+              arm: aarch64
+              intel: x86_64
           - name: Windows
             matrix: windows
             emoji: 🪟
             runs-on:
               intel: [windows-latest]
+            cibw-archs:
+              arm: ARM64
+              intel: AMD64
         python:
           - major-dot-minor: '3.7'
             cibw-build: 'cp37-*'
@@ -132,7 +138,7 @@ jobs:
       - name: Build and test
         if: matrix.os.matrix != 'windows'
         env:
-          CIBW_ARCHS_MACOS: ${{ matrix.os.cibw-archs-macos[matrix.arch.matrix] }}
+          CIBW_ARCHS: ${{ matrix.os.cibw-archs[matrix.arch.matrix] }}
           CIBW_BUILD: ${{ matrix.python.cibw-build }}
           CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
           CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
