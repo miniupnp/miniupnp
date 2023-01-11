@@ -118,7 +118,7 @@ jobs:
 
       - name: Copy out miniupnpc
         run: |
-          cp --recursive --verbose cloned/miniupnpc source
+          cp --dereference --recursive --verbose cloned/miniupnpc source
 
       - name: Install tools
         if: matrix.os.matrix != 'windows'
