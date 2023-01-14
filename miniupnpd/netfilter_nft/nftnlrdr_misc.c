@@ -4,7 +4,7 @@
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
  * (c) 2019 Paul Chambers
- * (c) 2019-2021 Thomas Bernard
+ * (c) 2019-2023 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
@@ -291,6 +291,7 @@ parse_rule_nat(struct nftnl_expr *e, rule_t *r)
 	reg_val_ptr = get_reg_val_ptr(r, proto_min_reg);
 	if (reg_val_ptr != NULL) {
 		proto_min_val = htons((uint16_t)*reg_val_ptr);
+		syslog(LOG_DEBUG, "%s: proto_min_reg %u : %08x => %hd", "parse_rule_nat", proto_min_reg, *reg_val_ptr, proto_min_val);
 	} else {
 		syslog(LOG_ERR, "%s: invalid proto_min_reg %u", "parse_rule_nat", proto_min_reg);
 	}
