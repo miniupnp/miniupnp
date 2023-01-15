@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.493 2022/10/21 19:43:28 nanard Exp $
 
+2023/01/15:
+  Fix NFTables again (RULE_HANDLE using more than 32 bits)
+
 2022/10/21:
   Add option to match rules description with regex
 
