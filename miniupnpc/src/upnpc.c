@@ -135,7 +135,7 @@ static void ListRedirections(struct UPNPUrls * urls,
                              struct IGDdatas * data)
 {
 	int r;
-	int i = 0;
+	unsigned short i = 0;
 	char index[6];
 	char intClient[40];
 	char intPort[6];
@@ -150,7 +150,7 @@ static void ListRedirections(struct UPNPUrls * urls,
 	printf("PortMappingNumberOfEntries : %u\n", num);*/
 	printf(" i protocol exPort->inAddr:inPort description remoteHost leaseTime\n");
 	do {
-		snprintf(index, 6, "%d", i);
+		snprintf(index, 6, "%hu", i);
 		rHost[0] = '\0'; enabled[0] = '\0';
 		duration[0] = '\0'; desc[0] = '\0';
 		extPort[0] = '\0'; intPort[0] = '\0'; intClient[0] = '\0';
@@ -162,20 +162,19 @@ static void ListRedirections(struct UPNPUrls * urls,
 									   rHost, duration);
 		if(r==0)
 		/*
-			printf("%02d - %s %s->%s:%s\tenabled=%s leaseDuration=%s\n"
+			printf("%02hu - %s %s->%s:%s\tenabled=%s leaseDuration=%s\n"
 			       "     desc='%s' rHost='%s'\n",
 			       i, protocol, extPort, intClient, intPort,
 				   enabled, duration,
 				   desc, rHost);
 				   */
-			printf("%2d %s %5s->%s:%-5s '%s' '%s' %s\n",
+			printf("%2hu %s %5s->%s:%-5s '%s' '%s' %s\n",
 			       i, protocol, extPort, intClient, intPort,
 			       desc, rHost, duration);
 		else
 			printf("GetGenericPortMappingEntry() returned %d (%s)\n",
 			       r, strupnperror(r));
-		i++;
-	} while(r == 0 && i < 65536);
+	} while(r == 0 && i++ < 65535);
 }
 
 static void NewListRedirections(struct UPNPUrls * urls,
