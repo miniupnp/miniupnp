@@ -29,7 +29,7 @@ jobs:
         run: make -C miniupnpc -f Makefile.mingw DLLWRAP=i686-w64-mingw32-dllwrap CC=i686-w64-mingw32-gcc WINDRES=i686-w64-mingw32-windres AR=i686-w64-mingw32-ar all dist
 
       - name: upload binaries
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: miniupnpc-win32-binaries-${{github.sha}}
           path: |
