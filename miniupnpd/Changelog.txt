@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.495 2023/01/19 23:28:24 nanard Exp $
 
+2023/01/28
+  Fix updating of existing pinhole leasetime by AddPinhole
+
 VERSION 2.3.2 : released on 2023/01/20
 
 2023/01/15:
