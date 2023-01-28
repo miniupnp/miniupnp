@@ -1666,6 +1666,14 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	protocol = GetValueFromNameValueList(&data, "Protocol");
 	leaseTime = GetValueFromNameValueList(&data, "LeaseTime");
 
+#ifdef UPNP_STRICT
+	if (rem_port == NULL || rem_port[0] == '\0' || int_port == NULL || int_port[0] == '\0' )
+	{
+		ClearNameValueList(&data);
+		SoapError(h, 402, "Invalid Args");
+		return;
+	}
+#endif
 	rport = (unsigned short)(rem_port ? atoi(rem_port) : 0);
 	iport = (unsigned short)(int_port ? atoi(int_port) : 0);
 	ltime = leaseTime ? atoi(leaseTime) : -1;
