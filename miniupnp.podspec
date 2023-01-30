@@ -7,7 +7,7 @@ Pod::Spec.new do |spec|
 
   spec.version = "2.0.0.2"
   spec.source = {
-      git: 'https://github.com/cpp-ethereum-ios/miniupnp.git',
+      git: 'https://github.com/miniupnp/miniupnp.git',
       tag: "v#{spec.version}"
   }
 
