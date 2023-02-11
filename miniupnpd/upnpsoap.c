@@ -1634,7 +1634,7 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 		strncpy(clientaddr_str, "*ERROR*", sizeof(clientaddr_str));
 	}
 
-	if(h->clientaddr_v6.s6_addr != result_ip.s6_addr)
+	if(memcmp(&h->clientaddr_v6, &result_ip, sizeof(struct in6_addr)) != 0)
 	{
 		syslog(LOG_INFO, "%s: Client %s tried to access pinhole for internal %s and is not authorized",
 		       "PinholeVerification", clientaddr_str, int_ip);
