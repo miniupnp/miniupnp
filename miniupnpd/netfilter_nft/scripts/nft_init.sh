@@ -20,7 +20,6 @@ cat > /tmp/miniupnpd.nft <<EOF
 table inet $TABLE {
     chain forward {
         type filter hook forward priority 0;
-        policy drop;
 
         # miniupnpd
         jump $CHAIN
@@ -46,7 +45,6 @@ fi
 cat >> /tmp/miniupnpd.nft <<EOF
     chain prerouting {
         type nat hook prerouting priority -100;
-        policy accept;
 
         # miniupnpd
         jump $PREROUTING_CHAIN
@@ -56,7 +54,6 @@ cat >> /tmp/miniupnpd.nft <<EOF
 
     chain postrouting {
         type nat hook postrouting priority 100;
-        policy accept;
 
         # miniupnpd
         jump $POSTROUTING_CHAIN
