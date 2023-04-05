@@ -1,7 +1,7 @@
 /* $Id: upnppermissions.c,v 1.20 2020/10/30 21:37:35 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2022 Thomas Bernard
+ * (c) 2006-2023 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -175,6 +175,9 @@ read_permission_line(struct upnpperm * perm,
 	char * q;
 	int n_bits;
 	int i;
+
+	/* zero memory : see https://github.com/miniupnp/miniupnp/issues/652 */
+	memset(perm, 0, sizeof(struct upnpperm));
 
 	/* first token: (allow|deny) */
 	while(isspace(*p))
