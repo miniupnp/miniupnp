@@ -152,7 +152,22 @@ get_next_token(const char * s, char ** token, int raw)
 			memmove(*token + i + 1, *token + i + sequence_len,
 			        token_len - i - sequence_len);
 		}
-		*token = realloc(*token, i);
+		if (i == 0)
+		{
+			/* behavior of realloc(p, 0) is implementation-defined, so better set it to NULL.
+			 * https://github.com/miniupnp/miniupnp/issues/652#issuecomment-1518922139 */
+			free(*token);
+			*token = NULL;
+		}
+		else
+		{
+			char * tmp = realloc(*token, i);
+			if (tmp != NULL)
+				*token = tmp;
+			else
+				syslog(LOG_ERR, "%s: failed to reallocate to %u bytes",
+				       "get_next_token()", i);
+		}
 	}
 
 	/* return the beginning of the next token */
