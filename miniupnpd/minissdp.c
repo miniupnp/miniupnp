@@ -914,7 +914,11 @@ ProcessSSDPRequest(int s, unsigned short http_port)
 		   errno != EWOULDBLOCK &&
 		   errno != EINTR)
 		{
+#if defined(IP_RECVIF) || defined(IP_PKTINFO)
+			syslog(LOG_ERR, "recvmsg(udp): %m");
+#else
 			syslog(LOG_ERR, "recvfrom(udp): %m");
+#endif
 		}
 		return;
 	}
