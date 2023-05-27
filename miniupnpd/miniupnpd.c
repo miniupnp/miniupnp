@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.255 2023/05/27 09:33:16 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.256 2023/05/27 09:55:40 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -2184,6 +2184,41 @@ main(int argc, char * * argv)
 			puts(SSLeay_version(SSLEAY_VERSION));
 #endif
 #endif
+			puts("build options:"
+#ifdef USE_MINIUPNPDCTL
+				" miniupnpdctl"
+#endif
+#ifdef ENABLE_IPV6
+				" ipv6"
+#endif
+#ifdef UPNP_STRICT
+				" strict"
+#endif
+#ifdef ENABLE_NATPMP
+				" NAT-PMP"
+#endif
+#ifdef ENABLE_PCP
+				" PCP"
+#ifdef PCP_PEER
+				" PCP-PEER"
+#endif
+#ifdef PCP_FLOWP
+				" PCP-FLOWP"
+#endif
+#ifdef PCP_SADSCP
+				" PCP-SADSCP"
+#endif
+#endif /* ENABLE_PCP */
+#ifdef ENABLE_LEASEFILE
+				" leasefile"
+#endif
+#ifdef CHECK_PORTINUSE
+				" check_portinuse"
+#endif
+#ifdef IGD_V2
+				" igdv2"
+#endif
+			);
 			return 0;
 		}
 	}

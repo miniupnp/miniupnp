@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.498 2023/02/17 03:18:51 nanard Exp $
+$Id: Changelog.txt,v 1.500 2023/05/27 09:55:39 nanard Exp $
+
+2023/05/27:
+  option enable_natpmp => enable_pcp_pmp
+  add a short list of build-time options in --version output
 
 VERSION 2.3.3 : released on 2023/02/17
 
