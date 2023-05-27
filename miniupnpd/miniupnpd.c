@@ -1,8 +1,8 @@
-/* $Id: miniupnpd.c,v 1.250 2021/05/21 22:04:34 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.254 2023/05/27 09:28:50 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2021 Thomas Bernard
+ * (c) 2006-2023 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -1402,13 +1402,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 #endif	/* USE_PF */
 #ifdef ENABLE_NATPMP
+			/* enable both NAT-PMP and PCP (if enabled) */
 			case UPNPENABLENATPMP:
 				if(strcmp(ary_options[i].value, "yes") == 0)
-					SETFLAG(ENABLENATPMPMASK);	/*enablenatpmp = 1;*/
+					SETFLAG(ENABLENATPMPMASK);
 				else
 					if(atoi(ary_options[i].value))
 						SETFLAG(ENABLENATPMPMASK);
-					/*enablenatpmp = atoi(ary_options[i].value);*/
 				break;
 #endif	/* ENABLE_NATPMP */
 #ifdef ENABLE_PCP
@@ -1596,7 +1596,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			break;
 #ifdef ENABLE_NATPMP
 		case 'N':
-			/*enablenatpmp = 1;*/
+			/* enable both NAT-PMP and PCP (if enabled) */
 			SETFLAG(ENABLENATPMPMASK);
 			break;
 #endif	/* ENABLE_NATPMP */
