@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.256 2023/05/27 09:55:40 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.257 2023/05/27 16:49:17 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -1214,7 +1214,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #endif /* DISABLE_CONFIG_FILE */
 
 	/* set initial values */
-	SETFLAG(ENABLEUPNPMASK);	/* UPnP is enabled by default */
+	SETFLAG(ENABLEUPNPMASK | SECUREMODEMASK);	/* UPnP and secure mode */
 #ifdef ENABLE_IPV6
 	ipv6_bind_addr = in6addr_any;
 #endif /* ENABLE_IPV6 */
@@ -1440,8 +1440,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					CLEARFLAG(ENABLEUPNPMASK);
 				break;
 			case UPNPSECUREMODE:
-				if(strcmp(ary_options[i].value, "yes") == 0)
-					SETFLAG(SECUREMODEMASK);
+				if (strcmp(ary_options[i].value, "no") == 0)
+					CLEARFLAG(SECUREMODEMASK);
 				break;
 #ifdef ENABLE_LEASEFILE
 			case UPNPLEASEFILE:
@@ -1614,7 +1614,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			break;
 #endif	/* defined(USE_PF) || defined(USE_IPF) */
 		case 'S':
-			SETFLAG(SECUREMODEMASK);
+			/* -S0 to disable secure mode, for backward compatibility
+			 * -S is ignored */
+			if (argv[i][2] == '0') {
+				CLEARFLAG(SECUREMODEMASK);
+			} else if (argv[i][2] != '\0') {
+				INIT_PRINT_ERR("Uses -S0 to disable secure mode.\n");
+				goto print_usage;
+			}
 			break;
 		case 'i':
 			if(i+1 < argc) {
@@ -2019,7 +2026,7 @@ print_usage:
 #if defined(USE_PF) || defined(USE_IPF)
 			" [-L]"
 #endif
-			" [-U] [-S]"
+			" [-U] [-S0]"
 #ifdef ENABLE_NATPMP
 			" [-N]"
 #endif
@@ -2059,7 +2066,7 @@ print_usage:
 #if defined(USE_PF) || defined(USE_IPF)
 			"\t-L sets packet log in pf and ipf on.\n"
 #endif
-			"\t-S sets \"secure\" mode : clients can only add mappings to their own ip\n"
+			"\t-S0 disable \"secure\" mode so clients can add mappings to other ips\n"
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
 #ifdef ENABLE_NATPMP
