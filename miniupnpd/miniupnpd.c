@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.254 2023/05/27 09:28:50 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.255 2023/05/27 09:33:16 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -2063,7 +2063,11 @@ print_usage:
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
 #ifdef ENABLE_NATPMP
+#ifdef ENABLE_PCP
+			"\t-N enables NAT-PMP and PCP functionality.\n"
+#else
 			"\t-N enables NAT-PMP functionality.\n"
+#endif
 #endif
 			"\t-B sets bitrates reported by daemon in bits per second.\n"
 			"\t-w sets the presentation url. Default is http address on port 80\n"
