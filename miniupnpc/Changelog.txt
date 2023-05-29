@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.254 2022/10/21 21:13:12 nanard Exp $
+$Id: Changelog.txt,v 1.255 2023/05/29 22:36:21 nanard Exp $
 miniUPnP client Changelog.
+
+2023/05/30:
+  CheckPinholeWorking is optional
 
 VERSION 2.2.4 : released 2022/10/21
 

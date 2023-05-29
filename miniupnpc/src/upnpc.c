@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.131 2022/02/19 23:22:54 nanard Exp $ */
+/* $Id: upnpc.c,v 1.133 2023/05/29 22:36:22 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2023 Thomas Bernard
@@ -465,11 +465,20 @@ static void GetPinholeAndUpdate(struct UPNPUrls * urls, struct IGDdatas * data,
 		fprintf(stderr, "Wrong arguments\n");
 		return;
 	}
+	/* CheckPinholeWorking is an Optional Action, error 602 should be
+	 * returned if it is not implemented */
 	r = UPNP_CheckPinholeWorking(urls->controlURL_6FC, data->IPv6FC.servicetype, uniqueID, &isWorking);
-	printf("CheckPinholeWorking: Pinhole ID = %s / IsWorking = %s\n", uniqueID, (isWorking)? "Yes":"No");
-	if(r!=UPNPCOMMAND_SUCCESS)
-		printf("CheckPinholeWorking() failed with code %d (%s)\n", r, strupnperror(r));
-	if(isWorking || r==709)
+	if(r==UPNPCOMMAND_SUCCESS)
+		printf("CheckPinholeWorking: Pinhole ID = %s / IsWorking = %s\n", uniqueID, (isWorking)? "Yes":"No");
+	else
+		printf("CheckPinholeWorking(%s) failed with code %d (%s)\n", uniqueID, r, strupnperror(r));
+	/* 702 FirewallDisabled Firewall is disabled and this action is disabled
+	 * 703 InboundPinholeNotAllowed Creation of inbound pinholes by UPnP CPs
+	 *                              are not allowed and this action is disabled
+	 * 704 NoSuchEntry There is no pinhole with the specified UniqueID.
+	 * 709 NoTrafficReceived No traffic corresponding to this pinhole has
+	 *                       been received by the gateway. */
+	if(isWorking || r==709 || r==602)
 	{
 		r = UPNP_UpdatePinhole(urls->controlURL_6FC, data->IPv6FC.servicetype, uniqueID, lease_time);
 		printf("UpdatePinhole: Pinhole ID = %s with Lease Time: %s\n", uniqueID, lease_time);
