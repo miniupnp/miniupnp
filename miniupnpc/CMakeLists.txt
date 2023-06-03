@@ -40,7 +40,10 @@ if (NOT WIN32)
     target_compile_definitions(miniupnpc-private INTERFACE _NETBSD_SOURCE)
   endif ()
 else ()
-  target_compile_definitions(miniupnpc-private INTERFACE _WIN32_WINNT=0x0501) # XP or higher for getnameinfo and friends
+  set (MINIUPNPC_TARGET_WINDOWS_VERSION "0x0501" CACHE STRING "Minimum target Windows version as hex string") # XP or higher for getnameinfo and friends
+  if (MINIUPNPC_TARGET_WINDOWS_VERSION)
+    target_compile_definitions(miniupnpc-private INTERFACE _WIN32_WINNT=${MINIUPNPC_TARGET_WINDOWS_VERSION})
+  endif ()
 endif ()
 
 if (APPLE)
