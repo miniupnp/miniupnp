@@ -382,10 +382,10 @@ read_permission_line(struct upnpperm * perm,
 
 #ifdef DEBUG
 	printf("perm rule added : %s %hu-%hu %08x/%08x %hu-%hu %s\n",
-	       (perm->type==UPNPPERM_ALLOW)?"allow":"deny",
+	       (perm->type==UPNPPERM_ALLOW) ? "allow" : "deny",
 	       perm->eport_min, perm->eport_max, ntohl(perm->address.s_addr),
 	       ntohl(perm->mask.s_addr), perm->iport_min, perm->iport_max,
-	       (perm->re)?re:"");
+	       perm->re ? perm->re : "");
 #endif
 	return 0;
 }
