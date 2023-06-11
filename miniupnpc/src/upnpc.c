@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.133 2023/05/29 22:36:22 nanard Exp $ */
+/* $Id: upnpc.c,v 1.134 2023/06/11 23:23:10 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2023 Thomas Bernard
@@ -478,7 +478,7 @@ static void GetPinholeAndUpdate(struct UPNPUrls * urls, struct IGDdatas * data,
 	 * 704 NoSuchEntry There is no pinhole with the specified UniqueID.
 	 * 709 NoTrafficReceived No traffic corresponding to this pinhole has
 	 *                       been received by the gateway. */
-	if(isWorking || r==709 || r==602)
+	if(isWorking || (r!=702 && r!=703 && r!=704))
 	{
 		r = UPNP_UpdatePinhole(urls->controlURL_6FC, data->IPv6FC.servicetype, uniqueID, lease_time);
 		printf("UpdatePinhole: Pinhole ID = %s with Lease Time: %s\n", uniqueID, lease_time);
