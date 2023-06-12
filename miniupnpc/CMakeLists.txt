@@ -243,7 +243,9 @@ if (UPNPC_BUILD_TESTS)
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
   target_link_libraries (testportlistingparse PRIVATE miniupnpc-tests)
 
-  add_executable (minihttptestserver src/minihttptestserver.c)
+  if (NOT WIN32)
+    add_executable (minihttptestserver src/minihttptestserver.c)
+  endif()
 
 # set (UPNPC_INSTALL_TARGETS ${UPNPC_INSTALL_TARGETS} testminixml minixmlvalid testupnpreplyparse testigddescparse testminiwget)
   include(CTest)
@@ -251,10 +253,12 @@ if (UPNPC_BUILD_TESTS)
            COMMAND minixmlvalid)
   add_test(NAME validateminiwget
            COMMAND ${CMAKE_SOURCE_DIR}/testminiwget.sh)
-  set_property(TEST validateminiwget
-               PROPERTY ENVIRONMENT
-               TESTSERVER=${CMAKE_BINARY_DIR}/minihttptestserver
-               TESTMINIWGET=${CMAKE_BINARY_DIR}/testminiwget)
+  if (NOT WIN32)
+    set_property(TEST validateminiwget
+                 PROPERTY ENVIRONMENT
+                 TESTSERVER=${CMAKE_BINARY_DIR}/minihttptestserver
+                 TESTMINIWGET=${CMAKE_BINARY_DIR}/testminiwget)
+  endif()
   add_test(NAME validateupnpreplyparse
            COMMAND ${CMAKE_SOURCE_DIR}/testupnpreplyparse.sh
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
