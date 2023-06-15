@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.257 2023/06/11 23:25:45 nanard Exp $
+$Id: Changelog.txt,v 1.259 2023/06/15 22:42:36 nanard Exp $
 miniUPnP client Changelog.
+
+2023/06/15:
+  Make User-Agent compliant.
 
 VERSION 2.2.5 : released 2023/06/12
 
