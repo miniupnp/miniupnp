@@ -144,6 +144,14 @@ if (UPNPC_BUILD_STATIC)
                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     endif()
   endif ()
+
+  add_executable (upnp-listdevices-static src/listdevices.c)
+  target_link_libraries (upnp-listdevices-static PRIVATE libminiupnpc-static)
+  target_include_directories(upnp-listdevices-static PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+  if (NOT UPNPC_NO_INSTALL)
+    install (TARGETS upnp-listdevices-static
+             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif ()
 
 if (UPNPC_BUILD_SHARED)
@@ -186,11 +194,11 @@ if (UPNPC_BUILD_SHARED)
     endif()
   endif ()
 
-  add_executable (listdevices src/listdevices.c)
-  target_link_libraries (listdevices PRIVATE libminiupnpc-shared)
-  target_include_directories(listdevices PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+  add_executable (upnp-listdevices-shared src/listdevices.c)
+  target_link_libraries (upnp-listdevices-shared PRIVATE libminiupnpc-shared)
+  target_include_directories(upnp-listdevices-shared PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
   if (NOT UPNPC_NO_INSTALL)
-    install (TARGETS listdevices
+    install (TARGETS upnp-listdevices-shared
              RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 endif ()

@@ -3,6 +3,7 @@ miniUPnP client Changelog.
 
 2023/06/15:
   Make User-Agent compliant.
+  listdevices => upnp-listdevices
 
 VERSION 2.2.5 : released 2023/06/12
 
