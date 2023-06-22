@@ -1,9 +1,9 @@
-/* $Id: upnphttp.c,v 1.111 2021/05/22 21:34:12 nanard Exp $ */
+/* $Id: upnphttp.c,v 1.113 2023/06/22 23:17:01 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2021 Thomas Bernard
+ * Copyright (c) 2005-2023 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -310,8 +310,11 @@ ParseHttpHeaders(struct upnphttp * h)
 			}
 			else if(strncasecmp(line, "user-agent:", 11) == 0)
 			{
-				if(strcasestr(line + 11, "microsoft") != NULL)
+				/* - User-Agent: Microsoft-Windows/10.0 UPnP/1.0
+				 * - User-Agent: FDSSDP                           */
+				if(strcasestr(line + 11, "microsoft") != NULL || strstr(line + 11, "FDSSDP") != NULL) {
 					h->respflags |= FLAG_MS_CLIENT;
+				}
 			}
 #ifdef ENABLE_EVENTS
 			else if(strncasecmp(line, "Callback:", 9)==0)
