@@ -1,4 +1,4 @@
-/* $Id: upnpsoap.c,v 1.163 2023/02/04 10:36:34 nanard Exp $ */
+/* $Id: upnpsoap.c,v 1.165 2023/06/26 23:15:56 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -2101,7 +2101,7 @@ CheckPinholeWorking(struct upnphttp * h, const char * action, const char * ns)
 			return ;
 		if(packets == 0)
 		{
-			SoapError(h, 709, "NoPacketSent");
+			SoapError(h, 709, "NoTrafficReceived");
 			return;
 		}
 		bodylen = snprintf(body, sizeof(body), resp,
