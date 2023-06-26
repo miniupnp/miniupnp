@@ -1,4 +1,4 @@
-/* $Id: nftnlrdr.c,v 1.10 2020/11/11 12:08:43 nanard Exp $
+/* $Id: nftnlrdr.c,v 1.14 2023/06/26 23:54:55 nanard Exp $
  * vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -655,6 +655,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 		    p->eport <= endport) {
 
 			if (*number >= capacity) {
+				capacity += 128;
 				tmp = realloc(array,
 					      sizeof(unsigned short)*capacity);
 				if (tmp == NULL) {
