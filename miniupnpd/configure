@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: configure,v 1.122 2023/06/26 23:08:15 nanard Exp $
+# $Id: configure,v 1.123 2023/06/29 00:16:45 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -814,7 +814,7 @@ echo "" >> ${CONFIGFILE}
 
 echo "#ifdef IGD_V2" >> ${CONFIGFILE}
 echo "/* Enable DeviceProtection service (IGDv2) */" >> ${CONFIGFILE}
-echo "#define ENABLE_DP_SERVICE" >> ${CONFIGFILE}
+echo "/*#define ENABLE_DP_SERVICE*/" >> ${CONFIGFILE}
 echo "/*#define ENABLE_HTTPS*/" >> ${CONFIGFILE}
 echo "/*#define HTTPS_CERTFILE \"/path/to/certificate.pem\"*/" >> ${CONFIGFILE}
 echo "/*#define HTTPS_KEYFILE \"/path/to/private.key\"*/" >> ${CONFIGFILE}
