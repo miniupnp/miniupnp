@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.134 2023/06/11 23:23:10 nanard Exp $ */
+/* $Id: upnpc.c,v 1.135 2023/06/29 09:55:14 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2023 Thomas Bernard
@@ -656,14 +656,14 @@ int main(int argc, char ** argv)
 	   || (command == 'U' && commandargc<2)
 	   || (command == 'D' && commandargc<1))
 	{
-		fprintf(stderr, "Usage :\t%s [options] -a ip port external_port protocol [duration] [remote host]\n\t\tAdd port redirection\n", argv[0]);
+		fprintf(stderr, "Usage :\t%s [options] -a ip port external_port protocol [duration] [remote host]\n\t\tAdd port mapping\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n\t\tAdd multiple port mappings to the current host\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -d external_port protocol [remote host]\n\t\tDelete port redirection\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -s\n\t\tGet Connection status\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -l\n\t\tList redirections\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -L\n\t\tList redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -n ip port external_port protocol [duration] [remote host]\n\t\tAdd (any) port redirection allowing IGD to use alternative external_port (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -N external_port_start external_port_end protocol [manage]\n\t\tDelete range of port redirections (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n\t\tAdd all redirections to the current host\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -n ip port external_port protocol [duration] [remote host]\n\t\tAdd (any) port mapping allowing IGD to use alternative external_port (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -N external_port_start external_port_end protocol [manage]\n\t\tDelete range of port mappings (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n\t\tAdd Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -U uniqueID new_lease_time\n\t\tUpdate Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -C uniqueID\n\t\tCheck if Pinhole is Working (for IGD:2 only)\n", argv[0]);
