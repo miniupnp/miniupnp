@@ -155,7 +155,7 @@ find_pinhole(const char * ifname,
 
 		if ((proto == p->proto) && (rem_port == p->rport)
 		   && (0 == memcmp(&saddr, &p->rhost6, sizeof(struct in6_addr)))
-		   && (int_port == p->eport) &&
+		   && (int_port == p->iport) &&
 		   (0 == memcmp(&daddr, &p->iaddr6, sizeof(struct in6_addr)))) {
 
 			if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
