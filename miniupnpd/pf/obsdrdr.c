@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2022 Thomas Bernard
+ * (c) 2006-2023 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -464,6 +464,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 {
 	int i, n;
 	struct pfioc_rule pr;
+	struct pf_rule *r = &pr.rule;
 	UNUSED(ifname);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
@@ -472,10 +473,10 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
-	pr.rule.action = PF_NAT;
+	r->action = PF_NAT;
 #else
-	pr.rule.action = PF_PASS;	/* or PF_MATCH as we dont expect outbound packets to be blocked */
-	pr.rule.direction = PF_OUT;
+	r->action = PF_PASS;	/* or PF_MATCH as we dont expect outbound packets to be blocked */
+	r->direction = PF_OUT;
 #endif
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
 	{
@@ -493,12 +494,12 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 		}
 #ifdef TEST
 		syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x    %8x",
-		       i, ntohs(pr.rule.src.port[0]), pr.rule.proto,
-		       pr.rule.src.addr.v.a.addr.v4.s_addr, iaddr);
+		       i, ntohs(r->src.port[0]), r->proto,
+		       r->src.addr.v.a.addr.v4.s_addr, iaddr);
 #endif /* TEST */
-		if(iport == ntohs(pr.rule.src.port[0])
-		 && pr.rule.proto == proto
-		 && iaddr == pr.rule.src.addr.v.a.addr.v4.s_addr)
+		if(iport == ntohs(r->src.port[0])
+		 && r->proto == proto
+		 && iaddr == r->src.addr.v.a.addr.v4.s_addr)
 		{
 			pr.action = PF_CHANGE_GET_TICKET;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
@@ -843,6 +844,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 {
 	int i, n;
 	struct pfioc_rule pr;
+	struct pf_rule *r = &pr.rule;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
 #endif
@@ -872,31 +874,31 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			goto error;
 		}
 #ifdef __APPLE__
-		if( (eport == ntohs(pr.rule.dst.xport.range.port[0]))
-		  && (eport == ntohs(pr.rule.dst.xport.range.port[1]))
+		if( (eport == ntohs(r->dst.xport.range.port[0]))
+		  && (eport == ntohs(r->dst.xport.range.port[1]))
 #else
-		if( (eport == ntohs(pr.rule.dst.port[0]))
-		  && (eport == ntohs(pr.rule.dst.port[1]))
+		if( (eport == ntohs(r->dst.port[0]))
+		  && (eport == ntohs(r->dst.port[1]))
 #endif
-		  && (pr.rule.proto == proto) )
+		  && (r->proto == proto) )
 		{
 #ifndef PF_NEWSTYLE
-			*iport = pr.rule.rpool.proxy_port[0];
+			*iport = r->rpool.proxy_port[0];
 #else
-			*iport = pr.rule.rdr.proxy_port[0];
+			*iport = r->rdr.proxy_port[0];
 #endif
 			if(desc)
-				strlcpy(desc, pr.rule.label, desclen);
+				strlcpy(desc, r->label, desclen);
 #ifdef PFRULE_INOUT_COUNTS
 			if(packets)
-				*packets = pr.rule.packets[0] + pr.rule.packets[1];
+				*packets = r->packets[0] + r->packets[1];
 			if(bytes)
-				*bytes = pr.rule.bytes[0] + pr.rule.bytes[1];
+				*bytes = r->bytes[0] + r->bytes[1];
 #else
 			if(packets)
-				*packets = pr.rule.packets;
+				*packets = r->packets;
 			if(bytes)
-				*bytes = pr.rule.bytes;
+				*bytes = r->bytes;
 #endif
 #ifndef PF_NEWSTYLE
 			memset(&pp, 0, sizeof(pp));
@@ -928,15 +930,15 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			          iaddr, iaddrlen);
 #endif
 #else
-			inet_ntop(AF_INET, &pr.rule.rdr.addr.v.a.addr.v4.s_addr,
+			inet_ntop(AF_INET, &r->rdr.addr.v.a.addr.v4.s_addr,
 			          iaddr, iaddrlen);
 #endif
 			if(rhost && rhostlen > 0)
 			{
 #ifdef PFVAR_NEW_STYLE
-				if (pr.rule.src.addr.v.a.addr.v4addr.s_addr == 0)
+				if (r->src.addr.v.a.addr.v4addr.s_addr == 0)
 #else
-				if (pr.rule.src.addr.v.a.addr.v4.s_addr == 0)
+				if (r->src.addr.v.a.addr.v4.s_addr == 0)
 #endif
 				{
 					rhost[0] = '\0'; /* empty string */
@@ -944,10 +946,10 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 				else
 				{
 #ifdef PFVAR_NEW_STYLE
-					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4addr.s_addr,
+					inet_ntop(AF_INET, &r->src.addr.v.a.addr.v4addr.s_addr,
 					          rhost, rhostlen);
 #else
-					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr,
+					inet_ntop(AF_INET, &r->src.addr.v.a.addr.v4.s_addr,
 					          rhost, rhostlen);
 #endif
 				}
@@ -978,6 +980,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 {
 	int i, n;
 	struct pfioc_rule pr;
+	struct pf_rule *r = &pr.rule;
 	UNUSED(ifname);
 
 	if(dev<0) {
@@ -1004,17 +1007,17 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 			goto error;
 		}
 #ifdef __APPLE__
-		if( (eport == ntohs(pr.rule.dst.xport.range.port[0]))
-		  && (eport == ntohs(pr.rule.dst.xport.range.port[1]))
+		if( (eport == ntohs(r->dst.xport.range.port[0]))
+		  && (eport == ntohs(r->dst.xport.range.port[1]))
 #else
-		if( (eport == ntohs(pr.rule.dst.port[0]))
-		  && (eport == ntohs(pr.rule.dst.port[1]))
+		if( (eport == ntohs(r->dst.port[0]))
+		  && (eport == ntohs(r->dst.port[1]))
 #endif
-		  && (pr.rule.proto == proto) )
+		  && (r->proto == proto) )
 		{
 			/* retrieve iport in order to remove filter rule */
 #ifndef PF_NEWSTYLE
-			if(iport) *iport = pr.rule.rpool.proxy_port[0];
+			if(iport) *iport = r->rpool.proxy_port[0];
 			if(iaddr)
 			{
 				/* retrieve internal address */
@@ -1047,33 +1050,33 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 #endif
 			}
 #else
-			if(iport) *iport = pr.rule.rdr.proxy_port[0];
+			if(iport) *iport = r->rdr.proxy_port[0];
 			if(iaddr)
 			{
 				/* retrieve internal address */
-				*iaddr = pr.rule.rdr.addr.v.a.addr.v4.s_addr;
+				*iaddr = r->rdr.addr.v.a.addr.v4.s_addr;
 			}
 #endif
 			if(rhost && rhostlen > 0)
 			{
 #ifdef PFVAR_NEW_STYLE
-				if (pr.rule.src.addr.v.a.addr.v4addr.s_addr == 0)
+				if (r->src.addr.v.a.addr.v4addr.s_addr == 0)
 #else
-				if (pr.rule.src.addr.v.a.addr.v4.s_addr == 0)
+				if (r->src.addr.v.a.addr.v4.s_addr == 0)
 #endif
 					rhost[0] = '\0'; /* empty string */
 				else
 #ifdef PFVAR_NEW_STYLE
-					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4addr.s_addr,
+					inet_ntop(AF_INET, &r->src.addr.v.a.addr.v4addr.s_addr,
 					          rhost, rhostlen);
 #else
-					inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr,
+					inet_ntop(AF_INET, &r->src.addr.v.a.addr.v4.s_addr,
 					          rhost, rhostlen);
 #endif
 			}
 			if(check_desc) {
-				if((desc == NULL && pr.rule.label[0] == '\0') ||
-				   (desc && 0 == strcmp(desc, pr.rule.label))) {
+				if((desc == NULL && r->label[0] == '\0') ||
+				   (desc && 0 == strcmp(desc, r->label))) {
 					return 1;
 				}
 			}
@@ -1116,6 +1119,7 @@ priv_delete_filter_rule(const char * ifname, unsigned short iport,
 #else
 	int i, n;
 	struct pfioc_rule pr;
+	struct pf_rule *r = &pr.rule;
 	UNUSED(ifname);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
@@ -1140,13 +1144,13 @@ priv_delete_filter_rule(const char * ifname, unsigned short iport,
 		}
 #ifdef TEST
 syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
-       i, ntohs(pr.rule.dst.port[0]), pr.rule.proto,
-       pr.rule.dst.addr.v.a.addr.v4.s_addr);
-/*pr.rule.dst.addr.v.a.mask.v4.s_addr*/
+       i, ntohs(r->dst.port[0]), r->proto,
+       r->dst.addr.v.a.addr.v4.s_addr);
+/*r->dst.addr.v.a.mask.v4.s_addr*/
 #endif
-		if( (iport == ntohs(pr.rule.dst.port[0]))
+		if( (iport == ntohs(r->dst.port[0]))
 		  && (pr.rule.proto == proto) &&
-		   (iaddr == 0 || iaddr == pr.rule.dst.addr.v.a.addr.v4.s_addr)
+		   (iaddr == 0 || iaddr == r->dst.addr.v.a.addr.v4.s_addr)
 		  )
 		{
 			pr.action = PF_CHANGE_GET_TICKET;
@@ -1208,6 +1212,7 @@ get_redirect_rule_by_index(int index,
 {
 	int n;
 	struct pfioc_rule pr;
+	struct pf_rule *r = &pr.rule;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
 #endif
@@ -1238,29 +1243,29 @@ get_redirect_rule_by_index(int index,
 	}
 	*proto = pr.rule.proto;
 #ifdef __APPLE__
-	*eport = ntohs(pr.rule.dst.xport.range.port[0]);
+	*eport = ntohs(r->dst.xport.range.port[0]);
 #else
-	*eport = ntohs(pr.rule.dst.port[0]);
+	*eport = ntohs(r->dst.port[0]);
 #endif
 #ifndef PF_NEWSTYLE
-	*iport = pr.rule.rpool.proxy_port[0];
+	*iport = r->rpool.proxy_port[0];
 #else
-	*iport = pr.rule.rdr.proxy_port[0];
+	*iport = r->rdr.proxy_port[0];
 #endif
 	if(ifname)
-		strlcpy(ifname, pr.rule.ifname, IFNAMSIZ);
+		strlcpy(ifname, r->ifname, IFNAMSIZ);
 	if(desc)
-		strlcpy(desc, pr.rule.label, desclen);
+		strlcpy(desc, r->label, desclen);
 #ifdef PFRULE_INOUT_COUNTS
 	if(packets)
-		*packets = pr.rule.packets[0] + pr.rule.packets[1];
+		*packets = r->packets[0] + r->packets[1];
 	if(bytes)
-		*bytes = pr.rule.bytes[0] + pr.rule.bytes[1];
+		*bytes = r->bytes[0] + r->bytes[1];
 #else
 	if(packets)
-		*packets = pr.rule.packets;
+		*packets = r->packets;
 	if(bytes)
-		*bytes = pr.rule.bytes;
+		*bytes = r->bytes;
 #endif
 #ifndef PF_NEWSTYLE
 	memset(&pp, 0, sizeof(pp));
@@ -1292,15 +1297,15 @@ get_redirect_rule_by_index(int index,
 	          iaddr, iaddrlen);
 #endif
 #else
-	inet_ntop(AF_INET, &pr.rule.rdr.addr.v.a.addr.v4.s_addr,
+	inet_ntop(AF_INET, &r->rdr.addr.v.a.addr.v4.s_addr,
 	          iaddr, iaddrlen);
 #endif
 	if(rhost && rhostlen > 0)
 	{
 #ifdef PFVAR_NEW_STYLE
-		if (pr.rule.src.addr.v.a.addr.v4addr.s_addr == 0)
+		if (r->src.addr.v.a.addr.v4addr.s_addr == 0)
 #else
-		if (pr.rule.src.addr.v.a.addr.v4.s_addr == 0)
+		if (r->src.addr.v.a.addr.v4.s_addr == 0)
 #endif
 		{
 			rhost[0] = '\0'; /* empty string */
@@ -1308,10 +1313,10 @@ get_redirect_rule_by_index(int index,
 		else
 		{
 #ifdef PFVAR_NEW_STYLE
-			inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4addr.s_addr,
+			inet_ntop(AF_INET, &r->src.addr.v.a.addr.v4addr.s_addr,
 			          rhost, rhostlen);
 #else
-			inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr,
+			inet_ntop(AF_INET, &r->src.addr.v.a.addr.v4.s_addr,
 			          rhost, rhostlen);
 #endif
 		}
@@ -1334,6 +1339,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	int i, n;
 	unsigned short eport;
 	struct pfioc_rule pr;
+	struct pf_rule *r = &pr.rule;
 
 	*number = 0;
 	if(dev<0) {
@@ -1368,13 +1374,13 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 			continue;
 		}
 #ifdef __APPLE__
-		eport = ntohs(pr.rule.dst.xport.range.port[0]);
-		if( (eport == ntohs(pr.rule.dst.xport.range.port[1]))
+		eport = ntohs(r->dst.xport.range.port[0]);
+		if( (eport == ntohs(r->dst.xport.range.port[1]))
 #else
-		eport = ntohs(pr.rule.dst.port[0]);
-		if( (eport == ntohs(pr.rule.dst.port[1]))
+		eport = ntohs(r->dst.port[0]);
+		if( (eport == ntohs(r->dst.port[1]))
 #endif
-		  && (pr.rule.proto == proto)
+		  && (r->proto == proto)
 		  && (startport <= eport) && (eport <= endport) )
 		{
 			if(*number >= capacity)
@@ -1471,6 +1477,7 @@ list_rules(void)
 	char buf2[32];
 	int i, n;
 	struct pfioc_rule pr;
+	struct pf_rule *r = &pr.rule;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
 #endif
@@ -1494,22 +1501,22 @@ list_rules(void)
 		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
 			perror("DIOCGETRULE");
 		printf(" %s %s %d:%d -> %s %d:%d  proto %d keep_state=%d action=%d\n",
-			pr.rule.ifname,
-			inet_ntop(AF_INET, &pr.rule.src.addr.v.a.addr.v4.s_addr, buf, 32),
-			(int)ntohs(pr.rule.dst.port[0]),
-			(int)ntohs(pr.rule.dst.port[1]),
-			inet_ntop(AF_INET, &pr.rule.dst.addr.v.a.addr.v4.s_addr, buf2, 32),
+			r->ifname,
+			inet_ntop(AF_INET, &r->src.addr.v.a.addr.v4.s_addr, buf, 32),
+			(int)ntohs(r->dst.port[0]),
+			(int)ntohs(r->dst.port[1]),
+			inet_ntop(AF_INET, &r->dst.addr.v.a.addr.v4.s_addr, buf2, 32),
 #ifndef PF_NEWSTYLE
-			(int)pr.rule.rpool.proxy_port[0],
-			(int)pr.rule.rpool.proxy_port[1],
+			(int)r->rpool.proxy_port[0],
+			(int)r->rpool.proxy_port[1],
 #else
-			(int)pr.rule.rdr.proxy_port[0],
-			(int)pr.rule.rdr.proxy_port[1],
+			(int)r->rdr.proxy_port[0],
+			(int)r->rdr.proxy_port[1],
 #endif
-			(int)pr.rule.proto,
-			(int)pr.rule.keep_state,
-			(int)pr.rule.action);
-		printf("  description: \"%s\"\n", pr.rule.label);
+			(int)r->proto,
+			(int)r->keep_state,
+			(int)r->action);
+		printf("  description: \"%s\"\n", r->label);
 #ifndef PF_NEWSTYLE
 		memset(&pp, 0, sizeof(pp));
 		strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
@@ -1529,11 +1536,11 @@ list_rules(void)
 #else
 		printf("  rule_flag=%08x action=%d direction=%d log=%d logif=%d "
 		       "quick=%d ifnot=%d af=%d type=%d code=%d rdr.port_op=%d rdr.opts=%d\n",
-		       pr.rule.rule_flag, pr.rule.action, pr.rule.direction,
-		       pr.rule.log, pr.rule.logif, pr.rule.quick, pr.rule.ifnot,
-		       pr.rule.af, pr.rule.type, pr.rule.code,
-		       pr.rule.rdr.port_op, pr.rule.rdr.opts);
-		printf("  %s\n", inet_ntop(AF_INET, &pr.rule.rdr.addr.v.a.addr.v4.s_addr, buf, 32));
+		       r->rule_flag, r->action, r->direction,
+		       r->log, r->logif, r->quick, r->ifnot,
+		       r->af, r->type, r->code,
+		       r->rdr.port_op, r->rdr.opts);
+		printf("  %s\n", inet_ntop(AF_INET, &r->rdr.addr.v.a.addr.v4.s_addr, buf, 32));
 #endif
 	}
 }
