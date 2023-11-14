@@ -82,8 +82,8 @@ int add_pinhole(const char * ifname,
 
 	uid = next_uid;
 
-	d_printf(("add_pinhole(%s, %s, %s, %d, %d, %d, %s)\n",
-	          ifname, rem_host, int_client, rem_port, int_port, proto, desc));
+	d_printf(("add_pinhole(%s, %s, %hu, %s, %hu, %d, %s, %u)\n",
+	          ifname, rem_host, rem_port, int_client, int_port, proto, desc, timestamp));
 
 	if (rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
 		inet_pton(AF_INET6, rem_host, &rhost_addr);
