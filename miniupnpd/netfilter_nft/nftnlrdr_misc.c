@@ -1068,6 +1068,13 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 	return r;
 }
 
+/*
+ * Create the IP6 filter rule
+ * called by add_pinhole() and update_pinhole()
+ * eport is always 0
+ * iport is the destination port of the filter rule
+ * rport is the (optional) source port of the rule
+ */
 struct nftnl_rule *
 rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		struct in6_addr *rhost6, struct in6_addr *iaddr6,
@@ -1108,6 +1115,12 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 	return r;
 }
 
+/*
+ * Create common parts for the filter rules (IPv4 or IPv6)
+ * eport is ignored
+ * iport is the destination port of the filter rule
+ * rport is the (optional) source port of the rule
+ */
 struct nftnl_rule *
 rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname,
 		uint8_t proto, unsigned short eport, unsigned short iport,
