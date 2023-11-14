@@ -359,15 +359,25 @@ parse_rule_payload(struct nftnl_expr *e, rule_t *r)
 		} else if (offset == offsetof(struct ipv6hdr, saddr) &&
 			   len == sizeof(struct in6_addr) * 2) {
 			*regptr = RULE_REG_IP6_SD_ADDR;
+		} else {
+			syslog(LOG_WARNING,
+				   "%s: Unsupported payload: (dreg:%u, base:NETWORK_HEADER, offset:%u, len:%u)",
+				   "parse_rule_payload", dreg, offset, len);
 		}
 		break;
 	case NFT_PAYLOAD_TRANSPORT_HEADER:
+		/* in both UDP and TCP headers, source port is at offset 0,
+		 * destination port at offset 2 */
 		if (offset == offsetof(struct tcphdr, dest) &&
 		    len == sizeof(uint16_t)) {
 			*regptr = RULE_REG_TCP_DPORT;
 		} else if (offset == offsetof(struct tcphdr, source) &&
 			   len == sizeof(uint16_t) * 2) {
 			*regptr = RULE_REG_TCP_SD_PORT;
+		} else {
+			syslog(LOG_WARNING,
+				   "%s: Unsupported payload: (dreg:%u, base:TRANSPORT_HEADER, offset:%u, len:%u)",
+				   "parse_rule_payload", dreg, offset, len);
 		}
 		break;
 	default:
