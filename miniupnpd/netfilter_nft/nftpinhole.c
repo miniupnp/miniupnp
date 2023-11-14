@@ -128,11 +128,18 @@ find_pinhole(const char * ifname,
 	UNUSED(ifname);
 
 	if (rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
-		inet_pton(AF_INET6, rem_host, &saddr);
+		if (inet_pton(AF_INET6, rem_host, &saddr) < 1) {
+			syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", rem_host);
+			memset(&saddr, 0, sizeof(struct in6_addr));
+		}
 	} else {
 		memset(&saddr, 0, sizeof(struct in6_addr));
 	}
-	inet_pton(AF_INET6, int_client, &daddr);
+
+	if (inet_pton(AF_INET6, int_client, &daddr) < 1) {
+		syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", int_client);
+		memset(&daddr, 0, sizeof(struct in6_addr));
+	}
 
 	d_printf(("find_pinhole()\n"));
 	refresh_nft_cache_filter();
