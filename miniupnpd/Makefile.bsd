@@ -113,10 +113,8 @@ EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp
 
-.if $(OSNAME) == "Darwin"
-LIBS =
-.else
-LIBS = -lkvm
+.if $(OSNAME) != "Darwin"
+LIBS += -lkvm
 .endif
 .if $(OSNAME) == "SunOS"
 LIBS += -lsocket -lnsl -lkstat -lresolv
