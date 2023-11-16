@@ -18,6 +18,7 @@ UPNP_VERSION_MINOR=1
 # PORTINUSE, REGEX, DISABLEPPPCONN, FW, IPTABLESPATH, TARGET_OPENWRT,
 # PKG_CONFIG, NO_BACKGROUND_NO_PIDFILE, DYNAMIC_OS_VERSION
 # OS_NAME, OS_VERSION, OS_MACHINE, V6SOCKETS_ARE_V6ONLY
+# USE_LIBPFCTL
 
 if [ -z "$DYNAMIC_OS_VERSION" ] ; then
   DYNAMIC_OS_VERSION=1
@@ -47,6 +48,7 @@ case "$argv" in
 	--disable-fork) NO_BACKGROUND_NO_PIDFILE=1 ;;
 	--firewall=*)
 	    FW=$(echo $argv | cut -d= -f2) ;;
+	--libpfctl) USE_LIBPFCTL=1 ;;
 	--iptablespath=*)
 		IPTABLESPATH=$(echo $argv | cut -d= -f2) ;;
 	--getifaddrs) GETIFADDRS=1 ;;
@@ -72,6 +74,7 @@ case "$argv" in
 		echo " --uda-version=x.x     Set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn     Disable WANPPPConnection"
 		echo " --firewall=<name>     Force firewall type (nftables, iptables, pf, ipf, ipfw)"
+		echo " --libpfctl            Use libpfctl"
 		echo " --iptablespath=/path  Use a specific version of iptables"
 		echo " --disable-fork        Do not go to background and do not write pid file"
 		echo " --getifaddrs          Force use getifaddrs() to obtain interface addresses"
@@ -256,10 +259,16 @@ case $OS_NAME in
 			if [ $VER -ge 700049 ]; then
 				echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
 			fi
+			if [ $VER -ge 1500000 ]; then
+				USE_LIBPFCTL=1
+			fi
 		else
 			VER=`echo $OS_VERSION | cut -d. -f1`
 			if [ $VER -ge 7 ]; then
 				echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
+			fi
+			if [ $VER -ge 15 ]; then
+				USE_LIBPFCTL=1
 			fi
 		fi
 		HAVE_IP_MREQN=1
@@ -492,6 +501,9 @@ esac
 case $FW in
 	pf)
 		echo "#define USE_PF 1" >> ${CONFIGFILE}
+		if [ "$USE_LIBPFCTL" = "1" ] ; then
+			echo "#define USE_LIBPFCTL 1" >> ${CONFIGFILE}
+		fi
 		;;
 	ipf)
 		echo "#define USE_IPF 1" >> ${CONFIGFILE}
@@ -633,6 +645,11 @@ if [ "$MAKEFILE" = "Makefile.bsd" ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME"
 	echo "FWNAME = $FW" > bsdmake.inc
 	echo "SRCDIR = ${BASEDIR}" >> bsdmake.inc
 	echo "CPPFLAGS += -I." >> bsdmake.inc
+	if [ "$USE_LIBPFCTL" = "1" ] ; then
+		echo "CPPFLAGS += -I/usr/local/include/" >> bsdmake.inc
+		echo "LDFLAGS += -L/usr/local/lib" >> bsdmake.inc
+		echo "LIBS += -lpfctl" >> bsdmake.inc
+	fi
 fi
 if [ "$MAKEFILE" ] ; then
 	cp "${BASEDIR}/${MAKEFILE}" Makefile && echo "${BASEDIR}/${MAKEFILE} -> Makefile"
