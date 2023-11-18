@@ -47,7 +47,7 @@ static void print_infos(unsigned short uid)
 
 int main(int argc, char * * argv)
 {
-	int uid;
+	int uid, r;
 	const char * ifname = "eth0";
 	const char * rem_host = "2a00::dead:beaf";
 	unsigned short rem_port = 1911;
@@ -57,6 +57,12 @@ int main(int argc, char * * argv)
 	unsigned int timestamp = 0;
 
 	openlog("testnftpinhole", LOG_PERROR|LOG_CONS, LOG_LOCAL0);
+
+	r = init_redirect();
+	if (r < 0) {
+		syslog(LOG_ERR, "init_redirect() failed");
+		return 1;
+	}
 
 	uid = add_pinhole(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP,
 	                  "dummy description", upnp_time() + 60 /* timestamp */);
@@ -68,7 +74,6 @@ int main(int argc, char * * argv)
 	syslog(LOG_INFO, "find_pinhole(): uid=%d desc=\"%s\" timestamp=%u", uid, desc, timestamp);
 
 	if (uid >= 0) {
-		int r;
 		print_infos(uid);
 
 		r = update_pinhole(uid, upnp_time() + 3600);
@@ -78,6 +83,8 @@ int main(int argc, char * * argv)
 		r = delete_pinhole(uid);
 		syslog(LOG_INFO, "delete_pinhole(%d) returned %d", uid, r);
 	}
+
+	shutdown_redirect();
 
 	return 0;
 }
