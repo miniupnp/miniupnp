@@ -153,10 +153,10 @@ find_pinhole(const char * ifname,
 		if (p->desc_len == 0)
 			continue;
 
-		if ((proto == p->proto) && (rem_port == p->rport)
-		   && (0 == memcmp(&saddr, &p->rhost6, sizeof(struct in6_addr)))
-		   && (int_port == p->iport) &&
-		   (0 == memcmp(&daddr, &p->iaddr6, sizeof(struct in6_addr)))) {
+		if ((proto == p->proto) && (rem_port == p->sport)
+		   && (0 == memcmp(&saddr, &p->saddr6, sizeof(struct in6_addr)))
+		   && (int_port == p->dport) &&
+		   (0 == memcmp(&daddr, &p->daddr6, sizeof(struct in6_addr)))) {
 
 			if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
 				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
@@ -259,23 +259,23 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 		if (0 == strcmp(tmp_label, label_start)) {
 			/* Source IP Address */
 			// Check if empty
-			if (0 == memcmp(&rhost_addr, &p->rhost6, sizeof(struct in6_addr))) {
+			if (0 == memcmp(&rhost_addr, &p->saddr6, sizeof(struct in6_addr))) {
 				rhost_addr_p = NULL;
 				raddr[0] = '*';
 				raddr[1] = '\0';
 			} else {
-				rhost_addr_p = &p->rhost6;
+				rhost_addr_p = &p->saddr6;
 				inet_ntop(AF_INET6, rhost_addr_p, raddr, INET6_ADDRSTRLEN);
 			}
 
 			/* Source Port */
-			rport = p->iport;
+			rport = p->sport;
 
 			/* Destination IP Address */
-			ihost_addr = p->iaddr6;
+			ihost_addr = p->daddr6;
 
 			/* Destination Port */
-			iport = p->eport;
+			iport = p->dport;
 
 			proto = p->proto;
 
@@ -357,23 +357,23 @@ get_pinhole_info(unsigned short uid,
 		if (0 == strcmp(tmp_label, label_start)) {
 			/* Source IP Address */
 			if (rem_host && (rem_host[0] != '\0')) {
-				if(inet_ntop(AF_INET6, &p->rhost6, rem_host, rem_hostlen) == NULL)
+				if(inet_ntop(AF_INET6, &p->saddr6, rem_host, rem_hostlen) == NULL)
 					return -1;
 			}
 
 			/* Source Port */
 			if (rem_port)
-				*rem_port = p->rport;
+				*rem_port = p->sport;
 
 			/* Destination IP Address */
 			if (int_client) {
-				if(inet_ntop(AF_INET6, &p->iaddr6, int_client, int_clientlen) == NULL)
+				if(inet_ntop(AF_INET6, &p->daddr6, int_client, int_clientlen) == NULL)
 					return -1;
 			}
 
 			/* Destination Port */
 			if (int_port)
-				*int_port = p->eport;
+				*int_port = p->dport;
 
 			if (proto)
 				*proto = p->proto;
