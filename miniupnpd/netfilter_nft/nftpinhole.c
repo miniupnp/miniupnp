@@ -404,8 +404,14 @@ get_pinhole_info(unsigned short uid,
 				*timestamp = ts;
 			}
 
-			if (desc)
-				strncpy(desc, p->desc, desclen);
+			if (desc && (desclen > 0)) {
+				char * pd = strchr(p->desc, ':');
+				if(pd) {
+					pd += 2;
+					strncpy(desc, pd, desclen);
+					desc[desclen - 1] = '\0';
+				}
+			}
 
 			if (packets || bytes) {
 				if (packets)
