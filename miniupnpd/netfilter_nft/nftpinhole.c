@@ -265,7 +265,9 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 				raddr[1] = '\0';
 			} else {
 				rhost_addr_p = &p->saddr6;
-				inet_ntop(AF_INET6, rhost_addr_p, raddr, INET6_ADDRSTRLEN);
+				if (inet_ntop(AF_INET6, rhost_addr_p, raddr, INET6_ADDRSTRLEN) == NULL) {
+					syslog(LOG_WARNING, "%s: inet_ntop(raddr): %m", "update_pinhole");
+				}
 			}
 
 			/* Source Port */
@@ -356,9 +358,12 @@ get_pinhole_info(unsigned short uid,
 		strtok(tmp_label, " ");
 		if (0 == strcmp(tmp_label, label_start)) {
 			/* Source IP Address */
-			if (rem_host && (rem_host[0] != '\0')) {
-				if(inet_ntop(AF_INET6, &p->saddr6, rem_host, rem_hostlen) == NULL)
+			if (rem_host) {
+				if(inet_ntop(AF_INET6, &p->saddr6, rem_host, rem_hostlen) == NULL) {
+					syslog(LOG_ERR, "%s: inet_ntop(rem_host): %m",
+					       "get_pinhole_info");
 					return -1;
+				}
 			}
 
 			/* Source Port */
@@ -367,8 +372,11 @@ get_pinhole_info(unsigned short uid,
 
 			/* Destination IP Address */
 			if (int_client) {
-				if(inet_ntop(AF_INET6, &p->daddr6, int_client, int_clientlen) == NULL)
+				if(inet_ntop(AF_INET6, &p->daddr6, int_client, int_clientlen) == NULL) {
+					syslog(LOG_ERR, "%s: inet_ntop(rem_host): %m",
+					       "get_pinhole_info");
 					return -1;
+				}
 			}
 
 			/* Destination Port */
