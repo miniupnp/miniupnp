@@ -166,11 +166,12 @@ find_pinhole(const char * ifname,
 			if (timestamp)
 				*timestamp = ts;
 
-			if (desc) {
+			if (desc && (desc_len > 0)) {
 				char * pd = strchr(p->desc, ':');
 				if(pd) {
 					pd += 2;
 					strncpy(desc, pd, desc_len);
+					desc[desc_len - 1] = '\0';
 				}
 			}
 
@@ -203,7 +204,8 @@ delete_pinhole(unsigned short uid)
 		if (p->desc_len == 0)
 			continue;
 
-		strncpy(tmp_label, p->desc, p->desc_len);
+		strncpy(tmp_label, p->desc, sizeof(tmp_label));
+		tmp_label[sizeof(tmp_label) - 1] = '\0';
 		strtok(tmp_label, " ");
 		if (0 == strcmp(tmp_label, label_start)) {
 			r = rule_del_handle(p);
@@ -254,8 +256,10 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 		if (p->desc_len == 0)
 			continue;
 
-		strncpy(tmp_label, p->desc, p->desc_len);
+		strncpy(tmp_label, p->desc, sizeof(tmp_label));
+		tmp_label[sizeof(tmp_label) - 1] = '\0';
 		strtok(tmp_label, " ");
+		/* check for the right uid */
 		if (0 == strcmp(tmp_label, label_start)) {
 			/* Source IP Address */
 			// Check if empty
@@ -354,7 +358,8 @@ get_pinhole_info(unsigned short uid,
 		if (p->desc_len == 0)
 			continue;
 
-		strncpy(tmp_label, p->desc, p->desc_len);
+		strncpy(tmp_label, p->desc, sizeof(tmp_label));
+		tmp_label[sizeof(tmp_label) - 1] = '\0';
 		strtok(tmp_label, " ");
 		if (0 == strcmp(tmp_label, label_start)) {
 			/* Source IP Address */
