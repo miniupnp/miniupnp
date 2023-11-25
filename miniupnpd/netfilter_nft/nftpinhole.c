@@ -207,6 +207,7 @@ delete_pinhole(unsigned short uid)
 		strncpy(tmp_label, p->desc, sizeof(tmp_label));
 		tmp_label[sizeof(tmp_label) - 1] = '\0';
 		strtok(tmp_label, " ");
+		/* compare the uid value */
 		if (0 == strcmp(tmp_label, label_start)) {
 			r = rule_del_handle(p);
 			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
@@ -261,6 +262,7 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 		strtok(tmp_label, " ");
 		/* check for the right uid */
 		if (0 == strcmp(tmp_label, label_start)) {
+			char *pd;
 			/* Source IP Address */
 			// Check if empty
 			if (0 == memcmp(&rhost_addr, &p->saddr6, sizeof(struct in6_addr))) {
@@ -288,10 +290,11 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 			ext_if_indx = p->ingress_ifidx;
 			if_indextoname(ext_if_indx, ifname);
 
-			tmp_p = tmp_label;
-			strsep(&tmp_p, " ");
-			if (tmp_p) {
-				strncpy(desc, tmp_p, NFT_DESCR_SIZE);
+			pd = strchr(p->desc, ':');
+			if (pd) {
+				pd += 2;
+				strncpy(desc, pd, sizeof(desc));
+				desc[sizeof(desc) - 1] = '\0';
 			} else {
 				desc[0] = '\0';
 			}
