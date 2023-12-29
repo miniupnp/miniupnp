@@ -69,21 +69,11 @@
 #include "obsdrdr.h"
 #include "../upnpglobalvars.h"
 #include "../getifaddr.h"
+#include "rtickets.h"
 
 #ifndef USE_PF
 #error "USE_PF macro is undefined, check consistency between config.h and Makefile"
 #else
-
-#if defined(PF_NEWSTYLE) && defined(DIOCXEND)
-#define PF_RELEASETICKETS
-#define release_ticket(device, ticket_num) {\
-	if (ioctl((device), DIOCXEND, &(ticket_num)) < 0) {\
-		syslog(LOG_ERR, "ioctl(dev, DIOCXEND, ...): %m");\
-	}\
-}
-#else
-#define release_ticket(device, ticket_num)	(void)(ticket_num)
-#endif
 
 /* list to keep timestamps for port mappings having a lease duration */
 struct timestamp_entry {

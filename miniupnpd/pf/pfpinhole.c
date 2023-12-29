@@ -34,6 +34,7 @@
 #include "../upnpglobalvars.h"
 #include "../macros.h"
 #include "../upnputils.h"
+#include "rtickets.h"
 
 /* the pass rules created by add_pinhole() are as follow :
  *
@@ -54,17 +55,6 @@ static int next_uid = 1;
 
 #define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
 #define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
-
-#if defined(PF_NEWSTYLE) && defined(DIOCXEND)
-#define PF_RELEASETICKETS
-#define release_ticket(device, ticket_num) {\
-	if (ioctl((device), DIOCXEND, &(ticket_num)) < 0) {\
-		syslog(LOG_ERR, "ioctl(dev, DIOCXEND, ...): %m");\
-	}\
-}
-#else
-#define release_ticket(device, ticket_num)	(void)(ticket_num)
-#endif
 
 int add_pinhole(const char * ifname,
                 const char * rem_host, unsigned short rem_port,
