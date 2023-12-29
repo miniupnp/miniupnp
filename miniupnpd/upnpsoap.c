@@ -2350,8 +2350,8 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 
 	/* SoapAction example :
 	 * urn:schemas-upnp-org:service:WANIPConnection:1#GetStatusInfo */
-	p = strchr(action, '#');
-	if(p && (p - action) < n) {
+	p = memchr(action, '#', n);
+	if(p) {
 		for(i = 0; i < ((int)sizeof(namespace) - 1) && (action + i) < p; i++)
 			namespace[i] = action[i];
 		namespace[i] = '\0';
