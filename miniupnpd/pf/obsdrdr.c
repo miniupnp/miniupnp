@@ -1473,7 +1473,10 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 	if (priv_delete_filter_rule(ifname, old_iport, proto, iaddr) < 0)
 		return -1;
 
-	inet_ntop(AF_INET, &iaddr, iaddr_str, sizeof(iaddr_str));
+	if (inet_ntop(AF_INET, &iaddr, iaddr_str, sizeof(iaddr_str)) == NULL) {
+		syslog(LOG_ERR, "inet_ntop(AF_INET, ...): %m");
+		return -1;
+	}
 
 	if(add_redirect_rule2(ifname, rhost, eport, iaddr_str, iport, proto,
 	                      desc, timestamp) < 0)
@@ -1508,7 +1511,10 @@ update_portmapping_desc_timestamp(const char * ifname,
 	if (priv_delete_filter_rule(ifname, iport, proto, iaddr) < 0)
 		return -1;
 
-	inet_ntop(AF_INET, &iaddr, iaddr_str, sizeof(iaddr_str));
+	if (inet_ntop(AF_INET, &iaddr, iaddr_str, sizeof(iaddr_str)) == NULL) {
+		syslog(LOG_ERR, "inet_ntop(AF_INET, ...): %m");
+		return -1;
+	}
 
 	if(add_redirect_rule2(ifname, rhost, eport, iaddr_str, iport, proto,
 	                      desc, timestamp) < 0)
