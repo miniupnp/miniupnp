@@ -2344,7 +2344,6 @@ void
 ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 {
 	char * p;
-	char * p2;
 	int i, len, methodlen;
 	char namespace[256];
 
@@ -2356,11 +2355,10 @@ ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 			namespace[i] = action[i];
 		namespace[i] = '\0';
 		p++;
-		p2 = strchr(p, '"');
-		if(p2 && (p2 - action) <= n)
-			methodlen = p2 - p;
-		else
-			methodlen = n - (p - action);
+		methodlen = n - (int)(p - action);
+		if(p[methodlen-1] == '"') {
+			methodlen--;	/* remove the ending " */
+		}
 		/*syslog(LOG_DEBUG, "SoapMethod: %.*s %d %d %p %p %d",
 		       methodlen, p, methodlen, n, action, p, (int)(p - action));*/
 		for(i = 0; soapMethods[i].methodName; i++) {
