@@ -171,6 +171,8 @@ static void ListRedirections(struct UPNPUrls * urls,
 			printf("%2hu %s %5s->%s:%-5s '%s' '%s' %s\n",
 			       i, protocol, extPort, intClient, intPort,
 			       desc, rHost, duration);
+		else if(r==713)
+			break;
 		else
 			printf("GetGenericPortMappingEntry() returned %d (%s)\n",
 			       r, strupnperror(r));
