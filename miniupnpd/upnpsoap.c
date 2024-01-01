@@ -479,7 +479,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 			syslog(LOG_INFO, "Client %s tried to redirect port to %s",
 			       inet_ntoa(h->clientaddr), int_ip);
 			ClearNameValueList(&data);
-			SoapError(h, 718, "ConflictInMappingEntry");
+			SoapError(h, 606, "Action not authorized");
 			return;
 		}
 	}
