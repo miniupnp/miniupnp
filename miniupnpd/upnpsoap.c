@@ -503,7 +503,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	if (strcmp(ext_port, "*") == 0 || eport == 0)
 	{
 		ClearNameValueList(&data);
-		SoapError(h, 716, "Wildcard not permited in ExtPort");
+		SoapError(h, 716, "WildCardNotPermittedInExtPort");
 		return;
 	}
 
@@ -533,8 +533,8 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	 * 402 - Invalid Args
 	 * 501 - Action Failed
 	 * 606 - Action not authorized (added in IGD v2)
-	 * 715 - Wildcard not permited in SrcAddr
-	 * 716 - Wildcard not permited in ExtPort
+	 * 715 - WildCardNotPermittedInSrcIP
+	 * 716 - WildCardNotPermittedInExtPort
 	 * 718 - ConflictInMappingEntry
 	 * 724 - SamePortValuesRequired (deprecated in IGD v2)
      * 725 - OnlyPermanentLeasesSupported
@@ -572,7 +572,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		SoapError(h, 718, "ConflictInMappingEntry");
 		break;
 	default:
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 	}
 }
 
@@ -738,7 +738,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		SoapError(h, 606, "Action not authorized");
 		break;
 	default:
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 	}
 }
 
@@ -1197,14 +1197,14 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	if(!body)
 	{
 		ClearNameValueList(&data);
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 		return;
 	}
 	bodylen = snprintf(body, bodyalloc, resp_start,
 	              action, ns/*SERVICE_TYPE_WANIPC*/);
 	if(bodylen < 0)
 	{
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 		free(body);
 		return;
 	}
@@ -1226,7 +1226,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 			{
 				syslog(LOG_CRIT, "realloc(%p, %u) FAILED", body_sav, (unsigned)bodyalloc);
 				ClearNameValueList(&data);
-				SoapError(h, 501, "ActionFailed");
+				SoapError(h, 501, "Action Failed");
 				free(body_sav);
 				free(port_list);
 				return;
@@ -1258,7 +1258,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 		{
 			syslog(LOG_CRIT, "realloc(%p, %u) FAILED", body_sav, (unsigned)bodyalloc);
 			ClearNameValueList(&data);
-			SoapError(h, 501, "ActionFailed");
+			SoapError(h, 501, "Action Failed");
 			free(body_sav);
 			return;
 		}
@@ -1821,7 +1821,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 			SoapError(h, 701, "PinholeSpaceExhausted");
 			break;
 		default:
-			SoapError(h, 501, "ActionFailed");
+			SoapError(h, 501, "Action Failed");
 			break;
 	}
 	/* 606 Action not authorized
@@ -1894,7 +1894,7 @@ UpdatePinhole(struct upnphttp * h, const char * action, const char * ns)
 	}
 	else
 	{
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 		return;
 	}
 
@@ -1905,7 +1905,7 @@ UpdatePinhole(struct upnphttp * h, const char * action, const char * ns)
 	if(n == -1)
 		SoapError(h, 704, "NoSuchEntry");
 	else if(n < 0)
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 	else {
 		bodylen = snprintf(body, sizeof(body), resp,
 		                   action, ns, action);
@@ -1973,7 +1973,7 @@ GetOutboundPinholeTimeout(struct upnphttp * h, const char * action, const char *
 			SoapError(h, 705, "ProtocolNotSupported");
 			break;
 		default:
-			SoapError(h, 501, "ActionFailed");
+			SoapError(h, 501, "Action Failed");
 	}
 	ClearNameValueList(&data);
 }
@@ -2036,7 +2036,7 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 	}
 	else
 	{
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 		return;
 	}
 
@@ -2045,7 +2045,7 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 	{
 		syslog(LOG_INFO, "%s: (inbound) failed to remove pinhole with ID: %d",
 	           action, uid);
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 		return;
 	}
 	syslog(LOG_INFO, "%s: (inbound) pinhole with ID %d successfully removed",
@@ -2112,7 +2112,7 @@ CheckPinholeWorking(struct upnphttp * h, const char * action, const char * ns)
 	else if(r == -2)
 		SoapError(h, 704, "NoSuchEntry");
 	else
-		SoapError(h, 501, "ActionFailed");
+		SoapError(h, 501, "Action Failed");
 }
 
 static void
