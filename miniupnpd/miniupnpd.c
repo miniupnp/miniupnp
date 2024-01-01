@@ -1424,10 +1424,6 @@ init(int argc, char * * argv, struct runtime_vars * v)
 						max_lifetime = 86400;
 					}
 				break;
-			case UPNPPCPALLOWTHIRDPARTY:
-				if(strcmp(ary_options[i].value, "yes") == 0)
-					SETFLAG(PCP_ALLOWTHIRDPARTYMASK);
-				break;
 #endif	/* ENABLE_PCP */
 #ifdef PF_ENABLE_FILTER_RULES
 			case UPNPQUICKRULES:

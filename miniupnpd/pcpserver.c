@@ -1183,7 +1183,7 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	}
 
 	if (pcp_msg_info->thirdp_ip) {
-		if (!GETFLAG(PCP_ALLOWTHIRDPARTYMASK)) {
+		if (GETFLAG(SECUREMODEMASK)) {
 			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
 			return 0;
 		}
@@ -1591,7 +1591,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 	/* If we're in allow third party-mode, we probably don't care
 	 * about locality either. Let's hope firewall is ok. */
-	if (!GETFLAG(PCP_ALLOWTHIRDPARTYMASK)) {
+	if (GETFLAG(SECUREMODEMASK)) {
 		lan_addr = get_lan_for_peer(senderaddr);
 		if(lan_addr == NULL) {
 			syslog(LOG_WARNING, "PCP packet sender %s not from a LAN, ignoring",

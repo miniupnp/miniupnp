@@ -55,7 +55,6 @@ enum upnpconfigoptions {
 	UPNPENABLENATPMP,		/* enable_natpmp */
 	UPNPPCPMINLIFETIME,		/* minimum lifetime for PCP mapping */
 	UPNPPCPMAXLIFETIME,		/* maximum lifetime for PCP mapping */
-	UPNPPCPALLOWTHIRDPARTY,		/* allow third-party requests */
 #ifdef USE_NETFILTER
 	UPNPTABLENAME,
 	UPNPNATTABLENAME,

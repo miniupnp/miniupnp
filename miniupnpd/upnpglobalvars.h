@@ -78,9 +78,6 @@ extern int runtime_flags;
 #define IPV6FCFWDISABLEDMASK		0x0100
 #define IPV6FCINBOUNDDISALLOWEDMASK	0x0200
 #endif
-#ifdef ENABLE_PCP
-#define PCP_ALLOWTHIRDPARTYMASK	0x0400
-#endif
 #ifdef IGD_V2
 #define FORCEIGDDESCV1MASK 0x0800
 #endif
