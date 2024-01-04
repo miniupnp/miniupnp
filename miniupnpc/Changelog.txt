@@ -1,5 +1,11 @@
-$Id: Changelog.txt,v 1.259 2023/06/15 22:42:36 nanard Exp $
+$Id: Changelog.txt,v 1.262 2024/01/04 00:49:22 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.2.6 : released 2024/04/01
+
+2024/01/04:
+  includes charset="utf-8" in Content-Type
+  fix memory allocation error in minissdpc.c
 
 2023/06/15:
   Make User-Agent compliant.
