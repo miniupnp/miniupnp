@@ -1,4 +1,4 @@
-/* $Id: minisoap.c,v 1.31 2023/06/15 21:47:50 nanard Exp $ */
+/* $Id: minisoap.c,v 1.32 2023/07/05 22:43:50 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
@@ -92,7 +92,11 @@ int soapPostSubmit(SOCKET fd,
 	                   "Host: %s%s\r\n"
 					   "User-Agent: " OS_STRING " " UPNP_VERSION_STRING " MiniUPnPc/" MINIUPNPC_VERSION_STRING "\r\n"
 	                   "Content-Length: %d\r\n"
+#if (UPNP_VERSION_MAJOR == 1) && (UPNP_VERSION_MINOR == 0)
 					   "Content-Type: text/xml\r\n"
+#else
+					   "Content-Type: text/xml; charset=\"utf-8\"\r\n"
+#endif
 					   "SOAPAction: \"%s\"\r\n"
 					   "Connection: Close\r\n"
 					   "Cache-Control: no-cache\r\n"	/* ??? */

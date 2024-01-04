@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.259 2023/06/15 22:42:36 nanard Exp $
+$Id: Changelog.txt,v 1.260 2024/01/04 00:32:52 nanard Exp $
 miniUPnP client Changelog.
+
+2024/01/04:
+  includes charset="utf-8" in Content-Type
 
 2023/06/15:
   Make User-Agent compliant.
