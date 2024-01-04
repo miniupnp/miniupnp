@@ -627,6 +627,12 @@ if [ "$MAKEFILE" = "Makefile.bsd" ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME"
 	echo "FWNAME = $FW" > bsdmake.inc
 	echo "SRCDIR = ${BASEDIR}" >> bsdmake.inc
 	echo "CPPFLAGS += -I." >> bsdmake.inc
+	if [ "$OS_NAME" = "FreeBSD" ] && [ "$FW" = "pf" ] ; then
+		echo "#define USE_LIBPFCTL 1" >> ${CONFIGFILE}
+		echo "CFLAGS += -I/usr/local/include/" >> bsdmake.inc
+		echo "LDFLAGS += -L/usr/local/lib" >> bsdmake.inc
+		echo "LDFLAGS += -lpfctl" >> bsdmake.inc
+	fi
 fi
 if [ "$MAKEFILE" ] ; then
 	cp "${BASEDIR}/${MAKEFILE}" Makefile && echo "${BASEDIR}/${MAKEFILE} -> Makefile"
