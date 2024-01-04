@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.135 2023/06/29 09:55:14 nanard Exp $ */
+/* $Id: upnpc.c,v 1.136 2023/07/05 22:27:32 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2023 Thomas Bernard
@@ -671,14 +671,14 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "       \t%s [options] -D uniqueID\n\t\tDelete Pinhole (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -S\n\t\tGet Firewall status (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "       \t%s [options] -G remote_ip remote_port internal_ip internal_port protocol\n\t\tGet Outbound Pinhole Timeout (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -P\n\t\tGet Presentation url\n", argv[0]);
+		fprintf(stderr, "       \t%s [options] -P\n\t\tGet Presentation URL\n", argv[0]);
 		fprintf(stderr, "\nprotocol is UDP or TCP\n");
 		fprintf(stderr, "@ can be used in option -a, -n, -A and -G to represent local LAN address.\n");
 		fprintf(stderr, "Options:\n");
 		fprintf(stderr, "  -e description : set description for port mapping.\n");
-		fprintf(stderr, "  -6 : use ip v6 instead of ip v4.\n");
-		fprintf(stderr, "  -u url : bypass discovery process by providing the XML root description url.\n");
-		fprintf(stderr, "  -m address/interface : provide ip address (ip v4) or interface name (ip v4 or v6) to use for sending SSDP multicast packets.\n");
+		fprintf(stderr, "  -6 : use IPv6 instead of IPv4.\n");
+		fprintf(stderr, "  -u URL : bypass discovery process by providing the XML root description URL.\n");
+		fprintf(stderr, "  -m address/interface : provide IPv4 address or interface name (IPv4 or IPv6) to use for sending SSDP multicast packets.\n");
 		fprintf(stderr, "  -z localport : SSDP packets local (source) port (1024-65535).\n");
 		fprintf(stderr, "  -p path : use this path for MiniSSDPd socket.\n");
 		fprintf(stderr, "  -t ttl : set multicast TTL. Default value is 2.\n");
