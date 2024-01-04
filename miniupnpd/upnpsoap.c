@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2023 Thomas Bernard
+ * (c) 2006-2024 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -479,7 +479,11 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 			syslog(LOG_INFO, "Client %s tried to redirect port to %s",
 			       inet_ntoa(h->clientaddr), int_ip);
 			ClearNameValueList(&data);
+#ifdef IGD_V2
+			SoapError(h, 606, "Action not authorized");
+#else
 			SoapError(h, 718, "ConflictInMappingEntry");
+#endif
 			return;
 		}
 	}
@@ -912,8 +916,11 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 			{
 				if(h->clientaddr.s_addr != int_ip_addr.s_addr)
 				{
+#ifdef IGD_V2
 					SoapError(h, 606, "Action not authorized");
-					/*SoapError(h, 714, "NoSuchEntryInArray");*/
+#else
+					SoapError(h, 714, "NoSuchEntryInArray");
+#endif
 					ClearNameValueList(&data);
 					return;
 				}
