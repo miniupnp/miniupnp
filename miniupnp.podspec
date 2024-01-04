@@ -1,7 +1,7 @@
 Pod::Spec.new do |spec|
   spec.name = "miniupnp"
-  spec.summary = "Mini UPnP client"
-  spec.homepage = 'http://miniupnp.free.fr/'
+  spec.summary = "MiniUPnP IGD client"
+  spec.homepage = 'https://miniupnp.tuxfamily.org/'
   spec.authors = "The MiniUPnP Authors"
   spec.license = { type: "BSD", file: "miniupnpc/LICENSE" }
 
