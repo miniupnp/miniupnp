@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.261 2024/01/04 00:35:54 nanard Exp $
+$Id: Changelog.txt,v 1.262 2024/01/04 00:49:22 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.2.6 : released 2024/04/01
 
 2024/01/04:
   includes charset="utf-8" in Content-Type
