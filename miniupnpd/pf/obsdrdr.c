@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2023 Thomas Bernard
+ * (c) 2006-2024 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -984,6 +984,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			if(timestamp)
 				*timestamp = get_timestamp(eport, proto);
 			r = 0;
+			break;
 		}
 	}
 	release_ticket(dev, tnum);
@@ -1134,6 +1135,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 			}
 			remove_timestamp_entry(eport, proto);
 			r = 0;
+			break;
 		}
 	}
 	if (r == -2)
@@ -1174,7 +1176,7 @@ priv_delete_filter_rule(const char * ifname, unsigned short iport,
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
 	{
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
-		goto error;
+		return -1;
 	}
 	n = pr.nr;
 #ifdef PF_RELEASETICKETS
@@ -1225,7 +1227,7 @@ syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
 	if (r == -2)
 		syslog(LOG_NOTICE, "could not find filter rule to delete iport=%hu addr=%8x", iport, ntohl(iaddr));
 	release_ticket(dev, tnum);
-	return -1;
+	return r;
 #endif
 }
 
