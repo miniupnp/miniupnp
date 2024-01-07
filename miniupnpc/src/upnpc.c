@@ -592,10 +592,10 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 #endif
-    printf("upnpc : miniupnpc library test client, version %s.\n", MINIUPNPC_VERSION_STRING);
+    printf("upnpc: miniupnpc library test client, version %s.\n", MINIUPNPC_VERSION_STRING);
 	printf(" (c) 2005-2024 Thomas Bernard.\n");
-    printf("Go to http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/\n"
-	       "for more information.\n");
+    printf("More information at https://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/\n\n");
+
 	/* command line processing */
 	for(i=1; i<argc; i++)
 	{
