@@ -658,22 +658,23 @@ int main(int argc, char ** argv)
 	   || (command == 'U' && commandargc<2)
 	   || (command == 'D' && commandargc<1))
 	{
-		fprintf(stderr, "Usage :\t%s [options] -a ip port external_port protocol [duration] [remote host]\n\t\tAdd port mapping\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n\t\tAdd multiple port mappings to the current host\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -d external_port protocol [remote host]\n\t\tDelete port redirection\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -s\n\t\tGet Connection status\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -l\n\t\tList redirections\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -L\n\t\tList redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -n ip port external_port protocol [duration] [remote host]\n\t\tAdd (any) port mapping allowing IGD to use alternative external_port (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -N external_port_start external_port_end protocol [manage]\n\t\tDelete range of port mappings (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n\t\tAdd Pinhole (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -U uniqueID new_lease_time\n\t\tUpdate Pinhole (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -C uniqueID\n\t\tCheck if Pinhole is Working (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -K uniqueID\n\t\tGet Number of packets going through the rule (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -D uniqueID\n\t\tDelete Pinhole (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -S\n\t\tGet Firewall status (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -G remote_ip remote_port internal_ip internal_port protocol\n\t\tGet Outbound Pinhole Timeout (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "       \t%s [options] -P\n\t\tGet Presentation URL\n", argv[0]);
+		fprintf(stderr, "Usage :\n");
+		fprintf(stderr, "  %s [options] -a ip port external_port protocol [duration] [remote host]\n    Add port mapping\n", argv[0]);
+		fprintf(stderr, "  %s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n    Add multiple port mappings to the current host\n", argv[0]);
+		fprintf(stderr, "  %s [options] -d external_port protocol [remote host]\n    Delete port redirection\n", argv[0]);
+		fprintf(stderr, "  %s [options] -s\n    Get Connection status\n", argv[0]);
+		fprintf(stderr, "  %s [options] -l\n    List redirections\n", argv[0]);
+		fprintf(stderr, "  %s [options] -L\n    List redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -n ip port external_port protocol [duration] [remote host]\n    Add (any) port mapping allowing IGD to use alternative external_port (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -N external_port_start external_port_end protocol [manage]\n    Delete range of port mappings (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n    Add Pinhole (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -U uniqueID new_lease_time\n    Update Pinhole (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -C uniqueID\n    Check if Pinhole is Working (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -K uniqueID\n    Get Number of packets going through the rule (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -D uniqueID\n    Delete Pinhole (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -S\n    Get Firewall status (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -G remote_ip remote_port internal_ip internal_port protocol\n    Get Outbound Pinhole Timeout (for IGD:2 only)\n", argv[0]);
+		fprintf(stderr, "  %s [options] -P\n    Get Presentation URL\n", argv[0]);
 		fprintf(stderr, "\nprotocol is UDP or TCP\n");
 		fprintf(stderr, "@ can be used in option -a, -n, -A and -G to represent local LAN address.\n");
 		fprintf(stderr, "Options:\n");
