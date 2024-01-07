@@ -1414,12 +1414,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #ifdef ENABLE_PCP
 			case UPNPPCPMINLIFETIME:
 					min_lifetime = atoi(ary_options[i].value);
-					if (min_lifetime > 120 ) {
+					/* RFC6887 15. the minimum value SHOULD be 120 seconds */
+					if (min_lifetime < 120 ) {
 						min_lifetime = 120;
 					}
 				break;
 			case UPNPPCPMAXLIFETIME:
 					max_lifetime = atoi(ary_options[i].value);
+					/* maximum is 24 hours */
 					if (max_lifetime > 86400 ) {
 						max_lifetime = 86400;
 					}
