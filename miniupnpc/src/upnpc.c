@@ -658,7 +658,7 @@ int main(int argc, char ** argv)
 	   || (command == 'U' && commandargc<2)
 	   || (command == 'D' && commandargc<1))
 	{
-		fprintf(stderr, "Usage :\n");
+		fprintf(stderr, "Usage:\n");
 		fprintf(stderr, "  %s [options] -a ip port external_port protocol [duration] [remote host]\n    Add port mapping\n", argv[0]);
 		fprintf(stderr, "  %s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n    Add multiple port mappings to the current host\n", argv[0]);
 		fprintf(stderr, "  %s [options] -d external_port protocol [remote host]\n    Delete port redirection\n", argv[0]);
@@ -675,9 +675,11 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "  %s [options] -S\n    Get Firewall status (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "  %s [options] -G remote_ip remote_port internal_ip internal_port protocol\n    Get Outbound Pinhole Timeout (for IGD:2 only)\n", argv[0]);
 		fprintf(stderr, "  %s [options] -P\n    Get Presentation URL\n", argv[0]);
-		fprintf(stderr, "\nprotocol is UDP or TCP\n");
-		fprintf(stderr, "@ can be used in option -a, -n, -A and -G to represent local LAN address.\n");
-		fprintf(stderr, "Options:\n");
+		fprintf(stderr, "\nNotes:\n");
+		fprintf(stderr, "  protocol is UDP or TCP.\n");
+		fprintf(stderr, "  Use \"\" for any remote_host and 0 for any remote_port.\n");
+		fprintf(stderr, "  @ can be used in option -a, -n, -A and -G to represent local LAN address.\n");
+		fprintf(stderr, "\nOptions:\n");
 		fprintf(stderr, "  -e description : set description for port mapping.\n");
 		fprintf(stderr, "  -6 : use IPv6 instead of IPv4.\n");
 		fprintf(stderr, "  -u URL : bypass discovery process by providing the XML root description URL.\n");
