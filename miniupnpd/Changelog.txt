@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.505 2024/01/04 01:12:03 nanard Exp $
 
+2024/01/07:
+  pf: fix for OpenBSD 7.4
+
 VERSION 2.3.4 : released on 2024/01/04
 
 2024/01/04:
