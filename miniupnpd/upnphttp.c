@@ -643,8 +643,7 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 	       h->req_Timeout);
 	syslog(LOG_DEBUG, "SID '%.*s'", h->req_SIDLen, h->req_buf + h->req_SIDOff);
 #if defined(UPNP_STRICT) && (UPNP_VERSION_MAJOR > 1) || (UPNP_VERSION_MINOR > 0)
-	/*if(h->req_Timeout < 1800) {*/
-	if(h->req_Timeout == 0) {
+	if(h->req_Timeout < 1800) {
 		/* Second-infinite is forbidden with UDA v1.1 and later :
 		 * (UDA 1.1 : 4.1.1 Subscription)
 		 * UPnP 1.1 control points MUST NOT subscribe using keyword infinite,
