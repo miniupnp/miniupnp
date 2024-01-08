@@ -767,7 +767,7 @@ int main(int argc, char ** argv)
 				if (SetRedirectAndTest(&urls, &data,
 						   commandargv[0], commandargv[1],
 						   commandargv[2], commandargv[3],
-						   (commandargc > 4) && is_int(commandargv[4]) ? commandargv[4] : "0",
+						   (commandargc > 4) && is_int(commandargv[4]) ? commandargv[4] : "3600",
 						   (commandargc > 4) && !is_int(commandargv[4]) ? commandargv[4] : (commandargc > 5) ? commandargv[5] : NULL,
 						   description, 0) < 0)
 					retcode = 2;
@@ -781,7 +781,7 @@ int main(int argc, char ** argv)
 				if (SetRedirectAndTest(&urls, &data,
 						   commandargv[0], commandargv[1],
 						   commandargv[2], commandargv[3],
-						   (commandargc > 4) && is_int(commandargv[4]) ? commandargv[4] : "0",
+						   (commandargc > 4) && is_int(commandargv[4]) ? commandargv[4] : "3600",
 						   (commandargc > 4) && !is_int(commandargv[4]) ? commandargv[4] : (commandargc > 5) ? commandargv[5] : NULL,
 						   description, 1) < 0)
 					retcode = 2;
