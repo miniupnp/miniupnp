@@ -371,7 +371,7 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
 	AddPortMappingArgs[5].elt = "NewEnabled";
 	AddPortMappingArgs[5].val = "1";
 	AddPortMappingArgs[6].elt = "NewPortMappingDescription";
-	AddPortMappingArgs[6].val = desc?desc:"libminiupnpc";
+	AddPortMappingArgs[6].val = desc?desc:"miniupnpc";
 	AddPortMappingArgs[7].elt = "NewLeaseDuration";
 	AddPortMappingArgs[7].val = leaseDuration?leaseDuration:"0";
 	buffer = simpleUPnPcommand(-1, controlURL, servicetype,
@@ -435,7 +435,7 @@ UPNP_AddAnyPortMapping(const char * controlURL, const char * servicetype,
 	AddPortMappingArgs[5].elt = "NewEnabled";
 	AddPortMappingArgs[5].val = "1";
 	AddPortMappingArgs[6].elt = "NewPortMappingDescription";
-	AddPortMappingArgs[6].val = desc?desc:"libminiupnpc";
+	AddPortMappingArgs[6].val = desc?desc:"miniupnpc";
 	AddPortMappingArgs[7].elt = "NewLeaseDuration";
 	AddPortMappingArgs[7].val = leaseDuration?leaseDuration:"0";
 	buffer = simpleUPnPcommand(-1, controlURL, servicetype,

@@ -91,7 +91,7 @@ UPNP_GetLinkLayerMaxBitRates(const char* controlURL,
 							unsigned int * bitrateUp);
 
 /* UPNP_AddPortMapping()
- * if desc is NULL, it will be defaulted to "libminiupnpc"
+ * if desc is NULL, it will be defaulted to "miniupnpc"
  * remoteHost is usually NULL because IGD don't support it.
  *
  * Return values :
@@ -134,7 +134,7 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
 		    const char * leaseDuration);
 
 /* UPNP_AddAnyPortMapping()
- * if desc is NULL, it will be defaulted to "libminiupnpc"
+ * if desc is NULL, it will be defaulted to "miniupnpc"
  * remoteHost is usually NULL because IGD don't support it.
  *
  * Return values :
