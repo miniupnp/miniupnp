@@ -691,6 +691,10 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 
+	if(ipv6 == 0 && (command == 'A' || command == 'D' || command == 'U' || command == 'K' || command == 'C' || command == 'G')) {
+		printf("Use IPv6 (option -6) GUA address to ensure UPnP IGDv2 pinholes are allowed\n\n");
+	}
+
 	if( rootdescurl
 	  || (devlist = upnpDiscover(2000, multicastif, minissdpdpath,
 	                             localport, ipv6, ttl, &error)))
