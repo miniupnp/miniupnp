@@ -528,7 +528,7 @@ static int upnpc_get_desc(upnpc_device_t * d, const char * url)
 	headers = evhttp_request_get_output_headers(req);
 	evhttp_add_header(headers, "Host", hostname_port);
 	evhttp_add_header(headers, "Connection", "close");
-	/*evhttp_add_header(headers, "User-Agent", "***");*/
+	/*evhttp_add_header(headers, "User-Agent", "OS/version UPnP/1.1 MiniUPnPc-libevent/2.2");*/
 	return evhttp_make_request(d->desc_conn, req, EVHTTP_REQ_GET, path);
 }
 
@@ -644,8 +644,8 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	buffer = evhttp_request_get_output_buffer(req);
 	evhttp_add_header(headers, "Host", hostname_port);
 	evhttp_add_header(headers, "SOAPAction", action);
-	evhttp_add_header(headers, "Content-Type", "text/xml");
-	/*evhttp_add_header(headers, "User-Agent", "***");*/
+	evhttp_add_header(headers, "Content-Type", "text/xml; charset=\"utf-8\"");
+	/*evhttp_add_header(headers, "User-Agent", "OS/version UPnP/1.1 MiniUPnPc-libevent/2.2");*/
 	/*evhttp_add_header(headers, "Cache-Control", "no-cache");*/
 	/*evhttp_add_header(headers, "Pragma", "no-cache");*/
 	evbuffer_add(buffer, body, body_len);
@@ -958,7 +958,7 @@ int upnpc_event_subscribe(upnpc_device_t * p)
 	headers = evhttp_request_get_output_headers(req);
 	/*buffer = evhttp_request_get_output_buffer(req);*/
 	evhttp_add_header(headers, "Host", hostname_port);
-	/*evhttp_add_header(headers, "User-Agent", "***");*/
+	/*evhttp_add_header(headers, "User-Agent", "OS/version UPnP/1.1 MiniUPnPc-libevent/2.2");*/
 	snprintf(callback_header, sizeof(callback_header), "<http://%s:%hu/evt_conn>", p->parent->local_address, p->parent->local_port);
 	evhttp_add_header(headers, "Callback", callback_header);
 	evhttp_add_header(headers, "NT", "upnp:event");
