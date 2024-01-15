@@ -1,4 +1,9 @@
-$Id: Changelog.txt,v 1.505 2024/01/04 01:12:03 nanard Exp $
+$Id: Changelog.txt,v 1.509 2024/01/15 00:20:19 nanard Exp $
+
+2024/01/15:
+  fix SUBSCRIBE timeout compliance (should be >= 1800 seconds)
+  PCP: fix enforcing min_lifetime minimum of 120secs
+  CACHE-CONTROL: max-age=1800 in M-SEARCH response
 
 2024/01/07:
   pf: fix for OpenBSD 7.4
