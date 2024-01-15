@@ -102,7 +102,7 @@ void init_iptpinhole(void);
 #endif
 
 #ifndef DEFAULT_CONFIG
-#define DEFAULT_CONFIG "/etc/miniupnpd.conf"
+#define DEFAULT_CONFIG "/etc/miniupnpd/miniupnpd.conf"
 #endif
 
 #ifdef USE_MINIUPNPDCTL

@@ -874,6 +874,10 @@ echo "/* disable reading and parsing of config file (miniupnpd.conf) */" >> ${CO
 echo "/*#define DISABLE_CONFIG_FILE*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
+echo "/* Set default config file path, if not set, /etc/miniupnpd/miniupnpd.conf will be used */" >> ${CONFIGFILE}
+echo "/*#define DEFAULT_CONFIG \"/etc/miniupnpd/miniupnpd.conf\"*/" >> ${CONFIGFILE}
+echo "" >> ${CONFIGFILE}
+
 echo "/* Uncomment the following line to configure all manufacturer infos through miniupnpd.conf */" >> ${CONFIGFILE}
 if [ -n "$VENDORCFG" ] ; then
 	echo "#define ENABLE_MANUFACTURER_INFO_CONFIGURATION" >> ${CONFIGFILE}

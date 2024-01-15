@@ -127,7 +127,7 @@ LIBS += -lssl -lcrypto
 # set PREFIX variable to install in the wanted place
 
 INSTALLBINDIR = $(PREFIX)/sbin
-INSTALLETCDIR = $(PREFIX)/etc
+INSTALLETCDIR = $(PREFIX)/etc/miniupnpd
 MANPREFIX ?= $(PREFIX)
 INSTALLMANDIR = $(MANPREFIX)/man
 
