@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.258 2024/01/15 00:17:41 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.259 2024/01/17 00:05:14 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -99,10 +99,6 @@
 #ifdef USE_NETFILTER
 void init_iptpinhole(void);
 #endif
-#endif
-
-#ifndef DEFAULT_CONFIG
-#define DEFAULT_CONFIG "/etc/miniupnpd.conf"
 #endif
 
 #ifdef USE_MINIUPNPDCTL

@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: configure,v 1.124 2024/01/04 01:12:04 nanard Exp $
+# $Id: configure,v 1.125 2024/01/17 00:05:14 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -623,6 +623,12 @@ if [ "$FW" = "iptables" ] || [ "$FW" = "nftables" ] ; then
 	fi
 fi
 
+if [ "$MAKEFILE" = "Makefile.linux" ] || [ "$MAKEFILE" = "Makefile.linux_nft" ] || [ "$MAKEFILE" = "Makefile.macosx" ] ; then
+	DEFAULT_CONFIG=/etc/miniupnpd/miniupnpd.conf
+else
+	DEFAULT_CONFIG=/etc/miniupnpd.conf
+fi
+
 if [ "$MAKEFILE" = "Makefile.bsd" ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME" = "SunOS" ] ; then
 	echo "FWNAME = $FW" > bsdmake.inc
 	echo "SRCDIR = ${BASEDIR}" >> bsdmake.inc
@@ -872,6 +878,9 @@ echo "" >> ${CONFIGFILE}
 
 echo "/* disable reading and parsing of config file (miniupnpd.conf) */" >> ${CONFIGFILE}
 echo "/*#define DISABLE_CONFIG_FILE*/" >> ${CONFIGFILE}
+echo "" >> ${CONFIGFILE}
+
+echo "#define DEFAULT_CONFIG \"${DEFAULT_CONFIG}\"" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
 echo "/* Uncomment the following line to configure all manufacturer infos through miniupnpd.conf */" >> ${CONFIGFILE}

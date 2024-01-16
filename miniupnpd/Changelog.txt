@@ -1,4 +1,8 @@
-$Id: Changelog.txt,v 1.509 2024/01/15 00:20:19 nanard Exp $
+$Id: Changelog.txt,v 1.510 2024/01/17 00:05:12 nanard Exp $
+
+2024/01/17:
+  default path for miniupnpd.conf is /etc/miniupnpd/miniupnpd.conf
+  under linux
 
 2024/01/15:
   fix SUBSCRIBE timeout compliance (should be >= 1800 seconds)
