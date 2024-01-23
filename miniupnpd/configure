@@ -45,6 +45,7 @@ case "$argv" in
 		fi ;;
 	--disable-pppconn) DISABLEPPPCONN=1 ;;
 	--disable-fork) NO_BACKGROUND_NO_PIDFILE=1 ;;
+	--disable-firewall-checks) DISABLE_FIREWALL_CHECKS=1 ;;
 	--firewall=*)
 	    FW=$(echo $argv | cut -d= -f2) ;;
 	--iptablespath=*)
@@ -79,6 +80,9 @@ case "$argv" in
 		echo " --host-os=<name>       For cross build. result of uname -s on the host machine"
 		echo " --host-os-version=x.x  For cross build. result of uname -r on the host machine"
 		echo " --host-machine=<arch>  For cross build. result of uname -m on the host machine"
+		echo " --disable-firewall-checks  Disable firewall checks for port porwarding rules"
+		echo "                            (when checks are disabled then miniupnpd may report"
+		echo "                             incorrect information about forwarded ports; use with care)"
 		exit 1
 		;;
 	*)
@@ -927,6 +931,10 @@ if [ -n "$GETIFADDRS" ] && [ $GETIFADDRS -eq 1 ] ; then
 	echo "#define USE_GETIFADDRS" >> ${CONFIGFILE}
 else
 	echo "/*#define USE_GETIFADDRS*/" >> ${CONFIGFILE}
+fi
+
+if [ -n "$DISABLE_FIREWALL_CHECKS" ]; then
+echo "#define DISABLE_FIREWALL_CHECKS" >> ${CONFIGFILE}
 fi
 
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}

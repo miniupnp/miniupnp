@@ -78,6 +78,7 @@
 #include "upnpredirect.h"
 #include "upnppinhole.h"
 #include "upnpstun.h"
+#include "upnpforwardcheck.h"
 #include "miniupnpdtypes.h"
 #include "daemonize.h"
 #include "upnpevents.h"
@@ -1114,6 +1115,69 @@ int update_ext_ip_addr_from_stun(int init)
 
 	use_ext_ip_addr = ext_addr_str;
 	disable_port_forwarding = restrictive_nat;
+	return 0;
+}
+
+int check_port_forwarding_setup(void)
+{
+	struct in_addr if_addr, ext_addr;
+	char if_addr_str[INET_ADDRSTRLEN];
+	const char *ext_addr_str;
+	int ret;
+
+	if (getifaddr(ext_if_name, if_addr_str, sizeof(if_addr_str), &if_addr, NULL) < 0) {
+		syslog(LOG_ERR, "CHECK: Cannot get IP address for ext interface %s", ext_if_name);
+		disable_port_forwarding = 1;
+		return 1;
+	}
+
+	if (use_ext_ip_addr) {
+		ext_addr_str = use_ext_ip_addr;
+		if (inet_pton(AF_INET, ext_addr_str, &ext_addr) != 1) {
+			syslog(LOG_ERR, "CHECK: External IP address %s is invalid", ext_addr_str);
+			disable_port_forwarding = 1;
+			return 1;
+		}
+	} else {
+		ext_addr_str = if_addr_str;
+		ext_addr = if_addr;
+	}
+
+	ret = perform_forwarding_check(ext_if_name, if_addr_str, &if_addr, &ext_addr);
+	if (ret < 0) {
+		syslog(LOG_ERR, "CHECK: Cannot perform check for port forwarding setup: %s", strerror(errno));
+		disable_port_forwarding = 1;
+		return 1;
+	}
+
+	if (ret == 0) {
+		syslog(LOG_INFO, "CHECK: Port forwarding should work");
+		syslog(LOG_INFO, "In case of some errors enable option ext_perform_stun=yes for detailed output");
+		disable_port_forwarding = 0;
+	} else if (strcmp(if_addr_str, ext_addr_str) == 0) {
+		syslog(LOG_WARNING, "CHECK: Firewall on local machine is blocking port forwarding");
+		syslog(LOG_WARNING, "Verify configuration of firewall on local machine and also on upstream router");
+		syslog(LOG_WARNING, "Enable option ext_perform_stun=yes for detailed output");
+#ifdef DISABLE_FIREWALL_CHECKS
+		/* When DISABLE_FIREWALL_CHECKS is enabled then do not disable port forwarding.
+		 * Beware that miniupnpd in this case may report incorrect status of port. */
+		syslog(LOG_WARNING, "WARNING: miniupnpd may report incorrect status of port forwarding");
+#else
+		disable_port_forwarding = 1;
+#endif
+	} else {
+		syslog(LOG_WARNING, "CHECK: Firewall on upstream router %s is blocking port forwarding", ext_addr_str);
+		syslog(LOG_WARNING, "Verify configuration of firewall on upstream router %s", ext_addr_str);
+		syslog(LOG_WARNING, "Enable option ext_perform_stun=yes for detailed output");
+#ifdef DISABLE_FIREWALL_CHECKS
+		/* When DISABLE_FIREWALL_CHECKS is enabled then do not disable port forwarding.
+		 * Beware that miniupnpd in this case may report incorrect status of port. */
+		syslog(LOG_WARNING, "WARNING: miniupnpd may report incorrect status of port forwarding");
+#else
+		disable_port_forwarding = 1;
+#endif
+	}
+
 	return 0;
 }
 
@@ -2308,7 +2372,15 @@ main(int argc, char * * argv)
 			syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
 			syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
 			disable_port_forwarding = 1;
+		} else {
+			if (check_port_forwarding_setup() != 0)
+				return 1;
 		}
+	}
+	else
+	{
+		if (check_port_forwarding_setup() != 0)
+			return 1;
 	}
 
 #ifdef DYNAMIC_OS_VERSION
@@ -2601,10 +2673,14 @@ main(int argc, char * * argv)
 						syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
 						disable_port_forwarding = 1;
 					} else if (disable_port_forwarding && !reserved) {
-						syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
-						disable_port_forwarding = 0;
+						syslog(LOG_INFO, "Public IP address %s on ext interface %s", if_addr, ext_if_name);
+						check_port_forwarding_setup(); /* it updates also disable_port_forwarding */
 					}
 				}
+			}
+			else
+			{
+				check_port_forwarding_setup(); /* it updates also disable_port_forwarding */
 			}
 #ifdef ENABLE_NATPMP
 			if(GETFLAG(ENABLENATPMPMASK))
