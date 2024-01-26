@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.137 2024/01/04 00:42:50 nanard Exp $ */
+/* $Id: upnpc.c,v 1.141 2024/01/26 23:34:01 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2024 Thomas Bernard
@@ -562,6 +562,38 @@ RemovePinhole(struct UPNPUrls * urls,
 	printf("UPNP_DeletePinhole() returned : %d\n", r);
 }
 
+static void usage(FILE * out, const char * argv0) {
+	fprintf(out, "Usage:\n");
+	fprintf(out, "  %s [options] -a ip port external_port protocol [duration] [remote host]\n    Add port mapping\n", argv0);
+	fprintf(out, "  %s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n    Add multiple port mappings to the current host\n", argv0);
+	fprintf(out, "  %s [options] -d external_port protocol [remote host]\n    Delete port redirection\n", argv0);
+	fprintf(out, "  %s [options] -s\n    Get Connection status\n", argv0);
+	fprintf(out, "  %s [options] -l\n    List redirections\n", argv0);
+	fprintf(out, "  %s [options] -L\n    List redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -n ip port external_port protocol [duration] [remote host]\n    Add (any) port mapping allowing IGD to use alternative external_port (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -N external_port_start external_port_end protocol [manage]\n    Delete range of port mappings (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n    Add Pinhole (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -U uniqueID new_lease_time\n    Update Pinhole (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -C uniqueID\n    Check if Pinhole is Working (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -K uniqueID\n    Get Number of packets going through the rule (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -D uniqueID\n    Delete Pinhole (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -S\n    Get Firewall status (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -G remote_ip remote_port internal_ip internal_port protocol\n    Get Outbound Pinhole Timeout (for IGD:2 only)\n", argv0);
+	fprintf(out, "  %s [options] -P\n    Get Presentation URL\n", argv0);
+	fprintf(out, "\nNotes:\n");
+	fprintf(out, "  protocol is UDP or TCP.\n");
+	fprintf(out, "  Use \"\" for any remote_host and 0 for any remote_port.\n");
+	fprintf(out, "  @ can be used in option -a, -n, -A and -G to represent local LAN address.\n");
+	fprintf(out, "\nOptions:\n");
+	fprintf(out, "  -e description : set description for port mapping.\n");
+	fprintf(out, "  -6 : use IPv6 instead of IPv4.\n");
+	fprintf(out, "  -u URL : bypass discovery process by providing the XML root description URL.\n");
+	fprintf(out, "  -m address/interface : provide IPv4 address or interface name (IPv4 or IPv6) to use for sending SSDP multicast packets.\n");
+	fprintf(out, "  -z localport : SSDP packets local (source) port (1024-65535).\n");
+	fprintf(out, "  -p path : use this path for MiniSSDPd socket.\n");
+	fprintf(out, "  -t ttl : set multicast TTL. Default value is 2.\n");
+	fprintf(out, "  -i : ignore errors and try to use also disconnected IGD or non-IGD device.\n");
+}
 
 /* sample upnp client program */
 int main(int argc, char ** argv)
@@ -601,8 +633,8 @@ int main(int argc, char ** argv)
 	{
 		if(0 == strcmp(argv[i], "--help") || 0 == strcmp(argv[i], "-h"))
 		{
-			command = 0;
-			break;
+			usage(stdout, argv[0]);
+			return 0;
 		}
 		if(argv[i][0] == '-')
 		{
@@ -663,36 +695,8 @@ int main(int argc, char ** argv)
 	   || (command == 'C' && commandargc<1)
 	   || (command == 'G' && commandargc<5))
 	{
-		fprintf(stderr, "Usage:\n");
-		fprintf(stderr, "  %s [options] -a ip port external_port protocol [duration] [remote host]\n    Add port mapping\n", argv[0]);
-		fprintf(stderr, "  %s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n    Add multiple port mappings to the current host\n", argv[0]);
-		fprintf(stderr, "  %s [options] -d external_port protocol [remote host]\n    Delete port redirection\n", argv[0]);
-		fprintf(stderr, "  %s [options] -s\n    Get Connection status\n", argv[0]);
-		fprintf(stderr, "  %s [options] -l\n    List redirections\n", argv[0]);
-		fprintf(stderr, "  %s [options] -L\n    List redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -n ip port external_port protocol [duration] [remote host]\n    Add (any) port mapping allowing IGD to use alternative external_port (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -N external_port_start external_port_end protocol [manage]\n    Delete range of port mappings (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -A remote_ip remote_port internal_ip internal_port protocol lease_time\n    Add Pinhole (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -U uniqueID new_lease_time\n    Update Pinhole (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -C uniqueID\n    Check if Pinhole is Working (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -K uniqueID\n    Get Number of packets going through the rule (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -D uniqueID\n    Delete Pinhole (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -S\n    Get Firewall status (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -G remote_ip remote_port internal_ip internal_port protocol\n    Get Outbound Pinhole Timeout (for IGD:2 only)\n", argv[0]);
-		fprintf(stderr, "  %s [options] -P\n    Get Presentation URL\n", argv[0]);
-		fprintf(stderr, "\nNotes:\n");
-		fprintf(stderr, "  protocol is UDP or TCP.\n");
-		fprintf(stderr, "  Use \"\" for any remote_host and 0 for any remote_port.\n");
-		fprintf(stderr, "  @ can be used in option -a, -n, -A and -G to represent local LAN address.\n");
-		fprintf(stderr, "\nOptions:\n");
-		fprintf(stderr, "  -e description : set description for port mapping.\n");
-		fprintf(stderr, "  -6 : use IPv6 instead of IPv4.\n");
-		fprintf(stderr, "  -u URL : bypass discovery process by providing the XML root description URL.\n");
-		fprintf(stderr, "  -m address/interface : provide IPv4 address or interface name (IPv4 or IPv6) to use for sending SSDP multicast packets.\n");
-		fprintf(stderr, "  -z localport : SSDP packets local (source) port (1024-65535).\n");
-		fprintf(stderr, "  -p path : use this path for MiniSSDPd socket.\n");
-		fprintf(stderr, "  -t ttl : set multicast TTL. Default value is 2.\n");
-		fprintf(stderr, "  -i : ignore errors and try to use also disconnected IGD or non-IGD device.\n");
+		fprintf(stderr, "Command line argument error.\n\n");
+		usage(stderr, argv[0]);
 		return 1;
 	}
 
