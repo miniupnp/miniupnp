@@ -652,11 +652,16 @@ int main(int argc, char ** argv)
 
 	if(!command
 	   || (command == 'a' && commandargc<4)
-	   || (command == 'd' && argc<2)
-	   || (command == 'r' && argc<2)
+	   || (command == 'r' && commandargc<2)
 	   || (command == 'A' && commandargc<6)
+	   || (command == 'd' && commandargc<2)
+	   || (command == 'D' && commandargc<1)
+	   || (command == 'n' && commandargc<4)
+	   || (command == 'N' && commandargc<3)
 	   || (command == 'U' && commandargc<2)
-	   || (command == 'D' && commandargc<1))
+	   || (command == 'K' && commandargc<1)
+	   || (command == 'C' && commandargc<1)
+	   || (command == 'G' && commandargc<5))
 	{
 		fprintf(stderr, "Usage:\n");
 		fprintf(stderr, "  %s [options] -a ip port external_port protocol [duration] [remote host]\n    Add port mapping\n", argv[0]);
