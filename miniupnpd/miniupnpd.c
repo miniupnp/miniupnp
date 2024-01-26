@@ -1094,9 +1094,9 @@ int update_ext_ip_addr_from_stun(int init)
 
 	if ((init || disable_port_forwarding) && !restrictive_nat) {
 		if (addr_is_reserved(&if_addr))
-			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniunnpd", ext_if_name, if_addr_str, ext_addr_str);
+			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str, ext_addr_str);
 		else
-			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s and firewall does not block incoming connections set by miniunnpd", ext_if_name, if_addr_str);
+			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str);
 		syslog(LOG_INFO, "Port forwarding is now enabled");
 	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
 		if (addr_is_reserved(&if_addr)) {
