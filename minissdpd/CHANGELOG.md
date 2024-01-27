@@ -1,173 +1,173 @@
-$Id: Changelog.txt,v 1.54 2022/10/22 18:54:16 nanard Exp $
+# MiniSSDPd - SSDP managing daemon changelog
 
-VERSION 1.6.0:
+## 1.6.0 - 2022-10-22
 
-2021/01/15:
-	Add submit_to_minissdpd.py
+*2021-01-15*
+- Add submit_to_minissdpd.py
 
-2020/06/06:
-	define NO_BACKGROUND_NO_PIDFILE for a systemd friendly mode
-	send the startup M-SEARCH message on the right interface(s)
+*2020-06-06*
+- Define NO_BACKGROUND_NO_PIDFILE for a systemd friendly mode
+- Send the startup M-SEARCH message on the right interface(s)
 
-2018/12/18:
-	updateDevice() remove element from the list when realloc fails
+*2018-12-18*
+- updateDevice() remove element from the list when realloc fails
 
-2018/05/08:
-	fix test shell scripts for *BSD
+*2018-05-08*
+- Fix test shell scripts for *BSD
 
-2018/02/23:
-	Fix build with IPv6 disabled and SSDP_LISTEN_ON_SPECIFIC_ADDR enabled
+*2018-03-23*
+- Fix build with IPv6 disabled and SSDP_LISTEN_ON_SPECIFIC_ADDR enabled
 
-2018/02/03:
-	Properly parse several requests read() at once
-	Ignore the version of devices while answering to requests
+*2018-02-03*
+- Properly parse several requests read() at once
+- Ignore the version of devices while answering to requests
 
-2016/11/11:
-	Fix for Solaris build
+*2016-11-11*
+- Fix for Solaris build
 
-2016/03/01:
-	Fix broken overflow test (p+l > buf+n) thanks to Salva Peiro
+*2016-03-01*
+- Fix broken overflow test (p+l > buf+n) thanks to Salva Peiro
 
-VERSION 1.5:
+## 1.5 - 2016-01-13
 
-2016/01/13:
-	add "notification" mode (command 5)
+*2016-01-13*
+- Add "notification" mode (command 5)
 
-2015/08/06:
-	disable multicast loop
-	add -f command line option to filter for a specific device type
+*2015-08-06*
+- Disable multicast loop
+- Add -f command line option to filter for a specific device type
 
-VERSION 1.4:
+## 1.4 - 2015-08-06
 
-2015/08/06:
-	added command 0 (version)
+*2015-08-06*
+- Added command 0 (version)
 
-2015/07/21:
-	set multicast TTL to 2 by default and configurable
+*2015-07-21*
+- Set multicast TTL to 2 by default and configurable
 
-2015/05/27:
-	support larger buffer size (useful for type 3 requests)
+*2015-05-27*
+- Support larger buffer size (useful for type 3 requests)
 
-VERSION 1.3:
+## 1.3 - 2014-12-05
 
-2014/12/05:
-	clean up select call()
-	fix non blocking write to sockets
+*2014-12-05*
+- Clean up select call()
+- Fix non blocking write to sockets
 
-2014/12/04:
-	Fixes removing of devices on ssdp:byebye
-	handle ssdp:update messages
+*2014-12-04*
+- Fixes removing of devices on ssdp:byebye
+- Handle ssdp:update messages
 
-2014/11/28:
-	revert "listen on only 1 IPv4 if only 1 interface is specified"
-	because it prevents broadcast messages to be received
-	Change the list of LAN addresses/interfaces (code taken from miniupnpd)
-	Check that the peer is from a LAN for each SSDP packet
+*2014-11-28*
+- Revert "listen on only 1 IPv4 if only 1 interface is specified"
+  because it prevents broadcast messages to be received
+- Change the list of LAN addresses/interfaces (code taken from miniupnpd)
+- Check that the peer is from a LAN for each SSDP packet
 
-2014/11/06:
-	listen on only 1 IPv4 if only 1 interface is specified
-	also when ENABLE_IPV6 is not defined
+*2014-11-06*
+- Listen on only 1 IPv4 if only 1 interface is specified
+  also when ENABLE_IPV6 is not defined
 
-2014/09/06:
-	freebsd-glue for Debian/kFreeBSD
-	use LDFLAGS when linking binary
+*2014-09-06*
+- freebsd-glue for Debian/kFreeBSD
+- Use LDFLAGS when linking binary
 
-2014/05/01:
-	listen on only 1 IPv4 if only 1 interface is specified
+*2014-05-01*
+- Listen on only 1 IPv4 if only 1 interface is specified
 
-2014/02/03:
-	silently ignore EAGAIN, EWOULDBLOCK, EINTR of recv calls
-	Discover devices on the network at startup
+*2014-02-03*
+- Silently ignore EAGAIN, EWOULDBLOCK, EINTR of recv calls
+- Discover devices on the network at startup
 
-2013/08/19:
-	Translate README in english
+*2013-08-19*
+- Translate README in english
 
-2012/09/27:
-	Rename all include guards to not clash with C99
-	(7.1.3 Reserved identifiers).
+*2012-09-27*
+- Rename all include guards to not clash with C99
+  (7.1.3 Reserved identifiers).
 
-VERSION 1.2:
+## 1.2 - 2012-05-25
 
-2012/05/21:
-	Clean signal handling
-	Set sockets non blocking
+*2012-05-21*
+- Clean signal handling
+- Set sockets non blocking
 
-2012/05/18:
-	Improve ProcessInterfaceWatch() under BSD.
+*2012-05-18*
+- Improve ProcessInterfaceWatch() under BSD.
 
-2012/05/15:
-	Improve ProcessInterfaceWatch() under linux.
+*2012-05-15*
+- Improve ProcessInterfaceWatch() under linux.
 
-2012/05/02:
-	Clean CLFAGS in Makefile.
-	Remove a few signed/unsigned compares
+*2012-05-02*
+- Clean CLFAGS in Makefile.
+- Remove a few signed/unsigned compares
 
-2012/04/09:
-	Added -ansi to compilation flags.
-	Handle ssdp:update messages and update logging
+*2012-04-09*
+- Added -ansi to compilation flags.
+- Handle ssdp:update messages and update logging
 
-2012/01/02:
-	Install manpage. Fix installation under Mac OS X.
+*2012-01-02*
+- Install manpage. Fix installation under Mac OS X.
 
-2011/10/07:
-	unlink unix socket before binding.
-	set SO_REUSEADDR on SSDP socket.
-	daemonize after init
+*2011-10-07*
+- Unlink unix socket before binding.
+- Set SO_REUSEADDR on SSDP socket.
+- Daemonize after init
 
-VERSION 1.1:
+## 1.1 - 2011-07-30
 
-2011/07/30:
-	fixes. More overflow checks
+*2011-07-30*
+- Fixes. More overflow checks
 
-2011/07/29:
-	added a lot of buffer overflow checks. Check malloc() failure, etc.
-	Better cleanup in case of crash at start.
-	network interface watch to add/drop multicast membership when the interface get live.
+*2011-07-29*
+- Added a lot of buffer overflow checks. Check malloc() failure, etc.
+- Better cleanup in case of crash at start.
+- Network interface watch to add/drop multicast membership when the interface get live.
 
-2011/06/18:
-	Starting to add support for UPnP Device Architecture v1.1
+*2011-06-18*
+- Starting to add support for UPnP Device Architecture v1.1
 
-2011/05/23:
-	Added IPv6 support.
-	-i option now understands interface names as well as addresses.
+*2011-05-23*
+- Added IPv6 support.
+- -i option now understands interface names as well as addresses.
 
-VERSION 1.0:
+## 1.0 - 2008-10-07
 
-2008/10/07:
-	added codelength.h
-	Fixing response to M-SEARCH
-	Doc update
+*2008-10-07*
+- Added codelength.h
+- Fixing response to M-SEARCH
+- Doc update
 
-2008/10/06:
-	UPnP server support (answering M-SEARCH)
+*2008-10-06*
+- UPnP server support (answering M-SEARCH)
 
-2008/10/04:
-	listening on several interfaces.
+*2008-10-04*
+- Listening on several interfaces.
 
-2008/10/01:
-	use of daemon() instead of home made daemonize.
+*2008-10-01*
+- Use of daemon() instead of home made daemonize.
 
-2007/12/19:
-	added uuid in responses
-	3 types of requests supported.
-	preventing buffer overflow
+*2007-12-19*
+- Added uuid in responses
+- 3 types of requests supported.
+- Preventing buffer overflow
 
-2007/12/18:
-	It is now possible to change the location of both pid file and
-	unix socket.
+*2007-12-18*
+- It is now possible to change the location of both pid file and
+  unix socket.
 
-2007/10/08:
-	Added a man page
+*2007-10-08*
+- Added a man page
 
-2007/09/27:
-	Support for install in different location $ PREFIX=... make install
+*2007-09-27*
+- Support for install in different location $ PREFIX=... make install
 
-2007/09/23:
-	added a script for use in /etc/init.d
-	improved Makefile
-	creating /var/run/minissdpd.pid
-	adding synthetic messages for new devices/removed devices
+*2007-09-23*
+- Added a script for use in /etc/init.d
+- Improved Makefile
+- Creating /var/run/minissdpd.pid
+- Adding synthetic messages for new devices/removed devices
 
-2007/09/19:
-	Take SSDP announce packets lifetime into account.
+*2007-09-19*
+- Take SSDP announce packets lifetime into account.
 
