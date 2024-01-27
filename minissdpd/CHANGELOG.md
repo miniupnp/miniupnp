@@ -1,6 +1,8 @@
 # MiniSSDPd - SSDP managing daemon changelog
 
-## 1.6.0 - 2022-10-22
+## [Unreleased]
+
+## [1.6.0] - 2022-10-22
 
 *2021-01-15*
 - Add submit_to_minissdpd.py
@@ -171,3 +173,5 @@
 *2007-09-19*
 - Take SSDP announce packets lifetime into account.
 
+[unreleased]: https://github.com/miniupnp/miniupnp/compare/minissdpd_1_6_0...HEAD
+[1.6.0]: https://github.com/miniupnp/miniupnp/compare/minissdpd_1_5...minissdpd_1_6_0

@@ -1,5 +1,7 @@
 # MiniUPnP IGD & PCP/NAT-PMP daemon changelog
 
+## [Unreleased]
+
 *2024-01-17*
 - Default path for miniupnpd.conf is /etc/miniupnpd/miniupnpd.conf
   under linux
@@ -12,7 +14,7 @@
 *2024-01-07*
 - pf: fix for OpenBSD 7.4
 
-## 2.3.4 - 2024-01-04
+## [2.3.4] - 2024-01-04
 
 *2024-01-04*
 - Fix parsing of action string in ExecuteSoapAction()
@@ -28,7 +30,7 @@
 - Add a short list of build-time options in --version output
 - Enable secure mode by default
 
-## 2.3.3 - 2023-02-17
+## [2.3.3] - 2023-02-17
 
 *2023-02-04*
 - Fix PinholeVerification()
@@ -36,7 +38,7 @@
 *2023-01-28*
 - Fix updating of existing pinhole leasetime by AddPinhole
 
-## 2.3.2 - 2023-01-20
+## [2.3.2] - 2023-01-20
 
 *2023-01-15*
 - Fix NFTables again (RULE_HANDLE using more than 32 bits)
@@ -44,7 +46,7 @@
 *2022-10-21*
 - Add option to match rules description with regex
 
-## 2.3.1 - 2022-10-16
+## [2.3.1] - 2022-10-16
 
 *2022-10-10*
 - NFTables: fix for Big Endian. iport was always read as 0
@@ -63,7 +65,7 @@
 - pf: use external IP for NAT in double NAT setups
 - miniupnpd.init.d.script: support nftables
 
-## 2.3.0 - 2022-01-23
+## [2.3.0] - 2022-01-23
 
 *2021-12-01*
 - NFTables: use scripts to create table and chains
@@ -1495,3 +1497,9 @@
 - Command line arguments processing
 - Added possibility to listen internally on several interfaces
 
+[unreleased]: https://github.com/miniupnp/miniupnp/compare/miniupnpd_2_3_4...HEAD
+[2.3.4]: https://github.com/miniupnp/miniupnp/compare/miniupnpd_2_3_3...miniupnpd_2_3_4
+[2.3.3]: https://github.com/miniupnp/miniupnp/compare/miniupnpd_2_3_2...miniupnpd_2_3_3
+[2.3.2]: https://github.com/miniupnp/miniupnp/compare/miniupnpd_2_3_1...miniupnpd_2_3_2
+[2.3.1]: https://github.com/miniupnp/miniupnp/compare/miniupnpd_2_3_0...miniupnpd_2_3_1
+[2.3.0]: https://github.com/miniupnp/miniupnp/compare/miniupnpd_2_2_3...miniupnpd_2_3_0

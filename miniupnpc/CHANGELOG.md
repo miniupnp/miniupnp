@@ -1,7 +1,8 @@
 # MiniUPnP IGD client changelog
 
+## [Unreleased]
 
-## 2.2.6 - 2024-04-01
+## [2.2.6] - 2024-04-01
 
 *2024-01-04*
 - Includes charset="utf-8" in Content-Type
@@ -11,7 +12,7 @@
 - Make User-Agent compliant.
 - listdevices => upnp-listdevices
 
-## 2.2.5 - 2023-06-12
+## [2.2.5] - 2023-06-12
 
 *2023-06-05*
 - GetListOfPortMappings NewStartPort 0 => 1
@@ -23,7 +24,7 @@
 *2023-01-04*
 - cmake: install binaries, man pages and external-ip.sh
 
-## 2.2.4 - 2022-10-21
+## [2.2.4] - 2022-10-21
 
 *2022-02-20*
 - upnpc: use of @ to replace local lan address
@@ -31,12 +32,12 @@
 *2021-11-09*
 - python module: Allow to specify the root description url
 
-## 2.2.3 - 2021-09-28
+## [2.2.3] - 2021-09-28
 
 *2021-08-13*
 - Change directory structure: include/ and src/ directories.
 
-## 2.2.2 - 2021-03-03
+## [2.2.2] - 2021-03-03
 
 *2021-01-15*
 - miniupnpcmodule.c: throw an exception in UPnP_discover()
@@ -44,12 +45,12 @@
 *2020-12-30*
 - Fix usage of IP_MULTICAST_IF with struct ip_mreqn
 
-## 2.2.1 - 2020-12-20
+## [2.2.1] - 2020-12-20
 
 *2020-11-30*
 - Add miniupnpc.rc for .dll description
 
-## 2.2.0 - 2020-11-09
+## [2.2.0] - 2020-11-09
 
 *2020-09-24*
 - Check properly for reserved IP addresses
@@ -799,3 +800,11 @@
 *2006-07-19*
 - Using GetCommonLinkProperties to get down/upload bitrate
 
+[unreleased]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_2_6...HEAD
+[2.2.6]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_2_5...miniupnpc_2_2_6
+[2.2.5]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_2_4...miniupnpc_2_2_5
+[2.2.4]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_2_3...miniupnpc_2_2_4
+[2.2.3]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_2_2...miniupnpc_2_2_3
+[2.2.2]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_2_1...miniupnpc_2_2_2
+[2.2.1]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_2_0...miniupnpc_2_2_1
+[2.2.0]: https://github.com/miniupnp/miniupnp/compare/miniupnpc_2_1...miniupnpc_2_2_0
