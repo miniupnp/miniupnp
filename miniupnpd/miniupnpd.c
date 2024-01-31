@@ -899,7 +899,7 @@ struct runtime_vars {
 	int notify_interval;	/* seconds between SSDP announces */
 	/* unused rules cleaning related variables : */
 	int clean_ruleset_threshold;	/* threshold for removing unused rules */
-	int clean_ruleset_interval;		/* (minimum) interval between checks */
+	int clean_ruleset_interval;		/* (minimum) interval between checks. 0=disabled */
 };
 
 /* parselanaddr()
