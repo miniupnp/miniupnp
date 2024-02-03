@@ -2,7 +2,7 @@
 #define MINIUPNPCSTRINGS_H_INCLUDED
 
 #define OS_STRING "${CMAKE_SYSTEM_NAME}"
-#define MINIUPNPC_VERSION_STRING "${MINIUPNPC_VERSION}"
+#define MINIUPNPC_VERSION_STRING "${PROJECT_VERSION}"
 
 #if 0
 /* according to "UPnP Device Architecture 1.0" */
