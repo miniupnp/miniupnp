@@ -40,10 +40,10 @@
 static SSL_CTX *ssl_ctx = NULL;
 
 #ifndef HTTPS_CERTFILE
-#define HTTPS_CERTFILE "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+#define HTTPS_CERTFILE "/etc/miniupnpd/https-certificate.pem"
 #endif
 #ifndef HTTPS_KEYFILE
-#define HTTPS_KEYFILE "/etc/ssl/private/ssl-cert-snakeoil.key"
+#define HTTPS_KEYFILE "/etc/miniupnpd/https-privatekey.pem"
 #endif
 
 static void
