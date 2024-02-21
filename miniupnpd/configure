@@ -29,12 +29,13 @@ case "$argv" in
 	--igd2) IGD2=1 ;;
 	--strict) STRICT=1 ;;
 	--debug) DEBUG=1 ;;
+	--disable-fork) NO_BACKGROUND_NO_PIDFILE=1 ;;
 	--leasefile) LEASEFILE=1 ;;
-	--vendorcfg) VENDORCFG=1 ;;
-	--pcp-peer) PCP_PEER=1 ;;
 	--portinuse) PORTINUSE=1 ;;
+	--pcp-peer) PCP_PEER=1 ;;
 	--randomize-urls) RANDOMIZE_URLS=1 ;;
 	--enable-https) ENABLE_HTTPS=1 ;;
+	--vendorcfg) VENDORCFG=1 ;;
 	--regex) REGEX=1 ;;
 	--uda-version=*)
 		UPNP_VERSION=$(echo $argv | cut -d= -f2)
@@ -46,7 +47,6 @@ case "$argv" in
 			exit 1
 		fi ;;
 	--disable-pppconn) DISABLEPPPCONN=1 ;;
-	--disable-fork) NO_BACKGROUND_NO_PIDFILE=1 ;;
 	--firewall=*)
 	    FW=$(echo $argv | cut -d= -f2) ;;
 	--iptablespath=*)
@@ -66,18 +66,18 @@ case "$argv" in
 		echo " --igd2                Build an UPnP IGDv2 instead of an IGDv1"
 		echo " --strict              Stricter compliance with UPnP IGD specifications"
 		echo " --debug               #define DEBUG 1"
+		echo " --disable-fork        Do not go to background and do not write PID file"
 		echo " --leasefile           Enable lease file"
-		echo " --vendorcfg           Enable configuration of UPnP IGD manufacturer info"
-		echo " --pcp-peer            Enable PCP PEER operation"
 		echo " --portinuse           Enable port in use check"
+		echo " --pcp-peer            Enable PCP PEER operation"
 		echo " --randomize-urls      Randomize UPnP IGD URLs by adding a random prefix"
 		echo " --enable-https        Enable HTTPS support (IGDv2), requires openssl"
+		echo " --vendorcfg           Enable configuration of UPnP IGD manufacturer info"
 		echo " --regex               Enable description regex filter"
 		echo " --uda-version=x.x     Set advertised UPnP UDA version (default ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn     Disable IGDv1 WANPPPConnection (disabled with strict)"
 		echo " --firewall=type       Force firewall type (nftables, iptables, pf, ipf, ipfw)"
 		echo " --iptablespath=path   Path to iptables to use a specific version"
-		echo " --disable-fork        Do not go to background and do not write PID file"
 		echo " --getifaddrs          Force use getifaddrs() to obtain interface addresses"
 		echo " --v6sockets-v6only    IPv6 only, no IPv4, ie sysctl net.inet6.ip6.v6only=1"
 		echo " --host-os=name        For cross build, result of uname -s on the host machine"
