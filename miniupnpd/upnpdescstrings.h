@@ -22,19 +22,19 @@
 #define WANDEV_MANUFACTURERURL		"https://miniupnp.tuxfamily.org/"
 #define WANDEV_MODELNAME			"WAN Device"
 #define WANDEV_MODELDESCRIPTION		"WAN Device"
-#define WANDEV_MODELNUMBER			MINIUPNPD_DATE
+#define WANDEV_MODELNUMBER			MINIUPNPD_VERSION "@" MINIUPNPD_DATE
 #define WANDEV_MODELURL				"https://miniupnp.tuxfamily.org/"
-#define WANDEV_UPC					"000000000000"
+#define WANDEV_UPC					""
 /* UPC is 12 digit (barcode) */
 
 #define WANCDEV_FRIENDLYNAME		"WANConnectionDevice"
 #define WANCDEV_MANUFACTURER		WANDEV_MANUFACTURER
 #define WANCDEV_MANUFACTURERURL		WANDEV_MANUFACTURERURL
-#define WANCDEV_MODELNAME			"MiniUPnPd"
-#define WANCDEV_MODELDESCRIPTION	"MiniUPnP daemon"
-#define WANCDEV_MODELNUMBER			MINIUPNPD_DATE
+#define WANCDEV_MODELNAME			"WAN Connection Device"
+#define WANCDEV_MODELDESCRIPTION	"WAN Connection Device"
+#define WANCDEV_MODELNUMBER			MINIUPNPD_VERSION "@" MINIUPNPD_DATE
 #define WANCDEV_MODELURL			"https://miniupnp.tuxfamily.org/"
-#define WANCDEV_UPC					"000000000000"
+#define WANCDEV_UPC					""
 /* UPC is 12 digit (barcode) */
 
 #endif
