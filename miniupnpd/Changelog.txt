@@ -1,5 +1,9 @@
 $Id: Changelog.txt,v 1.510 2024/01/17 00:05:12 nanard Exp $
 
+2024/02/25:
+  fix IGDv2 WANIPConnection XML service description for AddAnyPortMapping
+  out argument is NewReservedPort, not NewExternalPort
+
 2024/01/17:
   default path for miniupnpd.conf is /etc/miniupnpd/miniupnpd.conf
   under linux
