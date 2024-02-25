@@ -1124,7 +1124,7 @@ genServiceDesc(int * len, const struct serviceDesc * s, int force_igd1)
 #ifdef IGD_V2
 				} else if(plen >= 11 && 0 == memcmp(p, "A_ARG_TYPE_", 11)) {
 					str = strcat_str(str, len, &tmplen, p + 11);
-				} else if(plen >= 13 && 0 == memcmp(p, "ExternalPort", 13)
+				} else if(plen >= 12 && 0 == memcmp(p, "ExternalPort", 12)
 				          && args[j].dir == 2
 				          && 0 == memcmp(acts[i].name, "AddAnyPortMapping", 18)) {
 					str = strcat_str(str, len, &tmplen, "ReservedPort");
