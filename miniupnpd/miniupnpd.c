@@ -1353,6 +1353,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPNATPOSTCHAIN:
 				set_rdr_name(RDR_NAT_POSTROUTING_CHAIN_NAME, ary_options[i].value);
 				break;
+			case UPNPNFFAMILYSPLIT:
+				set_rdr_name(RDR_FAMILY_SPLIT, ary_options[i].value);
+				break;
 #endif    /* USE_NETFILTER */
 			case UPNPNOTIFY_INTERVAL:
 				v->notify_interval = atoi(ary_options[i].value);

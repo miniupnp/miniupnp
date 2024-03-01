@@ -97,7 +97,7 @@ int add_pinhole(const char * ifname,
 	snprintf(comment, NFT_DESCR_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
 
-	r = rule_set_filter6(NFPROTO_INET, ifname, proto,
+	r = rule_set_filter6(nft_ipv6_family, ifname, proto,
 			    rhost_addr_p, &ihost_addr,
 				0, int_port, rem_port, comment, 0);
 
@@ -304,7 +304,7 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	d_printf(("update add_pinhole(%s, %s, %s, %d, %d, %d, %s)\n",
 	          ifname, raddr, inet_ntop(AF_INET6, &ihost_addr, iaddr, INET6_ADDRSTRLEN), rport, iport, proto, comment));
 
-	r = rule_set_filter6(NFPROTO_INET, ifname, proto,
+	r = rule_set_filter6(nft_ipv6_family, ifname, proto,
 			    rhost_addr_p, &ihost_addr,
 				0, iport, rport, comment, 0);
 

@@ -15,6 +15,9 @@ extern const char * nft_nat_table;
 extern const char * nft_prerouting_chain;
 extern const char * nft_postrouting_chain;
 extern const char * nft_forward_chain;
+extern int nft_nat_family;
+extern int nft_ipv4_family;
+extern int nft_ipv6_family;
 
 #define NFT_DESCR_SIZE 1024
 
