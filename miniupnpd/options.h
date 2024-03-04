@@ -62,6 +62,7 @@ enum upnpconfigoptions {
 	UPNPFORWARDCHAIN,
 	UPNPNATCHAIN,
 	UPNPNATPOSTCHAIN,
+	UPNPNFFAMILYSPLIT,
 #endif
 #ifdef USE_PF
 	UPNPANCHOR,				/* anchor */
