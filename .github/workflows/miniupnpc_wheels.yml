@@ -39,9 +39,6 @@ jobs:
             runs-on:
               arm: [macos-14]
               intel: [macos-latest]
-            cibw-archs-macos:
-              arm: arm64
-              intel: x86_64
             macosx-deployment-target:
               arm: 11.0
               intel: 10.14
@@ -99,9 +96,11 @@ jobs:
           - name: ARM
             file-name: arm
             matrix: arm
+            cibw: arm64
           - name: Intel
             file-name: intel
             matrix: intel
+            cibw: x86_64
         exclude:
 #          - os:  # excluding windows entirely as that is presently handled in AppVeyor
 #              matrix: windows
@@ -130,7 +129,7 @@ jobs:
 
     env:
       FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
-      CIBW_ARCHS_MACOS: ${{ matrix.os.cibw-archs-macos[matrix.arch.matrix] }}
+      CIBW_ARCHS: ${{ matrix.arch.cibw }}
       CIBW_BUILD: ${{ matrix.python.cibw-build }}
       CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
       CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
@@ -163,22 +162,23 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Build and test
-        if: matrix.os.matrix == 'macos' || ( matrix.os.matrix == 'linux' && matrix.arch.matrix == 'intel' )
+        if: matrix.os.matrix != 'windows'
+#        if: matrix.os.matrix == 'macos' || ( matrix.os.matrix == 'linux' && matrix.arch.matrix == 'intel' )
         run: |
           pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"'
           cibuildwheel source --output-dir dist
 
-      - name: Build and test (QEMU)
-        if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
-        run: |
-          docker run --rm --platform linux/arm64 \
-          -v ${{ github.workspace }}:/ws \
-          --workdir=/ws \
-          quay.io/pypa/${{ matrix.python.manylinux[matrix.arch.matrix] }}_aarch64 \
-          bash -exc ' \
-          python${{ matrix.python.major-dot-minor }} -m pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"' \
-          && python${{ matrix.python.major-dot-minor }} -m cibuildwheel source --output-dir dist \
-          '
+#      - name: Build and test (QEMU)
+#        if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
+#        run: |
+#          docker run --rm --platform linux/arm64 \
+#          -v ${{ github.workspace }}:/ws \
+#          --workdir=/ws \
+#          quay.io/pypa/${{ matrix.python.manylinux[matrix.arch.matrix] }}_aarch64 \
+#          bash -exc ' \
+#          python${{ matrix.python.major-dot-minor }} -m pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"' \
+#          && python${{ matrix.python.major-dot-minor }} -m cibuildwheel source --output-dir dist \
+#          '
 
       - name: Build (Windows)
         if: matrix.os.matrix == 'windows'
