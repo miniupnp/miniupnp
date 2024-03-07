@@ -42,6 +42,10 @@ jobs:
             macosx-deployment-target:
               arm: 11.0
               intel: 10.14
+            cibw-arch:
+              # TODO: do we need universal2?
+              arm: arm64
+              intel: x86_64
           - name: Linux
             file-name: linux
             matrix: linux
@@ -49,12 +53,17 @@ jobs:
             runs-on:
               arm: [ubuntu-latest]
               intel: [ubuntu-latest]
+            cibw-arch:
+              arm: aarch64
+              intel: x86_64
           - name: Windows
             file-name: windows
             matrix: windows
             emoji: 🪟
             runs-on:
               intel: [windows-latest]
+            cibw-arch:
+              intel: x86_64
         python:
           - major-dot-minor: '3.7'
             cibw-build: 'cp37-*'
@@ -129,7 +138,7 @@ jobs:
 
     env:
       FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
-      CIBW_ARCHS: ${{ matrix.arch.cibw }}
+      CIBW_ARCHS: ${{ matrix.os.cibw[matrix.arch.matrix] }}
       CIBW_BUILD: ${{ matrix.python.cibw-build }}
       CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
       CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
