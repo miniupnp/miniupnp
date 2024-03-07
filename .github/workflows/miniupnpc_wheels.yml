@@ -37,7 +37,7 @@ jobs:
             matrix: macos
             emoji: 🍎
             runs-on:
-              arm: [macOS, ARM64]
+              arm: [macos-14]
               intel: [macos-latest]
             cibw-archs-macos:
               arm: arm64
