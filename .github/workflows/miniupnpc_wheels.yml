@@ -115,6 +115,18 @@ jobs:
               matrix: arm
             python:
               matrix: '3.7'
+          - os:
+              matrix: macos
+            arch:
+              matrix: arm
+            python:
+              matrix: '3.8'
+          - os:
+              matrix: macos
+            arch:
+              matrix: arm
+            python:
+              matrix: '3.9'
 
     env:
       FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
