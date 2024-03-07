@@ -50,7 +50,7 @@ jobs:
             matrix: linux
             emoji: 🐧
             runs-on:
-              arm: [Linux, ARM64]
+              arm: [ubuntu-latest]
               intel: [ubuntu-latest]
           - name: Windows
             file-name: windows
