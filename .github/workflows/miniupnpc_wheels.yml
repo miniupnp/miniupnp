@@ -90,6 +90,12 @@ jobs:
               arch: manylinux2014
               intel: manylinux2014
             matrix: '3.11'
+          - major-dot-minor: '3.12'
+            cibw-build: 'cp312-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2014
+            matrix: '3.12'
         arch:
           - name: ARM
             matrix: arm
