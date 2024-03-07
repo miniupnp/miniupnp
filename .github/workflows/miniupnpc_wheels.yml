@@ -142,7 +142,7 @@ jobs:
       - name: Install tools
         if: matrix.os.matrix != 'windows'
         run: |
-          pip install cibuildwheel==2.16.5
+          pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"'
 
       - name: Set up QEMU
         if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
