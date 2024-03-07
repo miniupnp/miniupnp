@@ -172,10 +172,10 @@ jobs:
           mkdir ../dist
           cp dist/*.whl ../dist
 
-      - uses: ./.github/actions/create-venv
+      - uses: ./cloned/.github/actions/create-venv
         id: create-test-venv
 
-      - uses: ./.github/actions/activate-venv
+      - uses: ./cloned/.github/actions/activate-venv
         with:
           directories: ${{ steps.create-test-venv.outputs.activate-venv-directories }}
 
