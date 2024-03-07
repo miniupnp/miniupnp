@@ -128,10 +128,10 @@ jobs:
         with:
           path: cloned
 
-      - uses: ./.github/actions/create-venv
+      - uses: ./cloned/.github/actions/create-venv
         id: create-venv
 
-      - uses: ./.github/actions/activate-venv
+      - uses: ./cloned/.github/actions/activate-venv
         with:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
