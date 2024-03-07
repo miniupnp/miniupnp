@@ -96,7 +96,7 @@ jobs:
           - name: ARM
             file-name: arm
             matrix: arm
-            cibw: arm64
+            cibw: aarch64
           - name: Intel
             file-name: intel
             matrix: intel
