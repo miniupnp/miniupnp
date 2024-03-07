@@ -176,7 +176,7 @@ jobs:
           --workdir=/ws \
           quay.io/pypa/${{ matrix.python.manylinux[matrix.arch.matrix] }}_aarch64 \
           bash -exc ' \
-          python${{ matrix.python.major-dot-minor }} pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"' \
+          python${{ matrix.python.major-dot-minor }} -m pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"' \
           && python${{ matrix.python.major-dot-minor }} -m cibuildwheel source --output-dir dist \
           '
 
