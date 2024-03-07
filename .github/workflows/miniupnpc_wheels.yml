@@ -1,3 +1,5 @@
+# copied from https://github.com/Chia-Network/build-wheels/blob/52e183920e3ec44017ed767c65e9b204536c0f13/.github/workflows/miniupnpc.yml
+
 name: "build miniupnpc wheels"
 
 on:
@@ -31,34 +33,31 @@ jobs:
       matrix:
         os:
           - name: macOS
+            file-name: macos
             matrix: macos
             emoji: 🍎
             runs-on:
-              arm: [macos-latest]
+              arm: [macOS, ARM64]
               intel: [macos-latest]
-            cibw-archs:
+            cibw-archs-macos:
               arm: arm64
               intel: x86_64
             macosx-deployment-target:
               arm: 11.0
               intel: 10.14
           - name: Linux
+            file-name: linux
             matrix: linux
             emoji: 🐧
             runs-on:
-              arm: [ubuntu-latest]
+              arm: [Linux, ARM64]
               intel: [ubuntu-latest]
-            cibw-archs:
-              arm: aarch64
-              intel: x86_64
           - name: Windows
+            file-name: windows
             matrix: windows
             emoji: 🪟
             runs-on:
               intel: [windows-latest]
-            cibw-archs:
-              arm: ARM64
-              intel: AMD64
         python:
           - major-dot-minor: '3.7'
             cibw-build: 'cp37-*'
@@ -69,37 +68,39 @@ jobs:
           - major-dot-minor: '3.8'
             cibw-build: 'cp38-*'
             manylinux:
-              arch: manylinux2014
+              arm: manylinux2014
               intel: manylinux2010
             matrix: '3.8'
           - major-dot-minor: '3.9'
             cibw-build: 'cp39-*'
             manylinux:
-              arch: manylinux2014
+              arm: manylinux2014
               intel: manylinux2010
             matrix: '3.9'
           - major-dot-minor: '3.10'
             cibw-build: 'cp310-*'
             manylinux:
-              arch: manylinux2014
+              arm: manylinux2014
               intel: manylinux2010
             matrix: '3.10'
           - major-dot-minor: '3.11'
             cibw-build: 'cp311-*'
             manylinux:
-              arch: manylinux2014
+              arm: manylinux2014
               intel: manylinux2014
             matrix: '3.11'
           - major-dot-minor: '3.12'
             cibw-build: 'cp312-*'
             manylinux:
-              arch: manylinux2014
+              arm: manylinux2014
               intel: manylinux2014
             matrix: '3.12'
         arch:
           - name: ARM
+            file-name: arm
             matrix: arm
           - name: Intel
+            file-name: intel
             matrix: intel
         exclude:
 #          - os:  # excluding windows entirely as that is presently handled in AppVeyor
@@ -114,6 +115,10 @@ jobs:
               matrix: arm
             python:
               matrix: '3.7'
+
+    env:
+      FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
+
     steps:
       - uses: actions/setup-python@v4
         with:
@@ -126,7 +131,7 @@ jobs:
         with:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: cloned
 
@@ -137,16 +142,16 @@ jobs:
       - name: Install tools
         if: matrix.os.matrix != 'windows'
         run: |
-          pip install cibuildwheel==2.11.2
+          pip install cibuildwheel==2.16.5
 
       - name: Set up QEMU
         if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Build and test
         if: matrix.os.matrix != 'windows'
         env:
-          CIBW_ARCHS: ${{ matrix.os.cibw-archs[matrix.arch.matrix] }}
+          CIBW_ARCHS: ${{ matrix.os.cibw-archs-macos[matrix.arch.matrix] }}
           CIBW_BUILD: ${{ matrix.python.cibw-build }}
           CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
           CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
@@ -161,7 +166,7 @@ jobs:
         run: |
           cd source
           mingw32-make -f Makefile.mingw CC=gcc
-          python -m pip install wheel
+          python -m pip install setuptools wheel
           mingw32-make -f Makefile.mingw pythonmodule PYTHON=python
           7z a dist/*.whl miniupnpc.dll
           mkdir ../dist
@@ -184,9 +189,9 @@ jobs:
         run: |
           python -c 'import miniupnpc; print(miniupnpc)'
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: wheel
+          name: wheel-${{ env.FILE_NAME }}
           path: ./dist
           if-no-files-found: error
