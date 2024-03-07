@@ -111,10 +111,10 @@ jobs:
         with:
           python-version: ${{ matrix.python.major-dot-minor }}
 
-      - uses: Chia-Network/actions/create-venv@main
+      - uses: ./.github/actions/create-venv
         id: create-venv
 
-      - uses: Chia-Network/actions/activate-venv@main
+      - uses: ./.github/actions/activate-venv
         with:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
@@ -159,10 +159,10 @@ jobs:
           mkdir ../dist
           cp dist/*.whl ../dist
 
-      - uses: Chia-Network/actions/create-venv@main
+      - uses: ./.github/actions/create-venv
         id: create-test-venv
 
-      - uses: Chia-Network/actions/activate-venv@main
+      - uses: ./.github/actions/activate-venv
         with:
           directories: ${{ steps.create-test-venv.outputs.activate-venv-directories }}
 

@@ -1,0 +1,31 @@
+name: "Activate virtual environment"
+description: 'Activate the a virtual environment for future steps.'
+inputs:
+  directories:
+    description: "A list of directories to attempt to activate, terminates on the first present directory.  Uses JSON format."
+    required: true
+    default: '["venv/", ".venv/"]'
+#outputs:
+#  virtual-env:
+#    description: "The VIRTUAL_ENV environment value."
+#    value:
+#  virtual-env-bin:
+#    description: "The path to the virtual environment directory containing the executables."
+#    value:
+runs:
+  using: "composite"
+  steps:
+    - name: Activate virtual environment
+      shell: sh
+      env:
+        INPUT_DIRECTORIES: ${{ inputs.directories }}
+      run: |
+        unset PYTHON
+        for V in 311 3.11 310 3.10 39 3.9 38 3.8 37 3.7 3 ""; do
+          if command -v python$V >/dev/null; then
+            PYTHON=python$V
+            break
+          fi
+        done
+        [ -n "$PYTHON" ] || (echo "Unable to find python" && exit 1)
+        $PYTHON "${GITHUB_ACTION_PATH}/activate_venv.py"
