@@ -37,8 +37,8 @@ jobs:
             matrix: macos
             emoji: 🍎
             runs-on:
-              arm: [macOS, ARM64]
-              intel: [macOS, X86]
+              arm: [macos-14]
+              intel: [macos-latest]
             macosx-deployment-target:
               arm: 11.0
               intel: 10.14
@@ -51,9 +51,8 @@ jobs:
             matrix: linux
             emoji: 🐧
             runs-on:
-              # using QEMU for arm
-              arm: [Linux, X86]
-              intel: [Linux, X86]
+              arm: [ubuntu-latest]
+              intel: [ubuntu-latest]
             cibw-archs:
               arm: aarch64
               intel: x86_64
@@ -62,7 +61,7 @@ jobs:
             matrix: windows
             emoji: 🪟
             runs-on:
-              intel: [Windows, X86]
+              intel: [windows-latest]
             cibw-archs:
               intel: x86_64
         python:
