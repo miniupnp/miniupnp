@@ -96,6 +96,8 @@ jobs:
           - name: Intel
             matrix: intel
         exclude:
+#          - os:  # excluding windows entirely as that is presently handled in AppVeyor
+#              matrix: windows
           - os:
               matrix: windows
             arch:
