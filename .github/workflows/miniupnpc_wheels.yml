@@ -130,6 +130,13 @@ jobs:
 
     env:
       FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
+      CIBW_ARCHS_MACOS: ${{ matrix.os.cibw-archs-macos[matrix.arch.matrix] }}
+      CIBW_BUILD: ${{ matrix.python.cibw-build }}
+      CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
+      CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
+      CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.python.manylinux['intel'] }}
+      CIBW_PRERELEASE_PYTHONS: True
+      CIBW_SKIP: '*-manylinux_i686 *-win32 *-musllinux_*'
 
     steps:
       - uses: actions/setup-python@v5
@@ -151,28 +158,27 @@ jobs:
         run: |
           cp -RLv cloned/miniupnpc source
 
-      - name: Install tools
-        if: matrix.os.matrix != 'windows'
-        run: |
-          python -m pip install --upgrade pip
-          pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"'
-
       - name: Set up QEMU
         if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
         uses: docker/setup-qemu-action@v3
 
       - name: Build and test
-        if: matrix.os.matrix != 'windows'
-        env:
-          CIBW_ARCHS_MACOS: ${{ matrix.os.cibw-archs-macos[matrix.arch.matrix] }}
-          CIBW_BUILD: ${{ matrix.python.cibw-build }}
-          CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
-          CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
-          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.python.manylinux['intel'] }}
-          CIBW_PRERELEASE_PYTHONS: True
-          CIBW_SKIP: '*-manylinux_i686 *-win32 *-musllinux_*'
+        if: matrix.os.matrix == 'macos' || ( matrix.os.matrix == 'linux' && matrix.arch.matrix == 'intel' )
         run: |
+          pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"'
           cibuildwheel source --output-dir dist
+
+      - name: Build and test (QEMU)
+        if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
+        run: |
+          docker run --rm --platform linux/arm64 \
+          -v ${{ github.workspace }}:/ws \
+          --workdir=/ws \
+          quay.io/pypa/${{ matrix.python.manylinux[matrix.arch.matrix] }}_aarch64 \
+          bash -exc ' \
+          pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"' \
+          && cibuildwheel source --output-dir dist \
+          '
 
       - name: Build (Windows)
         if: matrix.os.matrix == 'windows'
