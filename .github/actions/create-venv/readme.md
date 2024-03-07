@@ -11,3 +11,5 @@ This can be used in combination with the `activate-venv` action such as shown be
   with:
     directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 ```
+
+copied from https://github.com/Chia-Network/actions/tree/5851777428fb98585ae9628b7dc49ed9f6487fde/create-venv
