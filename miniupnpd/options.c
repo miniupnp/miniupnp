@@ -1,9 +1,9 @@
-/* $Id: options.c,v 1.44 2023/05/27 09:27:20 nanard Exp $ */
+/* $Id: options.c,v 1.45 2024/03/11 23:17:56 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2023 Thomas Bernard
+ * (c) 2006-2024 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 

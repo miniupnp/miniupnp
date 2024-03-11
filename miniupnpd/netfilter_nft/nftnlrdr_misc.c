@@ -1,10 +1,10 @@
-/* $Id: nftnlrdr_misc.c,v 1.14 2021/08/21 08:24:38 nanard Exp $ */
+/* $Id: nftnlrdr_misc.c,v 1.19 2024/03/11 23:28:21 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
  * (c) 2019 Paul Chambers
- * (c) 2019-2023 Thomas Bernard
+ * (c) 2019-2024 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.

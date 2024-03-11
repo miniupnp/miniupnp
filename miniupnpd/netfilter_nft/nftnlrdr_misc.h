@@ -1,9 +1,9 @@
-/*
- * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+/* $Id: nftnlrdr_misc.h,v 1.11 2024/03/11 23:35:07 nanard Exp $ */
+/* MiniUPnP project
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2015 Tomofumi Hayashi
  * (c) 2019 Paul Chambers
- * (c) 2020 Thomas Bernard
+ * (c) 2020-2024 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
