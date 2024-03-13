@@ -238,7 +238,7 @@ jobs:
           pattern: wheel-*
           path: dist/
 
-      - name: List all artifacts
+      - name: List artifacts
         run: |
           ls -la dist/
 
