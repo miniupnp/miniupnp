@@ -49,6 +49,7 @@ jobs:
           - name: macOS
             file-name: macos
             matrix: macos
+            cibuildwheel: macos
             emoji: 🍎
             runs-on:
               arm: [macos-14]
@@ -63,6 +64,7 @@ jobs:
           - name: Linux
             file-name: linux
             matrix: linux
+            cibuildwheel: linux
             emoji: 🐧
             runs-on:
               # arm so at least emulation via qemu isn't required
@@ -74,6 +76,7 @@ jobs:
           - name: Windows
             file-name: windows
             matrix: windows
+            cibuildwheel: windows
             emoji: 🪟
             runs-on:
               intel: [windows-latest]
@@ -153,6 +156,7 @@ jobs:
 
     env:
       FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
+      CIBW_PLATFORM: ${{ matrix.os.cibuildwheel }}
       CIBW_ARCHS: ${{ matrix.os.cibw-archs[matrix.arch.matrix] }}
       CIBW_BUILD: ${{ matrix.python.cibw-build }}
       CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
