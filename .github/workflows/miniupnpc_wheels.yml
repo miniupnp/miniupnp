@@ -238,6 +238,10 @@ jobs:
           pattern: wheel-*
           path: dist/
 
+      - name: List all artifacts
+        run: |
+          ls -la dist/
+
       - name: Publish distribution to PyPI
         # TODO: identify the desired condition
         if: false
