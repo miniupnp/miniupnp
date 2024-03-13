@@ -244,4 +244,6 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          print-hash: true
           skip-existing: true
+          verbose: true
