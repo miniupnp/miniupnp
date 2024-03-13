@@ -65,7 +65,8 @@ jobs:
             matrix: linux
             emoji: 🐧
             runs-on:
-              arm: [ubuntu-latest]
+              # arm so at least emulation via qemu isn't required
+              arm: [macos-14]
               intel: [ubuntu-latest]
             cibw-archs:
               arm: aarch64
@@ -179,10 +180,6 @@ jobs:
       - name: Copy out miniupnpc
         run: |
           cp -RLv cloned/miniupnpc source
-
-      - name: Set up QEMU
-        if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
-        uses: docker/setup-qemu-action@v3
 
       - name: Build and test
         if: matrix.os.matrix != 'windows'
