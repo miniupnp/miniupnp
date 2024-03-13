@@ -224,3 +224,24 @@ jobs:
           name: wheel-${{ env.FILE_NAME }}
           path: ./dist
           if-no-files-found: error
+
+  upload:
+    name: ${{ matrix.os.emoji }} 📦 Build ${{ matrix.arch.name }} ${{ matrix.python.major-dot-minor }}
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download Results
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          pattern: wheel-*
+          path: dist/
+
+      - name: Publish distribution to PyPI
+        # TODO: identify the desired condition
+        if: false
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
