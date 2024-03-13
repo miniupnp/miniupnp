@@ -242,7 +242,7 @@ jobs:
         run: |
           ls -la dist/
 
-      - name: Publish distribution to PyPI
+      - name: Publish to PyPI
         # TODO: identify the desired condition
         if: false
         uses: pypa/gh-action-pypi-publish@release/v1
