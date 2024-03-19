@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.512 2024/03/02 11:05:45 nanard Exp $
 
+2024/03/05:
+  NFTables: rewrite rule parsing code to fix source/dest address parsing.
+
 2024/03/04:
   NFTables: add upnp_nftables_family_split option to use NFPROTO_IPV4/IPV6
   instead of the generic NFPROTO_INET
