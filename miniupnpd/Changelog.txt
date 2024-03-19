@@ -1,4 +1,6 @@
-$Id: Changelog.txt,v 1.512 2024/03/02 11:05:45 nanard Exp $
+$Id: Changelog.txt,v 1.515 2024/03/19 23:40:30 nanard Exp $
+
+VERSION 2.3.6 : released on 2024/03/20
 
 2024/03/05:
   NFTables: rewrite rule parsing code to fix source/dest address parsing.
