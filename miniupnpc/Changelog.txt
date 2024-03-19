@@ -1,7 +1,15 @@
-$Id: Changelog.txt,v 1.262 2024/01/04 00:49:22 nanard Exp $
+$Id: Changelog.txt,v 1.264 2024/03/19 23:26:05 nanard Exp $
 miniUPnP client Changelog.
 
-VERSION 2.2.6 : released 2024/04/01
+VERSION 2.2.7 : released 2024/03/20
+
+2024/01/15:
+  listdevices.c: exit with status code 1 if no UPNP device is found
+
+2024/01/07:
+  upnpc.c: reformat Usage
+
+VERSION 2.2.6 : released 2024/01/04
 
 2024/01/04:
   includes charset="utf-8" in Content-Type
