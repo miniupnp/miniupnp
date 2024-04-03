@@ -567,6 +567,7 @@ static void usage(FILE * out, const char * argv0) {
 	fprintf(out, "  %s [options] -a ip port external_port protocol [duration] [remote host]\n    Add port mapping\n", argv0);
 	fprintf(out, "  %s [options] -r port1 [external_port1] protocol1 [port2 [external_port2] protocol2] [...]\n    Add multiple port mappings to the current host\n", argv0);
 	fprintf(out, "  %s [options] -d external_port protocol [remote host]\n    Delete port redirection\n", argv0);
+	fprintf(out, "  %s [options] -f external_port1 protocol1 [external_port2 protocol2] [...]\n    Delete multiple port redirections\n", argv0);
 	fprintf(out, "  %s [options] -s\n    Get Connection status\n", argv0);
 	fprintf(out, "  %s [options] -l\n    List redirections\n", argv0);
 	fprintf(out, "  %s [options] -L\n    List redirections (using GetListOfPortMappings (for IGD:2 only)\n", argv0);
@@ -830,6 +831,29 @@ int main(int argc, char ** argv)
 								   commandargv[i], commandargv[i+1], "0", NULL,
 								   description, 0) < 0)
 							retcode = 2;
+						i+=2;	/* 2 parameters parsed */
+					}
+				}
+				break;
+			case 'f':
+				i = 0;
+				while(i<commandargc)
+				{
+					if(!is_int(commandargv[i])) {
+						/* 1st parameter not an integer : error */
+						fprintf(stderr, "command -f : %s is not an port number\n", commandargv[i]);
+						retcode = 1;
+						break;
+					} else if(i+1 == commandargc){
+						/* too few arguments */
+						fprintf(stderr, "command -f : too few arguments\n");
+						retcode = 2;
+						break;
+					} else {
+						/* <port> <protocol> */
+						if (RemoveRedirect(&urls, &data,
+								commandargv[i], commandargv[i+1], NULL) < 0)
+							retcode = 3;
 						i+=2;	/* 2 parameters parsed */
 					}
 				}
