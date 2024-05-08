@@ -2421,6 +2421,28 @@ main(int argc, char * * argv)
 			return 1;
 		}
 
+#if defined(UPNP_STRICT) && defined(IGD_V2)
+		/* WANIPConnection:2 Service p9 :
+		 * Upon startup, UPnP IGD DCP MUST broadcast an ssdp:byebye before
+		 * sending the initial ssdp:alive onto the local network. Sending an
+		 * ssdp:byebye as part of the normal start up process for a UPnP
+		 * device ensures that UPnP control points with information about the
+		 * previous device instance will safely discard state information
+		 * about the previous device instance before communicating with the
+		 * new device instance. */
+		if (GETFLAG(ENABLEUPNPMASK))
+		{
+#ifndef ENABLE_IPV6
+			if(SendSSDPGoodbye(snotify, addr_count) < 0)
+#else
+			if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
+#endif
+			{
+				syslog(LOG_WARNING, "Failed to broadcast good-bye notifications");
+			}
+		}
+#endif /* UPNP_STRICT */
+
 #ifdef USE_IFACEWATCHER
 		/* open socket for kernel notifications about new network interfaces */
 		if (sudp >= 0)
