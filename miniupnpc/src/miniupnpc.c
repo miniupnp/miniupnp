@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2021 Thomas Bernard
+ * copyright (c) 2005-2024 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #include <stdlib.h>
@@ -534,9 +534,11 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
  *    -1 = Internal error
  *     0 = NO IGD found
  *     1 = A valid connected IGD has been found
- *     2 = A valid IGD has been found but it reported as
+ *     2 = A valid connected IGD has been found but its
+ *         IP address is reserved (non routable)
+ *     3 = A valid IGD has been found but it reported as
  *         not connected
- *     3 = an UPnP device has been found but was not recognized as an IGD
+ *     4 = an UPnP device has been found but was not recognized as an IGD
  *
  * In any positive non zero return case, the urls and data structures
  * passed as parameters are set. Don't forget to call FreeUPNPUrls(urls) to
@@ -545,11 +547,13 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
 MINIUPNP_LIBSPEC int
 UPNP_GetValidIGD(struct UPNPDev * devlist,
                  struct UPNPUrls * urls,
-				 struct IGDdatas * data,
-				 char * lanaddr, int lanaddrlen)
+                 struct IGDdatas * data,
+                 char * lanaddr, int lanaddrlen,
+                 char * wanaddr, int wanaddrlen)
 {
 	struct xml_desc {
 		char lanaddr[40];
+		char wanaddr[40];
 		char * xml;
 		int size;
 		int is_igd;
@@ -557,8 +561,8 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	struct UPNPDev * dev;
 	int ndev = 0;
 	int i;
-	int state = -1; /* state 1 : IGD connected. State 2 : IGD. State 3 : anything */
-	char extIpAddr[16];
+	int state = -1; /* state 1 : IGD connected. State 2 : connected with reserved IP.
+	                 * State 3 : IGD. State 4 : anything */
 	int status_code = -1;
 
 	if(!devlist)
@@ -602,7 +606,7 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 		}
 	}
 	/* iterate the list to find a device depending on state */
-	for(state = 1; state <= 3; state++)
+	for(state = 1; state <= 4; state++)
 	{
 		for(dev = devlist, i = 0; dev; dev = dev->pNext, i++)
 		{
@@ -611,14 +615,14 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				memset(data, 0, sizeof(struct IGDdatas));
 				memset(urls, 0, sizeof(struct UPNPUrls));
 				parserootdesc(desc[i].xml, desc[i].size, data);
-				if(desc[i].is_igd || state >= 3 )
+				if(desc[i].is_igd || state >= 4 )
 				{
 				  int is_connected;
 
 				  GetUPNPUrls(urls, data, dev->descURL, dev->scope_id);
 
-				  /* in state 2 and 3 we don't test if device is connected ! */
-				  if(state >= 2)
+				  /* in state 3 and 4 we don't test if device is connected ! */
+				  if(state >= 3)
 				    goto free_and_return;
 				  is_connected = UPNPIGD_IsConnected(urls, data);
 #ifdef DEBUG
@@ -626,9 +630,11 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				     urls->controlURL, is_connected);
 #endif
 				  /* checks that status is connected AND there is a external IP address assigned */
-				  if(is_connected &&
-				     (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
-					if(!addr_is_reserved(extIpAddr))
+				  if(is_connected) {
+					if(state >= 2)
+					  goto free_and_return;
+				    if(UPNP_GetExternalIPAddress(urls->controlURL, data->first.servicetype, desc[i].wanaddr) == 0
+					   && !addr_is_reserved(desc[i].wanaddr))
 					  goto free_and_return;
 				  }
 				  FreeUPNPUrls(urls);
@@ -647,9 +653,11 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 				    printf("UPNPIGD_IsConnected(%s) = %d\n",
 				       urls->controlURL, is_connected);
 #endif
-				    if(is_connected &&
-				       (UPNP_GetExternalIPAddress(urls->controlURL,  data->first.servicetype, extIpAddr) == 0)) {
-					  if(!addr_is_reserved(extIpAddr))
+				    if(is_connected) {
+					  if(state >= 2)
+					    goto free_and_return;
+				      if(UPNP_GetExternalIPAddress(urls->controlURL, data->first.servicetype, desc[i].wanaddr) == 0
+					     && !addr_is_reserved(desc[i].wanaddr))
 					    goto free_and_return;
 				    }
 				    FreeUPNPUrls(urls);
@@ -661,8 +669,12 @@ UPNP_GetValidIGD(struct UPNPDev * devlist,
 	}
 	state = 0;
 free_and_return:
-	if (lanaddr != NULL && state >= 1 && state <= 3 && i < ndev)
-		strncpy(lanaddr, desc[i].lanaddr, lanaddrlen);
+	if (state >= 1 && state <= 4 && i < ndev) {
+		if (lanaddr != NULL)
+			strncpy(lanaddr, desc[i].lanaddr, lanaddrlen);
+		if (wanaddr != NULL)
+			strncpy(wanaddr, desc[i].wanaddr, wanaddrlen);
+	}
 	for(i = 0; i < ndev; i++)
 		free(desc[i].xml);
 	free(desc);

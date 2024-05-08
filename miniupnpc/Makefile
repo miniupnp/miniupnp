@@ -84,7 +84,7 @@ ifneq (, $(findstring sun, $(OS))$(findstring solaris, $(OS)))
 endif
 
 # APIVERSION is used to build SONAME
-APIVERSION = 17
+APIVERSION = 18
 
 SRCS = $(wildcard $(SRCDIR)/*.c)
 

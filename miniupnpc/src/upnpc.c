@@ -604,6 +604,7 @@ int main(int argc, char ** argv)
 	int commandargc = 0;
 	struct UPNPDev * devlist = 0;
 	char lanaddr[64] = "unset";	/* my ip address on the LAN */
+	char wanaddr[64] = "unsed";	/* up address of the IGD on the WAN */
 	int i;
 	const char * rootdescurl = 0;
 	const char * multicastif = 0;
@@ -727,17 +728,20 @@ int main(int argc, char ** argv)
 		}
 		i = 1;
 		if( (rootdescurl && UPNP_GetIGDFromUrl(rootdescurl, &urls, &data, lanaddr, sizeof(lanaddr)))
-		  || (i = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr))))
+		  || (i = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr), wanaddr, sizeof(wanaddr))))
 		{
 			switch(i) {
 			case 1:
 				printf("Found valid IGD : %s\n", urls.controlURL);
 				break;
 			case 2:
+				printf("Found an IGD with a reserved IP address (%s) : %s\n", wanaddr, urls.controlURL);
+				break;
+			case 3:
 				printf("Found a (not connected?) IGD : %s\n", urls.controlURL);
 				if (ignore) printf("Trying to continue anyway\n");
 				break;
-			case 3:
+			case 4:
 				printf("UPnP device found. Is it an IGD ? : %s\n", urls.controlURL);
 				if (ignore) printf("Trying to continue anyway\n");
 				break;
@@ -745,7 +749,7 @@ int main(int argc, char ** argv)
 				printf("Found device (igd ?) : %s\n", urls.controlURL);
 				if (ignore) printf("Trying to continue anyway\n");
 			}
-			if(i==1 || ignore) {
+			if(i==1 || i==2 || ignore) {
 
 			printf("Local LAN ip address : %s\n", lanaddr);
 			#if 0

@@ -3,6 +3,9 @@ miniUPnP client Changelog.
 
 2024/05/08:
   upnpc.c: Add -f option to upnpc program (delete multiple port redirections)
+  UPNP_GetValidIGD(): distinguish between not connected and connected to a
+    "private" network (with a reserved IP address).
+  Increments API_VERSION to 18
 
 VERSION 2.2.7 : released 2024/03/20
 
