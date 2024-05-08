@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.264 2024/03/19 23:26:05 nanard Exp $
 miniUPnP client Changelog.
 
+2024/05/08:
+  upnpc.c: Add -f option to upnpc program (delete multiple port redirections)
+
 VERSION 2.2.7 : released 2024/03/20
 
 2024/01/15:
