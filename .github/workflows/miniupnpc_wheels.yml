@@ -217,6 +217,7 @@ jobs:
         run: |
           ls -l dist/
           pip --version
+          pip debug --verbose
           pip install -vvv --no-index --only-binary :all: --find-links dist miniupnpc
 
       - name: Import
