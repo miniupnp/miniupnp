@@ -215,7 +215,9 @@ jobs:
       - name: Install
         if: matrix.arch.matrix != 'arm'
         run: |
-          pip install --no-index --only-binary :all: --find-links dist miniupnpc
+          ls -l dist/
+          pip --version
+          pip install -vvv --no-index --only-binary :all: --find-links dist miniupnpc
 
       - name: Import
         if: matrix.arch.matrix != 'arm'
