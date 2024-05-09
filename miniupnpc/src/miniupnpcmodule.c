@@ -1,9 +1,9 @@
-/* $Id: miniupnpcmodule.c,v 1.38 2021/11/09 18:46:49 nanard Exp $*/
+/* $Id: miniupnpcmodule.c,v 1.40 2024/05/09 15:10:29 nanard Exp $*/
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas BERNARD
  * website : https://miniupnp.tuxfamily.org/
- * copyright (c) 2007-2021 Thomas Bernard
+ * copyright (c) 2007-2024 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <Python.h>
