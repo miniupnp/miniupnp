@@ -99,4 +99,4 @@ artifacts:
 deploy_script:
   - appveyor AddCompilationMessage "Deploying to PyPI"
   - '%PYTHON_VER%\\python.exe -m pip install twine'
-  - '%PYTHON_VER%\\python.exe -m twine upload -u %USER% -p %PASS% --skip-existing dist/*.whl'
+  - '%PYTHON_VER%\\python.exe -m twine upload -u %USER% -p %PASS% --skip-existing dist/*.whl dist/*.tar.gz'

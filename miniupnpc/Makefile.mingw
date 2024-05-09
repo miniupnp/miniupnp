@@ -86,6 +86,7 @@ libminiupnpc.a:	$(OBJS)
 pythonmodule:	libminiupnpc.a
 	$(PYTHON) setupmingw32.py build $(SETUP_COMPILER_FLAG)
 	$(PYTHON) setupmingw32.py install --skip-build
+	$(PYTHON) setupmingw32.py sdist
 	$(PYTHON) setupmingw32.py bdist_wheel --skip-build
 
 miniupnpc.dll:	miniupnpc.def $(OBJSDLL)

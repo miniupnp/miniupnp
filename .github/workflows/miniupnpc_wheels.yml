@@ -51,8 +51,8 @@ jobs:
             matrix: macos
             emoji: 🍎
             runs-on:
-              arm: [macos-14]
-              intel: [macos-latest]
+              arm: [macos-latest]
+              intel: [macos-12]
               universal2: [macos-12]
             macosx-deployment-target:
               arm: 11.0
