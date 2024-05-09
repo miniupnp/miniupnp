@@ -3,7 +3,7 @@
 # http://miniupnp.free.fr/
 # https://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2023 Thomas Bernard
+# (c) 2005-2024 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -178,8 +178,11 @@ check:	validateminixml validateminiwget validateupnpreplyparse \
 
 everything:	all $(EXECUTABLES_ADDTESTS)
 
+# note : the python module "wheel" is required for bdist_wheel
 pythonmodule:	$(LIBRARY) $(SRCDIR)/miniupnpcmodule.c setup.py
 	MAKE=$(MAKE) python setup.py build
+	MAKE=$(MAKE) python setup.py sdist
+	MAKE=$(MAKE) python setup.py bdist_wheel --skip-build
 	touch $@
 
 installpythonmodule:	pythonmodule
