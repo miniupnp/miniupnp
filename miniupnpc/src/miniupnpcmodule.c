@@ -58,7 +58,7 @@ static PyMemberDef UPnP_members[] = {
 	{"lanaddr", T_STRING_INPLACE, offsetof(UPnPObject, lanaddr),
 	 READONLY, "ip address on the LAN"
 	},
-	{"wanaddr", T_STRING_INPLACE, offsetof(UPnPObject, lanaddr),
+	{"wanaddr", T_STRING_INPLACE, offsetof(UPnPObject, wanaddr),
 	 READONLY, "public ip address on the WAN"
 	},
 	{"discoverdelay", T_UINT, offsetof(UPnPObject, discoverdelay),
