@@ -243,8 +243,7 @@ jobs:
           ls -la dist/
 
       - name: Publish to PyPI
-        # TODO: identify the desired condition
-        if: false
+        if: startsWith(github.ref, 'refs/tags')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
