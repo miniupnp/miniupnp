@@ -154,7 +154,7 @@ jobs:
       FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
       CIBW_ARCHS: ${{ matrix.os.cibw-archs[matrix.arch.matrix] }}
       CIBW_BUILD: ${{ matrix.python.cibw-build }}
-      CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
+      CIBW_ENVIRONMENT_MACOS: "MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }} SYSTEM_VERSION_COMPAT=0"
       CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
       CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.python.manylinux['intel'] }}
       CIBW_PRERELEASE_PYTHONS: True
