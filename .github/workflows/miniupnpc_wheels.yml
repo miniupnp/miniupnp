@@ -151,6 +151,12 @@ jobs:
           - os:
               matrix: macos
             arch:
+              matrix: universal2
+            python:
+              matrix: '3.7'
+          - os:
+              matrix: macos
+            arch:
               matrix: arm
             python:
               matrix: '3.8'
