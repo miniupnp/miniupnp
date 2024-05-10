@@ -747,9 +747,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 	static struct { const char * p1, * p2; } const mcast_addrs[] =
 		{ { LL_SSDP_MCAST_ADDR, "[" LL_SSDP_MCAST_ADDR "]" },	/* Link Local */
 		  { SL_SSDP_MCAST_ADDR, "[" SL_SSDP_MCAST_ADDR "]" },	/* Site Local */
-#ifndef UPNP_STRICT
 		  { GL_SSDP_MCAST_ADDR, "[" GL_SSDP_MCAST_ADDR "]" },	/* Global */
-#endif /* ! UPNP_STRICT */
 		  { NULL, NULL } };
 	int j;
 #else /* ENABLE_IPV6 */
