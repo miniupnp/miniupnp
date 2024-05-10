@@ -663,7 +663,7 @@ echo "Please edit config.h for more compilation options."
 
 # define SUPPORT_REMOTEHOST if the FW related code really supports setting
 # a RemoteHost
-if [ \( "$FW" = "netfilter" \) -o \( "$FW" = "pf" \) -o \( "$FW" = "ipfw" \) ] ; then
+if [ \( "$FW" = "nftables" \) -o \( "$FW" = "iptables" \) -o \( "$FW" = "pf" \) -o \( "$FW" = "ipfw" \) ] ; then
 	echo "#define SUPPORT_REMOTEHOST" >> ${CONFIGFILE}
 fi
 
