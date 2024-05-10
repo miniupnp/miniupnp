@@ -1211,6 +1211,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 
 	/* set initial values */
 	SETFLAG(ENABLEUPNPMASK | SECUREMODEMASK);	/* UPnP and secure mode */
+	SETFLAG(REQUIRE_PUBLIC_EXT_IP);
 #ifdef ENABLE_IPV6
 	ipv6_bind_addr = in6addr_any;
 #endif /* ENABLE_IPV6 */
@@ -1251,6 +1252,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #endif
 			case UPNPEXT_IP:
 				use_ext_ip_addr = ary_options[i].value;
+				break;
+			case UPNPEXT_IP_REQUIRE_PUBLIC:
+				if (strcmp(ary_options[i].value, "yes") != 0)
+					CLEARFLAG(REQUIRE_PUBLIC_EXT_IP);
 				break;
 			case UPNPEXT_PERFORM_STUN:
 				if(strcmp(ary_options[i].value, "yes") == 0)
@@ -2306,11 +2311,16 @@ main(int argc, char * * argv)
 			syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
 			disable_port_forwarding = 1;
 		} else if (addr_is_reserved(&addr)) {
-			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
-			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-			syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-			syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
-			disable_port_forwarding = 1;
+			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
+			if (GETFLAG(REQUIRE_PUBLIC_EXT_IP)) {
+				syslog(LOG_INFO, "Port forwarding is impossible");
+				syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
+				syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
+				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+				disable_port_forwarding = 1;
+			} else {
+				syslog(LOG_NOTICE, "External traffic must be redirected to this device for forwarding to work");
+			}
 		}
 	}
 

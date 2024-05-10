@@ -347,8 +347,10 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 				ext_if_name);
 			ext_ip_addr[0] = '\0';
 		} else if (addr_is_reserved(&addr)) {
-			syslog(LOG_NOTICE, "private/reserved address %s is not suitable for external IP", ext_ip_addr);
-			ext_ip_addr[0] = '\0';
+			if (GETFLAG(REQUIRE_PUBLIC_EXT_IP)) {
+				syslog(LOG_NOTICE, "private/reserved address %s is not suitable for external IP", ext_ip_addr);
+				ext_ip_addr[0] = '\0';
+			}
 		}
 	}
 #else

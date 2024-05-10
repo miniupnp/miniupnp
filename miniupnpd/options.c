@@ -35,6 +35,7 @@ static const struct {
 	{ UPNPEXT_IFNAME6, "ext_ifname6" },
 #endif
 	{ UPNPEXT_IP,	"ext_ip" },
+	{ UPNPEXT_IP_REQUIRE_PUBLIC, "ext_ip_require_public" },
 	{ UPNPEXT_PERFORM_STUN, "ext_perform_stun" },
 	{ UPNPEXT_STUN_HOST, "ext_stun_host" },
 	{ UPNPEXT_STUN_PORT, "ext_stun_port" },
