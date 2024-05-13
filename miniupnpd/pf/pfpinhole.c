@@ -56,13 +56,15 @@ static int next_uid = 1;
 #define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
 #define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
 
+#define RULE (pr.rule)
+
 int add_pinhole(const char * ifname,
                 const char * rem_host, unsigned short rem_port,
                 const char * int_client, unsigned short int_port,
                 int proto, const char * desc, unsigned int timestamp)
 {
 	int uid;
-	struct pfioc_rule pcr;
+	struct pfioc_rule pr;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
 #endif
@@ -71,8 +73,8 @@ int add_pinhole(const char * ifname,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
-	memset(&pcr, 0, sizeof(pcr));
-	strlcpy(pcr.anchor, anchor_name, MAXPATHLEN);
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 
 #ifndef PF_NEWSTYLE
 	memset(&pp, 0, sizeof(pp));
@@ -81,74 +83,74 @@ int add_pinhole(const char * ifname,
 		syslog(LOG_ERR, "ioctl(dev, DIOCBEGINADDRS, ...): %m");
 		return -1;
 	} else {
-		pcr.pool_ticket = pp.ticket;
+		pr.pool_ticket = pp.ticket;
 #else
 	{
 #endif
-		pcr.rule.direction = PF_IN;
-		pcr.rule.action = PF_PASS;
-		pcr.rule.af = AF_INET6;
+		RULE.direction = PF_IN;
+		RULE.action = PF_PASS;
+		RULE.af = AF_INET6;
 #ifdef PF_NEWSTYLE
-		pcr.rule.nat.addr.type = PF_ADDR_NONE;
-		pcr.rule.rdr.addr.type = PF_ADDR_NONE;
+		RULE.nat.addr.type = PF_ADDR_NONE;
+		RULE.rdr.addr.type = PF_ADDR_NONE;
 #endif
 #ifdef USE_IFNAME_IN_RULES
 		if(ifname)
-			strlcpy(pcr.rule.ifname, ifname, IFNAMSIZ);
+			strlcpy(RULE.ifname, ifname, IFNAMSIZ);
 #endif
-		pcr.rule.proto = proto;
+		RULE.proto = proto;
 
-		pcr.rule.quick = 1;/*(GETFLAG(PFNOQUICKRULESMASK))?0:1;*/
-		pcr.rule.log = (GETFLAG(LOGPACKETSMASK))?1:0;	/*logpackets;*/
+		RULE.quick = 1;/*(GETFLAG(PFNOQUICKRULESMASK))?0:1;*/
+		RULE.log = (GETFLAG(LOGPACKETSMASK))?1:0;	/*logpackets;*/
 /* see the discussion on the forum :
  * http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=638 */
-		pcr.rule.flags = TH_SYN;
-		pcr.rule.flagset = (TH_SYN|TH_ACK);
+		RULE.flags = TH_SYN;
+		RULE.flagset = (TH_SYN|TH_ACK);
 #ifdef PFRULE_HAS_RTABLEID
-		pcr.rule.rtableid = -1;	/* first appeared in OpenBSD 4.0 */
+		RULE.rtableid = -1;	/* first appeared in OpenBSD 4.0 */
 #endif
 #ifdef PFRULE_HAS_ONRDOMAIN
-		pcr.rule.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
+		RULE.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
-		pcr.rule.keep_state = 1;
+		RULE.keep_state = 1;
 		uid = next_uid;
-		snprintf(pcr.rule.label, PF_RULE_LABEL_SIZE,
+		snprintf(RULE.label, PF_RULE_LABEL_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
 		if(queue)
-			strlcpy(pcr.rule.qname, queue, PF_QNAME_SIZE);
+			strlcpy(RULE.qname, queue, PF_QNAME_SIZE);
 		if(tag)
-			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
+			strlcpy(RULE.tagname, tag, PF_TAG_NAME_SIZE);
 
 		if(rem_port) {
-			pcr.rule.src.port_op = PF_OP_EQ;
-			pcr.rule.src.port[0] = htons(rem_port);
+			RULE.src.port_op = PF_OP_EQ;
+			RULE.src.port[0] = htons(rem_port);
 		}
 		if(rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
-			pcr.rule.src.addr.type = PF_ADDR_ADDRMASK;
-			if(inet_pton(AF_INET6, rem_host, &pcr.rule.src.addr.v.a.addr.v6) != 1) {
+			RULE.src.addr.type = PF_ADDR_ADDRMASK;
+			if(inet_pton(AF_INET6, rem_host, &RULE.src.addr.v.a.addr.v6) != 1) {
 				syslog(LOG_ERR, "inet_pton(%s) failed", rem_host);
 			}
-			memset(&pcr.rule.src.addr.v.a.mask.addr8, 255, 16);
+			memset(&RULE.src.addr.v.a.mask.addr8, 255, 16);
 		}
 
-		pcr.rule.dst.port_op = PF_OP_EQ;
-		pcr.rule.dst.port[0] = htons(int_port);
-		pcr.rule.dst.addr.type = PF_ADDR_ADDRMASK;
-		if(inet_pton(AF_INET6, int_client, &pcr.rule.dst.addr.v.a.addr.v6) != 1) {
+		RULE.dst.port_op = PF_OP_EQ;
+		RULE.dst.port[0] = htons(int_port);
+		RULE.dst.addr.type = PF_ADDR_ADDRMASK;
+		if(inet_pton(AF_INET6, int_client, &RULE.dst.addr.v.a.addr.v6) != 1) {
 			syslog(LOG_ERR, "inet_pton(%s) failed", int_client);
 		}
-		memset(&pcr.rule.dst.addr.v.a.mask.addr8, 255, 16);
+		memset(&RULE.dst.addr.v.a.mask.addr8, 255, 16);
 
 		if(ifname)
-			strlcpy(pcr.rule.ifname, ifname, IFNAMSIZ);
+			strlcpy(RULE.ifname, ifname, IFNAMSIZ);
 
-		pcr.action = PF_CHANGE_GET_TICKET;
-		if(ioctl(dev, DIOCCHANGERULE, &pcr) < 0) {
+		pr.action = PF_CHANGE_GET_TICKET;
+		if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
 			syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
 			return -1;
 		} else {
-			pcr.action = PF_CHANGE_ADD_TAIL;
-			if(ioctl(dev, DIOCCHANGERULE, &pcr) < 0) {
+			pr.action = PF_CHANGE_ADD_TAIL;
+			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
 				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_ADD_TAIL: %m");
 				return -1;
 			}
@@ -188,7 +190,7 @@ int find_pinhole(const char * ifname,
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
-	pr.rule.action = PF_PASS;
+	RULE.action = PF_PASS;
 #endif
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
@@ -205,17 +207,17 @@ int find_pinhole(const char * ifname,
 			release_ticket(dev, tnum);
 			return -1;
 		}
-		if((proto == pr.rule.proto) && (rem_port == ntohs(pr.rule.src.port[0]))
-		   && (0 == memcmp(&saddr, &pr.rule.src.addr.v.a.addr.v6, sizeof(struct in6_addr)))
-		   && (int_port == ntohs(pr.rule.dst.port[0])) &&
-		   (0 == memcmp(&daddr, &pr.rule.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)))) {
-			if(sscanf(pr.rule.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", pr.rule.label);
+		if((proto == RULE.proto) && (rem_port == ntohs(RULE.src.port[0]))
+		   && (0 == memcmp(&saddr, &RULE.src.addr.v.a.addr.v6, sizeof(struct in6_addr)))
+		   && (int_port == ntohs(RULE.dst.port[0])) &&
+		   (0 == memcmp(&daddr, &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)))) {
+			if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
+				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
 				continue;
 			}
 			if(timestamp) *timestamp = ts;
 			if(desc) {
-				char * p = strchr(pr.rule.label, ':');
+				char * p = strchr(RULE.label, ':');
 				if(p) {
 					p += 2;
 					strlcpy(desc, p, desc_len);
@@ -246,7 +248,7 @@ int delete_pinhole(unsigned short uid)
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
-	pr.rule.action = PF_PASS;
+	RULE.action = PF_PASS;
 #endif
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
@@ -262,7 +264,7 @@ int delete_pinhole(unsigned short uid)
 			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 			return -1;
 		}
-		strlcpy(tmp_label, pr.rule.label, sizeof(tmp_label));
+		strlcpy(tmp_label, RULE.label, sizeof(tmp_label));
 		strtok(tmp_label, " ");
 		if(0 == strcmp(tmp_label, label_start)) {
 			pr.action = PF_CHANGE_GET_TICKET;
@@ -311,7 +313,7 @@ get_pinhole_info(unsigned short uid,
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
-	pr.rule.action = PF_PASS;
+	RULE.action = PF_PASS;
 #endif
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
@@ -328,24 +330,24 @@ get_pinhole_info(unsigned short uid,
 			release_ticket(dev, tnum);
 			return -1;
 		}
-		strlcpy(tmp_label, pr.rule.label, sizeof(tmp_label));
+		strlcpy(tmp_label, RULE.label, sizeof(tmp_label));
 		p = tmp_label;
 		strsep(&p, " ");
 		if(0 == strcmp(tmp_label, label_start)) {
-			if(rem_host && (inet_ntop(AF_INET6, &pr.rule.src.addr.v.a.addr.v6, rem_host, rem_hostlen) == NULL)) {
+			if(rem_host && (inet_ntop(AF_INET6, &RULE.src.addr.v.a.addr.v6, rem_host, rem_hostlen) == NULL)) {
 				release_ticket(dev, tnum);
 				return -1;
 			}
 			if(rem_port)
-				*rem_port = ntohs(pr.rule.src.port[0]);
-			if(int_client && (inet_ntop(AF_INET6, &pr.rule.dst.addr.v.a.addr.v6, int_client, int_clientlen) == NULL)) {
+				*rem_port = ntohs(RULE.src.port[0]);
+			if(int_client && (inet_ntop(AF_INET6, &RULE.dst.addr.v.a.addr.v6, int_client, int_clientlen) == NULL)) {
 				release_ticket(dev, tnum);
 				return -1;
 			}
 			if(int_port)
-				*int_port = ntohs(pr.rule.dst.port[0]);
+				*int_port = ntohs(RULE.dst.port[0]);
 			if(proto)
-				*proto = pr.rule.proto;
+				*proto = RULE.proto;
 			if(timestamp)
 				sscanf(p, "ts-%u", timestamp);
 			if(desc) {
@@ -358,14 +360,14 @@ get_pinhole_info(unsigned short uid,
 			}
 #ifdef PFRULE_INOUT_COUNTS
 			if(packets)
-				*packets = pr.rule.packets[0] + pr.rule.packets[1];
+				*packets = RULE.packets[0] + RULE.packets[1];
 			if(bytes)
-				*bytes = pr.rule.bytes[0] + pr.rule.bytes[1];
+				*bytes = RULE.bytes[0] + RULE.bytes[1];
 #else
 			if(packets)
-				*packets = pr.rule.packets;
+				*packets = RULE.packets;
 			if(bytes)
-				*bytes = pr.rule.bytes;
+				*bytes = RULE.bytes;
 #endif
 			release_ticket(dev, tnum);
 			return 0;
@@ -408,7 +410,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
-	pr.rule.action = PF_PASS;
+	RULE.action = PF_PASS;
 #endif
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
@@ -424,12 +426,12 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			release_ticket(dev, tnum);
 			return -1;
 		}
-		if(sscanf(pr.rule.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", pr.rule.label);
+		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
+			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
 			continue;
 		}
 		if(ts <= (unsigned int)current_time) {
-			syslog(LOG_INFO, "removing expired pinhole '%s'", pr.rule.label);
+			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label);
 			pr.action = PF_CHANGE_GET_TICKET;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
 				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
@@ -445,7 +447,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			}
 			n++;
 #ifndef PF_NEWSTYLE
-			pr.rule.action = PF_PASS;
+			RULE.action = PF_PASS;
 #endif
 			release_ticket(dev, tnum);
 			if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
