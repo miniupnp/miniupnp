@@ -53,13 +53,15 @@ jobs:
             runs-on:
               arm: [macos-latest]
               intel: [macos-12]
+              universal2: [macos-12]
             macosx-deployment-target:
               arm: 11.0
               intel: 10.14
+              universal2: 11.0
             cibw-archs:
-              # TODO: do we need universal2?
               arm: arm64
               intel: x86_64
+              universal2: universal2
           - name: Linux
             file-name: linux
             matrix: linux
@@ -119,12 +121,21 @@ jobs:
           - name: ARM
             file-name: arm
             matrix: arm
-            cibw: aarch64
           - name: Intel
             file-name: intel
             matrix: intel
-            cibw: x86_64
+          - name: Universal2
+            file-name: universal2
+            matrix: universal2
         exclude:
+          - os:
+              matrix: linux
+            arch:
+              matrix: universal2
+          - os:
+              matrix: windows
+            arch:
+              matrix: universal2
           - os:  # excluding windows entirely as that is presently handled in AppVeyor
               matrix: windows
           - os:
@@ -135,6 +146,12 @@ jobs:
               matrix: macos
             arch:
               matrix: arm
+            python:
+              matrix: '3.7'
+          - os:
+              matrix: macos
+            arch:
+              matrix: universal2
             python:
               matrix: '3.7'
           - os:
