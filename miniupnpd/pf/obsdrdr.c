@@ -481,7 +481,6 @@ int add_nat_rule(const char * ifname,
 	return r;
 }
 
-#define RULE (pr.rule)
 
 /*
  * returns:  0 : OK
@@ -493,12 +492,31 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 {
 	int i, n, r;
 	unsigned int tnum;
+#ifdef USE_LIBPFCTL
+	struct pfctl_rules_info ri;
+	struct pfctl_rule rule;
+#define RULE (rule)
+	char anchor_call[MAXPATHLEN] = "";
+#else
 	struct pfioc_rule pr;
+#define RULE (pr.rule)
+#endif
 	UNUSED(ifname);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
+#ifdef USE_LIBPFCTL
+	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
+	{
+		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
+		return -1;
+	}
+	n = ri.nr;
+#ifdef PF_RELEASETICKETS
+	tnum = ri.ticket;
+#endif /* PF_RELEASETICKETS */
+#else /* USE_LIBPFCTL */
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
@@ -516,9 +534,18 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 #ifdef PF_RELEASETICKETS
 	tnum = pr.ticket;
 #endif /* PF_RELEASETICKETS */
+#endif /* USE_LIBPFCTL */
 	r = -2;	/* not found */
 	for(i=0; i<n; i++)
 	{
+#ifdef USE_LIBPFCTL
+		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_PASS, &rule, anchor_call) < 0)
+		{
+			syslog(LOG_ERR, "pfctl_get_rule(): %m");
+			r = -1;
+			break;
+		}
+#else /* USE_LIBPFCTL */
 		pr.nr = i;
 		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
 		{
@@ -526,6 +553,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 			r = -1;
 			break;
 		}
+#endif /* USE_LIBPFCTL */
 #ifdef TEST
 		syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x    %8x",
 		       i, ntohs(RULE.src.port[0]), RULE.proto,
@@ -535,6 +563,13 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 		 && RULE.proto == proto
 		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr)
 		{
+#ifdef USE_LIBPFCTL
+			/* to change with the libpfctl alternative to DIOCCHANGERULE */
+			struct pfioc_rule pr;
+			memset(&pr, 0, sizeof(pr));
+			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+			pr.ticket = ri.ticket;
+#endif
 			pr.action = PF_CHANGE_GET_TICKET;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
 			{
@@ -899,6 +934,8 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 {
 	int i, n, r;
 	unsigned int tnum;
+#undef RULE
+#define RULE (pr.rule)
 	struct pfioc_rule pr;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
