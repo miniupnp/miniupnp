@@ -66,6 +66,14 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
       SETUP_COMPILER_FLAG:
       ARCH_BITS: 64
+    - PYTHON_VER: C:\Python312
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+      SETUP_COMPILER_FLAG:
+      ARCH_BITS: 32
+    - PYTHON_VER: C:\Python312-x64
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+      SETUP_COMPILER_FLAG:
+      ARCH_BITS: 64
 
 
 version: '$(APP_VERSION).{build}'
@@ -74,6 +82,8 @@ install:
   - set PATH=%PYTHON_VER%;%PYTHON_VER%\Scripts;%PATH%;C:\msys64\mingw%ARCH_BITS%\bin
   # We need wheel installed to build wheels
   - "%PYTHON_VER%\\python.exe -m pip install wheel"
+  # Starting with python 3.12, setuptools is not provided by default
+  - "%PYTHON_VER%\\python.exe -m pip install setuptools"
   - echo "using twine login %USER% %PASS%"
   - echo %PATH%
   - cc -v
