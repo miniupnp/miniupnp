@@ -935,8 +935,15 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	int i, n, r;
 	unsigned int tnum;
 #undef RULE
-#define RULE (pr.rule)
+#ifdef USE_LIBPFCTL
+	struct pfctl_rules_info ri;
+	struct pfctl_rule rule;
+#define RULE (rule)
+	char anchor_call[MAXPATHLEN] = "";
+#else /* USE_LIBPFCTL */
 	struct pfioc_rule pr;
+#define RULE (pr.rule)
+#endif /* USE_LIBPFCTL */
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
 #endif
@@ -946,6 +953,17 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
+#ifdef USE_LIBPFCTL
+	if(pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	{
+		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
+		return -1;
+	}
+	n = ri.nr;
+#ifdef PF_RELEASETICKETS
+	tnum = ri.ticket;
+#endif /* PF_RELEASETICKETS */
+#else /* USE_LIBPFCTL */
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
@@ -960,9 +978,13 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 #ifdef PF_RELEASETICKETS
 	tnum = pr.ticket;
 #endif /* PF_RELEASETICKETS */
+#endif /* USE_LIBPFCTL */
 	r = -2;
 	for(i=0; i<n; i++)
 	{
+#ifdef USE_LIBPFCTL
+		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call) < 0)
+#else /* USE_LIBPFCTL */
 		pr.nr = i;
 		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
 		{
@@ -970,6 +992,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			r = -1;
 			break;
 		}
+#endif /* USE_LIBPFCTL */
 #ifdef __APPLE__
 		if( (eport == ntohs(RULE.dst.xport.range.port[0]))
 		  && (eport == ntohs(RULE.dst.xport.range.port[1]))
@@ -985,7 +1008,11 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			*iport = RULE.rdr.proxy_port[0];
 #endif
 			if(desc)
+#ifdef USE_LIBPFCTL
+				strlcpy(desc, RULE.label[0], desclen);
+#else /* USE_LIBPFCTL */
 				strlcpy(desc, RULE.label, desclen);
+#endif /* USE_LIBPFCTL */
 #ifdef PFRULE_INOUT_COUNTS
 			if(packets)
 				*packets = RULE.packets[0] + RULE.packets[1];
@@ -1002,7 +1029,11 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
 			pp.r_action = PF_RDR;
 			pp.r_num = i;
+#ifdef USE_LIBPFCTL
+			pp.ticket = ri.ticket;
+#else /* USE_LIBPFCTL */
 			pp.ticket = pr.ticket;
+#endif /* USE_LIBPFCTL */
 			if(ioctl(dev, DIOCGETADDRS, &pp) < 0)
 			{
 				syslog(LOG_ERR, "ioctl(dev, DIOCGETADDRS, ...): %m");
@@ -1083,6 +1114,8 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 	int i, n, r;
 	unsigned int tnum;
 	struct pfioc_rule pr;
+#undef RULE
+#define RULE (pr.rule)
 	UNUSED(ifname);
 
 	if(dev<0) {
