@@ -41,6 +41,7 @@
  *   Must be set with OpenBSD version 4.7 and up. FreeBSD/pfSense is old style.
  */
 
+#include "config.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
@@ -63,9 +64,11 @@
 #include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef USE_LIBPFCTL
+#include <libpfctl.h>
+#endif
 
 #include "../macros.h"
-#include "config.h"
 #include "obsdrdr.h"
 #include "../upnpglobalvars.h"
 #include "../getifaddr.h"
@@ -155,7 +158,11 @@ shutdown_redirect(void)
 int
 init_redirect(void)
 {
+#ifdef USE_LIBPFCTL
+	struct pfctl_status *status;
+#else
 	struct pf_status status;
+#endif
 	if(dev>=0)
 		shutdown_redirect();
 	dev = open("/dev/pf", O_RDWR);
@@ -163,6 +170,19 @@ init_redirect(void)
 		syslog(LOG_ERR, "open(\"/dev/pf\"): %m");
 		return -1;
 	}
+#ifdef USE_LIBPFCTL
+	status = pfctl_get_status(dev);
+	if (status == NULL) {
+		syslog(LOG_ERR, "pfctl_get_status: %m");
+		return -1;
+	}
+	if(!status->running) {
+		pfctl_free_status(status);
+		syslog(LOG_ERR, "pf is disabled");
+		return -1;
+	}
+	pfctl_free_status(status);
+#else
 	if(ioctl(dev, DIOCGETSTATUS, &status)<0) {
 		syslog(LOG_ERR, "DIOCGETSTATUS: %m");
 		return -1;
@@ -171,6 +191,7 @@ init_redirect(void)
 		syslog(LOG_ERR, "pf is disabled");
 		return -1;
 	}
+#endif
 	return 0;
 }
 
