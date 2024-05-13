@@ -851,13 +851,25 @@ add_filter_rule2(const char * ifname,
 int
 get_redirect_rule_count(const char * ifname)
 {
+#ifdef USE_LIBPFCTL
+	struct pfctl_rules_info ri;
+#else
 	struct pfioc_rule pr;
+#endif
 	UNUSED(ifname);
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
+#ifdef USE_LIBPFCTL
+	if (pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	{
+		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
+		return -1;
+	}
+	return ri.nr;
+#else
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
@@ -870,6 +882,7 @@ get_redirect_rule_count(const char * ifname)
 	}
 	release_ticket(dev, pr.ticket);
 	return pr.nr;
+#endif
 }
 
 /* get_redirect_rule()
