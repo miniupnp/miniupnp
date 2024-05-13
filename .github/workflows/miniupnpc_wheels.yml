@@ -56,7 +56,7 @@ jobs:
               universal2: [macos-12]
             macosx-deployment-target:
               arm: 11.0
-              intel: 10.14
+              intel: 11.00
               universal2: 11.0
             cibw-archs:
               arm: arm64
