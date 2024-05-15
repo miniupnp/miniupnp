@@ -1171,6 +1171,18 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				/* retrieve the IPv6 address which
 				 * will be used locally to reach sender */
 				memset(&addr6, 0, sizeof(addr6));
+				/* UPnP Device Architecture 2.0 - Annex A - IP version 6 support
+				 * p112 A2.3 :
+				 * a) Devices and control points SHALL use only the Link-Local
+				 * unicast address as the source address and when specifying
+				 * a literal IP address in LOCATION URLs in all multicast
+				 * messages that are multicast to the Link-Local scope FF02::C
+				 * for SSDP and FF02::130 for multicast eventing.
+				 * f) Devices and control points SHALL use an acquired ULA or
+				 * GUA in all multicast messages as the source address and
+				 * when specifying a literal IP address in LOCATION URLs
+				 * that are multicast to the Site-Local scope addresses of
+				 * either FF05::C or FF05::130 */
 				if(IN6_IS_ADDR_LINKLOCAL(&(((struct sockaddr_in6 *)sender)->sin6_addr))) {
 					get_link_local_addr(((struct sockaddr_in6 *)sender)->sin6_scope_id, &addr6);
 				} else if(get_src_for_route_to (sender, &addr6, &addr6_len, &index) < 0) {
@@ -1178,6 +1190,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					announced_host = ipv6_addr_for_http_with_brackets;
 				}
 				if(announced_host == NULL) {
+					/* convert addr6 to string with brackets */
 					if(inet_ntop(AF_INET6, &addr6,
 					             announced_host_buf+1,
 					             sizeof(announced_host_buf) - 2)) {
