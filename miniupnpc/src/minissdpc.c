@@ -548,7 +548,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #ifdef _WIN32
 	unsigned long _ttl = (unsigned long)ttl;
 #endif
-	int linklocal = 1;
+	int linklocal = 0;	/* try first with site-local multicast */
 	int sentok;
 
 	if(error)
@@ -1007,9 +1007,10 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			/* switch linklocal flag */
 			if(linklocal) {
 				linklocal = 0;
-				--deviceIndex;
 			} else {
+				/* try again with linklocal multicast */
 				linklocal = 1;
+				--deviceIndex;
 			}
 		}
 	}
