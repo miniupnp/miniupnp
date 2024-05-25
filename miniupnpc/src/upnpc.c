@@ -403,7 +403,7 @@ static void GetFirewallStatus(struct UPNPUrls * urls, struct IGDdatas * data)
 /* Test function
  * 1 - Add pinhole
  * 2 - Check if pinhole is working from the IGD side */
-static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
+static int SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
 					const char * remoteaddr, const char * eport,
 					const char * intaddr, const char * iport,
 					const char * proto, const char * lease_time)
@@ -416,7 +416,7 @@ static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
 	if(!intaddr || !remoteaddr || !iport || !eport || !proto || !lease_time)
 	{
 		fprintf(stderr, "Wrong arguments\n");
-		return;
+		return -1;
 	}
 	if(atoi(proto) == 0)
 	{
@@ -435,13 +435,16 @@ static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
 		else
 		{
 			fprintf(stderr, "invalid protocol\n");
-			return;
+			return -1;
 		}
 	}
 	r = UPNP_AddPinhole(urls->controlURL_6FC, data->IPv6FC.servicetype, remoteaddr, eport, intaddr, iport, proto, lease_time, uniqueID);
 	if(r!=UPNPCOMMAND_SUCCESS)
+	{
 		printf("AddPinhole([%s]:%s -> [%s]:%s) failed with code %d (%s)\n",
 		       remoteaddr, eport, intaddr, iport, r, strupnperror(r));
+		return -2;
+	}
 	else
 	{
 		printf("AddPinhole: ([%s]:%s -> [%s]:%s) / Pinhole ID = %s\n",
@@ -451,6 +454,7 @@ static void SetPinholeAndTest(struct UPNPUrls * urls, struct IGDdatas * data,
 			printf("CheckPinholeWorking() failed with code %d (%s)\n", r, strupnperror(r));
 		printf("CheckPinholeWorking: Pinhole ID = %s / IsWorking = %s\n", uniqueID, (isWorking)? "Yes":"No");*/
 	}
+	return 0;
 }
 
 /* Test function
@@ -548,7 +552,7 @@ CheckPinhole(struct UPNPUrls * urls,
 		printf("CheckPinholeWorking: Pinhole ID = %s / IsWorking = %s\n", uniqueID, (isWorking)? "Yes":"No");
 }
 
-static void
+static int
 RemovePinhole(struct UPNPUrls * urls,
                struct IGDdatas * data, const char * uniqueID)
 {
@@ -556,10 +560,11 @@ RemovePinhole(struct UPNPUrls * urls,
 	if(!uniqueID)
 	{
 		fprintf(stderr, "invalid arguments\n");
-		return;
+		return -1;
 	}
 	r = UPNP_DeletePinhole(urls->controlURL_6FC, data->IPv6FC.servicetype, uniqueID);
 	printf("UPNP_DeletePinhole() returned : %d\n", r);
+	return r;
 }
 
 static void usage(FILE * out, const char * argv0) {
@@ -863,10 +868,11 @@ int main(int argc, char ** argv)
 				}
 				break;
 			case 'A':
-				SetPinholeAndTest(&urls, &data,
+				if (SetPinholeAndTest(&urls, &data,
 				                  commandargv[0], commandargv[1],
 				                  commandargv[2], commandargv[3],
-				                  commandargv[4], commandargv[5]);
+				                  commandargv[4], commandargv[5]) < 0)
+					retcode = 2;
 				break;
 			case 'U':
 				GetPinholeAndUpdate(&urls, &data,
@@ -887,7 +893,8 @@ int main(int argc, char ** argv)
 			case 'D':
 				for(i=0; i<commandargc; i++)
 				{
-					RemovePinhole(&urls, &data, commandargv[i]);
+					if (RemovePinhole(&urls, &data, commandargv[i]) < 0)
+						retcode = 2;
 				}
 				break;
 			case 'S':
