@@ -129,7 +129,7 @@ main(int argc, char * * argv)
 		printf("delete_redirect_rule() failed\n");
 */
 	if(delete_redirect_and_filter_rules("ep0", 12123, IPPROTO_UDP) < 0)
-		printf("delete_redirect_rule() failed\n");
+		printf("delete_redirect_and_filter_rules() failed\n");
 
 	if(delete_redirect_rule("ep0", 12123, IPPROTO_UDP) < 0)
 		printf("delete_redirect_rule() failed\n");

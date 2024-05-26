@@ -12,17 +12,21 @@
 #include <netinet/in.h>
 #include <syslog.h>
 
-#include "../config.h"
+#include "config.h"
 #include "obsdrdr.h"
 #include "pfpinhole.h"
+#include "../miniupnpdtypes.h"
 
 int runtime_flags = 0;
+time_t startup_time = 0;
 const char * tag = NULL;
 
 const char * anchor_name = "miniupnpd";
 const char * queue = NULL;
 
 const char * use_ext_ip_addr = "42.42.42.42";
+
+struct lan_addr_list lan_addrs;
 
 #ifdef ENABLE_IPV6
 static int print_pinhole(int uid)
