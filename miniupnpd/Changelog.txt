@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.515 2024/03/19 23:40:30 nanard Exp $
 
+2024/06/17:
+  FreeBSD: use libpfctl (FreeBSD 15+ or --libpfctl)
+
 2024/06/09:
   default NOTIFY interval of 900s minus a random value
 
