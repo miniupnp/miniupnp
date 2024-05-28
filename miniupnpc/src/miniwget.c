@@ -443,7 +443,7 @@ miniwget3(const char * host,
 	len = snprintf(buf, sizeof(buf),
                  "GET %s HTTP/%s\r\n"
 			     "Host: %s:%d\r\n"
-				 "Connection: Close\r\n"
+				 "Connection: close\r\n"
 				 "User-Agent: " OS_STRING " " UPNP_VERSION_STRING " MiniUPnPc/" MINIUPNPC_VERSION_STRING "\r\n"
 
 				 "\r\n",

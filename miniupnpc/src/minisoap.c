@@ -83,7 +83,7 @@ int soapPostSubmit(SOCKET fd,
 	 * Using HTTP/1.1 means we need to support chunked transfer-encoding :
 	 * When using HTTP/1.1, the router "BiPAC 7404VNOX" always use chunked
 	 * transfer encoding. */
-    /* Connection: Close is normally there only in HTTP/1.1 but who knows */
+    /* Connection: close is normally there only in HTTP/1.1 but who knows */
 	portstr[0] = '\0';
 	if(port != 80)
 		snprintf(portstr, sizeof(portstr), ":%hu", port);
@@ -98,9 +98,7 @@ int soapPostSubmit(SOCKET fd,
 					   "Content-Type: text/xml; charset=\"utf-8\"\r\n"
 #endif
 					   "SOAPAction: \"%s\"\r\n"
-					   "Connection: Close\r\n"
-					   "Cache-Control: no-cache\r\n"	/* ??? */
-					   "Pragma: no-cache\r\n"
+					   "Connection: close\r\n"
 					   "\r\n",
 					   url, httpversion, host, portstr, bodysize, action);
 	if ((unsigned int)headerssize >= sizeof(headerbuf))

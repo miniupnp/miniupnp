@@ -472,7 +472,7 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 	 *
 	 * have a look at the document "UPnP Device Architecture v1.1 */
 	l = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\n"
-		"CACHE-CONTROL: max-age=120\r\n"
+		"CACHE-CONTROL: max-age=1800\r\n"
 		/*"DATE: ...\r\n"*/
 		"ST: %.*s\r\n"
 		"USN: %s\r\n"
