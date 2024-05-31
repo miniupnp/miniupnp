@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: download packages
         run: wget -c https://launchpad.net/ubuntu/+archive/primary/+files/mingw32-binutils_2.20-0.2ubuntu1_amd64.deb https://launchpad.net/ubuntu/+archive/primary/+files/mingw32-runtime_3.15.2-0ubuntu1_all.deb https://launchpad.net/ubuntu/+archive/primary/+files/mingw32_4.2.1.dfsg-2ubuntu1_amd64.deb

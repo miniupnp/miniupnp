@@ -22,7 +22,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: install packages
         run: sudo apt-get install libiptc-dev libxtables-dev libnfnetlink-dev libnftnl-dev libmnl-dev libssl-dev
