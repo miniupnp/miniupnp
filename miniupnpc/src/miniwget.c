@@ -2,7 +2,7 @@
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2023 Thomas Bernard
+ * Copyright (c) 2005-2024 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -443,9 +443,8 @@ miniwget3(const char * host,
 	len = snprintf(buf, sizeof(buf),
                  "GET %s HTTP/%s\r\n"
 			     "Host: %s:%d\r\n"
-				 "Connection: Close\r\n"
+				 "Connection: close\r\n"
 				 "User-Agent: " OS_STRING " " UPNP_VERSION_STRING " MiniUPnPc/" MINIUPNPC_VERSION_STRING "\r\n"
-
 				 "\r\n",
 			   path, httpversion, host, port);
 	if ((unsigned int)len >= sizeof(buf))
