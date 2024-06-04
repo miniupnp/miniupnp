@@ -92,15 +92,15 @@ MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGD
 #endif
 }
 
-/* simpleUPnPcommand2 :
+/* simpleUPnPcommand :
  * not so simple !
  * return values :
  *   pointer - OK
  *   NULL - error */
-static char *
-simpleUPnPcommand2(SOCKET s, const char * url, const char * service,
-                   const char * action, struct UPNParg * args,
-                   int * bufsize, const char * httpversion)
+char *
+simpleUPnPcommand(SOCKET s, const char * url, const char * service,
+                  const char * action, struct UPNParg * args,
+                  int * bufsize)
 {
 	char hostname[MAXHOSTNAMELEN+1];
 	unsigned short port = 0;
@@ -205,7 +205,7 @@ simpleUPnPcommand2(SOCKET s, const char * url, const char * service,
 		}
 	}
 
-	n = soapPostSubmit(s, path, hostname, port, soapact, soapbody, httpversion);
+	n = soapPostSubmit(s, path, hostname, port, soapact, soapbody, "1.1");
 	if(n<=0) {
 #ifdef DEBUG
 		printf("Error sending SOAP request\n");
@@ -226,33 +226,6 @@ simpleUPnPcommand2(SOCKET s, const char * url, const char * service,
 	}
 #endif
 	closesocket(s);
-	return buf;
-}
-
-/* simpleUPnPcommand :
- * not so simple !
- * return values :
- *   pointer - OK
- *   NULL    - error */
-char *
-simpleUPnPcommand(int s, const char * url, const char * service,
-                  const char * action, struct UPNParg * args,
-                  int * bufsize)
-{
-	char * buf;
-
-#if 1
-	buf = simpleUPnPcommand2((SOCKET)s, url, service, action, args, bufsize, "1.1");
-#else
-	buf = simpleUPnPcommand2((SOCKET)s, url, service, action, args, bufsize, "1.0");
-	if (!buf || *bufsize == 0)
-	{
-#if DEBUG
-	    printf("Error or no result from SOAP request; retrying with HTTP/1.1\n");
-#endif
-		buf = simpleUPnPcommand2((SOCKET)s, url, service, action, args, bufsize, "1.1");
-	}
-#endif
 	return buf;
 }
 
