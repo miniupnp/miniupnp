@@ -98,7 +98,7 @@ MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGD
  *   pointer - OK
  *   NULL - error */
 char *
-simpleUPnPcommand(SOCKET s, const char * url, const char * service,
+simpleUPnPcommand(int s, const char * url, const char * service,
                   const char * action, struct UPNParg * args,
                   int * bufsize)
 {
@@ -197,9 +197,9 @@ simpleUPnPcommand(SOCKET s, const char * url, const char * service,
 			return NULL;
 	}
 	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
-	if(ISINVALID(s)) {
+	if(ISINVALID((SOCKET)s)) {
 		s = connecthostport(hostname, port, 0);
-		if(ISINVALID(s)) {
+		if(ISINVALID((SOCKET)s)) {
 			/* failed to connect */
 			return NULL;
 		}
