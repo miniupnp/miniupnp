@@ -695,7 +695,6 @@ static int upnpc_build_soap_request(upnpc_device_t * p, const char * url,
 		"SOAPAction: \"%s#%s\"\r\n"
 		"Connection: close\r\n"
 		"Cache-Control: no-cache\r\n"	/* ??? */
-		"Pragma: no-cache\r\n"
 		"\r\n"
 		"%s";
 	char hostname[MAXHOSTNAMELEN+1];
