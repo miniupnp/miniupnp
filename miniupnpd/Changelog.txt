@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.515 2024/03/19 23:40:30 nanard Exp $
 
+2024/06/09:
+  default NOTIFY interval of 900s minus a random value
+
 2024/04/29:
   ipv6: prefer globally routable addresses
 
