@@ -1,7 +1,7 @@
 /* $Id: minissdpd.c,v 1.61 2021/11/04 23:27:28 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * (c) 2007-2022 Thomas Bernard
+ * (c) 2007-2024 Thomas Bernard
  * website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -472,7 +472,7 @@ SendSSDPMSEARCHResponse(int s, const struct sockaddr * sockname,
 	 *
 	 * have a look at the document "UPnP Device Architecture v1.1 */
 	l = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\n"
-		"CACHE-CONTROL: max-age=120\r\n"
+		"CACHE-CONTROL: max-age=1800\r\n"
 		/*"DATE: ...\r\n"*/
 		"ST: %.*s\r\n"
 		"USN: %s\r\n"
