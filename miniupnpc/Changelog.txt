@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.267 2024/05/16 00:19:18 nanard Exp $
+$Id: Changelog.txt,v 1.268 2024/06/08 22:09:20 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.2.8 : released 2024/06/09
 
 2024/05/16:
   IPv6: try site-local before link-local
