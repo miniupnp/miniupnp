@@ -249,6 +249,7 @@ jobs:
   upload:
     name: 🚀 Upload
     runs-on: ubuntu-latest
+    environment: pypi
     needs: build
 
     steps:
