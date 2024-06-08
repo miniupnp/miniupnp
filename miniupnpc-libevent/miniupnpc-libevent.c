@@ -647,7 +647,6 @@ static int upnpc_send_soap_request(upnpc_device_t * p, const char * url,
 	evhttp_add_header(headers, "Content-Type", "text/xml; charset=\"utf-8\"");
 	/*evhttp_add_header(headers, "User-Agent", "OS/version UPnP/1.1 MiniUPnPc-libevent/2.2");*/
 	/*evhttp_add_header(headers, "Cache-Control", "no-cache");*/
-	/*evhttp_add_header(headers, "Pragma", "no-cache");*/
 	evbuffer_add(buffer, body, body_len);
 	evhttp_make_request(p->soap_conn, req, EVHTTP_REQ_POST, path);
 	free(body);
