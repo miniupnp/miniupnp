@@ -222,6 +222,11 @@ jobs:
           mkdir ../dist
           cp dist/*.whl ../dist
 
+      - name: check wheel
+        run: |
+          python -m pip install twine
+          twine check dist/*
+        
       - uses: ./cloned/.github/actions/create-venv
         id: create-test-venv
 
