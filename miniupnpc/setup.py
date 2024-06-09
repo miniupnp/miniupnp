@@ -27,6 +27,8 @@ setup(name="miniupnpc",
       license=open('LICENSE').read(),
       url='https://miniupnp.tuxfamily.org/',
       description='MiniUPnP IGD client',
+      long_description=open('README').read().strip(),
+      long_description_content_type='text/plain',
       cmdclass={'build_ext': make_then_build_ext},
       ext_modules=[
          Extension(name="miniupnpc", sources=["src/miniupnpcmodule.c"],
