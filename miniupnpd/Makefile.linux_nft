@@ -42,7 +42,7 @@ DEPFLAGS = -MM -MG -MT $(patsubst %.d,%.o,$@) -MT $@
 # -M : with system headers, -MM : without
 
 INSTALLPREFIX ?= $(PREFIX)/usr
-SBININSTALLDIR = $(INSTALLPREFIX)/sbin
+SBININSTALLDIR ?= $(INSTALLPREFIX)/sbin
 ETCINSTALLDIR = $(PREFIX)/etc/miniupnpd
 MANINSTALLDIR = $(INSTALLPREFIX)/share/man/man8
 
