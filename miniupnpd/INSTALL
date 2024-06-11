@@ -133,7 +133,7 @@ Almost all options are also available through command line switches.
 A basic configuration would set :
 ext_ifname :   WAN network interface (interface connected to the internet)
 listening_ip : LAN network interface (network where to supply NAT traversal)
-enable_natpmp=yes
+enable_pcp_pmp=yes
 enable_upnp=yes
 and the permission rules (see below).
 

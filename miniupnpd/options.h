@@ -52,7 +52,7 @@ enum upnpconfigoptions {
 	UPNPMODEL_NUMBER,		/* model_number */
 	UPNPCLEANTHRESHOLD,		/* clean_ruleset_threshold */
 	UPNPCLEANINTERVAL,		/* clean_ruleset_interval */
-	UPNPENABLENATPMP,		/* enable_natpmp */
+	UPNPENABLENATPMP,		/* enable_pcp_pmp */
 	UPNPPCPMINLIFETIME,		/* minimum lifetime for PCP mapping */
 	UPNPPCPMAXLIFETIME,		/* maximum lifetime for PCP mapping */
 	UPNPPCPALLOWTHIRDPARTY,		/* allow third-party requests */
