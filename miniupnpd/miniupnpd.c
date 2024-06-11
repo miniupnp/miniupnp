@@ -1423,14 +1423,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					min_lifetime = atoi(ary_options[i].value);
 					/* RFC6887 15. the minimum value SHOULD be 120 seconds */
 					if (min_lifetime < 120 ) {
-						min_lifetime = 120;
+						syslog(LOG_INFO, "PCP/NAT-PMP port map min. lifetime configured to less than 120s");
 					}
 				break;
 			case UPNPPCPMAXLIFETIME:
 					max_lifetime = atoi(ary_options[i].value);
-					/* maximum is 24 hours */
+					/* maximum SHOULD be 24 hours */
 					if (max_lifetime > 86400 ) {
-						max_lifetime = 86400;
+						syslog(LOG_WARNING, "PCP/NAT-PMP port map max. lifetime configured to more than 86400s");
 					}
 				break;
 			case UPNPPCPALLOWTHIRDPARTY:
