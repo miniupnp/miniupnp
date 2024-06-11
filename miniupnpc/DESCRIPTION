@@ -1,0 +1,6 @@
+MiniUPnPc is a library enabling applications to access the services provided
+by an UPnP "Internet Gateway Device" present on the network. In UPnP
+terminology, MiniUPnPc is a UPnP Control Point.
+
+MiniUPnPc is designed to have low footprint and the libc as unique
+dependency.
