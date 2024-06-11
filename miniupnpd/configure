@@ -405,6 +405,10 @@ case $OS_NAME in
 				OS_NAME=`${LSB_RELEASE} -i -s`
 				OS_VERSION=`${LSB_RELEASE} -r -s`
 				case $OS_NAME in
+					Chimera)
+						OS_URL=https://chimera-linux.org/
+						OS_VERSION=`uname -r`
+						;;
 					Debian)
 						OS_URL=https://www.debian.org/
 						OS_VERSION=`${LSB_RELEASE} -c -s`
