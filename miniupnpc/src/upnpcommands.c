@@ -640,8 +640,8 @@ UPNP_GetGenericPortMappingEntry(const char * controlURL,
 	p = GetValueFromNameValueList(&pdata, "NewPortMappingDescription");
 	if(p && desc)
 	{
-		strncpy(desc, p, 80);
-		desc[79] = '\0';
+		strncpy(desc, p, 1016);
+		desc[1015] = '\0';
 	}
 	p = GetValueFromNameValueList(&pdata, "NewLeaseDuration");
 	if(p && duration)
@@ -764,8 +764,8 @@ UPNP_GetSpecificPortMappingEntry(const char * controlURL,
 
 	p = GetValueFromNameValueList(&pdata, "NewPortMappingDescription");
 	if(p && desc) {
-		strncpy(desc, p, 80);
-		desc[79] = '\0';
+		strncpy(desc, p, 1016);
+		desc[1015] = '\0';
 	}
 
 	p = GetValueFromNameValueList(&pdata, "NewLeaseDuration");
