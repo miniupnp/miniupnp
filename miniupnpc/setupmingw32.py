@@ -20,11 +20,17 @@ except ImportError:
 from distutils import sysconfig
 sysconfig.get_config_vars()["OPT"] = ''
 sysconfig.get_config_vars()["CFLAGS"] = ''
+
+lic = open('LICENSE').read()
+# follow the symbolic link manually if needed
+if lic.startswith('../'):
+        lic = open(lic).read()
+
 setup(name="miniupnpc",
       version=open('VERSION').read().strip(),
       author='Thomas BERNARD',
       author_email='miniupnp@free.fr',
-      license=open('LICENSE').read(),
+      license=lic,
       url='https://miniupnp.tuxfamily.org/',
       description='MiniUPnP IGD client',
       ext_modules=[
