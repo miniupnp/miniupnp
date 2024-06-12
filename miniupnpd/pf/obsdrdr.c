@@ -1144,6 +1144,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
 		return -1;
 	}
+	pr.ticket = ri.ticket;
 	n = ri.nr;
 #else /* USE_LIBPFCTL */
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
@@ -1413,13 +1414,13 @@ get_redirect_rule_by_index(int index,
 {
 	int n, r;
 	unsigned int tnum;
-	struct pfioc_rule pr;
 #ifdef USE_LIBPFCTL
 	struct pfctl_rules_info ri;
 	struct pfctl_rule rule;
 #define RULE (rule)
 	char anchor_call[MAXPATHLEN] = "";
 #else /* USE_LIBPFCTL */
+	struct pfioc_rule pr;
 #define RULE (pr.rule)
 #endif /* USE_LIBPFCTL */
 #ifndef PF_NEWSTYLE
@@ -1450,11 +1451,11 @@ get_redirect_rule_by_index(int index,
 		return -1;
 	}
 	n = pr.nr;
-#endif /* USE_LIBPFCTL */
-	r = -1;
 #ifdef PF_RELEASETICKETS
 	tnum = pr.ticket;
 #endif /* PF_RELEASETICKETS */
+#endif /* USE_LIBPFCTL */
+	r = -1;
 	if(index >= n)
 		goto error;
 #ifdef USE_LIBPFCTL
@@ -1506,7 +1507,11 @@ get_redirect_rule_by_index(int index,
 	strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
 	pp.r_action = PF_RDR;
 	pp.r_num = index;
+#ifdef USE_LIBPFCTL
+	pp.ticket = ri.ticket;
+#else /* USE_LIBPFCTL */
 	pp.ticket = pr.ticket;
+#endif /* USE_LIBPFCTL */
 	if(ioctl(dev, DIOCGETADDRS, &pp) < 0)
 	{
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETADDRS, ...): %m");
