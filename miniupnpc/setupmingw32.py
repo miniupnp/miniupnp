@@ -33,6 +33,8 @@ setup(name="miniupnpc",
       license=lic,
       url='https://miniupnp.tuxfamily.org/',
       description='MiniUPnP IGD client',
+      long_description=open('DESCRIPTION').read().strip(),
+      long_description_content_type='text/plain',
       ext_modules=[
          Extension(name="miniupnpc", sources=["src/miniupnpcmodule.c"],
                    libraries=["ws2_32", "iphlpapi"] + compat_lib,
