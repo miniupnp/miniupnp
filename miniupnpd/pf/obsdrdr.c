@@ -39,6 +39,10 @@
  *   Must be set with OpenBSD version 4.0 and up.
  * - PF_NEWSTYLE
  *   Must be set with OpenBSD version 4.7 and up. FreeBSD/pfSense is old style.
+ * - USE_LIBPFCTL
+ *   libpfctl was introduced in FreeBSD 14. Starting with FreeBSD 15,
+ *   several ioctl calls (such as DIOCGETRULE) are removed, so libpfctl has
+ *   to be used.
  */
 
 #include "config.h"
@@ -1137,7 +1141,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
 	RULE.action = PF_RDR;
-	pr.rule.action = PF_RDR;
+	pr.rule.action = PF_RDR;	/* used with USE_LIBPFCTL for the DIOCCHANGERULE calls */
 #endif
 #ifdef USE_LIBPFCTL
 	if (pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
