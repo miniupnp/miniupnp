@@ -1137,6 +1137,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
 	RULE.action = PF_RDR;
+	pr.rule.action = PF_RDR;
 #endif
 #ifdef USE_LIBPFCTL
 	if (pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
