@@ -1,7 +1,7 @@
-/* $Id: testobsdrdr.c,v 1.31 2020/05/29 22:29:13 nanard Exp $ */
+/* $Id: testobsdrdr.c,v 1.32 2024/06/22 16:48:54 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2024 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
