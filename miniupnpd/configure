@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: configure,v 1.129 2024/06/22 17:13:28 nanard Exp $
+# $Id: configure,v 1.130 2024/06/22 19:20:10 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -683,7 +683,7 @@ if [ -z "$V6SOCKETS_ARE_V6ONLY" ] ; then
 	V6SOCKETS_ARE_V6ONLY=0
 fi
 
-echo "Configuring compilation for [$OS_NAME] [$OS_VERSION] with [$FW] firewall software."
+echo "Configuring compilation for [$OS_NAME] [$OS_VERSION] [$OS_MACHINE] with [$FW] firewall software."
 echo "Please edit config.h for more compilation options."
 
 # define SUPPORT_REMOTEHOST if the FW related code really supports setting
