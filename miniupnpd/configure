@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: configure,v 1.125 2024/01/17 00:05:14 nanard Exp $
+# $Id: configure,v 1.129 2024/06/22 17:13:28 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -60,7 +60,7 @@ case "$argv" in
 	--host-machine=*)
 		OS_MACHINE=$(echo $argv | cut -d= -f2) ;;
 	--help|-h)
-		echo "Usage : $0 [options]"
+		echo "Usage: $0 [options]"
 		echo " --help                Show this help"
 		echo " --ipv6                Enable IPv6"
 		echo " --igd2                Build an IGDv2 instead of an IGDv1"
