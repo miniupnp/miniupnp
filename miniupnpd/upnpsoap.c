@@ -767,7 +767,7 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 	const char * r_host, * ext_port, * protocol;
 	unsigned short eport, iport;
 	char int_ip[32];
-	char desc[64];
+	char desc[1016];
 	unsigned int leaseduration = 0;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
@@ -1043,7 +1043,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 	const char * m_index;
 	char * endptr;
 	char protocol[8], iaddr[32];
-	char desc[64];
+	char desc[1016];
 	char rhost[40];
 	unsigned int leaseduration = 0;
 	struct NameValueParserData data;
@@ -1140,7 +1140,7 @@ GetListOfPortMappings(struct upnphttp * h, const char * action, const char * ns)
 	int r = -1;
 	unsigned short iport;
 	char int_ip[32];
-	char desc[64];
+	char desc[1016];
 	char rhost[64];
 	unsigned int leaseduration = 0;
 
