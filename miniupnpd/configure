@@ -380,15 +380,9 @@ case $OS_NAME in
 		;;
 	Linux)
 		OS_URL=https://www.kernel.org/
-		KERNVERA=`echo $OS_VERSION | awk -F. '{print $1}'`
-		KERNVERB=`echo $OS_VERSION | awk -F. '{print $2}'`
-		KERNVERC=`echo $OS_VERSION | awk -F. '{print $3}'`
-		KERNVERD=`echo $OS_VERSION | awk -F. '{print $4}'`
-		#echo "$KERNVERA.$KERNVERB.$KERNVERC.$KERNVERD"
+		# HAVE_IP_MREQN=1 requires kernel version >= 2.4
 		# from the 2.4 version, struct ip_mreqn instead of struct ip_mreq
-		if [ \( $KERNVERA -ge 3 \) -o \( $KERNVERA -eq 2 -a $KERNVERB -ge 4 \) ]; then
-			HAVE_IP_MREQN=1
-		fi
+		HAVE_IP_MREQN=1
 		if [ "$CROSSBUILD" != "1" ] ; then
 			# Debian GNU/Linux special case
 			if [ -f /etc/debian_version ]; then
