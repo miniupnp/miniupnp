@@ -609,7 +609,7 @@ int main(int argc, char ** argv)
 	int commandargc = 0;
 	struct UPNPDev * devlist = 0;
 	char lanaddr[64] = "unset";	/* my ip address on the LAN */
-	char wanaddr[64] = "unsed";	/* up address of the IGD on the WAN */
+	char wanaddr[64] = "unset";	/* up address of the IGD on the WAN */
 	int i;
 	const char * rootdescurl = 0;
 	const char * multicastif = 0;
