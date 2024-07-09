@@ -38,6 +38,6 @@ setup(name="miniupnpc",
       ext_modules=[
          Extension(name="miniupnpc", sources=["src/miniupnpcmodule.c"],
                    libraries=["ws2_32", "iphlpapi"] + compat_lib,
-                   include_dirs=['include'], extra_objects=["miniupnpc.lib"])
+                   include_dirs=['include'], extra_objects=["miniupnpc.dll"])
       ])
 
