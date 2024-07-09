@@ -216,7 +216,7 @@ jobs:
           mingw32-make -f Makefile.mingw CC=gcc
           python -m pip install setuptools wheel
           mingw32-make -f Makefile.mingw pythonmodule PYTHON=python
-          7z a dist/*.whl miniupnpc.dll
+          # 7z a dist/*.whl miniupnpc.dll
           mkdir ../dist
           cp dist/*.whl ../dist
 
