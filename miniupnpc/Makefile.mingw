@@ -88,7 +88,9 @@ pythonmodule:	libminiupnpc.a
 	$(PYTHON) setupmingw32.py install --skip-build
 	$(PYTHON) setupmingw32.py sdist
 	$(PYTHON) setupmingw32.py bdist_wheel --skip-build
-	powershell Compress-Archive -update miniupnpc.dll dist/*.whl
+	rename dist/*.whl dist/*.whl.zip
+	powershell Compress-Archive -update miniupnpc.dll dist/*.whl.zip
+	rename dist/*.whl.zip dist/*.whl
 
 miniupnpc.dll:	miniupnpc.def $(OBJSDLL)
 	$(DLLWRAP) -k --driver-name $(CC) \
