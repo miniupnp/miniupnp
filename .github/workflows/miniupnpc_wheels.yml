@@ -137,7 +137,7 @@ jobs:
             arch:
               matrix: universal2
           - os:  # excluding windows entirely as that is presently handled in AppVeyor
-              matrix: windows
+              matrix: windows-temporarily-allow-windows-here
           - os:
               matrix: windows
             arch:
