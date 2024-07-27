@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.518 2024/06/22 22:30:01 nanard Exp $
 
+2024/07/27:
+  Hide the PCP nonce in descriptions returned by UPnP
+
 2024/07/11:
   PCP: Check nonce when renewing IPv6 pinhole
 
