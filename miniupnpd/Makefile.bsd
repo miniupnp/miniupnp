@@ -1,4 +1,4 @@
-# $Id: Makefile.bsd,v 1.100 2020/05/10 22:44:41 nanard Exp $
+# $Id: Makefile.bsd,v 1.109 2024/07/27 13:36:50 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -127,6 +127,9 @@ LIBS += -lssl -lcrypto
 INSTALLBINDIR = $(PREFIX)/sbin
 INSTALLETCDIR = $(PREFIX)/etc
 MANPREFIX ?= $(PREFIX)
+.if $(MANPREFIX) == ""
+MANPREFIX = /usr/share
+.endif
 INSTALLMANDIR = $(MANPREFIX)/man
 
 all:	$(EXECUTABLES)
@@ -150,7 +153,7 @@ install:	miniupnpd genuuid
 	$(INSTALL) -d $(DESTDIR)$(INSTALLETCDIR)
 	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLMANDIR)
-	$(INSTALL) -m 644 miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
+	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
 
 # genuuid is using the uuid cli tool available under OpenBSD 4.0 in
 # the uuid-1.5.0 package
@@ -163,7 +166,7 @@ UUID != if which uuidgen 2>&1 > /dev/null; then \
         fi
 
 genuuid:
-	$(MV) miniupnpd.conf miniupnpd.conf.before
+	$(CP) $(SRCDIR)/miniupnpd.conf miniupnpd.conf.before
 	sed -e "s/^uuid=[-0-9a-fA-F]*/uuid=$(UUID)/" miniupnpd.conf.before > miniupnpd.conf
 	$(RM) miniupnpd.conf.before
 
