@@ -99,7 +99,6 @@ int soapPostSubmit(SOCKET fd,
 #endif
 					   "SOAPAction: \"%s\"\r\n"
 					   "Connection: close\r\n"
-					   "Cache-Control: no-cache\r\n"	/* ??? */
 					   "\r\n",
 					   url, httpversion, host, portstr, bodysize, action);
 	if ((unsigned int)headerssize >= sizeof(headerbuf))
