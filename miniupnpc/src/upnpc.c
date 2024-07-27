@@ -1,4 +1,4 @@
-/* $Id: upnpc.c,v 1.141 2024/01/26 23:34:01 nanard Exp $ */
+/* $Id: upnpc.c,v 1.145 2024/07/27 11:53:46 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2024 Thomas Bernard
@@ -736,17 +736,17 @@ int main(int argc, char ** argv)
 		  || (i = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr), wanaddr, sizeof(wanaddr))))
 		{
 			switch(i) {
-			case 1:
+			case UPNP_CONNECTED_IGD:
 				printf("Found valid IGD : %s\n", urls.controlURL);
 				break;
-			case 2:
+			case UPNP_PRIVATEIP_IGD:
 				printf("Found an IGD with a reserved IP address (%s) : %s\n", wanaddr, urls.controlURL);
 				break;
-			case 3:
+			case UPNP_DISCONNECTED_IGD:
 				printf("Found a (not connected?) IGD : %s\n", urls.controlURL);
 				if (ignore) printf("Trying to continue anyway\n");
 				break;
-			case 4:
+			case UPNP_UNKNOWN_DEVICE:
 				printf("UPnP device found. Is it an IGD ? : %s\n", urls.controlURL);
 				if (ignore) printf("Trying to continue anyway\n");
 				break;
@@ -754,7 +754,7 @@ int main(int argc, char ** argv)
 				printf("Found device (igd ?) : %s\n", urls.controlURL);
 				if (ignore) printf("Trying to continue anyway\n");
 			}
-			if(i==1 || i==2 || ignore) {
+			if(i==UPNP_CONNECTED_IGD || i==UPNP_PRIVATEIP_IGD || ignore) {
 
 			printf("Local LAN ip address : %s\n", lanaddr);
 			#if 0

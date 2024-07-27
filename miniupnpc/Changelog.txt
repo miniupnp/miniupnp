@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.268 2024/06/08 22:09:20 nanard Exp $
+$Id: Changelog.txt,v 1.269 2024/07/27 11:53:44 nanard Exp $
 miniUPnP client Changelog.
+
+2024/07/27:
+  Add #define for UPNP_GetValidIGD() return values
 
 VERSION 2.2.8 : released 2024/06/09
 

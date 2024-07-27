@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.159 2021/03/02 23:36:32 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.163 2024/07/27 11:53:45 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -505,13 +505,14 @@ UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
 /* UPNP_GetValidIGD() :
  * return values :
  *    -1 = Internal error
- *     0 = NO IGD found
- *     1 = A valid connected IGD has been found
+ *     0 = NO IGD found (UPNP_NO_IGD)
+ *     1 = A valid connected IGD has been found (UPNP_CONNECTED_IGD)
  *     2 = A valid connected IGD has been found but its
- *         IP address is reserved (non routable)
+ *         IP address is reserved (non routable) (UPNP_PRIVATEIP_IGD)
  *     3 = A valid IGD has been found but it reported as
- *         not connected
+ *         not connected (UPNP_DISCONNECTED_IGD)
  *     4 = an UPnP device has been found but was not recognized as an IGD
+ *         (UPNP_UNKNOWN_DEVICE)
  *
  * In any positive non zero return case, the urls and data structures
  * passed as parameters are set. Don't forget to call FreeUPNPUrls(urls) to

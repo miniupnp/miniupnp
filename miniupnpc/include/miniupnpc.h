@@ -104,15 +104,21 @@ struct UPNPUrls {
 	char * rootdescURL;
 };
 
+#define UPNP_NO_IGD (0)
+#define UPNP_CONNECTED_IGD (1)
+#define UPNP_PRIVATEIP_IGD (2)
+#define UPNP_DISCONNECTED_IGD (3)
+#define UPNP_UNKNOWN_DEVICE (4)
 /* UPNP_GetValidIGD() :
  * return values :
- *     0 = NO IGD found
- *     1 = A valid connected IGD has been found
+ *     0 = NO IGD found (UPNP_NO_IGD)
+ *     1 = A valid connected IGD has been found (UPNP_CONNECTED_IGD)
  *     2 = A valid connected IGD has been found but its
- *         IP address is reserved (non routable)
+ *         IP address is reserved (non routable) (UPNP_PRIVATEIP_IGD)
  *     3 = A valid IGD has been found but it reported as
- *         not connected
+ *         not connected (UPNP_DISCONNECTED_IGD)
  *     4 = an UPnP device has been found but was not recognized as an IGD
+ *         (UPNP_UNKNOWN_DEVICE)
  *
  * In any non zero return case, the urls and data structures
  * passed as parameters are set. Donc forget to call FreeUPNPUrls(urls) to
