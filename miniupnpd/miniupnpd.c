@@ -1467,10 +1467,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 #ifdef IGD_V2
 			case UPNPFORCEIGDDESCV1:
-				if (strcmp(ary_options[i].value, "yes") == 0)
+				if ((strcmp(ary_options[i].value, "igdv1") == 0) || (strcmp(ary_options[i].value, "yes") == 0))
 					SETFLAG(FORCEIGDDESCV1MASK);
-				else if (strcmp(ary_options[i].value, "no") != 0 ) {
-					INIT_PRINT_ERR("force_igd_desc_v1 can only be yes or no\n");
+				else if ((strcmp(ary_options[i].value, "igdv2") != 0 ) && (strcmp(ary_options[i].value, "no") != 0 )) {
+					INIT_PRINT_ERR("upnp_igd_compat (or force_igd_desc_v1) can only be igdv1/igdv2 (or yes/no)\n");
 					return 1;
 				}
 				break;

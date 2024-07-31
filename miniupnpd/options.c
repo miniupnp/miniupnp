@@ -101,6 +101,7 @@ static const struct {
 #endif
 #endif
 #ifdef IGD_V2
+	{ UPNPFORCEIGDDESCV1, "upnp_igd_compat"},
 	{ UPNPFORCEIGDDESCV1, "force_igd_desc_v1"},
 #endif
 	{ UPNPMINISSDPDSOCKET, "minissdpdsocket"},
