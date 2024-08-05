@@ -146,7 +146,7 @@ tomato_save(const char *fname)
 	unsigned int timestamp;
 	char proto[4];
 	char iaddr[32];
-	char desc[64];
+	char desc[1016];
 	char rhost[32];
 	int n;
 	FILE *f;
@@ -239,7 +239,7 @@ tomato_delete(void)
 	unsigned int leaseduration;
 	char proto[4];
 	char iaddr[32];
-	char desc[64];
+	char desc[1016];
 	char rhost[32];
 	int n;
 

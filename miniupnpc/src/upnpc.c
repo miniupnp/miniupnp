@@ -141,7 +141,7 @@ static void ListRedirections(struct UPNPUrls * urls,
 	char intPort[6];
 	char extPort[6];
 	char protocol[4];
-	char desc[80];
+	char desc[1016];
 	char enabled[6];
 	char rHost[64];
 	char duration[16];
