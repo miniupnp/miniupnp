@@ -716,6 +716,7 @@ else
 fi
 
 if [ "$MAKEFILE" = "Makefile.bsd" ] || [ "$OS_NAME" = "Darwin" ] || [ "$OS_NAME" = "SunOS" ] ; then
+	CONFIG_MK=bsdmake.inc
 	echo "FWNAME = $FW" > bsdmake.inc
 	echo "SRCDIR = ${BASEDIR}" >> bsdmake.inc
 	echo "CPPFLAGS += -I." >> bsdmake.inc
@@ -765,6 +766,24 @@ if [ -n "$HTTPS" ] && [ -n "$IGD2" ] ; then
 			echo "LIBS += -lssl -lcrypto" >> bsdmake.inc
 		;;
 	esac
+fi
+
+# UUID binary
+if [ "$OS_NAME" = "OpenWrt" ]; then
+	UUIDBINDIR="${STAGING_DIR_HOST}/bin/"
+fi
+# genuuid uses the uuidgen CLI tool which is part of libuuid
+# from the e2fsprogs
+# 'cat /proc/sys/kernel/random/uuid' could be also used
+for bin in genuuid uuidgen uuid; do
+	UUIDBIN="$(command -v "${UUIDBINDIR}${bin}" 2>/dev/null)" && break
+done
+if [ -n "${UUIDBIN}" ]; then
+	echo "UUIDBIN = ${UUIDBIN}" >> ${CONFIG_MK}
+elif [ -f /proc/sys/kernel/random/uuid ] ; then
+	echo "UUIDBIN = cat /proc/sys/kernel/random/uuid" >> ${CONFIG_MK}
+else
+	echo "Warning: genuuid/uuidgen/uuid not found!"
 fi
 
 # set V6SOCKETS_ARE_V6ONLY to 0 if it was not set above
@@ -1052,7 +1071,7 @@ fi
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}
 
 ${MV} ${CONFIGFILE} ${CONFIGFILE_FINAL}
-if [ -f "${CONFIG_MK}" ] ; then
+if [ -f "${CONFIG_MK}" ] && [ -n "${CONFIG_MK_FINAL}" ] ; then
 	${MV} ${CONFIG_MK} ${CONFIG_MK_FINAL}
 fi
 

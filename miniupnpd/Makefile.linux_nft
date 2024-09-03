@@ -68,18 +68,6 @@ NFT_SCRIPTS = $(addprefix $(SRCDIR)/netfilter_nft/scripts/, \
 
 #LDLIBS += -lnfnetlink
 
-# genuuid uses the uuidgen CLI tool which is part of libuuid
-# from the e2fsprogs
-# 'cat /proc/sys/kernel/random/uuid' could be also used
-#
-ifeq ($(TARGET_OPENWRT),)
-    UUIDEXECDIR=''
-else
-    UUIDEXECDIR="$(STAGING_DIR_HOST)/bin/"
-endif
-UUID=$(shell ($(UUIDEXECDIR)genuuid || $(UUIDEXECDIR)uuidgen || $(UUIDEXECDIR)uuid) 2> /dev/null )
-
-
 TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
 EXECUTABLES = miniupnpd miniupnpdctl \
@@ -116,7 +104,7 @@ install:	miniupnpd $(SRCDIR)/miniupnpd.8 $(SRCDIR)/miniupnpd.conf \
 	$(INSTALL) $(SRCDIR)/netfilter_nft/scripts/nft_delete_chain.sh $(DESTDIR)$(ETCINSTALLDIR)
 	$(INSTALL) $(SRCDIR)/netfilter_nft/scripts/miniupnpd_functions.sh $(DESTDIR)$(ETCINSTALLDIR)
 	$(INSTALL) -m 0644 -b $(SRCDIR)/miniupnpd.conf $(DESTDIR)$(ETCINSTALLDIR)
-	sed -i'' -e "s/^uuid=[-0-9a-f]*/uuid=$(UUID)/" $(DESTDIR)$(ETCINSTALLDIR)/miniupnpd.conf
+	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=$(shell $(UUIDBIN))/" $(DESTDIR)$(ETCINSTALLDIR)/miniupnpd.conf
 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/etc/init.d
 	$(INSTALL) $(SRCDIR)/linux/miniupnpd.init.d.script $(DESTDIR)$(PREFIX)/etc/init.d/miniupnpd
 	$(INSTALL) -d $(DESTDIR)$(MANINSTALLDIR)
