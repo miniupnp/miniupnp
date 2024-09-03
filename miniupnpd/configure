@@ -751,6 +751,22 @@ case $OS_FAMILY in
 		;;
 esac
 
+# OpenSSL : only with IGDv2 enabled
+if [ -n "$HTTPS" ] && [ -n "$IGD2" ] ; then
+	case $OS_FAMILY in
+		Linux)
+			if pkg_detect openssl; then
+				:
+			else
+				echo "Warning: openssl pkg-config not found!"
+			fi
+		;;
+		*BSD)
+			echo "LIBS += -lssl -lcrypto" >> bsdmake.inc
+		;;
+	esac
+fi
+
 # set V6SOCKETS_ARE_V6ONLY to 0 if it was not set above
 if [ -z "$V6SOCKETS_ARE_V6ONLY" ] ; then
 	V6SOCKETS_ARE_V6ONLY=0

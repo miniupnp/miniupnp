@@ -67,8 +67,6 @@ NFT_SCRIPTS = $(addprefix $(SRCDIR)/netfilter_nft/scripts/, \
 
 #LDLIBS += -lnfnetlink
 
-LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libssl)
-
 # genuuid uses the uuidgen CLI tool which is part of libuuid
 # from the e2fsprogs
 # 'cat /proc/sys/kernel/random/uuid' could be also used

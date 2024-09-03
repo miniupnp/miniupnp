@@ -74,11 +74,6 @@ NETFILTER_SCRIPTS = $(addprefix $(SRCDIR)/netfilter/, \
 
 #LDLIBS += -lnfnetlink
 
-# OpenWrt packager disables https server for IGD v2 and hardcodes libuuid support
-ifeq ($(TARGET_OPENWRT),)
-LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libssl)
-endif # ($(TARGET_OPENWRT,)
-
 ifneq ($(shell ldd --version | grep GLIBC),)
 GLIBC_VERSION := $(shell ldd --version | head -n 1 | sed 's/^.* //')
 GLIBC_VERSION_MAJOR = $(shell echo $(GLIBC_VERSION) | cut -f 1 -d . )
