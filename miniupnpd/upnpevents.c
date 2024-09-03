@@ -20,12 +20,18 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include "config.h"
+#include "getconnstatus.h"
+#include "getifaddr.h"
+#include "upnpredirect.h"
 #if defined(LIB_UUID)
 /* as found on linux */
 #include <uuid/uuid.h>
 #elif defined(BSD_UUID)
 #include <uuid.h>
 #endif /* LIB_UUID / BSD_UUID */
+#ifdef USE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
 #include "upnpevents.h"
 #include "miniupnpdpath.h"
 #include "upnpglobalvars.h"
@@ -686,5 +692,29 @@ void write_events_details(int s) {
 }
 #endif
 
-#endif
+#endif /* ENABLE_EVENTS */
 
+#ifdef USE_SYSTEMD
+void upnp_update_status(void)
+{
+	char wan_ip_address[INET_ADDRSTRLEN];
+
+	if(use_ext_ip_addr) {
+		snprintf(wan_ip_address, sizeof(wan_ip_address), "%s", use_ext_ip_addr);
+	} else {
+		struct in_addr addr;
+		if (getifaddr(ext_if_name, wan_ip_address, sizeof(wan_ip_address), &addr, NULL) < 0)
+			snprintf(wan_ip_address, sizeof(wan_ip_address), "(unknown)");
+		else if (addr_is_reserved(&addr))
+			snprintf(wan_ip_address, sizeof(wan_ip_address), "(invalid)");
+	}
+
+	sd_notifyf(0,
+		"STATUS=%s on %s, IP: %s, active redirects: %d\n",
+		get_wan_connection_status_str(ext_if_name),
+		ext_if_name,
+		wan_ip_address,
+		upnp_get_portmapping_number_of_entries()
+	);
+}
+#endif /* USE_SYSTEMD */

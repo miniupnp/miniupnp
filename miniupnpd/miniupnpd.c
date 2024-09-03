@@ -51,6 +51,10 @@
 #include <cap-ng.h>
 #endif
 
+#ifdef USE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 /* unix sockets */
 #ifdef USE_MINIUPNPDCTL
 #include <sys/un.h>
@@ -908,6 +912,9 @@ struct runtime_vars {
 	/* unused rules cleaning related variables : */
 	int clean_ruleset_threshold;	/* threshold for removing unused rules */
 	int clean_ruleset_interval;		/* (minimum) interval between checks. 0=disabled */
+#ifdef USE_SYSTEMD
+	int systemd_notify;
+#endif
 };
 
 /* parselanaddr()
@@ -1174,6 +1181,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	int pid;
 #endif
 	int debug_flag = 0;
+#ifdef USE_SYSTEMD
+	int systemd_flag = 0;
+#endif
+	int foreground_flag = 0;
 	int verbosity_level = 0;	/* for determining setlogmask() */
 	int openlog_option;
 	struct in_addr addr;
@@ -1192,8 +1203,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	{
 		if(0 == strcmp(argv[i], "-h") || 0 == strcmp(argv[i], "--help"))
 			goto print_usage;
-		if(0 == strcmp(argv[i], "-d"))
-			debug_flag = 1;
+		else if(0 == strcmp(argv[i], "-d"))
+			foreground_flag = debug_flag = 1;
+#ifdef USE_SYSTEMD
+		else if(0 == strcmp(argv[i], "-D"))
+			foreground_flag = systemd_flag = 1;
+#endif
 	}
 
 	openlog_option = LOG_PID|LOG_CONS;
@@ -1721,6 +1736,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #endif
 		case 'd':	/* discarding */
 			break;
+#ifdef USE_SYSTEMD
+		case 'D':	/* handled above, discarding */
+			break;
+#endif
 		case 'w':
 			if(i+1 < argc)
 				presurl = argv[++i];
@@ -1874,7 +1893,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	}
 
 #ifndef NO_BACKGROUND_NO_PIDFILE
-	if(debug_flag)
+	if (foreground_flag)
 	{
 		pid = getpid();
 	}
@@ -1996,6 +2015,16 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		pidfilename = NULL;
 #endif
 
+#ifdef USE_SYSTEMD
+	if (systemd_flag) {
+		int r = sd_notify(0,
+			"STATUS=version " MINIUPNPD_VERSION " starting\n"
+		);
+		if (r > 0)
+			v->systemd_notify = 1;
+	}
+#endif
+
 #ifdef ENABLE_LEASEFILE
 	/*remove(lease_file);*/
 	syslog(LOG_INFO, "Reloading rules from lease file");
@@ -2067,7 +2096,10 @@ print_usage:
 			"\tDefault pid file is '%s'.\n"
 #endif
 			"\tDefault config file is '%s'.\n"
-			"\tWith -d miniupnpd will run as a standard program.\n"
+			"\t-d starts miniupnpd in foreground in debug mode.\n"
+#ifdef USE_SYSTEMD
+	                "\t-D starts miniupnpd in foreground as a systemd service.\n"
+#endif
 			"\t-o argument is either an IPv4 address or \"STUN:host[:port]\".\n"
 #ifdef ENABLE_IPV6
 			"\t-4 disable IPv6\n"
@@ -2590,6 +2622,15 @@ main(int argc, char * * argv)
 		}
 	}
 #endif /* HAS_LIBCAP_NG */
+
+#ifdef USE_SYSTEMD
+	if (v.systemd_notify) {
+		upnp_update_status();
+		sd_notify(0,
+			"READY=1\n"
+		);
+	}
+#endif
 
 	/* main loop */
 	while(!quitting)
@@ -3168,10 +3209,26 @@ main(int argc, char * * argv)
 			e = next;
 		}
 
+#ifdef USE_SYSTEMD
+		if (v.systemd_notify) {
+			upnp_update_status();
+		}
+#endif
+
 	}	/* end of main loop */
 
 shutdown:
+
 	syslog(LOG_NOTICE, "shutting down MiniUPnPd");
+#ifdef USE_SYSTEMD
+	if (v.systemd_notify) {
+		sd_notify(0,
+			"STATUS=version " MINIUPNPD_VERSION " shutting down\n"
+			"STOPPING=1\n"
+		);
+	}
+#endif
+
 	/* send good-bye */
 	if (GETFLAG(ENABLEUPNPMASK))
 	{
@@ -3286,4 +3343,3 @@ shutdown:
 	closelog();
 	return 0;
 }
-

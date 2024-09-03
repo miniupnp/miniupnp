@@ -48,5 +48,10 @@ void upnpevents_processfds(fd_set *readset, fd_set *writeset);
 void write_events_details(int s);
 #endif
 
+#endif /* ENABLE_EVENTS */
+
+#ifdef USE_SYSTEMD
+void upnp_update_status(void);
 #endif
+
 #endif
