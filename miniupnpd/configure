@@ -682,6 +682,11 @@ case $FW in
 		MAKEFILE=Makefile.linux_nft
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
 		echo "#define USE_NFTABLES  1" >> ${CONFIGFILE}
+		if pkg_detect libnftnl libmnl; then
+			:
+		else
+			echo "Warning: no libnftnl or libmnl pkg-config found"
+		fi
 		;;
 	*)
 		echo "Unknown Firewall/packet filtering software [$FW]"

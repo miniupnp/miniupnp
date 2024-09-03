@@ -65,19 +65,6 @@ ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS) $(OTHEROBJS)
 NFT_SCRIPTS = $(addprefix $(SRCDIR)/netfilter_nft/scripts/, \
 	nft_init.sh nft_removeall.sh nft_flush.sh nft_delete_chain.sh)
 
-PCFILE_FOUND := $(shell $(PKG_CONFIG) --exists libnftnl; echo $$?)
-
-ifeq (${PCFILE_FOUND},0)
-
-PKG_CONFIG_LIBS = libnftnl libmnl
-CFLAGS  += $(shell $(PKG_CONFIG) --cflags $(PKG_CONFIG_LIBS))
-LDLIBS  += $(shell $(PKG_CONFIG) --static --libs-only-l $(PKG_CONFIG_LIBS))
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-L $(PKG_CONFIG_LIBS))
-LDFLAGS += $(shell $(PKG_CONFIG) --libs-only-other $(PKG_CONFIG_LIBS))
-else
-
-endif # ifdef PCFILE_FOUND
-
 #LDLIBS += -lnfnetlink
 
 LDLIBS += $(shell $(PKG_CONFIG) --static --libs-only-l libssl)
