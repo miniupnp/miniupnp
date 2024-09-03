@@ -60,6 +60,7 @@ case "$argv" in
 		fi ;;
 	--disable-pppconn) DISABLEPPPCONN=1 ;;
 	--disable-fork) NO_BACKGROUND_NO_PIDFILE=1 ;;
+	--systemd) SYSTEMD=1 ;;
 	--firewall=*)
 	    FW=$(echo $argv | cut -d= -f2) ;;
 	--libpfctl) USE_LIBPFCTL=1 ;;
@@ -94,6 +95,7 @@ case "$argv" in
 		echo " --libpfctl            Use libpfctl"
 		echo " --iptablespath=/path  Use a specific version of iptables"
 		echo " --disable-fork        Do not go to background and do not write pid file"
+		echo " --systemd             Include support for systemd process management"
 		echo " --getifaddrs          Force use getifaddrs() to obtain interface addresses"
 		echo " --v6sockets-v6only    v6 sockets don't do v4, ie sysctl net.inet6.ip6.v6only=1"
 		echo " --host-os=<name>      For cross build. result of uname -s on the host machine"
@@ -738,6 +740,15 @@ if [ "$MAKEFILE" ] ; then
 	cp "${BASEDIR}/${MAKEFILE}" Makefile && echo "${BASEDIR}/${MAKEFILE} -> Makefile"
 fi
 
+# discover systemd
+if [ -n "$SYSTEMD" ] && [ "$SYSTEMD" -eq 1 ] ; then
+	if pkg_detect libsystemd; then
+		:
+	else
+		echo "Warning: libsystemd not found"
+	fi
+fi
+
 # UUID API
 case $OS_FAMILY in
 	Linux)
@@ -1067,6 +1078,13 @@ if [ -n "$NO_BACKGROUND_NO_PIDFILE" ] && [ $NO_BACKGROUND_NO_PIDFILE -eq 1 ] ; t
 	echo "#define NO_BACKGROUND_NO_PIDFILE" >> ${CONFIGFILE}
 else
 	echo "/*#define NO_BACKGROUND_NO_PIDFILE*/" >> ${CONFIGFILE}
+fi
+
+echo "/* support systemd process management (use sd_notify() instead of daemonization) */" >> ${CONFIGFILE}
+if [ -n "$SYSTEMD" ] && [ $SYSTEMD -eq 1 ] ; then
+	echo "#define USE_SYSTEMD" >> ${CONFIGFILE}
+else
+	echo "/*#define USE_SYSTEMD*/" >> ${CONFIGFILE}
 fi
 
 echo "/* Whether to use getifaddrs() to determine interface addresses */" >> ${CONFIGFILE}
