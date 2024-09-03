@@ -40,7 +40,6 @@ CC ?= gcc
 RM = rm -f
 INSTALL = install
 STRIP ?= strip
-PKG_CONFIG ?= pkg-config
 CP = cp
 DOXYGEN ?= doxygen
 
