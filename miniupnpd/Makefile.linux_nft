@@ -68,11 +68,14 @@ NFT_SCRIPTS = $(addprefix $(SRCDIR)/netfilter_nft/scripts/, \
 
 #LDLIBS += -lnfnetlink
 
-EXECUTABLES = miniupnpd miniupnpdctl \
-              testupnpdescgen testgetifstats \
-              testupnppermissions testgetifaddr \
-              testgetroute testasyncsendto testportinuse \
-              testssdppktgen testminissdp
+EXECUTABLES = miniupnpd miniupnpdctl
+
+ifeq ($(TESTS), 1)
+EXECUTABLES += testupnpdescgen testgetifstats \
+               testupnppermissions testgetifaddr \
+               testgetroute testasyncsendto testportinuse \
+               testssdppktgen testminissdp
+endif
 
 .PHONY:	all clean install dox
 
