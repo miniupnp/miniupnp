@@ -19,13 +19,19 @@
 #
 CONFIG_OPTIONS ?= $(cat .configure.cache)
 CONFIG_OPTIONS += --firewall=nftables
+
+# Make sucks, prove me wrong
+, := ,
+ifeq ($(filter -D_FORTIFY_SOURCE=% -Wp$(,)-D_FORTIFY_SOURCE=%,$(CPPFLAGS) $(CFLAGS)),)
+CPPFLAGS += -D_FORTIFY_SOURCE=2
+endif
+CPPFLAGS += -D_GNU_SOURCE
+
 #CFLAGS = -O -g #-DDEBUG
 CFLAGS ?= -Os
 CFLAGS += -fno-strict-aliasing
 CFLAGS += -fno-common
 CFLAGS += -fstack-protector -fPIE
-CFLAGS += -D_FORTIFY_SOURCE=2
-CPPFLAGS += -D_GNU_SOURCE
 CFLAGS += -Wall
 CFLAGS += -Wextra -Wstrict-prototypes -Wdeclaration-after-statement
 #CFLAGS += -Wno-missing-field-initializers
