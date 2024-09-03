@@ -212,6 +212,7 @@ EOF
 echo "" >> ${CONFIGFILE}
 
 # OS Specific stuff
+OS_FAMILY="$OS_NAME"
 case $OS_NAME in
 	OpenBSD)
 		MAKEFILE=Makefile.bsd
@@ -313,6 +314,7 @@ case $OS_NAME in
 		fi
 		;;
 	pfSense)
+		OS_FAMILY=FreeBSD
 		MAKEFILE=Makefile.bsd
 		# we need to detect if PFRULE_INOUT_COUNTS macro is needed
 		FW=pf
@@ -343,6 +345,7 @@ case $OS_NAME in
 		OS_URL=https://www.netbsd.org/
 		;;
 	DragonFly)
+		OS_FAMILY=DragonFlyBSD
 		MAKEFILE=Makefile.bsd
 		if [ "$CROSSBUILD" != "1" ] && [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
@@ -369,6 +372,7 @@ case $OS_NAME in
 		OS_URL=https://www.dragonflybsd.org/
 		;;
 	SunOS)
+		OS_FAMILY=BSD
 		MAKEFILE=Makefile.bsd
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		FW=ipf
@@ -454,21 +458,25 @@ case $OS_NAME in
 		fi
 		;;
 	OpenWrt)
+		OS_FAMILY=Linux
 		OS_URL=https://www.openwrt.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		GETIFADDRS=1
 		;;
 	OpenEmbedded)
+		OS_FAMILY=Linux
 		OS_URL=https://www.openembedded.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		FW=iptables
 		;;
 	AstLinux)
+		OS_FAMILY=Linux
 		OS_URL=https://www.astlinux-project.org/
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		FW=iptables
 		;;
 	Tomato)
+		OS_FAMILY=Linux
 		OS_NAME=UPnP
 		OS_URL=http://tomatousb.org/
 		echo "" >> ${CONFIGFILE}
