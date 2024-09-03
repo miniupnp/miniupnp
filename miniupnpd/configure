@@ -1083,6 +1083,7 @@ fi
 echo "/* support systemd process management (use sd_notify() instead of daemonization) */" >> ${CONFIGFILE}
 if [ -n "$SYSTEMD" ] && [ $SYSTEMD -eq 1 ] ; then
 	echo "#define USE_SYSTEMD" >> ${CONFIGFILE}
+	echo "USE_SYSTEMD = 1" >> ${CONFIG_MK}
 else
 	echo "/*#define USE_SYSTEMD*/" >> ${CONFIGFILE}
 fi

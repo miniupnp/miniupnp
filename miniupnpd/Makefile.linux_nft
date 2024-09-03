@@ -53,9 +53,11 @@ INSTALLPREFIX ?= $(PREFIX)/usr
 ETCDIR ?= $(PREFIX)/etc
 SBINDIR ?= $(INSTALLPREFIX)/sbin
 MANDIR ?= $(INSTALLPREFIX)/share/man
+LIBDIR ?= $(INSTALLPREFIX)/lib
 
 CONFIGDIR = $(ETCDIR)/miniupnpd
 INITDIR = $(ETCDIR)/init.d
+SYSTEMDUNITDIR = $(LIBDIR)/systemd/system
 
 include config.mk
 include $(SRCDIR)/gitrev.mk
@@ -101,7 +103,18 @@ install:	miniupnpd $(SRCDIR)/miniupnpd.8 $(SRCDIR)/miniupnpd.conf \
 	$(INSTALL) -D -m 0755 $(NFT_SCRIPTS) -t $(DESTDIR)$(CONFIGDIR)
 	$(INSTALL) -D -m 0644 -b $(SRCDIR)/miniupnpd.conf -t $(DESTDIR)$(CONFIGDIR)
 	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=$(shell $(UUIDBIN))/" $(DESTDIR)$(CONFIGDIR)/miniupnpd.conf
+ifneq ($(USE_SYSTEMD),)
+	$(INSTALL) -D -m 0644 $(SRCDIR)/linux/miniupnpd.nft.service $(DESTDIR)$(SYSTEMDUNITDIR)/miniupnpd.service
+	sed -r \
+		-e "s|%BINDIR%|$(SBINDIR)|" \
+		-e "s|%CONFIGDIR%|$(CONFIGDIR)|" \
+		-i $(DESTDIR)/$(SYSTEMDUNITDIR)/miniupnpd.service
+	sed -r \
+		-e "s|(#lease_file)=.*|\1=/var/lib/miniupnpd/upnp.leases|" \
+		-i $(DESTDIR)/$(CONFIGDIR)/miniupnpd.conf
+else
 	$(INSTALL) -D -m 0755 $(SRCDIR)/linux/miniupnpd.init.d.script $(DESTDIR)$(INITDIR)/miniupnpd
+endif
 	$(INSTALL) -D -m 0644 $(SRCDIR)/miniupnpd.8 -t $(DESTDIR)$(MANDIR)/man8
 	gzip -f $(DESTDIR)$(MANDIR)/man8/miniupnpd.8
 
