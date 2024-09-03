@@ -620,8 +620,7 @@ case $FW in
 			              --atleast-version=1.0.3 libmnl; then
 				echo "CPPFLAGS += -DUSE_NFCT" >> ${CONFIG_MK}
 			fi
-		fi
-		if [ "$IPTABLESPATH" ] ; then
+		elif [ "$IPTABLESPATH" ] ; then
 			echo "CPPFLAGS += -I${IPTABLESPATH}/include/" >> ${CONFIG_MK}
 			echo "LDFLAGS += -L${IPTABLESPATH}/libiptc/" >> ${CONFIG_MK}
 			if [ "$OS_NAME" != "OpenWrt" ]; then
@@ -655,7 +654,7 @@ case $FW in
 					echo "LDLIBS += -liptc /usr/lib${arch}/libiptc.a" >> ${CONFIG_MK}
 				fi
 			fi
-		elif [ -z "${PKG_CONFIG}" ] ; then
+		else
 			# IPTABLESPATH not defined and no pkg-config
 			echo "WARNING: no pkg-config and IPTABLESPATH not defined. checking /usr/include/xtables.h"
 			# since 1.4.16, XTABLES_VERSION_CODE has been moved to xtables-version.h
