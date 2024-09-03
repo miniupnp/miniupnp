@@ -716,9 +716,16 @@ if [ "$MAKEFILE" ] ; then
 fi
 
 # UUID API
-case $OS_NAME in
-	OpenWrt)
-		echo "#define LIB_UUID" >> ${CONFIGFILE}
+case $OS_FAMILY in
+	Linux)
+		if [ "$OS_NAME" = "OpenWrt" ]; then
+			# OpenWrt hardcodes libuuid support
+			echo "#define LIB_UUID" >> ${CONFIGFILE}
+		elif pkg_detect uuid; then
+			echo "#define LIB_UUID" >> ${CONFIGFILE}
+		else
+			echo "Warning: uuid pkg-config not found"
+		fi
 		;;
 	*)
 		if grep uuid_create /usr/include/uuid.h > /dev/null 2>&1 ; then
