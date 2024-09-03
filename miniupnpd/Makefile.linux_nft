@@ -71,7 +71,8 @@ NFT_SCRIPTS = $(addprefix $(SRCDIR)/netfilter_nft/scripts/, \
 EXECUTABLES = miniupnpd miniupnpdctl \
               testupnpdescgen testgetifstats \
               testupnppermissions testgetifaddr \
-              testgetroute testasyncsendto testportinuse
+              testgetroute testasyncsendto testportinuse \
+              testssdppktgen testminissdp
 
 .PHONY:	all clean install dox
 
@@ -86,6 +87,8 @@ clean:
 	$(RM) testupnppermissions.o testgetifaddr.o
 	$(RM) testgetroute.o testasyncsendto.o
 	$(RM) testportinuse.o
+	$(RM) testminissdp.o
+	$(RM) testssdppktgen.o
 	$(RM) miniupnpdctl.o
 	$(RM) -r dox/
 
@@ -123,11 +126,16 @@ testgetifaddr:	testgetifaddr.o getifaddr.o
 
 testgetroute:	testgetroute.o getroute.o upnputils.o
 
+testssdppktgen:	testssdppktgen.o
+
 testasyncsendto:	testasyncsendto.o asyncsendto.o upnputils.o \
 	getroute.o
 
 testportinuse:	testportinuse.o portinuse.o getifaddr.o \
 	nftnlrdr.o nftnlrdr_misc.o
+
+testminissdp:	testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
+	asyncsendto.o getroute.o
 
 miniupnpdctl:	miniupnpdctl.o
 

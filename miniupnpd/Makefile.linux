@@ -144,7 +144,6 @@ testportinuse:	testportinuse.o portinuse.o getifaddr.o \
 testminissdp:	testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
 	asyncsendto.o getroute.o
 
-
 miniupnpdctl:	miniupnpdctl.o
 
 config.mk config.h:	$(SRCDIR)/configure $(SRCDIR)/VERSION
