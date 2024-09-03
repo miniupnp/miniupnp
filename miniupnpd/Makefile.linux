@@ -72,20 +72,6 @@ NETFILTER_SCRIPTS = $(addprefix $(SRCDIR)/netfilter/, \
 	ip6tables_init.sh ip6tables_removeall.sh \
 	miniupnpd_functions.sh)
 
-ifneq ($(IPTABLES_PCFILE_FOUND),1)
-
-ifeq "$(wildcard /etc/gentoo-release )" ""
-LDLIBS ?= -liptc
-else # gentoo
-# the following is better, at least on gentoo with iptables 1.4.6
-# see http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=1618
-# and http://miniupnp.tuxfamily.org/forum/viewtopic.php?p=2183
-LDLIBS ?= -lip4tc
-CPPFLAGS := -DIPTABLES_143 $(CPPFLAGS)
-endif
-
-endif # ifneq ($(IPTABLES_PCFILE_FOUND),1)
-
 #LDLIBS += -lnfnetlink
 
 # OpenWrt packager disables https server for IGD v2 and hardcodes libuuid support

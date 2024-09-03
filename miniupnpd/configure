@@ -609,10 +609,9 @@ case $FW in
 		echo "#define USE_IPTABLES  1" >> ${CONFIGFILE}
 		if [ "$PKG_CONFIG" ] ; then
 			if pkg_detect --atleast-version=1.4.3 libiptc; then
-				echo "IPTABLES_PCFILE_FOUND = 1" >> ${CONFIG_MK}
 				IPTABLES_143=1
 			elif pkg_detect libiptc; then
-				echo "IPTABLES_PCFILE_FOUND = 1" >> ${CONFIG_MK}
+				:
 			else
 				echo "Warning: no libiptc pkg-config found"
 			fi
