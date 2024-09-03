@@ -49,7 +49,8 @@ PKG_CONFIG ?= pkg-config
 CP = cp
 DOXYGEN ?= doxygen
 
-DEPFLAGS = -MM -MG -MT $(patsubst %.d,%.o,$@) -MT $@
+DEPDIR := .depend
+DEPFLAGS = -MMD -MP -MF $(@:%.o=$(DEPDIR)/%.d) -MT $@
 # -M : with system headers, -MM : without
 
 INSTALLPREFIX ?= $(PREFIX)/usr
@@ -65,8 +66,6 @@ include $(SRCDIR)/objects.mk
 NETFILTEROBJS = iptcrdr.o iptpinhole.o nfct_get.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS) $(OTHEROBJS)
-
-DEP = $(ALLOBJS:.o=.d)
 
 NETFILTER_SCRIPTS = $(addprefix $(SRCDIR)/netfilter/, \
 	iptables_init.sh iptables_removeall.sh \
@@ -118,14 +117,14 @@ EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testgetroute testasyncsendto testportinuse \
               testssdppktgen testminissdp
 
-.PHONY:	all clean install depend dox
+.PHONY:	all clean install dox
 
 all:	$(EXECUTABLES)
 
 clean:
 	$(RM) config.h
 	$(RM) $(ALLOBJS)
-	$(RM) $(DEP)
+	$(RM) -r $(DEPDIR)
 	$(RM) $(EXECUTABLES)
 	$(RM) testupnpdescgen.o testgetifstats.o
 	$(RM) testupnppermissions.o testgetifaddr.o
@@ -198,26 +197,24 @@ miniupnpdctl:	miniupnpdctl.o
 config.mk config.h:	$(SRCDIR)/configure $(SRCDIR)/VERSION
 	$(SHELL) $< $(CONFIG_OPTIONS)
 
-depend:	$(DEP)
-
-%.d:	$(SRCDIR)/%.c
-	$(CC) $(CPPFLAGS) $(DEPFLAGS) -o $@ $<
-
 dox:	$(SRCDIR)/miniupnpd.doxyconf
 	(cat $< ; echo "INPUT=$(SRCDIR)" ) | $(DOXYGEN) -
 
-%.o:	$(SRCDIR)/%.c
-	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+%.o:	$(SRCDIR)/%.c $(DEPDIR)/%.d | $(DEPDIR)
+	$(CC) -c $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $< -o $@
 
-%.o:	$(SRCDIR)/linux/%.c
-	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+%.o:	$(SRCDIR)/linux/%.c $(DEPDIR)/%.d | $(DEPDIR)
+	$(CC) -c $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $< -o $@
 
-%.o:	$(SRCDIR)/netfilter/%.c
-	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+%.o:	$(SRCDIR)/netfilter/%.c $(DEPDIR)/%.d | $(DEPDIR)
+	$(CC) -c $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 print-%:
 	@echo "$* = $($*)"
 
-ifneq ($(MAKECMDGOALS),clean)
--include $(DEP)
-endif
+
+DEPFILES := $(ALLOBJS:%.o=$(DEPDIR)/%.d)
+$(DEPDIR): ; @mkdir -p $@
+$(DEPFILES):
+
+-include $(wildcard $(DEPFILES))
