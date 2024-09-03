@@ -75,8 +75,6 @@ NETFILTER_SCRIPTS = $(addprefix $(SRCDIR)/netfilter/, \
 
 #LDLIBS += -lnfnetlink
 
-TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
-
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl testgetifaddr \
               testgetroute testasyncsendto testportinuse \
@@ -125,7 +123,7 @@ include $(SRCDIR)/check.mk
 
 miniupnpd:	$(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
-testupnpdescgen:	$(TESTUPNPDESCGENOBJS)
+testupnpdescgen:	testupnpdescgen.o upnpdescgen.o
 
 testgetifstats:	testgetifstats.o getifstats.o
 

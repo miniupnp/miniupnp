@@ -68,8 +68,6 @@ NFT_SCRIPTS = $(addprefix $(SRCDIR)/netfilter_nft/scripts/, \
 
 #LDLIBS += -lnfnetlink
 
-TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
-
 EXECUTABLES = miniupnpd miniupnpdctl \
               testupnpdescgen testgetifstats \
               testupnppermissions testgetifaddr \
@@ -115,7 +113,7 @@ include $(SRCDIR)/check.mk
 
 miniupnpd:	$(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
 
-testupnpdescgen:	$(TESTUPNPDESCGENOBJS)
+testupnpdescgen:	testupnpdescgen.o upnpdescgen.o
 
 testgetifstats:	testgetifstats.o getifstats.o
 
