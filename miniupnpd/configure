@@ -15,7 +15,7 @@ UPNP_VERSION_MINOR=1
 
 # input environment variables :
 # IPV6, IGD2, STRICT, DEBUG, LEASFILE, VENDORCFG, PCP_PEER,
-# PORTINUSE, REGEX, DISABLEPPPCONN, FW, IPTABLESPATH, TARGET_OPENWRT,
+# PORTINUSE, REGEX, DISABLEPPPCONN, FW, IPTABLESPATH,
 # PKG_CONFIG, NO_BACKGROUND_NO_PIDFILE, DYNAMIC_OS_VERSION
 # OS_NAME, OS_VERSION, OS_MACHINE, V6SOCKETS_ARE_V6ONLY
 # USE_LIBPFCTL
@@ -589,8 +589,7 @@ case $FW in
 		if [ "$IPTABLESPATH" ] ; then
 			echo "CPPFLAGS += -I${IPTABLESPATH}/include/" >> ${CONFIG_MK}
 			echo "LDFLAGS += -L${IPTABLESPATH}/libiptc/" >> ${CONFIG_MK}
-			# to test : change the following test to [ "$OS_NAME" != "OpenWrt" ]
-			if [ -z "$TARGET_OPENWRT" ] ; then
+			if [ "$OS_NAME" != "OpenWrt" ]; then
 				IPTABLESVERSION=`grep "\#define VERSION" ${IPTABLESPATH}/config.h | tr -d \" |cut -d" " -f3`
 				echo "detected libiptc version $IPTABLESVERSION"
 				echo "# detected libiptc version $IPTABLESVERSION" >> ${CONFIG_MK}
