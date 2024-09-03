@@ -104,6 +104,60 @@ if [ -z "$PKG_CONFIG" ] ; then
 	PKG_CONFIG=`command -v pkg-config`
 fi
 
+pkg_config_write ()
+{
+	key="$1"; shift
+	value="$("${PKG_CONFIG}" "$@")"
+	if [ -n "$value" ]; then
+		printf "%s += %s\n" "$key" "$value"
+	fi
+}
+
+# Outputs CFLAGS / LDFLAGS / LDLIBS to CONFIG_MK if needed
+pkg_detect ()
+{
+	if [ -z "${PKG_CONFIG}" ]; then
+		return 1
+	fi
+
+	libs=
+	check_args=
+	preamble=
+	ok=1
+	for arg in "$@"; do
+		if echo "${arg}" | grep -q '^-'; then
+			check_args="${check_args} ${arg}"
+		else
+			libs="${libs} ${arg}"
+			if [ -z "${check_args}" ]; then
+				check_args="--exists"
+			fi
+			if "${PKG_CONFIG}" ${check_args} "${arg}"; then
+				version="$("${PKG_CONFIG}" --modversion "${arg}")"
+				eval "$(echo "${arg}" | tr -dc 'a-zA-Z0-9' | tr 'a-z' 'A-Z')_VERSION='${version}'"
+
+				info="found ${arg} version ${version}"
+				echo "${info}"
+				preamble="$(printf "%s\n# %s\n" "${preamble}" "${info}")"
+			else
+				ok=
+			fi
+			check_args=
+		fi
+	done
+
+	if [ -z "$ok" ]; then
+		return 1
+	fi
+
+	{
+		printf "%s\n" "${preamble}"
+		pkg_config_write CFLAGS --cflags ${libs}
+		pkg_config_write LDFLAGS --libs-only-L --libs-only-other ${libs}
+		pkg_config_write LDLIBS --libs-only-l ${libs}
+	} >> "${CONFIG_MK}"
+}
+
 MINIUPNPD_DATE=`date +"%Y%m%d"`
 if [ -n "$SOURCE_DATE_EPOCH" ]; then
 	if date --version 2>&1 | grep -q GNU; then
@@ -525,17 +579,9 @@ if [ "$FW" = "iptables" ] || [ "$FW" = "nftables" ] ; then
 	echo "CPPFLAGS += -I." >> ${CONFIG_MK}
 
 	if [ "$PKG_CONFIG" ] ; then
-		if ${PKG_CONFIG} --exists libcap-ng ; then
-			echo "detected libcap-ng `${PKG_CONFIG} --modversion libcap-ng`"
-			echo "CFLAGS += `${PKG_CONFIG} --cflags libcap-ng`" >> ${CONFIG_MK}
-			echo "LDLIBS += `${PKG_CONFIG} --libs-only-l libcap-ng`" >> ${CONFIG_MK}
-			echo "LDFLAGS += `${PKG_CONFIG} --libs-only-L --libs-only-other libcap-ng`" >> ${CONFIG_MK}
+		if pkg_detect libcap-ng; then
 			echo "#define HAS_LIBCAP_NG" >> ${CONFIGFILE}
-		elif ${PKG_CONFIG} --exists libcap ; then
-			echo "detected libcap `${PKG_CONFIG} --modversion libcap`"
-			echo "CFLAGS += `${PKG_CONFIG} --cflags libcap`" >> ${CONFIG_MK}
-			echo "LDLIBS += `${PKG_CONFIG} --libs-only-l libcap`" >> ${CONFIG_MK}
-			echo "LDFLAGS += `${PKG_CONFIG} --libs-only-L --libs-only-other libcap`" >> ${CONFIG_MK}
+		elif pkg_detect libcap; then
 			echo "#define HAS_LIBCAP" >> ${CONFIGFILE}
 		fi
 	else
@@ -561,29 +607,17 @@ case $FW in
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
 		echo "#define USE_IPTABLES  1" >> ${CONFIGFILE}
 		if [ "$PKG_CONFIG" ] ; then
-			if ${PKG_CONFIG} --exists libiptc ; then
-				IPTABLESVERSION=`${PKG_CONFIG} --modversion libiptc`
-				echo "detected libiptc version $IPTABLESVERSION"
-				echo "# detected libiptc version $IPTABLESVERSION" >> ${CONFIG_MK}
+			if pkg_detect --atleast-version=1.4.3 libiptc; then
 				echo "IPTABLES_PCFILE_FOUND = 1" >> ${CONFIG_MK}
-				IPTVER1=`echo $IPTABLESVERSION | cut -d. -f1`
-				IPTVER2=`echo $IPTABLESVERSION | cut -d. -f2`
-				IPTVER3=`echo $IPTABLESVERSION | cut -d. -f3`
-				if [ $IPTVER1 -gt 1 ] || \
-				   [ \( $IPTVER1 -eq 1 \) -a \( \( $IPTVER2 -gt 4 \) \
-				     -o \( \( $IPTVER2 -eq 4 \) -a \( $IPTVER3 -ge 3 \) \) \) ] ; then
-					IPTABLES_143=1
-				fi
-				echo "CFLAGS += `${PKG_CONFIG} --cflags libiptc`" >> ${CONFIG_MK}
-				echo "LDLIBS += `${PKG_CONFIG} --static --libs-only-l libiptc`" >> ${CONFIG_MK}
-				echo "LDFLAGS += `${PKG_CONFIG} --libs-only-L --libs-only-other libiptc`" >> ${CONFIG_MK}
+				IPTABLES_143=1
+			elif pkg_detect libiptc; then
+				echo "IPTABLES_PCFILE_FOUND = 1" >> ${CONFIG_MK}
 			else
 				echo "Warning: no libiptc pkg-config found"
 			fi
-			if ${PKG_CONFIG} --atleast-version=1.0.2 libnetfilter_conntrack \
-			   && ${PKG_CONFIG} --atleast-version=1.0.3 libmnl ; then
+			if pkg_detect --atleast-version=1.0.2 libnetfilter_conntrack \
+			              --atleast-version=1.0.3 libmnl; then
 				echo "CPPFLAGS += -DUSE_NFCT" >> ${CONFIG_MK}
-				echo "LDLIBS += `${PKG_CONFIG} --static --libs-only-l libmnl libnetfilter_conntrack`" >> ${CONFIG_MK}
 			fi
 		fi
 		if [ "$IPTABLESPATH" ] ; then
