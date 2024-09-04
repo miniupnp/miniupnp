@@ -55,9 +55,12 @@ DEPFLAGS = -MMD -MP -MF $(@:%.o=$(DEPDIR)/%.d) -MT $@
 # -M : with system headers, -MM : without
 
 INSTALLPREFIX ?= $(PREFIX)/usr
-SBININSTALLDIR ?= $(INSTALLPREFIX)/sbin
-ETCINSTALLDIR = $(PREFIX)/etc/miniupnpd
-MANINSTALLDIR = $(INSTALLPREFIX)/share/man/man8
+ETCDIR ?= $(PREFIX)/etc
+SBINDIR ?= $(INSTALLPREFIX)/sbin
+MANDIR ?= $(INSTALLPREFIX)/share/man
+
+CONFIGDIR = $(ETCDIR)/miniupnpd
+INITDIR = $(ETCDIR)/init.d
 
 include config.mk
 include $(SRCDIR)/gitrev.mk
@@ -97,24 +100,17 @@ clean:
 	$(RM) -r dox/
 
 install:	miniupnpd $(SRCDIR)/miniupnpd.8 $(SRCDIR)/miniupnpd.conf \
-	$(NETFILTER_SCRIPTS) \
-	$(SRCDIR)/linux/miniupnpd.init.d.script
+		$(NETFILTER_SCRIPTS) \
+		$(SRCDIR)/linux/miniupnpd.init.d.script \
+		$(SRCDIR)/linux/miniupnpd.iptables.service
 	$(STRIP) miniupnpd
-	$(INSTALL) -d $(DESTDIR)$(SBININSTALLDIR)
-	$(INSTALL) miniupnpd $(DESTDIR)$(SBININSTALLDIR)
-	$(INSTALL) -d $(DESTDIR)$(ETCINSTALLDIR)
-	$(INSTALL) $(SRCDIR)/netfilter/iptables_init.sh $(DESTDIR)$(ETCINSTALLDIR)
-	$(INSTALL) $(SRCDIR)/netfilter/iptables_removeall.sh $(DESTDIR)$(ETCINSTALLDIR)
-	$(INSTALL) $(SRCDIR)/netfilter/ip6tables_init.sh $(DESTDIR)$(ETCINSTALLDIR)
-	$(INSTALL) $(SRCDIR)/netfilter/ip6tables_removeall.sh $(DESTDIR)$(ETCINSTALLDIR)
-	$(INSTALL) $(SRCDIR)/netfilter/miniupnpd_functions.sh $(DESTDIR)$(ETCINSTALLDIR)
-	$(INSTALL) -m 0644 -b $(SRCDIR)/miniupnpd.conf $(DESTDIR)$(ETCINSTALLDIR)
-	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=$(shell $(UUIDBIN))/" $(DESTDIR)$(ETCINSTALLDIR)/miniupnpd.conf
-	$(INSTALL) -d $(DESTDIR)$(PREFIX)/etc/init.d
-	$(INSTALL) $(SRCDIR)/linux/miniupnpd.init.d.script $(DESTDIR)$(PREFIX)/etc/init.d/miniupnpd
-	$(INSTALL) -d $(DESTDIR)$(MANINSTALLDIR)
-	$(INSTALL) -m 0644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(MANINSTALLDIR)
-	gzip -f $(DESTDIR)$(MANINSTALLDIR)/miniupnpd.8
+	$(INSTALL) -D -m 0755 miniupnpd -t $(DESTDIR)$(SBINDIR)
+	$(INSTALL) -D -m 0755 $(NETFILTER_SCRIPTS) -t $(DESTDIR)$(CONFIGDIR)
+	$(INSTALL) -D -m 0644 -b $(SRCDIR)/miniupnpd.conf -t $(DESTDIR)$(CONFIGDIR)
+	sed -i -e "s/^uuid=[-0-9a-f]*/uuid=$(shell $(UUIDBIN))/" $(DESTDIR)$(CONFIGDIR)/miniupnpd.conf
+	$(INSTALL) -D -m 0755 $(SRCDIR)/linux/miniupnpd.init.d.script $(DESTDIR)$(INITDIR)/miniupnpd
+	$(INSTALL) -D -m 0644 $(SRCDIR)/miniupnpd.8 -t $(DESTDIR)$(MANDIR)/man8
+	gzip -f $(DESTDIR)$(MANDIR)/man8/miniupnpd.8
 
 include $(SRCDIR)/check.mk
 
