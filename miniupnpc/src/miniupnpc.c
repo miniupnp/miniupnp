@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.163 2024/07/27 11:53:45 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.164 2024/09/22 22:48:36 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -98,7 +98,7 @@ MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGD
  *   pointer - OK
  *   NULL - error */
 char *
-simpleUPnPcommand(int s, const char * url, const char * service,
+simpleUPnPcommand(int sock, const char * url, const char * service,
                   const char * action, struct UPNParg * args,
                   int * bufsize)
 {
@@ -111,6 +111,11 @@ simpleUPnPcommand(int s, const char * url, const char * service,
 	char * buf;
 	int n;
 	int status_code;
+#ifdef _WIN32
+	SOCKET s = (SOCKET)sock;
+#else
+	#define s sock
+#endif
 
 	*bufsize = 0;
 	snprintf(soapact, sizeof(soapact), "%s#%s", service, action);
@@ -197,9 +202,9 @@ simpleUPnPcommand(int s, const char * url, const char * service,
 			return NULL;
 	}
 	if(!parseURL(url, hostname, &port, &path, NULL)) return NULL;
-	if(ISINVALID((SOCKET)s)) {
+	if(ISINVALID(s)) {
 		s = connecthostport(hostname, port, 0);
-		if(ISINVALID((SOCKET)s)) {
+		if(ISINVALID(s)) {
 			/* failed to connect */
 			return NULL;
 		}
