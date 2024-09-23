@@ -130,7 +130,7 @@ MANPREFIX ?= $(PREFIX)
 .if $(MANPREFIX) == ""
 MANPREFIX = /usr/share
 .endif
-INSTALLMANDIR = $(MANPREFIX)/man
+INSTALLMANDIR = $(MANPREFIX)/man/man8
 
 all:	$(EXECUTABLES)
 
@@ -153,7 +153,7 @@ install:	miniupnpd genuuid
 	$(INSTALL) -d $(DESTDIR)$(INSTALLETCDIR)
 	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLMANDIR)
-	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
+	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/miniupnpd.8
 
 # genuuid is using the uuid cli tool available under OpenBSD 4.0 in
 # the uuid-1.5.0 package
