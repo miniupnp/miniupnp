@@ -100,9 +100,7 @@ static const struct {
 	{ UPNPLEASEFILE6, "lease_file6"},
 #endif
 #endif
-#ifdef IGD_V2
 	{ UPNPFORCEIGDDESCV1, "force_igd_desc_v1"},
-#endif
 	{ UPNPMINISSDPDSOCKET, "minissdpdsocket"},
 	{ UPNPSECUREMODE, "secure_mode"}
 };

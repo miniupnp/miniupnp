@@ -1465,16 +1465,18 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
-#ifdef IGD_V2
 			case UPNPFORCEIGDDESCV1:
+#ifdef IGD_V2
 				if (strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(FORCEIGDDESCV1MASK);
 				else if (strcmp(ary_options[i].value, "no") != 0 ) {
 					INIT_PRINT_ERR("force_igd_desc_v1 can only be yes or no\n");
 					return 1;
 				}
-				break;
+#else
+				syslog(LOG_INFO, "Ignoring force_igd_desc_v1 option as not compiled with IGDv2 support");
 #endif
+				break;
 			default:
 				INIT_PRINT_ERR("Unknown option in file %s\n",
 				        optionsfile);
@@ -1517,11 +1519,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			SETFLAG(IPV6DISABLEDMASK);
 			break;
 #endif
-#ifdef IGD_V2
 		case '1':
+#ifdef IGD_V2
 			SETFLAG(FORCEIGDDESCV1MASK);
-			break;
+#else
+			syslog(LOG_INFO, "Ignoring -1 option as not compiled with IGDv2 support");
 #endif
+			break;
 		case 'b':
 			if(i+1 < argc) {
 				upnp_bootid = (unsigned int)strtoul(argv[++i], NULL, 10);
