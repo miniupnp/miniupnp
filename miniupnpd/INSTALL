@@ -173,9 +173,9 @@ allowed, so it is a good practice to have a "catch all" deny permission
 rule at the end of your permission ruleset.
 Sample permission ruleset :
 allow 4662-4672 192.168.1.34/32 4662-4672
-deny 0-65535 192.168.1.34/32 0-65535
+deny 1-65535 192.168.1.34/32 1-65535
 allow 1024-65535 192.168.1.0/24 1024-65535
-deny 0-65535 0.0.0.0/0 0-65535
+deny 1-65535 0.0.0.0/0 1-65535
 With this ruleset, redirections are allowed only for host on the subnet
 192.168.1.0/255.255.255.0 for the ports 1024 or above. There is an exception
 for the host 192.168.1.34 for which only redirections from/to port 4662 to

@@ -1,6 +1,6 @@
 .TH MINIUPNPD 8
 .SH NAME
-miniupnpd \- UPnP Internet Gateway Device Daemon
+miniupnpd \- UPnP IGD & PCP/NAT-PMP daemon
 .SH SYNOPSIS
 .B miniupnpd
 .RB [--version]
@@ -11,10 +11,10 @@ miniupnpd \- UPnP Internet Gateway Device Daemon
 .RB [ "\-B \fIdown up" "] [" "\-w \fIurl" "] [" "\-r \fIclean_ruleset_interval" ]
 .RB [ "\-A \fIpermission rule" "] [" "\-b \fIBOOTID" "] [" \-1 ]
 .SH DESCRIPTION
-miniupnpd act as a UPnP Internet Gateway Device. It is designed
+miniupnpd act as a UPnP IGD & PCP/NAT-PMP daemon. It is designed
 to run on the gateway between the internet and a NAT'ed LAN. It provides
-an interface, as defined in the UPnP standard, for enabling
-clients on the LAN to ask for port redirections.
+an interface, as defined in the UPnP IGD & PCP/NAT-PMP standards, for enabling
+clients on the LAN to ask for port maps.
 .SH OPTIONS
 .TP
 .BI \-f " config_file"
@@ -41,11 +41,11 @@ and do not filter out low priority messages.
 .B \-U
 report system uptime instead of daemon uptime to clients.
 .TP
-.B \-S
-sets "secure" mode : clients can only add mappings to their own ip
+.B \-S0
+disable "secure" mode so clients can add mappings to other IPs
 .TP
 .B \-N
-enables NAT-PMP functionality.
+enable PCP/NAT-PMP protocols.
 .TP
 .BI \-u " uuid"
 set the uuid of the UPnP Internet Gateway Device.
@@ -57,8 +57,7 @@ serial number for the UPnP Internet Gateway Device.
 model number for the UPnP Internet Gateway Device.
 .TP
 .BI \-t " notify_interval"
-SSDP notify interval in seconds :
-SSDP announce messages will be broadcasted at this interval.
+SSDP notify interval in seconds. Default is 900 seconds. SSDP announce messages will be broadcasted at this interval.
 .TP
 .BI \-P " pid_filename"
 pid file. default is /var/run/miniupnpd.pid
@@ -78,13 +77,13 @@ use following syntax for permission rules :
 .br
 examples :
   "allow 1024-65535 192.168.1.0/24 1024-65535"
-  "deny 0-65535 0.0.0.0/0 0-65535"
+  "deny 1-65535 0.0.0.0/0 1-65535"
 .TP
 .BI \-b " BOOTID"
 sets the value of BOOTID.UPNP.ORG SSDP header
 .TP
 .B \-1
-force reporting IGDv1 in rootDesc when compiled as IGDv2 *use with care*
+force reporting IGDv1 in rootDesc when compiled as IGDv2
 .SH "SEE ALSO"
 minissdpd(1) miniupnpc(3)
 .SH BUGS

@@ -20,7 +20,7 @@
 
 /* UPnP permission rule samples:
  * allow 1024-65535 192.168.3.0/24 1024-65535
- * deny 0-65535 192.168.1.125/32 0-65535 */
+ * deny 1-65535 192.168.1.125/32 1-65535 */
 struct upnpperm {
 	enum {UPNPPERM_ALLOW=1, UPNPPERM_DENY=2 } type;
 				/* is it an allow or deny permission rule ? */
@@ -40,7 +40,7 @@ struct upnpperm {
  * line sample :
  *  allow 1024-65535 192.168.3.0/24 1024-65535
  *  allow 22 192.168.4.33/32 22
- *  deny 0-65535 0.0.0.0/0 0-65535 */
+ *  deny 1-65535 0.0.0.0/0 1-65535 */
 int
 read_permission_line(struct upnpperm * perm,
                      char * p);

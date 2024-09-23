@@ -2075,14 +2075,14 @@ print_usage:
 #if defined(USE_PF) || defined(USE_IPF)
 			"\t-L sets packet log in pf and ipf on.\n"
 #endif
-			"\t-S0 disable \"secure\" mode so clients can add mappings to other ips\n"
+			"\t-S0 disable \"secure\" mode so clients can add mappings to other IPs\n"
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
 #ifdef ENABLE_NATPMP
 #ifdef ENABLE_PCP
-			"\t-N enables NAT-PMP and PCP functionality.\n"
+			"\t-N enable PCP/NAT-PMP protocols.\n"
 #else
-			"\t-N enables NAT-PMP functionality.\n"
+			"\t-N enable NAT-PMP protocol.\n"
 #endif
 #endif
 			"\t-B sets bitrates reported by daemon in bits per second.\n"
@@ -2099,10 +2099,10 @@ print_usage:
 			"\t  (allow|deny) (external port range) ip/mask (internal port range)\n"
 			"\texamples :\n"
 			"\t  \"allow 1024-65535 192.168.1.0/24 1024-65535\"\n"
-			"\t  \"deny 0-65535 0.0.0.0/0 0-65535\"\n"
+			"\t  \"deny 1-65535 0.0.0.0/0 1-65535\"\n"
 			"\t-b sets the value of BOOTID.UPNP.ORG SSDP header\n"
 #ifdef IGD_V2
-			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
+			"\t-1 force reporting IGDv1 in rootDesc\n"
 #endif
 			"\t-v enables LOG_INFO messages, -vv LOG_DEBUG as well (default with -d)\n"
 			"\t-h / --help prints this help and quits.\n"
