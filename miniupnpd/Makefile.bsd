@@ -151,8 +151,8 @@ install:	miniupnpd genuuid
 	$(INSTALL) -d $(DESTDIR)$(INSTALLBINDIR)
 	$(INSTALL) -m 755 miniupnpd $(DESTDIR)$(INSTALLBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLETCDIR)
-	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)
-	$(INSTALL) -d $(DESTDIR)$(INSTALLMANDIR)
+	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)/miniupnpd.conf.sample
+	$(INSTALL) -d $(DESTDIR)$(INSTALLMANDIR)/man8
 	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
 
 # genuuid is using the uuid cli tool available under OpenBSD 4.0 in
