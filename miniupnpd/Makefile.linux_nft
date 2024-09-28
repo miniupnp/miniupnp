@@ -59,7 +59,7 @@ include $(SRCDIR)/objects.mk
 # sources in the netfilter_nft/ directory
 NETFILTEROBJS = nftnlrdr.o nftpinhole.o nfct_get.o nftnlrdr_misc.o
 
-ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
+ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS) $(OTHEROBJS)
 
 DEP = $(ALLOBJS:.o=.d)
 

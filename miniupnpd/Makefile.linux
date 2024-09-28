@@ -64,7 +64,7 @@ include $(SRCDIR)/objects.mk
 # sources in netfilter/ directory
 NETFILTEROBJS = iptcrdr.o iptpinhole.o nfct_get.o
 
-ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS)
+ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS) $(OTHEROBJS)
 
 DEP = $(ALLOBJS:.o=.d)
 
