@@ -615,7 +615,10 @@ case $FW in
 			fi
 		elif [ -z "${PKG_CONFIG}" ] ; then
 			# IPTABLESPATH not defined and no pkg-config
-			if test -f /usr/include/xtables.h && \
+			echo "WARNING: no pkg-config and IPTABLESPATH not defined. checking /usr/include/xtables.h"
+			# since 1.4.16, XTABLES_VERSION_CODE has been moved to xtables-version.h
+			if test -f /usr/include/xtables-version.h || \
+			   test -f /usr/include/xtables.h && \
 			   grep -q "XTABLES_VERSION_CODE" /usr/include/xtables.h ; then
 				IPTABLES_143=1
 				echo "LDLIBS += -liptc" >> ${CONFIG_MK}
