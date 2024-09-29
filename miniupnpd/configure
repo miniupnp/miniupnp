@@ -530,6 +530,8 @@ if [ "$FW" = "iptables" ] || [ "$FW" = "nftables" ] ; then
 			echo "LDFLAGS += `${PKG_CONFIG} --libs-only-L --libs-only-other libcap`" >> ${CONFIG_MK}
 			echo "#define HAS_LIBCAP" >> ${CONFIGFILE}
 		fi
+	else
+		echo "WARNING: no pkg-config, cannot detect libcap/libcap-ng"
 	fi
 fi
 
