@@ -1016,7 +1016,7 @@ fi
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}
 
 ${MV} ${CONFIGFILE} ${CONFIGFILE_FINAL}
-if [ -f ${CONFIG_MK} ] ; then
+if [ -f "${CONFIG_MK}" ] ; then
 	${MV} ${CONFIG_MK} ${CONFIG_MK_FINAL}
 fi
 
