@@ -140,6 +140,7 @@ pkg_detect ()
 				echo "${info}"
 				preamble="$(printf "%s\n# %s\n" "${preamble}" "${info}")"
 			else
+				echo "${arg} not found"
 				ok=
 			fi
 			check_args=
