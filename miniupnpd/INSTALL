@@ -77,8 +77,10 @@ To Build and install :
   necessary files : read "how to get libiptc with its headers on debian" below.
   In anycase, libiptc is available in iptables sources packages
   from http://netfilter.org
-- You should also have libcap/libcap-ng for privilege dropping.
+- You should also have libcap/libcap-ng for privilege dropping:
   > apt-get install libcap-ng-dev
+  And libuuid to generate uuid at runtimes for events:
+  > apt-get install uuid-dev
 - edit and run netfilter/iptables_init.sh shell script.
   This script must allways be run before the daemon
   to set up initial rules and chains.
@@ -125,6 +127,7 @@ install the required development libraries. For debian :
 Also useful :
  > apt-get install libnetfilter-conntrack-dev
  > apt-get install libcap-ng-dev
+ > apt-get install uuid-dev
 
 To build :
  > ./configure --firewall=nftables
