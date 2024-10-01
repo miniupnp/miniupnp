@@ -18,10 +18,16 @@ UPNP_VERSION_MINOR=1
 # PORTINUSE, REGEX, DISABLEPPPCONN, FW, IPTABLESPATH,
 # PKG_CONFIG, NO_BACKGROUND_NO_PIDFILE, DYNAMIC_OS_VERSION
 # OS_NAME, OS_VERSION, OS_MACHINE, V6SOCKETS_ARE_V6ONLY
-# USE_LIBPFCTL
+# USE_LIBPFCTL, HTTPS, HTTPS_CERTFILE, HTTPS_KEYFILE
 
 if [ -z "$DYNAMIC_OS_VERSION" ] ; then
   DYNAMIC_OS_VERSION=1
+fi
+if [ -z "$HTTPS_CERTFILE" ] ; then
+  HTTPS_CERTFILE=/etc/miniupnpd/certificate.pem
+fi
+if [ -z "$HTTPS_KEYFILE" ] ; then
+  HTTPS_KEYFILE=/etc/miniupnpd/private-key.pem
 fi
 
 for argv; do
@@ -35,6 +41,11 @@ case "$argv" in
 	--pcp-peer) PCP_PEER=1 ;;
 	--portinuse) PORTINUSE=1 ;;
 	--regex) REGEX=1 ;;
+	--https) HTTPS=1 ;;
+	--https-cert=*)
+		HTTPS_CERTFILE=$(echo $argv | cut -d= -f2) ;;
+	--https-key=*)
+		HTTPS_KEYFILE=$(echo $argv | cut -d= -f2) ;;
 	--uda-version=*)
 		UPNP_VERSION=$(echo $argv | cut -d= -f2)
 		UPNP_VERSION_MAJOR=$(echo $UPNP_VERSION | cut -s -d. -f1)
@@ -71,6 +82,9 @@ case "$argv" in
 		echo " --pcp-peer            Enable PCP PEER operation"
 		echo " --portinuse           Enable port in use check"
 		echo " --regex               Enable description regex filter"
+		echo " --https               Enable HTTPS support (for IGDv2)"
+		echo " --https-cert=/path    Path to the HTTPS certificate (default to ${HTTPS_CERTFILE})"
+		echo " --https-key=/path     Path to the HTTPS private key (default to ${HTTPS_KEYFILE})"
 		echo " --uda-version=x.x     Set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn     Disable WANPPPConnection"
 		echo " --firewall=<name>     Force firewall type (nftables, iptables, pf, ipf, ipfw)"
@@ -905,9 +919,15 @@ echo "" >> ${CONFIGFILE}
 echo "#ifdef IGD_V2" >> ${CONFIGFILE}
 echo "/* Enable DeviceProtection service (IGDv2) - incomplete implementation */" >> ${CONFIGFILE}
 echo "/*#define ENABLE_DP_SERVICE*/" >> ${CONFIGFILE}
-echo "/*#define ENABLE_HTTPS*/" >> ${CONFIGFILE}
-echo "/*#define HTTPS_CERTFILE \"/path/to/certificate.pem\"*/" >> ${CONFIGFILE}
-echo "/*#define HTTPS_KEYFILE \"/path/to/private.key\"*/" >> ${CONFIGFILE}
+if [ -n "$HTTPS" ]; then
+	echo "#define ENABLE_HTTPS" >> ${CONFIGFILE}
+	echo "#define HTTPS_CERTFILE \"${HTTPS_CERTFILE}\"" >> ${CONFIGFILE}
+	echo "#define HTTPS_KEYFILE \"${HTTPS_KEYFILE}\"" >> ${CONFIGFILE}
+else
+	echo "/*#define ENABLE_HTTPS*/" >> ${CONFIGFILE}
+	echo "/*#define HTTPS_CERTFILE \"${HTTPS_CERTFILE}\"*/" >> ${CONFIGFILE}
+	echo "/*#define HTTPS_KEYFILE \"${HTTPS_KEYFILE}\"*/" >> ${CONFIGFILE}
+fi
 echo "" >> ${CONFIGFILE}
 echo "/* Enable WANIPv6FirewallControl service (IGDv2). needs IPv6 */" >> ${CONFIGFILE}
 echo "#ifdef ENABLE_IPV6" >> ${CONFIGFILE}
