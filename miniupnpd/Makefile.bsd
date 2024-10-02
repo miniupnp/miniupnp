@@ -133,10 +133,13 @@ clean:
 	$(RM) $(TESTUPNPDESCGENOBJS)
 	$(RM) $(TESTUPNPPERMISSIONSOBJS)
 	$(RM) $(TESTGETIFADDROBJS)
+	$(RM) $(TESTGETIFSTATSOBJS)
 	$(RM) $(MINIUPNPDCTLOBJS)
 	$(RM) $(TESTASYNCSENDTOOBJS)
 	$(RM) $(TESTPORTINUSEOBJS)
 	$(RM) $(TESTMINISSDPOBJS)
+	$(RM) $(TESTGETROUTEOBJS)
+	$(RM) testssdppktgen.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
 
 install:	miniupnpd
