@@ -79,7 +79,6 @@ EXECUTABLES = miniupnpd miniupnpdctl \
 all:	$(EXECUTABLES)
 
 clean:
-	$(RM) config.h
 	$(RM) $(ALLOBJS)
 	$(RM) -r $(DEPDIR)
 	$(RM) $(EXECUTABLES)
