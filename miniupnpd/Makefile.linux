@@ -21,8 +21,10 @@
 # ./configure them and build them then miniupnpd will build using :
 # $ IPTABLESPATH=/path/to/iptables-1.4.1 make
 #
-CONFIG_OPTIONS ?= $(cat .configure.cache)
+CONFIG_OPTIONS ?= $(shell cat .configure.cache)
+ifeq ($(filter --firewall=iptables,$(CONFIG_OPTIONS)),)
 CONFIG_OPTIONS += --firewall=iptables
+endif
 
 # Make sucks, prove me wrong
 , := ,

@@ -17,8 +17,10 @@
 # (default INSTALLPREFIX is /usr)
 #
 #
-CONFIG_OPTIONS ?= $(cat .configure.cache)
+CONFIG_OPTIONS ?= $(shell cat .configure.cache)
+ifeq ($(filter --firewall=nftables,$(CONFIG_OPTIONS)),)
 CONFIG_OPTIONS += --firewall=nftables
+endif
 
 # Make sucks, prove me wrong
 , := ,
