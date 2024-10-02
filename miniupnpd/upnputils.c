@@ -185,6 +185,11 @@ get_lan_for_peer(const struct sockaddr * peer)
 	return lan_addr;
 }
 
+/* Note : clock_gettime() is POSIX
+ * It is available in standard C library (libc, -lc), since glibc 2.17
+ * Before glibc 2.17, Real-time library (librt, -lrt)
+ * In libc on OpenBSD / FreeBSD / etc. */
+
 time_t upnp_time(void)
 {
 #if defined(CLOCK_MONOTONIC_FAST) || defined(CLOCK_MONOTONIC)
