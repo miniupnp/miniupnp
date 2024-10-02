@@ -35,12 +35,7 @@ CONFIG_OPTIONS != cat .configure.cache
 .endif
 
 # OSNAME and FWNAME are used for building OS or FW dependent code.
-OSNAME != uname -s
-ARCH != uname -m
-
-.ifndef FWNAME
 .include "bsdmake.inc"
-.endif
 
 # Solaris specific CFLAGS
 .if $(OSNAME) == "SunOS"
