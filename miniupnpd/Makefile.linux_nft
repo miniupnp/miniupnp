@@ -83,13 +83,7 @@ clean:
 	$(RM) $(ALLOBJS)
 	$(RM) -r $(DEPDIR)
 	$(RM) $(EXECUTABLES)
-	$(RM) testupnpdescgen.o testgetifstats.o
-	$(RM) testupnppermissions.o testgetifaddr.o
-	$(RM) testgetroute.o testasyncsendto.o
-	$(RM) testportinuse.o
-	$(RM) testminissdp.o
-	$(RM) testssdppktgen.o
-	$(RM) miniupnpdctl.o
+	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
 	$(RM) -r dox/
 
 install:	miniupnpd $(SRCDIR)/miniupnpd.8 $(SRCDIR)/miniupnpd.conf \
