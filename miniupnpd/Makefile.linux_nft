@@ -86,6 +86,7 @@ clean:
 	$(RM) -r $(DEPDIR)
 	$(RM) $(EXECUTABLES)
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
+	$(RM) validateversion
 	$(RM) -r dox/
 
 install:	miniupnpd $(SRCDIR)/miniupnpd.8 $(SRCDIR)/miniupnpd.conf \
