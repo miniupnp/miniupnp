@@ -3346,4 +3346,3 @@ shutdown:
 	closelog();
 	return 0;
 }
-
