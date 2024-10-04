@@ -598,16 +598,6 @@ if [ "$OS_FAMILY" = "Linux" ] ; then
 	echo "SRCDIR = ${BASEDIR}" >> ${CONFIG_MK}
 	echo "CPPFLAGS += -I." >> ${CONFIG_MK}
 	echo "TESTS = ${TESTS}" >> ${CONFIG_MK}
-
-	if [ "$PKG_CONFIG" ] ; then
-		if pkg_detect libcap-ng; then
-			echo "#define HAS_LIBCAP_NG" >> ${CONFIGFILE}
-		elif pkg_detect libcap; then
-			echo "#define HAS_LIBCAP" >> ${CONFIGFILE}
-		fi
-	else
-		echo "WARNING: no pkg-config, cannot detect libcap/libcap-ng"
-	fi
 fi
 
 case $FW in
@@ -757,6 +747,21 @@ if [ -n "$SYSTEMD" ] && [ "$SYSTEMD" -eq 1 ] ; then
 		echo "Warning: libsystemd not found"
 	fi
 fi
+
+# libcap variants
+case $OS_FAMILY in
+	Linux)
+		if [ "$PKG_CONFIG" ] ; then
+			if pkg_detect libcap-ng; then
+				echo "#define HAS_LIBCAP_NG" >> ${CONFIGFILE}
+			elif pkg_detect libcap; then
+				echo "#define HAS_LIBCAP" >> ${CONFIGFILE}
+			fi
+		else
+			echo "WARNING: no pkg-config, cannot detect libcap/libcap-ng"
+		fi
+		;;
+esac
 
 # UUID API
 case $OS_FAMILY in
