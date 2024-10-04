@@ -588,8 +588,7 @@ case $OS_NAME in
 		;;
 esac
 
-if [ "$FW" = "iptables" ] || [ "$FW" = "nftables" ] ; then
-	# linux
+if [ "$OS_FAMILY" = "Linux" ] ; then
 	CONFIG_MK=`mktemp tmp.config.mk.XXXXXXXXXX`
 	CONFIG_MK_FINAL="config.mk"
 	${RM} ${CONFIG_MK}
@@ -623,6 +622,11 @@ case $FW in
 		echo "#define USE_IPFW 1" >> ${CONFIGFILE}
 		;;
 	iptables)
+		if ! [ "$OS_FAMILY" = "Linux" ] ; then
+			echo "Error: --firewall=$FW is only available on Linux"
+			exit 1
+		fi
+
 		MAKEFILE=Makefile.linux
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
 		echo "#define USE_IPTABLES  1" >> ${CONFIGFILE}
@@ -698,6 +702,11 @@ case $FW in
 		fi
 		;;
 	nftables)
+		if ! [ "$OS_FAMILY" = "Linux" ] ; then
+			echo "Error: --firewall=$FW is only available on Linux"
+			exit 1
+		fi
+
 		MAKEFILE=Makefile.linux_nft
 		echo "#define USE_NETFILTER 1" >> ${CONFIGFILE}
 		echo "#define USE_NFTABLES  1" >> ${CONFIGFILE}
