@@ -740,7 +740,7 @@ if [ "$MAKEFILE" ] ; then
 fi
 
 # discover systemd
-if [ -n "$SYSTEMD" ] && [ "$SYSTEMD" -eq 1 ] ; then
+if [ "$OS_FAMILY" = "Linux" ] && [ -n "$SYSTEMD" ] && [ "$SYSTEMD" -eq 1 ] ; then
 	if pkg_detect libsystemd; then
 		:
 	else
