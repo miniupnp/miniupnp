@@ -151,7 +151,7 @@ typedef struct pcp_info {
 	int pfailure_present;
 	struct in6_addr sender_ip;
 	int is_fw; /* is this firewall operation? if not, nat. */
-	char desc[64];
+	char desc[1016];
 } pcp_info_t;
 
 /* getPCPOpCodeStr()
@@ -842,7 +842,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 	unsigned short eport2, iport2, rport2;
 	char iaddr2[INET6_ADDRSTRLEN], rhost2[INET6_ADDRSTRLEN];
 	int proto2;
-	char desc[64];
+	char desc[1016];
 	unsigned int timestamp;
 #if 0
 	int uid;
@@ -1107,7 +1107,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	unsigned short eport2, iport2;
 	char iaddr2[INET6_ADDRSTRLEN];
 	int proto2;
-	char desc[64];
+	char desc[1016];
 	unsigned int timestamp;
 
 	syslog(LOG_DEBUG, "is_fw=%d addr=%s iport=%hu proto=%d",
