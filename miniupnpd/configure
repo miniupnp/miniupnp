@@ -766,10 +766,7 @@ esac
 # UUID API
 case $OS_FAMILY in
 	Linux)
-		if [ "$OS_NAME" = "OpenWrt" ]; then
-			# OpenWrt hardcodes libuuid support
-			echo "#define LIB_UUID" >> ${CONFIGFILE}
-		elif pkg_detect uuid; then
+		if pkg_detect uuid; then
 			echo "#define LIB_UUID" >> ${CONFIGFILE}
 		else
 			echo "Warning: uuid pkg-config not found"
