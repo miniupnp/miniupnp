@@ -87,6 +87,8 @@ extern int runtime_flags;
 
 #define PERFORMSTUNMASK    0x1000
 
+#define REQUIRE_PUBLIC_EXT_IP	0x2000
+
 #define SETFLAG(mask)	runtime_flags |= mask
 #define GETFLAG(mask)	(runtime_flags & mask)
 #define CLEARFLAG(mask)	runtime_flags &= ~mask
