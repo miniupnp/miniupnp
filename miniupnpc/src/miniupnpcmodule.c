@@ -489,7 +489,7 @@ UPnP_getspecificportmapping(UPnPObject *self, PyObject *args)
 	char intClient[40];
 	char intPort[6];
 	unsigned short iPort;
-	char desc[80];
+	char desc[1016];
 	char enabled[4];
 	char leaseDuration[16];
 	if(!PyArg_ParseTuple(args, "Hs|z", &ePort, &proto, &remoteHost))
@@ -530,7 +530,7 @@ UPnP_getgenericportmapping(UPnPObject *self, PyObject *args)
 	char extPort[6];
 	unsigned short ePort;
 	char protocol[4];
-	char desc[80];
+	char desc[1016];
 	char enabled[6];
 	char rHost[64];
 	char duration[16];	/* lease duration */

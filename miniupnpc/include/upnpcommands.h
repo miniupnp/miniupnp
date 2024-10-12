@@ -218,7 +218,7 @@ UPNP_GetPortMappingNumberOfEntries(const char * controlURL,
  *  in   remoteHost
  *  out  intClient (16 bytes)
  *  out  intPort (6 bytes)
- *  out  desc (80 bytes)
+ *  out  desc (1016 bytes)
  *  out  enabled (4 bytes)
  *  out  leaseDuration (16 bytes)
  *
@@ -252,7 +252,7 @@ UPNP_GetSpecificPortMappingEntry(const char * controlURL,
  *  out  intClient (16 bytes)
  *  out  intPort (6 bytes)
  *  out  protocol (4 bytes)
- *  out  desc (80 bytes)
+ *  out  desc (1016 bytes)
  *  out  enabled (4 bytes)
  *  out  rHost (64 bytes)
  *  out  duration (16 bytes)

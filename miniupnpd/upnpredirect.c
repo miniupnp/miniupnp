@@ -303,7 +303,7 @@ void lease_file_rewrite(void)
 	unsigned short eport, iport;
 	int proto;
 	char iaddr[32];
-	char desc[64];
+	char desc[1016];
 	char rhost[40];
 	unsigned int timestamp;
 
@@ -588,7 +588,7 @@ upnp_get_portmapping_number_of_entries(void)
 #else
 	int n = 0, r = 0;
 	unsigned short eport, iport;
-	char protocol[8], iaddr[32], desc[64], rhost[32];
+	char protocol[8], iaddr[32], desc[1016], rhost[32];
 	unsigned int leaseduration;
 	do {
 		protocol[0] = '\0'; iaddr[0] = '\0'; desc[0] = '\0';
@@ -760,7 +760,7 @@ write_ruleset_details(int s)
 {
 	int proto = 0;
 	unsigned short eport, iport;
-	char desc[64];
+	char desc[1016];
 	char iaddr[32];
 	char rhost[32];
 	unsigned int timestamp;
