@@ -147,8 +147,8 @@ install:	miniupnpd
 	$(INSTALL) -d $(DESTDIR)$(INSTALLBINDIR)
 	$(INSTALL) -m 755 miniupnpd $(DESTDIR)$(INSTALLBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(INSTALLETCDIR)
-	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)/miniupnpd.conf.sample
-	sed -i '' -e "s/^uuid=[-0-9a-fA-F]*/uuid=`$(UUIDBIN)`/" $(DESTDIR)$(INSTALLETCDIR)/miniupnpd.conf.sample
+	$(INSTALL) -b miniupnpd.conf $(DESTDIR)$(INSTALLETCDIR)/miniupnpd.conf
+	sed -i '' -e "s/^uuid=[-0-9a-fA-F]*/uuid=`$(UUIDBIN)`/" $(DESTDIR)$(INSTALLETCDIR)/miniupnpd.conf
 	$(INSTALL) -d $(DESTDIR)$(INSTALLMANDIR)/man8
 	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
 
@@ -243,4 +243,3 @@ $(EXECUTABLES:S/\$/.o/):	$(SRCDIR)/$(@:.o=.c)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 #	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $(.TARGET) $(.IMPSRC)
-
