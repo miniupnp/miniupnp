@@ -2018,6 +2018,21 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		pidfilename = NULL;
 #endif
 
+syslog(LOG_NOTICE, "miniupnpd version " MINIUPNPD_VERSION " starting, enabled protocols: %s%s%s, ext_ifname=%s BOOTID=%u",
+	GETFLAG(ENABLEUPNPMASK) ? "UPnP IGD" : "",
+#ifdef ENABLE_NATPMP
+	GETFLAG(ENABLEUPNPMASK) && GETFLAG(ENABLENATPMPMASK) ? " & " : "",
+#ifdef ENABLE_PCP
+	GETFLAG(ENABLENATPMPMASK) ? "PCP/NAT-PMP" : "",
+#else
+	GETFLAG(ENABLENATPMPMASK) ? "NAT-PMP" : "",
+#endif
+#else
+	"", "",
+#endif
+	ext_if_name, upnp_bootid);
+syslog(LOG_INFO, "More information at https://miniupnp.tuxfamily.org or http://miniupnp.free.fr");
+
 #ifdef USE_SYSTEMD
 	if (systemd_flag) {
 		int r = sd_notify(0,
@@ -2110,14 +2125,14 @@ print_usage:
 #if defined(USE_PF) || defined(USE_IPF)
 			"\t-L sets packet log in pf and ipf on.\n"
 #endif
-			"\t-S0 disable \"secure\" mode so clients can add mappings to other ips\n"
+			"\t-S0 disable UPnP IGD secure mode, allow adding port maps for (other) non-requesting IPs\n"
 			"\t-U causes miniupnpd to report system uptime instead "
 			"of daemon uptime.\n"
 #ifdef ENABLE_NATPMP
 #ifdef ENABLE_PCP
-			"\t-N enables NAT-PMP and PCP functionality.\n"
+			"\t-N enable PCP/NAT-PMP protocols.\n"
 #else
-			"\t-N enables NAT-PMP functionality.\n"
+			"\t-N enable NAT-PMP protocol.\n"
 #endif
 #endif
 			"\t-B sets bitrates reported by daemon in bits per second.\n"
@@ -2318,18 +2333,6 @@ main(int argc, char * * argv)
 		return 0;
 	}
 
-	syslog(LOG_INFO, "version " MINIUPNPD_VERSION " starting%s%sext if %s BOOTID=%u",
-#ifdef ENABLE_NATPMP
-#ifdef ENABLE_PCP
-	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP/PCP " : " ",
-#else
-	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP " : " ",
-#endif
-#else
-	       " ",
-#endif
-	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
-	       ext_if_name, upnp_bootid);
 #ifdef ENABLE_IPV6
 	if (strcmp(ext_if_name6, ext_if_name) != 0) {
 		syslog(LOG_INFO, "specific IPv6 ext if %s", ext_if_name6);
@@ -2354,7 +2357,7 @@ main(int argc, char * * argv)
 			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 			syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-			syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+			syslog(LOG_NOTICE, "Public IPv4 is required by UPnP IGD & PCP/NAT-PMP protocols and clients do not work without it");
 			disable_port_forwarding = 1;
 		}
 	}
@@ -2387,7 +2390,7 @@ main(int argc, char * * argv)
 			return 1;
 		}
 		v.port = listen_port;
-		syslog(LOG_NOTICE, "HTTP listening on port %d", v.port);
+		syslog(LOG_NOTICE, "Listening for UPnP IGD (SOAP/HTTP) on port %d", v.port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		if(!GETFLAG(IPV6DISABLEDMASK))
 		{
@@ -2413,7 +2416,7 @@ main(int argc, char * * argv)
 			return 1;
 		}
 		v.https_port = listen_port;
-		syslog(LOG_NOTICE, "HTTPS listening on port %d", v.https_port);
+		syslog(LOG_NOTICE, "Listening for UPnP IGD (SOAP/HTTPS) on port %d", v.https_port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		shttpsl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
 		if(shttpsl_v4 < 0)
@@ -2427,7 +2430,7 @@ main(int argc, char * * argv)
 		if(!GETFLAG(IPV6DISABLEDMASK)) {
 			if(find_ipv6_addr(lan_addrs.lh_first ? lan_addrs.lh_first->ifname : NULL,
 			                  ipv6_addr_for_http_with_brackets, sizeof(ipv6_addr_for_http_with_brackets)) > 0) {
-				syslog(LOG_NOTICE, "HTTP IPv6 address given to control points : %s",
+				syslog(LOG_NOTICE, "IPv6 given to UPnP IGD control points: %s",
 				       ipv6_addr_for_http_with_brackets);
 			} else {
 				memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
@@ -2502,20 +2505,20 @@ main(int argc, char * * argv)
 	}
 
 #ifdef ENABLE_NATPMP
-	/* open socket for NAT PMP traffic */
+	/* open socket for NAT-PMP traffic */
 	if(GETFLAG(ENABLENATPMPMASK))
 	{
 		if(OpenAndConfNATPMPSockets(snatpmp) < 0)
 #ifdef ENABLE_PCP
 		{
-			syslog(LOG_ERR, "Failed to open sockets for NAT-PMP/PCP.");
+			syslog(LOG_ERR, "Failed to open sockets for PCP/NAT-PMP.");
 		} else {
-			syslog(LOG_NOTICE, "Listening for NAT-PMP/PCP traffic on port %u",
+			syslog(LOG_NOTICE, "Listening for PCP/NAT-PMP traffic on port %u/UDP",
 			       NATPMP_PORT);
 		}
 #else
 		{
-			syslog(LOG_ERR, "Failed to open sockets for NAT PMP.");
+			syslog(LOG_ERR, "Failed to open sockets for NAT-PMP.");
 		} else {
 			syslog(LOG_NOTICE, "Listening for NAT-PMP traffic on port %u",
 			       NATPMP_PORT);
@@ -2626,6 +2629,13 @@ main(int argc, char * * argv)
 	}
 #endif /* HAS_LIBCAP_NG */
 
+if (GETFLAG(ENABLEUPNPMASK) && !GETFLAG(SECUREMODEMASK))
+	syslog(LOG_WARNING, "WARNING: secure_mode=no, allow adding port maps for (other) non-requesting IPs using UPnP IGD");
+#ifdef ENABLE_PCP
+if (GETFLAG(ENABLENATPMPMASK) && GETFLAG(PCP_ALLOWTHIRDPARTYMASK))
+	syslog(LOG_WARNING, "WARNING: pcp_allow_thirdparty=yes, allow adding port maps for (other) non-requesting IPs using PCP");
+#endif
+
 #ifdef USE_SYSTEMD
 	if (v.systemd_notify) {
 		upnp_update_status();
@@ -2677,7 +2687,7 @@ main(int argc, char * * argv)
 						syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
 						syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 						syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-						syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+						syslog(LOG_NOTICE, "Public IPv4 is required by UPnP IGD & PCP/NAT-PMP protocols and clients do not work without it");
 						disable_port_forwarding = 1;
 					} else if (disable_port_forwarding && !reserved) {
 						syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
