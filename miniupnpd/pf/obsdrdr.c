@@ -1471,11 +1471,13 @@ get_redirect_rule_by_index(int index,
 	}
 #else /* USE_LIBPFCTL */
 	pr.nr = index;
-	if(ioctl(dev, DIOCGETRULE, &pr) < 0)
-	{
-		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
-		goto error;
-	}
+	do {
+		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
+		{
+			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
+			goto error;
+		}
+	} while ( pr.nr != (unsigned int)index );
 #endif /* USE_LIBPFCTL */
 	*proto = RULE.proto;
 #ifdef __APPLE__

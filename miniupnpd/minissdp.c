@@ -220,7 +220,11 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 #endif /* IP_PKTINFO */
 #if defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO)
 	if(ipv6) {
+#ifdef IPPROTO_IPV6
+		if(setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0)
+#else
 		if(setsockopt(s, IPPROTO_IP, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0)
+#endif
 		{
 			syslog(LOG_WARNING, "setsockopt(udp, IPV6_RECVPKTINFO): %m");
 		}

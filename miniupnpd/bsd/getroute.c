@@ -65,7 +65,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 	rtm.rtm_flags = RTF_UP;
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_seq = 1;
-	rtm.rtm_addrs = RTA_DST | RTA_IFA | RTA_IFP;	/* pass destination address, request source address & interface */
+	rtm.rtm_addrs = RTA_DST;
 	memcpy(m_rtmsg.m_space, dst, l);
 #if !defined(__sun)
 	((struct sockaddr *)m_rtmsg.m_space)->sa_len = l;
