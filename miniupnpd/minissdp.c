@@ -402,7 +402,19 @@ OpenAndConfSSDPNotifySocketIPv6(struct lan_addr_s * lan_addr)
 		close(s);
 		return -1;
 	}
-
+#if defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP)
+	/* One and only one LAN interface */
+	if(lan_addrs.lh_first != NULL && lan_addrs.lh_first->list.le_next == NULL
+	   && lan_addrs.lh_first->ifname[0] != '\0')
+	{
+		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+		              lan_addrs.lh_first->ifname,
+		              strlen(lan_addrs.lh_first->ifname)) < 0)
+			syslog(LOG_WARNING, "%s: setsockopt(udp6, SO_BINDTODEVICE, %s): %m",
+			       "OpenAndConfSSDPNotifySocketIPv6",
+			       lan_addrs.lh_first->ifname);
+	}
+#endif /* defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP) */
 	/* bind() socket before using sendto() is not mandatory
 	 * (sendto() will implicitly bind the socket when called on
 	 * an unbound socket)

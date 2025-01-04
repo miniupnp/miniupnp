@@ -1652,6 +1652,20 @@ int OpenAndConfPCPv6Socket(void)
 		       "OpenAndConfPCPv6Socket");
 	}
 #endif
+#if defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP)
+	/* One and only one LAN interface and no bind any ipv6 addr */
+	if(lan_addrs.lh_first != NULL && lan_addrs.lh_first->list.le_next == NULL
+	   && lan_addrs.lh_first->ifname[0] != '\0' &&
+	   memcmp(&ipv6_bind_addr, &in6addr_any, sizeof(in6addr_any)) == 0 )
+	{
+		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+		              lan_addrs.lh_first->ifname,
+		              strlen(lan_addrs.lh_first->ifname)) < 0)
+			syslog(LOG_WARNING, "%s: setsockopt(udp6, SO_BINDTODEVICE, %s): %m",
+			       "OpenAndConfPCPv6Socket",
+			       lan_addrs.lh_first->ifname);
+	}
+#endif /* defined(SO_BINDTODEVICE) && !defined(MULTIPLE_EXTERNAL_IP) */
 #ifdef IPV6_RECVPKTINFO
 	/* see RFC3542 */
 	if(setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &i, sizeof(i)) < 0) {
