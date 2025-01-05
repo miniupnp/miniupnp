@@ -593,7 +593,7 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 				return -1;
 			}
 #ifdef ENABLE_IPV6
-		} else if ((af == AF_INET6) && (ext_if_name6 != ext_if_name)) {
+		} else if ((af == AF_INET6) && (strcmp(ext_if_name6, ext_if_name) != 0)) {
 			if(!ext_if_name6 || ext_if_name6[0]=='\0') {
 				pcp_msg_info->result_code = PCP_ERR_NETWORK_FAILURE;
 				return -1;

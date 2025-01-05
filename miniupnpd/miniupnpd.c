@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2024 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -2331,7 +2331,7 @@ main(int argc, char * * argv)
 	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
 	       ext_if_name, upnp_bootid);
 #ifdef ENABLE_IPV6
-	if (ext_if_name6 != ext_if_name) {
+	if (strcmp(ext_if_name6, ext_if_name) != 0) {
 		syslog(LOG_INFO, "specific IPv6 ext if %s", ext_if_name6);
 	}
 #endif
