@@ -1660,7 +1660,7 @@ int OpenAndConfPCPv6Socket(void)
 	{
 		if(setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
 		              lan_addrs.lh_first->ifname,
-		              strlen(lan_addrs.lh_first->ifname)) < 0)
+		              strlen(lan_addrs.lh_first->ifname) + 1) < 0)
 			syslog(LOG_WARNING, "%s: setsockopt(udp6, SO_BINDTODEVICE, %s): %m",
 			       "OpenAndConfPCPv6Socket",
 			       lan_addrs.lh_first->ifname);
