@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2024 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -220,7 +220,11 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 #endif /* IP_PKTINFO */
 #if defined(ENABLE_IPV6) && defined(IPV6_RECVPKTINFO)
 	if(ipv6) {
+#ifdef IPPROTO_IPV6
+		if(setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0)
+#else
 		if(setsockopt(s, IPPROTO_IP, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0)
+#endif
 		{
 			syslog(LOG_WARNING, "setsockopt(udp, IPV6_RECVPKTINFO): %m");
 		}
