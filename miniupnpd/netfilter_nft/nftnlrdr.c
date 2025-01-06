@@ -5,7 +5,7 @@
  * (c) 2015 Tomofumi Hayashi
  * (c) 2019 Sven Auhagen
  * (c) 2019 Paul Chambers
- * (c) 2020-2024 Thomas Bernard
+ * (c) 2020-2025 Thomas Bernard
  *
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution.
@@ -322,6 +322,8 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		    (p->type == RULE_NAT && p->nat_type == NFT_NAT_DNAT)) {
 			iaddr = p->nat_addr;
 			iport = p->nat_port;
+			syslog(LOG_DEBUG, "%s: found redirect rule %hu => %08x:%hu proto %d",
+			       "delete_redirect_and_filter_rules", eport, iaddr, iport, proto);
 
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
@@ -336,12 +338,17 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		LIST_FOREACH(p, &head_filter, entry) {
 			if (p->nat_port == iport &&
 				p->nat_addr == iaddr && p->type == RULE_FILTER) {
+				syslog(LOG_DEBUG, "%s: found forward/filter rule %08x:%hu proto %d",
+				       "delete_redirect_and_filter_rules", iaddr, iport, p->proto);
 				r = rule_del_handle(p);
 				/* Todo: send bulk request */
 				nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
 				break;
 			}
 		}
+	} else {
+		syslog(LOG_WARNING, "%s: redirect rule with eport=%hu proto %d NOT FOUND",
+		       "delete_redirect_and_filter_rules", eport, proto);
 	}
 
 	iaddr = 0;
