@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.521 2024/10/06 21:10:48 nanard Exp $
 
+2025/01/05:
+  Fix get_src_for_route_to() for OpenBSD >= 6.6
+
 2024/10/05:
   Rework the buildsystem + systemd integration
 
