@@ -1470,12 +1470,27 @@ get_redirect_rule_by_index(int index,
 		goto error;
 	}
 #else /* USE_LIBPFCTL */
+#if defined(OpenBSD) && OpenBSD >= 202310
+	/* OpenBSD >= 7.4
+	 * DIOCGETRULE is changed to always get rules incrementaly
+	 * pr.nr is now a return value
+	 * https://github.com/openbsd/src/commit/072583c99019a91ac511a1e33e10ad02df79ec97 */
+	do {
+		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
+		{
+			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
+			goto error;
+		}
+	} while(pr.nr < (unsigned int)index);
+#else
+	/* not OpenBSD >= 7.4 */
 	pr.nr = index;
 	if(ioctl(dev, DIOCGETRULE, &pr) < 0)
 	{
 		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
 		goto error;
 	}
+#endif /* defined(OpenBSD) && OpenBSD >= 202310 */
 #endif /* USE_LIBPFCTL */
 	*proto = RULE.proto;
 #ifdef __APPLE__
