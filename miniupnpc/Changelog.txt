@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.270 2025/01/10 22:57:19 nanard Exp $
+$Id: Changelog.txt,v 1.271 2025/01/10 23:19:30 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.3.0 : released 2025/01/11
 
 2025/01/10:
   Change simpleUPnPcommand() prototype to remove unused first argument
