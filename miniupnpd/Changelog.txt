@@ -1,4 +1,7 @@
-$Id: Changelog.txt,v 1.522 2025/01/09 00:15:31 nanard Exp $
+$Id: Changelog.txt,v 1.523 2025/01/10 22:10:49 nanard Exp $
+
+2025/01/10:
+  NFTables: fix delete_redirect_and_filter_rules() (remove filter rule)
 
 2025/01/09:
   Fix get_redirect_rule_by_index() for OpenBSD >= 7.4
