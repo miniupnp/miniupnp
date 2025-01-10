@@ -3,7 +3,7 @@
  * Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2024 Thomas Bernard
+ * Copyright (c) 2005-2025 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
 #ifndef MINIUPNPC_H_INCLUDED
@@ -21,7 +21,7 @@
 
 /* versions : */
 #define MINIUPNPC_VERSION	"2.2.8"
-#define MINIUPNPC_API_VERSION	18
+#define MINIUPNPC_API_VERSION	19
 
 /* Source port:
    Using "1" as an alias for 1900 for backwards compatibility
@@ -37,7 +37,7 @@ extern "C" {
 struct UPNParg { const char * elt; const char * val; };
 
 char *
-simpleUPnPcommand(int, const char *, const char *,
+simpleUPnPcommand(const char *, const char *,
                   const char *, struct UPNParg *,
                   int *);
 

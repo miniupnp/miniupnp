@@ -1,7 +1,7 @@
-/* $Id: upnpc.c,v 1.145 2024/07/27 11:53:46 nanard Exp $ */
+/* $Id: upnpc.c,v 1.146 2025/01/10 23:02:54 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2024 Thomas Bernard
+ * Copyright (c) 2005-2025 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -632,7 +632,7 @@ int main(int argc, char ** argv)
 	}
 #endif
     printf("upnpc: miniupnpc library test client, version %s.\n", MINIUPNPC_VERSION_STRING);
-	printf(" (c) 2005-2024 Thomas Bernard.\n");
+	printf(" (c) 2005-2025 Thomas Bernard.\n");
     printf("More information at https://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/\n\n");
 
 	/* command line processing */

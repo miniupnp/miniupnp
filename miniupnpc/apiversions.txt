@@ -1,6 +1,11 @@
-$Id: apiversions.txt,v 1.9 2016/01/24 17:24:36 nanard Exp $
+$Id: apiversions.txt,v 1.12 2025/01/10 22:57:21 nanard Exp $
 
 Differences in API between miniUPnPc versions
+
+API version 19
+  change simpleUPnPcommand() prototype
+  updated macro :
+    #define MINIUPNPC_API_VERSION 19
 
 API version 18
   change UPNP_GetValidIGD() prototype and return values
