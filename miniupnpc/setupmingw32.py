@@ -16,6 +16,7 @@ else:
 try:
         from setuptools import setup, Extension
 except ImportError:
+        print("error importing setuptools, fallback to distutils.core")
         from distutils.core import setup, Extension
 from distutils import sysconfig
 sysconfig.get_config_vars()["OPT"] = ''
