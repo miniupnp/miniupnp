@@ -16,7 +16,7 @@ fi
 
 echo "Creating nftables structure"
 
-cat > /tmp/miniupnpd.nft <<EOF
+firewallinit="
 table inet $TABLE {
     chain forward {
         type filter hook forward priority 0;
@@ -32,18 +32,18 @@ table inet $TABLE {
     chain $CHAIN {
     }
 
-EOF
+"
 
 if [ "$TABLE" != "$NAT_TABLE" ]
 then
-cat >> /tmp/miniupnpd.nft <<EOF
+firewallinit="${firewallinit}
 }
 
 table inet $NAT_TABLE {
-EOF
+"
 fi
 
-cat >> /tmp/miniupnpd.nft <<EOF
+firewallinit="${firewallinit}
     chain prerouting {
         type nat hook prerouting priority -100;
         policy accept;
@@ -70,6 +70,6 @@ cat >> /tmp/miniupnpd.nft <<EOF
     chain $POSTROUTING_CHAIN {
     }
 }
-EOF
+"
 
-$NFT -f /tmp/miniupnpd.nft
+echo "$firewallinit" | $NFT -f -
