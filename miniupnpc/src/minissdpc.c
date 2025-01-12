@@ -595,7 +595,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	if(!ipv6) {
 		DWORD ifbestidx;
 #if _WIN32_WINNT >= _WIN32_WINNT_VISTA
-		// While we don't need IPv6 support, the IPv4 only funciton is not available in UWP apps.
+		// While we don't need IPv6 support, the IPv4 only function is not available in UWP apps.
 		SOCKADDR_IN destAddr;
 		memset(&destAddr, 0, sizeof(destAddr));
 		destAddr.sin_family = AF_INET;
