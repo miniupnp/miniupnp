@@ -186,7 +186,7 @@ lease_file6_update(int uid, unsigned int leaseduration)
 	char * rem_client;
 	unsigned int timestamp_rule;
 	unsigned int timestamp;
-	char line[128];
+	char line[370];
 	char tmpfilename[128];
 	int uid_rule;
 	int tmp;
@@ -509,7 +509,7 @@ int reload_from_lease_file6()
 	unsigned int timestamp;
 	time_t current_time;
 	time_t current_unix_time;
-	char line[128];
+	char line[370];
 	int r, uid;
 
 	if(!lease_file6) return -1;
