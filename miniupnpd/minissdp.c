@@ -1269,7 +1269,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					else
 						snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 #endif
-					syslog(LOG_INFO, "Single search found");
+					syslog(LOG_DEBUG, "Single search found: %s", known_service_types[i].s);
 #ifdef DELAY_MSEARCH_RESPONSE
 					delay = random() / (1 + RAND_MAX / (1000 * mx_value));
 #ifdef DEBUG
@@ -1298,7 +1298,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #ifdef DELAY_MSEARCH_RESPONSE
 				unsigned int delay_increment = (mx_value * 1000) / 15;
 #endif
-				syslog(LOG_INFO, "ssdp:all found");
+				syslog(LOG_DEBUG, "ssdp:all found");
 				for(i=0; known_service_types[i].s; i++)
 				{
 #ifdef DELAY_MSEARCH_RESPONSE
@@ -1354,9 +1354,10 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #ifdef DELAY_MSEARCH_RESPONSE
 				delay = random() / (1 + RAND_MAX / (1000 * mx_value));
 #endif
+				/* TODO: factorize the following code */
 				if(0 == memcmp(st, uuidvalue_igd, l))
 				{
-					syslog(LOG_INFO, "ssdp:uuid (IGD) found");
+					syslog(LOG_DEBUG, "ssdp:uuid(%s) found : %s", "IGD", uuidvalue_igd);
 					SendSSDPResponse(s, sender, st, st_len, "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
@@ -1366,7 +1367,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				}
 				else if(0 == memcmp(st, uuidvalue_wan, l))
 				{
-					syslog(LOG_INFO, "ssdp:uuid (WAN) found");
+					syslog(LOG_DEBUG, "ssdp:uuid(%s) found : %s", "WAN", uuidvalue_wan);
 					SendSSDPResponse(s, sender, st, st_len, "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
@@ -1376,7 +1377,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				}
 				else if(0 == memcmp(st, uuidvalue_wcd, l))
 				{
-					syslog(LOG_INFO, "ssdp:uuid (WCD) found");
+					syslog(LOG_DEBUG, "ssdp:uuid(%s) found : %s", "WCD", uuidvalue_wcd);
 					SendSSDPResponse(s, sender, st, st_len, "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
