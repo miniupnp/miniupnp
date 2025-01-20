@@ -105,7 +105,7 @@ lease_file_add(unsigned short eport,
 
 	fd = fopen( lease_file, "a");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_ERR, "could not open lease_file: %s", lease_file);
 		return -1;
 	}
 
@@ -207,7 +207,7 @@ int reload_from_lease_file()
 	if(!lease_file) return -1;
 	fd = fopen( lease_file, "r");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_INFO, "lease_file does not exist yet: %s", lease_file);
 		return -1;
 	}
 	if(unlink(lease_file) < 0) {
