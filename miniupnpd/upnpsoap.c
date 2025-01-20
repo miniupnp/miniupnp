@@ -548,7 +548,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		leaseduration = 604800;
 #endif
 
-	syslog(LOG_INFO, "%s: ext port %hu to %s:%hu protocol %s for: %s leaseduration=%u rhost=%s",
+	syslog(LOG_DEBUG, "%s: ext port %hu to %s:%hu protocol %s for: %s leaseduration=%u rhost=%s",
 	       action, eport, int_ip, iport, protocol, desc, leaseduration,
 	       r_host ? r_host : "NULL");
 
@@ -919,7 +919,7 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: external port: %hu, protocol: %s",
+	syslog(LOG_DEBUG, "%s: external port: %hu, protocol: %s",
 		action, eport, protocol);
 
 	/* if in secure mode, check the IP
@@ -1035,8 +1035,9 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	for(i = 0; i < number; i++)
 	{
 		r = upnp_delete_redirection(port_list[i], protocol);
-		syslog(LOG_INFO, "%s: deleting external port: %hu, protocol: %s: %s",
+		syslog(LOG_DEBUG, "%s: deleting external port: %hu, protocol: %s: %s",
 		       action, port_list[i], protocol, r < 0 ? "failed" : "ok");
+		/* TODO: return a SOAP error code when there is at least 1 failure */
 	}
 	free(port_list);
 	bodylen = snprintf(body, sizeof(body), resp,

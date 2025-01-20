@@ -401,8 +401,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 		   ((rhost == NULL && rhost_old[0]=='\0') ||
 		    (rhost && (strcmp(rhost, "*") == 0) && rhost_old[0]=='\0') ||
 		    (rhost && (strcmp(rhost, rhost_old) == 0)))) {
-			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
-				eport, protocol, rhost_old, iaddr_old, iport_old);
+			syslog(LOG_DEBUG, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
+			       eport, protocol, rhost_old, iaddr_old, iport_old);
 			timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
 			if(iport != iport_old) {
 				r = update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
@@ -415,6 +415,10 @@ upnp_redirect(const char * rhost, unsigned short eport,
 				lease_file_add(eport, iaddr, iport, proto, desc, timestamp);
 			}
 #endif /* ENABLE_LEASEFILE */
+			if(r == 0) {
+				syslog(LOG_INFO, "action=%s rhost=%s eport=%hu iaddr=%s iport=%hu proto=%s desc=%s timestamp=%u",
+				       "UpdatePortMapping", rhost, eport, iaddr, iport, protocol, desc, timestamp);
+			}
 			return r;
 		} else {
 			syslog(LOG_INFO, "port %hu %s (rhost '%s') already redirected to %s:%hu",
@@ -429,8 +433,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 #endif /* CHECK_PORTINUSE */
 	} else {
 		timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
-		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-			eport, iaddr, iport, protocol, desc);
+		syslog(LOG_DEBUG, "redirecting port %hu to %s:%hu protocol %s for: %s",
+		       eport, iaddr, iport, protocol, desc);
 		return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
 		                              desc, timestamp);
 	}
@@ -442,8 +446,6 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp)
 {
-	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-		eport, iaddr, iport, protocol, desc);			*/
 	if(disable_port_forwarding)
 		return -1;
 	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
@@ -467,6 +469,8 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;
 	}
+	syslog(LOG_INFO, "action=%s rhost=%s eport=%hu iaddr=%s iport=%hu proto=%s desc=%s timestamp=%u",
+	       "AddPortMapping", rhost, eport, iaddr, iport, proto_itoa(proto), desc, timestamp);
 #ifdef ENABLE_EVENTS
 	/* the number of port mappings changed, we must
 	 * inform the subscribers */
@@ -565,6 +569,13 @@ _upnp_delete_redir(unsigned short eport, int proto)
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove( eport, proto);
 #endif
+	if (r == 0) {
+		syslog(LOG_INFO, "action=%s eport=%hu proto=%s",
+		       "DeletePortMapping", eport, proto_itoa(proto));
+	} else {
+		syslog(LOG_INFO, "failed to remove port mapping eport=%hu proto=%s",
+		       eport, proto_itoa(proto));
+	}
 
 #ifdef ENABLE_EVENTS
 	upnp_event_var_change_notify(EWanIPC);
@@ -575,7 +586,6 @@ _upnp_delete_redir(unsigned short eport, int proto)
 int
 upnp_delete_redirection(unsigned short eport, const char * protocol)
 {
-	syslog(LOG_INFO, "removing redirect rule port %hu %s", eport, protocol);
 	return _upnp_delete_redir(eport, proto_atoi(protocol));
 }
 
