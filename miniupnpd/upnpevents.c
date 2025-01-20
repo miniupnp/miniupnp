@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2008-2024 Thomas Bernard
+ * (c) 2008-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -98,8 +98,11 @@ newSubscriber(const char * eventurl, const char * callback, int callbacklen)
 	if(!eventurl || !callback || !callbacklen)
 		return NULL;
 	tmp = calloc(1, sizeof(struct subscriber)+callbacklen+1);
-	if(!tmp)
+	if(!tmp) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "newSubscriber",
+		       sizeof(struct subscriber)+callbacklen+1);
 		return NULL;
+	}
 	if(strcmp(eventurl, WANCFG_EVENTURL)==0)
 		tmp->service = EWanCFG;
 	else if(strcmp(eventurl, WANIPC_EVENTURL)==0)
@@ -254,7 +257,8 @@ upnp_event_create_notify(struct subscriber * sub)
 
 	obj = calloc(1, sizeof(struct upnp_event_notify));
 	if(!obj) {
-		syslog(LOG_ERR, "%s: calloc(): %m", "upnp_event_create_notify");
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "upnp_event_create_notify",
+		       sizeof(struct upnp_event_notify));
 		return;
 	}
 	obj->sub = sub;
@@ -453,7 +457,7 @@ static void upnp_event_prepare(struct upnp_event_notify * obj)
 	for (;;) {
 		obj->buffer = malloc(obj->buffersize);
 		if(!obj->buffer) {
-			syslog(LOG_ERR, "%s: malloc returned NULL", "upnp_event_prepare");
+			syslog(LOG_CRIT, "%s: malloc(%d) failed", "upnp_event_prepare", obj->buffersize);
 			if(xml) {
 				free(xml);
 			}

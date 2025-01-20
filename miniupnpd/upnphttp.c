@@ -3,7 +3,7 @@
  * Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2024 Thomas Bernard
+ * Copyright (c) 2005-2025 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -132,8 +132,10 @@ New_upnphttp(int s)
 	if(s<0)
 		return NULL;
 	ret = (struct upnphttp *)malloc(sizeof(struct upnphttp));
-	if(ret == NULL)
+	if(ret == NULL) {
+		syslog(LOG_CRIT, "New_upnphttp::malloc(%u) failed", (unsigned)sizeof(struct upnphttp));
 		return NULL;
+	}
 	memset(ret, 0, sizeof(struct upnphttp));
 	ret->socket = s;
 	if(!set_non_blocking(s))
@@ -986,7 +988,8 @@ Process_upnphttp(struct upnphttp * h)
 			h_tmp = (char *)realloc(h->req_buf, n + h->req_buflen + 1);
 			if (h_tmp == NULL)
 			{
-				syslog(LOG_WARNING, "Unable to allocate new memory for h->req_buf)");
+				syslog(LOG_CRIT, "%s: Unable to allocate %lu bytes for h->req_buf)",
+				       "Process_upnphttp", (unsigned long)(n + h->req_buflen + 1));
 				h->state = EToDelete;
 			}
 			else
@@ -1065,7 +1068,8 @@ Process_upnphttp(struct upnphttp * h)
 			void * tmp = realloc(h->req_buf, n + h->req_buflen);
 			if(!tmp)
 			{
-				syslog(LOG_ERR, "memory allocation error %m");
+				syslog(LOG_CRIT, "%s: failed to allocate %lu bytes",
+				       "Process_upnphttp", (unsigned long)(n + h->req_buflen));
 				h->state = EToDelete;
 			}
 			else
@@ -1124,7 +1128,7 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 			free(h->res_buf);
 		h->res_buf = (char *)malloc(templen);
 		if(!h->res_buf) {
-			syslog(LOG_ERR, "malloc error in BuildHeader_upnphttp()");
+			syslog(LOG_CRIT, "%s: malloc(%d) failed", "BuildHeader_upnphttp", templen);
 			return -1;
 		}
 		h->res_buf_alloclen = templen;
@@ -1207,7 +1211,8 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 		}
 		else
 		{
-			syslog(LOG_ERR, "realloc error in BuildHeader_upnphttp()");
+			syslog(LOG_CRIT, "%s: realloc(%d) failed",
+			       "BuildHeader_upnphttp", (h->res_buflen + bodylen));
 			return -1;
 		}
 	}
