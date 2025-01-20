@@ -1434,17 +1434,17 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #endif	/* ENABLE_NATPMP */
 #ifdef ENABLE_PCP
 			case UPNPPCPMINLIFETIME:
-					min_lifetime = atoi(ary_options[i].value);
+					pcp_min_lifetime = atoi(ary_options[i].value);
 					/* RFC6887 15. the minimum value SHOULD be 120 seconds */
-					if (min_lifetime < 120 ) {
-						min_lifetime = 120;
+					if (pcp_min_lifetime < 120 ) {
+						pcp_min_lifetime = 120;
 					}
 				break;
 			case UPNPPCPMAXLIFETIME:
-					max_lifetime = atoi(ary_options[i].value);
+					pcp_max_lifetime = atoi(ary_options[i].value);
 					/* maximum is 24 hours */
-					if (max_lifetime > 86400 ) {
-						max_lifetime = 86400;
+					if (pcp_max_lifetime > 86400 ) {
+						pcp_max_lifetime = 86400;
 					}
 				break;
 			case UPNPPCPALLOWTHIRDPARTY:
@@ -1496,8 +1496,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 #ifdef ENABLE_PCP
 		/* if lifetimes are inverse */
-		if (min_lifetime >= max_lifetime) {
-			INIT_PRINT_ERR("Minimum lifetime (%lu) is greater than or equal to maximum lifetime (%lu).\n", min_lifetime, max_lifetime);
+		if (pcp_min_lifetime >= pcp_max_lifetime) {
+			INIT_PRINT_ERR("Minimum lifetime (%lu) is greater than or equal to maximum lifetime (%lu).\n", pcp_min_lifetime, pcp_max_lifetime);
 			INIT_PRINT_ERR("Check your configuration file.\n");
 			return 1;
 		}
