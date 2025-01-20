@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2024 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -620,8 +620,11 @@ get_upnp_rules_state_list(int max_rules_number_target)
 
 	/*ifname[0] = '\0';*/
 	tmp = malloc(sizeof(struct rule_state));
-	if(!tmp)
+	if(!tmp) {
+		syslog(LOG_CRIT, "%s: malloc(%lu) failed", "get_upnp_rules_state_list",
+		       sizeof(struct rule_state));
 		return 0;
+	}
 	current_time = upnp_time();
 	nextruletoclean_timestamp = 0;
 	while(get_redirect_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
@@ -644,8 +647,11 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		/* prepare next iteration */
 		i++;
 		tmp = malloc(sizeof(struct rule_state));
-		if(!tmp)
+		if(!tmp) {
+			syslog(LOG_CRIT, "%s: malloc(%lu) failed", "get_upnp_rules_state_list",
+			       sizeof(struct rule_state));
 			break;
+		}
 	}
 #ifdef PCP_PEER
 	i=0;
@@ -669,8 +675,11 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		/* prepare next iteration */
 		i++;
 		tmp = malloc(sizeof(struct rule_state));
-		if(!tmp)
+		if(!tmp) {
+			syslog(LOG_CRIT, "%s: malloc(%lu) failed", "get_upnp_rules_state_list",
+			       sizeof(struct rule_state));
 			break;
+		}
 	}
 #endif
 	free(tmp);

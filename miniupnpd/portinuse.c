@@ -1,7 +1,7 @@
 /* $Id: portinuse.c,v 1.12 2020/11/04 21:29:50 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * (c) 2007-2020 Thomas Bernard
+ * (c) 2007-2025 Thomas Bernard
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -226,7 +226,7 @@ static struct nlist list[] = {
 	}
 	buf = malloc(len);
 	if (buf == NULL) {
-		syslog(LOG_ERR, "malloc(%u) failed", (unsigned)len);
+		syslog(LOG_CRIT, "malloc(%u) failed", (unsigned)len);
 		return -1;
 	}
 	if (sysctlbyname(varname, buf, &len, NULL, 0) < 0) {
@@ -311,7 +311,7 @@ static struct nlist list[] = {
 	}
 	buf = malloc(len);
 	if (buf == NULL) {
-		syslog(LOG_ERR, "malloc(%u) failed", (unsigned)len);
+		syslog(LOG_CRIT, "malloc(%u) failed", (unsigned)len);
 		return -1;
 	}
 	if (sysctlbyname(varname, buf, &len, NULL, 0) < 0) {

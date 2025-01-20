@@ -1,7 +1,7 @@
 /* $Id: ifacewatcher.c,v 1.10 2019/10/02 22:02:02 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  *
  * ifacewatcher.c
  *
@@ -140,7 +140,7 @@ ProcessInterfaceUp(struct ifinfomsg *ifi)
 		lan_iface = (struct lan_iface_s *) malloc(sizeof(struct lan_iface_s));
 		if (lan_iface == NULL)
 		{
-			syslog(LOG_ERR, "malloc(sizeof(struct lan_iface_s): %m");
+			syslog(LOG_CRIT, "malloc(sizeof(struct lan_iface_s): %m");
 			continue;
 		}
 

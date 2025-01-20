@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2024 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -1232,6 +1232,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	body = malloc(bodyalloc);
 	if(!body)
 	{
+		syslog(LOG_CRIT, "%s: malloc(%lu) failed", "GetListOfPortMappings", (unsigned long)bodyalloc);
 		ClearNameValueList(&data);
 		SoapError(h, 501, "Action Failed");
 		return;

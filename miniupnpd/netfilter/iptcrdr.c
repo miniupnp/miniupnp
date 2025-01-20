@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include <stdio.h>
@@ -204,6 +204,8 @@ add_redirect_desc(unsigned short eport, int proto,
 		p->proto = (short)proto;
 		memcpy(p->str, desc, l);
 		rdr_desc_list = p;
+	} else {
+		syslog(LOG_CRIT, "%s: malloc(%lu) failed", "add_redirect_desc", sizeof(struct rdr_desc) + l);
 	}
 }
 
@@ -988,6 +990,10 @@ get_tcp_match(unsigned short dport, unsigned short sport)
 	size =   IPT_ALIGN(sizeof(struct ipt_entry_match))
 	       + IPT_ALIGN(sizeof(struct ipt_tcp));
 	match = calloc(1, size);
+	if (match == NULL) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "get_tcp_match", size);
+		return NULL;
+	}
 	match->u.match_size = size;
 	strncpy(match->u.user.name, "tcp", sizeof(match->u.user.name));
 	tcpinfo = (struct ipt_tcp *)match->data;
@@ -1017,6 +1023,10 @@ get_udp_match(unsigned short dport, unsigned short sport)
 	size =   IPT_ALIGN(sizeof(struct ipt_entry_match))
 	       + IPT_ALIGN(sizeof(struct ipt_udp));
 	match = calloc(1, size);
+	if (match == NULL) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "get_udp_match", size);
+		return NULL;
+	}
 	match->u.match_size = size;
 	strncpy(match->u.user.name, "udp", sizeof(match->u.user.name));
 	udpinfo = (struct ipt_udp *)match->data;
@@ -1048,6 +1058,10 @@ get_dnat_target(const char * daddr, unsigned short dport)
 	size =   IPT_ALIGN(sizeof(struct ipt_entry_target))
 	       + IPT_ALIGN(sizeof(struct ip_nat_multi_range));
 	target = calloc(1, size);
+	if (target == NULL) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "get_dnat_target", size);
+		return NULL;
+	}
 	target->u.target_size = size;
 	strncpy(target->u.user.name, "DNAT", sizeof(target->u.user.name));
 	/* one ip_nat_range already included in ip_nat_multi_range */
@@ -1072,6 +1086,10 @@ get_snat_target(const char * saddr, unsigned short sport)
 	size =   IPT_ALIGN(sizeof(struct ipt_entry_target))
 	       + IPT_ALIGN(sizeof(struct ip_nat_multi_range));
 	target = calloc(1, size);
+	if (target == NULL) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "get_snat_target", size);
+		return NULL;
+	}
 	target->u.target_size = size;
 	strncpy(target->u.user.name, "SNAT", sizeof(target->u.user.name));
 	/* one ip_nat_range already included in ip_nat_multi_range */
@@ -1095,6 +1113,10 @@ get_dscp_target(unsigned char dscp)
 	size =   IPT_ALIGN(sizeof(struct ipt_entry_target))
 	       + IPT_ALIGN(sizeof(struct xt_DSCP_info));
 	target = calloc(1, size);
+	if (target == NULL) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "get_dscp_target", size);
+		return NULL;
+	}
 	target->u.target_size = size;
 	strncpy(target->u.user.name, "DSCP", sizeof(target->u.user.name));
 	/* one ip_nat_range already included in ip_nat_multi_range */
@@ -1115,6 +1137,10 @@ get_masquerade_target(unsigned short port)
 	size =   IPT_ALIGN(sizeof(struct ipt_entry_target))
 	       + IPT_ALIGN(sizeof(struct ip_nat_multi_range));
 	target = calloc(1, size);
+	if (target == NULL) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "get_masquerade_target", size);
+		return NULL;
+	}
 	target->u.target_size = size;
 	strncpy(target->u.user.name, "MASQUERADE", sizeof(target->u.user.name));
 	/* one ip_nat_range already included in ip_nat_multi_range */
@@ -1214,8 +1240,8 @@ addnatrule(int proto, unsigned short eport,
 
 	e = calloc(1, sizeof(struct ipt_entry));
 	if(!e) {
-		syslog(LOG_ERR, "%s: calloc(%d) error", "addnatrule",
-		       (int)sizeof(struct ipt_entry));
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "addnatrule",
+		       sizeof(struct ipt_entry));
 		return -1;
 	}
 	e->ip.proto = proto;
@@ -1235,7 +1261,7 @@ addnatrule(int proto, unsigned short eport,
 	               + match->u.match_size
 				   + target->u.target_size);
 	if(!tmp) {
-		syslog(LOG_ERR, "%s: realloc(%d) error", "addnatrule",
+		syslog(LOG_CRIT, "%s: realloc(%d) error", "addnatrule",
 		       (int)(sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size));
 		free(e);
 		free(match);
@@ -1288,8 +1314,8 @@ addmasqueraderule(int proto,
 
 	e = calloc(1, sizeof(struct ipt_entry));
 	if(!e) {
-		syslog(LOG_ERR, "%s: calloc(%d) error", "addmasqueraderule",
-		       (int)sizeof(struct ipt_entry));
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "addmasqueraderule",
+		       sizeof(struct ipt_entry));
 		return -1;
 	}
 	e->ip.proto = proto;
@@ -1309,7 +1335,7 @@ addmasqueraderule(int proto,
 	               + match->u.match_size
 				   + target->u.target_size);
 	if(!tmp) {
-		syslog(LOG_ERR, "%s: realloc(%d) error", "addmasqueraderule",
+		syslog(LOG_CRIT, "%s: realloc(%d) error", "addmasqueraderule",
 		       (int)(sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size));
 		free(e);
 		free(match);
@@ -1371,8 +1397,8 @@ addpeernatrule(int proto,
 
 	e = calloc(1, sizeof(struct ipt_entry));
 	if(!e) {
-		syslog(LOG_ERR, "%s: calloc(%d) error", "addpeernatrule",
-		       (int)sizeof(struct ipt_entry));
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "addpeernatrule",
+		       sizeof(struct ipt_entry));
 		return -1;
 	}
 	e->ip.proto = proto;
@@ -1396,7 +1422,7 @@ addpeernatrule(int proto,
 	               + match->u.match_size
 				   + target->u.target_size);
 	if(!tmp) {
-		syslog(LOG_ERR, "%s: realloc(%d) error", "addpeernatrule",
+		syslog(LOG_CRIT, "%s: realloc(%d) error", "addpeernatrule",
 		       (int)(sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size));
 		free(e);
 		free(match);
@@ -1449,8 +1475,8 @@ addpeerdscprule(int proto, unsigned char dscp,
 
 	e = calloc(1, sizeof(struct ipt_entry));
 	if(!e) {
-		syslog(LOG_ERR, "%s: calloc(%d) error", "addpeerdscprule",
-		       (int)sizeof(struct ipt_entry));
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "addpeerdscprule",
+		       sizeof(struct ipt_entry));
 		return -1;
 	}
 	e->ip.proto = proto;
@@ -1474,7 +1500,7 @@ addpeerdscprule(int proto, unsigned char dscp,
 	               + match->u.match_size
 				   + target->u.target_size);
 	if(!tmp) {
-		syslog(LOG_ERR, "%s: realloc(%d) error", "addpeerdscprule",
+		syslog(LOG_CRIT, "%s: realloc(%d) error", "addpeerdscprule",
 		       (int)(sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size));
 		free(e);
 		free(match);
@@ -1521,6 +1547,11 @@ get_accept_target(void)
 	size =   IPT_ALIGN(sizeof(struct ipt_entry_target))
 	       + IPT_ALIGN(sizeof(int));
 	target = calloc(1, size);
+	if (target == NULL) {
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed",
+		       "get_accept_target", size);
+		return NULL;
+	}
 	target->u.user.target_size = size;
 	strncpy(target->u.user.name, "ACCEPT", sizeof(target->u.user.name));
 	return target;
@@ -1540,8 +1571,8 @@ add_filter_rule(int proto, const char * rhost,
 
 	e = calloc(1, sizeof(struct ipt_entry));
 	if(!e) {
-		syslog(LOG_ERR, "%s: calloc(%d) error", "add_filter_rule",
-		       (int)sizeof(struct ipt_entry));
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "add_filter_rule",
+		       sizeof(struct ipt_entry));
 		return -1;
 	}
 	e->ip.proto = proto;
@@ -1563,7 +1594,7 @@ add_filter_rule(int proto, const char * rhost,
 	               + match->u.match_size
 				   + target->u.target_size);
 	if(!tmp) {
-		syslog(LOG_ERR, "%s: realloc(%d) error", "add_filter_rule",
+		syslog(LOG_CRIT, "%s: realloc(%d) error", "add_filter_rule",
 		       (int)(sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size));
 		free(e);
 		free(match);
@@ -1610,7 +1641,8 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	array = calloc(capacity, sizeof(unsigned short));
 	if(!array)
 	{
-		syslog(LOG_ERR, "%s() : calloc error", "get_portmappings_in_range");
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed",
+		       "get_portmappings_in_range", sizeof(unsigned short)*capacity);
 		return NULL;
 	}
 
@@ -1667,8 +1699,9 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 						tmp = realloc(array, sizeof(unsigned short)*capacity);
 						if(!tmp)
 						{
-							syslog(LOG_ERR, "get_portmappings_in_range() : realloc(%u) error",
-							       (unsigned)sizeof(unsigned short)*capacity);
+							syslog(LOG_CRIT, "%s: realloc(%u) error",
+							       "get_portmappings_in_range",
+							       (int)sizeof(unsigned short)*capacity);
 							*number = 0;
 							free(array);
 							array = NULL;
@@ -1815,8 +1848,8 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 				entry_len = sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size;
 				new_e = malloc(entry_len);
 				if(new_e == NULL) {
-					syslog(LOG_ERR, "%s: malloc(%u) error",
-					       "update_portmapping", (unsigned)entry_len);
+					syslog(LOG_CRIT, "%s: malloc(%lu) failed",
+					       "update_portmapping", entry_len);
 					r = -1;
 				}
 				else
@@ -1895,8 +1928,8 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 			entry_len = sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size;
 			new_e = malloc(entry_len);
 			if(new_e == NULL) {
-				syslog(LOG_ERR, "%s: malloc(%u) error",
-				       "update_portmapping", (unsigned)entry_len);
+				syslog(LOG_CRIT, "%s: malloc(%lu) failed",
+				       "update_portmapping", entry_len);
 				r = -1;
 			} else {
 				memcpy(new_e, e, entry_len);
@@ -1995,8 +2028,8 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 				entry_len = sizeof(struct ipt_entry) + match->u.match_size + target->u.target_size;
 				new_e = malloc(entry_len);
 				if(new_e == NULL) {
-					syslog(LOG_ERR, "%s: malloc(%u) error",
-							"update_portmapping", (unsigned)entry_len);
+					syslog(LOG_CRIT, "%s: malloc(%lu) failed",
+							"update_portmapping", entry_len);
 					r = -1;
 				} else {
 					memcpy(new_e, e, entry_len);

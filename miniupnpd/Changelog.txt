@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.523 2025/01/10 22:10:49 nanard Exp $
 
+2025/01/20:
+  change most memory allocation errors to LOG_CRIT
+
 2025/01/10:
   NFTables: fix delete_redirect_and_filter_rules() (remove filter rule)
 
