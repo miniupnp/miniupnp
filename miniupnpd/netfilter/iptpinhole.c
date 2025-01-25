@@ -1,7 +1,7 @@
-/* $Id: iptpinhole.c,v 1.21 2020/05/10 17:49:33 nanard Exp $ */
+/* $Id: iptpinhole.c,v 1.24 2025/01/25 21:18:16 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2012-2020 Thomas Bernard
+ * (c) 2012-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
