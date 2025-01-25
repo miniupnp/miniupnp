@@ -40,3 +40,4 @@ miniupnpc.pc
 testaddr_is_reserved
 validateaddr_is_reserved
 wingenminiupnpcstrings
+doxygen/
