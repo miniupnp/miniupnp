@@ -3,7 +3,7 @@
 # http://miniupnp.free.fr/
 # https://miniupnp.tuxfamily.org/
 # https://github.com/miniupnp/miniupnp
-# (c) 2005-2024 Thomas Bernard
+# (c) 2005-2025 Thomas Bernard
 # to install use :
 # $ make DESTDIR=/tmp/dummylocation install
 # or
@@ -167,7 +167,7 @@ endif
 
 
 .PHONY:	install clean depend all check test everything \
-	installpythonmodule updateversion
+	installpythonmodule updateversion doc
 
 all:	$(LIBRARY) $(EXECUTABLES)
 
@@ -177,6 +177,8 @@ check:	validateminixml validateminiwget validateupnpreplyparse \
 	validateportlistingparse validateigddescparse validateaddr_is_reserved
 
 everything:	all $(EXECUTABLES_ADDTESTS)
+
+doc:	doxygen/html/index.html
 
 # note : the python module "wheel" is required for bdist_wheel
 pythonmodule:	$(LIBRARY) $(SRCDIR)/miniupnpcmodule.c setup.py
@@ -396,6 +398,9 @@ ideb:
 	(sudo apt-get install python-all-dev)
 
 minihttptestserver:	minihttptestserver.o
+
+doxygen/html/index.html: Doxyfile $(SRCS) $(HEADERS)
+	doxygen
 
 print-%:
 	@echo "$* = $($*)"
