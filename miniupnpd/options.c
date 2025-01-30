@@ -81,7 +81,9 @@ static const struct {
 	{ UPNPENABLENATPMP, "enable_pcp_pmp"},
 #endif
 #ifdef ENABLE_PCP
+	{ UPNPPCPMINLIFETIME, "pcp_min_lifetime"},
 	{ UPNPPCPMINLIFETIME, "min_lifetime"},
+	{ UPNPPCPMAXLIFETIME, "pcp_max_lifetime"},
 	{ UPNPPCPMAXLIFETIME, "max_lifetime"},
 	{ UPNPPCPALLOWTHIRDPARTY, "pcp_allow_thirdparty"},
 #endif
