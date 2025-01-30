@@ -15,7 +15,7 @@ extern "C" {
 struct NameValue {
 	struct NameValue * l_next;
 	char name[64];
-	char value[128];
+	char value[256];
 };
 
 struct NameValueParserData {
