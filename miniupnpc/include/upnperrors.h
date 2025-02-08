@@ -1,4 +1,4 @@
-/* $Id: upnperrors.h,v 1.7 2025/01/26 00:31:44 nanard Exp $ */
+/* $Id: upnperrors.h,v 1.8 2025/02/08 23:15:17 nanard Exp $ */
 /* (c) 2007-2025 Thomas Bernard
  * All rights reserved.
  * MiniUPnP Project.
@@ -11,9 +11,7 @@
 /*! \file upnperrors.h
  * \brief code to string API for errors
  */
-/*! \cond */
 #include "miniupnpc_declspec.h"
-/*! \endcond */
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +20,10 @@ extern "C" {
 /*!
  * \brief convert error code to string
  *
- * \param[in] err error code
+ * Work for both MiniUPnPc specific errors and UPnP standard defined
+ * errors.
+ *
+ * \param[in] err numerical error code
  * \return a string description of the error code
  *         or NULL for undefinded errors
  */

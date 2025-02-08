@@ -1,4 +1,4 @@
-/* $Id: upnpdev.h,v 1.5 2025/01/26 00:31:44 nanard Exp $ */
+/* $Id: upnpdev.h,v 1.6 2025/02/08 23:15:17 nanard Exp $ */
 /* Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
@@ -10,10 +10,9 @@
 
 /*! \file upnpdev.h
  * \brief UPNPDev device linked-list structure
+ * \todo could be merged into miniupnpc.h
  */
-/*! \cond */
 #include "miniupnpc_declspec.h"
-/*! \endcond */
 
 #ifdef __cplusplus
 extern "C" {

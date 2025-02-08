@@ -1,4 +1,4 @@
-/* $Id: igd_desc_parse.h,v 1.13 2025/01/26 00:31:44 nanard Exp $ */
+/* $Id: igd_desc_parse.h,v 1.14 2025/02/08 23:15:16 nanard Exp $ */
 /* Project : miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas Bernard
@@ -11,6 +11,7 @@
 
 /*! \file igd_desc_parse.h
  * \brief API to parse UPNP device description XML
+ * \todo should not be exposed in the public API
  */
 
 /*! \brief maximum lenght of URLs */

@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.71 2025/01/25 23:56:32 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.72 2025/02/08 23:15:16 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -14,10 +14,20 @@
  *
  * Contains functions to discover devices and check for device validity
  * or connectivity.
+ *
+ * \mainpage MiniUPnPc API documentation
+ * MiniUPnPc (MiniUPnP client) is a library implementing a UPnP
+ * Internet Gateway Device (IGD) control point.
+ *
+ * It should be used by applications that needs to listen to incoming
+ * traffic from the internet which are running on a LAN where a
+ * UPnP IGD is running on the router (or gateway).
+ *
+ * See more documentation on the website http://miniupnp.free.fr
+ * or https://miniupnp.tuxfamily.org/ or GitHub :
+ * https://github.com/miniupnp/miniupnp/tree/master/miniupnpc
  */
-/*! \cond */
 #include "miniupnpc_declspec.h"
-/*! \endcond */
 #include "igd_desc_parse.h"
 #include "upnpdev.h"
 
@@ -31,8 +41,9 @@
 /*! \brief value for a memory allocation error */
 #define UPNPDISCOVER_MEMORY_ERROR (-102)
 
-/* versions : */
+/*! \brief software version */
 #define MINIUPNPC_VERSION	"2.3.0"
+/*! \brief C API version */
 #define MINIUPNPC_API_VERSION	19
 
 /*! \brief any (ie system chosen) port */
@@ -65,9 +76,9 @@ struct UPNParg {
  * \return NULL in case of error or the raw XML response
  */
 char *
-simpleUPnPcommand(const char *, const char *,
-                  const char *, struct UPNParg *,
-                  int *);
+simpleUPnPcommand(const char * url, const char * service,
+                  const char * action, struct UPNParg * args,
+                  int * bufsize);
 
 /*!
  * \brief Discover UPnP IGD on the network.
@@ -179,7 +190,7 @@ upnpDiscoverDevices(const char * const deviceTypes[],
  * \param[in] bufsize size in bytes of the buffer
  * \param[out] data IGDdatas structure to fill
  */
-MINIUPNP_LIBSPEC void parserootdesc(const char *, int, struct IGDdatas *);
+MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data);
 
 /*!
  * \brief structure used to get fast access to urls
@@ -261,8 +272,8 @@ UPNP_GetIGDFromUrl(const char * rootdescurl,
  *            addresses in URLs
  */
 MINIUPNP_LIBSPEC void
-GetUPNPUrls(struct UPNPUrls *, struct IGDdatas *,
-            const char *, unsigned int);
+GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
+            const char * descURL, unsigned int scope_id);
 
 /*!
  * \brief free the members of a UPNPUrls struct
@@ -271,7 +282,7 @@ GetUPNPUrls(struct UPNPUrls *, struct IGDdatas *,
  * \param[out] urls
  */
 MINIUPNP_LIBSPEC void
-FreeUPNPUrls(struct UPNPUrls *);
+FreeUPNPUrls(struct UPNPUrls * urls);
 
 /*!
  * \brief check the current connection status of an IGD
@@ -281,7 +292,7 @@ FreeUPNPUrls(struct UPNPUrls *);
  * \param[in] data IGD data
  * \return 1 Connected / 0 Disconnected
  */
-MINIUPNP_LIBSPEC int UPNPIGD_IsConnected(struct UPNPUrls *, struct IGDdatas *);
+MINIUPNP_LIBSPEC int UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data);
 
 
 #ifdef __cplusplus
