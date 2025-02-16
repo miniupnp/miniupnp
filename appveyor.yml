@@ -4,7 +4,6 @@
 # https://stackoverflow.com/questions/45630032/valueerror-no-pkg-info-in-archive
 
 environment:
-  APP_VERSION: '2.2'
   # for pypi/twine
   USER: '__token__'
   PASS:
@@ -87,6 +86,11 @@ install:
   - echo "using twine login %USER% %PASS%"
   - echo %PATH%
   - cc -v
+
+before_build:
+  - ps: |
+      $version = Get-Content miniupnpc\VERSION
+      Set-AppveyorBuildVariable 'APP_VERSION' $version
 
 build_script:
   - cd miniupnpc
