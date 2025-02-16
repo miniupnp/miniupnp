@@ -75,8 +75,6 @@ environment:
       ARCH_BITS: 64
 
 
-version: '$(APP_VERSION).{build}'
-
 install:
   - set PATH=%PYTHON_VER%;%PYTHON_VER%\Scripts;%PATH%;C:\msys64\mingw%ARCH_BITS%\bin
   # We need wheel installed to build wheels
@@ -90,7 +88,7 @@ install:
 before_build:
   - ps: |
       $version = Get-Content miniupnpc\VERSION
-      Set-AppveyorBuildVariable 'APP_VERSION' $version
+      Update-AppveyorBuild -Version "$version.$env:APPVEYOR_BUILD_NUMBER"
 
 build_script:
   - cd miniupnpc
