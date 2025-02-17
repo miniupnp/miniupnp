@@ -77,6 +77,7 @@ environment:
 
 install:
   - set PATH=%PYTHON_VER%;%PYTHON_VER%\Scripts;%PATH%;C:\msys64\mingw%ARCH_BITS%\bin
+  - "%PYTHON_VER%\\python.exe -m pip install --upgrade pip"
   # We need wheel installed to build wheels
   - "%PYTHON_VER%\\python.exe -m pip install wheel"
   # Starting with python 3.12, setuptools is not provided by default
