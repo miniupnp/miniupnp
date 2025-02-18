@@ -25,7 +25,7 @@ struct NameValue {
 	/*! \brief name */
 	char name[64];
 	/*! \brief character value */
-	char value[128];
+	char value[256];
 };
 
 /*! \brief data structure for parsing */
