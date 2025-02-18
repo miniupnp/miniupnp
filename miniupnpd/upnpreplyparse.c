@@ -1,8 +1,8 @@
-/* $Id: upnpreplyparse.c,v 1.20 2017/12/12 11:26:25 nanard Exp $ */
+/* $Id: upnpreplyparse.c,v 1.22 2025/02/08 23:12:26 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2019 Thomas Bernard
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -137,7 +137,7 @@ ClearNameValueList(struct NameValueParserData * pdata)
 
 char *
 GetValueFromNameValueList(struct NameValueParserData * pdata,
-                          const char * Name)
+                          const char * name)
 {
     struct NameValue * nv;
     char * p = NULL;
@@ -145,36 +145,11 @@ GetValueFromNameValueList(struct NameValueParserData * pdata,
         (nv != NULL) && (p == NULL);
         nv = nv->l_next)
     {
-        if(strcmp(nv->name, Name) == 0)
+        if(strcmp(nv->name, name) == 0)
             p = nv->value;
     }
     return p;
 }
-
-#if 0
-/* useless now that minixml ignores namespaces by itself */
-char *
-GetValueFromNameValueListIgnoreNS(struct NameValueParserData * pdata,
-                                  const char * Name)
-{
-	struct NameValue * nv;
-	char * p = NULL;
-	char * pname;
-	for(nv = pdata->head.lh_first;
-	    (nv != NULL) && (p == NULL);
-		nv = nv->entries.le_next)
-	{
-		pname = strrchr(nv->name, ':');
-		if(pname)
-			pname++;
-		else
-			pname = nv->name;
-		if(strcmp(pname, Name)==0)
-			p = nv->value;
-	}
-	return p;
-}
-#endif
 
 /* debug all-in-one function
  * do parsing then display to stdout */
