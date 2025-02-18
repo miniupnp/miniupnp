@@ -201,7 +201,7 @@ int reload_from_lease_file()
 #ifndef LEASEFILE_USE_REMAINING_TIME
 	time_t current_unix_time;
 #endif
-	char line[128];
+	char line[300];
 	int r;
 
 	if(!lease_file) return -1;
