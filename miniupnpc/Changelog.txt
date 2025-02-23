@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.273 2025/02/23 15:31:26 nanard Exp $
+$Id: Changelog.txt,v 1.274 2025/02/23 16:46:23 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.3.1 : released 2025/02/23
 
 2025/02/23:
   allocate argument arrays on stack instead of heap in upnpcommand.c

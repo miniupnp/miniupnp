@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 project (miniupnpc
-         VERSION 2.3.0
+         VERSION 2.3.1
          DESCRIPTION "UPnP IGD client lightweight library"
          HOMEPAGE_URL https://miniupnp.tuxfamily.org/
          LANGUAGES C)

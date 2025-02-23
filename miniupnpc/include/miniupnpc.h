@@ -42,7 +42,7 @@
 #define UPNPDISCOVER_MEMORY_ERROR (-102)
 
 /*! \brief software version */
-#define MINIUPNPC_VERSION	"2.3.0"
+#define MINIUPNPC_VERSION	"2.3.1"
 /*! \brief C API version */
 #define MINIUPNPC_API_VERSION	19
 
