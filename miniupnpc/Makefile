@@ -87,6 +87,7 @@ endif
 APIVERSION = 19
 
 SRCS = $(wildcard $(SRCDIR)/*.c)
+PRIVATE_HEADERS = $(wildcard $(SRCDIR)/*.h)
 
 LIBOBJS = $(addprefix $(BUILD)/,miniwget.o minixml.o igd_desc_parse.o minisoap.o \
           miniupnpc.o upnpreplyparse.o upnpcommands.o upnperrors.o \
@@ -399,7 +400,7 @@ ideb:
 
 minihttptestserver:	minihttptestserver.o
 
-doxygen/html/index.html: Doxyfile $(SRCS) $(HEADERS)
+doxygen/html/index.html: Doxyfile $(SRCS) $(HEADERS) $(PRIVATE_HEADERS)
 	doxygen
 
 print-%:
