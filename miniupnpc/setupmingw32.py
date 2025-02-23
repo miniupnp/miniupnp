@@ -40,4 +40,5 @@ setup(name="miniupnpc",
                    libraries=["ws2_32", "iphlpapi"] + compat_lib,
                    include_dirs=['include'], extra_objects=["miniupnpc.lib"])
       ],
-      package_data={'miniupnpc': ['*.dll']})
+      package_data={'miniupnpc': ['*.dll']},
+      has_ext_modules=lambda : True)
