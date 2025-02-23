@@ -575,7 +575,10 @@ UPNP_GetGenericPortMappingEntry(const char * controlURL,
 							 char * duration)
 {
 	struct NameValueParserData pdata;
-	struct UPNParg * GetPortMappingArgs;
+	struct UPNParg GetPortMappingArgs[] = {
+		{"NewPortMappingIndex", index},
+		{NULL, NULL}
+	};
 	char * buffer;
 	int bufsize;
 	char * p;
@@ -584,15 +587,9 @@ UPNP_GetGenericPortMappingEntry(const char * controlURL,
 		return UPNPCOMMAND_INVALID_ARGS;
 	intClient[0] = '\0';
 	intPort[0] = '\0';
-	GetPortMappingArgs = calloc(2, sizeof(struct UPNParg));
-	if(GetPortMappingArgs == NULL)
-		return UPNPCOMMAND_MEM_ALLOC_ERROR;
-	GetPortMappingArgs[0].elt = "NewPortMappingIndex";
-	GetPortMappingArgs[0].val = index;
 	buffer = simpleUPnPcommand(controlURL, servicetype,
 	                           "GetGenericPortMappingEntry",
 	                           GetPortMappingArgs, &bufsize);
-	free(GetPortMappingArgs);
 	if(!buffer) {
 		return UPNPCOMMAND_HTTP_ERROR;
 	}
