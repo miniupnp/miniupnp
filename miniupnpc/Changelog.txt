@@ -4,6 +4,7 @@ miniUPnP client Changelog.
 2025/02/24:
   remove STRTOUI from public headers
   remove parseURL() from public headers
+  remove struct NameValue from upnpreplyparse.h and use flexible array member
 
 VERSION 2.3.1 : released 2025/02/23
 

@@ -17,16 +17,9 @@ extern "C" {
 #endif
 
 /*! \brief Name/Value linked list 
- * \todo should not be exposed in the public API
+ * not exposed in the public API
  */
-struct NameValue {
-	/*! \brief pointer to the next element */
-	struct NameValue * l_next;
-	/*! \brief name */
-	char name[64];
-	/*! \brief character value */
-	char value[128];
-};
+struct NameValue;
 
 /*! \brief data structure for parsing */
 struct NameValueParserData {
