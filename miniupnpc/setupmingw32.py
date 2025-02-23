@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # vim: tabstop=8 shiftwidth=8 expandtab
 # $Id: setupmingw32.py,v 1.15 2024/01/14 23:48:43 nanard Exp $
-# the MiniUPnP Project (c) 2007-2024 Thomas Bernard
+# the MiniUPnP Project (c) 2007-2025 Thomas Bernard
 # https://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/
 #
 # python script to build the miniupnpc module under windows (using mingw32)
@@ -39,5 +39,5 @@ setup(name="miniupnpc",
          Extension(name="miniupnpc", sources=["src/miniupnpcmodule.c"],
                    libraries=["ws2_32", "iphlpapi"] + compat_lib,
                    include_dirs=['include'], extra_objects=["miniupnpc.lib"])
-      ])
-
+      ],
+      package_data={'miniupnpc': ['*.dll']})
