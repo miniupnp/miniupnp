@@ -14,6 +14,17 @@
 #include "portlistingparse.h"
 #include "upnpreplyparse.h"
 
+/*! \file upnpcommands.c
+ * \brief Internet Gateway Device methods implementations
+ * \def STRTOUI
+ * \brief strtoull() if available, strtol() if not
+ */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define STRTOUI	strtoull
+#else
+#define STRTOUI	strtoul
+#endif
+
 static UNSIGNED_INTEGER
 my_atoui(const char * s)
 {

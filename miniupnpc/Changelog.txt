@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.274 2025/02/23 16:46:23 nanard Exp $
 miniUPnP client Changelog.
 
+2025/02/24:
+  remove STRTOUI from public headers
+
 VERSION 2.3.1 : released 2025/02/23
 
 2025/02/23:

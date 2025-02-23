@@ -14,19 +14,14 @@
  * Use unsigned long long when available :
  * strtoull is C99
  *
- * \def STRTOUI
- * \brief strtoull() if available, strtol() if not
- * \todo should not be in the public API
  * \def UNSIGNED_INTEGER
  * \brief `unsigned long long` or `unsigned int`
+ * \todo int can be 16 bits, so it should be `unsigned long`
  */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
 #define UNSIGNED_INTEGER unsigned long long
-#define STRTOUI	strtoull
 #else
 #define UNSIGNED_INTEGER unsigned int
-#define STRTOUI	strtoul
 #endif
 
 #endif
-
