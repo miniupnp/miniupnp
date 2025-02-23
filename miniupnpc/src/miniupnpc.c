@@ -99,7 +99,7 @@ MINIUPNP_LIBSPEC void parserootdesc(const char * buffer, int bufsize, struct IGD
  *   NULL - error */
 char *
 simpleUPnPcommand(const char * url, const char * service,
-                  const char * action, struct UPNParg * args,
+                  const char * action, const struct UPNParg * args,
                   int * bufsize)
 {
 	char hostname[MAXHOSTNAMELEN+1];
