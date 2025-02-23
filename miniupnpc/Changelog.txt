@@ -1,5 +1,8 @@
-$Id: Changelog.txt,v 1.272 2025/02/08 23:15:14 nanard Exp $
+$Id: Changelog.txt,v 1.273 2025/02/23 15:31:26 nanard Exp $
 miniUPnP client Changelog.
+
+2025/02/23:
+  allocate argument arrays on stack instead of heap in upnpcommand.c
 
 2025/02/09:
   doxygen documentation of the public headers
