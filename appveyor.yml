@@ -9,38 +9,6 @@ environment:
   PASS:
     secure: W0Gy5WrAKN5vEEgBvcbrQREbSq5zi5l3vIUFXB6ueKq9yj6vTLuKGfyR1crLjv9G0r4qABt6ZkObVQ+tSJ/YRcokdTnV1+GEpTxbB/qe0riXO0LeoHKIxwV+oyCtVpNk9c5YmJ3eu7XHjrCLvS1LLuJuSfwylgCQ5kC60fQu8XuqDNdZbMRo0m4v+oAlMuumC1YeGcYEMQbaioz1N7ebwFmOzHoVskVo15LTHwA7s5ERRIWIP0D2z64+02hAKkKzN5d80/oBZd3uDu9d2FFS9mUeyx82KC20GqO9kO9DGWw=
   matrix:
-    - PYTHON_VER: C:\Python27
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
-      SETUP_COMPILER_FLAG: --compiler=mingw32
-      ARCH_BITS: 32
-    - PYTHON_VER: C:\Python35
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
-      SETUP_COMPILER_FLAG:
-      ARCH_BITS: 32
-    - PYTHON_VER: C:\Python36
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
-      SETUP_COMPILER_FLAG:
-      ARCH_BITS: 32
-    - PYTHON_VER: C:\Python36-x64
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
-      SETUP_COMPILER_FLAG:
-      ARCH_BITS: 64
-    - PYTHON_VER: C:\Python37
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
-      SETUP_COMPILER_FLAG:
-      ARCH_BITS: 32
-    - PYTHON_VER: C:\Python37-x64
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
-      SETUP_COMPILER_FLAG:
-      ARCH_BITS: 64
-    - PYTHON_VER: C:\Python38
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      SETUP_COMPILER_FLAG:
-      ARCH_BITS: 32
-    - PYTHON_VER: C:\Python38-x64
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      SETUP_COMPILER_FLAG:
-      ARCH_BITS: 64
     - PYTHON_VER: C:\Python39
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       SETUP_COMPILER_FLAG:
@@ -81,6 +49,8 @@ install:
   - "%PYTHON_VER%\\python.exe -m pip install wheel"
   # Starting with python 3.12, setuptools is not provided by default
   - "%PYTHON_VER%\\python.exe -m pip install setuptools"
+  # to add the needed DLL to the wheel
+  - '%PYTHON_VER%\\python.exe -m pip install delvewheel'
   - echo "using twine login %USER% %PASS%"
   - echo %PATH%
   - cc -v
@@ -96,6 +66,7 @@ build_script:
   - mingw32-make -f Makefile.mingw
   - appveyor AddCompilationMessage "Building python module"
   - mingw32-make -f Makefile.mingw pythonmodule PYTHON=%PYTHON_VER%\python
+  - '%PYTHON_VER%\\python.exe -m delvewheel repair --add-path . --include miniupnpc.dll dist/*.whl'
 
 after_build:
   - 7z a -x!wingenminiupnpcstrings.exe ..\miniupnpc_%ARCH_BITS%b-%APPVEYOR_BUILD_VERSION%.zip *.exe *.dll *.a *.lib
@@ -107,8 +78,10 @@ artifacts:
     name: miniupnpc python wheel (self-contained)
   - path: miniupnpc/dist/miniupnpc-*.egg
     name: miniupnpc python egg (self-contained)
+  - path: miniupnpc/wheelhouse/miniupnpc-*.whl
+    name: miniupnpc python wheel (self-contained with dll)
 
 deploy_script:
   - appveyor AddCompilationMessage "Deploying to PyPI"
   - '%PYTHON_VER%\\python.exe -m pip install twine'
-  - '%PYTHON_VER%\\python.exe -m twine upload -u %USER% -p %PASS% --skip-existing dist/*.whl dist/*.tar.gz'
+  - '%PYTHON_VER%\\python.exe -m twine upload -u %USER% -p %PASS% --skip-existing wheelhouse/*.whl dist/*.tar.gz'
