@@ -1,10 +1,11 @@
-$Id: Changelog.txt,v 1.274 2025/02/23 16:46:23 nanard Exp $
+$Id: Changelog.txt,v 1.275 2025/03/02 01:17:20 nanard Exp $
 miniUPnP client Changelog.
 
 2025/02/24:
   remove STRTOUI from public headers
   remove parseURL() from public headers
   remove struct NameValue from upnpreplyparse.h and use flexible array member
+  Increments API_VERSION to 20
 
 VERSION 2.3.1 : released 2025/02/23
 
