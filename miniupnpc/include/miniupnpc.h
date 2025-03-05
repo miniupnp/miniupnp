@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.76 2025/03/05 10:35:57 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.77 2025/03/05 10:59:34 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -19,7 +19,7 @@
  * MiniUPnPc (MiniUPnP client) is a library implementing a UPnP
  * Internet Gateway Device (IGD) control point.
  *
- * It should be used by applications that needs to listen to incoming
+ * It should be used by applications that need to listen to incoming
  * traffic from the internet which are running on a LAN where a
  * UPnP IGD is running on the router (or gateway).
  *
@@ -67,6 +67,8 @@ struct UPNParg {
 
 /*!
  * \brief execute a UPnP method (SOAP action)
+ *
+ * \todo error reporting should be improved
  *
  * \param[in] url Control URL for the service
  * \param[in] service service to use
