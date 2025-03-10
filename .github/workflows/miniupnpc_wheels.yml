@@ -52,12 +52,12 @@ jobs:
             emoji: 🍎
             runs-on:
               arm: [macos-latest]
-              intel: [macos-12]
-              universal2: [macos-12]
+              intel: [macos-13]
+              universal2: [macos-13]
             macosx-deployment-target:
-              arm: 11.0
-              intel: 11.00
-              universal2: 11.0
+              arm: 13.0
+              intel: 13.00
+              universal2: 13.0
             cibw-archs:
               arm: arm64
               intel: x86_64
@@ -81,18 +81,6 @@ jobs:
             cibw-archs:
               intel: x86_64
         python:
-          - major-dot-minor: '3.7'
-            cibw-build: 'cp37-*'
-            manylinux:
-              arm: manylinux2014
-              intel: manylinux2010
-            matrix: '3.7'
-          - major-dot-minor: '3.8'
-            cibw-build: 'cp38-*'
-            manylinux:
-              arm: manylinux2014
-              intel: manylinux2010
-            matrix: '3.8'
           - major-dot-minor: '3.9'
             cibw-build: 'cp39-*'
             manylinux:
@@ -117,6 +105,12 @@ jobs:
               arm: manylinux2014
               intel: manylinux2014
             matrix: '3.12'
+          - major-dot-minor: '3.13'
+            cibw-build: 'cp313-*'
+            manylinux:
+              arm: manylinux2014
+              intel: manylinux2014
+            matrix: '3.13'
         arch:
           - name: ARM
             file-name: arm
@@ -208,7 +202,7 @@ jobs:
       - name: Build and test
         if: matrix.os.matrix != 'windows'
         run: |
-          pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"'
+          pip install cibuildwheel==2.23.0
           cibuildwheel source --output-dir dist
 
       - name: Build (Windows)
