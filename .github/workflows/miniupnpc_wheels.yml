@@ -81,18 +81,6 @@ jobs:
             cibw-archs:
               intel: x86_64
         python:
-          - major-dot-minor: '3.7'
-            cibw-build: 'cp37-*'
-            manylinux:
-              arm: manylinux2014
-              intel: manylinux2010
-            matrix: '3.7'
-          - major-dot-minor: '3.8'
-            cibw-build: 'cp38-*'
-            manylinux:
-              arm: manylinux2014
-              intel: manylinux2010
-            matrix: '3.8'
           - major-dot-minor: '3.9'
             cibw-build: 'cp39-*'
             manylinux:
@@ -117,6 +105,12 @@ jobs:
               arm: manylinux2014
               intel: manylinux2014
             matrix: '3.12'
+          - major-dot-minor: '3.13'
+            cibw-build: 'cp313-*'
+            manylinux:
+              arm: manylinux2014
+              intel: manylinux2014
+            matrix: '3.13'
         arch:
           - name: ARM
             file-name: arm
