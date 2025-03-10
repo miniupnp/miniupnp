@@ -202,7 +202,7 @@ jobs:
       - name: Build and test
         if: matrix.os.matrix != 'windows'
         run: |
-          pip install 'cibuildwheel==2.13.1; python_version < "3.8"' 'cibuildwheel==2.16.5; python_version >= "3.8"'
+          pip install cibuildwheel==2.23.0
           cibuildwheel source --output-dir dist
 
       - name: Build (Windows)
