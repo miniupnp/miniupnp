@@ -913,7 +913,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 					}
 #endif
 					PRINT_SOCKET_ERROR("sendto");
-					continue;
+					break;
 				} else {
 					sentok = 1;
 				}
