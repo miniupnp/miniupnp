@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.h,v 1.34 2025/02/08 23:15:17 nanard Exp $ */
+/* $Id: upnpcommands.h,v 1.36 2025/03/18 23:40:15 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -360,6 +360,44 @@ UPNP_GetSpecificPortMappingEntry(const char * controlURL,
                                  char * enabled,
                                  char * leaseDuration);
 
+/*! \brief retrieves an existing port mapping for a port:protocol
+ *
+ * List of possible UPnP errors for UPNP_GetSpecificPortMappingEntry() :
+ * errorCode errorDescription (short) | Description (long)
+ * ---------------------------------- | ------------------
+ * 402 Invalid Args | See UPnP Device Architecture section on Control.
+ * 501 Action Failed | See UPnP Device Architecture section on Control.
+ * 606 Action not authorized | The action requested REQUIRES authorization and the sender was not authorized.
+ * 714 NoSuchEntryInArray | The specified value does not exist in the array.
+ *
+ * \param[in] controlURL controlURL of the WANIPConnection of a WANConnectionDevice
+ * \param[in] servicetype urn:schemas-upnp-org:service:WANIPConnection:1
+ * \param[in] extPort External port
+ * \param[in] proto `TCP` or `UDP`
+ * \param[in] remoteHost IP or empty string for wildcard. Most IGD don't
+ *            support it
+ * \param[out] intClient 16 bytes buffer
+ * \param[out] intPort 6 bytes buffer
+ * \param[out] desc desclen bytes buffer
+ * \param[in] desclen desc buffer length
+ * \param[out] enabled 4 bytes buffer
+ * \param[out] leaseDuration 16 bytes
+ * \return #UPNPCOMMAND_SUCCESS, #UPNPCOMMAND_INVALID_ARGS,
+ *         #UPNPCOMMAND_UNKNOWN_ERROR or a UPnP Error Code.
+ */
+MINIUPNP_LIBSPEC int
+UPNP_GetSpecificPortMappingEntryExt(const char * controlURL,
+                                    const char * servicetype,
+                                    const char * extPort,
+                                    const char * proto,
+                                    const char * remoteHost,
+                                    char * intClient,
+                                    char * intPort,
+                                    char * desc,
+                                    size_t desclen,
+                                    char * enabled,
+                                    char * leaseDuration);
+
 /*! \brief WANIPConnection:GetGenericPortMappingEntry()
  *
  * errorCode errorDescription (short) | Description (long)
@@ -394,6 +432,45 @@ UPNP_GetGenericPortMappingEntry(const char * controlURL,
 								char * enabled,
 								char * rHost,
 								char * duration);
+
+/*! \brief WANIPConnection:GetGenericPortMappingEntry()
+ *
+ * errorCode errorDescription (short) | Description (long)
+ * ---------------------------------- | ------------------
+ * 402 Invalid Args | See UPnP Device Architecture section on Control.
+ * 606 Action not authorized | The action requested REQUIRES authorization and the sender was not authorized.
+ * 713 SpecifiedArrayIndexInvalid | The specified array index is out of bounds
+ *
+ * \param[in] controlURL controlURL of the WANIPConnection of a WANConnectionDevice
+ * \param[in] servicetype urn:schemas-upnp-org:service:WANIPConnection:1
+ * \param[in] index
+ * \param[out] extPort 6 bytes buffer
+ * \param[out] intClient 16 bytes buffer
+ * \param[out] intPort 6 bytes buffer
+ * \param[out] protocol 4 bytes buffer
+ * \param[out] desc desclen bytes buffer
+ * \param[in] desclen desc buffer length
+ * \param[out] enabled 4 bytes buffer
+ * \param[out] rHost desclen bytes buffer
+ * \param[in] rHostlen rHost buffer length
+ * \param[out] duration 16 bytes buffer
+ * \return #UPNPCOMMAND_SUCCESS, #UPNPCOMMAND_INVALID_ARGS,
+ *         #UPNPCOMMAND_UNKNOWN_ERROR or a UPnP Error Code.
+ */
+MINIUPNP_LIBSPEC int
+UPNP_GetGenericPortMappingEntryExt(const char * controlURL,
+                                   const char * servicetype,
+                                   const char * index,
+                                   char * extPort,
+                                   char * intClient,
+                                   char * intPort,
+                                   char * protocol,
+                                   char * desc,
+                                   size_t desclen,
+                                   char * enabled,
+                                   char * rHost,
+                                   size_t rHostlen,
+                                   char * duration);
 
 /*! \brief  retrieval of a list of existing port mappings
  *

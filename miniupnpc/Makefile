@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.155 2025/03/02 01:17:19 nanard Exp $
+# $Id: Makefile,v 1.156 2025/03/18 23:40:14 nanard Exp $
 # MiniUPnP Project
 # http://miniupnp.free.fr/
 # https://miniupnp.tuxfamily.org/
@@ -84,7 +84,7 @@ ifneq (, $(findstring sun, $(OS))$(findstring solaris, $(OS)))
 endif
 
 # APIVERSION is used to build SONAME
-APIVERSION = 20
+APIVERSION = 21
 
 SRCS = $(wildcard $(SRCDIR)/*.c)
 PRIVATE_HEADERS = $(wildcard $(SRCDIR)/*.h)

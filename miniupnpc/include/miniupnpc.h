@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.77 2025/03/05 10:59:34 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.78 2025/03/18 23:40:14 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -44,7 +44,7 @@
 /*! \brief software version */
 #define MINIUPNPC_VERSION	"2.3.2"
 /*! \brief C API version */
-#define MINIUPNPC_API_VERSION	20
+#define MINIUPNPC_API_VERSION	21
 
 /*! \brief any (ie system chosen) port */
 #define UPNP_LOCAL_PORT_ANY     0

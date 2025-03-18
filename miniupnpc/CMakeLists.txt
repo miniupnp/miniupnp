@@ -6,7 +6,7 @@ project (miniupnpc
          HOMEPAGE_URL https://miniupnp.tuxfamily.org/
          LANGUAGES C)
 
-set (MINIUPNPC_API_VERSION 20)
+set (MINIUPNPC_API_VERSION 21)
 
 option (UPNPC_BUILD_STATIC "Build static library" TRUE)
 option (UPNPC_BUILD_SHARED "Build shared library" TRUE)

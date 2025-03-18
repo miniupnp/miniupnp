@@ -1,5 +1,11 @@
-$Id: Changelog.txt,v 1.276 2025/03/05 10:29:50 nanard Exp $
+$Id: Changelog.txt,v 1.277 2025/03/18 23:40:13 nanard Exp $
 miniUPnP client Changelog.
+
+2025/03/18:
+  Add UPNP_GetSpecificPortMappingEntryExt() and
+  UPNP_GetGenericPortMappingEntryExt() functions to support retrieving
+  arbitrary long descriptions.
+  Increments API_VERSION to 21
 
 VERSION 2.3.2 : released 2025/03/05
 

@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.c,v 1.53 2025/02/23 15:31:26 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.55 2025/03/18 23:40:14 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
@@ -537,15 +537,36 @@ UPNP_DeletePortMappingRange(const char * controlURL, const char * servicetype,
 MINIUPNP_LIBSPEC int
 UPNP_GetGenericPortMappingEntry(const char * controlURL,
                                 const char * servicetype,
-							 const char * index,
-							 char * extPort,
-							 char * intClient,
-							 char * intPort,
-							 char * protocol,
-							 char * desc,
-							 char * enabled,
-							 char * rHost,
-							 char * duration)
+                                const char * index,
+                                char * extPort,
+                                char * intClient,
+                                char * intPort,
+                                char * protocol,
+                                char * desc,
+                                char * enabled,
+                                char * rHost,
+                                char * duration)
+{
+	return UPNP_GetGenericPortMappingEntryExt(controlURL, servicetype, index,
+	                                          extPort, intClient, intPort,
+	                                          protocol, desc, 80, enabled,
+	                                          rHost, 64, duration);
+}
+
+MINIUPNP_LIBSPEC int
+UPNP_GetGenericPortMappingEntryExt(const char * controlURL,
+                                   const char * servicetype,
+                                   const char * index,
+                                   char * extPort,
+                                   char * intClient,
+                                   char * intPort,
+                                   char * protocol,
+                                   char * desc,
+                                   size_t desclen,
+                                   char * enabled,
+                                   char * rHost,
+                                   size_t rHostlen,
+                                   char * duration)
 {
 	struct NameValueParserData pdata;
 	struct UPNParg GetPortMappingArgs[] = {
@@ -572,8 +593,8 @@ UPNP_GetGenericPortMappingEntry(const char * controlURL,
 	p = GetValueFromNameValueList(&pdata, "NewRemoteHost");
 	if(p && rHost)
 	{
-		strncpy(rHost, p, 64);
-		rHost[63] = '\0';
+		strncpy(rHost, p, rHostlen);
+		rHost[rHostlen-1] = '\0';
 	}
 	p = GetValueFromNameValueList(&pdata, "NewExternalPort");
 	if(p && extPort)
@@ -610,8 +631,8 @@ UPNP_GetGenericPortMappingEntry(const char * controlURL,
 	p = GetValueFromNameValueList(&pdata, "NewPortMappingDescription");
 	if(p && desc)
 	{
-		strncpy(desc, p, 80);
-		desc[79] = '\0';
+		strncpy(desc, p, desclen);
+		desc[desclen-1] = '\0';
 	}
 	p = GetValueFromNameValueList(&pdata, "NewLeaseDuration");
 	if(p && duration)
@@ -681,6 +702,26 @@ UPNP_GetSpecificPortMappingEntry(const char * controlURL,
                                  char * enabled,
                                  char * leaseDuration)
 {
+	return UPNP_GetSpecificPortMappingEntryExt(controlURL, servicetype,
+	                                           extPort, proto, remoteHost,
+	                                           intClient, intPort,
+	                                           desc, 80, enabled,
+	                                           leaseDuration);
+}
+
+MINIUPNP_LIBSPEC int
+UPNP_GetSpecificPortMappingEntryExt(const char * controlURL,
+                                    const char * servicetype,
+                                    const char * extPort,
+                                    const char * proto,
+                                    const char * remoteHost,
+                                    char * intClient,
+                                    char * intPort,
+                                    char * desc,
+                                    size_t desclen,
+                                    char * enabled,
+                                    char * leaseDuration)
+{
 	struct NameValueParserData pdata;
 	struct UPNParg GetPortMappingArgs[] = {
 		{"NewRemoteHost", remoteHost},
@@ -729,8 +770,8 @@ UPNP_GetSpecificPortMappingEntry(const char * controlURL,
 
 	p = GetValueFromNameValueList(&pdata, "NewPortMappingDescription");
 	if(p && desc) {
-		strncpy(desc, p, 80);
-		desc[79] = '\0';
+		strncpy(desc, p, desclen);
+		desc[desclen-1] = '\0';
 	}
 
 	p = GetValueFromNameValueList(&pdata, "NewLeaseDuration");
