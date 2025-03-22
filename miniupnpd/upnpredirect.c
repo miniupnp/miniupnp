@@ -1,8 +1,8 @@
-/* $Id: upnpredirect.c,v 1.100 2024/03/19 23:34:58 nanard Exp $ */
+/* $Id: upnpredirect.c,v 1.101 2025/03/22 22:19:33 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2024 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -186,7 +186,7 @@ lease_file_remove(unsigned short eport, int proto)
 /* reload_from_lease_file()
  * read lease_file and add the rules contained
  */
-int reload_from_lease_file()
+int reload_from_lease_file(void)
 {
 	FILE * fd;
 	char * p;
