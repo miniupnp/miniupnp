@@ -201,7 +201,7 @@ int reload_from_lease_file(void)
 #ifndef LEASEFILE_USE_REMAINING_TIME
 	time_t current_unix_time;
 #endif
-	char line[128];
+	char line[320];
 	int r;
 
 	if(!lease_file) return -1;
@@ -270,7 +270,8 @@ int reload_from_lease_file(void)
 			timestamp += current_time;	/* convert to our time */
 #else
 			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file");
+				syslog(LOG_NOTICE, "already expired lease in lease file (%hu=>%s:%hu %s)",
+				       eport, iaddr, iport, proto);
 				continue;
 			} else {
 				leaseduration = timestamp - current_unix_time;
