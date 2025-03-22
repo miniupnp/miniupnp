@@ -1,4 +1,4 @@
-/* $Id: upnpreplyparse.c,v 1.22 2025/02/08 23:12:26 nanard Exp $ */
+/* $Id: upnpreplyparse.c,v 1.23 2025/03/02 01:12:59 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -12,6 +12,23 @@
 
 #include "upnpreplyparse.h"
 #include "minixml.h"
+
+struct NameValue {
+	/*! \brief pointer to the next element */
+	struct NameValue * l_next;
+	/*! \brief name */
+	char name[64];
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+	/* C99 flexible array member */
+	/*! \brief character value */
+	char value[];
+#elif defined(__GNUC__)
+	char value[0];
+#else
+	/* Fallback to a hack */
+	char value[1];
+#endif
+};
 
 static void
 NameValueParserStartElt(void * d, const char * name, int l)
@@ -40,7 +57,7 @@ NameValueParserEndElt(void * d, const char * name, int namelen)
 		int l;
 		/* standard case. Limited to n chars strings */
 		l = data->cdatalen;
-	    nv = malloc(sizeof(struct NameValue));
+	    nv = malloc(sizeof(struct NameValue) + l + 1);
 		if(nv == NULL)
 		{
 			/* malloc error */
@@ -50,8 +67,6 @@ NameValueParserEndElt(void * d, const char * name, int namelen)
 #endif /* DEBUG */
 			return;
 		}
-	    if(l>=(int)sizeof(nv->value))
-	        l = sizeof(nv->value) - 1;
 	    strncpy(nv->name, data->curelt, 64);
 		nv->name[63] = '\0';
 		if(data->cdata != NULL)
