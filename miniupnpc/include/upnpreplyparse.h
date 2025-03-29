@@ -1,4 +1,4 @@
-/* $Id: upnpreplyparse.h,v 1.20 2025/02/08 23:15:17 nanard Exp $ */
+/* $Id: upnpreplyparse.h,v 1.22 2025/03/29 17:58:12 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2025 Thomas Bernard
@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 
-/*! \brief Name/Value linked list 
+/*! \brief Name/Value linked list
  * not exposed in the public API
  */
 struct NameValue;
