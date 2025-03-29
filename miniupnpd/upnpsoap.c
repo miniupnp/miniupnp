@@ -371,7 +371,11 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 			ext_ip_addr[0] = '\0';
 		} else if (addr_is_reserved(&addr)) {
 			syslog(LOG_NOTICE, "private/reserved address %s is not suitable for external IP", ext_ip_addr);
-			ext_ip_addr[0] = '\0';
+			if (!GETFLAG(FORCEFORWARDINGMASK)) {
+				ext_ip_addr[0] = '\0';
+			} else {
+				syslog(LOG_NOTICE, "force_forwarding is enabled, private/reserved address %s is used as external IP", ext_ip_addr);
+			}
 		}
 	}
 #else
