@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.52 2025/01/12 15:47:17 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.53 2025/03/29 17:32:59 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -874,9 +874,9 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			p->sin_port = htons(SSDP_PORT);
 			p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
 		}
-		n = sendto(sudp, bufr, n, 0, &sockudp_w,
-		           ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
-		if (n < 0) {
+		rv = sendto(sudp, bufr, n, 0, &sockudp_w,
+		            ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
+		if (rv < 0) {
 			if(error)
 				*error = MINISSDPC_SOCKET_ERROR;
 			PRINT_SOCKET_ERROR("sendto");
@@ -902,9 +902,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			break;
 		} else {
 			struct addrinfo *p;
+			/* as getaddrinfo() returns a linked list, we are iterating it
+			 * even thought it should only return one result here */
 			for(p = servinfo; p; p = p->ai_next) {
-				n = sendto(sudp, bufr, n, 0, p->ai_addr, MSC_CAST_INT p->ai_addrlen);
-				if (n < 0) {
+				rv = sendto(sudp, bufr, n, 0, p->ai_addr, MSC_CAST_INT p->ai_addrlen);
+				if (rv < 0) {
 #ifdef DEBUG
 					char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 					if (getnameinfo(p->ai_addr, (socklen_t)p->ai_addrlen, hbuf, sizeof(hbuf), sbuf,
