@@ -1,4 +1,4 @@
-/* $Id: minissdpc.c,v 1.53 2025/03/29 17:32:59 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.54 2025/03/29 17:59:01 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -390,7 +390,7 @@ free_tmp_and_return:
  * the last 4 arguments are filled during the parsing :
  *    - location/locationsize : "location:" field of the SSDP reply packet
  *    - st/stsize : "st:" field of the SSDP reply packet.
- *    - usn/usnsize : "usn:" filed of the SSDP reply packet
+ *    - usn/usnsize : "usn:" field of the SSDP reply packet
  * The strings are NOT null terminated */
 static void
 parseMSEARCHReply(const char * reply, int size,
