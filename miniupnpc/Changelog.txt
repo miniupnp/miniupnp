@@ -1,9 +1,11 @@
-$Id: Changelog.txt,v 1.278 2025/03/29 17:32:58 nanard Exp $
+$Id: Changelog.txt,v 1.279 2025/03/29 18:09:00 nanard Exp $
 miniUPnP client Changelog.
 
 2025/03/29:
   fix a bug in ssdpDiscoverDevices() that has been there since 2010/04/05
     and the use of getaddrinfo()
+  more argument checks in UPNP_AddAnyPortMapping() and
+    UPNP_GetGenericPortMappingEntryExt()
 
 2025/03/18:
   Add UPNP_GetSpecificPortMappingEntryExt() and

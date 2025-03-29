@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.c,v 1.55 2025/03/18 23:40:14 nanard Exp $ */
+/* $Id: upnpcommands.c,v 1.56 2025/03/29 18:08:59 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
@@ -421,7 +421,7 @@ UPNP_AddAnyPortMapping(const char * controlURL, const char * servicetype,
 	const char * resVal;
 	int ret;
 
-	if(!inPort || !inClient || !proto || !extPort)
+	if(!inPort || !inClient || !proto || !extPort || !reservedPort)
 		return UPNPCOMMAND_INVALID_ARGS;
 	buffer = simpleUPnPcommand(controlURL, servicetype,
 	                           "AddAnyPortMapping", AddAnyPortMappingArgs,
@@ -577,10 +577,8 @@ UPNP_GetGenericPortMappingEntryExt(const char * controlURL,
 	int bufsize;
 	char * p;
 	int ret = UPNPCOMMAND_UNKNOWN_ERROR;
-	if(!index)
+	if(!index || !extPort || !intClient || !intPort || !protocol)
 		return UPNPCOMMAND_INVALID_ARGS;
-	intClient[0] = '\0';
-	intPort[0] = '\0';
 	buffer = simpleUPnPcommand(controlURL, servicetype,
 	                           "GetGenericPortMappingEntry",
 	                           GetPortMappingArgs, &bufsize);
@@ -597,17 +595,25 @@ UPNP_GetGenericPortMappingEntryExt(const char * controlURL,
 		rHost[rHostlen-1] = '\0';
 	}
 	p = GetValueFromNameValueList(&pdata, "NewExternalPort");
-	if(p && extPort)
+	if(p)
 	{
 		strncpy(extPort, p, 6);
 		extPort[5] = '\0';
 		ret = UPNPCOMMAND_SUCCESS;
 	}
+	else
+	{
+		extPort[0] = '\0';
+	}
 	p = GetValueFromNameValueList(&pdata, "NewProtocol");
-	if(p && protocol)
+	if(p)
 	{
 		strncpy(protocol, p, 4);
 		protocol[3] = '\0';
+	}
+	else
+	{
+		protocol[0] = '\0';
 	}
 	p = GetValueFromNameValueList(&pdata, "NewInternalClient");
 	if(p)
@@ -616,11 +622,19 @@ UPNP_GetGenericPortMappingEntryExt(const char * controlURL,
 		intClient[15] = '\0';
 		ret = 0;
 	}
+	else
+	{
+		intClient[0] = '\0';
+	}
 	p = GetValueFromNameValueList(&pdata, "NewInternalPort");
 	if(p)
 	{
 		strncpy(intPort, p, 6);
 		intPort[5] = '\0';
+	}
+	else
+	{
+		intPort[0] = '\0';
 	}
 	p = GetValueFromNameValueList(&pdata, "NewEnabled");
 	if(p && enabled)
