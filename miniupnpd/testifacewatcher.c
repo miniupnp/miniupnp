@@ -14,6 +14,10 @@ volatile sig_atomic_t should_send_public_address_change_notif = 0;
 
 int main(int argc, char * * argv)
 {
+#ifndef USE_IFACEWATCHER
+	fprintf(stderr, "build without USE_IFACEWATCHER\n");
+	return 1;
+#else
 	int s;
 
 	ext_if_name = (const char *)0;
@@ -38,4 +42,5 @@ int main(int argc, char * * argv)
 	}
 	closelog();
 	return 0;
+#endif
 }
