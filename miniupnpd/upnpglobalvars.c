@@ -65,9 +65,9 @@ const char * pidfilename = "/var/run/miniupnpd.pid";
 char uuidvalue_igd[] = "uuid:00000000-0000-0000-0000-000000000000";
 char uuidvalue_wan[] = "uuid:00000000-0000-0000-0000-000000000000";
 char uuidvalue_wcd[] = "uuid:00000000-0000-0000-0000-000000000000";
-char serialnumber[SERIALNUMBER_MAX_LEN] = "00000000";
+char serialnumber[SERIALNUMBER_MAX_LEN] = "";
 
-char modelnumber[MODELNUMBER_MAX_LEN] = "1";
+char modelnumber[MODELNUMBER_MAX_LEN] = "";
 
 /* presentation url :
  * http://nnn.nnn.nnn.nnn:ppppp/  => max 30 bytes including terminating 0 */
