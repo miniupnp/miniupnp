@@ -53,8 +53,8 @@ extern time_t startup_time;
 extern time_t epoch_origin;
 #endif /*  defined(ENABLE_NATPMP) || defined(ENABLE_PCP) */
 
-extern unsigned long int min_lifetime;
-extern unsigned long int max_lifetime;
+extern unsigned long int pcp_min_lifetime;
+extern unsigned long int pcp_max_lifetime;
 
 /* runtime boolean flags */
 extern int runtime_flags;
