@@ -1,4 +1,4 @@
-/* $Id: commonrdr.h,v 1.16 2024/03/11 23:28:19 nanard Exp $ */
+/* $Id: commonrdr.h,v 1.17 2025/04/03 21:11:34 nanard Exp $ */
 /* MiniUPnP project
  * (c) 2006-2025 Thomas Bernard
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
