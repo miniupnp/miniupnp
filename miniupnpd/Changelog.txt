@@ -1,4 +1,6 @@
-$Id: Changelog.txt,v 1.526 2025/04/03 21:18:03 nanard Exp $
+$Id: Changelog.txt,v 1.527 2025/04/03 21:24:39 nanard Exp $
+
+VERSION 2.3.8 : released on 2025/04/03
 
 2025/04/03:
   Add doxygen documentation to some of the functions
