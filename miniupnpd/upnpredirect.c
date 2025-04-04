@@ -445,7 +445,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 {
 	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
 		eport, iaddr, iport, protocol, desc);			*/
-	if(disable_port_forwarding)
+	if(disable_port_forwarding && !GETFLAG(IGNOREPRIVATEIPMASK))
 		return -1;
 	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
 	                      desc, timestamp) < 0) {

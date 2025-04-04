@@ -14,6 +14,8 @@
 #include "config.h"
 #include "portinuse.h"
 
+int runtime_flags = 0;
+
 int main(int argc, char * * argv)
 {
 #ifndef CHECK_PORTINUSE
