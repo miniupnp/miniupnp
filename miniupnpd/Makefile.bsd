@@ -1,4 +1,4 @@
-# $Id: Makefile.bsd,v 1.111 2025/03/30 22:36:04 nanard Exp $
+# $Id: Makefile.bsd,v 1.112 2025/04/06 22:46:24 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -102,7 +102,8 @@ TESTASYNCSENDTOOBJS = testasyncsendto.o asyncsendto.o upnputils.o getroute.o
 TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o
 TESTMINISSDPOBJS = testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
                    asyncsendto.o getroute.o
-TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o
+TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o \
+                       getroute.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
