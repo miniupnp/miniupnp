@@ -18,8 +18,6 @@
 #define LOG_PERROR 0
 #endif
 
-int runtime_flags = 0;
-
 int main(int argc, char * * argv) {
 	char str_addr[64];
 	struct in_addr addr;

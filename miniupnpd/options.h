@@ -1,9 +1,9 @@
-/* $Id: options.h,v 1.36 2024/06/22 18:13:33 nanard Exp $ */
+/* $Id: options.h,v 1.37 2025/04/06 22:30:24 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2024 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -21,7 +21,7 @@ enum upnpconfigoptions {
 	UPNPEXT_IFNAME6,		/* ext_ifname6 */
 #endif
 	UPNPEXT_IP,				/* ext_ip */
-	UPNP_IGNORE_PRIVATE_IP, /* ignore_private_ip */
+	UPNP_IGNORE_PRIVATE_IP,	/* ignore_private_ip_check */
 	UPNPEXT_PERFORM_STUN,		/* ext_perform_stun */
 	UPNPEXT_STUN_HOST,		/* ext_stun_host */
 	UPNPEXT_STUN_PORT,		/* ext_stun_port */

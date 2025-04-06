@@ -1,6 +1,6 @@
-/* $Id: natpmp.c,v 1.58 2022/10/16 06:03:56 nanard Exp $ */
+/* $Id: natpmp.c,v 1.60 2025/04/06 22:30:24 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2007-2022 Thomas Bernard
+ * (c) 2007-2025 Thomas Bernard
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -109,7 +109,7 @@ static void FillPublicAddressResponse(unsigned char * resp, in_addr_t senderaddr
 			syslog(LOG_ERR, "Failed to get IP for interface %s", ext_if_name);
 			resp[3] = 3;	/* Network Failure (e.g. NAT box itself
 			                 * has not obtained a DHCP lease) */
-		} else if (addr_is_reserved(&addr) && !GETFLAG(IGNOREPRIVATEIPMASK)) {
+		} else if (!GETFLAG(IGNOREPRIVATEIPMASK) && addr_is_reserved(&addr)) {
 			resp[3] = 3;	/* Network Failure, box has not obtained
 			                   public IP address */
 		} else {

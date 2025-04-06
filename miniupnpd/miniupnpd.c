@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.264 2024/06/22 18:14:08 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.267 2025/04/06 22:30:22 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -1025,10 +1025,14 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 				INIT_PRINT_ERR("Error parsing address : %s\n", lan_addr->ext_ip_str);
 				return -1;
 			}
-			if(addr_is_reserved(&lan_addr->ext_ip_addr) && !GETFLAG(IGNOREPRIVATEIPMASK)) {
-				/* error */
-				INIT_PRINT_ERR("Error: option ext_ip address contains reserved / private address : %s\n", lan_addr->ext_ip_str);
-				return -1;
+			if(addr_is_reserved(&lan_addr->ext_ip_addr)) {
+				if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+					syslog(LOG_WARNING, "IGNORED : option ext_ip address contains reserved / private address : %s", lan_addr->ext_ip_str);
+				} else {
+					/* error */
+					INIT_PRINT_ERR("Error: option ext_ip address contains reserved / private address : %s\n", lan_addr->ext_ip_str);
+					return -1;
+				}
 			}
 		}
 	}
@@ -1889,9 +1893,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			INIT_PRINT_ERR("Error: option ext_ip contains invalid address %s\n", use_ext_ip_addr);
 			return 1;
 		}
-		if (addr_is_reserved(&addr) && !GETFLAG(IGNOREPRIVATEIPMASK)) {
-			INIT_PRINT_ERR("Error: option ext_ip contains reserved / private address %s, not public routable\n", use_ext_ip_addr);
-			return 1;
+		if (addr_is_reserved(&addr)) {
+			if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+				syslog(LOG_WARNING, "IGNORED : option ext_ip contains reserved / private address %s, not public routable", use_ext_ip_addr);
+			} else {
+				INIT_PRINT_ERR("Error: option ext_ip contains reserved / private address %s, not public routable\n", use_ext_ip_addr);
+				return 1;
+			}
 		}
 	}
 
@@ -2354,15 +2362,19 @@ main(int argc, char * * argv)
 		if (getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL) < 0) {
 			syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
 			disable_port_forwarding = 1;
-		} else if (addr_is_reserved(&addr) && !GETFLAG(IGNOREPRIVATEIPMASK)) {
-			syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
-			syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-			syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-			syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-			syslog(LOG_INFO, "You can enable option ignore_private_ip=yes to force enable port forwarding");
-			syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
-			syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
-			disable_port_forwarding = 1;
+		} else if (addr_is_reserved(&addr)) {
+			if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+				syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
+			} else {
+				syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
+				syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
+				syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
+				syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
+				syslog(LOG_INFO, "You can set option ignore_private_ip_check=yes to enable port forwarding");
+				syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
+				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+				disable_port_forwarding = 1;
+			}
 		}
 	}
 
@@ -2679,16 +2691,20 @@ main(int argc, char * * argv)
 					syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
 					disable_port_forwarding = 1;
 				} else {
-					int reserved = addr_is_reserved(&addr) && !GETFLAG(IGNOREPRIVATEIPMASK);
+					int reserved = addr_is_reserved(&addr);
 					if (!disable_port_forwarding && reserved) {
-						syslog(LOG_INFO, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
-						syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-						syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-						syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-						syslog(LOG_INFO, "You can enable option ignore_private_ip=yes to force enable port forwarding");
-						syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
-						syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
-						disable_port_forwarding = 1;
+						if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+							syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s.", if_addr, ext_if_name);
+						} else {
+							syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
+							syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
+							syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
+							syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
+							syslog(LOG_INFO, "You can set option ignore_private_ip_check=yes to enable port forwarding");
+							syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
+							syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+							disable_port_forwarding = 1;
+						}
 					} else if (disable_port_forwarding && !reserved) {
 						syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
 						disable_port_forwarding = 0;

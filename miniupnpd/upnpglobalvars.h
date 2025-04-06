@@ -1,8 +1,8 @@
-/* $Id: upnpglobalvars.h,v 1.51 2021/05/21 22:03:38 nanard Exp $ */
+/* $Id: upnpglobalvars.h,v 1.53 2025/04/06 22:30:26 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2021 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
