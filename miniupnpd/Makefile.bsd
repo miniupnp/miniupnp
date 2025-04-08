@@ -1,4 +1,4 @@
-# $Id: Makefile.bsd,v 1.112 2025/04/06 22:46:24 nanard Exp $
+# $Id: Makefile.bsd,v 1.113 2025/04/08 21:28:42 nanard Exp $
 # MiniUPnP project
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author: Thomas Bernard
@@ -96,7 +96,7 @@ ALLSRCS += $(IPFOBJS:S/^/$(SRCDIR)\/ipf\//:S/.o$/.c/)
 
 TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 TESTUPNPPERMISSIONSOBJS = testupnppermissions.o upnppermissions.o
-TESTGETIFADDROBJS = testgetifaddr.o getifaddr.o
+TESTGETIFADDROBJS = testgetifaddr.o getifaddr.o getconnstatus.o
 MINIUPNPDCTLOBJS = miniupnpdctl.o
 TESTASYNCSENDTOOBJS = testasyncsendto.o asyncsendto.o upnputils.o getroute.o
 TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o

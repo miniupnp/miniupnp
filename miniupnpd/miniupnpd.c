@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.267 2025/04/06 22:30:22 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.268 2025/04/08 21:28:42 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -941,24 +941,39 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 	while(*p && *p != '/' && !isspace(*p))
 		p++;
 	n = p - str;
-	if(!isdigit(str[0]) && n < (int)sizeof(lan_addr->ifname))
-	{
+	if(!isdigit(str[0]) && n < (int)sizeof(lan_addr->ifname)) {
+		int r;
 		/* not starting with a digit : suppose it is an interface name */
 		memcpy(lan_addr->ifname, str, n);
 		lan_addr->ifname[n] = '\0';
-		if(getifaddr(lan_addr->ifname, lan_addr->str, sizeof(lan_addr->str),
-		             &lan_addr->addr, &lan_addr->mask) < 0) {
+		r = getifaddr(lan_addr->ifname, lan_addr->str, sizeof(lan_addr->str),
+		             &lan_addr->addr, &lan_addr->mask);
 #ifdef ENABLE_IPV6
+		if(r == GETIFADDR_NO_ADDRESS) {
 			fprintf(stderr, "interface \"%s\" has no IPv4 address\n", str);
 			syslog(LOG_NOTICE, "interface \"%s\" has no IPv4 address\n", str);
 			lan_addr->str[0] = '\0';
 			lan_addr->addr.s_addr = htonl(0x00000000u);
 			lan_addr->mask.s_addr = htonl(0xffffffffu);
-#else /* ENABLE_IPV6 */
+		} else if(r != GETIFADDR_OK) {
+			INIT_PRINT_ERR("error getting address for interface %s\n", str);
 			goto parselan_error;
-#endif /* ENABLE_IPV6 */
 		}
-		/*printf("%s => %s\n", lan_addr->ifname, lan_addr->str);*/
+#else /* ENABLE_IPV6 */
+		if(r == GETIFADDR_NO_ADDRESS) {
+			INIT_PRINT_ERR("interface \"%s\" has no address\n", str);
+			goto parselan_error;
+		} else if (r == GETIFADDR_DEVICE_NOT_CONFIGURED) {
+			INIT_PRINT_ERR("interface \"%s\" is not configured\n", str);
+			goto parselan_error;
+		} else if (r == GETIFADDR_IF_DOWN) {
+			INIT_PRINT_ERR("interface \"%s\" is down\n", str);
+			goto parselan_error;
+		} else if(r != GETIFADDR_OK) {
+			INIT_PRINT_ERR("error getting address for interface %s\n", str);
+			goto parselan_error;
+		}
+#endif /* ENABLE_IPV6 */
 	}
 	else
 	{
@@ -1136,8 +1151,52 @@ int update_ext_ip_addr_from_stun(int init)
 	return 0;
 }
 
+/*! \brief check external IP address and update disable_port_forwarding
+ */
+static void update_disable_port_forwarding(void)
+{
+	char if_addr[INET_ADDRSTRLEN];
+	struct in_addr addr;
+	int r = getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL);
+	if (r < 0) {
+		switch(r) {
+		case GETIFADDR_DEVICE_NOT_CONFIGURED:
+			syslog(LOG_WARNING, "ext interface %s is not configured / no such device", ext_if_name);
+			break;
+		case GETIFADDR_IF_DOWN:
+			syslog(LOG_WARNING, "ext interface %s is down", ext_if_name);
+			break;
+		case GETIFADDR_NO_ADDRESS:
+			syslog(LOG_WARNING, "ext interface %s has no IPv4 address. Network is down", ext_if_name);
+			break;
+		default:
+			syslog(LOG_ERR, "Error getting IPv4 address for ext interface %s. Network is down", ext_if_name);
+		}
+		disable_port_forwarding = 1;
+	} else {
+		int reserved = addr_is_reserved(&addr);
+		if (!disable_port_forwarding && reserved) {
+			if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+				syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
+			} else {
+				syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
+				syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
+				syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
+				syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
+				syslog(LOG_INFO, "You can set option ignore_private_ip_check=yes to enable port forwarding");
+				syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
+				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+				disable_port_forwarding = 1;
+			}
+		} else if (disable_port_forwarding && !reserved) {
+			syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
+			disable_port_forwarding = 0;
+		}
+	}
+}
+
 /* fill uuidvalue_wan and uuidvalue_wcd based on uuidvalue_igd */
-void complete_uuidvalues(void)
+static void complete_uuidvalues(void)
 {
 	size_t len;
 	len = strlen(uuidvalue_igd);
@@ -2357,25 +2416,7 @@ main(int argc, char * * argv)
 	}
 	else if (!use_ext_ip_addr)
 	{
-		char if_addr[INET_ADDRSTRLEN];
-		struct in_addr addr;
-		if (getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL) < 0) {
-			syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
-			disable_port_forwarding = 1;
-		} else if (addr_is_reserved(&addr)) {
-			if (GETFLAG(IGNOREPRIVATEIPMASK)) {
-				syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
-			} else {
-				syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
-				syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-				syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-				syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-				syslog(LOG_INFO, "You can set option ignore_private_ip_check=yes to enable port forwarding");
-				syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
-				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
-				disable_port_forwarding = 1;
-			}
-		}
+		update_disable_port_forwarding();
 	}
 
 #ifdef DYNAMIC_OS_VERSION
@@ -2685,31 +2726,7 @@ main(int argc, char * * argv)
 			}
 			else if (!use_ext_ip_addr)
 			{
-				char if_addr[INET_ADDRSTRLEN];
-				struct in_addr addr;
-				if (getifaddr(ext_if_name, if_addr, INET_ADDRSTRLEN, &addr, NULL) < 0) {
-					syslog(LOG_WARNING, "Cannot get IP address for ext interface %s. Network is down", ext_if_name);
-					disable_port_forwarding = 1;
-				} else {
-					int reserved = addr_is_reserved(&addr);
-					if (!disable_port_forwarding && reserved) {
-						if (GETFLAG(IGNOREPRIVATEIPMASK)) {
-							syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s.", if_addr, ext_if_name);
-						} else {
-							syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
-							syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-							syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-							syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-							syslog(LOG_INFO, "You can set option ignore_private_ip_check=yes to enable port forwarding");
-							syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
-							syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
-							disable_port_forwarding = 1;
-						}
-					} else if (disable_port_forwarding && !reserved) {
-						syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
-						disable_port_forwarding = 0;
-					}
-				}
+				update_disable_port_forwarding();
 			}
 #ifdef ENABLE_NATPMP
 			if(GETFLAG(ENABLENATPMPMASK))

@@ -1,7 +1,7 @@
-/* $Id: testgetifaddr.c,v 1.7 2013/04/27 15:38:57 nanard Exp $ */
+/* $Id: testgetifaddr.c,v 1.9 2025/04/08 21:28:45 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 #include <stdio.h>
@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include "config.h"
 #include "getifaddr.h"
+#include "getconnstatus.h"
 
 #if defined(__sun)
 /* solaris 10 does not define LOG_PERROR */
@@ -32,8 +33,11 @@ int main(int argc, char * * argv) {
 	}
 
 	openlog("testgetifaddr", LOG_CONS|LOG_PERROR, LOG_USER);
-	if(getifaddr(argv[1], str_addr, sizeof(str_addr), &addr, &mask) < 0) {
-		fprintf(stderr, "Cannot get address for interface %s.\n", argv[1]);
+	printf("Interface %s status : %s\n", argv[1], get_wan_connection_status_str(argv[1]));
+
+	r = getifaddr(argv[1], str_addr, sizeof(str_addr), &addr, &mask);
+	if(r < 0) {
+		fprintf(stderr, "getifaddr(\"%s\") returned %d\n", argv[1], r);
 		return 1;
 	}
 	printf("Interface %s has IP address %s.\n", argv[1], str_addr);
