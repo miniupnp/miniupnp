@@ -54,8 +54,8 @@ time_t epoch_origin = 0;
 
 #ifdef ENABLE_PCP
 /* for PCP */
-unsigned long int min_lifetime = 120;
-unsigned long int max_lifetime = 86400;
+unsigned long int pcp_min_lifetime = 120;
+unsigned long int pcp_max_lifetime = 86400;
 #endif
 
 int runtime_flags = 0;
