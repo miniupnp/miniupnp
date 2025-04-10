@@ -1134,20 +1134,18 @@ int update_ext_ip_addr_from_stun(int init)
 		syslog(LOG_INFO, "Port forwarding is now enabled");
 	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
 		if (addr_is_reserved(&if_addr)) {
-			syslog(LOG_WARNING, "STUN: ext interface %s with private IP address %s is now behind restrictive or symmetric NAT with public IP address %s which does not support port forwarding", ext_if_name, if_addr_str, ext_addr_str);
+			syslog(LOG_WARNING, "STUN: ext interface %s with private IP address %s is now possibly behind restrictive or symmetric NAT with public IP address %s which does not support port forwarding", ext_if_name, if_addr_str, ext_addr_str);
 			syslog(LOG_WARNING, "NAT on upstream router blocks incoming connections set by miniupnpd");
 			syslog(LOG_WARNING, "Turn off NAT on upstream router or change it to full-cone NAT 1:1 type");
 		} else {
 			syslog(LOG_WARNING, "STUN: ext interface %s has now public IP address %s but firewall filters incoming connections set by miniunnpd", ext_if_name, if_addr_str);
 			syslog(LOG_WARNING, "Check configuration of firewall on local machine and also on upstream router");
 		}
-		syslog(LOG_WARNING, "Port forwarding is now disabled");
 	} else {
 		syslog(LOG_INFO, "STUN: ... done");
 	}
 
 	use_ext_ip_addr = ext_addr_str;
-	disable_port_forwarding = restrictive_nat;
 	return 0;
 }
 
