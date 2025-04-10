@@ -1041,7 +1041,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 				return -1;
 			}
 			if(addr_is_reserved(&lan_addr->ext_ip_addr)) {
-				if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+				if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
 					syslog(LOG_WARNING, "IGNORED : option ext_ip address contains reserved / private address : %s", lan_addr->ext_ip_str);
 				} else {
 					/* error */
@@ -1176,7 +1176,7 @@ static void update_disable_port_forwarding(void)
 	} else {
 		int reserved = addr_is_reserved(&addr);
 		if (!disable_port_forwarding && reserved) {
-			if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
 				syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
 			} else {
 				syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
@@ -1337,9 +1337,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPEXT_IP:
 				use_ext_ip_addr = ary_options[i].value;
 				break;
-			case UPNP_IGNORE_PRIVATE_IP:
+			case UPNPEXT_ALLOW_PRIVATE_IPV4:
 				if(strcmp(ary_options[i].value, "yes") == 0)
-					SETFLAG(IGNOREPRIVATEIPMASK);
+					SETFLAG(ALLOWPRIVATEIPV4MASK);
 				break;
 			case UPNPEXT_PERFORM_STUN:
 				if(strcmp(ary_options[i].value, "yes") == 0)
@@ -1953,7 +1953,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			return 1;
 		}
 		if (addr_is_reserved(&addr)) {
-			if (GETFLAG(IGNOREPRIVATEIPMASK)) {
+			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
 				syslog(LOG_WARNING, "IGNORED : option ext_ip contains reserved / private address %s, not public routable", use_ext_ip_addr);
 			} else {
 				INIT_PRINT_ERR("Error: option ext_ip contains reserved / private address %s, not public routable\n", use_ext_ip_addr);
