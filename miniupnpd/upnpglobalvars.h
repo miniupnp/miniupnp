@@ -87,7 +87,7 @@ extern int runtime_flags;
 
 #define PERFORMSTUNMASK    0x1000
 
-#define IGNOREPRIVATEIPMASK 0x2000
+#define ALLOWPRIVATEIPV4MASK 0x2000
 
 #define SETFLAG(mask)	runtime_flags |= mask
 #define GETFLAG(mask)	(runtime_flags & mask)
