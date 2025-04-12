@@ -1,7 +1,7 @@
-/* $Id: upnputils.c,v 1.14 2024/10/04 23:10:18 nanard Exp $ */
+/* $Id: upnputils.c,v 1.15 2025/04/12 23:14:32 nanard Exp $ */
 /* MiniUPnP project
- * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2024 Thomas Bernard
+ * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -240,4 +240,39 @@ int upnp_gettimeofday(struct timeval * tv)
 #else
 	return gettimeofday(tv, NULL);
 #endif
+}
+
+int
+proto_atoi(const char * protocol)
+{
+	int proto = IPPROTO_TCP;
+	if(strcasecmp(protocol, "UDP") == 0)
+		proto = IPPROTO_UDP;
+#ifdef IPPROTO_UDPLITE
+	else if(strcasecmp(protocol, "UDPLITE") == 0)
+		proto = IPPROTO_UDPLITE;
+#endif /* IPPROTO_UDPLITE */
+	return proto;
+}
+
+const char *
+proto_itoa(int proto)
+{
+	const char * protocol;
+	switch(proto) {
+	case IPPROTO_UDP:
+		protocol = "UDP";
+		break;
+	case IPPROTO_TCP:
+		protocol = "TCP";
+		break;
+#ifdef IPPROTO_UDPLITE
+	case IPPROTO_UDPLITE:
+		protocol = "UDPLITE";
+		break;
+#endif /* IPPROTO_UDPLITE */
+	default:
+		protocol = "*UNKNOWN*";
+	}
+	return protocol;
 }
