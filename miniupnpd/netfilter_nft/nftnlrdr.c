@@ -181,7 +181,7 @@ add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
 	}
 	else
 	{
-		syslog(LOG_ERR, "add_timestamp_entry() malloc(%lu) error",
+		syslog(LOG_CRIT, "add_timestamp_entry() malloc(%lu) error",
 		       sizeof(struct timestamp_entry));
 	}
 }
@@ -664,7 +664,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	array = calloc(capacity, sizeof(unsigned short));
 
 	if (array == NULL) {
-		syslog(LOG_ERR, "get_portmappings_in_range(): calloc error");
+		syslog(LOG_CRIT, "%s: calloc(%lu) failed", "get_portmappings_in_range", capacity * sizeof(unsigned short));
 		return NULL;
 	}
 
@@ -680,10 +680,10 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 				tmp = realloc(array,
 					      sizeof(unsigned short)*capacity);
 				if (tmp == NULL) {
-					syslog(LOG_ERR,
-					       "get_portmappings_in_range(): "
-					       "realloc(%u) error",
-					       (unsigned)sizeof(unsigned short)*capacity);
+					syslog(LOG_CRIT,
+					       "%s: realloc(%lu) failed",
+					       "get_portmappings_in_range",
+					       sizeof(unsigned short)*capacity);
 					*number = 0;
 					free(array);
 					return NULL;
