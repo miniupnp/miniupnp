@@ -86,7 +86,7 @@ port_in_use(const char *if_name,
 	}
 
 	syslog(LOG_DEBUG, "Check protocol %s for port %u on ext_if %s %s, %08X",
-	    (proto==IPPROTO_TCP)?"tcp":"udp", eport, if_name,
+	    proto_itoa(proto), eport, if_name,
 	    ip_addr_str, (unsigned)ip_addr.s_addr);
 
 	/* Phase 1 : check for local sockets (would be listed by netstat) */

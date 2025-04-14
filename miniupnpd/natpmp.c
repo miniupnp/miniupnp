@@ -341,11 +341,11 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					} else if(eport == eport_first) { /* no eport available */
 						if(any_eport_allowed == 0) { /* all eports rejected by permissions */
 							syslog(LOG_ERR, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
-							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
+							       eport, proto_itoa(proto), senderaddrstr, iport);
 							resp[3] = 2;	/* Not Authorized/Refused */
 						} else { /* at least one eport allowed (but none available) */
 							syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
-							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport);
+							       eport, proto_itoa(proto), senderaddrstr, iport);
 							resp[3] = 4;	/* Out of resources */
 						}
 						break;
@@ -359,7 +359,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 #ifdef CHECK_PORTINUSE
 					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
 						syslog(LOG_INFO, "port %hu protocol %s already in use",
-						       eport, (proto==IPPROTO_TCP)?"tcp":"udp");
+						       eport, proto_itoa(proto));
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
 						continue;
@@ -389,13 +389,13 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					/* do the redirection */
 					timestamp = upnp_time() + lifetime;
 					snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
-					         eport, (proto==IPPROTO_TCP)?"tcp":"udp");
+					         eport, proto_itoa(proto));
 					/* TODO : check return code */
 					if(upnp_redirect_internal(NULL, eport, senderaddrstr,
 					                          iport, proto, desc,
 					                          timestamp) < 0) {
 						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
-						       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport, desc);
+						       eport, proto_itoa(proto), senderaddrstr, iport, desc);
 						resp[3] = 3;  /* Failure */
 					}
 					break;
