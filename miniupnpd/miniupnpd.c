@@ -1141,11 +1141,17 @@ int update_ext_ip_addr_from_stun(int init)
 			syslog(LOG_WARNING, "STUN: ext interface %s has now public IP address %s but firewall filters incoming connections set by miniunnpd", ext_if_name, if_addr_str);
 			syslog(LOG_WARNING, "Check configuration of firewall on local machine and also on upstream router");
 		}
+		if (!GETFLAG(ALLOWFILTEREDSTUNMASK)) {
+			syslog(LOG_WARNING, "Port forwarding is now disabled");
+			syslog(LOG_WARNING, "Set ext_perform_stun=allow-filtered if you still want to use port forwarding in current situation");
+		}
 	} else {
 		syslog(LOG_INFO, "STUN: ... done");
 	}
 
 	use_ext_ip_addr = ext_addr_str;
+	if (!GETFLAG(ALLOWFILTEREDSTUNMASK))
+		disable_port_forwarding = restrictive_nat;
 	return 0;
 }
 
@@ -1342,6 +1348,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPEXT_PERFORM_STUN:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(PERFORMSTUNMASK);
+				if(strcmp(ary_options[i].value, "allow-filtered") == 0)
+				{
+					SETFLAG(PERFORMSTUNMASK);
+					SETFLAG(ALLOWFILTEREDSTUNMASK);
+				}
 				break;
 			case UPNPEXT_STUN_HOST:
 				ext_stun_host = ary_options[i].value;
