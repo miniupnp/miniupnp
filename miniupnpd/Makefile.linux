@@ -130,7 +130,7 @@ include $(SRCDIR)/check.mk
 include $(SRCDIR)/common.mk
 
 testportinuse:	testportinuse.o portinuse.o getifaddr.o \
-	iptcrdr.o
+	iptcrdr.o upnputils.o getroute.o
 
 config.mk config.h:	$(SRCDIR)/configure $(SRCDIR)/VERSION
 	$(SHELL) $< $(CONFIG_OPTIONS)

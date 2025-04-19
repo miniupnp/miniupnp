@@ -48,6 +48,7 @@
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "portinuse.h"
+#include "upnputils.h"
 
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
