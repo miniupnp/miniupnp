@@ -23,8 +23,8 @@ int main(int argc, char * * argv) {
 	char str_addr[64];
 	struct in_addr addr;
 	struct in_addr mask;
-#ifdef ENABLE_IPV6
 	int r;
+#ifdef ENABLE_IPV6
 	char str_addr6[64];
 #endif
 	if(argc < 2) {
