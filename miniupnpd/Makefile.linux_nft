@@ -124,6 +124,7 @@ include $(SRCDIR)/check.mk
 include $(SRCDIR)/common.mk
 
 testportinuse:	testportinuse.o portinuse.o getifaddr.o \
+	upnputils.o getroute.o \
 	nftnlrdr.o nftnlrdr_misc.o
 
 config.mk config.h:	$(SRCDIR)/configure $(SRCDIR)/VERSION
