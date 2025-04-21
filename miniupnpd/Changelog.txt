@@ -10,6 +10,9 @@ VERSION 2.3.9 : released on 2025/04/22
     and now setting ext_perform_stun=allow-filtered would allow failed
     STUN CGNAT filter check to be ignored
 
+2025/04/25:
+  NFTables: don't apply iif to rules if USE_IFNAME_IN_RULES is disabled
+
 2025/04/10:
   Unify naming scheme and rename to ext_allow_private_ipv4 for
   ignore_private_ip_check
