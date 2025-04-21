@@ -795,6 +795,20 @@ expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,
 }
 
 static void
+expr_add_counter(struct nftnl_rule *r)
+{
+	struct nftnl_expr *e;
+
+	e = nftnl_expr_alloc("counter");
+	if (e == NULL) {
+		log_error("nftnl_expr_alloc(\"%s\") FAILED", "counter");
+		return;
+	}
+
+	nftnl_rule_add_expr(r, e);
+}
+
+static void
 expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
 {
 	struct nftnl_expr *e;
@@ -1021,6 +1035,9 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 	}
+
+	/* Counter */
+	expr_add_counter(r);
 
 	expr_add_nat(r, NFT_NAT_DNAT, NFPROTO_IPV4, ihost, htons(iport), 0);
 
