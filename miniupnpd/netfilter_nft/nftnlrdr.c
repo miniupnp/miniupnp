@@ -608,8 +608,6 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 	struct in_addr addr;
 	UNUSED(nat_chain_name);
 	UNUSED(ifname);
-	UNUSED(packets);
-	UNUSED(bytes);
 	UNUSED(rhost);
 	UNUSED(rhostlen);
 
@@ -636,6 +634,11 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 
 			if(timestamp != NULL)
 				*timestamp = get_timestamp(eport, proto);
+
+			if(packets)
+				*packets = p->packets;
+			if(bytes)
+				*bytes = p->bytes;
 
 			return 0;
 		}
