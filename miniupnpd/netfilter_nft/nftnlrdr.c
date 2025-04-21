@@ -465,9 +465,7 @@ get_peer_rule_by_index(int index,
 			if (timestamp) {
 				*timestamp = get_timestamp(r->dport, r->proto);
 			}
-			/*
-			 * TODO: Implement counter in case of add {nat,filter}
-			 */
+
 			return 0;
 		}
 	}
@@ -581,9 +579,6 @@ get_redirect_rule_by_index(int index,
 					*bytes = r->bytes;
 			}
 
-			/*
-			 * TODO: Implement counter in case of add {nat,filter}
-			 */
 			return 0;
 		}
 	}
