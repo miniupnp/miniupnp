@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: configure,v 1.133 2025/01/25 21:22:24 nanard Exp $
+# $Id: configure,v 1.136 2025/04/21 22:56:48 nanard Exp $
 # vim: tabstop=4 shiftwidth=4 noexpandtab
 #
 # miniupnp daemon
@@ -1110,6 +1110,10 @@ else
 	echo "/*#define USE_GETIFADDRS*/" >> ${CONFIGFILE}
 fi
 
+echo "/* uncomment if your libc is too old to include strndup() */" >> ${CONFIGFILE}
+echo "/*#define NO_STRNDUP */" >> ${CONFIGFILE}
+
+echo "" >> ${CONFIGFILE}
 echo "#endif /* ${CONFIGMACRO} */" >> ${CONFIGFILE}
 
 ${MV} ${CONFIGFILE} ${CONFIGFILE_FINAL}

@@ -1,4 +1,4 @@
-/* $Id: upnppermissions.c,v 1.20 2020/10/30 21:37:35 nanard Exp $ */
+/* $Id: upnppermissions.c,v 1.24 2025/04/21 22:56:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2023 Thomas Bernard
@@ -21,6 +21,7 @@
 #include "config.h"
 #include "macros.h"
 #include "upnppermissions.h"
+#include "upnputils.h"
 
 static int
 isodigit(char c)

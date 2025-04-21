@@ -1,4 +1,4 @@
-/* $Id: upnputils.c,v 1.15 2025/04/12 23:14:32 nanard Exp $ */
+/* $Id: upnputils.c,v 1.16 2025/04/21 22:56:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2006-2025 Thomas Bernard
@@ -8,6 +8,7 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -22,6 +23,7 @@
 #endif
 #include <errno.h>
 
+#include "config.h"
 #include "upnputils.h"
 #include "upnpglobalvars.h"
 #ifdef ENABLE_IPV6
@@ -276,3 +278,23 @@ proto_itoa(int proto)
 	}
 	return protocol;
 }
+
+#ifdef NO_STRNDUP
+char * strndup_impl(const char * str, size_t len)
+{
+	size_t str_len;
+	char * p;
+
+	if (str == NULL)
+		return NULL;
+	str_len = strlen(str);
+	if (str_len < len)
+		len = str_len;
+	p = malloc(len + 1);
+	if (p == NULL)
+		return NULL;
+	memcpy(p, str, len);
+	p[len] = '\0';
+	return p;
+}
+#endif /* NO_STRNDUP */

@@ -1,4 +1,4 @@
-/* $Id: upnputils.h,v 1.12 2025/04/12 23:14:32 nanard Exp $ */
+/* $Id: upnputils.h,v 1.13 2025/04/21 22:56:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * (c) 2011-2025 Thomas Bernard
@@ -91,5 +91,9 @@ static __inline size_t _sa_len(const struct sockaddr *addr)
 # define MAX(a,b) (((a)>(b))?(a):(b))
 #endif
 
-#endif
+#ifdef NO_STRNDUP
+char * strndup_impl(const char * str, size_t len);
+#define strndup strndup_impl
+#endif /* NO_STRNDUP */
 
+#endif
