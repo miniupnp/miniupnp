@@ -542,10 +542,10 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 	int n;
 	struct sockaddr_storage sockudp_r;
 	unsigned int mx;
+	int rv;
 #ifdef NO_GETADDRINFO
 	struct sockaddr_storage sockudp_w;
 #else
-	int rv;
 	struct addrinfo hints, *servinfo;
 #endif
 #ifdef _WIN32
@@ -874,7 +874,7 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 			p->sin_port = htons(SSDP_PORT);
 			p->sin_addr.s_addr = inet_addr(UPNP_MCAST_ADDR);
 		}
-		rv = sendto(sudp, bufr, n, 0, &sockudp_w,
+		rv = sendto(sudp, bufr, n, 0, (struct sockaddr *)&sockudp_w,
 		            ipv6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
 		if (rv < 0) {
 			if(error)
