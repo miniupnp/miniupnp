@@ -13,7 +13,10 @@ case $OS in
 	# linux
 	IP="`command -v ip`" || exit 1
 	EXTIF="`LC_ALL=C $IP -4 route | grep 'default' | sed -e 's/.*dev[[:space:]]*//' -e 's/[[:space:]].*//'`" || exit 1
-	EXTIF="`LC_ALL=C $IP -4 addr show $EXTIF | awk '/[0-9]+:/ { print $2; exit 0 }' | cut -d ":" -f 1`"
+	if [ -z "$EXTIF" ] ; then
+		# there is no default route
+		EXTIF="`LC_ALL=C $IP -4 addr show $EXTIF | awk '/[0-9]+:/ { print $2; exit 0 }' | cut -d ":" -f 1`"
+	fi
 	EXTIP="`LC_ALL=C $IP -4 addr show $EXTIF | awk '/inet/ { print $2; exit 0 }' | cut -d "/" -f 1`"
 	;;
 esac
