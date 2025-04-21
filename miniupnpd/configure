@@ -1010,7 +1010,7 @@ echo " * It can be disabled to save a few bytes. */" >> ${CONFIGFILE}
 echo "#define ENABLE_EVENTS" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
-echo "/* include interface name in pf and ipf rules */" >> ${CONFIGFILE}
+echo "/* include interface name in pf, ipf and nftables rules */" >> ${CONFIGFILE}
 echo "#define USE_IFNAME_IN_RULES" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
