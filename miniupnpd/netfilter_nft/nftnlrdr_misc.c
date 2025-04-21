@@ -987,12 +987,14 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 		nftnl_rule_set_u64(r, NFTNL_RULE_POSITION, handle_num);
 	}
 
+#ifdef USE_IFNAME_IN_RULES
 	if (ifname != NULL) {
 		if_idx = (uint32_t)if_nametoindex(ifname);
 		expr_add_meta(r, NFT_META_IIF, NFT_REG_1);
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &if_idx,
 			     sizeof(uint32_t));
 	}
+#endif
 
 	/* Source IP */
 	if (rhost != 0) {
@@ -1143,12 +1145,14 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 		nftnl_rule_set_u64(r, NFTNL_RULE_POSITION, handle_num);
 	}
 
+#ifdef USE_IFNAME_IN_RULES
 	if (ifname != NULL) {
 		if_idx = (uint32_t)if_nametoindex(ifname);
 		expr_add_meta(r, NFT_META_IIF, NFT_REG_1);
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &if_idx,
 			     sizeof(uint32_t));
 	}
+#endif
 
 	/* Destination Port */
 	dport = htons(iport);
