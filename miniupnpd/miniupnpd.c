@@ -1348,7 +1348,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPEXT_PERFORM_STUN:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(PERFORMSTUNMASK);
-				if(strcmp(ary_options[i].value, "allow-filtered") == 0)
+				else if(strcmp(ary_options[i].value, "allow-filtered") == 0)
 				{
 					SETFLAG(PERFORMSTUNMASK);
 					SETFLAG(ALLOWFILTEREDSTUNMASK);
