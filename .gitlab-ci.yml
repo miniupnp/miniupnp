@@ -7,6 +7,7 @@ stages:
 miniupnpd_iptables:
     stage: build
     before_script:
+        - echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
         - >
           apt-get update -qq && apt-get install -y -qq iproute2
           libip4tc-dev libip6tc-dev libiptc-dev libxtables-dev
@@ -22,6 +23,7 @@ miniupnpd_iptables:
 miniupnpd_nftables:
     stage: build
     before_script:
+        - echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
         - >
           apt-get update -qq && apt-get install -y -qq iproute2
           libnftables-dev libnftnl-dev
