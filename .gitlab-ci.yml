@@ -27,6 +27,8 @@ miniupnpd_nftables:
           libnftables-dev libnftnl-dev
           libnfnetlink-dev uuid-dev make gcc
           libmnl-dev libssl-dev net-tools doxygen graphviz
+        - ip -4 route
+        - ip -4 addr
     script:
         - "cd miniupnpd"
         - "./configure --firewall=nftables || exit 1"
