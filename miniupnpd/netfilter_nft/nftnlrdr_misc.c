@@ -741,9 +741,11 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		} else if (n == 0) {
 			break;
 		}
+		/* https://git.netfilter.org/libmnl/tree/src/callback.c#n48 */
+		errno = 0;
 		ret = mnl_cb_run(buf, n, mnl_seq, mnl_portid, table_cb, &data);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
-			syslog(LOG_ERR, "%s: mnl_cb_run returned %d",
+			syslog(LOG_ERR, "%s: mnl_cb_run returned %d: %m",
 			       "refresh_nft_cache", ret);
 			return -1;
 		}
@@ -1435,9 +1437,11 @@ send_batch(struct mnl_nlmsg_batch *batch)
 		} else if (n == 0) {
 			break;
 		}
+		/* https://git.netfilter.org/libmnl/tree/src/callback.c#n48 */
+		errno = 0;
 		ret = mnl_cb_run(buf, n, 0, mnl_portid, NULL, NULL);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
-			syslog(LOG_ERR, "%s: mnl_cb_run returned %d",
+			syslog(LOG_ERR, "%s: mnl_cb_run returned %d: %m",
 			       "send_batch", ret);
 			return -4;
 		}
