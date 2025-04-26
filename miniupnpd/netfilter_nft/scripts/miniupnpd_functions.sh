@@ -14,7 +14,7 @@ CHAIN="miniupnpd"
 PREROUTING_CHAIN="prerouting_miniupnpd"
 POSTROUTING_CHAIN="postrouting_miniupnpd"
 
-while getopts ":t:n:c:p:r:h" opt; do
+while getopts ":t:n:c:p:r:f:h" opt; do
 	case $opt in
 		t)
 			TABLE=$OPTARG
@@ -31,10 +31,29 @@ while getopts ":t:n:c:p:r:h" opt; do
 		r)
 			POSTROUTING_CHAIN=$OPTARG
 			;;
+		f)
+			conf=$OPTARG
+			if [ ! -r "$conf" ] ; then
+				echo "$conf is unreadable" >&2
+				exit 1
+			fi
+			for line in $(grep -E '^[a-z_]+=' $conf | sed 's/\s*#.*//') ; do
+				v=$(echo "$line" | cut -d= -f2)
+				case $line in
+					upnp_table_name=*) TABLE=$v ;;
+					upnp_nat_table_name=*) NAT_TABLE=$v ;;
+					upnp_forward_chain=*) CHAIN=$v ;;
+					upnp_nat_chain=*) PREROUTING_CHAIN=$v ;;
+					upnp_nat_postrouting_chain=*) POSTROUTING_CHAIN=$v ;;
+				esac
+			done
+			echo "TABLE=$TABLE"
+			;;
 		h)
 			echo "Usage: $0 [options]"
 			echo
 			echo "Options:"
+			echo "  -f /to/miniupnpd.conf read table and chain names from miniupnpd.conf"
 			echo "  -t table              upnp_table_name in miniupnpd.conf"
 			echo "  -n nat_table          upnp_nat_table_name in miniupnpd.conf"
 			echo "  -c chain              upnp_forward_chain in miniupnpd.conf"
