@@ -935,48 +935,59 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 	const char * p;
 	unsigned int n;
 	char tmp[16];
+	unsigned int dot_count = 0;
+	int only_digits_and_dots = 1;
 
 	memset(lan_addr, 0, sizeof(struct lan_addr_s));
 	p = str;
-	while(*p && *p != '/' && !isspace(*p))
+	while(*p && *p != '/' && !isspace(*p)) {
+		if (*p == '.')
+			dot_count++;
+		else if (!isdigit(*p))
+			only_digits_and_dots = 0;
 		p++;
+	}
 	n = p - str;
-	if(!isdigit(str[0]) && n < (int)sizeof(lan_addr->ifname)) {
+	if(!only_digits_and_dots || dot_count != 3) {
+		/* not only digits and dots : suppose it is an interface name */
 		int r;
-		/* not starting with a digit : suppose it is an interface name */
+		if (n >= (unsigned int)sizeof(lan_addr->ifname)) {
+			INIT_PRINT_ERR("interface name \"%.*s\" is too long (maximum is %d caracters)\n",
+			               n, str, (int)sizeof(lan_addr->ifname) - 1);
+			goto parselan_error;
+		}
 		memcpy(lan_addr->ifname, str, n);
 		lan_addr->ifname[n] = '\0';
 		r = getifaddr(lan_addr->ifname, lan_addr->str, sizeof(lan_addr->str),
 		             &lan_addr->addr, &lan_addr->mask);
 #ifdef ENABLE_IPV6
 		if(r == GETIFADDR_NO_ADDRESS) {
-			fprintf(stderr, "interface \"%s\" has no IPv4 address\n", str);
-			syslog(LOG_NOTICE, "interface \"%s\" has no IPv4 address\n", str);
+			fprintf(stderr, "interface \"%s\" has no IPv4 address\n", lan_addr->ifname);
+			syslog(LOG_NOTICE, "interface \"%s\" has no IPv4 address\n", lan_addr->ifname);
 			lan_addr->str[0] = '\0';
 			lan_addr->addr.s_addr = htonl(0x00000000u);
 			lan_addr->mask.s_addr = htonl(0xffffffffu);
 		} else if(r != GETIFADDR_OK) {
-			INIT_PRINT_ERR("error getting address for interface %s\n", str);
+			INIT_PRINT_ERR("error getting address for interface %s\n", lan_addr->ifname);
 			goto parselan_error;
 		}
 #else /* ENABLE_IPV6 */
 		if(r == GETIFADDR_NO_ADDRESS) {
-			INIT_PRINT_ERR("interface \"%s\" has no address\n", str);
+			INIT_PRINT_ERR("interface \"%s\" has no address\n", lan_addr->ifname);
 			goto parselan_error;
 		} else if (r == GETIFADDR_DEVICE_NOT_CONFIGURED) {
-			INIT_PRINT_ERR("interface \"%s\" is not configured\n", str);
+			INIT_PRINT_ERR("interface \"%s\" is not configured\n", lan_addr->ifname);
 			goto parselan_error;
 		} else if (r == GETIFADDR_IF_DOWN) {
-			INIT_PRINT_ERR("interface \"%s\" is down\n", str);
+			INIT_PRINT_ERR("interface \"%s\" is down\n", lan_addr->ifname);
 			goto parselan_error;
 		} else if(r != GETIFADDR_OK) {
-			INIT_PRINT_ERR("error getting address for interface %s\n", str);
+			INIT_PRINT_ERR("error getting address for interface %s\n", lan_addr->ifname);
 			goto parselan_error;
 		}
 #endif /* ENABLE_IPV6 */
-	}
-	else
-	{
+	} else { /* if(!only_digits_and_dots || dot_count != 3) */
+		/* only digits and 3 dots, so it looks like an IPv4 address */
 		if(n>15)
 			goto parselan_error;
 		memcpy(lan_addr->str, str, n);
@@ -1052,6 +1063,7 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 		}
 	}
 #else
+	/* add associated network interfaces (for bridges) */
 	while(*p) {
 		/* skip spaces */
 		while(*p && isspace(*p))
