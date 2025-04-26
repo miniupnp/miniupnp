@@ -794,6 +794,7 @@ expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,
 	nftnl_rule_add_expr(r, e);
 }
 
+#ifdef ENABLE_NFT_RULE_COUNTER
 static void
 expr_add_counter(struct nftnl_rule *r)
 {
@@ -807,6 +808,7 @@ expr_add_counter(struct nftnl_rule *r)
 
 	nftnl_rule_add_expr(r, e);
 }
+#endif
 
 static void
 expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
@@ -1036,8 +1038,10 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 	}
 
+#ifdef ENABLE_NFT_RULE_COUNTER
 	/* Counter */
 	expr_add_counter(r);
+#endif
 
 	expr_add_nat(r, NFT_NAT_DNAT, NFPROTO_IPV4, ihost, htons(iport), 0);
 

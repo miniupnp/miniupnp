@@ -1018,6 +1018,12 @@ echo "/* Experimental NFQUEUE support. */" >> ${CONFIGFILE}
 echo "/*#define ENABLE_NFQUEUE*/" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
+if [ "$FW" = "nftables" ] ; then
+	echo "/* Add a counter to nftables rules */" >> ${CONFIGFILE}
+	echo "#define ENABLE_NFT_RULE_COUNTER" >> ${CONFIGFILE}
+	echo "" >> ${CONFIGFILE}
+fi
+
 echo "/* Enable to make MiniUPnPd more strict about UPnP conformance" >> ${CONFIGFILE}
 echo " * and the messages it receives from control points */" >> ${CONFIGFILE}
 if [ -n "$STRICT" ] ; then
