@@ -230,7 +230,6 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	char desc[NFT_DESCR_SIZE];
 	char ifname[IFNAMSIZ];
 	char comment[NFT_DESCR_SIZE];
-	char * tmp_p;
 	uint32_t ext_if_indx;
 	int proto, res;
 	unsigned short iport, rport;
