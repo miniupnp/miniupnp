@@ -572,12 +572,10 @@ get_redirect_rule_by_index(int index,
 				*timestamp = get_timestamp(*eport, *proto);
 			}
 
-			if (packets || bytes) {
-				if (packets)
-					*packets = r->packets;
-				if (bytes)
-					*bytes = r->bytes;
-			}
+			if (packets)
+				*packets = r->packets;
+			if (bytes)
+				*bytes = r->bytes;
 
 			return 0;
 		}
