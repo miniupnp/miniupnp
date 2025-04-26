@@ -3,6 +3,7 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 2025/04/26
   Fix parsing of interfaces names starting with a digit
   nftables: add counter for DNAT rule (ENABLE_NFT_RULE_COUNTER in config.h)
+  nftables: improve scripts to support already existing tables
 
 VERSION 2.3.9 : released on 2025/04/22
 

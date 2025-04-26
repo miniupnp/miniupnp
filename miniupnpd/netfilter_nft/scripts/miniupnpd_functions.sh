@@ -8,6 +8,17 @@ NFT=$(which nft) || {
 }
 fi
 
+$NFT list tables > /dev/null
+if [ $? -ne 0 ] ; then
+	echo "nft error" >&2
+	exit 1
+fi
+
+# nft support the following address families :
+# ip       IPv4 address family.
+# ip6      IPv6 address family.
+# inet     Internet (IPv4/IPv6) address family.
+af=inet
 TABLE="filter"
 NAT_TABLE="filter"
 CHAIN="miniupnpd"
@@ -45,6 +56,7 @@ while getopts ":t:n:c:p:r:f:h" opt; do
 					upnp_forward_chain=*) CHAIN=$v ;;
 					upnp_nat_chain=*) PREROUTING_CHAIN=$v ;;
 					upnp_nat_postrouting_chain=*) POSTROUTING_CHAIN=$v ;;
+					upnp_nftables_family_split=*) if [ "$v" = "yes" ] ; then af=ip ; fi ;;
 				esac
 			done
 			echo "TABLE=$TABLE"
