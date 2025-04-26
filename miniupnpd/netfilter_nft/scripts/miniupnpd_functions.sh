@@ -1,9 +1,12 @@
 #! /bin/sh
+# vim: tabstop=4 shiftwidth=4
 
+if [ ! -x "$NFT" ] ; then
 NFT=$(which nft) || {
 	echo "Can't find nft" >&2
 	exit 1
 }
+fi
 
 TABLE="filter"
 NAT_TABLE="filter"
