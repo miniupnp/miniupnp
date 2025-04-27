@@ -1,8 +1,8 @@
-/* $Id: minisoap.c,v 1.32 2023/07/05 22:43:50 nanard Exp $ */
+/* $Id: minisoap.c,v 1.35 2025/04/27 21:13:45 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project : miniupnp
  * Author : Thomas Bernard
- * Copyright (c) 2005-2024 Thomas Bernard
+ * Copyright (c) 2005-2025 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution.
  *
@@ -99,7 +99,6 @@ int soapPostSubmit(SOCKET fd,
 #endif
 					   "SOAPAction: \"%s\"\r\n"
 					   "Connection: close\r\n"
-					   "Cache-Control: no-cache\r\n"	/* ??? */
 					   "\r\n",
 					   url, httpversion, host, portstr, bodysize, action);
 	if ((unsigned int)headerssize >= sizeof(headerbuf))
