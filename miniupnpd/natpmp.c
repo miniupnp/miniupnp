@@ -332,7 +332,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
-				char desc[64];
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {
@@ -388,14 +387,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					}
 					/* do the redirection */
 					timestamp = upnp_time() + lifetime;
-					snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
-					         eport, proto_itoa(proto));
 					/* TODO : check return code */
 					if(upnp_redirect_internal(NULL, eport, senderaddrstr,
-					                          iport, proto, desc,
+					                          iport, proto, "NAT-PMP",
 					                          timestamp) < 0) {
 						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
-						       eport, proto_itoa(proto), senderaddrstr, iport, desc);
+						       eport, proto_itoa(proto), senderaddrstr, iport, "NAT-PMP");
 						resp[3] = 3;  /* Failure */
 					}
 					break;

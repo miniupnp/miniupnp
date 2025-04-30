@@ -52,8 +52,8 @@
 
 static int next_uid = 1;
 
-#define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
-#define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
+#define PINEHOLE_LABEL_FORMAT "UPnP IGDv2 IPv6 (UID %d ts-%u: %s)"
+#define PINEHOLE_LABEL_FORMAT_SKIPDESC "UPnP IGDv2 IPv6 (UID %d ts-%u: %*s)"
 
 void init_iptpinhole(void)
 {
@@ -189,7 +189,7 @@ delete_pinhole(unsigned short uid)
 	char tmp_label[NFT_DESCR_SIZE];
 
 	snprintf(label_start, sizeof(label_start),
-	         "pinhole-%hu", uid);
+	         "UPnP IGDv2 IPv6 (UID %hu)", uid);
 
 	d_printf(("delete_pinhole()\n"));
 	refresh_nft_cache_filter();
@@ -239,7 +239,7 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	d_printf(("update_pinhole()\n"));
 
 	snprintf(label_start, sizeof(label_start),
-	         "pinhole-%hu", uid);
+	         "UPnP IGDv2 IPv6 (UID %hu)", uid);
 
 	refresh_nft_cache_filter();
 
@@ -345,7 +345,7 @@ get_pinhole_info(unsigned short uid,
 	char tmp_label[NFT_DESCR_SIZE];
 
 	snprintf(label_start, sizeof(label_start),
-	         "pinhole-%hu", uid);
+	         "UPnP IGDv2 IPv6 (UID %hu)", uid);
 
 	d_printf(("get_pinhole_info()\n"));
 	refresh_nft_cache_filter();

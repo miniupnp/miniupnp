@@ -44,9 +44,9 @@
  * pass in quick on ep0 inet6 proto udp
  *   from any to dead:beef::42:42 port = 8080
  *   flags S/SA keep state
- *   label "pinhole-2 ts-4321000"
+ *   label "UPnP IGDv2 IPv6 (UID 2 ts-4321000"
  *
- * with the label "pinhole-$uid ts-$timestamp: $description"
+ * with the label "UPnP IGDv2 IPv6 (UID $uid ts-$timestamp: $description"
  */
 
 #ifdef ENABLE_UPNPPINHOLE
@@ -56,8 +56,8 @@ extern int dev;
 
 static int next_uid = 1;
 
-#define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
-#define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
+#define PINEHOLE_LABEL_FORMAT "UPnP IGDv2 IPv6 (UID %d ts-%u: %s)"
+#define PINEHOLE_LABEL_FORMAT_SKIPDESC "UPnP IGDv2 IPv6 (UID %d ts-%u: %*s)"
 
 #define RULE (pr.rule)
 
@@ -293,7 +293,7 @@ int delete_pinhole(unsigned short uid)
 		return -1;
 	}
 	snprintf(label_start, sizeof(label_start),
-	         "pinhole-%hu", uid);
+	         "UPnP IGDv2 IPv6 (UID %hu)", uid);
 #ifdef USE_LIBPFCTL
 	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
 	{
@@ -398,7 +398,7 @@ get_pinhole_info(unsigned short uid,
 		return -1;
 	}
 	snprintf(label_start, sizeof(label_start),
-	         "pinhole-%hu", uid);
+	         "UPnP IGDv2 IPv6 (UID %hu)", uid);
 #ifdef USE_LIBPFCTL
 	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
 	{
