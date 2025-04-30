@@ -1244,7 +1244,7 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	case PCP_OPCODE_MAP:
 	case PCP_OPCODE_PEER:
 		snprintf(pcp_msg_info->desc, sizeof(pcp_msg_info->desc),
-			 "PCP %s %08x%08x%08x",
+			 "PCP %s nonce %08x%08x%08x",
 			 getPCPOpCodeStr(pcp_msg_info->opcode),
 			 pcp_msg_info->nonce[0],
 			 pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
