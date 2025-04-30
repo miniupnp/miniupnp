@@ -252,12 +252,12 @@ static int parseCommonRequestHeader(const uint8_t *common_req, pcp_info_t *pcp_m
 		return 1;
 	}
 
-	if (pcp_msg_info->lifetime > max_lifetime ) {
-		pcp_msg_info->lifetime = max_lifetime;
+	if (pcp_msg_info->lifetime > pcp_max_lifetime ) {
+		pcp_msg_info->lifetime = pcp_max_lifetime;
 	}
 
-	if ( (pcp_msg_info->lifetime < min_lifetime) && (pcp_msg_info->lifetime != 0) ) {
-		pcp_msg_info->lifetime = min_lifetime;
+	if ( (pcp_msg_info->lifetime < pcp_min_lifetime) && (pcp_msg_info->lifetime != 0) ) {
+		pcp_msg_info->lifetime = pcp_min_lifetime;
 	}
 
 	return 0;
