@@ -245,15 +245,11 @@ int find_pinhole(const char * ifname,
 		   && (int_port == ntohs(RULE.dst.port[0])) &&
 		   (0 == memcmp(&daddr, &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)))) {
 #ifdef USE_LIBPFCTL
-			if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+			if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 				continue;
-			}
 #else /* USE_LIBPFCTL */
-			if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+			if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 				continue;
-			}
 #endif /* USE_LIBPFCTL */
 			if(timestamp) *timestamp = ts;
 			if(desc) {
@@ -564,10 +560,8 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			release_ticket(dev, tnum);
 			return -1;
 		}
-		if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+		if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 			continue;
-		}
 #else /* USE_LIBPFCTL */
 		pr.nr = i;
 		if(ioctl(dev, DIOCGETRULE, &pr) < 0) {
@@ -575,10 +569,8 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			release_ticket(dev, tnum);
 			return -1;
 		}
-		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 			continue;
-		}
 #endif /* USE_LIBPFCTL */
 		if(ts <= (unsigned int)current_time) {
 #ifdef USE_LIBPFCTL
