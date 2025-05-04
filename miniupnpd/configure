@@ -513,6 +513,11 @@ case $OS_NAME in
 						OS_URL=https://archlinux.org/
 						OS_VERSION=`uname -r`
 						;;
+					VoidLinux)
+						OS_URL=https://voidlinux.org/
+						# OS_VERSION=rolling (lsb_release -r -s)
+						# lsb_release -c -s => void
+						;;
 				esac
 			fi
 		fi
