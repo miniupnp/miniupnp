@@ -1,5 +1,15 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2025/05/26:
+  Fix false negative filtered STUN CGNAT test result for
+    unsupported servers #825
+
+2025/05/24:
+  Fix Mac OS X 10.9 build
+
+2025/05/15:
+  build: teststun executable
+
 2025/04/28:
   pf: fix delete_pinhole for openbsd. Was broken since miniupnpd 2.3.7
 
