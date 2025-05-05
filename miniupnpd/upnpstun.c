@@ -287,6 +287,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 	uint16_t attr_len;
 	int have_address;
 	int have_xor_mapped_address;
+	int have_other_address;
 
 	if (len < 20)
 		return -1;
@@ -310,6 +311,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 	end = buffer + len;
 	have_address = 0;
 	have_xor_mapped_address = 0;
+	have_other_address = 0;
 
 	while (ptr + 4 <= end) {
 
@@ -325,7 +327,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 		switch (attr_type) {
 		case 0x0001:	/* MAPPED-ADDRESS */
 		case 0x0020:	/* XOR-MAPPED-ADDRESS (RFC 5389) */
-		case 0x8020:	/* XOR-MAPPED-ADDRESS (2005 draft) */
+		case 0x8020:	/* Was XOR-MAPPED-ADDRESS (draft 2 of 2005) */
 			/* Mapped Address or XOR Mapped Address */
 			if (attr_len == 8 && ptr[1] == 1) {
 				/* IPv4 address */
@@ -365,32 +367,40 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 			       attr_len - 4, ptr + 4);
 			}
 			break;
-		case 0x0004:	/* SOURCE-ADDRESS (RFC 3489) */
-		case 0x0005:	/* CHANGED-ADDRESS (RFC 3489) */
 		case 0x802b:	/* RESPONSE-ORIGIN (RFC 5780) */
+		case 0x0004:	/* Was SOURCE-ADDRESS (RFC 3489) */
 		case 0x802c:	/* OTHER-ADDRESS (RFC 5780) */
+		case 0x0005:	/* Was CHANGED-ADDRESS (RFC 3489) */
 			if (attr_len == 8 && ptr[1] == 1) {
+				if (attr_type == 0x802c || attr_type == 0x0005) have_other_address = 1;
 				syslog(LOG_DEBUG, "%s: %s %hhu.%hhu.%hhu.%hhu:%hu",
 				       "parse_stun_response",
+				       (attr_type == 0x802b) ? "RESPONSE-ORIGIN" :
 				       (attr_type == 0x0004) ? "SOURCE-ADDRESS" :
-				       (attr_type == 0x0005) ? "CHANGED-ADDRESS" :
-				       (attr_type == 0x802b) ? "RESPONSE-ORIGIN" : "OTHER-ADDRESS",
+				       (attr_type == 0x802c) ? "OTHER-ADDRESS" : "CHANGED-ADDRESS",
 				       ptr[4], ptr[5], ptr[6], ptr[7],
 				       (uint16_t)((ptr[2] << 8) + ptr[3]));
 			}
 			break;
-		case 0x8022:	/* SOFTWARE (RFC 5780) */
+		case 0x8022:	/* SOFTWARE (RFC 5389) */
 			syslog(LOG_DEBUG, "%s: SOFTWARE %.*s", "parse_stun_response", attr_len, ptr);
 			break;
 		default:
-			syslog(LOG_WARNING, "%s: unknown attribute type 0x%04x (len=%hu)",
+			syslog(LOG_DEBUG, "%s: unknown attribute type 0x%04x (len=%hu)",
 			       "parse_stun_response", attr_type, attr_len);
 		}
 
 		ptr += attr_len;
 	}
 
-	return have_address ? 0 : -1;
+	if (!have_other_address && have_address) {
+		syslog(LOG_ERR, "ERROR: STUN server not supported, not returning "
+			"OTHER-ADDRESS / support CHANGE-REQUEST's required for "
+			"endpoint-independent (1:1) CGNAT filtering tests per RFC 5780.");
+		syslog(LOG_ERR, "Two public servers: stun.nextcloud.com and stun.sipgate.net");
+		exit(1);
+	}
+	return (have_address && have_other_address) ? 0 : -1;
 }
 
 /* Perform main STUN operation, return external IP address and check
@@ -430,7 +440,10 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 			return -1;
 		}
 
-		fill_request(requests[i], i/2, i%2);
+		/* Determine unrestricted endpoint-independent (1:1) CGNAT in two STUN requests per RFC 5780 4.4 test I/II */
+		/* 1. Connectivity (binding, detect public IPv4), 2. CHANGE-REQUEST with change-IP and change-port set */
+		/* https://datatracker.ietf.org/doc/html/rfc5780#section-4.4 */
+		i == 0 ? fill_request(requests[i], 0, 0) : fill_request(requests[i], 1, 1);
 		transaction_ids[i] = requests[i]+8;
 	}
 
