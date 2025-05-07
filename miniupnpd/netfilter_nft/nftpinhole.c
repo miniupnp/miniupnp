@@ -158,10 +158,8 @@ find_pinhole(const char * ifname,
 		   && (int_port == p->dport) &&
 		   (0 == memcmp(&daddr, &p->daddr6, sizeof(struct in6_addr)))) {
 
-			if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
+			if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 				continue;
-			}
 
 			if (timestamp)
 				*timestamp = ts;
@@ -395,10 +393,8 @@ get_pinhole_info(unsigned short uid,
 
 			if (timestamp) {
 				int uid_temp;
-				if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid_temp, &ts) != 2) {
-					syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
+				if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid_temp, &ts) != 2)
 					continue;
-				}
 
 				*timestamp = ts;
 			}
@@ -459,10 +455,8 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		if (p->desc_len == 0)
 			continue;
 
-		if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
+		if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 			continue;
-		}
 
 		if (ts <= (unsigned int)current_time) {
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
