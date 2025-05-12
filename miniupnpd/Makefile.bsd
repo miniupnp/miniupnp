@@ -84,15 +84,17 @@ ALLSRCS += $(SRCDIR)/bsd/getifstats.c
 ALLSRCS += $(SRCDIR)/bsd/ifacewatcher.c $(SRCDIR)/bsd/getroute.c
 
 .if $(FWNAME) == "pf"
-ALLOBJS += $(PFOBJS)
-ALLSRCS += $(PFOBJS:S/^/$(SRCDIR)\/pf\//:S/.o$/.c/)
+FWOBJS = $(PFOBJS)
+FWSRCS = $(PFOBJS:S/^/$(SRCDIR)\/pf\//:S/.o$/.c/)
 .elif $(FWNAME) == "ipfw"
-ALLOBJS += $(IPFWOBJS)
-ALLSRCS += $(IPFWOBJS:S/^/$(SRCDIR)\/ipfw\//:S/.o$/.c/)
+FWOBJS = $(IPFWOBJS)
+FWSRCS = $(IPFWOBJS:S/^/$(SRCDIR)\/ipfw\//:S/.o$/.c/)
 .else
-ALLOBJS += $(IPFOBJS)
-ALLSRCS += $(IPFOBJS:S/^/$(SRCDIR)\/ipf\//:S/.o$/.c/)
+FWOBJS = $(IPFOBJS)
+FWSRCS = $(IPFOBJS:S/^/$(SRCDIR)\/ipf\//:S/.o$/.c/)
 .endif
+ALLOBJS += $(FWOBJS)
+ALLSRCS += $(FWSRCS)
 
 TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 TESTUPNPPERMISSIONSOBJS = testupnppermissions.o upnppermissions.o
