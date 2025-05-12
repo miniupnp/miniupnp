@@ -551,7 +551,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	} else {
 		rule_t *r = malloc(sizeof(rule_t));
 		if (r == NULL) {
-			syslog(LOG_ERR, "%s: failed to allocate %u bytes",
+			syslog(LOG_CRIT, "%s: failed to allocate %u bytes",
 			       "table_cb", (unsigned)sizeof(rule_t));
 			result = MNL_CB_ERROR;
 		} else {
@@ -576,7 +576,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 							memcpy(r->desc, descr, r->desc_len);
 							r->desc[r->desc_len] = '\0';
 						} else {
-							syslog(LOG_ERR, "failed to allocate %u bytes for desc", r->desc_len);
+							syslog(LOG_CRIT, "failed to allocate %u bytes for desc", r->desc_len);
 						}
 					}
 				}
