@@ -78,7 +78,8 @@ TESTUPNPPERMISSIONSOBJS = testupnppermissions.o upnppermissions.o
 TESTGETIFADDROBJS = testgetifaddr.o getifaddr.o
 MINIUPNPDCTLOBJS = miniupnpdctl.o
 TESTASYNCSENDTOOBJS = testasyncsendto.o asyncsendto.o upnputils.o bsd/getroute.o
-TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o
+TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o upnputils.o \
+                    bsd/getroute.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \

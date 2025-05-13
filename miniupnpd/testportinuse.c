@@ -16,6 +16,7 @@
 #include "upnpglobalvars.h"
 
 struct lan_addr_list lan_addrs;
+int runtime_flags = 0;
 time_t startup_time = 0;
 
 int main(int argc, char * * argv)

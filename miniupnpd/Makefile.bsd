@@ -99,7 +99,8 @@ TESTUPNPPERMISSIONSOBJS = testupnppermissions.o upnppermissions.o
 TESTGETIFADDROBJS = testgetifaddr.o getifaddr.o getconnstatus.o
 MINIUPNPDCTLOBJS = miniupnpdctl.o
 TESTASYNCSENDTOOBJS = testasyncsendto.o asyncsendto.o upnputils.o getroute.o
-TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o
+TESTPORTINUSEOBJS = testportinuse.o portinuse.o getifaddr.o upnputils.o \
+                    getroute.o
 TESTMINISSDPOBJS = testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
                    asyncsendto.o getroute.o
 TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o \

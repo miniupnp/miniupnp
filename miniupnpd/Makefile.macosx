@@ -51,7 +51,8 @@ TEST_UPNPDESCGEN_OBJS = testupnpdescgen.o upnpdescgen.o
 TEST_GETIFSTATS_OBJS = testgetifstats.o mac/getifstats.o
 TEST_UPNPPERMISSIONS_OBJS = testupnppermissions.o upnppermissions.o
 TEST_GETIFADDR_OBJS = testgetifaddr.o getifaddr.o
-TEST_PORTINUSE_OBJS = testportinuse.o portinuse.o getifaddr.o
+TEST_PORTINUSE_OBJS = testportinuse.o portinuse.o getifaddr.o upnputils.o \
+                      bsd/getroute.o
 TEST_ASYNCSENDTO_OBJS = testasyncsendto.o asyncsendto.o upnputils.o bsd/getroute.o
 MINIUPNPDCTL_OBJS = miniupnpdctl.o
 
