@@ -106,12 +106,14 @@ TESTMINISSDPOBJS = testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
                    asyncsendto.o getroute.o
 TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o \
                        getroute.o
+TESTSTUNOBJS = teststun.o upnpstun.o upnputils.o getroute.o $(FWOBJS) \
+               getifaddr.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp \
-              testifacewatcher
+              testifacewatcher teststun
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -216,6 +218,9 @@ testifacewatcher:	config.h $(TESTIFACEWATCHEROBJS)
 
 testssdppktgen:	testssdppktgen.o
 	$(CC) $(LDFLAGS) -o $@ $(.ALLSRC) $(LIBS)
+
+teststun: config.h $(TESTSTUNOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTSTUNOBJS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^
