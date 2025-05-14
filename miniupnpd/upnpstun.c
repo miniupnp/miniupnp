@@ -21,10 +21,7 @@
 #include <string.h>
 #include <errno.h>
 
-#ifndef TEST_LINUX_DEBUG_APP
 #include "config.h"
-#endif
-
 #include "upnputils.h"
 #include "upnpstun.h"
 
@@ -39,12 +36,6 @@
 #endif
 #if defined(USE_IPFW)
 #include "ipfw/ipfwrdr.h"
-#endif
-
-#ifdef TEST_LINUX_DEBUG_APP
-static int add_filter_rule2(const char *ifname, const char *rhost, const char *iaddr, unsigned short eport, unsigned short iport, int proto, const char *desc);
-static int delete_filter_rule(const char * ifname, unsigned short port, int proto);
-#define syslog(priority, format, ...) do { switch(priority) { case LOG_ERR: printf("Error: "); break; case LOG_WARNING: printf("Warning: "); } printf(format, ##__VA_ARGS__); putchar('\n'); } while (0)
 #endif
 
 /* Generate random STUN Transaction Id */
@@ -531,76 +522,3 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 	/* There is no filtering, so port forwarding would work fine */
 	return 0;
 }
-
-#ifdef TEST_LINUX_DEBUG_APP
-
-/* This linux test application for debugging purposes can be compiled as: */
-/* gcc upnpstun.c upnputils.o -o upnpstun -g3 -W -Wall -O2 -DTEST_LINUX_DEBUG_APP */
-
-#include <arpa/inet.h>
-#include <time.h>
-
-#include "upnpglobalvars.h"
-struct lan_addr_list lan_addrs;
-int runtime_flags = 0;
-time_t startup_time = 0;
-
-static int add_filter_rule2(const char *ifname, const char *rhost, const char *iaddr, unsigned short eport, unsigned short iport, int proto, const char *desc)
-{
-	char buffer[100];
-	ifname = ifname;
-	rhost = rhost;
-	iaddr = iaddr;
-	iport = iport;
-	desc = desc;
-	snprintf(buffer, sizeof(buffer), "/sbin/iptables -t filter -I INPUT -p %d --dport %hu -j ACCEPT", proto, eport);
-	printf("Executing: %s\n", buffer);
-	return system(buffer);
-}
-
-static int delete_filter_rule(const char * ifname, unsigned short port, int proto)
-{
-	char buffer[100];
-	ifname = ifname;
-	snprintf(buffer, sizeof(buffer), "/sbin/iptables -t filter -D INPUT -p %d --dport %hu -j ACCEPT", proto, port);
-	printf("Executing: %s\n", buffer);
-	return system(buffer);
-}
-
-int main(int argc, char *argv[])
-{
-	struct in_addr ext_addr;
-	int restrictive_nat;
-	int ret;
-	char str[INET_ADDRSTRLEN];
-
-	if (argc != 3 && argc != 2) {
-		printf("Usage: %s stun_host [stun_port]\n", argv[0]);
-		return 1;
-	}
-
-	if (geteuid() != 0) {
-		printf("You need to run this application as root\n");
-		return 1;
-	}
-
-	if (argc == 2)
-		argv[2] = "0";
-
-	srandom(time(NULL) * getpid());
-
-	ret = perform_stun(NULL, NULL, argv[1], atoi(argv[2]), &ext_addr, &restrictive_nat);
-	if (ret != 0) {
-		printf("STUN Failed: %s\n", strerror(errno));
-		return 1;
-	}
-
-	if (!inet_ntop(AF_INET, &ext_addr, str, INET_ADDRSTRLEN))
-		str[0] = 0;
-
-	printf("External IP address: %s\n", str);
-	printf("Restrictive NAT: %s\n", restrictive_nat ? "active (port forwarding impossible)" : "not used (ready for port forwarding)");
-	return 0;
-}
-
-#endif
