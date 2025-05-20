@@ -123,8 +123,12 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #else
 		n = select(s + 1, NULL, &wset, NULL, NULL);
 #endif
-		if(n == -1 && errno == EINTR)
-			continue;
+		if(n == -1) {
+			if (errno == EINTR)
+				continue;	/* try again */
+			else
+				break;	/* EBADF, EFAULT, EINVAL */
+		}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 		if(n == 0) {
 			errno = ETIMEDOUT;
@@ -132,8 +136,6 @@ SOCKET connecthostport(const char * host, unsigned short port,
 			break;
 		}
 #endif
-		/*len = 0;*/
-		/*n = getpeername(s, NULL, &len);*/
 		len = sizeof(err);
 		if(getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &len) < 0) {
 			PRINT_SOCKET_ERROR("getsockopt");
@@ -240,8 +242,12 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #else
 			n = select(s + 1, NULL, &wset, NULL, NULL);
 #endif
-			if(n == -1 && errno == EINTR)
-				continue;
+			if(n == -1) {
+				if (errno == EINTR)
+					continue;	/* try again */
+				else
+					break; /* EBADF, EFAULT, EINVAL */
+			}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 			if(n == 0) {
 				errno = ETIMEDOUT;
@@ -249,8 +255,6 @@ SOCKET connecthostport(const char * host, unsigned short port,
 				break;
 			}
 #endif
-			/*len = 0;*/
-			/*n = getpeername(s, NULL, &len);*/
 			len = sizeof(err);
 			if(getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &len) < 0) {
 				PRINT_SOCKET_ERROR("getsockopt");
