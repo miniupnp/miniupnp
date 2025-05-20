@@ -140,8 +140,8 @@ SOCKET connecthostport(const char * host, unsigned short port,
 			closesocket(s);
 			return INVALID_SOCKET;
 		}
+		errno = err;
 		if(err != 0) {
-			errno = err;
 			n = -1;
 		}
 	}
@@ -258,8 +258,8 @@ SOCKET connecthostport(const char * host, unsigned short port,
 				freeaddrinfo(ai);
 				return INVALID_SOCKET;
 			}
+			errno = err;
 			if(err != 0) {
-				errno = err;
 				n = -1;
 			}
 		}
