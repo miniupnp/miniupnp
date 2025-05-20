@@ -7,6 +7,9 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
+/*! \file upnpstun.c
+ * \brief STUN client implementation
+ */
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -38,7 +41,8 @@
 #include "ipfw/ipfwrdr.h"
 #endif
 
-/* Generate random STUN Transaction Id */
+/*! \brief Generate random STUN Transaction Id
+ * \param[out] transaction_id */
 static void generate_transaction_id(unsigned char transaction_id[12])
 {
 	size_t i;
@@ -47,7 +51,10 @@ static void generate_transaction_id(unsigned char transaction_id[12])
 		transaction_id[i] = random() & 255;
 }
 
-/* Create and fill STUN Binding Request */
+/*! \brief Create and fill STUN Binding Request
+ * \param[out] buffer
+ * \param[in] change_ip
+ * \param[in] change_port */
 static void fill_request(unsigned char buffer[28], int change_ip, int change_port)
 {
 	/* Type: Binding Request */
@@ -87,8 +94,12 @@ static void fill_request(unsigned char buffer[28], int change_ip, int change_por
 	buffer[27] |= change_port ? 0x2 : 0x00;
 }
 
-/* Resolve STUN host+port and return sockaddr_in structure */
-/* When port is 0 then use default STUN port */
+/*! \brief Resolve STUN host+port and return sockaddr_in structure
+ * When port is 0 then use default STUN port
+ * \param[in] stun_host
+ * \param[in] stun_port
+ * \param[out] sock_addr
+ * \return -1 for error */
 static int resolve_stun_host(const char *stun_host, unsigned short stun_port, struct sockaddr_in *sock_addr)
 {
 	int have_sock;
