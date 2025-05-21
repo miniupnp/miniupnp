@@ -123,7 +123,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #else
 		n = select(s + 1, NULL, &wset, NULL, NULL);
 #endif
-		if(n == -1) {
+		if(n < 0) {
 			if (errno == EINTR)
 				continue;	/* try again */
 			else
@@ -242,7 +242,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #else
 			n = select(s + 1, NULL, &wset, NULL, NULL);
 #endif
-			if(n == -1) {
+			if(n < 0) {
 				if (errno == EINTR)
 					continue;	/* try again */
 				else
