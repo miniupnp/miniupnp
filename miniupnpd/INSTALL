@@ -8,6 +8,15 @@ If you find some outdated information in this documentation, please fix
 or report the issue on https://github.com/miniupnp/miniupnp or the web
 forum https://miniupnp.tuxfamily.org/
 
+Note : building from another directory than the source directory is now
+       supported. Instead of just
+       $ ./configure
+       It is possible to run configure from the directory of your choice :
+       $ mdir build
+       $ cd build
+       $ ../configure
+       It will populate the current directory with a Makefile, config.h, etc.
+
 ================================ *BSD/pf =================================
 To Build and Install :
 
