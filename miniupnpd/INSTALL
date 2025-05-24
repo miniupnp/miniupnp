@@ -52,7 +52,7 @@ used. If it fails, you can use ./configure --firewall=ipf
 Installation steps are almost the same as with pf.
 
 *Solaris users would be interested in reading informations from :
-http://blogs.sun.com/avalon/category/IPFilter
+https://web.archive.org/web/20110506013706/http://blogs.sun.com/avalon/category/IPFilter
 
 ============================= Mac OS X/ipfw ===============================
 
