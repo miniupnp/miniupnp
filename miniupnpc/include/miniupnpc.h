@@ -281,7 +281,7 @@ GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
  * \brief free the members of a UPNPUrls struct
  *
  * All URLs buffers are freed and zeroed
- * \param[out] urls
+ * \param[out] urls URL structure to free
  */
 MINIUPNP_LIBSPEC void
 FreeUPNPUrls(struct UPNPUrls * urls);
