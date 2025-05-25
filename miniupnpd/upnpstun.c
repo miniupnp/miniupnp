@@ -281,6 +281,67 @@ static int wait_for_stun_responses(int fds[4], unsigned char *transaction_ids[4]
 	return 0;
 }
 
+/*! \brief Convert STUN Attribute type to name
+ * see :
+ * - RFC 3489 11.2 Message Attributes
+ * - RFC 5389 18.2 STUN Attribute Registry
+ * - RFC 5780 9.1 STUN Attribute Registry
+ * \param[in] attr_type 16 bits attribute type
+ * \return the attribute name */
+static const char * get_stun_attr_name(uint16_t attr_type)
+{
+	switch(attr_type) {
+	case 0x0001:	/* RFC 3489 */
+		return "MAPPED-ADDRESS";
+	case 0x0002:	/* RFC 3489, removed in RFC 5389 */
+		return "RESPONSE-ADDRESS";
+	case 0x0003:	/* RFC 3489, removed in RFC 5389, added again in RFC 5780*/
+		return "CHANGE-REQUEST";
+	case 0x0004:	/* RFC 3489, removed in RFC 5389 */
+		return "SOURCE-ADDRESS";
+	case 0x0005:	/* RFC 3489, removed in RFC 5389*/
+		return "CHANGED-ADDRESS";
+	case 0x0006:	/* RFC 3489 */
+		return "USERNAME";
+	case 0x0007:	/* RFC 3489, removed in RFC 5389 */
+		return "PASSWORD";
+	case 0x0008:	/* RFC 3489 */
+		return "MESSAGE-INTEGRITY";
+	case 0x0009:	/* RFC 3489 */
+		return "ERROR-CODE";
+	case 0x000a:	/* RFC 3489 */
+		return "UNKNOWN-ATTRIBUTES";
+	case 0x000b:	/* RFC 3489, removed in RFC 5389 */
+		return "REFLECTED-FROM";
+	case 0x0014:	/* RFC 5389 */
+		return "REALM";
+	case 0x0015:	/* RFC 5389 */
+		return "NONCE";
+	case 0x0020:	/* RFC 5389 */
+	case 0x8020:	/* Was XOR-MAPPED-ADDRESS (draft 2 of 2005) */
+		return "XOR-MAPPED-ADDRESS";
+	case 0x0026:	/* RFC 5780 */
+		return "PADDING";
+	case 0x0027:	/* RFC 5780 */
+		return "RESPONSE-PORT";
+
+	case 0x8022:	/* RFC 5389 */
+		return "SOFTWARE";
+	case 0x8023:	/* RFC 5389 */
+		return "ALTERNATE-SERVER";
+	case 0x8027:	/* RFC 5780 */
+		return "CACHE-TIMEOUT";
+	case 0x8028:	/* RFC 5389 */
+		return "FINGERPRINT";
+	case 0x802b:	/* RFC 5780 */
+		return "RESPONSE-ORIGIN";
+	case 0x802c:	/* RFC 5780 */
+		return "OTHER-ADDRESS";
+	default:
+		return "!UNKOWN!";
+	}
+}
+
 /* Parse Mapped Address (with port) from STUN response message */
 static int parse_stun_response(unsigned char *buffer, size_t len, struct sockaddr_in *mapped_addr)
 {
@@ -345,7 +406,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 
 				syslog(LOG_DEBUG, "%s: %s %hhu.%hhu.%hhu.%hhu:%hu",
 				       "parse_stun_response",
-				       ((attr_type & 0x7fff) == 0x0020) ? "XOR-MAPPED-ADDRESS" : "MAPPED-ADDRESS",
+				       get_stun_attr_name(attr_type),
 				       ptr[4], ptr[5], ptr[6], ptr[7],
 				       (uint16_t)((ptr[2] << 8) + ptr[3]));
 
@@ -377,9 +438,7 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 				if (attr_type == 0x802c || attr_type == 0x0005) have_other_address = 1;
 				syslog(LOG_DEBUG, "%s: %s %hhu.%hhu.%hhu.%hhu:%hu",
 				       "parse_stun_response",
-				       (attr_type == 0x802b) ? "RESPONSE-ORIGIN" :
-				       (attr_type == 0x0004) ? "SOURCE-ADDRESS" :
-				       (attr_type == 0x802c) ? "OTHER-ADDRESS" : "CHANGED-ADDRESS",
+				       get_stun_attr_name(attr_type),
 				       ptr[4], ptr[5], ptr[6], ptr[7],
 				       (uint16_t)((ptr[2] << 8) + ptr[3]));
 			}
@@ -388,8 +447,11 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 			syslog(LOG_DEBUG, "%s: SOFTWARE %.*s", "parse_stun_response", attr_len, ptr);
 			break;
 		default:
-			syslog(LOG_DEBUG, "%s: unknown attribute type 0x%04x (len=%hu)",
-			       "parse_stun_response", attr_type, attr_len);
+			/* Attributes 0x0000-0x7FFF are Comprehension-required */
+			syslog((attr_type & 0x8000) ? LOG_DEBUG : LOG_WARNING,
+			       "%s: ignored attribute type 0x%04x %s (len=%hu)",
+			       "parse_stun_response",
+			       attr_type, get_stun_attr_name(attr_type), attr_len);
 		}
 
 		ptr += attr_len;
