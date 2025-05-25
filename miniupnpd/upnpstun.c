@@ -9,6 +9,10 @@
 
 /*! \file upnpstun.c
  * \brief STUN client implementation
+ *
+ * - https://datatracker.ietf.org/doc/html/rfc3489 (obsolete)
+ * - https://datatracker.ietf.org/doc/html/rfc5389
+ * - https://datatracker.ietf.org/doc/html/rfc5780 (experimental)
  */
 #include <sys/select.h>
 #include <sys/time.h>
