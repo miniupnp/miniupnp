@@ -88,10 +88,10 @@ static void fill_request(unsigned char buffer[28], int change_ip, int change_por
 	buffer[27] = 0x00;
 
 	/* Change IP */
-	buffer[27] |= change_ip ? 0x4 : 0x00;
+	if (change_ip) buffer[27] |= 0x4;
 
 	/* Change Port */
-	buffer[27] |= change_port ? 0x2 : 0x00;
+	if (change_port) buffer[27] |= 0x2;
 }
 
 /*! \brief Resolve STUN host+port and return sockaddr_in structure
@@ -444,7 +444,7 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 		/* Determine unrestricted endpoint-independent (1:1) CGNAT in two STUN requests per RFC 5780 4.4 test I/II */
 		/* 1. Connectivity (binding, detect public IPv4), 2. CHANGE-REQUEST with change-IP and change-port set */
 		/* https://datatracker.ietf.org/doc/html/rfc5780#section-4.4 */
-		i == 0 ? fill_request(requests[i], 0, 0) : fill_request(requests[i], 1, 1);
+		fill_request(requests[i], i, i);
 		transaction_ids[i] = requests[i]+8;
 	}
 
