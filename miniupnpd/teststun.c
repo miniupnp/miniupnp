@@ -1,4 +1,4 @@
-/* $Id: $ */
+/* $Id: teststun.c,v 1.2 2025/05/24 23:45:12 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -29,6 +29,7 @@ time_t startup_time = 0;
 const char * use_ext_ip_addr = 0;
 const char * tag = 0;
 const char * anchor_name = "miniupnpd";
+const char * queue = 0;
 
 int main(int argc, char *argv[])
 {
