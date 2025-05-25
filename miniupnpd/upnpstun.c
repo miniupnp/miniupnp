@@ -157,7 +157,9 @@ static int resolve_stun_host(const char *stun_host, unsigned short stun_port, st
 	return 0;
 }
 
-/* Create a new UDP socket for STUN connection and return file descriptor and local UDP port */
+/*! \brief Create a new UDP socket for STUN connection
+ * \param[out] local_port local UDP port
+ * \return file descriptor */
 static int stun_socket(unsigned short *local_port)
 {
 	int fd;
@@ -196,7 +198,13 @@ static int stun_socket(unsigned short *local_port)
 	return fd;
 }
 
-/* Receive STUN response message for specified Transaction Id and returns message and peer address */
+/*! \brief Receive STUN response message for specified Transaction Id
+ * \param[in] fd socket
+ * \param[out] buffer receiving buffer
+ * \param[in] transaction_id transaction id to check for
+ * \param[in] buffer_len receiving buffer length
+ * \param[out] peer_addr peer address
+ * \return message size or 0 for error */
 static size_t receive_stun_response(int fd, unsigned char *buffer, unsigned char transaction_id[12], size_t buffer_len, struct sockaddr_in *peer_addr)
 {
 	ssize_t len;
@@ -234,7 +242,14 @@ static size_t receive_stun_response(int fd, unsigned char *buffer, unsigned char
 	return len;
 }
 
-/* Wait for STUN response messages and try to receive them */
+/*! \brief Wait for STUN response messages and try to receive them
+ * \param[in] fds
+ * \param[in] transaction_ids
+ * \param[out] buffers
+ * \param[in] buffer_lens
+ * \param[out] peer_addrs
+ * \param[out] lens
+ * \return -1 for error, 0 for success */
 static int wait_for_stun_responses(int fds[4], unsigned char *transaction_ids[4], unsigned char *buffers[4], size_t buffers_lens[4], struct sockaddr_in peer_addrs[4], size_t lens[4])
 {
 	fd_set fdset;
@@ -346,7 +361,12 @@ static const char * get_stun_attr_name(uint16_t attr_type)
 	}
 }
 
-/* Parse Mapped Address (with port) from STUN response message */
+/*! \brief parse STUN response message
+ * Parse Mapped Address (with port) from STUN response message
+ * \param[in] buffer STUN message
+ * \param[in] len STUN message length
+ * \param[out] mapped_addr Mapped Address
+ * \return -1 for error, 0 for success */
 static int parse_stun_response(unsigned char *buffer, size_t len, struct sockaddr_in *mapped_addr)
 {
 	unsigned char *ptr, *end;
