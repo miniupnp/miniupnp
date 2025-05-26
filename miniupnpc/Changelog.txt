@@ -1,5 +1,7 @@
-$Id: Changelog.txt,v 1.280 2025/05/25 21:56:47 nanard Exp $
+$Id: Changelog.txt,v 1.281 2025/05/26 22:56:38 nanard Exp $
 miniUPnP client Changelog.
+
+VERSION 2.3.3 : released 2025/05/27
 
 2025/05/25:
   define WIN32_LEAN_AND_MEAN

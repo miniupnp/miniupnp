@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.h,v 1.78 2025/03/18 23:40:14 nanard Exp $ */
+/* $Id: miniupnpc.h,v 1.80 2025/05/26 22:56:40 nanard Exp $ */
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
@@ -42,7 +42,7 @@
 #define UPNPDISCOVER_MEMORY_ERROR (-102)
 
 /*! \brief software version */
-#define MINIUPNPC_VERSION	"2.3.2"
+#define MINIUPNPC_VERSION	"2.3.3"
 /*! \brief C API version */
 #define MINIUPNPC_API_VERSION	21
 
