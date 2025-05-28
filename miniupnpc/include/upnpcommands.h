@@ -21,6 +21,7 @@
  *
  */
 
+#include <stddef.h>
 #include "miniupnpc_declspec.h"
 #include "miniupnpctypes.h"
 
