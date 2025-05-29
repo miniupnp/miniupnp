@@ -104,14 +104,14 @@ void
 freeoptions(void);
 
 /*! \brief option key / value structure */
-struct option
+struct UPNPOption
 {
 	enum upnpconfigoptions id;
 	const char * value;
 };
 
 /*! \brief option array */
-extern struct option * ary_options;
+extern struct UPNPOption * ary_options;
 /*! \brief length of option array */
 extern unsigned int num_options;
 
