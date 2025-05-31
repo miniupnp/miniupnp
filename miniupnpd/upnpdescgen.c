@@ -892,8 +892,9 @@ genXML(char * str, int * len, int * tmplen,
        int force_igd1)
 {
 #define GENXML_STACK_SIZE 16
-	unsigned short i, j;
-	int top;
+	unsigned short i = 0; /* current node */
+	unsigned short j; /* i + number of nodes */
+	int top = -1;
 	const char * eltname, *s;
 	char c;
 	struct {
@@ -905,9 +906,6 @@ genXML(char * str, int * len, int * tmplen,
 	UNUSED(force_igd1);
 #endif
 
-	top = -1;
-	i = 0;	/* current node */
-	j = 1;	/* i + number of nodes*/
 	for(;;)
 	{
 		eltname = p[i].eltname;
