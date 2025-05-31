@@ -530,7 +530,6 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 			syslog(LOG_ERR, "PCP: Unrecognized mandatory PCP OPTION: %d \n", (int)pcp_buf[0]);
 			/* Mandatory to understand */
 			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
-			remain = 0;
 			break;
 		}
 		/* TODO - log optional not understood options? */
