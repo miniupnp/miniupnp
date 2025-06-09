@@ -892,7 +892,7 @@ genXML(char * str, int * len, int * tmplen,
        int force_igd1)
 {
 #define GENXML_STACK_SIZE 16
-	unsigned short i, j;
+	unsigned short i;
 	int top;
 	const char * eltname, *s;
 	char c;
@@ -907,7 +907,6 @@ genXML(char * str, int * len, int * tmplen,
 
 	top = -1;
 	i = 0;	/* current node */
-	j = 1;	/* i + number of nodes*/
 	for(;;)
 	{
 		eltname = p[i].eltname;
@@ -956,9 +955,7 @@ unstack:
 				if(top < 0)
 					return str;
 				i = ++(pile[top].i);
-				j = pile[top].j;
-				/*printf("  pile[%d]\t%d %d\n", top, i, j); */
-				if(i==j)
+				if(i == pile[top].j)
 				{
 					/*printf("</%s>\n", pile[top].eltname); */
 					str = strcat_char(str, len, tmplen, '<');
@@ -997,12 +994,10 @@ unstack:
 			}
 			str = strcat_char(str, len, tmplen, '>');
 			i = k & 0xffff;
-			j = i + (k >> 16);
 			if(top < (GENXML_STACK_SIZE - 1)) {
 				top++;
-				/*printf(" +pile[%d]\t%d %d\n", top, i, j); */
 				pile[top].i = i;
-				pile[top].j = j;
+				pile[top].j = i + (k >> 16);
 				pile[top].eltname = eltname;
 #ifdef DEBUG
 			} else {
