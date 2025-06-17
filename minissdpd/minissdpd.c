@@ -1529,7 +1529,7 @@ int main(int argc, char * * argv)
 			}
 		}
 		gettimeofday(&now, NULL);
-		i = get_sendto_fds(&writefds, &max_fd, &now);
+		get_sendto_fds(&writefds, &max_fd, &now);
 		/* select call */
 		if(select(max_fd + 1, &readfds, &writefds, 0, 0) < 0) {
 			if(errno != EINTR) {
