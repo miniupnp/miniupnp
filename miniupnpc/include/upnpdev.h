@@ -36,7 +36,7 @@ struct UPNPDev {
 	/* C99 flexible array member */
 	/*! \brief buffer for descURL, st and usn */
 	char buffer[];
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && !defined(__cplusplus)
 	char buffer[0];
 #else
 	/* Fallback to a hack */
