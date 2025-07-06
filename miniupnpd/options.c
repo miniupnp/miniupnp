@@ -136,11 +136,7 @@ readoptionsfile(const char * fname, int debug_flag)
 	if(!(hfile = fopen(fname, "r")))
 		return -1;
 
-	if(ary_options != NULL)
-	{
-		free(ary_options);
-		num_options = 0;
-	}
+	num_options = 0;
 
 	while(fgets(buffer, sizeof(buffer), hfile))
 	{
@@ -176,6 +172,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			{
 				INIT_PRINT_ERR("memory allocation error. Permission line in file %s line %d\n",
 				        fname, linenum);
+				fclose(hfile);
 				return -1;
 			}
 			else
@@ -190,6 +187,7 @@ readoptionsfile(const char * fname, int debug_flag)
 				{
 					INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 					        fname, linenum, name);
+					fclose(hfile);
 					return -1;
 				}
 			}
@@ -204,6 +202,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			{
 				INIT_PRINT_ERR("memory allocation error. DSCP line in file %s line %d\n",
 				        fname, linenum);
+				fclose(hfile);
 				return -1;
 			}
 			else
@@ -218,6 +217,7 @@ readoptionsfile(const char * fname, int debug_flag)
 				{
 					INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 					        fname, linenum, name);
+					fclose(hfile);
 					return -1;
 				}
 			}
@@ -228,6 +228,7 @@ readoptionsfile(const char * fname, int debug_flag)
 		{
 			INIT_PRINT_ERR("parsing error file %s line %d : %s\n",
 			        fname, linenum, name);
+			fclose(hfile);
 			return -1;
 		}
 
@@ -259,6 +260,7 @@ readoptionsfile(const char * fname, int debug_flag)
 		{
 			INIT_PRINT_ERR("invalid option in file %s line %d : %s=%s\n",
 			        fname, linenum, name, value);
+			fclose(hfile);
 			return -1;
 		}
 		else
@@ -268,6 +270,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			{
 				INIT_PRINT_ERR("memory allocation error. Option in file %s line %d.\n",
 				        fname, linenum);
+				fclose(hfile);
 				return -1;
 			}
 			else
@@ -279,6 +282,7 @@ readoptionsfile(const char * fname, int debug_flag)
 				{
 					INIT_PRINT_ERR("memory allocation error, Option value in file %s line %d : %s=%s\n",
 					        fname, linenum, name, value);
+					fclose(hfile);
 					return -1;
 				}
 				else
@@ -294,7 +298,6 @@ readoptionsfile(const char * fname, int debug_flag)
 				}
 			}
 		}
-
 	}
 
 	fclose(hfile);
