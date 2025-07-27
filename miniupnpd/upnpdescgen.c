@@ -819,7 +819,7 @@ strcat_str(char * str, int * len, int * tmplen, const char * s2)
 		p = (char *)realloc(str, newlen);
 		if(p == NULL) /* handle a failure of realloc() */
 		{
-			syslog(LOG_ERR, "strcat_str: Failed to realloc %d bytes", newlen);
+			syslog(LOG_CRIT, "%s: Failed to realloc %d bytes", "strcat_str", newlen);
 			return str;
 		}
 		str = p;
@@ -845,7 +845,7 @@ strcat_char(char * str, int * len, int * tmplen, char c)
 		p = (char *)realloc(str, *tmplen);
 		if(p == NULL) /* handle a failure of realloc() */
 		{
-			syslog(LOG_ERR, "strcat_char: Failed to realloc %d bytes", *tmplen);
+			syslog(LOG_CRIT, "%s: Failed to realloc %d bytes", "strcat_char", *tmplen);
 			*tmplen -= 256;
 			return str;
 		}
@@ -1020,8 +1020,10 @@ genRootDesc(int * len, int force_igd1)
 	int tmplen;
 	tmplen = 2048;
 	str = (char *)malloc(tmplen);
-	if(str == NULL)
+	if(str == NULL) {
+		syslog(LOG_CRIT, "%s: malloc(%d) failed", "genRootDesc", tmplen);
 		return NULL;
+	}
 	* len = strlen(xmlver);
 	/*strcpy(str, xmlver); */
 	memcpy(str, xmlver, *len + 1);
@@ -1048,8 +1050,10 @@ genServiceDesc(int * len, const struct serviceDesc * s, int force_igd1)
 
 	tmplen = 2048;
 	str = (char *)malloc(tmplen);
-	if(str == NULL)
+	if(str == NULL) {
+		syslog(LOG_CRIT, "%s: malloc(%d) failed", "genServiceDesc", tmplen);
 		return NULL;
+	}
 	/*strcpy(str, xmlver); */
 	*len = strlen(xmlver);
 	memcpy(str, xmlver, *len + 1);
@@ -1249,8 +1253,10 @@ genEventVars(int * len, const struct serviceDesc * s)
 	int tmplen;
 	tmplen = 512;
 	str = (char *)malloc(tmplen);
-	if(str == NULL)
+	if(str == NULL) {
+		syslog(LOG_CRIT, "%s: malloc(%d) failed", "genEventVars", tmplen);
 		return NULL;
+	}
 	*len = 0;
 	v = s->serviceStateTable;
 	str = strcat_str(str, len, &tmplen, "<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">");
