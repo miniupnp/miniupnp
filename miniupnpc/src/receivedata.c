@@ -63,6 +63,14 @@ receivedata(SOCKET socket,
 	/* using select under _WIN32 and amigaos */
     fd_set socketSet;
     TIMEVAL timeval;
+#ifndef _WIN32
+    /* Non-Windows, one needs to ensure the socket fd is within range */
+    if(socket >= FD_SETSIZE) {
+        fprintf(stderr, "Socket %d is >= FD_SETSIZE %d\n",
+                (int)socket, (int)FD_SETSIZE);
+        return -1;
+    }
+#endif
     FD_ZERO(&socketSet);
     FD_SET(socket, &socketSet);
     timeval.tv_sec = timeout / 1000;

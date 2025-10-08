@@ -41,6 +41,10 @@
 #define MINIUPNPC_IGNORE_EINTR
 #include <sys/socket.h>
 #include <sys/select.h>
+#if !defined(__amigaos__) && !defined(__amigaos4__)
+#define USE_POLL
+#include <poll.h>
+#endif
 #endif /* #else _WIN32 */
 
 #if defined(__amigaos__) || defined(__amigaos4__)
@@ -52,6 +56,25 @@
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
 #endif
+
+#if defined(MINIUPNPC_IGNORE_EINTR) && !defined(USE_POLL)
+/* Returns 0 if not in range, 1 if fd is in range */
+static int is_socket_in_fd_set_range(SOCKET s)
+{
+#ifdef _WIN32
+	/* WIN32 systems don't need this check */
+	(void)s;
+	return 1;
+#else
+	if (s >= FD_SETSIZE) {
+		fprintf(stderr, "Socket %d is >= FD_SETSIZE %d\n",
+		        (int)s, (int)FD_SETSIZE);
+		return 0;
+	}
+	return 1;
+#endif /* #ifdef _WIN32 */
+}
+#endif /* #if defined(MINIUPNPC_SET_SOCKET_TIMEOUT) && !defined(USE_POLL) */
 
 /* connecthostport()
  * return a socket connected (TCP) to the host and port
@@ -114,9 +137,26 @@ SOCKET connecthostport(const char * host, unsigned short port,
 	while(n < 0 && (errno == EINTR || errno == EINPROGRESS))
 	{
 		socklen_t len;
-		fd_set wset;
 		int err;
+#ifdef USE_POLL
+		struct pollfd pfd = {s, POLLOUT, 0};
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+		n = poll(&pfd, 1, 3000);
+#else
+		n = poll(&pfd, 1, -1);
+#endif
+		if(n == 1 && pfd.revents & POLLERR) {
+			/* error on socket */
+			closesocket(s);
+			return INVALID_SOCKET;
+		}
+#else /* #ifdef USE_POLL */
+		fd_set wset;
 		FD_ZERO(&wset);
+		if(!is_socket_in_fd_set_range(s)) {
+			closesocket(s);
+			return INVALID_SOCKET;
+		}
 		FD_SET(s, &wset);
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 		timeout.tv_sec = 3;
@@ -125,6 +165,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #else
 		n = select(s + 1, NULL, &wset, NULL, NULL);
 #endif
+#endif /* #ifdef USE_POLL */
 		if(n < 0) {
 			if (errno == EINTR)
 				continue;	/* try again */
@@ -233,9 +274,27 @@ SOCKET connecthostport(const char * host, unsigned short port,
 		while(n < 0 && (errno == EINTR || errno == EINPROGRESS))
 		{
 			socklen_t len;
-			fd_set wset;
 			int err;
+#ifdef USE_POLL
+			struct pollfd pfd = {s, POLLOUT, 0};
+#ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
+			n = poll(&pfd, 1, 3000);
+#else
+			n = poll(&pfd, 1, -1);
+#endif
+			if(n == 1 && pfd.revents & POLLERR) {
+				/* remote end closed socket */
+				n = -2;
+				fprintf(stderr, "poll: POLLERR on socket\n");
+				break;
+			}
+#else /* #ifdef USE_POLL */
+			fd_set wset;
 			FD_ZERO(&wset);
+			if(!is_socket_in_fd_set_range(s)) {
+				n = -2;
+				break;
+			}
 			FD_SET(s, &wset);
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 			timeout.tv_sec = 3;
@@ -244,6 +303,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #else
 			n = select(s + 1, NULL, &wset, NULL, NULL);
 #endif
+#endif /* #ifdef USE_POLL */
 			if(n < 0) {
 				if (errno == EINTR)
 					continue;	/* try again */
@@ -281,7 +341,8 @@ SOCKET connecthostport(const char * host, unsigned short port,
 	}
 	if(n < 0)
 	{
-		PRINT_SOCKET_ERROR("connect");
+		if(n != -2)
+			PRINT_SOCKET_ERROR("connect");
 		closesocket(s);
 		return INVALID_SOCKET;
 	}
