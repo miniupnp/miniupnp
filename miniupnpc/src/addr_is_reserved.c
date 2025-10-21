@@ -11,11 +11,11 @@
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#if !defined(_MSC_VER)
+#if !defined(_MSC_VER) || (_MSC_VER >= 1600)
 #include <stdint.h>
-#else /* !defined(_MSC_VER) */
+#else /* !defined(_MSC_VER) || (_MSC_VER >= 1600) */
 typedef unsigned long uint32_t;
-#endif /* !defined(_MSC_VER) */
+#endif /* !defined(_MSC_VER) || (_MSC_VER >= 1600) */
 #if !defined(_WIN32_WINNT_VISTA)
 #define _WIN32_WINNT_VISTA 0x0600
 #endif
