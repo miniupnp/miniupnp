@@ -1199,7 +1199,7 @@ static void update_disable_port_forwarding(void)
 				syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
 				syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
 				syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-				syslog(LOG_INFO, "You can set option ignore_private_ip_check=yes to enable port forwarding");
+				syslog(LOG_INFO, "You can set option ext_allow_private_ipv4=yes to enable port forwarding");
 				syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
 				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
 				disable_port_forwarding = 1;
