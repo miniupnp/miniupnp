@@ -43,7 +43,7 @@ struct upnpperm {
  *  deny 0-65535 0.0.0.0/0 0-65535 */
 int
 read_permission_line(struct upnpperm * perm,
-                     char * p);
+                     const char * p);
 
 void
 free_permission_line(struct upnpperm * perm);
@@ -72,4 +72,3 @@ write_permlist(int fd, const struct upnpperm * permary,
 #endif
 
 #endif
-
