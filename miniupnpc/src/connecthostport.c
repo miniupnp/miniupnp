@@ -96,6 +96,9 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 	/* setting a 3 seconds timeout for the connect() call */
 #ifdef _WIN32
+	/* https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-setsockopt
+	 * SO_RCVTIMEO DWORD Sets the timeout, in milliseconds, for blocking
+	 * receive calls. */
 	timeout = 3000; /* milliseconds */
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
 #else
