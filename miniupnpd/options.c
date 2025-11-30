@@ -22,7 +22,7 @@
 #include "macros.h"
 
 #ifndef DISABLE_CONFIG_FILE
-struct option * ary_options = NULL;
+struct UPNPOption * ary_options = NULL;
 static char * string_repo = NULL;
 unsigned int num_options = 0;
 
@@ -263,7 +263,7 @@ readoptionsfile(const char * fname, int debug_flag)
 		}
 		else
 		{
-			tmp = realloc(ary_options, (num_options + 1) * sizeof(struct option));
+			tmp = realloc(ary_options, (num_options + 1) * sizeof(struct UPNPOption));
 			if(tmp == NULL)
 			{
 				INIT_PRINT_ERR("memory allocation error. Option in file %s line %d.\n",
