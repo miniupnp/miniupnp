@@ -58,8 +58,15 @@ void hide_pcp_nonce(char * desc)
 	if (*desc++ != 'C') return;
 	if (*desc++ != 'P') return;
 	if (*desc++ != ' ') return;
+	if (*desc++ != '(') return;
 	/* skip the op code */
 	while (*desc >= 'A' && *desc <= 'Z') desc++;
+	if (*desc++ != ' ') return;
+	if (*desc++ != 'n') return;
+	if (*desc++ != 'o') return;
+	if (*desc++ != 'n') return;
+	if (*desc++ != 'c') return;
+	if (*desc++ != 'e') return;
 	if (*desc++ != ' ') return;
 	for (i = 0; i < 24; i++) {
 		if (desc[i] == '\0') return;
@@ -1849,7 +1856,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	 * InternalClient and Protocol are the same than an existing pinhole,
 	 * but LeaseTime is different, the device MUST extend the existing
 	 * pinhole's lease time and return the UniqueID of the existing pinhole. */
-	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, proto, "IGD2 pinhole", ltime, &uid);
+	r = upnp_add_inboundpinhole(rem_host, rport, int_ip, iport, proto, "UPnP IGDv2 IPv6", ltime, &uid);
 
 	switch(r)
 	{

@@ -44,9 +44,9 @@
  * pass in quick on ep0 inet6 proto udp
  *   from any to dead:beef::42:42 port = 8080
  *   flags S/SA keep state
- *   label "pinhole-2 ts-4321000"
+ *   label "UPnP IGDv2 IPv6 (UID 2 ts-4321000"
  *
- * with the label "pinhole-$uid ts-$timestamp: $description"
+ * with the label "UPnP IGDv2 IPv6 (UID $uid ts-$timestamp: $description"
  */
 
 #ifdef ENABLE_UPNPPINHOLE
@@ -56,8 +56,8 @@ extern int dev;
 
 static int next_uid = 1;
 
-#define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
-#define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
+#define PINEHOLE_LABEL_FORMAT "UPnP IGDv2 IPv6 (UID %d ts-%u: %s)"
+#define PINEHOLE_LABEL_FORMAT_SKIPDESC "UPnP IGDv2 IPv6 (UID %d ts-%u: %*s)"
 
 #define RULE (pr.rule)
 
@@ -245,15 +245,11 @@ int find_pinhole(const char * ifname,
 		   && (int_port == ntohs(RULE.dst.port[0])) &&
 		   (0 == memcmp(&daddr, &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)))) {
 #ifdef USE_LIBPFCTL
-			if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+			if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 				continue;
-			}
 #else /* USE_LIBPFCTL */
-			if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+			if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 				continue;
-			}
 #endif /* USE_LIBPFCTL */
 			if(timestamp) *timestamp = ts;
 			if(desc) {
@@ -297,7 +293,7 @@ int delete_pinhole(unsigned short uid)
 		return -1;
 	}
 	snprintf(label_start, sizeof(label_start),
-	         "pinhole-%hu", uid);
+	         "UPnP IGDv2 IPv6 (UID %hu)", uid);
 #ifdef USE_LIBPFCTL
 	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
 	{
@@ -402,7 +398,7 @@ get_pinhole_info(unsigned short uid,
 		return -1;
 	}
 	snprintf(label_start, sizeof(label_start),
-	         "pinhole-%hu", uid);
+	         "UPnP IGDv2 IPv6 (UID %hu)", uid);
 #ifdef USE_LIBPFCTL
 	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
 	{
@@ -564,10 +560,8 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			release_ticket(dev, tnum);
 			return -1;
 		}
-		if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+		if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 			continue;
-		}
 #else /* USE_LIBPFCTL */
 		pr.nr = i;
 		if(ioctl(dev, DIOCGETRULE, &pr) < 0) {
@@ -575,10 +569,8 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			release_ticket(dev, tnum);
 			return -1;
 		}
-		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 			continue;
-		}
 #endif /* USE_LIBPFCTL */
 		if(ts <= (unsigned int)current_time) {
 #ifdef USE_LIBPFCTL
