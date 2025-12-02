@@ -1,7 +1,7 @@
 /* $Id: asyncsendto.c,v 1.12 2020/11/11 12:13:26 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2020 Thomas Bernard
+ * (c) 2006-2025 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -132,7 +132,7 @@ sendto_schedule2(int sockfd, const void *buf, size_t len, int flags,
 		alloc_len += sizeof(struct sockaddr_in6);
 	elt = malloc(alloc_len);
 	if(elt == NULL) {
-		syslog(LOG_ERR, "malloc failed to allocate %u bytes",
+		syslog(LOG_CRIT, "malloc failed to allocate %u bytes",
 		       (unsigned)alloc_len);
 		return -1;
 	}

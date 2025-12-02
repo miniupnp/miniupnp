@@ -503,8 +503,8 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	{
 		if(h->clientaddr.s_addr != result_ip.s_addr)
 		{
-			syslog(LOG_INFO, "Client %s tried to redirect port to %s",
-			       inet_ntoa(h->clientaddr), int_ip);
+			syslog(LOG_INFO, "%s: Client %s tried to redirect port to %s",
+			       action, inet_ntoa(h->clientaddr), int_ip);
 			ClearNameValueList(&data);
 #ifdef IGD_V2
 			SoapError(h, 606, "Action not authorized");
@@ -552,7 +552,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		leaseduration = 604800;
 #endif
 
-	syslog(LOG_INFO, "%s: ext port %hu to %s:%hu protocol %s for: %s leaseduration=%u rhost=%s",
+	syslog(LOG_DEBUG, "%s: ext port %hu to %s:%hu protocol %s for: %s leaseduration=%u rhost=%s",
 	       action, eport, int_ip, iport, protocol, desc, leaseduration,
 	       r_host ? r_host : "NULL");
 
@@ -702,8 +702,8 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	{
 		if(h->clientaddr.s_addr != result_ip.s_addr)
 		{
-			syslog(LOG_INFO, "Client %s tried to redirect port to %s",
-			       inet_ntoa(h->clientaddr), int_ip);
+			syslog(LOG_INFO, "%s: Client %s tried to redirect port to %s",
+			       action, inet_ntoa(h->clientaddr), int_ip);
 			ClearNameValueList(&data);
 			SoapError(h, 606, "Action not authorized");
 			return;
@@ -923,7 +923,7 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: external port: %hu, protocol: %s",
+	syslog(LOG_DEBUG, "%s: external port: %hu, protocol: %s",
 		action, eport, protocol);
 
 	/* if in secure mode, check the IP
@@ -1039,8 +1039,9 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	for(i = 0; i < number; i++)
 	{
 		r = upnp_delete_redirection(port_list[i], protocol);
-		syslog(LOG_INFO, "%s: deleting external port: %hu, protocol: %s: %s",
+		syslog(LOG_DEBUG, "%s: deleting external port: %hu, protocol: %s: %s",
 		       action, port_list[i], protocol, r < 0 ? "failed" : "ok");
+		/* TODO: return a SOAP error code when there is at least 1 failure */
 	}
 	free(port_list);
 	bodylen = snprintf(body, sizeof(body), resp,
@@ -1104,7 +1105,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: index=%d", action, (int)index);
+	syslog(LOG_DEBUG, "%s: index=%d", action, (int)index);
 
 	rhost[0] = '\0';
 	r = upnp_get_redirection_infos_by_index((int)index, &eport, protocol, &iport,
@@ -1236,6 +1237,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	body = malloc(bodyalloc);
 	if(!body)
 	{
+		syslog(LOG_CRIT, "%s: malloc(%lu) failed", "GetListOfPortMappings", (unsigned long)bodyalloc);
 		ClearNameValueList(&data);
 		SoapError(h, 501, "Action Failed");
 		return;
