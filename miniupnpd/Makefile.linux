@@ -69,7 +69,7 @@ include $(SRCDIR)/gitrev.mk
 include $(SRCDIR)/objects.mk
 
 # sources in netfilter/ directory
-NETFILTEROBJS = iptcrdr.o iptpinhole.o nfct_get.o
+NETFILTEROBJS = iptcrdr.o iptpinhole.o nfct_get.o extscriptrdr.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS) $(NETFILTEROBJS) $(OTHEROBJS)
 

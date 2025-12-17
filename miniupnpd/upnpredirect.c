@@ -28,6 +28,7 @@
 #include "upnputils.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
+#include "netfilter/extscriptrdr.h"
 #endif
 #if defined(USE_PF)
 #include "pf/obsdrdr.h"
@@ -404,10 +405,54 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp)
 {
+	int r_redir, r_filter;
 	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
 		eport, iaddr, iport, protocol, desc);			*/
 	if(disable_port_forwarding)
 		return -1;
+
+#if defined(USE_NETFILTER)
+	/* Use external script if configured */
+	if(use_external_script) {
+		r_redir = ext_add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
+		                                  desc, timestamp);
+		if(r_redir < 0) {
+			return -1;
+		}
+
+#ifdef ENABLE_LEASEFILE
+		lease_file_add( eport, iaddr, iport, proto, desc, timestamp);
+#endif
+
+		r_filter = ext_add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc);
+		if(r_filter < 0) {
+			/* clean up the redirect rule */
+			ext_delete_redirect_rule(ext_if_name, eport, proto);
+			return -1;
+		}
+	} else {
+		/* Use standard iptables/nftables */
+		r_redir = add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
+		                              desc, timestamp);
+		if(r_redir < 0) {
+			return -1;
+		}
+
+#ifdef ENABLE_LEASEFILE
+		lease_file_add( eport, iaddr, iport, proto, desc, timestamp);
+#endif
+
+		r_filter = add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc);
+		if(r_filter < 0) {
+			/* clean up the redirect rule */
+#if !defined(__linux__)
+			delete_redirect_rule(ext_if_name, eport, proto);
+#endif
+			return -1;
+		}
+	}
+#else
+	/* Non-netfilter systems */
 	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
 	                      desc, timestamp) < 0) {
 		return -1;
@@ -425,6 +470,8 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #endif
 		return -1;
 	}
+#endif
+
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;
@@ -517,12 +564,30 @@ _upnp_delete_redir(unsigned short eport, int proto)
 {
 	int r;
 #if defined(__linux__)
+	#ifdef USE_NETFILTER
+	if(use_external_script) {
+		r = ext_delete_redirect_and_filter_rules(eport, proto);
+	} else {
+		r = delete_redirect_and_filter_rules(eport, proto);
+	}
+	#else
 	r = delete_redirect_and_filter_rules(eport, proto);
+	#endif
 #elif defined(USE_PF)
 	r = delete_redirect_and_filter_rules(ext_if_name, eport, proto);
 #else
+	#ifdef USE_NETFILTER
+	if(use_external_script) {
+		r = ext_delete_redirect_rule(ext_if_name, eport, proto);
+		ext_delete_filter_rule(ext_if_name, eport, proto);
+	} else {
+		r = delete_redirect_rule(ext_if_name, eport, proto);
+		delete_filter_rule(ext_if_name, eport, proto);
+	}
+	#else
 	r = delete_redirect_rule(ext_if_name, eport, proto);
 	delete_filter_rule(ext_if_name, eport, proto);
+	#endif
 #endif
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove( eport, proto);

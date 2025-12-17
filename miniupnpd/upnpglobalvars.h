@@ -165,6 +165,12 @@ extern const char * queue;
 extern const char * tag;
 #endif
 
+#ifdef USE_NETFILTER
+/* external script support */
+extern int use_external_script;
+extern const char * external_script_path;
+#endif
+
 #ifdef ENABLE_NFQUEUE
 extern int nfqueue;
 extern int n_nfqix;

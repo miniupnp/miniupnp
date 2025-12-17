@@ -1466,6 +1466,17 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPNFFAMILYSPLIT:
 				set_rdr_name(RDR_FAMILY_SPLIT, ary_options[i].value);
 				break;
+			case UPNPUSEEXTERNALSCRIPT:
+				if(strcmp(ary_options[i].value, "yes") == 0)
+					use_external_script = 1;
+				else
+					use_external_script = atoi(ary_options[i].value);
+				syslog(LOG_INFO, "external script mode: %s", use_external_script ? "enabled" : "disabled");
+				break;
+			case UPNPEXTERNALSCRIPTPATH:
+				external_script_path = ary_options[i].value;
+				syslog(LOG_INFO, "external script path: %s", external_script_path);
+				break;
 #endif    /* USE_NETFILTER */
 			case UPNPNOTIFY_INTERVAL:
 				v->notify_interval = atoi(ary_options[i].value);

@@ -105,7 +105,11 @@ static const struct {
 	{ UPNPFORCEIGDDESCV1, "force_igd_desc_v1"},
 #endif
 	{ UPNPMINISSDPDSOCKET, "minissdpdsocket"},
-	{ UPNPSECUREMODE, "secure_mode"}
+	{ UPNPSECUREMODE, "secure_mode"},
+#ifdef USE_NETFILTER
+	{ UPNPUSEEXTERNALSCRIPT, "use_external_script"},
+	{ UPNPEXTERNALSCRIPTPATH, "external_script_path"},
+#endif
 };
 
 int

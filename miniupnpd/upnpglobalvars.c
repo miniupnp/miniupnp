@@ -112,6 +112,12 @@ const char * queue = 0;
 const char * tag = 0;
 #endif
 
+#ifdef USE_NETFILTER
+/* external script support */
+int use_external_script = 0;
+const char * external_script_path = 0;
+#endif
+
 #ifdef ENABLE_NFQUEUE
 int nfqueue = -1;
 int n_nfqix = 0;

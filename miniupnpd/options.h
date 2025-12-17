@@ -88,7 +88,11 @@ enum upnpconfigoptions {
 #ifdef IGD_V2
 	UPNPFORCEIGDDESCV1,		/*!< force_igd_desc_v1 */
 #endif
-	UPNPENABLE				/*!< enable_upnp */
+	UPNPENABLE,				/*!< enable_upnp */
+#ifdef USE_NETFILTER
+	UPNPUSEEXTERNALSCRIPT,		/*!< use_external_script */
+	UPNPEXTERNALSCRIPTPATH		/*!< external_script_path */
+#endif
 };
 
 /*! \brief parse and store the option file values
