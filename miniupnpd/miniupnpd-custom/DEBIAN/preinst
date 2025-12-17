@@ -1,0 +1,106 @@
+#!/bin/sh
+
+set -e
+
+CONFFILE="/etc/miniupnpd/miniupnpd.conf"
+DEFAULT_FILE="/etc/default/miniupnpd"
+
+append_config () {
+	file="${1}"
+	key="${2}"
+	while [ "$#" -ge 3 ]; do
+		if [ -s "${file}" ]; then
+			sed -ri '
+x
+s|^$||
+t find
+x
+b
+: find
+x
+s|^\s*'"${key}"'=['\'\"']?'"${3}"'['\'\"']?\s*$|&|
+t end
+s|^#[ \t#]*('"${key}"'=['\'\"']?'"${3}"'['\'\"']?)\s*$|\1|
+t end
+s|^#[ \t#]*('"${key}"'=)\s*$|\1'"${3}"'|
+t end
+$ a'"${key}"'='"${3}"'
+b
+: end
+h
+			' "${file}"
+		else
+			echo "${key}=${3}" > "${file}"
+		fi
+		shift
+	done
+}
+
+remove_config_all () {
+	sed -ri 's|^\s*'"${2}"'=.*$|#&|' "${1}"
+}
+
+
+case "$1" in
+install|upgrade)
+	if [ -n "$2" ] && [ -r "${DEFAULT_FILE}" ] ; then
+		if dpkg --compare-versions "$2" lt 2.0.20180222-1 ; then
+			. "${DEFAULT_FILE}"
+			if [ -n "${MiniUPnPd_LISTENING_IP}" -o -n "${MiniUPnPd_EXTERNAL_INTERFACE}" ] ; then
+				# Make sure /etc/miniupnpd is there. It's in debian/dirs
+				# already, but we want to make sure an admin didn't delete it.
+				if ! [ -e /etc/miniupnpd ] ; then
+					mkdir -p /etc/miniupnpd
+				elif ! [ -d /etc/miniupnpd ] ; then
+					echo "Something is wrong: /etc/miniupnpd exists, but is not a directory!"
+					exit 1
+				fi
+				# Make sure we have a /etc/miniupnpd/miniupnpd.conf
+				if ! [ -e "${CONFFILE}" ] ; then
+					cp -f /usr/share/miniupnpd/miniupnpd.conf "${CONFFILE}"
+				fi
+
+				echo 'Migrating old "/etc/default/miniupnpd"...'
+				remove_config_all "${CONFFILE}" listening_ip
+				remove_config_all "${CONFFILE}" ext_ifname
+				append_config "${CONFFILE}" listening_ip ${MiniUPnPd_LISTENING_IP}
+				append_config "${CONFFILE}" ext_ifname ${MiniUPnPd_EXTERNAL_INTERFACE}
+				remove_config_all "${DEFAULT_FILE}" MiniUPnPd_LISTENING_IP
+				remove_config_all "${DEFAULT_FILE}" MiniUPnPd_EXTERNAL_INTERFACE
+			fi
+		fi
+
+		if dpkg --compare-versions "$2" lt 2.1-2 ; then
+			sed -i '
+				s/^MiniUPnPd_ip6tables_enable=no/MiniUPnPd_ip6tables_enable=0/
+				s/^MiniUPnPd_ip6tables_enable=yes/MiniUPnPd_ip6tables_enable=1/' "${DEFAULT_FILE}"
+		fi
+
+		if dpkg --compare-versions "$2" lt 2.1-3 ; then
+			sed -i 's/^START_DAEMON=/# START_DAEMON deprecated, use service miniupnpd enable\/disable\n#START_DAEMON=/' "${DEFAULT_FILE}"
+		fi
+	fi
+;;
+
+abort-upgrade)
+;;
+
+*)
+echo "preinst called with unknown argument \`$1'" >&2
+exit 1
+;;
+esac
+
+# Automatically added by dh_installinit/13.11.3
+if [ "$1" = "install" ] && [ -n "$2" ] && [ -e "/etc/init.d/miniupnpd" ] ; then
+	chmod +x "/etc/init.d/miniupnpd" >/dev/null || true
+fi
+# End automatically added section
+# Automatically added by dh_installsystemd/13.11.3
+if [ -z "${DPKG_ROOT:-}" ] && [ "$1" = upgrade ] && [ -d /run/systemd/system ] ; then
+	deb-systemd-invoke stop 'miniupnpd.service' >/dev/null || true
+fi
+# End automatically added section
+
+
+exit 0

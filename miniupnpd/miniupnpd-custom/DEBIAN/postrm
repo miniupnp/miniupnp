@@ -1,0 +1,42 @@
+#!/bin/sh
+
+set -e
+
+# Remove configuration if package is being purged
+if [ "$1" = "purge" ]; then
+	rm -f /etc/miniupnpd/miniupnpd.conf
+	rm -f /etc/default/miniupnpd
+	if [ -e /etc/miniupnpd ] ; then
+		rmdir --ignore-fail-on-non-empty /etc/miniupnpd || true
+	fi
+fi
+
+# Automatically added by dh_installinit/13.11.3
+if [ "$1" = "remove" ] && [ -x "/etc/init.d/miniupnpd" ] ; then
+	chmod -x "/etc/init.d/miniupnpd" >/dev/null || true
+fi
+if [ -z "${DPKG_ROOT:-}" ] && [ "$1" = "purge" ] ; then
+	update-rc.d miniupnpd remove >/dev/null
+fi
+# End automatically added section
+# Automatically added by dh_installsystemd/13.11.3
+if [ "$1" = remove ] && [ -d /run/systemd/system ] ; then
+	systemctl --system daemon-reload >/dev/null || true
+fi
+# End automatically added section
+# Automatically added by dh_installsystemd/13.11.3
+if [ "$1" = "purge" ]; then
+	if [ -x "/usr/bin/deb-systemd-helper" ]; then
+		deb-systemd-helper purge 'miniupnpd.service' >/dev/null || true
+	fi
+fi
+# End automatically added section
+# Automatically added by dh_installdebconf/13.11.3
+if [ "$1" = purge ] && [ -e /usr/share/debconf/confmodule ]; then
+	. /usr/share/debconf/confmodule
+	db_purge
+fi
+# End automatically added section
+
+
+exit 0

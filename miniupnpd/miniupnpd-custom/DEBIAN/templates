@@ -1,0 +1,249 @@
+
+Template: miniupnpd/start_daemon
+Type: boolean
+Default: false
+Description: Start the MiniUPnP daemon automatically?
+ Choose this option if the MiniUPnP daemon should start automatically,
+ now and at boot time.
+Description-cs.UTF-8: Spouštět daemona MiniUPnP automaticky?
+ Tuto možnost vyberte, pokud se má daemon MiniUPnP nyní automaticky spustit a spouštět při zavádění systému.
+Description-da.UTF-8: Start MiniUPnP-dæmonen op automatisk?
+ Vælg denne indstilling hvis MiniUPnP-dæmonen skal starte op automatisk, nu og ved opstartstidspunktet.
+Description-de.UTF-8: Den MiniUPnP-Daemon automatisch starten?
+ Wählen Sie diese Option, falls der MiniUPnP-Daemon jetzt und beim Hochfahren des Rechners automatisch gestartet werden soll.
+Description-es.UTF-8: ¿Desea iniciar el demonio MiniUPnP automáticamente?
+ Seleccione esta opción si desea que el demonio MiniUPnP se inicie automáticamente, ahora y en el arranque del equipo.
+Description-fr.UTF-8: Faut-il démarrer le démon MiniUPnP automatiquement ?
+ Choisissez cette option si vous voulez que le démon MiniUPnP démarre automatiquement, maintenant et à chaque démarrage du système.
+Description-it.UTF-8: Avviare il demone MiniUPnP automaticamente?
+ Scegliere questa opzione se il demone MiniUPnP deve essere avviato automaticamente, adesso e all'avvio.
+Description-ja.UTF-8: MiniUPnP デーモンを自動的に開始しますか?
+ 今ここで、またブート時に MiniUPnP デーモンを自動的に開始させる場合は選択してください。
+Description-nl.UTF-8: De MiniUPnP-achtergronddienst automatisch starten?
+ Kies voor deze optie als de MiniUPnP-achtergronddienst automatisch moet starten, nu en bij het opstarten van de computer.
+Description-pt.UTF-8: Iniciar o daemon do MiniUPnP automaticamente?
+ Escolha esta opção se o daemon do MiniUPnP deve iniciar automaticamente, agora e durante o arranque do sistema.
+Description-pt_BR.UTF-8: Iniciar o daemon do MiniUPnP automaticamente?
+ Escolha essa opção se o daemon do MiniUPnP deve iniciar automaticamente, agora e durante a inicialização do sistema.
+Description-ru.UTF-8: Запускать службу MiniUPnP автоматически?
+ Ответьте утвердительно, если хотите, чтобы служба MiniUPnP запускалась автоматически при включении машины и начала работу прямо сейчас.
+Description-sv.UTF-8: Ska MiniUPnP-tjänsten starta automatiskt?
+ Ange detta alternativ om MiniUPnP-tjänsten ska starta automatiskt nu och vid systemets uppstart.
+Description-vi.UTF-8: Khởi động dịch vụ MiniUPnP một cách tự động?
+ Chọn tùy chọn này nếu dịch vụ MiniUPnP nên tự khởi động, ngay bây giờ và vào lúc khởi động.
+Description-zh_CN.UTF-8: 自动启动 MiniUPnP 守护进程？
+ 若希望 MiniUPnP 守护程序现在和启动时自动启动，请选择此选项。
+Description-zh_TW.UTF-8: 自動啟動 MiniUPnP 守護程序？
+ 若希望 MiniUPnP 守護程式現在和啟動時自動啟動，請選擇此選項。
+
+Template: miniupnpd/listen
+Type: string
+Description: Interfaces to listen on for UPnP queries:
+ The MiniUPnP daemon will listen for requests on the local network. Please
+ enter the interfaces or IP addresses it should listen on, separated by
+ space.
+ .
+ Interface names are preferred, and required if you plan to enable IPv6 port
+ forwarding.
+Description-da.UTF-8: Grænseflader at lytte på efter UPnP-forespørgsler:
+ MiniUPnP-dæmonen vil lytte efter forespørgsler på det lokale netværk. Indtast venligst IP-adressen den skal lytte på, adskilt af mellemrum.
+ .
+ Grænsefladenavne foretrækkes, og kræves hvis du planlægger at aktivere IPv6-portomdirigering.
+Description-de.UTF-8: Schnittstellen, an denen auf UPnP-Anfragen gewartet werden soll:
+ Der MiniUPnP-Daemon wird auf Anfragen aus dem lokalen Netzwerk warten. Bitte geben Sie, durch Leerzeichen getrennt, die Schnittstellen oder IP-Adressen an, auf denen er Anfragen annehmen soll.
+ .
+ Schnittstellennamen werden bevorzugt und sind erforderlich, falls Sie IPv6-Portweiterleitung aktivieren möchten.
+Description-es.UTF-8: Interfaces donde se escucharán las consultas UPnP:
+ El demonio MiniUPnP escuchará consultas en la red local. Introduzca las interfaces o las direcciones IP que deberían utilizarse para escuchar estas peticiones.
+ .
+ Es preferible que utilice los nombres de las interfaces, y de uso obligado si desea activar el reenvío de puertos IPv6.
+Description-fr.UTF-8: Interfaces à écouter pour les requêtes UPnP :
+ Le démon MiniUPnP sera à l'écoute de requêtes sur le réseau local. Veuillez indiquer les interfaces ou les adresses IP, séparées par des espaces, sur lesquelles il écoutera.
+ .
+ Il est préférable d'indiquer le nom des interfaces. Cela est même requis si vous projetez d'activer la redirection de port IPv6.
+Description-it.UTF-8: Interfacce sulle quali restare in ascolto per richieste UPnP:
+ Il demone MiniUPnP resterà in ascolto per le richieste sulla rete locale. Inserire, separati da spazi, le interfacce o gli indirizzi IP su cui deve restare in ascolto.
+ .
+ I nomi di interfacce sono preferiti e sono richiesti se si ha intenzione di abilitare il forwarding delle porte IPv6.
+Description-nl.UTF-8: Interfaces waarop geluisterd moet worden naar UPnP-verzoeken:
+ De MiniUPnP-achtergronddienst luistert op het lokale netwerk naar aanvragen. Geef de interfaces of de IP-adressen op waarop de dienst moet luisteren, gescheiden door witruimte.
+ .
+ Interfacenamen genieten de voorkeur en zijn vereist als u IPv6 port forwarding wilt activeren.
+Description-pt.UTF-8: Interfaces a escutar por pedidos UPnP:
+ O daemon do MiniUPnP irá escutar por pedidos na rede local. Por favor indique as interfaces ou endereços IP que ele deve escutar, separados por espaços:
+ .
+ São preferidos nomes de interfaces, e necessários se planeia activar o port forwarding de IPv6.
+Description-pt_BR.UTF-8: Interfaces para escutar consultas UPnP:
+ O daemon do MiniUPnP escutará requisições na rede local. Por favor, informe as interfaces ou endereços IP nos quais ele deverá escutar, separados por espaços.
+ .
+ É preferido informar os nomes das interfaces, e é obrigatório se você planeja habilitar encaminhamento de porta IPv6.
+Description-sv.UTF-8: Gränssnitt som ska bevakas för UPnP-frågor:
+ MiniUPnP-tjänsten lyssnar efter förfrågningar på det lokala nätverket. Ange gränssnitt eller IP-adress som den ska lyssna på, separera med tomrum.
+ .
+ Namn på gränssnittet föredras, och är ett krav om du planerar att aktivera vidarebefordring av portar för IPv6.
+Description-vi.UTF-8: Giao diện để lắng nghe các truy vấn UPnP:
+ Dịch vụ MiniUPnP sẽ lắng nghe cho các yêu cầu trên mạng cục bộ. Xin vui lòng nhập các giao diện hoặc địa chỉ IP nó cần lắng nghe, cách nhau bằng khoảng trắng.
+ .
+ Tên giao diện được ưa thích, và là bắt buộc nếu bạn định bật chuyển tiếp cổng IPv6.
+Description-zh_CN.UTF-8: 监听 UPnP 查询的 LAN 接口或 IP 地址：
+ MiniUPnP 守护进程将监听本地网络上的请求。请输入应监听的 LAN 接口或 IP 地址，用空格分开。
+ .
+ 首选输入接口名称，如果您打算启用 IPv6 端口转发，则必须输入名称。
+Description-zh_TW.UTF-8: 監聽 UPnP 查詢的 LAN 介面或 IP 地址：
+ MiniUPnP 守護程序將監聽本地網路上的請求。請輸入應監聽的 LAN 介面或 IP 地址，用空格分開。
+ .
+ 首選輸入介面名稱，如果您打算啟用 IPv6 埠轉發，則必須輸入名稱。
+
+Template: miniupnpd/iface
+Type: string
+Description: External WAN network interface to open ports on:
+ The MiniUPnP daemon will listen on a specific IP address on the local
+ network, then open ports on the WAN interface. Please enter the name of
+ the WAN network interface on which the MiniUPnP daemon should perform
+ port forwarding.
+Description-cs.UTF-8: Vnější WAN rozhraní, na kterém se mají otevřít porty:
+ Daemon MiniUPnP bude naslouchat na určité IP adrese v místní síti, potom otevře porty na WAN rozhraní. Zadejte prosím název síťového rozhraní WAN, na kterém má daemon MiniUPnP provést přesměrování portů.
+Description-da.UTF-8: Ekstern WAN-netværksgrænseflade til at åbne porte på:
+ MiniUPnP-dæmonen vil lytte på en specifik IP-adresse på det lokale netværk, og så åbne porte på WAN-grænsefladen. Indtast venligst navnet på WAN-netværksgrænsefladen hvor MiniUPnP-dæmonen skal udføre portvideresendelse.
+Description-de.UTF-8: Externe WAN-Netzwerkschnittstelle, auf der Ports geöffnet werden sollen:
+ Der MiniUPnP-Daemon wird auf Anfragen auf einer bestimmten IP-Adresse im lokalen Netzwerk warten und dann Ports auf der WAN-Schnittstelle öffnen. Bitte geben Sie den Namen der WAN-Netzwerkschnittstelle an, auf die der MiniUPnP-Daemon Port-Weiterleitung durchführen soll.
+Description-es.UTF-8: Interfaz de red externa («WAN») donde abrir los puertos:
+ El demonio MiniUPnP escuchará en una dirección IP específica de la red local y abrirá los puertos en la interfaz externa («WAN»). Introduzca el nombre de la interfaz de red externa («WAN») donde el demonio MiniUPnP debería realizar la redirección de puertos.
+Description-fr.UTF-8: Interface réseau WAN sur laquelle il faut ouvrir des ports :
+ Le démon MiniUPnP écoutera sur une adresse IP spécifique du réseau local, puis ouvrira certains ports sur l'interface WAN. Veuillez indiquer le nom de l'interface de réseau WAN sur laquelle le démon MiniUPnP mettra en place des redirections de ports.
+Description-it.UTF-8: Interfaccia di rete WAN esterna su cui aprire le porte:
+ Il demone MiniUPnP resterà in ascolto su un indirizzo IP specifico sulla rete locale, poi aprirà porte sull'interfaccia WAN. Inserire il nome dell'interfaccia di rete WAN verso la quale il demone MiniUPnP deve fare il ridirezionamento delle porte.
+Description-ja.UTF-8: ポートを開く外部 WAN ネットワークインターフェイス:
+ MiniUPnP デーモンはローカルネットワーク上の特定のIPアドレスを待ち受け、WAN インターフェイス上のポートを開きます。MiniUPnP デーモンがポート転送を行う WAN ネットワークインターフェイスの名前を入力してください。
+Description-nl.UTF-8: Netwerk-interface voor het externe WAN waarop poorten geopend moeten worden:
+ De MiniUPnP-achtergronddienst zal op een specifiek IP-adres van het lokale netwerk luisteren en dan op de WAN-interface poorten openen. Geef de naam op van de WAN-netwerkinterface waarop de MiniUPnP-achtergronddienst port-forwarding moet uitvoeren.
+Description-pt.UTF-8: Interface de rede WAN externa para abrir portos em:
+ O daemon do MiniUPnP irá escutar num endereço IP específico na rede local, e depois abrir portos na interface da WAN. Por favor indique o nome da interface de rede WAN no qual o daemon do MiniUPnP deverá executar o reencaminhamento de portos.
+Description-pt_BR.UTF-8: Interface de rede WAN externa na qual abrir portas:
+ O daemon do MiniUPnP escutará em um endereço IP específico na rede local, e então abrirá portas na interface WAN. Por favor, informe o nome da interface de rede WAN na qual o daemon do MiniUPnP deverá fazer encaminhamento de porta ("port forwarding").
+Description-ru.UTF-8: Интерфейс внешней сети WAN для открытия портов:
+ Служба MiniUPnP прослушивает определённый IP-адрес в локальной сети, а затем открывает порты на интерфейсе WAN. Введите имя сетевого интерфейса WAN, на котором служба MiniUPnP должна выполнять проброс портов.
+Description-sv.UTF-8: Externt WAN-nätverksgränssnitt att öppna portar på:
+ MiniUPnP-tjänsten lyssnar på en specifik IP-adress på det lokala nätverket och öppnar sedan portar på WAN-gränssnittet. Ange namnet på det WAN-nätverksgränssnitt som MiniUPnP-tjänsten ska vidarebefordra portar på.
+Description-vi.UTF-8: Giao diện mạng WAN bên ngoài để mở cổng trên:
+ Dịch vụ MiniUPnP sẽ lắng nghe trên một địa chỉ IP cụ thể trên mạng cục bộ, sau đó mở các cổng trên giao diện WAN. Xin vui lòng nhập tên của giao diện mạng WAN mà trên đó các Dịch vụ MiniUPnP nên thực hiện chuyển tiếp cổng.
+Description-zh_CN.UTF-8: 要打开端口的外部 WAN 网络接口：
+ MiniUPnP 守护进程将监听本地网络上的特定 IP 地址，然后打开 WAN 接口上的端口。请输入 MiniUPnP 守护程序应执行端口转发的 WAN 网络接口的名称。
+Description-zh_TW.UTF-8: 要開啟埠的外部 WAN 網路介面：
+ MiniUPnP 守護程序將監聽本地網路上的特定 IP 地址，然後開啟 WAN 介面上的埠。請輸入 MiniUPnP 守護程式應執行埠轉發的 WAN 網路介面的名稱。
+
+Template: miniupnpd/ip6script
+Type: boolean
+Default: false
+Description: Enable IPv6 firewall chain?
+ Please specify whether the MiniUPnP daemon should run its
+ ip6tables script on startup to initialize the IPv6 firewall chain.
+ .
+ Note: This option is useless if you don't block any IPv6 forwarded traffic.
+Description-da.UTF-8: Aktiver IPv6-brandmurskæde?
+ Specificer venligst om MiniUPnP-dæmonen skal køre sit ip6tables-skript ved opstart for at initialisere IPv6-brandmurskæden.
+ .
+ Bemærk: Denne indstilling er ubrugelig hvis du ikke blokerer IPv6-omdirigeret trafik.
+Description-de.UTF-8: IPv6-Firewall-Regelkette aktivieren?
+ Bitte geben Sie an, ob der MiniUPnP-Daemon beim Starten sein Skript »ip6tables« ausführen soll, um die IPv6-Firewall-Regelkette zu initialisieren.
+ .
+ Hinweis: Diese Option ist nutzlos, falls Sie keinen weitergeleiteten IPv6-Verkehr blockieren.
+Description-es.UTF-8: ¿Desea activar la cadena IPv6 del cortafuegos?
+ Especifique si el demonio MiniUPnP debe ejecutar su script de ip6tables al arrancar para inicializar la cadena IPv6 del cortafuegos.
+ .
+ Nota: Esta opción es inútil si no se bloquea el tráfico reenviado IPv6.
+Description-fr.UTF-8: Faut-il activer la chaîne de pare-feu IPv6 ?
+ Veuillez indiquer si le démon MiniUPnP doit exécuter ses scripts ip6tables au démarrage pour initialiser la chaîne de pare-feu IPv6.
+ .
+ Note : cette option est inutile si la redirection de trafic IPv6 n'est pas bloquée.
+Description-it.UTF-8: Abilitare una catena IPv6 nel firewall?
+ Specificare se il demone MiniUPnP debba eseguire il suo script ip6tables all'avvio per inizializzare la catena IPv6 nel firewall.
+ .
+ Nota bene: questa opzione è inutile se non si blocca alcun traffico IPv6 con forwarding.
+Description-nl.UTF-8: IPv6 firewall chain (firewallregels) activeren?
+ Geef aan of de MiniUPnP-achtergronddienst bij het starten zijn ip6tables-script moet uitvoeren om de IPv6 firewall chain (firewallregels) te initialiseren.
+ .
+ Merk op: deze optie is zinloos indien u geen doorgestuurde IPv6-trafiek blokkeert.
+Description-pt.UTF-8: Activar a cadeia de firewall IPv6?
+ Por favor especifique se o daemon do MiniUPnP deverá correr o seu script ip6tables no arranque do sistema para inicializar a cadeia de firewall IPv6.
+ .
+ Nota: Esta opção é desnecessária se você não bloquear nenhum tráfego encaminhado de IPv6.
+Description-pt_BR.UTF-8: Habilitar cadeia ("chain") de firewall IPv6?
+ Por favor, especifique se o daemon do MiniUPnP deverá executar o seu script de ip6tables ao iniciar para inicializar a cadeia de firewall IPv6.
+ .
+ Nota: essa opção é inútil se você não bloquear nenhum encaminhamento de tráfego IPv6.
+Description-sv.UTF-8: Aktivera brandväggskedjan för IPv6?
+ Ange om MiniUPnP-tjänsten ska köra sitt ip6tables-skript vid uppstart för att initiera brandväggskedjan för IPv6.
+ .
+ Detta alternativ är meningslöst om du inte också blockerar vidarebefordrad IPv6-trafik.
+Description-vi.UTF-8: Cho phép móc xích tường lửa IPv6?
+ Xin vui lòng chỉ định liệu dịch vụ MiniUPnP có nên chạy kịch bản ip6tables của nó lúc khởi động để khởi tạo móc xích tường lửa IPv6.
+ .
+ Lưu ý: tùy chọn này là vô ích nếu bạn không chặn bất kỳ IPv6 chuyển tiếp lưu thông.
+Description-zh_CN.UTF-8: 启用 IPv6 防火墙链？
+ 请指定 MiniUPnP 守护程序是否应在启动时运行其 ip6tables 脚本以初始化 IPv6 防火墙链。
+ .
+ 注意：如果您未阻挡任何 IPv6 转发流量，则此选项对您无用。
+Description-zh_TW.UTF-8: 啟用 IPv6 防火牆鏈？
+ 請指定 MiniUPnP 守護程式是否應在啟動時執行其 ip6tables 指令碼以初始化 IPv6 防火牆鏈。
+ .
+ 注意：如果您未阻擋任何 IPv6 轉發流量，則此選項對您無用。
+
+Template: miniupnpd/force_igd_desc_v1
+Type: boolean
+Default: false
+Description: Force reporting IGDv1 in rootDesc?
+ Some IGD clients (most notably Microsoft® Windows® BITS) look for IGDv1 and do
+ not recognize IGDv2 as a valid IGD service. This option will fool them by
+ pretending itself to be IGDv1.
+ .
+ Of course you will lose IGDv2 functions (notably IPv6 support) by enabling
+ this.
+Description-da.UTF-8: Fremtving rapportering af IGDv1 i rootDesc?
+ Nogle IGD-klienter (især kendt Microsoft® Windows® BITS) kigger efter IGDv1 og anerkender ikke IGDv2 som en gyldig IGD-tjeneste. Denne indstilling vil snyde dem ved at udgive sig for at være IGDv1.
+ .
+ Du vil selvfølgelig miste IGDv2-funktioner (især IPv6-understøttelse) ved at aktivere dette.
+Description-de.UTF-8: Soll das Melden von IGDv1 in rootDesc erzwungen werden?
+ Einige IGD-Clients (insbesondere Microsoft® Windows® BITS) suchen nach IGDv1 und erkennen IGDv2 nicht als gültigen IGD-Dienst. Diese Option wird sie austricksen, indem sie sich selbst als IGDv1 ausgibt.
+ .
+ Durch Aktivieren dieser Option, werden Sie natürlich IGDv2-Funktionen einbüßen (insbesondere IPv6-Unterstützung).
+Description-es.UTF-8: ¿Desea forzar la notificación de IGDv1 en rootDesc?
+ Algunos clientes IGD (particularmente Microsoft® Windows® BITS) buscan IGDv1 y no reconocen IGDv2 como un servicio IGD válido. Esta opción les engañará haciéndose pasar por IGDv1.
+ .
+ Por supuesto, al activar esta opción ya no estarán disponibles las funciones IGDv2 (concretamente, el soporte IPv6).
+Description-fr.UTF-8: Forcer la déclaration IGDv1 dans rootDesc ?
+ Certains clients IGD (principalement Microsoft® Windows® BITS) recherchent des service IGDv1 et ne reconnaissent pas IGDv2 comme un service IGD valide. Cette option les trompera en se présentant comme un service IGDv1.
+ .
+ Bien évidement, les fonctions de IGDv2 (en particulier la prise en charge de IPv6) seront perdues en activant cette option.
+Description-it.UTF-8: Forzare la segnalazione come IGDv1 in rootDesc?
+ Alcuni client IGD (in particolare Microsoft® Windows® BITS) cercano IGDv1 e non riconoscono IGDv2 come servizio IGD valido. Questa opzione li ingannerà facendo finta di essere IGDv1.
+ .
+ Abilitando ciò, naturalmente verranno perse le funzioni IGDv2 (e, in modo degno di nota, il supporto per IPv6).
+Description-nl.UTF-8: De achtergronddienst zich in rootDesc verplicht als IGDv1 laten voordoen?
+ Sommige IGD-clients (in het bijzonder Microsoft® Windows® BITS) zijn op zoek naar IGDv1 en herkennen IGDv2 niet als een geldige IGD-dienst. Met deze optie bedrieg je hen door de achtergronddienst zich te laten voordoen als IGDv1.
+ .
+ Natuurlijk zult u door dit in te schakelen IGDv2-functionaliteit (in het bijzonder ondersteuning voor IPv6) verliezen.
+Description-pt.UTF-8: Forçar relatórios de IGDv1 em rootDesc?
+ Alguns clientes IGD (maioritariamente Microsoft® Windows® BITS) procuram IGDv1 e não reconhecem IGDv2 como um serviço IGD válido. Esta opção irá enganá-los ao fingir ser IGDv1.
+ .
+ É claro que irá perder funções de IGDv2 (notavelmente suporte de IPv6) ao activar isto.
+Description-pt_BR.UTF-8: Forçar o anúncio IGDv1 em rootDesc?
+ Alguns clientes IGD (notavelmente, o Microsoft® Windows® BITS) procuram por IGDv1 e não reconhecem IGDv2 como um serviço IGD válido. Essa opção os enganará, fingindo ser IGDv1.
+ .
+ Obviamente, você perderá funcionalidades IGDv2 (notavelmente, suporte a IPv6) habilitando essa opção.
+Description-sv.UTF-8: Tvinga fram rapportering av IGDv1 i rootDesc?
+ Vissa IGD-klienter (främsta exemplet är nog Microsoft® Windows® BITS) letar efter IGDv1 och känner inte till IGDv2 som korrekta IGD-enheter. Detta alternativ kommer att luras genom att låtsas vara en IGDv1-enhet.
+ .
+ Du kommer förstås att tappa IGDv2-funktioner (exempelvis IPv6-stöd) genom att aktivera detta.
+Description-vi.UTF-8: Buộc báo cáo IGDv1 trong rootDesc?
+ Một số máy khách IGD (nhất là Microsoft® Windows® BITS) có tìm kiếm IGDv1 và không nhận ra IGDv2 như là một dịch vụ IGD hợp lệ. Tùy chọn này sẽ  lừa chúng bằng các giả vờ nó là IGDv1.
+ .
+ Dĩ nhiên là bạn sẽ mất các tính năng IGDv2 (đặc biệt nhất là hỗ trợ IPv6) nếu bật cái này.
+Description-zh_CN.UTF-8: 强制在 rootDesc 中报告 IGDv1？
+ 某些 IGD 客户端（特别是 Microsoft® Windows® BITS）只识别 IGDv1，不把 IGDv2 看作有效的 IGD 服务。这个选项会将自己假装成 IGDv1 来欺骗他们。
+ .
+ 当然，启用此选项，您将失去 IGDv2 功能（特别是 IPv6 支持）。
+Description-zh_TW.UTF-8: 強制在 rootDesc 中報告 IGDv1？
+ 某些 IGD 客戶端（特別是 Microsoft® Windows® BITS）只識別 IGDv1，不把 IGDv2 看作有效的 IGD 服務。這個選項會將自己假裝成 IGDv1 來欺騙他們。
+ .
+ 當然，啟用此選項，您將失去 IGDv2 功能（特別是 IPv6 支援）。

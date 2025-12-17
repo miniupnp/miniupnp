@@ -1,0 +1,3 @@
+/etc/init.d/miniupnpd
+/etc/miniupnpd/miniupnpd_functions.sh
+/etc/miniupnpd/miniupnpd.conf

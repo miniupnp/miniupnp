@@ -1,0 +1,39 @@
+[Unit]
+Description=UPnP Internet Gateway Device Daemon
+Documentation=man:miniupnpd(8)
+After=network-online.target
+
+[Service]
+Type=forking
+EnvironmentFile=-/etc/default/miniupnpd
+#ExecStartPre commented as it is not necessary for the mode this fork is intended (script to fw)
+#ExecStartPre=/usr/libexec/miniupnpd-startstop-helper.sh start
+ExecStart=/usr/sbin/miniupnpd -f /etc/miniupnpd/miniupnpd.conf $MiniUPnPd_OTHER_OPTIONS
+#ExecStopPos commented as it is not necessary for the mode this fork is intended (script to fw)
+#ExecStopPost=/usr/libexec/miniupnpd-startstop-helper.sh stop
+PIDFile=/run/miniupnpd.pid
+
+# for /etc/miniupnpd/nft_removeall.sh. miniupnpd alone needs only 1.
+TasksMax=2
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BROADCAST CAP_NET_RAW CAP_SYSLOG
+MountAPIVFS=yes
+NoNewPrivileges=yes
+PrivateMounts=yes
+PrivateDevices=yes
+PrivateTmp=yes
+MemoryDenyWriteExecute=yes
+ProtectSystem=full
+ProtectHome=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

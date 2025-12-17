@@ -1,0 +1,15 @@
+Package: miniupnpd
+Version: 2.3.9-script1
+Architecture: all
+Maintainer: Lucas Ventura
+Depends: debconf, lsb-base, uuid-runtime, debconf (>= 0.5) | debconf-2.0, init-system-helpers (>= 1.51)
+Section: net
+Priority: optional
+Homepage: http://miniupnp.free.fr/
+Description: UPnP and NAT-PMP daemon for gateway routers
+ MiniUPnPd is a small daemon which can be installed on a NAT router to
+ provide UPnP Internet Gateway Device and Port Mapping Protocol services,
+ enabling clients on the LAN to ask for port redirections. It is
+ compatible with peer-to-peer software, messaging applications, and games
+ consoles that connect to online services (including Xbox LIVE and the
+ PlayStation Network).

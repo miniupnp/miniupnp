@@ -1,0 +1,191 @@
+#!/bin/sh
+
+set -e
+
+CONFFILE="/etc/miniupnpd/miniupnpd.conf"
+DEFAULT_FILE="/etc/default/miniupnpd"
+
+. /usr/share/debconf/confmodule
+
+replace_config () {
+	if [ -s "${1}" ]; then
+		sed -ri '
+x
+s|^$||
+t find
+x
+b
+: find
+x
+s|^\s*('"${2}"'=).*|\1'"${3}"'|
+t end
+s|^#[ \t#]*('"${2}"'=['\'\"']?'"${3}"'['\'\"']?)\s*$|\1|
+t end
+s|^#[ \t#]*('"${2}"'=)\s*$|\1'"${3}"'|
+t end
+$ a'"${2}"'='"${3}"'
+b
+: end
+h
+		' "${1}"
+	else
+		echo "${2}=${3}" > "${1}"
+	fi
+}
+
+append_config () {
+	file="${1}"
+	key="${2}"
+	while [ "$#" -ge 3 ]; do
+		if [ -s "${file}" ]; then
+			sed -ri '
+x
+s|^$||
+t find
+x
+b
+: find
+x
+s|^\s*'"${key}"'=['\'\"']?'"${3}"'['\'\"']?\s*$|&|
+t end
+s|^#[ \t#]*('"${key}"'=['\'\"']?'"${3}"'['\'\"']?)\s*$|\1|
+t end
+s|^#[ \t#]*('"${key}"'=)\s*$|\1'"${3}"'|
+t end
+$ a'"${key}"'='"${3}"'
+b
+: end
+h
+			' "${file}"
+		else
+			echo "${key}=${3}" > "${file}"
+		fi
+		shift
+	done
+}
+
+remove_config_all () {
+	sed -ri 's|^\s*'"${2}"'=.*$|#&|' "${1}"
+}
+
+read_config () {
+	sed -rn '
+s|^\s*'"${2}"'='\''([^'\'']+)'\''\s*$|\1|g
+t hold
+s|^\s*'"${2}"'='\"'([^'\"']+)'\"'\s*$|\1|g
+t hold
+s|^\s*'"${2}"'=(\S+)\s*$|\1|
+t hold
+b
+: hold
+p
+	' "${1}"
+}
+
+
+# Automatically added by dh_installinit/13.11.3
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
+	if [ -x "/etc/init.d/miniupnpd" ]; then
+		update-rc.d miniupnpd defaults-disabled >/dev/null || exit 1
+	fi
+fi
+# End automatically added section
+# Automatically added by dh_installsystemd/13.11.3
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
+	if deb-systemd-helper debian-installed 'miniupnpd.service'; then
+		# The following line should be removed in trixie or trixie+1
+		deb-systemd-helper unmask 'miniupnpd.service' >/dev/null || true
+
+		if deb-systemd-helper --quiet was-enabled 'miniupnpd.service'; then
+			# Create new symlinks, if any.
+			deb-systemd-helper enable 'miniupnpd.service' >/dev/null || true
+		fi
+	fi
+
+	# Update the statefile to add new symlinks (if any), which need to be cleaned
+	# up on purge. Also remove old symlinks.
+	deb-systemd-helper update-state 'miniupnpd.service' >/dev/null || true
+fi
+# End automatically added section
+
+
+case "${1}" in
+configure)
+	#########################################################################
+	### Maintain the uuid value in the /etc/miniupnpd/miniupnpd.conf file ###
+	#########################################################################
+	# Make sure /etc/miniupnpd is there. It's in debian/dirs
+	# already, but we want to make sure an admin didn't delete it.
+	if ! [ -e /etc/miniupnpd ] ; then
+		mkdir -p /etc/miniupnpd
+	elif ! [ -d /etc/miniupnpd ] ; then
+		echo "Something is wrong: /etc/miniupnpd exists, but is not a directory!"
+		exit 1
+	fi
+	# Make sure we have a /etc/miniupnpd/miniupnpd.conf
+	if ! [ -e "${CONFFILE}" ] ; then
+		cp -f /usr/share/miniupnpd/miniupnpd.conf "${CONFFILE}"
+	fi
+
+	# This postinst will generate a random uuid for miniupnpd
+	# only if the uuid= directive is either not there, or empty.
+	# in all other cases, the script will keep the existing
+	# uuid and not modify it.
+	if [ -z "$(read_config ${CONFFILE} uuid)" ] ; then
+		replace_config "${CONFFILE}" uuid $(uuidgen)
+	fi
+
+	#########################################################
+	### Maintain the /etc/default/miniupnpd configuration ###
+	#########################################################
+	if ! [ -e "${DEFAULT_FILE}" ] ; then
+		cp /usr/share/miniupnpd/miniupnpd.default "${DEFAULT_FILE}"
+	fi
+
+	db_get miniupnpd/listen
+	LISTEN_IP="${RET}"
+	remove_config_all "${CONFFILE}" listening_ip
+	append_config "${CONFFILE}" listening_ip ${LISTEN_IP}
+
+	db_get miniupnpd/iface
+	IFACE="${RET}"
+	remove_config_all "${CONFFILE}" ext_ifname
+	append_config "${CONFFILE}" ext_ifname ${IFACE}
+
+	db_get miniupnpd/ip6script
+	if [ "${RET}" = "true" ] ; then
+		replace_config "${DEFAULT_FILE}" MiniUPnPd_ip6tables_enable 1
+	else
+		replace_config "${DEFAULT_FILE}" MiniUPnPd_ip6tables_enable 0
+	fi
+
+	db_get miniupnpd/force_igd_desc_v1
+	if [ "${RET}" = "true" ] ; then
+		replace_config "${CONFFILE}" force_igd_desc_v1 yes
+	else
+		replace_config "${CONFFILE}" force_igd_desc_v1 no
+	fi
+
+	db_get miniupnpd/start_daemon
+	if [ "${RET}" = "true" ] ; then
+		update-rc.d miniupnpd enable >/dev/null
+		if [ -n "$2" ]; then
+			_dh_action=restart
+		else
+			_dh_action=start
+		fi
+		invoke-rc.d miniupnpd $_dh_action || exit 1
+		# if false, don't disable it - no-enable on first installation and keep everything untouched during upgrade
+	fi
+
+	db_stop
+;;
+abort-upgrade|abort-remove|abort-deconfigure)
+;;
+*)
+	echo "postinst called with unknown argument \`${1}'" >&2
+	exit 1
+;;
+esac
+
+exit 0

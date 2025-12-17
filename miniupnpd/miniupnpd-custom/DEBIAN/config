@@ -1,0 +1,81 @@
+#!/bin/sh
+
+set -e
+
+CONFFILE="/etc/miniupnpd/miniupnpd.conf"
+DEFAULT_FILE="/etc/default/miniupnpd"
+
+. /usr/share/debconf/confmodule
+
+read_config () {
+	sed -rn '
+s|^\s*'"${2}"'='\''([^'\'']+)'\''\s*$|\1|g
+t hold
+s|^\s*'"${2}"'='\"'([^'\"']+)'\"'\s*$|\1|g
+t hold
+s|^\s*'"${2}"'=(\S+)\s*$|\1|
+t hold
+b
+: hold
+p
+	' "${1}"
+}
+
+
+if [ -r "${DEFAULT_FILE}" ] ; then
+	. "${DEFAULT_FILE}"
+fi
+
+if [ -r "${CONFFILE}" ] ; then
+	MiniUPnPd_EXTERNAL_INTERFACE=$(read_config "${CONFFILE}" ext_ifname)
+	MiniUPnPd_LISTENING_IP=$(read_config "${CONFFILE}" listening_ip | sed -z 's/\n/ /g')
+fi
+
+if [ -z "${MiniUPnPd_EXTERNAL_INTERFACE}" ] ; then
+	# If no interface is defined, try to find one automatically
+	MiniUPnPd_EXTERNAL_INTERFACE=$(LC_ALL=C /sbin/route | grep -m 1 default | awk -- '{ print $8 }')
+fi
+
+# fetch anything in debconf
+db_get miniupnpd/start_daemon
+if [ -n "$RET" ] ; then
+	if [ "$RET" = 'true' ] ; then
+		START_DAEMON=1
+	else
+		START_DAEMON=0
+	fi
+fi
+
+db_get miniupnpd/iface
+if [ -n "$RET" ] ; then
+	MiniUPnPd_EXTERNAL_INTERFACE="$RET"
+else
+	db_set miniupnpd/iface "${MiniUPnPd_EXTERNAL_INTERFACE}"
+fi
+
+db_get miniupnpd/listen
+if [ -n "$RET" ] ; then
+	MiniUPnPd_LISTENING_IP="$RET"
+else
+	db_set miniupnpd/listen "${MiniUPnPd_LISTENING_IP}"
+fi
+
+if [ -z "${MiniUPnPd_EXTERNAL_INTERFACE}" -o -z "${MiniUPnPd_LISTENING_IP}" ] ; then
+	# If none found, then we shouldn't start the daemon.
+	START_DAEMON=0
+fi
+
+if [ "${START_DAEMON}" = 1 ] ; then
+	db_set miniupnpd/start_daemon true
+else
+	db_set miniupnpd/start_daemon false
+fi
+
+db_input high miniupnpd/start_daemon || true
+db_input high miniupnpd/iface || true
+db_input high miniupnpd/listen || true
+db_input low miniupnpd/ip6script || true
+db_input medium miniupnpd/force_igd_desc_v1 || true
+db_go
+
+exit 0
