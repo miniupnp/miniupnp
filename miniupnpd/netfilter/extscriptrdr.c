@@ -47,14 +47,10 @@ static int execute_external_script(const char *operation, const char **args, int
 	pid_t pid;
 	int status;
 	
-	syslog(LOG_ERR, "execute_external_script called: operation=%s, arg_count=%d", operation, arg_count);
-	
 	if (!external_script_path || strlen(external_script_path) == 0) {
 		syslog(LOG_ERR, "external script path not configured");
 		return -1;
 	}
-	
-	syslog(LOG_ERR, "external_script_path is: %s", external_script_path);
 	
 	/* Check if script exists and is executable */
 	if (access(external_script_path, X_OK) != 0) {
@@ -62,12 +58,10 @@ static int execute_external_script(const char *operation, const char **args, int
 		return -1;
 	}
 	
-	syslog(LOG_ERR, "external script found and executable: %s, operation: %s", external_script_path, operation);
-	
 	/* Build argv array */
 	char **argv = malloc(sizeof(char*) * (arg_count + 5));
 	if (!argv) {
-		syslog(LOG_ERR, "malloc failed");
+		syslog(LOG_ERR, "malloc failed for external script argv");
 		return -1;
 	}
 	
@@ -79,8 +73,6 @@ static int execute_external_script(const char *operation, const char **args, int
 		argv[i + 4] = (char*)args[i];
 	}
 	argv[arg_count + 4] = NULL;
-	
-	syslog(LOG_ERR, "attempting posix_spawn");
 	
 	/* Set up file actions to redirect stdin to /dev/null */
 	posix_spawn_file_actions_t file_actions;
@@ -98,20 +90,15 @@ static int execute_external_script(const char *operation, const char **args, int
 		return -1;
 	}
 	
-	syslog(LOG_ERR, "parent: waiting for child process %d", pid);
-	
 	if (waitpid(pid, &status, 0) == -1) {
 		syslog(LOG_ERR, "waitpid() failed: %m");
 		return -1;
 	}
 
-	syslog(LOG_ERR, "parent: child finished, status=%d", status);
-
 	if (WIFEXITED(status)) {
 		int exit_code = WEXITSTATUS(status);
-		syslog(LOG_ERR, "external script exited with code %d", exit_code);
 		if (exit_code != 0) {
-			syslog(LOG_ERR, "external script failed with code %d", exit_code);
+			syslog(LOG_WARNING, "external script failed with exit code %d", exit_code);
 			return -1;
 		}
 		return 0;
@@ -120,7 +107,7 @@ static int execute_external_script(const char *operation, const char **args, int
 		return -1;
 	}
 
-	syslog(LOG_ERR, "external script finished with unknown status %d", status);
+	syslog(LOG_ERR, "external script finished with unknown status");
 	return -1;
 }/* ext_add_redirect_rule2()
  * Add port forwarding rule using external script
@@ -150,7 +137,7 @@ ext_add_redirect_rule2(const char * ifname,
 	args[arg_count++] = desc ? desc : "";
 	args[arg_count++] = timestamp_str;
 
-	syslog(LOG_ERR, "ext_add_redirect_rule2: %s %s:%s -> %s:%s %s",
+	syslog(LOG_INFO, "ext_add_redirect_rule2: %s %s:%s -> %s:%s %s",
 	       proto_itoa(proto), rhost ? rhost : "*", eport_str, iaddr, iport_str, desc ? desc : "");
 
 	return execute_external_script("add_redirect", args, arg_count);
@@ -181,7 +168,7 @@ ext_add_filter_rule2(const char * ifname,
 	args[arg_count++] = proto_itoa(proto);
 	args[arg_count++] = desc ? desc : "";
 
-	syslog(LOG_ERR, "ext_add_filter_rule2: %s %s %s:%s -> %s:%s",
+	syslog(LOG_INFO, "ext_add_filter_rule2: %s %s %s:%s -> %s:%s",
 	       proto_itoa(proto), rhost ? rhost : "*", ifname, eport_str, iaddr, iport_str);
 
 	return execute_external_script("add_filter", args, arg_count);
@@ -203,7 +190,7 @@ ext_delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 	args[arg_count++] = eport_str;
 	args[arg_count++] = proto_itoa(proto);
 
-	syslog(LOG_ERR, "ext_delete_redirect_rule: %s %s:%s",
+	syslog(LOG_INFO, "ext_delete_redirect_rule: %s %s:%s",
 	       proto_itoa(proto), ifname, eport_str);
 
 	return execute_external_script("delete_redirect", args, arg_count);
@@ -225,7 +212,7 @@ ext_delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 	args[arg_count++] = eport_str;
 	args[arg_count++] = proto_itoa(proto);
 
-	syslog(LOG_ERR, "ext_delete_filter_rule: %s %s:%s",
+	syslog(LOG_INFO, "ext_delete_filter_rule: %s %s:%s",
 	       proto_itoa(proto), ifname, eport_str);
 
 	return execute_external_script("delete_filter", args, arg_count);
@@ -246,7 +233,7 @@ ext_delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	args[arg_count++] = eport_str;
 	args[arg_count++] = proto_itoa(proto);
 
-	syslog(LOG_ERR, "ext_delete_redirect_and_filter_rules: %s :%s",
+	syslog(LOG_INFO, "ext_delete_redirect_and_filter_rules: %s :%s",
 	       proto_itoa(proto), eport_str);
 
 	return execute_external_script("delete_redirect_and_filter", args, arg_count);
