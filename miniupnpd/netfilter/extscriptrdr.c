@@ -38,84 +38,61 @@ proto_itoa(int proto)
 /* execute_external_script()
  * Execute the external script with given parameters
  * Returns: 0 on success, -1 on error */
-static int
-execute_external_script(const char * operation, const char * args[], int arg_count)
-{
-	pid_t pid;
-	int status;
-
+static int execute_external_script(const char *operation, const char **args, int arg_count) {
+	char cmd_buffer[4096];
+	int offset = 0;
+	int ret;
+	
 	syslog(LOG_ERR, "execute_external_script called: operation=%s, arg_count=%d", operation, arg_count);
-
-	if (!external_script_path || external_script_path[0] == '\0') {
-		syslog(LOG_ERR, "external_script_path not configured");
+	
+	if (!external_script_path || strlen(external_script_path) == 0) {
+		syslog(LOG_ERR, "external script path not configured");
 		return -1;
 	}
-
+	
 	syslog(LOG_ERR, "external_script_path is: %s", external_script_path);
-
+	
 	/* Check if script exists and is executable */
 	if (access(external_script_path, X_OK) != 0) {
 		syslog(LOG_ERR, "external script not found or not executable: %s (%m)", external_script_path);
 		return -1;
 	}
-
+	
 	syslog(LOG_ERR, "external script found and executable: %s, operation: %s", external_script_path, operation);
-
-	pid = fork();
-	if (pid == -1) {
-		syslog(LOG_ERR, "fork() failed: %m");
+	
+	/* Build command line with proper quoting */
+	offset = snprintf(cmd_buffer, sizeof(cmd_buffer), "/bin/bash '%s' '%s'", 
+	                  external_script_path, operation);
+	
+	for (int i = 0; i < arg_count && offset < sizeof(cmd_buffer) - 3; i++) {
+		offset += snprintf(cmd_buffer + offset, sizeof(cmd_buffer) - offset,
+		                   " '%s'", args[i]);
+	}
+	
+	syslog(LOG_ERR, "executing command: %s", cmd_buffer);
+	
+	/* Execute using system() */
+	ret = system(cmd_buffer);
+	
+	if (ret == -1) {
+		syslog(LOG_ERR, "system() call failed: %m");
 		return -1;
 	}
-
-	if (pid == 0) {
-		/* Child process */
-		syslog(LOG_ERR, "child process: about to execute script");
-		
-		/* Build argument array for execv */
-		const char **argv = malloc(sizeof(char*) * (arg_count + 3));
-		if (!argv) {
-			syslog(LOG_ERR, "malloc failed in child process");
-			exit(1);
-		}
-
-		argv[0] = external_script_path;
-		argv[1] = operation;
-		for (int i = 0; i < arg_count; i++) {
-			argv[i + 2] = args[i];
-			syslog(LOG_ERR, "arg[%d] = %s", i + 2, args[i]);
-		}
-		argv[arg_count + 2] = NULL;
-
-		syslog(LOG_ERR, "executing: %s %s", external_script_path, operation);
-		execvp(external_script_path, (char * const *)argv);
-		/* If execvp returns, it failed */
-		syslog(LOG_ERR, "execvp(%s) failed: %m (errno=%d)", external_script_path, errno);
-		exit(254);
-	}
-
-	/* Parent process */
-	syslog(LOG_ERR, "parent: waiting for child process %d", pid);
-	if (waitpid(pid, &status, 0) == -1) {
-		syslog(LOG_ERR, "waitpid() failed: %m");
-		return -1;
-	}
-
-	syslog(LOG_ERR, "parent: child finished, status=%d", status);
-
-	if (WIFEXITED(status)) {
-		int exit_code = WEXITSTATUS(status);
+	
+	if (WIFEXITED(ret)) {
+		int exit_code = WEXITSTATUS(ret);
 		syslog(LOG_ERR, "external script exited with code %d", exit_code);
 		if (exit_code != 0) {
 			syslog(LOG_ERR, "external script failed with code %d", exit_code);
 			return -1;
 		}
 		return 0;
-	} else if (WIFSIGNALED(status)) {
-		syslog(LOG_ERR, "external script terminated by signal %d", WTERMSIG(status));
+	} else if (WIFSIGNALED(ret)) {
+		syslog(LOG_ERR, "external script killed by signal %d", WTERMSIG(ret));
 		return -1;
 	}
-
-	syslog(LOG_ERR, "external script ended abnormally");
+	
+	syslog(LOG_ERR, "external script finished with unknown status %d", ret);
 	return -1;
 }
 
