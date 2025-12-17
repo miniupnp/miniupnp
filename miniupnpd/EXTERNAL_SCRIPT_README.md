@@ -9,16 +9,63 @@ This feature allows you to completely disable miniupnpd's direct manipulation of
 - You need to integrate with third-party firewall solutions
 - You want to add custom logging or validation logic
 
+## Building and Installation
+
+### Prerequisites
+- Linux system with nftables support
+- Build tools: gcc, make
+- Debian packaging tools (for .deb creation): dpkg-deb
+
+### Build Instructions
+
+1. **Configure and compile:**
+   ```bash
+   make clean
+   ./configure --firewall=nftables && make
+   ```
+
+2. **Create Debian package (optional):**
+   ```bash
+   ./build.sh
+   ```
+   This will:
+   - Clean and compile with nftables support
+   - Copy the binary to the package structure
+   - Create `miniupnpd-custom.deb`
+
+3. **Install the package:**
+   ```bash
+   sudo dpkg -i miniupnpd-custom.deb
+   ```
+
 ## Configuration
 
 Add the following options to your `miniupnpd.conf`:
 
 ```ini
-# Enable external script mode
+# Enable external script mode (REQUIRED)
 use_external_script=yes
 
-# Path to your firewall management script
+# Path to your firewall management script (REQUIRED)
 external_script_path=/usr/local/bin/miniupnpd-firewall.sh
+```
+
+**Important:** Both options must be present in the configuration file for the external script feature to work. If `use_external_script=yes` is set but `external_script_path` is missing or empty, miniupnpd will log an error and fail to process port mapping requests.
+
+After modifying the configuration, restart the service:
+```bash
+sudo systemctl restart miniupnpd
+```
+
+Verify the configuration was loaded correctly:
+```bash
+sudo journalctl -u miniupnpd | grep -i "external script"
+```
+
+You should see messages like:
+```
+miniupnpd: external script mode: enabled
+miniupnpd: external script path: /usr/local/bin/miniupnpd-firewall.sh
 ```
 
 ## Script Interface
@@ -110,6 +157,18 @@ Your script MUST:
 3. **Exit with non-zero status** on failure
 4. **Handle all five operations** listed above
 5. **Be idempotent** where possible (handle cases where rules already exist or don't exist)
+6. **Avoid using `logger` command** - The `logger` command may hang when called from systemd context. Use file logging or echo to stdout/stderr instead:
+   ```bash
+   # Good - log to file
+   log() {
+       echo "[$(date)] $@" >> /var/log/miniupnpd-script.log
+   }
+   
+   # Bad - may hang under systemd
+   log() {
+       logger -t miniupnpd "$@"
+   }
+   ```
 
 ## Example Implementation
 

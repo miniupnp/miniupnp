@@ -1,3 +1,30 @@
+⚠️ **FORK NOTICE** ⚠️
+====================
+
+This is a fork of MiniUPnP project
+Fork repository: https://github.com/lfventura/miniupnp
+
+**Additional Features in This Fork:**
+- External Script Support for firewall operations (Linux only)
+- Completely bypass iptables/nftables and delegate to custom scripts, when enabled
+- Full control over port forwarding and filtering rules
+
+**Limitations:**
+- External script feature is Linux-only (requires USE_NETFILTER)
+- Only available when compiled with --firewall=nftables
+- Script execution is synchronous (should be fast)
+
+**Documentation:**
+- External Script Feature: See EXTERNAL_SCRIPT_README.md
+- Example Script: See miniupnpd-firewall-script-example.sh
+- Build Instructions: See build.sh for .deb package creation
+
+**Objective:**
+Enable custom firewall management systems to integrate with UPnP IGD
+without direct iptables/nftables manipulation. This is being used to add UPNP to VyOS 1.5.
+
+====================
+
 MiniUPnP project
 (c) 2006-2025 Thomas Bernard
 webpage: http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
