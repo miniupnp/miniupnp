@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <time.h>
 #include <spawn.h>
+#include <fcntl.h>
 #include "../config.h"
 #include "../upnpglobalvars.h"
 #include "extscriptrdr.h"
@@ -64,25 +65,32 @@ static int execute_external_script(const char *operation, const char **args, int
 	syslog(LOG_ERR, "external script found and executable: %s, operation: %s", external_script_path, operation);
 	
 	/* Build argv array */
-	char **argv = malloc(sizeof(char*) * (arg_count + 4));
+	char **argv = malloc(sizeof(char*) * (arg_count + 5));
 	if (!argv) {
 		syslog(LOG_ERR, "malloc failed");
 		return -1;
 	}
 	
 	argv[0] = "/bin/bash";
-	argv[1] = (char*)external_script_path;
-	argv[2] = (char*)operation;
+	argv[1] = "-e";  /* Exit on error */
+	argv[2] = (char*)external_script_path;
+	argv[3] = (char*)operation;
 	for (int i = 0; i < arg_count; i++) {
-		argv[i + 3] = (char*)args[i];
+		argv[i + 4] = (char*)args[i];
 	}
-	argv[arg_count + 3] = NULL;
+	argv[arg_count + 4] = NULL;
 	
 	syslog(LOG_ERR, "attempting posix_spawn");
 	
-	/* Use posix_spawn instead of fork+exec */
-	int spawn_result = posix_spawn(&pid, "/bin/bash", NULL, NULL, argv, environ);
+	/* Set up file actions to redirect stdin to /dev/null */
+	posix_spawn_file_actions_t file_actions;
+	posix_spawn_file_actions_init(&file_actions);
+	posix_spawn_file_actions_addopen(&file_actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
 	
+	/* Use posix_spawn instead of fork+exec */
+	int spawn_result = posix_spawn(&pid, "/bin/bash", &file_actions, NULL, argv, environ);
+	
+	posix_spawn_file_actions_destroy(&file_actions);
 	free(argv);
 	
 	if (spawn_result != 0) {
