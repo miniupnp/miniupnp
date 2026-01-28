@@ -184,33 +184,33 @@ int reload_from_lease_file(void)
 		proto = line;
 		p = strchr(line, ':');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		iaddr = strchr(p, ':');
 		if(!iaddr) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(iaddr++) = '\0';
 		eport = (unsigned short)atoi(p);
 		p = strchr(iaddr, ':');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		iport = (unsigned short)atoi(p);
 		p = strchr(p, ':');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		desc = strchr(p, ':');
 		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(desc++) = '\0';
