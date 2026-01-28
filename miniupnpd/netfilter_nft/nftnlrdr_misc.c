@@ -104,7 +104,7 @@ nft_mnl_connect(void)
 		return -1;
 	}
 	mnl_portid = mnl_socket_get_portid(mnl_sock);
-	syslog(LOG_INFO, "mnl_socket bound, port_id=%u", mnl_portid);
+	syslog(LOG_DEBUG, "mnl_socket bound, port_id=%u", mnl_portid);
 	return 0;
 }
 

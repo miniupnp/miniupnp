@@ -859,7 +859,7 @@ set_startup_time(void)
 			}
 			else
 			{
-				syslog(LOG_INFO, "system uptime is %lu seconds", uptime);
+				syslog(LOG_DEBUG, "system uptime is %lu seconds", uptime);
 			}
 			fclose(f);
 			startup_time -= uptime;
@@ -2516,7 +2516,7 @@ main(int argc, char * * argv)
 				       ipv6_addr_for_http_with_brackets);
 			} else {
 				memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
-				syslog(LOG_WARNING, "no HTTP IPv6 address, disabling IPv6");
+				syslog(LOG_DEBUG, "no HTTP IPv6 address, disabling IPv6");
 				SETFLAG(IPV6DISABLEDMASK);
 			}
 		}
@@ -3202,7 +3202,7 @@ if (GETFLAG(ENABLEUPNPMASK)) {
 		/* process SSDP packets */
 		if(sudp >= 0 && FD_ISSET(sudp, &readset))
 		{
-			/*syslog(LOG_INFO, "Received UDP Packet");*/
+			/*syslog(LOG_DEBUG, "Received UDP Packet");*/
 #ifdef ENABLE_HTTPS
 			ProcessSSDPRequest(sudp, (unsigned short)v.port, (unsigned short)v.https_port);
 #else
@@ -3212,7 +3212,7 @@ if (GETFLAG(ENABLEUPNPMASK)) {
 #ifdef ENABLE_IPV6
 		if(sudpv6 >= 0 && FD_ISSET(sudpv6, &readset))
 		{
-			syslog(LOG_INFO, "Received UDP Packet (IPv6)");
+			/*syslog(LOG_DEBUG, "Received UDP Packet (IPv6)");*/
 #ifdef ENABLE_HTTPS
 			ProcessSSDPRequest(sudpv6, (unsigned short)v.port, (unsigned short)v.https_port);
 #else
