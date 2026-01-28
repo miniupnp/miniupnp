@@ -231,7 +231,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		syslog(LOG_ERR, "inet_ntop(natpmp): %m");
 	}
 
-	syslog(LOG_INFO, "NAT-PMP request received from %s:%hu %dbytes",
+	syslog(LOG_DEBUG, "NAT-PMP request received from %s:%hu %d bytes",
 	       senderaddrstr, ntohs(senderaddr->sin_port), n);
 
 	if(n<2 || ((((req[1]-1)&~1)==0) && n<12)) {
@@ -260,7 +260,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		resp[3] = 1;	/* unsupported version */
 	} else switch(req[1]) {
 	case 0:	/* Public address request */
-		syslog(LOG_INFO, "NAT-PMP public address request");
+		syslog(LOG_DEBUG, "NAT-PMP public address request");
 		FillPublicAddressResponse(resp, senderaddr->sin_addr.s_addr);
 		resplen = 12;
 		break;
@@ -319,7 +319,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								resp[3] = 2;	/* Not Authorized/Refused */
 								break;
 							} else {
-								syslog(LOG_INFO, "NAT-PMP %s port %hu mapping removed",
+								syslog(LOG_DEBUG, "NAT-PMP %s port %hu mapping removed",
 								       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
 								index--;
 							}
@@ -340,7 +340,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						eport_first = eport;
 					} else if(eport == eport_first) { /* no eport available */
 						if(any_eport_allowed == 0) { /* all eports rejected by permissions */
-							syslog(LOG_ERR, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
+							syslog(LOG_INFO, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
 							       eport, proto_itoa(proto), senderaddrstr, iport);
 							resp[3] = 2;	/* Not Authorized/Refused */
 						} else { /* at least one eport allowed (but none available) */

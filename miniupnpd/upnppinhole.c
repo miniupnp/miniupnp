@@ -110,7 +110,7 @@ lease_file6_add(const char * rem_client,
 
 	fd = fopen( lease_file6, "a");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file);
 		return -1;
 	}
 
@@ -476,7 +476,7 @@ int reload_from_lease_file6(void)
 	if(!lease_file6) return -1;
 	fd = fopen( lease_file6, "r");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file6);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file6);
 		return -1;
 	}
 	if(unlink(lease_file6) < 0) {
@@ -549,7 +549,7 @@ int reload_from_lease_file6(void)
 
 		if(timestamp > 0) {
 			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file");
+				syslog(LOG_INFO, "already expired lease in lease file");
 				continue;
 			} else {
 				leaseduration = timestamp - current_unix_time;
