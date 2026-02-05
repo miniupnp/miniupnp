@@ -1,7 +1,7 @@
 /* $Id: upnppermissions.c,v 1.24 2025/04/21 22:56:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2023 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
