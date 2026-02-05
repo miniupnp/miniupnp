@@ -1,6 +1,16 @@
 $Id: Changelog.txt,v 1.281 2025/05/26 22:56:38 nanard Exp $
 miniUPnP client Changelog.
 
+2026/02/05:
+  dllwrap is deprecated : use gcc -shared for DLL build
+
+2025/11/29:
+  Fix Windows socket timeout handling in connecthostport.c
+  Use `poll()` where possible + Fix `FD_SET` crash bug
+
+2025/07/07:
+  fix build with C++ compilers
+
 VERSION 2.3.3 : released 2025/05/27
 
 2025/05/25:
