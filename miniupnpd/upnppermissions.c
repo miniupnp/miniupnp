@@ -100,7 +100,7 @@ unescape_char(const char * s, int * seqlen)
 /* greedy parser: try to match the longest sequence and do not
  * check for terminators */
 
-static char *
+static const char *
 get_sep(const char * s)
 {
 	if(!isspace(*s))
@@ -111,7 +111,7 @@ get_sep(const char * s)
 	return (char *) s;
 }
 
-static char *
+static const char *
 get_ushort(const char * s, u_short * val)
 {
 	char * end;
@@ -127,7 +127,7 @@ get_ushort(const char * s, u_short * val)
 	return end;
 }
 
-static char *
+static const char *
 get_range(const char * s, u_short * begin, u_short * end)
 {
 	s = get_ushort(s, begin);
@@ -145,10 +145,10 @@ get_range(const char * s, u_short * begin, u_short * end)
 		if(*begin > *end)
 			return NULL;
 	}
-	return (char *) s;
+	return s;
 }
 
-static char *
+static const char *
 get_addr(const char * s, struct in_addr * addr, unsigned int * dot_cnt)
 {
 	size_t i;
@@ -172,14 +172,14 @@ get_addr(const char * s, struct in_addr * addr, unsigned int * dot_cnt)
 	if(!inet_aton(buf, addr))
 		return NULL;
 
-	return (char *) s + i;
+	return s + i;
 }
 
 /* get_next_token(s, &token, raw)
  * put the unquoted/unescaped token in token and returns
  * a pointer to the begining of the next token
  * Do not unescape if raw is true */
-static char *
+static const char *
 get_next_token(const char * s, char ** token, int raw)
 {
 	char deli;
@@ -256,7 +256,7 @@ get_next_token(const char * s, char ** token, int raw)
 	s += len;
 	if(deli && *s == deli)
 		s++;
-	return (char *) s;
+	return s;
 }
 
 /* read_permission_line()
