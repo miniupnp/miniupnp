@@ -2384,10 +2384,24 @@ main(int argc, char * * argv)
 		/* one for IPv4, one for IPv6 */
 		snotify = calloc(addr_count * 2, sizeof(int));
 #endif
+		if(snotify == NULL) {
+			syslog(LOG_CRIT, "failed to allocate %lu bytes",
+#ifndef ENABLE_IPV6
+			       addr_count * sizeof(int)
+#else
+			       addr_count * 2 * sizeof(int)
+#endif
+			);
+			return 1;
+		}
 	}
 #ifdef ENABLE_NATPMP
 	if(addr_count > 0) {
 		snatpmp = malloc(addr_count * sizeof(int));
+		if (snatpmp == NULL) {
+			syslog(LOG_CRIT, "failed to allocate %lu bytes", addr_count * sizeof(int));
+			return 1;
+		}
 		for(i = 0; i < addr_count; i++)
 			snatpmp[i] = -1;
 	}
@@ -3071,7 +3085,7 @@ main(int argc, char * * argv)
 			tmp = malloc(sizeof(struct ctlelem));
 			if (tmp == NULL)
 			{
-				syslog(LOG_ERR, "Unable to allocate memory for ctlelem in main()");
+				syslog(LOG_CRIT, "Unable to allocate memory for ctlelem in main()");
 				close(s);
 			}
 			else

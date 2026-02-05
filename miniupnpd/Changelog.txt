@@ -55,6 +55,9 @@ VERSION 2.3.8 : released on 2025/04/03
 2025/01/25:
   Send byebye messages also to FF05::C (and eventually FF0E::C)
 
+2025/01/20:
+  change most memory allocation errors to LOG_CRIT
+
 2025/01/10:
   NFTables: fix delete_redirect_and_filter_rules() (remove filter rule)
 

@@ -227,7 +227,7 @@ static struct nlist list[] = {
 	}
 	buf = malloc(len);
 	if (buf == NULL) {
-		syslog(LOG_ERR, "malloc(%u) failed", (unsigned)len);
+		syslog(LOG_CRIT, "malloc(%u) failed", (unsigned)len);
 		return -1;
 	}
 	if (sysctlbyname(varname, buf, &len, NULL, 0) < 0) {
@@ -312,7 +312,7 @@ static struct nlist list[] = {
 	}
 	buf = malloc(len);
 	if (buf == NULL) {
-		syslog(LOG_ERR, "malloc(%u) failed", (unsigned)len);
+		syslog(LOG_CRIT, "malloc(%u) failed", (unsigned)len);
 		return -1;
 	}
 	if (sysctlbyname(varname, buf, &len, NULL, 0) < 0) {

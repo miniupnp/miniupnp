@@ -61,8 +61,10 @@ int getifstats(const char * ifname, struct ifdata * data) {
 		return -1;
 	}
 	buf = (char *) malloc(needed);
-	if (buf == NULL)
+	if (buf == NULL) {
+		syslog(LOG_CRIT, "malloc(%lu) failed", (unsigned long)needed);
 		return -1; /* error */
+	}
 	if (sysctl(mib, mib_len, buf, &needed, NULL, 0) == -1) {
 		syslog(LOG_ERR, "sysctl(): %m");
 		free(buf);
