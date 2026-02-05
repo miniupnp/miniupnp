@@ -66,3 +66,54 @@ Thanks to :
     * Pali Rohár
     * Brian John
     * Ivan Shapovalov
+
+# Foreword
+The MiniUPnP project offers software which supports the UPnP Internet Gateway Device (IGD) specifications. NAT-PMP and PCP support was added to MiniUPnPd. For client side NAT-PMP support, use libnatpmp.
+The MiniUPnP daemon (MiniUPnPd) supports OpenBSD, FreeBSD, NetBSD, DragonFly BSD, Solaris and Mac OS X in combination with pf or ipfw (ipfirewall) or ipf and Linux with netfilter or nftables.
+The MiniUPnP client (MiniUPnPc) and MiniSSDPd are portable and should work on any POSIX system. MiniUPnPc also works under MS Windows and AmigaOS (version 3 and 4).
+UPnP IGD client lightweight library and UPnP IGD daemon
+The UPnP protocol is supported by most home adsl/cable routers and Microsoft Windows 2K/XP. The aim of the MiniUPnP project is to bring a free software solution to support the "Internet Gateway Device" part of the protocol. The MediaServer/MediaRenderer UPnP protocol (DLNA) is also becoming very popular but here we are talking about IGD. ReadyMedia (formely known as MiniDLNA) is a UPnP Media Server using some UPnP code from MiniUPnPd.
+
+The Linux SDK for UPnP devices (libupnp) , now superseded by libupnp, seemed too heavy for me. I want the simplest library possible, with the smallest footprint and no dependencies to other libraries such as XML parsers or HTTP implementations. All the code is pure ANSI C.
+Compiled on a x86 PC, the miniupnp client library has less than 50KB code size.
+The miniUPnP daemon is much smaller than any other IGD daemon and is ideal for using on low memory devices for this reason. It also uses only ONE process and no additional thread, does not use any system() or exec() call, and therefore keeps system resources usage very low.
+
+The project is divided in two main parts :
+
+MiniUPnPc, the client library, enabling applications to access the services provided by an UPnP "Internet Gateway Device" present on the network. In UPnP terminology, MiniUPnPc is a UPnP Control Point.
+MiniUPnPd, a daemon providing these services to your network from a linux or BSD (or even Solaris) box being the gateway. Following UPnP terminology, MiniUPnPd is a UPnP Device.
+MiniSSDPd was developped to work together with MiniUPnPc, MiniUPnPd and other cooperative softwares : MiniSSDPd listen to SSDP traffic on the network so MiniUPnPc or other UPnP Control Points does not need to perform the discovery process and can work faster to set up a redirection. MiniSSDPd is also able to reply to M-SEARCH SSDP requests on behalf on MiniUPnPd or other UPnP server software. That is useful in order to host several UPnP services on the same machine, such as MiniDLNA (now ReadyMedia) and MiniUPnPd. MiniUPnPd natively uses MiniSSDPd if run on the same machine, but other UPnP software may require to be patched : read MiniSSDPd patch for MiniDLNA (not needeed for MiniDLNA 1.0.22 and up) and MiniSSDPd patch for MediaTomb.
+MiniUPnPd was first developped on OpenBSD 3.0+ with pf. You can see some of the work I have done to integrate with pf on this page (obsolete).
+As pf is also available under FreeBSD, guys at the pfSense project have ported miniupnpd to this system. Now it must be possible to compile and run on every platform where pf is available.
+The daemon is now also available for linux 2.4.x and 2.6.x using netfilter. It is possible to make it run on router devices running OpenWRT.
+Darren Reed worked on an IP Filter (ipf) implementation. I'm afraid it is not maintained... Darren also added support for Solaris/OpenSolaris. The ipfw port is available for MacOS X. It should be possible to make it work on FreeBSD too, but I haven't received any feedback about that.
+
+For some reasons, it may be not the good solution for you to use the code from the MiniUPnP project directly.
+As the code is small and simple to understand, it is a good base to take inspiration for your own UPnP implementation. The KTorrent UPnP plugin in C++ is a good example.
+
+If you are wondering which home router is working with the MiniUPnP client, you can find the answer here. In fact, you are more likely to help me fill the list by sending me an email :)
+
+# Usefulness of the MiniUPnP client library
+The usage of the MiniUPnP client library is useful whenever an application needs to listen for incoming connections.
+Examples : P2P applications, FTP clients for active mode, IRC (for DCC) or IM applications, network games, any server software.
+
+The typical usage of UPnP IGD capabilities of a router is a file tranfert using MSN messenger. The MSN Messenger software uses the UPnP API of Windows XP to open port for incoming connection. To mimic the MS software, it is a good idea to use UPnP as well.
+
+I have made a patch for XChat to show how the miniupnp client library can be used by an application.
+
+Transmission, a free software BitTorrent client is using miniupnpc and libnatpmp.
+
+# Usefulness of the MiniUPnP daemon
+UPnP and NAT-PMP are used to improve internet connectivity for devices behind a NAT router. Any peer to peer network application such as games, IM, etc. can benefit from a NAT router supporting UPnP and/or NAT-PMP.
+
+The latest generation Microsoft XBOX 360 and Sony Playstation 3 game machines use UPnP commands to enable the online play with the XBOX Live service and the Playstation Network. It has been reported that MiniUPnPd is correctly working with the two consoles. It may need a fine configuration tuning though. Look for discussions on the subject in the forum.
+
+# Security
+UPnP implementations are potentially subject to security breaches. Badly implemented or configured UPnP IGDs are vulnerable. Security researcher HD Moore did a good work to reveal vulnerabilities in existing implementations : Security Flaws in Universal Plug and Play (PDF). A common problem is to let SSDP or HTTP/SOAP ports open to the internet : they should be only reachable from the LAN.
+
+In the past, several vulnerabilities have been found in MiniUPnPd, so it is very important to update your code to the last version.
+
+# Donate
+The best gift you can make is to contribute to the project by submitting a patch ! Anyway if that is not possible, you can use the paypal Donate 
+[https://www.paypal.com/donate?token=GhMmspYlotPEZNZl4UZJBts6Uy-AaxBdKMut2k691t52W-inZW47-YRcecHOJOnrrN4rpbRGof9VJsI0&locale.x=FR](https://www.paypal.com/donate?token=GhMmspYlotPEZNZl4UZJBts6Uy-AaxBdKMut2k691t52W-inZW47-YRcecHOJOnrrN4rpbRGof9VJsI0&locale.x=FR)
+
