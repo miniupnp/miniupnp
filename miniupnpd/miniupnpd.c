@@ -1206,7 +1206,6 @@ static void update_disable_port_forwarding(void)
 			}
 		} else if (disable_port_forwarding && !reserved) {
 			syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
-			disable_port_forwarding = 0;
 		}
 	}
 }
