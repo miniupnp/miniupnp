@@ -1,11 +1,13 @@
 # $Id: Makefile.mingw,v 1.36 2024/01/04 01:29:56 nanard Exp $
 # Miniupnp project.
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
-# (c) 2005-2024 Thomas Bernard
+# (c) 2005-2026 Thomas Bernard
 # This Makefile is made for MinGW
 #
 # To cross compile on a *nix machine :
 # make -f Makefile.mingw DLLWRAP=mingw32-dllwrap CC=mingw32-gcc AR=mingw32-ar WINDRES=mingw32-windres
+#
+# set USE_DLLWRAP=1 to use dllwrap instead of gcc -shared
 #
 SRCDIR = src
 INCDIR = include
@@ -90,10 +92,18 @@ pythonmodule:	libminiupnpc.a
 	$(PYTHON) setupmingw32.py bdist_wheel --skip-build
 
 miniupnpc.dll:	miniupnpc.def $(OBJSDLL)
+ifeq ($(USE_DLLWRAP),1)
+	$(DLLWRAP) -k --driver-name $(CC) \
+	--def miniupnpc.def \
+	--output-def miniupnpc.dll.def \
+	--implib miniupnpc.lib -o $@ \
+	$(OBJSDLL) $(LDLIBS)
+else
 	$(CC) -shared -o $@ $(OBJSDLL) $(LDLIBS) \
 	-Wl,--output-def,miniupnpc.dll.def \
 	-Wl,--out-implib,miniupnpc.lib \
 	miniupnpc.def
+endif
 
 miniupnpc.lib:	miniupnpc.dll
 
