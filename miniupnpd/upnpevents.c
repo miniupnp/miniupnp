@@ -414,7 +414,6 @@ static void upnp_event_prepare(struct upnp_event_notify * obj)
 		"SID: %s\r\n"
 		"SEQ: %u\r\n"
 		"Connection: close\r\n"
-		"Cache-Control: no-cache\r\n"
 		"\r\n"
 		"%.*s\r\n";
 	char * xml;
