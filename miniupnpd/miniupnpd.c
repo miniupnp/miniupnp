@@ -2245,6 +2245,7 @@ print_usage:
 int
 main(int argc, char * * argv)
 {
+	int return_code = 0;
 	int i;
 	int shttpl = -1;	/* socket for HTTP */
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
@@ -2406,7 +2407,7 @@ main(int argc, char * * argv)
 #endif
 	   ) {
 		syslog(LOG_ERR, "Why did you run me anyway?");
-		return 0;
+		goto shutdown;
 	}
 
 	syslog(LOG_INFO, "version " MINIUPNPD_VERSION " starting%s%sext if %s BOOTID=%u",
@@ -2431,7 +2432,8 @@ main(int argc, char * * argv)
 	{
 		if (update_ext_ip_addr_from_stun(1) != 0) {
 			syslog(LOG_ERR, "Performing STUN failed. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 	}
 	else if (!use_ext_ip_addr)
@@ -2464,7 +2466,8 @@ main(int argc, char * * argv)
 		if(shttpl < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTP. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 		v.port = listen_port;
 		syslog(LOG_NOTICE, "HTTP listening on port %d", v.port);
@@ -2475,7 +2478,8 @@ main(int argc, char * * argv)
 			if(shttpl_v4 < 0)
 			{
 				syslog(LOG_ERR, "Failed to open socket for HTTP on port %d (IPv4). EXITING", v.port);
-				return 1;
+				return_code = 1;
+				goto shutdown;
 			}
 		}
 #endif /* V6SOCKETS_ARE_V6ONLY */
@@ -2490,7 +2494,8 @@ main(int argc, char * * argv)
 		if(shttpsl < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTPS. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 		v.https_port = listen_port;
 		syslog(LOG_NOTICE, "HTTPS listening on port %d", v.https_port);
@@ -2499,7 +2504,8 @@ main(int argc, char * * argv)
 		if(shttpsl_v4 < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTPS on port %d (IPv4). EXITING", v.https_port);
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 #endif /* V6SOCKETS_ARE_V6ONLY */
 #endif /* ENABLE_HTTPS */
@@ -2524,7 +2530,8 @@ main(int argc, char * * argv)
 			syslog(LOG_NOTICE, "Failed to open socket for receiving SSDP. Trying to use MiniSSDPd");
 			if(SubmitServicesToMiniSSDPD(lan_addrs.lh_first->str, v.port) < 0) {
 				syslog(LOG_ERR, "Failed to connect to MiniSSDPd. EXITING");
-				return 1;
+				return_code = 1;
+				goto shutdown;
 			}
 		}
 #ifdef ENABLE_IPV6
@@ -2543,7 +2550,8 @@ main(int argc, char * * argv)
 		{
 			syslog(LOG_ERR, "Failed to open sockets for sending SSDP notify "
 		                "messages. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 
 #if defined(UPNP_STRICT) && defined(IGD_V2)
@@ -2616,11 +2624,12 @@ main(int argc, char * * argv)
 #endif
 
 #ifdef ENABLE_NFQUEUE
-	if ( nfqueue != -1 && n_nfqix > 0) {
+	if (nfqueue != -1 && n_nfqix > 0) {
 		nfqh = OpenAndConfNFqueue();
 		if(nfqh < 0) {
 			syslog(LOG_ERR, "Failed to open fd for NFQUEUE.");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		} else {
 			syslog(LOG_NOTICE, "Opened NFQUEUE %d",nfqueue);
 		}
@@ -2648,7 +2657,8 @@ main(int argc, char * * argv)
 	/* mcast ? unix ? */
 	if (pledge("stdio inet pf", NULL) < 0) {
 		syslog(LOG_ERR, "pledge(): %m");
-		return 1;
+		return_code = 1;
+		goto shutdown;
 	}
 #endif /* HAS_PLEDGE */
 #ifdef HAS_LIBCAP
@@ -3407,5 +3417,5 @@ shutdown:
 	free(os_version);
 #endif
 	closelog();
-	return 0;
+	return return_code;
 }
