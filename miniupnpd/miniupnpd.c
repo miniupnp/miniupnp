@@ -1103,11 +1103,13 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 		}
 	} else {
 #ifdef ENABLE_IPV6
-		INIT_PRINT_ERR("Error: please specify LAN network interface by name instead of IPv4 address : %s\n", str);
-		return -1;
-#else
-		syslog(LOG_NOTICE, "it is advised to use network interface name instead of %s", str);
+		if(!GETFLAG(IPV6DISABLEDMASK))
+		{
+			INIT_PRINT_ERR("Error: please specify LAN network interface by name instead of IPv4 address : %s\n", str);
+			return -1;
+		}
 #endif
+		syslog(LOG_NOTICE, "it is advised to use network interface name instead of %s", str);
 	}
 	return 0;
 parselan_error:
