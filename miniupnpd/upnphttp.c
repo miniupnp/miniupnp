@@ -500,7 +500,7 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 		if(h->req_soapActionOff > 0)
 		{
 			/* we can process the request */
-			syslog(LOG_INFO, "SOAPAction: %.*s",
+			syslog(LOG_DEBUG, "SOAPAction: %.*s",
 			       h->req_soapActionLen, h->req_buf + h->req_soapActionOff);
 			ExecuteSoapAction(h,
 				h->req_buf + h->req_soapActionOff,
@@ -805,7 +805,7 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	for(i = 0; i<15 && *p != '\r'; i++)
 		HttpVer[i] = *(p++);
 	HttpVer[i] = '\0';
-	syslog(LOG_INFO, "HTTP REQUEST from %s : %s %s (%s)",
+	syslog(LOG_DEBUG, "HTTP REQUEST from %s : %s %s (%s)",
 	       h->clientaddr_str, HttpCommand, HttpUrl, HttpVer);
 	ParseHttpHeaders(h);
 	if(h->req_HostOff > 0 && h->req_HostLen > 0) {
@@ -885,7 +885,7 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 			return;
 		}
 #endif
-		syslog(LOG_NOTICE, "%s not found, responding ERROR 404", HttpUrl);
+		syslog(LOG_DEBUG, "%s not found, responding ERROR 404", HttpUrl);
 		Send404(h);
 	}
 #ifdef ENABLE_EVENTS

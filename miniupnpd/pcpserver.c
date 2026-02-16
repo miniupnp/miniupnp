@@ -1086,7 +1086,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 	else
 		r = CreatePCPMap_NAT(pcp_msg_info);
 	pcp_msg_info->result_code = r;
-	syslog(r == PCP_SUCCESS ? LOG_INFO : LOG_ERR,
+	syslog(LOG_INFO,
 	      "PCP MAP: %s mapping %s %hu->%s:%hu '%s'",
 	       r == PCP_SUCCESS ? "added" : "failed to add",
 	       proto_itoa(pcp_msg_info->protocol),
@@ -1128,7 +1128,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				if(0 != strcmp(desc, pcp_msg_info->desc)) {
 					/* nonce does not match */
 					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-					syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
+					syslog(LOG_INFO, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
 					       iport, proto_itoa(pcp_msg_info->protocol));
 					return;
 				} else {
@@ -1146,14 +1146,14 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 						desc, sizeof(desc),
 						NULL /* lifetime */);
 		if (uid < 0) {
-			syslog(LOG_ERR, "Failed to find mapping to %s:%hu, protocol %s",
+			syslog(LOG_INFO, "Failed to find mapping to %s:%hu, protocol %s",
 			       pcp_msg_info->mapped_str, iport, proto_itoa(pcp_msg_info->protocol));
 			return;
 		} else {
 			if(0 != strcmp(desc, pcp_msg_info->desc)) {
 				/* nonce does not match */
 				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-				syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
+				syslog(LOG_INFO, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
 				       iport, proto_itoa(pcp_msg_info->protocol));
 				return;
 			} else {
@@ -1168,7 +1168,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 		syslog(LOG_INFO, "PCP: %s port %hu mapping removed",
 		       proto==IPPROTO_TCP?"TCP":"UDP", (pcp_msg_info->is_fw ? iport : eport2));
 	} else {
-		syslog(LOG_ERR, "Failed to remove PCP mapping to %s:%hu %s",
+		syslog(LOG_INFO, "Failed to remove PCP mapping to %s:%hu %s",
 		       pcp_msg_info->mapped_str, iport, proto_itoa(proto));
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 	}
@@ -1391,7 +1391,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 					CreatePCPMap(pcp_msg_info);
 				}
 			} else {
-				syslog(LOG_ERR, "PCP: Invalid PCP v2 MAP message.");
+				syslog(LOG_INFO, "PCP: Invalid PCP v2 MAP message.");
 				return pcp_msg_info->result_code;
 			}
 
