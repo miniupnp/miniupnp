@@ -120,8 +120,8 @@ getHTTPResponse(SOCKET s, int * size, int * status_code)
 			int linestart=0;
 			int colon=0;
 			int valuestart=0;
-			if(header_buf_used + n > header_buf_len) {
-				char * tmp = realloc(header_buf, header_buf_used + n);
+			if(header_buf_used + n + 1 > header_buf_len) {
+				char * tmp = realloc(header_buf, header_buf_used + n + 1);
 				if(tmp == NULL) {
 					/* memory allocation error */
 					free(header_buf);
@@ -130,10 +130,11 @@ getHTTPResponse(SOCKET s, int * size, int * status_code)
 					return NULL;
 				}
 				header_buf = tmp;
-				header_buf_len = header_buf_used + n;
+				header_buf_len = header_buf_used + n + 1;
 			}
 			memcpy(header_buf + header_buf_used, buf, n);
 			header_buf_used += n;
+			header_buf[header_buf_used] = '\0';
 			/* search for CR LF CR LF (end of headers)
 			 * recognize also LF LF */
 			i = 0;
