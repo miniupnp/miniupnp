@@ -16,7 +16,7 @@
 #define	SALIGN	(sizeof(long) - 1)
 #define	SA_RLEN(sa)	(SA_LEN(sa) ? ((SA_LEN(sa) + SALIGN) & ~SALIGN) : (SALIGN + 1))
 
-#include "config.h"
+#include "../config.h"
 
 #include "../upnputils.h"
 #include "../upnpglobalvars.h"

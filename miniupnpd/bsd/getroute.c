@@ -20,7 +20,7 @@
 #include <sys/param.h>
 #endif
 
-#include "config.h"
+#include "../config.h"
 #include "../upnputils.h"
 
 /* SA_SIZE() is a multiple of sizeof(long) with a minimum value of sizeof(long) */

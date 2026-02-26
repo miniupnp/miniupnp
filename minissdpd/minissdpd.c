@@ -33,6 +33,12 @@
 #include <grp.h>
 #endif
 
+#if defined(__sun)
+               /* solaris does not seem to have link_ntoa */
+               /* #define link_ntoa _link_ntoa */
+#define link_ntoa(x) "dummy-link_ntoa"
+#endif
+
 /* LOG_PERROR does not exist on Solaris */
 #ifndef LOG_PERROR
 #define LOG_PERROR 0
