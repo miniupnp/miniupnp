@@ -59,7 +59,7 @@ struct file;
 #include <string.h>
 #include <unistd.h>
 
-#include "config.h"
+#include "../config.h"
 #include "netinet/ipl.h"
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
