@@ -711,7 +711,7 @@ delete_filter_rule(const char * ifname, unsigned short port, int proto)
 						continue;
 				}
 				index = i;
-				/*syslog(LOG_INFO, "Trying to delete filter rule at index %u", index);*/
+				/*syslog(LOG_DEBUG, "Trying to delete filter rule at index %u", index);*/
 				r = delete_rule_and_commit(index, h, miniupnpd_forward_chain, "delete_filter_rule");
 				h = NULL;
 				break;
@@ -804,7 +804,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 #endif
 	if(r == 0)
 	{
-		syslog(LOG_INFO, "Trying to delete nat rule at index %u", index);
+		syslog(LOG_DEBUG, "Trying to delete nat rule at index %u", index);
 		/* Now delete both rules */
 		/* first delete the nat rule */
 		h = iptc_init("nat");
@@ -848,7 +848,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 					if(iaddr != e->ip.dst.s_addr)
 						continue;
 					index = i;
-					syslog(LOG_INFO, "Trying to delete filter rule at index %u", index);
+					syslog(LOG_DEBUG, "Trying to delete filter rule at index %u", index);
 					r = delete_rule_and_commit(index, h, miniupnpd_forward_chain, "delete_filter_rule");
 					h = NULL;
 					break;
@@ -906,7 +906,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				}
 
 				index = i;
-				syslog(LOG_INFO, "Trying to delete peer rule at index %u", index);
+				syslog(LOG_DEBUG, "Trying to delete peer rule at index %u", index);
 				r2 = delete_rule_and_commit(index, h, miniupnpd_nat_postrouting_chain, "delete_peer_rule");
 				h = NULL;
 				break;
@@ -958,7 +958,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				if(iaddr != e->ip.src.s_addr)
 					continue;
 				index = i;
-				syslog(LOG_INFO, "Trying to delete dscp rule at index %u", index);
+				syslog(LOG_DEBUG, "Trying to delete dscp rule at index %u", index);
 				r2 = delete_rule_and_commit(index, h, miniupnpd_nat_chain, "delete_dscp_rule");
 				h = NULL;
 				break;

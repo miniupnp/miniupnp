@@ -74,7 +74,7 @@ getifaddr(const char * ifname, char * buf, int len,
 		} else {
 			r = GETIFADDR_IOCTL_ERROR;
 		}
-		syslog(LOG_ERR, "ioctl(s, SIOCGIFADDR, ...): %m");
+		syslog(LOG_DEBUG, "ioctl(s, SIOCGIFADDR, ...): %m");
 		close(s);
 		return r;
 	}
@@ -149,7 +149,7 @@ getifaddr(const char * ifname, char * buf, int len,
 		if(addr) *addr = ((struct sockaddr_in *)candidate->ifa_addr)->sin_addr;
 		if(mask) *mask = ((struct sockaddr_in *)candidate->ifa_netmask)->sin_addr;
 	} else {
-		syslog(LOG_WARNING, "no AF_INET address found for %s", ifname);
+		syslog(LOG_DEBUG, "no AF_INET address found for %s", ifname);
 		freeifaddrs(ifap);
 		return GETIFADDR_NO_ADDRESS;
 	}

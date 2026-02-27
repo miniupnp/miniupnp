@@ -129,7 +129,7 @@ find_pinhole(const char * ifname,
 
 	if (rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
 		if (inet_pton(AF_INET6, rem_host, &saddr) < 1) {
-			syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", rem_host);
+			syslog(LOG_INFO, "Failed to parse INET6 address \"%s\"", rem_host);
 			memset(&saddr, 0, sizeof(struct in6_addr));
 		}
 	} else {
@@ -137,7 +137,7 @@ find_pinhole(const char * ifname,
 	}
 
 	if (inet_pton(AF_INET6, int_client, &daddr) < 1) {
-		syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", int_client);
+		syslog(LOG_INFO, "Failed to parse INET6 address \"%s\"", int_client);
 		memset(&daddr, 0, sizeof(struct in6_addr));
 	}
 
@@ -159,7 +159,7 @@ find_pinhole(const char * ifname,
 		   (0 == memcmp(&daddr, &p->daddr6, sizeof(struct in6_addr)))) {
 
 			if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
+				/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);*/
 				continue;
 			}
 
@@ -396,7 +396,7 @@ get_pinhole_info(unsigned short uid,
 			if (timestamp) {
 				int uid_temp;
 				if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid_temp, &ts) != 2) {
-					syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
+					/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);*/
 					continue;
 				}
 
@@ -460,7 +460,7 @@ clean_pinhole_list(unsigned int * next_timestamp)
 			continue;
 
 		if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
+			/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);*/
 			continue;
 		}
 
