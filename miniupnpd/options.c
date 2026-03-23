@@ -263,48 +263,39 @@ readoptionsfile(const char * fname, int debug_flag)
 			fclose(hfile);
 			return -1;
 		}
-		else
+		tmp = realloc(ary_options, (num_options + 1) * sizeof(struct option));
+		if(tmp == NULL)
 		{
-			tmp = realloc(ary_options, (num_options + 1) * sizeof(struct option));
-			if(tmp == NULL)
-			{
-				INIT_PRINT_ERR("memory allocation error. Option in file %s line %d.\n",
-				        fname, linenum);
-				fclose(hfile);
-				return -1;
-			}
-			else
-			{
-				ary_options = tmp;
-				len = strlen(value) + 1;	/* +1 for terminating '\0' */
-				tmp = realloc(string_repo, string_repo_len + len);
-				if(tmp == NULL)
-				{
-					INIT_PRINT_ERR("memory allocation error, Option value in file %s line %d : %s=%s\n",
-					        fname, linenum, name, value);
-					fclose(hfile);
-					return -1;
-				}
-				else
-				{
-					string_repo = tmp;
-					memcpy(string_repo + string_repo_len, value, len);
-					ary_options[num_options].id = id;
-					/* save the offset instead of the absolute address because realloc() could
-					 * change it */
-					ary_options[num_options].value = (const char *)string_repo_len;
-					num_options += 1;
-					string_repo_len += len;
-				}
-			}
+			INIT_PRINT_ERR("memory allocation error. Option in file %s line %d.\n",
+			        fname, linenum);
+			fclose(hfile);
+			return -1;
 		}
+		ary_options = tmp;
+		len = strlen(value) + 1;	/* +1 for terminating '\0' */
+		tmp = realloc(string_repo, string_repo_len + len);
+		if(tmp == NULL)
+		{
+			INIT_PRINT_ERR("memory allocation error, Option value in file %s line %d : %s=%s\n",
+			        fname, linenum, name, value);
+			fclose(hfile);
+			return -1;
+		}
+		string_repo = tmp;
+		memcpy(string_repo + string_repo_len, value, len);
+		ary_options[num_options].id = id;
+		/* save the offset instead of the absolute address because realloc() could
+		 * change it */
+		ary_options[num_options].value = (const char *)string_repo_len;
+		num_options += 1;
+		string_repo_len += len;
 	}
 
 	fclose(hfile);
 
 	for(i = 0; i < num_options; i++)
 	{
-		/* add start address of string_repo to get right pointer */
+		/* add start address of string_repo to get the right pointer */
 		ary_options[i].value = string_repo + (size_t)ary_options[i].value;
 	}
 
