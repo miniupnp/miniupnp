@@ -136,8 +136,7 @@ getHTTPResponse(SOCKET s, int * size, int * status_code)
 			header_buf_used += n;
 			/* search for CR LF CR LF (end of headers)
 			 * recognize also LF LF */
-			i = 0;
-			while(i < ((int)header_buf_used-1) && (endofheaders == 0)) {
+			for(i = 0; i < ((int)header_buf_used-1) && (endofheaders == 0); i++) {
 				if(header_buf[i] == '\r') {
 					i++;
 					if(header_buf[i] == '\n') {
@@ -155,7 +154,6 @@ getHTTPResponse(SOCKET s, int * size, int * status_code)
 						endofheaders = i+1;
 					}
 				}
-				i++;
 			}
 			if(endofheaders == 0)
 				continue;
