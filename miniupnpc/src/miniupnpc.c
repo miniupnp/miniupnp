@@ -405,6 +405,8 @@ build_absolute_url(const char * baseurl, const char * descURL,
 #if defined(IF_NAMESIZE) && !defined(_WIN32)
 		if(if_indextoname(scope_id, ifname)) {
 			l += 3 + strlen(ifname);	/* 3 == strlen(%25) */
+		} else {
+			ifname[0] = '\0';
 		}
 #else /* defined(IF_NAMESIZE) && !defined(_WIN32) */
 		/* under windows, scope is numerical */
@@ -419,20 +421,22 @@ build_absolute_url(const char * baseurl, const char * descURL,
 		if(n > 13 && 0 == memcmp(s, "http://[fe80:", 13)) {
 			/* this is a linklocal IPv6 address */
 			p = strchr(s, ']');
-			if(p) {
-				/* insert %25<scope> into URL */
 #if defined(IF_NAMESIZE) && !defined(_WIN32)
+			if(p && ifname[0]) {
+				/* insert %25<scope> into URL */
 				memmove(p + 3 + strlen(ifname), p, strlen(p) + 1);
 				memcpy(p, "%25", 3);
 				memcpy(p + 3, ifname, strlen(ifname));
 				n += 3 + strlen(ifname);
+			}
 #else /* defined(IF_NAMESIZE) && !defined(_WIN32) */
+			if(p) {
 				memmove(p + 3 + strlen(scope_str), p, strlen(p) + 1);
 				memcpy(p, "%25", 3);
 				memcpy(p + 3, scope_str, strlen(scope_str));
 				n += 3 + strlen(scope_str);
-#endif /* defined(IF_NAMESIZE) && !defined(_WIN32) */
 			}
+#endif /* defined(IF_NAMESIZE) && !defined(_WIN32) */
 		}
 	}
 	if(url[0] != '/')

@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.281 2025/05/26 22:56:38 nanard Exp $
 miniUPnP client Changelog.
 
+2026/03/24:
+  fix: build_absolute_url if if_indextoname() returns NULL
+
 2026/02/05:
   dllwrap is deprecated : use gcc -shared for DLL build
 
