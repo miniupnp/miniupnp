@@ -1,8 +1,8 @@
 /* $Id: testminixml.c,v 1.10 2014/11/17 17:19:13 nanard Exp $
  * MiniUPnP project
- * Website : http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
+ * Website : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas Bernard.
- * Copyright (c) 2005-2014 Thomas Bernard
+ * Copyright (c) 2005-2026 Thomas Bernard
  *
  * testminixml.c
  * test program for the "minixml" functions.
@@ -57,6 +57,7 @@ void burptest(const char * buffer, int bufsize)
 	parser.starteltfunc = IGDstartelt;
 	parser.endeltfunc = IGDendelt;
 	parser.datafunc = IGDdata;
+	parser.attfunc = 0;
 	parsexml(&parser);
 #ifdef DEBUG
 	printIGD(&data);
