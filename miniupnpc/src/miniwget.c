@@ -59,6 +59,25 @@
 #define MAXHOSTNAMELEN 64
 #endif
 
+/*\ brief convert decimal string to unsigned integer
+ *
+ * It reads decimal digits ('0' to '9') and stops as soon as it reaches
+ * the end pointer or a non-digit character
+ *
+ * \param start pointer to the 1st digit
+ * \param end pointer to the 1st character after the string
+ */
+static unsigned int
+my_strtoui(const char * start, const char * end)
+{
+	unsigned int i = 0;
+	while ((start < end) && (*start >= '0') && (*start <= '9')) {
+		i = (i * 10) + (*start - '0');
+		start++;
+	}
+	return i;
+}
+
 /*
  * Read a HTTP response from a socket.
  * Process Content-Length and Transfer-encoding headers.
@@ -181,7 +200,7 @@ getHTTPResponse(SOCKET s, int * size, int * status_code)
 								if(*status_code < 0)
 								{
 									if (header_buf[sp+1] >= '1' && header_buf[sp+1] <= '9')
-										*status_code = atoi(header_buf + sp + 1);
+										*status_code = (int)my_strtoui(header_buf + sp + 1, header_buf + i);
 								}
 								else
 								{
@@ -206,7 +225,7 @@ getHTTPResponse(SOCKET s, int * size, int * status_code)
 #endif
 						if(0==strncasecmp(header_buf+linestart, "content-length", colon-linestart))
 						{
-							content_length = atoi(header_buf+valuestart);
+							content_length = (int)my_strtoui(header_buf + valuestart, header_buf + i);
 #ifdef DEBUG
 							printf("Content-Length: %d\n", content_length);
 #endif
