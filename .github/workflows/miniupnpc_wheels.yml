@@ -52,12 +52,12 @@ jobs:
             emoji: 🍎
             runs-on:
               arm: [macos-latest]
-              intel: [macos-13]
-              universal2: [macos-13]
+              intel: [macos-15]
+              universal2: [macos-15]
             macosx-deployment-target:
-              arm: 13.0
-              intel: 13.00
-              universal2: 13.0
+              arm: 15.0
+              intel: 15.00
+              universal2: 15.0
             cibw-archs:
               arm: arm64
               intel: x86_64
