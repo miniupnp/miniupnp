@@ -262,6 +262,9 @@ ProcessInterfaceWatchNotify(int s)
 		syslog(LOG_ERR, "recvmsg(s, &hdr, 0): %m");
 		return;
 	}
+	if (hdr.msg_flags & MSG_TRUNC) {
+		syslog(LOG_WARNING, "NETLINK message truncated len=%d", len);
+	}
 
 	if(ext_if_name) {
 		ext_if_name_index = if_nametoindex(ext_if_name);
