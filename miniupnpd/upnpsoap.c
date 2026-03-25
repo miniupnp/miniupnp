@@ -366,7 +366,7 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 		struct in_addr addr;
 		if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0)
 		{
-			syslog(LOG_ERR, "Failed to get ip address for interface %s",
+			syslog(LOG_DEBUG, "Failed to get ip address for interface %s",
 				ext_if_name);
 			ext_ip_addr[0] = '\0';
 		} else if (addr_is_reserved(&addr)) {
@@ -491,7 +491,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		}
 		else
 		{
-			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip);
+			syslog(LOG_INFO, "Failed to convert hostname '%s' to ip address", int_ip);
 			ClearNameValueList(&data);
 			SoapError(h, 402, "Invalid Args");
 			return;
@@ -690,7 +690,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		}
 		else
 		{
-			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip);
+			syslog(LOG_INFO, "Failed to convert hostname '%s' to ip address", int_ip);
 			ClearNameValueList(&data);
 			SoapError(h, 402, "Invalid Args");
 			return;
@@ -847,7 +847,7 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 	}
 	else
 	{
-		syslog(LOG_INFO, "%s: rhost='%s' %s %s found => %s:%u desc='%s' duration=%u",
+		syslog(LOG_DEBUG, "%s: rhost='%s' %s %s found => %s:%u desc='%s' duration=%u",
 		       action,
 		       r_host ? r_host : "NULL", ext_port, protocol, int_ip,
 		       (unsigned int)iport, desc, leaseduration);
@@ -923,7 +923,7 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: external port: %hu, protocol: %s",
+	syslog(LOG_DEBUG, "%s: external port: %hu, protocol: %s",
 		action, eport, protocol);
 
 	/* if in secure mode, check the IP
@@ -1039,7 +1039,7 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	for(i = 0; i < number; i++)
 	{
 		r = upnp_delete_redirection(port_list[i], protocol);
-		syslog(LOG_INFO, "%s: deleting external port: %hu, protocol: %s: %s",
+		syslog(LOG_DEBUG, "%s: deleting external port: %hu, protocol: %s: %s",
 		       action, port_list[i], protocol, r < 0 ? "failed" : "ok");
 	}
 	free(port_list);
@@ -1104,7 +1104,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: index=%d", action, (int)index);
+	syslog(LOG_DEBUG, "%s: index=%d", action, (int)index);
 
 	rhost[0] = '\0';
 	r = upnp_get_redirection_infos_by_index((int)index, &eport, protocol, &iport,
@@ -1619,7 +1619,7 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 		int r;
 		struct addrinfo hints, *ai, *p;
 
-		syslog(LOG_INFO, "%s: InternalClient %s is not an IPv6, assume hostname and convert",
+		syslog(LOG_DEBUG, "%s: InternalClient %s is not an IPv6, assume hostname and convert",
 		       "PinholeVerification", int_ip);
 
 		memset(&hints, 0, sizeof(hints));
@@ -1639,8 +1639,8 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 					{
 						result_ip = ((struct sockaddr_in6 *)p->ai_addr)->sin6_addr;
 						if (inet_ntop(AF_INET6, &result_ip, int_ip, sizeof(struct in6_addr)) == NULL)
-							syslog(LOG_WARNING, "%s: inet_ntop(): %m", "PinholeVerification");
-						syslog(LOG_INFO, "%s: InternalClient resolved as %s",
+							syslog(LOG_DEBUG, "%s: inet_ntop(): %m", "PinholeVerification");
+						syslog(LOG_DEBUG, "%s: InternalClient resolved as %s",
 						       "PinholeVerification", int_ip);
 						found = 1;
 					}
@@ -1656,7 +1656,7 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 			freeaddrinfo(ai);
 			if (!found)
 			{
-				syslog(LOG_NOTICE, "%s: No IPv6 address for hostname '%s'",
+				syslog(LOG_INFO, "%s: No IPv6 address for hostname '%s'",
 				       "PinholeVerification", int_ip);
 				SoapError(h, 402, "Invalid Args");
 				return -1;
@@ -1664,7 +1664,7 @@ PinholeVerification(struct upnphttp * h, char * int_ip, unsigned short int_port)
 		}
 		else
 		{
-			syslog(LOG_WARNING, "%s: Failed to convert hostname '%s' to IP address : %s",
+			syslog(LOG_INFO, "%s: Failed to convert hostname '%s' to IP address : %s",
 			       "PinholeVerification", int_ip, gai_strerror(r));
 			SoapError(h, 402, "Invalid Args");
 			return -1;
@@ -1797,7 +1797,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 					inet_ntop(AF_INET6,
 					          &(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr),
 					          rem_ip, sizeof(rem_ip));
-					syslog(LOG_INFO, "resolved '%s' to '%s'", rem_host, rem_ip);
+					syslog(LOG_DEBUG, "resolved '%s' to '%s'", rem_host, rem_ip);
 					rem_host = rem_ip;
 					break;
 				}
@@ -1806,7 +1806,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 		}
 		else
 		{
-			syslog(LOG_WARNING, "AddPinhole : getaddrinfo(%s) : %s",
+			syslog(LOG_INFO, "AddPinhole : getaddrinfo(%s) : %s",
 			       rem_host, gai_strerror(err));
 #if 0
 			SoapError(h, 402, "Invalid Args");
@@ -2465,7 +2465,7 @@ SoapError(struct upnphttp * h, int errCode, const char * errDesc)
 	char body[2048];
 	int bodylen;
 
-	syslog(LOG_INFO, "Returning UPnPError %d: %s", errCode, errDesc);
+	syslog(LOG_DEBUG, "Returning UPnPError %d: %s", errCode, errDesc);
 	bodylen = snprintf(body, sizeof(body), resp, errCode, errDesc);
 	BuildResp2_upnphttp(h, 500, "Internal Server Error", body, bodylen);
 	SendRespAndClose_upnphttp(h);
