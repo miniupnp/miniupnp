@@ -66,7 +66,7 @@ lease_file_add(unsigned short eport,
 
 	fd = fopen( lease_file, "a");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file);
 		return -1;
 	}
 
@@ -168,7 +168,7 @@ int reload_from_lease_file(void)
 	if(!lease_file) return -1;
 	fd = fopen( lease_file, "r");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file);
 		return -1;
 	}
 	if(unlink(lease_file) < 0) {
@@ -184,33 +184,33 @@ int reload_from_lease_file(void)
 		proto = line;
 		p = strchr(line, ':');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		iaddr = strchr(p, ':');
 		if(!iaddr) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(iaddr++) = '\0';
 		eport = (unsigned short)atoi(p);
 		p = strchr(iaddr, ':');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		iport = (unsigned short)atoi(p);
 		p = strchr(p, ':');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		desc = strchr(p, ':');
 		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(desc++) = '\0';
@@ -231,7 +231,7 @@ int reload_from_lease_file(void)
 			timestamp += current_time;	/* convert to our time */
 #else
 			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file (%hu=>%s:%hu %s)",
+				syslog(LOG_INFO, "already expired lease in lease file (%hu=>%s:%hu %s)",
 				       eport, iaddr, iport, proto);
 				continue;
 			} else {
@@ -391,7 +391,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 #endif /* CHECK_PORTINUSE */
 	} else {
 		timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
-		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
+		syslog(LOG_DEBUG, "redirecting port %hu to %s:%hu protocol %s for: %s",
 			eport, iaddr, iport, protocol, desc);
 		return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
 		                              desc, timestamp);
@@ -404,7 +404,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp)
 {
-	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
+	/*syslog(LOG_DEBUG, "redirecting port %hu to %s:%hu protocol %s for: %s",
 		eport, iaddr, iport, protocol, desc);			*/
 	if(disable_port_forwarding)
 		return -1;
@@ -641,7 +641,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	{
 		if(tmp->to_remove)
 		{
-			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
+			syslog(LOG_INFO, "remove port mapping %hu %s because it has expired",
 			       tmp->eport, proto_itoa(tmp->proto));
 			_upnp_delete_redir(tmp->eport, tmp->proto);
 			*p = tmp->next;
