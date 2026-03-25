@@ -859,7 +859,7 @@ set_startup_time(void)
 			}
 			else
 			{
-				syslog(LOG_INFO, "system uptime is %lu seconds", uptime);
+				syslog(LOG_DEBUG, "system uptime is %lu seconds", uptime);
 			}
 			fclose(f);
 			startup_time -= uptime;
@@ -2109,6 +2109,22 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		pidfilename = NULL;
 #endif
 
+syslog(LOG_NOTICE, "MiniUPnP daemon " MINIUPNPD_VERSION " starting, enable protocols %s%s%s, ext_ifname=%s BOOTID=%u",
+	GETFLAG(ENABLEUPNPMASK) ? "UPnP IGD" : "",
+#ifdef ENABLE_NATPMP
+	GETFLAG(ENABLEUPNPMASK) && GETFLAG(ENABLENATPMPMASK) ? " & " : "",
+#ifdef ENABLE_PCP
+	GETFLAG(ENABLENATPMPMASK) ? "PCP/NAT-PMP" : "",
+#else
+	GETFLAG(ENABLENATPMPMASK) ? "NAT-PMP" : "",
+#endif
+#else
+	"", "",
+#endif
+	ext_if_name, upnp_bootid);
+syslog(LOG_INFO, "More information at https://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/");
+syslog(LOG_NOTICE, "Extra logging with log level info (-v) or debug (-vv)");
+
 #ifdef USE_SYSTEMD
 	if (systemd_flag) {
 		int r = sd_notify(0,
@@ -2121,7 +2137,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 
 #ifdef ENABLE_LEASEFILE
 	/*remove(lease_file);*/
-	syslog(LOG_INFO, "Reloading rules from lease file");
+	syslog(LOG_INFO, "Reloading port maps from lease file");
 	reload_from_lease_file();
 #ifdef ENABLE_UPNPPINHOLE
 	reload_from_lease_file6();
@@ -2409,21 +2425,9 @@ main(int argc, char * * argv)
 		return 0;
 	}
 
-	syslog(LOG_INFO, "version " MINIUPNPD_VERSION " starting%s%sext if %s BOOTID=%u",
-#ifdef ENABLE_NATPMP
-#ifdef ENABLE_PCP
-	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP/PCP " : " ",
-#else
-	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP " : " ",
-#endif
-#else
-	       " ",
-#endif
-	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
-	       ext_if_name, upnp_bootid);
 #ifdef ENABLE_IPV6
 	if (strcmp(ext_if_name6, ext_if_name) != 0) {
-		syslog(LOG_INFO, "specific IPv6 ext if %s", ext_if_name6);
+		syslog(LOG_INFO, "Separate ext_ifname6=%s set", ext_if_name6);
 	}
 #endif
 
@@ -2467,7 +2471,7 @@ main(int argc, char * * argv)
 			return 1;
 		}
 		v.port = listen_port;
-		syslog(LOG_NOTICE, "HTTP listening on port %d", v.port);
+		syslog(LOG_NOTICE, "Listening for UPnP IGD (SOAP/HTTP) traffic on port %d/TCP, SSDP port 1900/UDP", v.port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		if(!GETFLAG(IPV6DISABLEDMASK))
 		{
@@ -2493,7 +2497,7 @@ main(int argc, char * * argv)
 			return 1;
 		}
 		v.https_port = listen_port;
-		syslog(LOG_NOTICE, "HTTPS listening on port %d", v.https_port);
+		syslog(LOG_NOTICE, "Listening for UPnP IGD (SOAP/HTTPS) traffic on port %d/TCP", v.https_port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		shttpsl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
 		if(shttpsl_v4 < 0)
@@ -2507,11 +2511,11 @@ main(int argc, char * * argv)
 		if(!GETFLAG(IPV6DISABLEDMASK)) {
 			if(find_ipv6_addr(lan_addrs.lh_first ? lan_addrs.lh_first->ifname : NULL,
 			                  ipv6_addr_for_http_with_brackets, sizeof(ipv6_addr_for_http_with_brackets)) > 0) {
-				syslog(LOG_NOTICE, "HTTP IPv6 address given to control points : %s",
+				syslog(LOG_NOTICE, "IPv6 address given to UPnP IGD clients: %s",
 				       ipv6_addr_for_http_with_brackets);
 			} else {
 				memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
-				syslog(LOG_WARNING, "no HTTP IPv6 address, disabling IPv6");
+				syslog(LOG_DEBUG, "no HTTP IPv6 address, disabling IPv6");
 				SETFLAG(IPV6DISABLEDMASK);
 			}
 		}
@@ -2582,22 +2586,22 @@ main(int argc, char * * argv)
 	}
 
 #ifdef ENABLE_NATPMP
-	/* open socket for NAT PMP traffic */
+	/* open socket for NAT-PMP traffic */
 	if(GETFLAG(ENABLENATPMPMASK))
 	{
 		if(OpenAndConfNATPMPSockets(snatpmp) < 0)
 #ifdef ENABLE_PCP
 		{
-			syslog(LOG_ERR, "Failed to open sockets for NAT-PMP/PCP.");
+			syslog(LOG_ERR, "Failed to open port 5351/UDP for PCP/NAT-PMP");
 		} else {
-			syslog(LOG_NOTICE, "Listening for NAT-PMP/PCP traffic on port %u",
+			syslog(LOG_NOTICE, "Listening for PCP/NAT-PMP traffic on port %u/UDP",
 			       NATPMP_PORT);
 		}
 #else
 		{
-			syslog(LOG_ERR, "Failed to open sockets for NAT PMP.");
+			syslog(LOG_ERR, "Failed to open port 5351/UDP for NAT-PMP");
 		} else {
-			syslog(LOG_NOTICE, "Listening for NAT-PMP traffic on port %u",
+			syslog(LOG_NOTICE, "Listening for NAT-PMP traffic on port %u/UDP",
 			       NATPMP_PORT);
 		}
 #endif
@@ -2705,6 +2709,30 @@ main(int argc, char * * argv)
 		}
 	}
 #endif /* HAS_LIBCAP_NG */
+
+if (GETFLAG(ENABLEUPNPMASK) && !GETFLAG(SECUREMODEMASK))
+	syslog(LOG_WARNING, "WARNING: secure_mode=no, allow adding port maps for non-requesting IP addresses via UPnP IGD");
+#ifdef ENABLE_PCP
+if (GETFLAG(ENABLENATPMPMASK) && GETFLAG(PCP_ALLOWTHIRDPARTYMASK))
+	syslog(LOG_WARNING, "WARNING: pcp_allow_thirdparty=yes, allow adding port maps for non-requesting IP addresses via PCP");
+#endif
+#ifdef ENABLE_IPV6
+if (GETFLAG(IPV6DISABLEDMASK))
+	syslog(LOG_NOTICE, "IPv6 mapping disabled");
+#else
+syslog(LOG_NOTICE, "IPv6 mapping disabled");
+#endif
+if (GETFLAG(ENABLEUPNPMASK)) {
+#ifdef IGD_V2
+	if (GETFLAG(FORCEIGDDESCV1MASK)) {
+		syslog(LOG_NOTICE, "UPnP IGD compatiblity mode set to IGDv1 (IPv4 only)");
+	} else {
+		syslog(LOG_NOTICE, "UPnP IGD compatiblity mode set to IGDv2 (with workarounds)");
+	}
+#else
+	syslog(LOG_NOTICE, "UPnP IGD compatiblity mode set to IGDv1 (IPv4 only)");
+#endif
+}
 
 #ifdef USE_SYSTEMD
 	if (v.systemd_notify) {
@@ -3173,7 +3201,7 @@ main(int argc, char * * argv)
 		/* process SSDP packets */
 		if(sudp >= 0 && FD_ISSET(sudp, &readset))
 		{
-			/*syslog(LOG_INFO, "Received UDP Packet");*/
+			/*syslog(LOG_DEBUG, "Received UDP Packet");*/
 #ifdef ENABLE_HTTPS
 			ProcessSSDPRequest(sudp, (unsigned short)v.port, (unsigned short)v.https_port);
 #else
@@ -3183,7 +3211,7 @@ main(int argc, char * * argv)
 #ifdef ENABLE_IPV6
 		if(sudpv6 >= 0 && FD_ISSET(sudpv6, &readset))
 		{
-			syslog(LOG_INFO, "Received UDP Packet (IPv6)");
+			/*syslog(LOG_DEBUG, "Received UDP Packet (IPv6)");*/
 #ifdef ENABLE_HTTPS
 			ProcessSSDPRequest(sudpv6, (unsigned short)v.port, (unsigned short)v.https_port);
 #else
@@ -3285,7 +3313,7 @@ main(int argc, char * * argv)
 
 shutdown:
 
-	syslog(LOG_NOTICE, "shutting down MiniUPnPd");
+	syslog(LOG_NOTICE, "Shutting down MiniUPnPd");
 #ifdef USE_SYSTEMD
 	if (v.systemd_notify) {
 		sd_notify(0,
