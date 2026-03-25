@@ -448,7 +448,7 @@ case $OS_NAME in
 		;;
 	SunOS)
 		OS_FAMILY=BSD
-		MAKEFILE=Makefile.bsd
+		MAKEFILE=Makefile.sunos
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		FW=ipf
 		echo "#define LOG_PERROR 0" >> ${CONFIGFILE}
