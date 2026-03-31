@@ -3,7 +3,7 @@
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * author: Ryan Wagoner
- * (c) 2006-2025 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -22,7 +22,7 @@
 #include "macros.h"
 
 #ifndef DISABLE_CONFIG_FILE
-struct option * ary_options = NULL;
+struct miniupnpd_option * ary_options = NULL;
 static char * string_repo = NULL;
 unsigned int num_options = 0;
 
@@ -263,7 +263,7 @@ readoptionsfile(const char * fname, int debug_flag)
 			fclose(hfile);
 			return -1;
 		}
-		tmp = realloc(ary_options, (num_options + 1) * sizeof(struct option));
+		tmp = realloc(ary_options, (num_options + 1) * sizeof(struct miniupnpd_option));
 		if(tmp == NULL)
 		{
 			INIT_PRINT_ERR("memory allocation error. Option in file %s line %d.\n",
