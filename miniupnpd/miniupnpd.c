@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2025 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -1101,13 +1101,6 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 			syslog(LOG_WARNING, "Cannot get index for network interface %s\n",
 			        lan_addr->ifname);
 		}
-	} else {
-#ifdef ENABLE_IPV6
-		INIT_PRINT_ERR("Error: please specify LAN network interface by name instead of IPv4 address : %s\n", str);
-		return -1;
-#else
-		syslog(LOG_NOTICE, "it is advised to use network interface name instead of %s", str);
-#endif
 	}
 	return 0;
 parselan_error:
@@ -1954,6 +1947,20 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		if (!lan_addrs.lh_first)
 		    INIT_PRINT_ERR("Error: Option -a missing and listening_ip is not set in config file\n");
 		goto print_usage;
+	}
+
+	/* check for LAN network interface names */
+	for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next) {
+		if(lan_addr->ifname[0] == '\0') {
+#ifdef ENABLE_IPV6
+			if(!GETFLAG(IPV6DISABLEDMASK)) {
+				INIT_PRINT_ERR("Error: please specify LAN network interface by name instead of IPv4 address : %s\n", lan_addr->str);
+				return 1;
+			}
+#endif
+			syslog(LOG_NOTICE, "it is advised to use network interface name instead of %s",
+			       lan_addr->str);
+		}
 	}
 
 	/* IPv6 ifname is defaulted to same as IPv4 */
