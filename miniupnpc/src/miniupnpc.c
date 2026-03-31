@@ -465,10 +465,11 @@ GetUPNPUrls(struct UPNPUrls * urls, struct IGDdatas * data,
 	                                          data->IPv6FC.controlurl, scope_id);
 
 #ifdef DEBUG
-	printf("urls->ipcondescURL='%s'\n", urls->ipcondescURL);
-	printf("urls->controlURL='%s'\n", urls->controlURL);
-	printf("urls->controlURL_CIF='%s'\n", urls->controlURL_CIF);
-	printf("urls->controlURL_6FC='%s'\n", urls->controlURL_6FC);
+#define STRORNULL(s) ((s) == NULL ? "<null>" : (s))
+	printf("urls->ipcondescURL='%s'\n", STRORNULL(urls->ipcondescURL));
+	printf("urls->controlURL='%s'\n", STRORNULL(urls->controlURL));
+	printf("urls->controlURL_CIF='%s'\n", STRORNULL(urls->controlURL_CIF));
+	printf("urls->controlURL_6FC='%s'\n", STRORNULL(urls->controlURL_6FC));
 #endif
 }
 
