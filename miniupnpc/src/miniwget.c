@@ -506,7 +506,7 @@ parseURL(const char * url,
          char * hostname, unsigned short * port,
          char * * path, unsigned int * scope_id)
 {
-	char * p1, *p2, *p3;
+	const char * p1, *p2, *p3;
 	if(!url)
 		return 0;
 	p1 = strstr(url, "://");
@@ -520,7 +520,7 @@ parseURL(const char * url,
 	if(*p1 == '[')
 	{
 		/* IP v6 : http://[2a00:1450:8002::6a]/path/abc */
-		char * scope;
+		const char * scope;
 		scope = strchr(p1, '%');
 		p2 = strchr(p1, ']');
 		if(p2 && scope && scope < p2 && scope_id) {
@@ -577,7 +577,7 @@ parseURL(const char * url,
 			{
 				*port = 80;
 			}
-			*path = p3;
+			*path = (char *)p3;
 			return 1;
 		}
 	}
@@ -602,7 +602,7 @@ parseURL(const char * url,
 			p2++;
 		}
 	}
-	*path = p3;
+	*path = (char *)p3;
 	return 1;
 }
 
