@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2025 Thomas Bernard
+ * copyright (c) 2005-2026 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENSE file. */
 #include <stdlib.h>
