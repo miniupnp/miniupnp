@@ -376,6 +376,7 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	size_t l, n;
 	char * s;
 	const char * base;
+	const char * base_p;
 	char * p;
 #if defined(IF_NAMESIZE) && !defined(_WIN32)
 	char ifname[IF_NAMESIZE];
@@ -394,9 +395,9 @@ build_absolute_url(const char * baseurl, const char * descURL,
 	base = (baseurl[0] == '\0') ? descURL : baseurl;
 	n = strlen(base);
 	if(n > 7) {
-		p = strchr(base + 7, '/');
-		if(p)
-			n = p - base;
+		base_p = strchr(base + 7, '/');
+		if(base_p)
+			n = base_p - base;
 	}
 	l = n + strlen(url) + 1;
 	if(url[0] != '/')
