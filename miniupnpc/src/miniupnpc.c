@@ -105,7 +105,7 @@ simpleUPnPcommand(const char * url, const char * service,
 {
 	char hostname[MAXHOSTNAMELEN+1];
 	unsigned short port = 0;
-	char * path;
+	const char * path;
 	char soapact[128];
 	char soapbody[2048];
 	int soapbodylen;

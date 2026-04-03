@@ -48,7 +48,7 @@ void * getHTTPResponse(SOCKET s, int * size, int * status_code);
  * \return 0 for failure, 1 for success
  */
 int parseURL(const char * url,
-             char * hostname, unsigned short * port, char * * path,
+             char * hostname, unsigned short * port, const char * * path,
              unsigned int * scope_id);
 
 #endif

@@ -504,7 +504,7 @@ miniwget3(const char * host,
 int
 parseURL(const char * url,
          char * hostname, unsigned short * port,
-         char * * path, unsigned int * scope_id)
+         const char * * path, unsigned int * scope_id)
 {
 	const char * p1, *p2, *p3;
 	if(!url)
@@ -577,7 +577,7 @@ parseURL(const char * url,
 			{
 				*port = 80;
 			}
-			*path = (char *)p3;
+			*path = p3;
 			return 1;
 		}
 	}
@@ -602,7 +602,7 @@ parseURL(const char * url,
 			p2++;
 		}
 	}
-	*path = (char *)p3;
+	*path = p3;
 	return 1;
 }
 
@@ -611,7 +611,7 @@ miniwget(const char * url, int * size,
          unsigned int scope_id, int * status_code)
 {
 	unsigned short port;
-	char * path;
+	const char * path;
 	/* protocol://host:port/chemin */
 	char hostname[MAXHOSTNAMELEN+1];
 	*size = 0;
@@ -630,7 +630,7 @@ miniwget_getaddr(const char * url, int * size,
                  int * status_code)
 {
 	unsigned short port;
-	char * path;
+	const char * path;
 	/* protocol://host:port/path */
 	char hostname[MAXHOSTNAMELEN+1];
 	*size = 0;
