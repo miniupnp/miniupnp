@@ -542,8 +542,8 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 		}
 		break;
 	}
-	/* pad to the next multiple of 4 octets */
-	return ((int)option_length + 3) & ~3;
+	/* add header and pad to the next multiple of 4 octets */
+	return 4 + (((int)option_length + 3) & ~3);
 }
 
 
