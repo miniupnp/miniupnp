@@ -434,10 +434,17 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 		pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 		return 0;
 	}
+	remain -= PCP_OPTION_HDR_SIZE;
 
-	option_length = READNU16(pcp_buf + 2) + 4;	/* len */
+	/* Option Length:  16 bits.  Indicates the length of the enclosed data,
+     * in octets.  Options with length of 0 are allowed.  Options that
+     * are not a multiple of 4 octets long are followed by one, two, or
+     * three 0 octets to pad their effective length in the packet to be a
+     * multiple of 4 octets.  The Option Length reflects the semantic
+     * length of the option, not including any padding octets. */
+	option_length = READNU16(pcp_buf + 2);
 
-	if (remain < option_length) {
+	if (remain < (int)option_length) {
 		pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 		return 0;
 	}
@@ -527,15 +534,16 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 #endif
 	default:
 		if (pcp_buf[0] < 128) {
-			syslog(LOG_ERR, "PCP: Unrecognized mandatory PCP OPTION: %d \n", (int)pcp_buf[0]);
+			syslog(LOG_ERR, "PCP: Unrecognized mandatory PCP OPTION: %d\n", (int)pcp_buf[0]);
 			/* Mandatory to understand */
 			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
-			break;
+		} else {
+			syslog(LOG_INFO, "PCP: Unrecognized optional PCP OPTION: %d\n", (int)pcp_buf[0]);
 		}
-		/* TODO - log optional not understood options? */
 		break;
 	}
-	return option_length;
+	/* pad to the next multiple of 4 octets */
+	return ((int)option_length + 3) & ~3;
 }
 
 
