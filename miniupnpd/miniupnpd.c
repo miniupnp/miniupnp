@@ -119,8 +119,8 @@ static struct sockaddr_in ssdp;
 
 /* prototypes */
 static int nfqueue_cb( struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data) ;
-int identify_ip_protocol (char *payload);
-int get_udp_dst_port (char *payload);
+int identify_ip_protocol (const unsigned char *payload);
+int get_udp_dst_port (const unsigned char *payload);
 #endif	/* ENABLE_NFQUEUE */
 
 /* variables used by signals */
@@ -541,7 +541,7 @@ ProcessIncomingHTTP(int shttpl, const char * protocol)
 
 #ifdef ENABLE_NFQUEUE
 
-int identify_ip_protocol(char *payload) {
+int identify_ip_protocol(const unsigned char *payload) {
     return payload[9];
 }
 
@@ -549,19 +549,16 @@ int identify_ip_protocol(char *payload) {
 /*
  * This function returns the destination port of the captured packet UDP
  */
-int get_udp_dst_port(char *payload) {
-        char *pkt_data_ptr = NULL;
-        pkt_data_ptr = payload + sizeof(struct ip);
+int get_udp_dst_port(const unsigned char *payload) {
+	/* Cast the UDP Header from the raw packet */
+	const struct udphdr *udp = (const struct udphdr *)(payload + sizeof(struct ip));
 
-    /* Cast the UDP Header from the raw packet */
-    struct udphdr *udp = (struct udphdr *) pkt_data_ptr;
-
-    /* get the dst port of the packet */
-    return(ntohs(udp->dest));
-
+	/* get the dst port of the packet */
+	return(ntohs(udp->dest));
 }
+
 static int
-OpenAndConfNFqueue(){
+OpenAndConfNFqueue(void) {
 
         struct nfq_q_handle *myQueue;
         struct nfnl_handle *netlinkHandle;
@@ -615,24 +612,30 @@ static int nfqueue_cb(
                 struct nfq_data *nfa,
                 void *data) {
 
-	char	*pkt;
+	unsigned char *pkt;
 	struct nfqnl_msg_packet_hdr *ph;
 	ph = nfq_get_msg_packet_hdr(nfa);
 
 	if ( ph ) {
-
-		int id = 0, size = 0;
-		id = ntohl(ph->packet_id);
-
-		size = nfq_get_payload(nfa, &pkt);
-
-    		struct ip *iph = (struct ip *) pkt;
-
-		int id_protocol = identify_ip_protocol(pkt);
-
-		int dport = get_udp_dst_port(pkt);
-
+		struct ip *iph;
+		int id, size;
+		int id_protocol, dport;
 		int x = sizeof (struct ip) + sizeof (struct udphdr);
+
+		id = ntohl(ph->packet_id);
+		size = nfq_get_payload(nfa, &pkt);
+		if (size < 0) {
+			syslog(LOG_ERR, "nfq_get_payload failed");
+			return 1;
+		}
+		if (size < (int)(sizeof(struct ip) + sizeof(struct udphdr))) {
+			syslog(LOG_ERR, "nfq_get_payload too short: %d bytes", size);
+			return 1;
+		}
+
+		iph = (struct ip *) pkt;
+		id_protocol = identify_ip_protocol(pkt);
+		dport = get_udp_dst_port(pkt);
 
 		/* packets we are interested in are UDP multicast to 239.255.255.250:1900
 		 * and start with a data string M-SEARCH
@@ -648,16 +651,16 @@ static int nfqueue_cb(
 
 					struct udphdr *udp = (struct udphdr *) (pkt + sizeof(struct ip));
 
-					char *dd = pkt + x;
+					const char *dd = (char *)pkt + x;
 
 					struct sockaddr_in sendername;
 					sendername.sin_family = AF_INET;
 					sendername.sin_port = udp->source;
 					sendername.sin_addr.s_addr = iph->ip_src.s_addr;
 
-					/* printf("pkt found %s\n",dd);*/
-					ProcessSSDPData (sudp, dd, size - x,
-					                 &sendername, -1, (unsigned short) 5555);
+					/* @todo : use data to pass sudp and port/https_port */
+					ProcessSSDPData (0/*sudp*/, dd, size - x,
+					                 (struct sockaddr *)&sendername, -1, /*http port*/(unsigned short) 5555);
 				}
 			}
 		}
@@ -665,7 +668,7 @@ static int nfqueue_cb(
 		nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
 	} else {
-		syslog(LOG_ERR,"nfq_get_msg_packet_hdr failed");
+		syslog(LOG_ERR, "nfq_get_msg_packet_hdr failed");
 		return 1;
 		/* from nfqueue source: 0 = ok, >0 = soft error, <0 hard error */
 	}
@@ -673,17 +676,19 @@ static int nfqueue_cb(
 	return 0;
 }
 
-static void ProcessNFQUEUE(int fd){
+static void ProcessNFQUEUE(int fd) {
 	char buf[4096];
 
-	socklen_t len_r;
+	socklen_t len_r = sizeof(struct sockaddr_in);
 	struct sockaddr_in sendername;
-	len_r = sizeof(struct sockaddr_in);
 
-        int res = recvfrom(fd, buf, sizeof(buf), 0,
-			(struct sockaddr *)&sendername, &len_r);
-
-	nfq_handle_packet(nfqHandle, buf, res);
+	ssize_t res = recvfrom(fd, buf, sizeof(buf), 0,
+	                       (struct sockaddr *)&sendername, &len_r);
+	if (res < 0) {
+		syslog(LOG_ERR, "ProcessNFQUEUE recvfrom: %m");
+	} else {
+		nfq_handle_packet(nfqHandle, buf, res);
+	}
 }
 #endif
 
