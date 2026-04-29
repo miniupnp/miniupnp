@@ -148,7 +148,7 @@ tomato_save(const char *fname)
 	unsigned short iport;
 	unsigned int leaseduration;
 	unsigned int timestamp;
-	char proto[4];
+	char proto[8];
 	char iaddr[32];
 	char desc[64];
 	char rhost[32];
