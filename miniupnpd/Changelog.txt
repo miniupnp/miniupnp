@@ -7,7 +7,7 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
   use a 8kB buffer for Netlink as recommended
   fix URL parsing in upnpevents.c
 
-VERSION 2.3.9 : released on 2026/03/24
+VERSION 2.3.10 : released on 2026/03/24
 
 2026/03/24:
   fix missing fclose and potential double free in option file parsing
