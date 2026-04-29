@@ -1,5 +1,11 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/04/13:
+  Re-enable port forwarding properly (broken in 2.3.10)
+
+2026/04/07:
+  Fix PCP option size parsing thanks to Sebastián Alba.
+
 2026/04/01:
   Allow using ip/mask when IPv6 is compiled but disabled
 
