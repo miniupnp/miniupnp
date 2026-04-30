@@ -743,8 +743,8 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 	}
 	n = sendto_or_schedule(s, bufr, l, 0, dest, dest_len);
 	if(n < 0) {
-		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
-		       host ? host : "NULL");
+		/*syslog(LOG_DEBUG, "sendto(udp_notify=%d, %s): %m", s,
+		       host ? host : "NULL");*/
 	} else if(n != l) {
 		syslog(LOG_NOTICE, "sendto() sent %d out of %d bytes", n, l);
 	}
@@ -754,8 +754,8 @@ SendSSDPNotify(int s, const struct sockaddr * dest, socklen_t dest_len,
 	 * discovery messages SHOULD NOT be sent more than three times. */
 	n = sendto_schedule(s, bufr, l, 0, dest, dest_len, 250);
 	if(n < 0) {
-		syslog(LOG_ERR, "sendto(udp_notify=%d, %s): %m", s,
-		       host ? host : "NULL");
+		/*syslog(LOG_DEBUG, "sendto(udp_notify=%d, %s): %m", s,
+		       host ? host : "NULL");*/
 	}
 }
 
@@ -1060,7 +1060,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	}
 	if(lan_addr == NULL)
 	{
-		syslog(LOG_WARNING, "SSDP packet sender %s (if_index=%d) not from a LAN, ignoring",
+		syslog(LOG_DEBUG, "SSDP packet sender %s (if_index=%d) not from a LAN, ignoring",
 		       sender_str, source_if);
 		return;
 	}
@@ -1163,7 +1163,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 	           sender_str );*/
 		if(st && (st_len > 0))
 		{
-			syslog(LOG_INFO, "SSDP M-SEARCH from %s ST: %.*s",
+			syslog(LOG_DEBUG, "SSDP M-SEARCH from %s ST: %.*s",
 			       sender_str, st_len, st);
 			/* find in which sub network the client is */
 #ifdef ENABLE_IPV6
@@ -1276,7 +1276,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 					else
 						snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
 #endif
-					syslog(LOG_INFO, "Single search found");
+					syslog(LOG_DEBUG, "Single search found");
 #ifdef DELAY_MSEARCH_RESPONSE
 					delay = random() / (1 + RAND_MAX / (1000 * mx_value));
 #ifdef DEBUG
@@ -1305,7 +1305,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #ifdef DELAY_MSEARCH_RESPONSE
 				unsigned int delay_increment = (mx_value * 1000) / 15;
 #endif
-				syslog(LOG_INFO, "ssdp:all found");
+				syslog(LOG_DEBUG, "ssdp:all found");
 				for(i=0; known_service_types[i].s; i++)
 				{
 #ifdef DELAY_MSEARCH_RESPONSE
@@ -1363,7 +1363,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 #endif
 				if(0 == memcmp(st, uuidvalue_igd, l))
 				{
-					syslog(LOG_INFO, "ssdp:uuid (IGD) found");
+					syslog(LOG_DEBUG, "ssdp:uuid (IGD) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
@@ -1373,7 +1373,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				}
 				else if(0 == memcmp(st, uuidvalue_wan, l))
 				{
-					syslog(LOG_INFO, "ssdp:uuid (WAN) found");
+					syslog(LOG_DEBUG, "ssdp:uuid (WAN) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS
@@ -1383,7 +1383,7 @@ ProcessSSDPData(int s, const char *bufr, int n,
 				}
 				else if(0 == memcmp(st, uuidvalue_wcd, l))
 				{
-					syslog(LOG_INFO, "ssdp:uuid (WCD) found");
+					syslog(LOG_DEBUG, "ssdp:uuid (WCD) found");
 					SendSSDPResponse(s, sender, st, st_len, "",
 					                 announced_host, http_port,
 #ifdef ENABLE_HTTPS

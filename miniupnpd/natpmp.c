@@ -106,7 +106,7 @@ static void FillPublicAddressResponse(unsigned char * resp, in_addr_t senderaddr
 			resp[3] = 3;	/* Network Failure (e.g. NAT box itself
 			                 * has not obtained a DHCP lease) */
 		} else if(getifaddr(ext_if_name, tmp, INET_ADDRSTRLEN, &addr, NULL) < 0) {
-			syslog(LOG_ERR, "Failed to get IP for interface %s", ext_if_name);
+			syslog(LOG_DEBUG, "Failed to get IP for interface %s", ext_if_name);
 			resp[3] = 3;	/* Network Failure (e.g. NAT box itself
 			                 * has not obtained a DHCP lease) */
 		} else if (!GETFLAG(ALLOWPRIVATEIPV4MASK) && addr_is_reserved(&addr)) {
@@ -231,7 +231,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		syslog(LOG_ERR, "inet_ntop(natpmp): %m");
 	}
 
-	syslog(LOG_INFO, "NAT-PMP request received from %s:%hu %dbytes",
+	syslog(LOG_DEBUG, "NAT-PMP request received from %s:%hu %d bytes",
 	       senderaddrstr, ntohs(senderaddr->sin_port), n);
 
 	if(n<2 || ((((req[1]-1)&~1)==0) && n<12)) {
@@ -260,7 +260,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		resp[3] = 1;	/* unsupported version */
 	} else switch(req[1]) {
 	case 0:	/* Public address request */
-		syslog(LOG_INFO, "NAT-PMP public address request");
+		syslog(LOG_DEBUG, "NAT-PMP public address request");
 		FillPublicAddressResponse(resp, senderaddr->sin_addr.s_addr);
 		resplen = 12;
 		break;
@@ -319,7 +319,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								resp[3] = 2;	/* Not Authorized/Refused */
 								break;
 							} else {
-								syslog(LOG_INFO, "NAT-PMP %s port %hu mapping removed",
+								syslog(LOG_DEBUG, "NAT-PMP %s port %hu mapping removed",
 								       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
 								index--;
 							}
@@ -340,7 +340,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						eport_first = eport;
 					} else if(eport == eport_first) { /* no eport available */
 						if(any_eport_allowed == 0) { /* all eports rejected by permissions */
-							syslog(LOG_ERR, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
+							syslog(LOG_INFO, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
 							       eport, proto_itoa(proto), senderaddrstr, iport);
 							resp[3] = 2;	/* Not Authorized/Refused */
 						} else { /* at least one eport allowed (but none available) */
@@ -443,7 +443,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 	FillPublicAddressResponse(notif, 0);
 	if(notif[3])
 	{
-		syslog(LOG_WARNING, "%s: cannot get public IP address, stopping",
+		syslog(LOG_DEBUG, "%s: cannot get public IP address, stopping",
 		       "SendNATPMPPublicAddressChangeNotification");
 		return;
 	}
@@ -471,7 +471,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d, port=%d): %m",
+			syslog(LOG_DEBUG, "%s: sendto(s_udp=%d, port=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j], NATPMP_PORT);
 			return;
 		}
@@ -481,7 +481,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d, port=%d): %m",
+			syslog(LOG_DEBUG, "%s: sendto(s_udp=%d, port=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j], NATPMP_NOTIF_PORT);
 			return;
 		}
