@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2025 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -788,13 +788,13 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 		"<NewLeaseDuration>%u</NewLeaseDuration>"
 		"</u:%sResponse>";
 
-	char body[1024];
+	char body[512+MINIUPNPD_DESC_SIZE];
 	int bodylen;
 	struct NameValueParserData data;
 	const char * r_host, * ext_port, * protocol;
 	unsigned short eport, iport;
 	char int_ip[32];
-	char desc[64];
+	char desc[MINIUPNPD_DESC_SIZE];
 	unsigned int leaseduration = 0;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
@@ -1073,7 +1073,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 	const char * m_index;
 	char * endptr;
 	char protocol[8], iaddr[32];
-	char desc[64];
+	char desc[MINIUPNPD_DESC_SIZE];
 	char rhost[40];
 	unsigned int leaseduration = 0;
 	struct NameValueParserData data;
@@ -1120,7 +1120,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 	else
 	{
 		int bodylen;
-		char body[2048];
+		char body[512+MINIUPNPD_DESC_SIZE];
 #ifdef ENABLE_PCP
 		hide_pcp_nonce(desc);
 #endif
@@ -1173,7 +1173,7 @@ GetListOfPortMappings(struct upnphttp * h, const char * action, const char * ns)
 	int r = -1;
 	unsigned short iport;
 	char int_ip[32];
-	char desc[64];
+	char desc[MINIUPNPD_DESC_SIZE];
 	char rhost[64];
 	unsigned int leaseduration = 0;
 
@@ -1256,8 +1256,8 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	/* loop through port mappings */
 	for(i = 0; number > 0 && i < list_size; i++)
 	{
-		/* have a margin of 1024 bytes to store the new entry */
-		if((unsigned int)bodylen + 1024 > bodyalloc)
+		/* have a margin of 1024 bytes + MINIUPNPD_DESC_SIZE to store the new entry */
+		if((unsigned int)bodylen + 1024 + MINIUPNPD_DESC_SIZE > bodyalloc)
 		{
 			char * body_sav = body;
 			bodyalloc += 4096;
