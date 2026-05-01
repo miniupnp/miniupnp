@@ -1238,6 +1238,112 @@ static void complete_uuidvalues(void)
 	}
 }
 
+void print_usage(FILE * out, const char * argv0) {
+	fprintf(out, "Usage:\n\t"
+	        "%s --version\n\t"
+	        "%s --help\n\t"
+	        "%s "
+#ifndef DISABLE_CONFIG_FILE
+			"[-f config_file] "
+#endif
+			"[-i ext_ifname] "
+#ifdef ENABLE_IPV6
+			"[-I ext_ifname6] [-4] "
+#endif
+			"[-o ext_ip]\n"
+#ifndef MULTIPLE_EXTERNAL_IP
+			"\t\t[-a listening_ip]"
+#else
+			"\t\t[-a listening_ip ext_ip]"
+#endif
+#ifdef ENABLE_HTTPS
+			" [-H https_port]"
+#endif
+			" [-p port] [-d] [-v]"
+#if defined(USE_PF) || defined(USE_IPF)
+			" [-L]"
+#endif
+			" [-U] [-S0]"
+#ifdef ENABLE_NATPMP
+			" [-N]"
+#endif
+			"\n"
+			/*"[-l logfile] " not functionnal */
+			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
+			"\t\t[-t notify_interval] "
+#ifndef NO_BACKGROUND_NO_PIDFILE
+			"[-P pid_filename] "
+#endif
+#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
+			"[-z fiendly_name]"
+#endif
+			"\n\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
+#ifdef USE_PF
+                        "\t\t[-q queue] [-T tag]\n"
+#endif
+#ifdef ENABLE_NFQUEUE
+                        "\t\t[-Q queue] [-n name]\n"
+#endif
+			"\t\t[-A \"permission rule\"] [-b BOOTID]"
+#ifdef IGD_V2
+			" [-1]"
+#endif
+			"\n"
+	        "\nNotes:\n\tThere can be one or several listening_ips.\n"
+	        "\tNotify interval is in seconds. Default is 900 seconds.\n"
+#ifndef NO_BACKGROUND_NO_PIDFILE
+			"\tDefault pid file is '%s'.\n"
+#endif
+			"\tDefault config file is '%s'.\n"
+			"\t-d starts miniupnpd in foreground in debug mode.\n"
+#ifdef USE_SYSTEMD
+	                "\t-D starts miniupnpd in foreground as a systemd service.\n"
+#endif
+			"\t-o argument is either an IPv4 address or \"STUN:host[:port]\".\n"
+#ifdef ENABLE_IPV6
+			"\t-4 disable IPv6\n"
+#endif
+#if defined(USE_PF) || defined(USE_IPF)
+			"\t-L sets packet log in pf and ipf on.\n"
+#endif
+			"\t-S0 disable \"secure\" mode so clients can add mappings to other ips\n"
+			"\t-U causes miniupnpd to report system uptime instead "
+			"of daemon uptime.\n"
+#ifdef ENABLE_NATPMP
+#ifdef ENABLE_PCP
+			"\t-N enables NAT-PMP and PCP functionality.\n"
+#else
+			"\t-N enables NAT-PMP functionality.\n"
+#endif
+#endif
+			"\t-B sets bitrates reported by daemon in bits per second.\n"
+			"\t-w sets the presentation url. Default is http address on port 80\n"
+#ifdef USE_PF
+			"\t-q sets the ALTQ queue in pf.\n"
+			"\t-T sets the tag name in pf.\n"
+#endif
+#ifdef ENABLE_NFQUEUE
+			"\t-Q sets the queue number that is used by NFQUEUE.\n"
+			"\t-n sets the name of the interface(s) that packets will arrive on.\n"
+#endif
+			"\t-A use following syntax for permission rules :\n"
+			"\t  (allow|deny) (external port range) ip/mask (internal port range)\n"
+			"\texamples :\n"
+			"\t  \"allow 1024-65535 192.168.1.0/24 1024-65535\"\n"
+			"\t  \"deny 0-65535 0.0.0.0/0 0-65535\"\n"
+			"\t-b sets the value of BOOTID.UPNP.ORG SSDP header\n"
+#ifdef IGD_V2
+			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
+#endif
+			"\t-v enables LOG_INFO messages, -vv LOG_DEBUG as well (default with -d)\n"
+			"\t-h / --help prints this help and quits.\n"
+	        "", argv0, argv0, argv0,
+#ifndef NO_BACKGROUND_NO_PIDFILE
+			pidfilename,
+#endif
+			DEFAULT_CONFIG);
+}
+
 /* init phase :
  * 1) read configuration file
  * 2) read command line arguments
@@ -1274,11 +1380,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	struct lan_addr_s * lan_addr;
 	struct lan_addr_s * lan_addr2;
 
-	/* only print usage if -h is used */
 	for(i=1; i<argc; i++)
 	{
-		if(0 == strcmp(argv[i], "-h") || 0 == strcmp(argv[i], "--help"))
-			goto print_usage;
 		if(0 == strcmp(argv[i], "-d"))
 			debug_flag = 1;
 #ifdef USE_SYSTEMD
@@ -2147,109 +2250,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 
 	return 0;
 print_usage:
-	fprintf(stderr, "Usage:\n\t"
-	        "%s --version\n\t"
-	        "%s --help\n\t"
-	        "%s "
-#ifndef DISABLE_CONFIG_FILE
-			"[-f config_file] "
-#endif
-			"[-i ext_ifname] "
-#ifdef ENABLE_IPV6
-			"[-I ext_ifname6] [-4] "
-#endif
-			"[-o ext_ip]\n"
-#ifndef MULTIPLE_EXTERNAL_IP
-			"\t\t[-a listening_ip]"
-#else
-			"\t\t[-a listening_ip ext_ip]"
-#endif
-#ifdef ENABLE_HTTPS
-			" [-H https_port]"
-#endif
-			" [-p port] [-d] [-v]"
-#if defined(USE_PF) || defined(USE_IPF)
-			" [-L]"
-#endif
-			" [-U] [-S0]"
-#ifdef ENABLE_NATPMP
-			" [-N]"
-#endif
-			"\n"
-			/*"[-l logfile] " not functionnal */
-			"\t\t[-u uuid] [-s serial] [-m model_number] \n"
-			"\t\t[-t notify_interval] "
-#ifndef NO_BACKGROUND_NO_PIDFILE
-			"[-P pid_filename] "
-#endif
-#ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
-			"[-z fiendly_name]"
-#endif
-			"\n\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
-#ifdef USE_PF
-                        "\t\t[-q queue] [-T tag]\n"
-#endif
-#ifdef ENABLE_NFQUEUE
-                        "\t\t[-Q queue] [-n name]\n"
-#endif
-			"\t\t[-A \"permission rule\"] [-b BOOTID]"
-#ifdef IGD_V2
-			" [-1]"
-#endif
-			"\n"
-	        "\nNotes:\n\tThere can be one or several listening_ips.\n"
-	        "\tNotify interval is in seconds. Default is 900 seconds.\n"
-#ifndef NO_BACKGROUND_NO_PIDFILE
-			"\tDefault pid file is '%s'.\n"
-#endif
-			"\tDefault config file is '%s'.\n"
-			"\t-d starts miniupnpd in foreground in debug mode.\n"
-#ifdef USE_SYSTEMD
-	                "\t-D starts miniupnpd in foreground as a systemd service.\n"
-#endif
-			"\t-o argument is either an IPv4 address or \"STUN:host[:port]\".\n"
-#ifdef ENABLE_IPV6
-			"\t-4 disable IPv6\n"
-#endif
-#if defined(USE_PF) || defined(USE_IPF)
-			"\t-L sets packet log in pf and ipf on.\n"
-#endif
-			"\t-S0 disable \"secure\" mode so clients can add mappings to other ips\n"
-			"\t-U causes miniupnpd to report system uptime instead "
-			"of daemon uptime.\n"
-#ifdef ENABLE_NATPMP
-#ifdef ENABLE_PCP
-			"\t-N enables NAT-PMP and PCP functionality.\n"
-#else
-			"\t-N enables NAT-PMP functionality.\n"
-#endif
-#endif
-			"\t-B sets bitrates reported by daemon in bits per second.\n"
-			"\t-w sets the presentation url. Default is http address on port 80\n"
-#ifdef USE_PF
-			"\t-q sets the ALTQ queue in pf.\n"
-			"\t-T sets the tag name in pf.\n"
-#endif
-#ifdef ENABLE_NFQUEUE
-			"\t-Q sets the queue number that is used by NFQUEUE.\n"
-			"\t-n sets the name of the interface(s) that packets will arrive on.\n"
-#endif
-			"\t-A use following syntax for permission rules :\n"
-			"\t  (allow|deny) (external port range) ip/mask (internal port range)\n"
-			"\texamples :\n"
-			"\t  \"allow 1024-65535 192.168.1.0/24 1024-65535\"\n"
-			"\t  \"deny 0-65535 0.0.0.0/0 0-65535\"\n"
-			"\t-b sets the value of BOOTID.UPNP.ORG SSDP header\n"
-#ifdef IGD_V2
-			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
-#endif
-			"\t-v enables LOG_INFO messages, -vv LOG_DEBUG as well (default with -d)\n"
-			"\t-h / --help prints this help and quits.\n"
-	        "", argv[0], argv[0], argv[0],
-#ifndef NO_BACKGROUND_NO_PIDFILE
-			pidfilename,
-#endif
-			DEFAULT_CONFIG);
+	print_usage(stderr, argv[0]);
 	return 1;
 }
 
@@ -2258,6 +2259,7 @@ print_usage:
 int
 main(int argc, char * * argv)
 {
+	int return_code = 0;
 	int i;
 	int shttpl = -1;	/* socket for HTTP */
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
@@ -2312,7 +2314,10 @@ main(int argc, char * * argv)
 #endif
 
 	for(i = 0; i < argc; i++) {
-		if(strcmp(argv[i], "version") == 0 || strcmp(argv[i], "--version") == 0) {
+		if(strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+			print_usage(stdout, argv[0]);
+			return 0;
+		} else if(strcmp(argv[i], "version") == 0 || strcmp(argv[i], "--version") == 0) {
 			puts("miniupnpd " MINIUPNPD_VERSION
 #ifdef MINIUPNPD_GIT_REF
 			     " " MINIUPNPD_GIT_REF
@@ -2419,7 +2424,7 @@ main(int argc, char * * argv)
 #endif
 	   ) {
 		syslog(LOG_ERR, "Why did you run me anyway?");
-		return 0;
+		goto shutdown;
 	}
 
 	syslog(LOG_INFO, "version " MINIUPNPD_VERSION " starting%s%sext if %s BOOTID=%u",
@@ -2444,7 +2449,8 @@ main(int argc, char * * argv)
 	{
 		if (update_ext_ip_addr_from_stun(1) != 0) {
 			syslog(LOG_ERR, "Performing STUN failed. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 	}
 	else if (!use_ext_ip_addr)
@@ -2477,7 +2483,8 @@ main(int argc, char * * argv)
 		if(shttpl < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTP. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 		v.port = listen_port;
 		syslog(LOG_NOTICE, "HTTP listening on port %d", v.port);
@@ -2488,7 +2495,8 @@ main(int argc, char * * argv)
 			if(shttpl_v4 < 0)
 			{
 				syslog(LOG_ERR, "Failed to open socket for HTTP on port %d (IPv4). EXITING", v.port);
-				return 1;
+				return_code = 1;
+				goto shutdown;
 			}
 		}
 #endif /* V6SOCKETS_ARE_V6ONLY */
@@ -2503,7 +2511,8 @@ main(int argc, char * * argv)
 		if(shttpsl < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTPS. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 		v.https_port = listen_port;
 		syslog(LOG_NOTICE, "HTTPS listening on port %d", v.https_port);
@@ -2512,7 +2521,8 @@ main(int argc, char * * argv)
 		if(shttpsl_v4 < 0)
 		{
 			syslog(LOG_ERR, "Failed to open socket for HTTPS on port %d (IPv4). EXITING", v.https_port);
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 #endif /* V6SOCKETS_ARE_V6ONLY */
 #endif /* ENABLE_HTTPS */
@@ -2537,7 +2547,8 @@ main(int argc, char * * argv)
 			syslog(LOG_NOTICE, "Failed to open socket for receiving SSDP. Trying to use MiniSSDPd");
 			if(SubmitServicesToMiniSSDPD(lan_addrs.lh_first->str, v.port) < 0) {
 				syslog(LOG_ERR, "Failed to connect to MiniSSDPd. EXITING");
-				return 1;
+				return_code = 1;
+				goto shutdown;
 			}
 		}
 #ifdef ENABLE_IPV6
@@ -2556,7 +2567,8 @@ main(int argc, char * * argv)
 		{
 			syslog(LOG_ERR, "Failed to open sockets for sending SSDP notify "
 		                "messages. EXITING");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		}
 
 #if defined(UPNP_STRICT) && defined(IGD_V2)
@@ -2629,11 +2641,12 @@ main(int argc, char * * argv)
 #endif
 
 #ifdef ENABLE_NFQUEUE
-	if ( nfqueue != -1 && n_nfqix > 0) {
+	if (nfqueue != -1 && n_nfqix > 0) {
 		nfqh = OpenAndConfNFqueue();
 		if(nfqh < 0) {
 			syslog(LOG_ERR, "Failed to open fd for NFQUEUE.");
-			return 1;
+			return_code = 1;
+			goto shutdown;
 		} else {
 			syslog(LOG_NOTICE, "Opened NFQUEUE %d",nfqueue);
 		}
@@ -2661,7 +2674,8 @@ main(int argc, char * * argv)
 	/* mcast ? unix ? */
 	if (pledge("stdio inet pf", NULL) < 0) {
 		syslog(LOG_ERR, "pledge(): %m");
-		return 1;
+		return_code = 1;
+		goto shutdown;
 	}
 #endif /* HAS_PLEDGE */
 #ifdef HAS_LIBCAP
@@ -3420,5 +3434,5 @@ shutdown:
 	free(os_version);
 #endif
 	closelog();
-	return 0;
+	return return_code;
 }
