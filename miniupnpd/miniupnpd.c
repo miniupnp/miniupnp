@@ -117,10 +117,17 @@ struct ctlelem {
 static struct nfq_handle *nfqHandle;
 static struct sockaddr_in ssdp;
 
+/* data for the callback */
+struct nfq_cb_data {
+	int sudp;
+	unsigned short http_port;
+	unsigned short https_port;
+};
+
 /* prototypes */
-static int nfqueue_cb( struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data) ;
-int identify_ip_protocol (const unsigned char *payload);
-int get_udp_dst_port (const unsigned char *payload);
+static int nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
+int identify_ip_protocol(const unsigned char *payload);
+int get_udp_dst_port(const unsigned char *payload);
 #endif	/* ENABLE_NFQUEUE */
 
 /* variables used by signals */
@@ -558,51 +565,46 @@ int get_udp_dst_port(const unsigned char *payload) {
 }
 
 static int
-OpenAndConfNFqueue(void) {
-
-        struct nfq_q_handle *myQueue;
-        struct nfnl_handle *netlinkHandle;
-
-        int fd = 0, e = 0;
+OpenAndConfNFqueue(struct nfq_cb_data * cb_data) {
+	struct nfq_q_handle *myQueue;
+	struct nfnl_handle *netlinkHandle;
+	int e;
 
 	inet_pton(AF_INET, "239.255.255.250", &(ssdp.sin_addr));
 
-        /* Get a queue connection handle from the module */
-        if (!(nfqHandle = nfq_open())) {
+	/* Get a queue connection handle from the module */
+	if (!(nfqHandle = nfq_open())) {
 		syslog(LOG_ERR, "Error in nfq_open(): %m");
-                return -1;
-        }
+		return -1;
+	}
 
-        /* Unbind the handler from processing any IP packets
-           Not totally sure why this is done, or if it's necessary... */
-        if ((e = nfq_unbind_pf(nfqHandle, AF_INET)) < 0) {
+	/* Unbind the handler from processing any IP packets
+	   Not totally sure why this is done, or if it's necessary... */
+	if ((e = nfq_unbind_pf(nfqHandle, AF_INET)) < 0) {
 		syslog(LOG_ERR, "Error in nfq_unbind_pf(): %m");
-                return -1;
-        }
+		return -1;
+	}
 
-        /* Bind this handler to process IP packets... */
-        if (nfq_bind_pf(nfqHandle, AF_INET) < 0) {
+	/* Bind this handler to process IP packets... */
+	if (nfq_bind_pf(nfqHandle, AF_INET) < 0) {
 		syslog(LOG_ERR, "Error in nfq_bind_pf(): %m");
-                return -1;
-        }
+		return -1;
+	}
 
-        /*      Install a callback on queue -Q */
-        if (!(myQueue = nfq_create_queue(nfqHandle,  nfqueue, &nfqueue_cb, NULL))) {
+	/*      Install a callback on queue -Q */
+	if (!(myQueue = nfq_create_queue(nfqHandle,  nfqueue, &nfqueue_cb, cb_data))) {
 		syslog(LOG_ERR, "Error in nfq_create_queue(): %m");
-                return -1;
-        }
+		return -1;
+	}
 
-        /*      Turn on packet copy mode */
-        if (nfq_set_mode(myQueue, NFQNL_COPY_PACKET, 0xffff) < 0) {
+	/*      Turn on packet copy mode */
+	if (nfq_set_mode(myQueue, NFQNL_COPY_PACKET, 0xffff) < 0) {
 		syslog(LOG_ERR, "Error setting packet copy mode (): %m");
-                return -1;
-        }
+		return -1;
+	}
 
-        netlinkHandle = nfq_nfnlh(nfqHandle);
-        fd = nfnl_fd(netlinkHandle);
-
-	return fd;
-
+	netlinkHandle = nfq_nfnlh(nfqHandle);
+	return nfnl_fd(netlinkHandle);
 }
 
 
@@ -614,6 +616,7 @@ static int nfqueue_cb(
 
 	unsigned char *pkt;
 	struct nfqnl_msg_packet_hdr *ph;
+	struct nfq_cb_data * cb_data = (struct nfq_cb_data *)data;
 	ph = nfq_get_msg_packet_hdr(nfa);
 
 	if ( ph ) {
@@ -659,8 +662,8 @@ static int nfqueue_cb(
 					sendername.sin_addr.s_addr = iph->ip_src.s_addr;
 
 					/* @todo : use data to pass sudp and port/https_port */
-					ProcessSSDPData (0/*sudp*/, dd, size - x,
-					                 (struct sockaddr *)&sendername, -1, /*http port*/(unsigned short) 5555);
+					ProcessSSDPData (cb_data->sudp, dd, size - x,
+					                 (struct sockaddr *)&sendername, -1, cb_data->http_port);
 				}
 			}
 		}
@@ -2283,6 +2286,7 @@ main(int argc, char * * argv)
 #endif
 #ifdef ENABLE_NFQUEUE
 	int nfqh = -1;
+	struct nfq_cb_data nfqueue_data;
 #endif
 #ifdef USE_IFACEWATCHER
 	int sifacewatcher = -1;
@@ -2487,6 +2491,9 @@ main(int argc, char * * argv)
 			goto shutdown;
 		}
 		v.port = listen_port;
+#ifdef ENABLE_NFQUEUE
+		nfqueue_data.http_port = listen_port;
+#endif /* ENABLE_NFQUEUE */
 		syslog(LOG_NOTICE, "HTTP listening on port %d", v.port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		if(!GETFLAG(IPV6DISABLEDMASK))
@@ -2515,6 +2522,9 @@ main(int argc, char * * argv)
 			goto shutdown;
 		}
 		v.https_port = listen_port;
+#ifdef ENABLE_NFQUEUE
+		nfqueue_data.https_port = listen_port;
+#endif /* ENABLE_NFQUEUE */
 		syslog(LOG_NOTICE, "HTTPS listening on port %d", v.https_port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		shttpsl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
@@ -2551,6 +2561,9 @@ main(int argc, char * * argv)
 				goto shutdown;
 			}
 		}
+#ifdef ENABLE_NFQUEUE
+		nfqueue_data.sudp = sudp;
+#endif /* ENABLE_NFQUEUE */
 #ifdef ENABLE_IPV6
 		if(!GETFLAG(IPV6DISABLEDMASK))
 		{
@@ -2642,7 +2655,7 @@ main(int argc, char * * argv)
 
 #ifdef ENABLE_NFQUEUE
 	if (nfqueue != -1 && n_nfqix > 0) {
-		nfqh = OpenAndConfNFqueue();
+		nfqh = OpenAndConfNFqueue(&nfqueue_data);
 		if(nfqh < 0) {
 			syslog(LOG_ERR, "Failed to open fd for NFQUEUE.");
 			return_code = 1;
