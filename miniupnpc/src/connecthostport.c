@@ -57,6 +57,10 @@
 #error MINIUPNPC_IGNORE_EINTR cannot be used in Win32 builds
 #endif
 
+#ifndef MINIUPNPC_CONNECT_TIMEOUT_IN_MS
+#define MINIUPNPC_CONNECT_TIMEOUT_IN_MS 3000
+#endif
+
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
 #endif
@@ -126,22 +130,22 @@ SOCKET connecthostport(const char * host, unsigned short port,
 	/* https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-setsockopt
 	 * SO_RCVTIMEO DWORD Sets the timeout, in milliseconds, for blocking
 	 * receive calls. */
-	timeout = 3000; /* milliseconds */
+	timeout = MINIUPNPC_CONNECT_TIMEOUT_IN_MS; /* milliseconds */
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
 #else
-	timeout.tv_sec = 3;
-	timeout.tv_usec = 0;
+	timeout.tv_sec = MINIUPNPC_CONNECT_TIMEOUT_IN_MS / 1000;
+	timeout.tv_usec = (MINIUPNPC_CONNECT_TIMEOUT_IN_MS % 1000) * 1000;
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
 #endif
 	{
 		PRINT_SOCKET_ERROR("setsockopt SO_RCVTIMEO");
 	}
 #ifdef _WIN32
-	timeout = 3000; /* milliseconds */
+	timeout = MINIUPNPC_CONNECT_TIMEOUT_IN_MS; /* milliseconds */
 	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
 #else
-	timeout.tv_sec = 3;
-	timeout.tv_usec = 0;
+	timeout.tv_sec = MINIUPNPC_CONNECT_TIMEOUT_IN_MS / 1000;
+	timeout.tv_usec = (MINIUPNPC_CONNECT_TIMEOUT_IN_MS % 1000) * 1000;
 	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
 #endif
 	{
@@ -162,7 +166,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #ifdef USE_POLL
 		struct pollfd pfd = {s, POLLOUT, 0};
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-		n = poll(&pfd, 1, 3000);
+		n = poll(&pfd, 1, MINIUPNPC_CONNECT_TIMEOUT_IN_MS);
 #else
 		n = poll(&pfd, 1, -1);
 #endif
@@ -180,8 +184,8 @@ SOCKET connecthostport(const char * host, unsigned short port,
 		}
 		FD_SET(s, &wset);
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-		timeout.tv_sec = 3;
-		timeout.tv_usec = 0;
+		timeout.tv_sec = MINIUPNPC_CONNECT_TIMEOUT_IN_MS / 1000;
+		timeout.tv_usec = (MINIUPNPC_CONNECT_TIMEOUT_IN_MS % 1000) * 1000;
 		n = select(s + 1, NULL, &wset, NULL, &timeout);
 #else
 		n = select(s + 1, NULL, &wset, NULL, NULL);
@@ -275,22 +279,22 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 		/* setting a 3 seconds timeout for the connect() call */
 #ifdef _WIN32
-		timeout = 3000; /* milliseconds */
+		timeout = MINIUPNPC_CONNECT_TIMEOUT_IN_MS; /* milliseconds */
 		if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
 #else
-		timeout.tv_sec = 3;
-		timeout.tv_usec = 0;
+		timeout.tv_sec = MINIUPNPC_CONNECT_TIMEOUT_IN_MS / 1000;
+		timeout.tv_usec = (MINIUPNPC_CONNECT_TIMEOUT_IN_MS % 1000) * 1000;
 		if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
 #endif
 		{
 			PRINT_SOCKET_ERROR("setsockopt");
 		}
 #ifdef _WIN32
-		timeout = 3000; /* milliseconds */
+		timeout = MINIUPNPC_CONNECT_TIMEOUT_IN_MS; /* milliseconds */
 		if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
 #else
-		timeout.tv_sec = 3;
-		timeout.tv_usec = 0;
+		timeout.tv_sec = MINIUPNPC_CONNECT_TIMEOUT_IN_MS / 1000;
+		timeout.tv_usec = (MINIUPNPC_CONNECT_TIMEOUT_IN_MS % 1000) * 1000;
 		if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
 #endif
 		{
@@ -309,7 +313,7 @@ SOCKET connecthostport(const char * host, unsigned short port,
 #ifdef USE_POLL
 			struct pollfd pfd = {s, POLLOUT, 0};
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-			n = poll(&pfd, 1, 3000);
+			n = poll(&pfd, 1, MINIUPNPC_CONNECT_TIMEOUT_IN_MS);
 #else
 			n = poll(&pfd, 1, -1);
 #endif
@@ -328,8 +332,8 @@ SOCKET connecthostport(const char * host, unsigned short port,
 			}
 			FD_SET(s, &wset);
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
-			timeout.tv_sec = 3;
-			timeout.tv_usec = 0;
+			timeout.tv_sec = MINIUPNPC_CONNECT_TIMEOUT_IN_MS / 1000;
+			timeout.tv_usec = (MINIUPNPC_CONNECT_TIMEOUT_IN_MS % 1000) * 1000;
 			n = select(s + 1, NULL, &wset, NULL, &timeout);
 #else
 			n = select(s + 1, NULL, &wset, NULL, NULL);
