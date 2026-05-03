@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas Bernard
- * Copyright (c) 2010-2025 Thomas Bernard
+ * Copyright (c) 2010-2026 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -52,6 +52,10 @@
 #endif
 
 #include "connecthostport.h"
+
+#if defined(_WIN32) && defined(MINIUPNPC_IGNORE_EINTR)
+#error MINIUPNPC_IGNORE_EINTR cannot be used in Win32 builds
+#endif
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
