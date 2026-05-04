@@ -127,11 +127,35 @@ SOCKET connecthostport(const char * host, unsigned short port,
 	}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 	/* setting a 3 seconds timeout for the connect() call */
+#ifdef _WIN32
+	/* https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-setsockopt
+	 * SO_RCVTIMEO DWORD Sets the timeout, in milliseconds, for blocking
+	 * receive calls. */
 	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
+#else
+	/* from socket(7) :
+	SO_RCVTIMEO et SO_SNDTIMEO
+	Specify the receiving or sending timeouts until reporting an error. The
+	argument is a struct timeval. If an input or output function blocks for
+	this period of time, and data has been sent or received, the return value
+	of that function will be the amount of data transferred; if no data has
+	been transferred and the timeout has been reached, then -1 is returned with
+	errno set to EAGAIN or EWOULDBLOCK, or EINPROGRESS (for connect(2)) just as
+	if the socket was specified to be nonblocking. If the timeout is set to
+	zero (the default), then the operation will never timeout. Timeouts only
+	have effect for system calls that perform socket I/O (e.g., accept(2),
+	connect(2), read(2), recvmsg(2), send(2), sendmsg(2)); timeouts have no
+	effect for select(2), poll(2), epoll_wait(2), and so on. */
+	if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
+#endif
 	{
 		PRINT_SOCKET_ERROR("setsockopt SO_RCVTIMEO");
 	}
+#ifdef _WIN32
 	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
+#else
+	if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
+#endif
 	{
 		PRINT_SOCKET_ERROR("setsockopt SO_SNDTIMEO");
 	}
@@ -260,11 +284,19 @@ SOCKET connecthostport(const char * host, unsigned short port,
 		}
 #ifdef MINIUPNPC_SET_SOCKET_TIMEOUT
 		/* setting a 3 seconds timeout for the connect() call */
+#ifdef _WIN32
 		if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
+#else
+		if(setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval)) < 0)
+#endif
 		{
 			PRINT_SOCKET_ERROR("setsockopt");
 		}
+#ifdef _WIN32
 		if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
+#else
+		if(setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval)) < 0)
+#endif
 		{
 			PRINT_SOCKET_ERROR("setsockopt");
 		}
