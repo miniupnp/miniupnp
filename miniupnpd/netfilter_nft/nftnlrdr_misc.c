@@ -104,7 +104,7 @@ nft_mnl_connect(void)
 		return -1;
 	}
 	mnl_portid = mnl_socket_get_portid(mnl_sock);
-	syslog(LOG_INFO, "mnl_socket bound, port_id=%u", mnl_portid);
+	syslog(LOG_DEBUG, "mnl_socket bound, port_id=%u", mnl_portid);
 	return 0;
 }
 
@@ -745,7 +745,7 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		errno = 0;
 		ret = mnl_cb_run(buf, n, mnl_seq, mnl_portid, table_cb, &data);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
-			syslog(LOG_ERR, "%s: mnl_cb_run returned %d: %m",
+			syslog(LOG_DEBUG, "%s: mnl_cb_run returned %d: %m",
 			       "refresh_nft_cache", ret);
 			return -1;
 		}
@@ -1279,7 +1279,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 
 		result = send_batch(batch);
 		if (result < 0) {
-			syslog(LOG_ERR, "%s(%p, %d, %d) send_batch failed %d",
+			syslog(LOG_DEBUG, "%s(%p, %d, %d) send_batch failed %d",
 			       "nft_send_rule", rule, (int)cmd, (int)chain_type, result);
 		}
 	}
@@ -1462,7 +1462,7 @@ send_batch(struct mnl_nlmsg_batch *batch)
 		errno = 0;
 		ret = mnl_cb_run(buf, n, 0, mnl_portid, NULL, NULL);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
-			syslog(LOG_ERR, "%s: mnl_cb_run returned %d: %m",
+			syslog(LOG_DEBUG, "%s: mnl_cb_run returned %d: %m",
 			       "send_batch", ret);
 			return -4;
 		}
