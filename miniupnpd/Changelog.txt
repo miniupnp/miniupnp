@@ -4,6 +4,7 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
   Free resources on start error
   print usage on stdout or stderr depending on command line
   increase maximum description length when possible (netfilter/nftables)
+  fix nfqueue code
 
 2026/04/13:
   Re-enable port forwarding properly (broken in 2.3.10)
