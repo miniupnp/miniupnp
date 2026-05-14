@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.281 2025/05/26 22:56:38 nanard Exp $
 miniUPnP client Changelog.
 
+2026/05/14:
+  fix build with cmake under DragonFly BSD
+
 2026/04/04:
   support C23 / glibc 2.43 strstr/strchr returning const char *
 
