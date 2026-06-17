@@ -175,6 +175,30 @@ get_addr(const char * s, struct in_addr * addr, unsigned int * dot_cnt)
 	return s + i;
 }
 
+static const char *
+get_mask(const char * s, struct in_addr * mask)
+{
+	const char * p;
+	u_short n_bits;
+	unsigned int dot_cnt;
+
+	if(!isdigit((unsigned char)*s))
+		return NULL;
+
+	for(p = s; isdigit((unsigned char)*p); p++);
+	if(*p == '.')
+		return get_addr(s, mask, &dot_cnt);
+
+	p = get_ushort(s, &n_bits);
+	if(!p)
+		return NULL;
+	if(n_bits > 32)
+		return NULL;
+	mask->s_addr = !n_bits ? 0 : htonl(0xffffffffu << (32 - n_bits));
+
+	return p;
+}
+
 /* get_next_token(s, &token, raw)
  * put the unquoted/unescaped token in token and returns
  * a pointer to the begining of the next token
@@ -315,19 +339,9 @@ read_permission_line(struct upnpperm * perm,
 	else
 	{
 		p++;
-		p = get_addr(p, &perm->mask, &dot_cnt);
+		p = get_mask(p, &perm->mask);
 		if(!p)
 			return -1;
-		/* inet_aton(): When only one part is given, the value is stored
-		 * directly in the network address without any byte
-		 * rearrangement. */
-		if(!dot_cnt)
-		{
-			unsigned int n_bits = ntohl(perm->mask.s_addr);
-			if(n_bits > 32)
-				return -1;
-			perm->mask.s_addr = !n_bits ? 0 : htonl(0xffffffffu << (32 - n_bits));
-		}
 	}
 
 	p = get_sep(p);
