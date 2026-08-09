@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/08/09:
+  check for the return value of snprintf() : overflow or error
+
 2026/06/16:
   nftables: Avoid building too long rule with
     nftnl_rule_nlmsg_build_payload() by triming description to 256 chars.
