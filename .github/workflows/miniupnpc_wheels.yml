@@ -172,11 +172,11 @@ jobs:
       CIBW_SKIP: '*-manylinux_i686 *-win32 *-musllinux_*'
 
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python.major-dot-minor }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: cloned
 
@@ -197,7 +197,7 @@ jobs:
 
       - name: Set up QEMU
         if: matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm'
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Build and test
         if: matrix.os.matrix != 'windows'
@@ -238,7 +238,7 @@ jobs:
         run: |
           python -c 'import miniupnpc; print(miniupnpc)'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: wheel-${{ env.FILE_NAME }}
@@ -253,7 +253,7 @@ jobs:
 
     steps:
       - name: Download results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           pattern: wheel-*
