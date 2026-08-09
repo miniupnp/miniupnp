@@ -172,7 +172,7 @@ jobs:
       CIBW_SKIP: '*-manylinux_i686 *-win32 *-musllinux_*'
 
     steps:
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python.major-dot-minor }}
 
