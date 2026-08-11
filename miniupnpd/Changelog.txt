@@ -1,5 +1,7 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+VERSION 2.3.11 : released on 2026/08/12
+
 2026/08/11:
   fix READNU32 by casting to uint32_t
   filter out non printable characters in description for lease file
