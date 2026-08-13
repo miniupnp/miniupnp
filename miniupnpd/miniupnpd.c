@@ -917,9 +917,6 @@ struct runtime_vars {
 	int https_port;	/* HTTPS Port */
 #endif
 	int notify_interval;	/* seconds between SSDP announces. Should be >= 900s */
-	/* unused rules cleaning related variables : */
-	int clean_ruleset_threshold;	/* threshold for removing unused rules */
-	int clean_ruleset_interval;		/* (minimum) interval between checks. 0=disabled */
 #ifdef USE_SYSTEMD
 	int systemd_notify;
 #endif
@@ -1280,7 +1277,7 @@ void print_usage(FILE * out, const char * argv0) {
 #ifdef ENABLE_MANUFACTURER_INFO_CONFIGURATION
 			"[-z fiendly_name]"
 #endif
-			"\n\t\t[-B down up] [-w url] [-r clean_ruleset_interval]\n"
+			"\n\t\t[-B down up] [-w url]\n"
 #ifdef USE_PF
                         "\t\t[-q queue] [-T tag]\n"
 #endif
@@ -1426,8 +1423,6 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	v->https_port = -1;
 #endif
 	v->notify_interval = 900;	/* seconds between SSDP announces */
-	v->clean_ruleset_threshold = 20;
-	v->clean_ruleset_interval = 0;	/* interval between ruleset check. 0=disabled */
 #ifndef DISABLE_CONFIG_FILE
 	/* read options file first since
 	 * command line arguments have final say */
@@ -1598,10 +1593,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				modelnumber[MODELNUMBER_MAX_LEN-1] = '\0';
 				break;
 			case UPNPCLEANTHRESHOLD:
-				v->clean_ruleset_threshold = atoi(ary_options[i].value);
+				syslog(LOG_NOTICE, "Ignored option clean_ruleset_threshold, as non-standard/legacy functionality removed");
 				break;
 			case UPNPCLEANINTERVAL:
-				v->clean_ruleset_interval = atoi(ary_options[i].value);
+				syslog(LOG_NOTICE, "Ignored option clean_ruleset_interval, as non-standard/legacy functionality removed");
 				break;
 #ifdef USE_PF
 			case UPNPANCHOR:
@@ -1765,12 +1760,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			break;
 		case 'r':
 			if(i+1 < argc) {
-				v->clean_ruleset_interval = atoi(argv[++i]);
+				syslog(LOG_NOTICE, "Ignored option -r, as non-standard/legacy functionality removed");
+				i++;
 			} else {
 				INIT_PRINT_ERR("Option -%c takes one argument.\n", argv[i][1]);
 				goto print_usage;
 			}
 			break;
+
 		case 'u':
 			if(i+1 < argc) {
 				strncpy(uuidvalue_igd+5, argv[++i], strlen(uuidvalue_igd+5) + 1);
@@ -2309,9 +2306,6 @@ main(int argc, char * * argv)
 	struct ctlelem * ectlnext;
 #endif
 	struct runtime_vars v;
-	/* variables used for the unused-rule cleanup process */
-	struct rule_state * rule_list = 0;
-	struct timeval checktime = {0, 0};
 	struct lan_addr_s * lan_addr;
 #ifdef ENABLE_UPNPPINHOLE
 	unsigned int next_pinhole_ts;
@@ -2850,21 +2844,6 @@ main(int argc, char * * argv)
 					timeout.tv_usec = lasttimeofday.tv_usec - timeofday.tv_usec;
 				}
 			}
-		}
-		/* remove unused rules */
-		if( v.clean_ruleset_interval
-		  && (timeofday.tv_sec >= checktime.tv_sec + v.clean_ruleset_interval))
-		{
-			if(rule_list)
-			{
-				remove_unused_rules(rule_list);
-				rule_list = NULL;
-			}
-			else
-			{
-				rule_list = get_upnp_rules_state_list(v.clean_ruleset_threshold);
-			}
-			memcpy(&checktime, &timeofday, sizeof(struct timeval));
 		}
 		/* Remove expired port mappings, based on UPnP IGD LeaseDuration
 		 * or NAT-PMP lifetime) */
