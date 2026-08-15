@@ -1205,8 +1205,10 @@ static void update_disable_port_forwarding(void)
 				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
 				disable_port_forwarding = 1;
 			}
-		} else if (disable_port_forwarding && !reserved) {
-			syslog(LOG_INFO, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
+		} else if (disable_port_forwarding &&
+		           (!reserved || GETFLAG(ALLOWPRIVATEIPV4MASK))) {
+			syslog(LOG_INFO, "%s IP address %s on ext interface %s: Port forwarding is enabled",
+			       reserved ? "Reserved / private" : "Public", if_addr, ext_if_name);
 			disable_port_forwarding = 0;
 		}
 	}
