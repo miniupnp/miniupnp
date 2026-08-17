@@ -246,12 +246,12 @@ int find_pinhole(const char * ifname,
 		   (0 == memcmp(&daddr, &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)))) {
 #ifdef USE_LIBPFCTL
 			if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+				/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);*/
 				continue;
 			}
 #else /* USE_LIBPFCTL */
 			if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+				/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);*/
 				continue;
 			}
 #endif /* USE_LIBPFCTL */
@@ -360,7 +360,7 @@ int delete_pinhole(unsigned short uid)
 			pr.action = PF_CHANGE_REMOVE;
 			pr.nr = i;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				syslog(LOG_DEBUG, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				release_ticket(dev, tnum);
 				return -1;
 			}
@@ -565,7 +565,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			return -1;
 		}
 		if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+			/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);*/
 			continue;
 		}
 #else /* USE_LIBPFCTL */
@@ -576,7 +576,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			return -1;
 		}
 		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+			/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);*/
 			continue;
 		}
 #endif /* USE_LIBPFCTL */
@@ -602,7 +602,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			pr.action = PF_CHANGE_REMOVE;
 			pr.nr = i;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				syslog(LOG_DEBUG, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				release_ticket(dev, tnum);
 				return -1;
 			}

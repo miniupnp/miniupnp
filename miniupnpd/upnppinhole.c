@@ -110,7 +110,7 @@ lease_file6_add(const char * rem_client,
 
 	fd = fopen( lease_file6, "a");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file);
 		return -1;
 	}
 
@@ -189,13 +189,13 @@ lease_file6_update(int uid, unsigned int leaseduration)
 		proto = line;
 		p = strchr(line, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
@@ -203,13 +203,13 @@ lease_file6_update(int uid, unsigned int leaseduration)
 		int_client = p;
 		p = strchr(p2, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
@@ -217,20 +217,20 @@ lease_file6_update(int uid, unsigned int leaseduration)
 		rem_client = p;
 		p = strchr(p2, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
 		desc = strchr(p2, ';');
 		uid_rule = atoi(p);
 		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(desc++) = '\0';
@@ -385,49 +385,49 @@ int lease_file6_expire(void)
 		// Internal Host
 		p = strchr(line, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		// Internal Port
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
 		// External Host
 		p = strchr(p2, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		// External Port
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
 		// uid
 		p = strchr(p2, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		// Timestamp
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
 		// descr
 		desc = strchr(p2, ';');
 		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(desc++) = '\0';
@@ -476,7 +476,7 @@ int reload_from_lease_file6(void)
 	if(!lease_file6) return -1;
 	fd = fopen( lease_file6, "r");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file6);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file6);
 		return -1;
 	}
 	if(unlink(lease_file6) < 0) {
@@ -491,13 +491,13 @@ int reload_from_lease_file6(void)
 		proto = line;
 		p = strchr(line, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
@@ -505,13 +505,13 @@ int reload_from_lease_file6(void)
 		int_client = p;
 		p = strchr(p2, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
@@ -519,20 +519,20 @@ int reload_from_lease_file6(void)
 		rem_client = p;
 		p = strchr(p2, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p++) = '\0';
 		p2 = strchr(p, ';');
 		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(p2++) = '\0';
 		desc = strchr(p2, ';');
 		uid = atoi(p);
 		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file");
 			continue;
 		}
 		*(desc++) = '\0';
@@ -549,7 +549,7 @@ int reload_from_lease_file6(void)
 
 		if(timestamp > 0) {
 			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file");
+				syslog(LOG_INFO, "already expired lease in lease file");
 				continue;
 			} else {
 				leaseduration = timestamp - current_unix_time;
