@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/08/28:
+  re-enable port forwarding with reserved address when ext_allow_private_ipv4
+
 VERSION 2.3.11 : released on 2026/08/12
 
 2026/08/11:
