@@ -3,7 +3,7 @@
  * Project :  miniupnp
  * Website :  http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author :   Thomas Bernard
- * Copyright (c) 2005-2025 Thomas Bernard
+ * Copyright (c) 2005-2026 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file included in this distribution.
  * */
@@ -384,6 +384,17 @@ intervening space) by either an integer or the keyword "infinite". */
 	}
 }
 
+static void
+Send400(struct upnphttp * h)
+{
+	static const char err400str[] =
+		"<html><body>Bad request</body></html>";
+	h->respflags = FLAG_HTML;
+	BuildResp2_upnphttp(h, 400, "Bad Request",
+	                    err400str, sizeof(err400str) - 1);
+	SendRespAndClose_upnphttp(h);
+}
+
 /* very minimalistic 404 error message */
 static void
 Send404(struct upnphttp * h)
@@ -410,6 +421,17 @@ Send405(struct upnphttp * h)
 	h->respflags |= FLAG_HTML;
 	BuildResp2_upnphttp(h, 405, "Method Not Allowed",
 	                    body405, sizeof(body405) - 1);
+	SendRespAndClose_upnphttp(h);
+}
+
+static void
+Send500(struct upnphttp * h)
+{
+	static const char error500[] = "<HTML><HEAD><TITLE>Error 500</TITLE>"
+	   "</HEAD><BODY>Internal Server Error</BODY></HTML>\r\n";
+	h->respflags = FLAG_HTML;
+	BuildResp2_upnphttp(h, 500, "Internal Server Error",
+	                    error500, sizeof(error500)-1);
 	SendRespAndClose_upnphttp(h);
 }
 
@@ -478,17 +500,11 @@ sendXMLdesc(struct upnphttp * h, char * (f)(int *, int))
 #endif
 	if(!desc)
 	{
-		static const char error500[] = "<HTML><HEAD><TITLE>Error 500</TITLE>"
-		   "</HEAD><BODY>Internal Server Error</BODY></HTML>\r\n";
 		syslog(LOG_ERR, "Failed to generate XML description");
-		h->respflags = FLAG_HTML;
-		BuildResp2_upnphttp(h, 500, "Internal Server Error",
-		                    error500, sizeof(error500)-1);
+		Send500(h);
+		return;
 	}
-	else
-	{
-		BuildResp_upnphttp(h, desc, len);
-	}
+	BuildResp_upnphttp(h, desc, len);
 	SendRespAndClose_upnphttp(h);
 	free(desc);
 }
@@ -512,13 +528,8 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 		}
 		else
 		{
-			static const char err400str[] =
-				"<html><body>Bad request</body></html>";
 			syslog(LOG_INFO, "No SOAPAction in HTTP headers");
-			h->respflags = FLAG_HTML;
-			BuildResp2_upnphttp(h, 400, "Bad Request",
-			                    err400str, sizeof(err400str) - 1);
-			SendRespAndClose_upnphttp(h);
+			Send400(h);
 		}
 	}
 	else if(h->respflags & FLAG_CONTINUE)
