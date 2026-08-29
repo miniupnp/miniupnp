@@ -929,11 +929,30 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 }
 
 
+/*! make sure we have at least 2048 bytes available for receiving
+ */
+static void
+upnphttp_adjust_buffer(struct upnphttp * h)
+{
+	if(h->req_bufalloc < (h->req_buflen + 2048)) {
+		char * h_tmp;
+		h->req_bufalloc += 8192;
+		/* if 1st arg of realloc() is null,
+		 * realloc behaves the same as malloc() */
+		h_tmp = (char *)realloc(h->req_buf, h->req_bufalloc);
+		if (h_tmp == NULL) {
+			syslog(LOG_WARNING, "Unable to allocate new memory for h->req_buf (%d bytes)", h->req_bufalloc);
+			h->req_bufalloc -= 8192;
+			Send500(h);
+		} else {
+			h->req_buf = h_tmp;
+		}
+	}
+}
+
 void
 Process_upnphttp(struct upnphttp * h)
 {
-	char * h_tmp;
-	char buf[2048];
 	int n;
 
 	if(!h)
@@ -941,14 +960,15 @@ Process_upnphttp(struct upnphttp * h)
 	switch(h->state)
 	{
 	case EWaitingForHttpRequest:
+		upnphttp_adjust_buffer(h);
 #ifdef ENABLE_HTTPS
 		if(h->ssl) {
-			n = SSL_read(h->ssl, buf, sizeof(buf));
+			n = SSL_read(h->ssl, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen);
 		} else {
-			n = recv(h->socket, buf, sizeof(buf), 0);
+			n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen, 0);
 		}
 #else
-		n = recv(h->socket, buf, sizeof(buf), 0);
+		n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen, 0);
 #endif
 		if(n<0)
 		{
@@ -996,21 +1016,9 @@ Process_upnphttp(struct upnphttp * h)
 		else
 		{
 			const char * endheaders;
-			/* if 1st arg of realloc() is null,
-			 * realloc behaves the same as malloc() */
-			h_tmp = (char *)realloc(h->req_buf, n + h->req_buflen + 1);
-			if (h_tmp == NULL)
-			{
-				syslog(LOG_WARNING, "Unable to allocate new memory for h->req_buf)");
-				h->state = EToDelete;
-			}
-			else
-			{
-				h->req_buf = h_tmp;
-				memcpy(h->req_buf + h->req_buflen, buf, n);
-				h->req_buflen += n;
+			h->req_buflen += n;
+			if(h->req_buflen < h->req_bufalloc)
 				h->req_buf[h->req_buflen] = '\0';
-			}
 			/* search for the string "\r\n\r\n" */
 			endheaders = findendheaders(h->req_buf, h->req_buflen);
 			if(endheaders)
@@ -1023,14 +1031,15 @@ Process_upnphttp(struct upnphttp * h)
 		}
 		break;
 	case EWaitingForHttpContent:
+		upnphttp_adjust_buffer(h);
 #ifdef ENABLE_HTTPS
 		if(h->ssl) {
-			n = SSL_read(h->ssl, buf, sizeof(buf));
+			n = SSL_read(h->ssl, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen);
 		} else {
-			n = recv(h->socket, buf, sizeof(buf), 0);
+			n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen, 0);
 		}
 #else
-		n = recv(h->socket, buf, sizeof(buf), 0);
+		n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen, 0);
 #endif
 		if(n<0)
 		{
@@ -1077,21 +1086,10 @@ Process_upnphttp(struct upnphttp * h)
 		}
 		else
 		{
-			void * tmp = realloc(h->req_buf, n + h->req_buflen);
-			if(!tmp)
+			h->req_buflen += n;
+			if((h->req_buflen - h->req_contentoff) >= h->req_contentlen)
 			{
-				syslog(LOG_ERR, "memory allocation error %m");
-				h->state = EToDelete;
-			}
-			else
-			{
-				h->req_buf = tmp;
-				memcpy(h->req_buf + h->req_buflen, buf, n);
-				h->req_buflen += n;
-				if((h->req_buflen - h->req_contentoff) >= h->req_contentlen)
-				{
-					ProcessHTTPPOST_upnphttp(h);
-				}
+				ProcessHTTPPOST_upnphttp(h);
 			}
 		}
 		break;
