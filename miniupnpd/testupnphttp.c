@@ -76,9 +76,18 @@ upnpevents_renewSubscription(const char * sid, int sidlen, int timeout)
 #endif /* ENABLE_EVENTS */
 
 void
-ExecuteSoapAction(struct upnphttp *, const char * action, int n)
+ExecuteSoapAction(struct upnphttp * h, const char * action, int n)
 {
+	int r;
 	printf("action : %.*s\n", n, action);
+	r = BuildHeader_upnphttp(h, 200, "OK", n);
+	if(r >= 0) {
+		memcpy(h->res_buf + h->res_buflen, action, n);
+		h->res_buflen += n;
+	} else {
+		BuildResp2_upnphttp(h, 500, "Internal Server Error", NULL, 0);
+	}
+	SendRespAndClose_upnphttp(h);
 }
 
 int main(int argc, char * * argv)

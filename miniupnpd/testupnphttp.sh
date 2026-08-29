@@ -19,10 +19,22 @@ RET=0
 
 if curl --fail-with-body -v "http://127.0.0.1:${PORT}/rootDesc.xml" ; then
   echo
-  echo "ok"
+  echo "GET ok"
 else
   echo
-  echo "test FAILED"
+  echo "GET test FAILED"
+  RET=1
+fi
+
+if dd bs=1024 count=4096 if=/dev/random | curl -v --fail-with-body \
+ --data-binary @- \
+ -H 'SoapAction: "Action#Test"' \
+ "http://127.0.0.1:${PORT}/soap" ; then
+  echo
+  echo "POST ok"
+else
+  echo
+  echo "POST test FAILED"
   RET=1
 fi
 
