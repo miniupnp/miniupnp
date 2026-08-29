@@ -1,6 +1,6 @@
 # $Id: Makefile.linux,v 1.113 2025/03/30 22:36:04 nanard Exp $
 # MiniUPnP project
-# (c) 2006-2025 Thomas Bernard
+# (c) 2006-2026 Thomas Bernard
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author : Thomas Bernard
 # for use with GNU Make
@@ -33,7 +33,6 @@ CPPFLAGS += -D_FORTIFY_SOURCE=2
 endif
 CPPFLAGS += -D_GNU_SOURCE
 
-#CFLAGS = -O -g -DDEBUG
 CFLAGS ?= -Os
 CFLAGS += -fno-strict-aliasing
 CFLAGS += -fno-common

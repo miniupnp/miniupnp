@@ -1,6 +1,6 @@
 # $Id: Makefile.linux_nft,v 1.19 2025/03/30 22:36:05 nanard Exp $
 # MiniUPnP project
-# (c) 2018-2025 Thomas Bernard
+# (c) 2018-2026 Thomas Bernard
 # (c) 2015 Tomofumi Hayashi
 # http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
 # Author : Tomofumi Hayashi
@@ -30,7 +30,6 @@ CPPFLAGS += -D_FORTIFY_SOURCE=2
 endif
 CPPFLAGS += -D_GNU_SOURCE
 
-#CFLAGS = -O -g #-DDEBUG
 CFLAGS ?= -Os
 CFLAGS += -fno-strict-aliasing
 CFLAGS += -fno-common

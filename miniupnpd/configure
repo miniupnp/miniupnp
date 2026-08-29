@@ -4,7 +4,7 @@
 #
 # miniupnp daemon
 # http://miniupnp.free.fr or https://miniupnp.tuxfamily.org/
-# (c) 2006-2025 Thomas Bernard
+# (c) 2006-2026 Thomas Bernard
 # This software is subject to the conditions detailed in the
 # LICENCE file provided within the distribution
 
@@ -605,6 +605,12 @@ if [ "$OS_FAMILY" = "Linux" ] ; then
 	echo "SRCDIR = ${BASEDIR}" >> ${CONFIG_MK}
 	echo "CPPFLAGS += -I." >> ${CONFIG_MK}
 	echo "TESTS = ${TESTS}" >> ${CONFIG_MK}
+	if [ -n "$DEBUG" ] ; then
+		echo >> ${CONFIG_MK}
+		echo "ASANFLAGS = -fsanitize=address -fsanitize=undefined -fsanitize=leak" >> ${CONFIG_MK}
+		echo "CFLAGS = -g -ggdb -O0 \$(ASANFLAGS) -fno-omit-frame-pointer" >> ${CONFIG_MK}
+		echo "LDFLAGS += \$(ASANFLAGS)" >> ${CONFIG_MK}
+	fi
 fi
 
 # default value for UPnP description max length : 1024 bytes
