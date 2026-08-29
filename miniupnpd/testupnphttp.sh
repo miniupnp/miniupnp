@@ -17,7 +17,7 @@ done
 echo "port=$PORT pid=$SERVERPID"
 RET=0
 
-if curl --fail-with-body -v "http://127.0.0.1:${PORT}/rootDesc.xml" ; then
+if curl --fail-with-body -vs "http://127.0.0.1:${PORT}/rootDesc.xml" ; then
   echo
   echo "GET ok"
 else
@@ -26,7 +26,7 @@ else
   RET=1
 fi
 
-if dd bs=1024 count=4096 if=/dev/random | curl -v --fail-with-body \
+if dd bs=1024 count=4096 if=/dev/random | curl -vs --fail-with-body \
  --data-binary @- \
  -H 'SoapAction: "Action#Test"' \
  "http://127.0.0.1:${PORT}/soap" ; then
