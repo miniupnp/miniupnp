@@ -30,46 +30,44 @@ genRootDesc(int * len, int force_igd1)
 }
 
 char *
-genWANIPCn(int * len, int force_igd1)
+genWANIPCn(int *, int)
 {
 	return NULL;
 }
 
 char *
-genWANCfg(int * len, int force_igd1)
+genWANCfg(int *, int)
 {
 	return NULL;
 }
 
 char *
-genL3F(int * len, int force_igd1)
+genL3F(int *, int)
 {
 	return NULL;
 }
 
 char *
-gen6FC(int * len, int force_igd1)
+gen6FC(int *, int)
 {
 	return NULL;
 }
 
 #ifdef ENABLE_EVENTS
 const char *
-upnpevents_addSubscriber(const char * eventurl,
-                         const char * callback, int callbacklen,
-                         int timeout)
+upnpevents_addSubscriber(const char *, const char *, int, int)
 {
 	return NULL;
 }
 
 int
-upnpevents_removeSubscriber(const char * sid, int sidlen)
+upnpevents_removeSubscriber(const char *, int)
 {
 	return 0;
 }
 
 const char *
-upnpevents_renewSubscription(const char * sid, int sidlen, int timeout)
+upnpevents_renewSubscription(const char *, int, int)
 {
 	return NULL;
 }
