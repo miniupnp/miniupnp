@@ -4,6 +4,7 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
   added testupnphttp
   upnphttp: do not call realloc() once per recv()
   enforce Content-Length / header limit on HTTP receive
+  Support remote host in lease file
 
 2026/08/28:
   re-enable port forwarding with reserved address when ext_allow_private_ipv4

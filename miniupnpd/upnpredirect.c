@@ -53,7 +53,8 @@
 
 #ifdef ENABLE_LEASEFILE
 static int
-lease_file_add(unsigned short eport,
+lease_file_add(const char * rhost,
+               unsigned short eport,
                const char * iaddr,
                unsigned short iport,
                int proto,
@@ -79,9 +80,18 @@ lease_file_add(unsigned short eport,
 #endif
 	}
 
+#ifdef SUPPORT_REMOTEHOST
+	/* PROTO:eport:rhost:iaddr:iport:timestamp:desc */
+	fprintf(fd, "%s:%hu:%s:%s:%hu:%u:",
+	        proto_itoa(proto), eport, rhost ? rhost : "",
+	        iaddr, iport,
+	        timestamp);
+#else
+	/* PROTO:eport:iaddr:iport:timestamp:desc */
 	fprintf(fd, "%s:%hu:%s:%hu:%u:",
 	        proto_itoa(proto), eport, iaddr, iport,
 	        timestamp);
+#endif /* SUPPORT_REMOTEHOST */
 	while(*desc) {
 		/* skip non-printable characters, including CR and LF */
 		if (*desc >= ' ')
@@ -119,8 +129,11 @@ lease_file_remove(unsigned short eport, int proto)
 		return 0;
 	}
 
-	snprintf( str, sizeof(str), "%s:%u", proto_itoa(proto), eport);
-	str_size = strlen(str);
+	str_size = snprintf(str, sizeof(str), "%s:%u:", proto_itoa(proto), eport);
+	if (str_size >= sizeof(str)) {
+		str_size = sizeof(str) - 1;
+		syslog(LOG_WARNING, "%s:%u: truncated to %s", proto_itoa(proto), eport, str);
+	}
 
 	tmp = mkstemp(tmpfilename);
 	if (tmp==-1) {
@@ -162,7 +175,7 @@ int reload_from_lease_file(void)
 	char * proto;
 	char * iaddr;
 	char * desc;
-	char * rhost;
+	char * rhost = NULL;
 	unsigned int leaseduration;
 	unsigned int timestamp;
 	time_t current_time;
@@ -195,13 +208,21 @@ int reload_from_lease_file(void)
 			continue;
 		}
 		*(p++) = '\0';
+		eport = (unsigned short)atoi(p);
+#ifdef SUPPORT_REMOTEHOST
+		p = strchr(p, ':');
+		if(!p) {
+			syslog(LOG_ERR, "unrecognized data in lease file");
+			continue;
+		}
+		rhost = p;
+#endif /* SUPPORT_REMOTEHOST */
 		iaddr = strchr(p, ':');
 		if(!iaddr) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
 			continue;
 		}
 		*(iaddr++) = '\0';
-		eport = (unsigned short)atoi(p);
 		p = strchr(iaddr, ':');
 		if(!p) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
@@ -215,14 +236,13 @@ int reload_from_lease_file(void)
 			continue;
 		}
 		*(p++) = '\0';
+		timestamp = (unsigned int)strtoul(p, NULL, 10);
 		desc = strchr(p, ':');
 		if(!desc) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
 			continue;
 		}
 		*(desc++) = '\0';
-		/*timestamp = (unsigned int)atoi(p);*/
-		timestamp = (unsigned int)strtoul(p, NULL, 10);
 		/* trim description */
 		while(isspace(*desc))
 			desc++;
@@ -249,14 +269,13 @@ int reload_from_lease_file(void)
 		} else {
 			leaseduration = 0;	/* default value */
 		}
-		rhost = NULL;
 		r = upnp_redirect(rhost, eport, iaddr, iport, proto, desc, leaseduration);
 		if(r == -1) {
 			syslog(LOG_ERR, "Failed to redirect %hu -> %s:%hu protocol %s",
 			       eport, iaddr, iport, proto);
 		} else if(r == -2) {
 			/* Add the redirection again to the lease file */
-			lease_file_add(eport, iaddr, iport, proto_atoi(proto),
+			lease_file_add(rhost, eport, iaddr, iport, proto_atoi(proto),
 			               desc, timestamp);
 		}
 	}
@@ -284,7 +303,7 @@ void lease_file_rewrite(void)
 		                              rhost, sizeof(rhost), &timestamp,
 		                              0, 0) < 0)
 			break;
-		if(lease_file_add(eport, iaddr, iport, proto, desc, timestamp) < 0)
+		if(lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp) < 0)
 			break;
 	}
 }
@@ -381,7 +400,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
-				lease_file_add(eport, iaddr, iport, proto, desc, timestamp);
+				lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
 			}
 #endif /* ENABLE_LEASEFILE */
 			return r;
@@ -421,7 +440,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 	}
 
 #ifdef ENABLE_LEASEFILE
-	lease_file_add( eport, iaddr, iport, proto, desc, timestamp);
+	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
 #endif
 /*	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %s for: %s",
 		iaddr, iport, protocol, desc);*/
@@ -532,7 +551,7 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	delete_filter_rule(ext_if_name, eport, proto);
 #endif
 #ifdef ENABLE_LEASEFILE
-	lease_file_remove( eport, proto);
+	lease_file_remove(eport, proto);
 #endif
 
 #ifdef ENABLE_EVENTS
