@@ -1,6 +1,7 @@
-# (c) 2020 Thomas BERNARD
+# (c) 2020-2026 Thomas BERNARD
 
 check:	validateupnppermissions validategetifaddr validatessdppktgen \
+	validateupnphttp \
 	validateversion
 
 validateversion:	miniupnpd $(SRCDIR)/VERSION
