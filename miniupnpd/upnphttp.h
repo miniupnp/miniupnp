@@ -99,7 +99,7 @@ struct upnphttp {
 /* If set, the POST request included a "Expect: 100-continue" header */
 #define FLAG_CONTINUE	0x40
 
-/* If set, the Content-Type is set to text/xml, otherwise it is text/xml */
+/* If set, the Content-Type is set to text/html, otherwise it is text/xml */
 #define FLAG_HTML		0x80
 
 /* If set, the corresponding Allow: header is set */
