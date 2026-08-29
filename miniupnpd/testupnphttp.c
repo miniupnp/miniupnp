@@ -207,6 +207,15 @@ int main(int argc, char * * argv)
 					Process_upnphttp(e);
 				}
 			}
+			/* delete finished HTTP connections */
+			for(e = upnphttphead.lh_first; e != NULL; ) {
+				struct upnphttp * next = e->entries.le_next;
+				if(e->state >= EToDelete) {
+					LIST_REMOVE(e, entries);
+					Delete_upnphttp(e);
+				}
+				e = next;
+			}
 		}
 	}
 
