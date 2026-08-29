@@ -33,6 +33,14 @@
 #include "upnpglobalvars.h"
 #endif /* RANDOMIZE_URLS */
 
+#ifndef CONTENT_LENGTH_LIMIT
+#define CONTENT_LENGTH_LIMIT (1024*1024)
+#endif
+
+#ifndef HEADERS_LENGTH_LIMIT
+#define HEADERS_LENGTH_LIMIT (64*1024)
+#endif
+
 #ifdef ENABLE_HTTPS
 #include <openssl/err.h>
 #include <openssl/engine.h>
@@ -138,6 +146,7 @@ New_upnphttp(int s)
 	ret->socket = s;
 	if(!set_non_blocking(s))
 		syslog(LOG_WARNING, "New_upnphttp::set_non_blocking(): %m");
+	memcpy(ret->HttpVer, "HTTP/0.9", 9);	/* HTTP/0.9 by default */
 	return ret;
 }
 
@@ -234,13 +243,16 @@ ParseHttpHeaders(struct upnphttp * h)
 		{
 			if(strncasecmp(line, "Content-Length:", 15)==0)
 			{
+				unsigned long ul;
 				p = colon;
 				while((*p < '0' || *p > '9') && (*p != '\r') && (*p != '\n'))
 					p++;
-				h->req_contentlen = atoi(p);
-				if(h->req_contentlen < 0) {
-					syslog(LOG_WARNING, "ParseHttpHeaders() invalid Content-Length %d", h->req_contentlen);
-					h->req_contentlen = 0;
+				ul = strtoul(p, NULL, 10);
+				if(ul > INT_MAX) {
+					h->req_contentlen = INT_MAX;
+					syslog(LOG_WARNING, "ParseHttpHeaders() Content-Length overflow : %lu", ul);
+				} else {
+					h->req_contentlen = (int)ul;
 				}
 				/*printf("*** Content-Lenght = %d ***\n", h->req_contentlen);
 				printf("    readbufflen=%d contentoff = %d\n",
@@ -823,6 +835,12 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	syslog(LOG_INFO, "HTTP REQUEST from %s : %s %s (%s)",
 	       h->clientaddr_str, HttpCommand, HttpUrl, HttpVer);
 	ParseHttpHeaders(h);
+	if(h->req_contentlen > CONTENT_LENGTH_LIMIT) {
+		syslog(LOG_WARNING, "Content-Length over limit : %d", h->req_contentlen);
+		BuildResp2_upnphttp(h, 413, "Content Too Large", 0, 0);
+		SendRespAndClose_upnphttp(h);
+		return;
+	}
 	if(h->req_HostOff > 0 && h->req_HostLen > 0) {
 		syslog(LOG_DEBUG, "Host: %.*s", h->req_HostLen, h->req_buf + h->req_HostOff);
 		p = h->req_buf + h->req_HostOff;
@@ -1021,12 +1039,28 @@ Process_upnphttp(struct upnphttp * h)
 				h->req_buf[h->req_buflen] = '\0';
 			/* search for the string "\r\n\r\n" */
 			endheaders = findendheaders(h->req_buf, h->req_buflen);
-			if(endheaders)
-			{
+			if(endheaders) {
 				/* at this point, the request buffer (h->req_buf)
 				 * is guaranteed to contain the \r\n\r\n character sequence */
 				h->req_contentoff = endheaders - h->req_buf + 4;
 				ProcessHttpQuery_upnphttp(h);
+			} else if (h->req_buflen >= HEADERS_LENGTH_LIMIT) {
+				/* the headers are still not finished but the buffer is over limit */
+				char * p;
+				/* we need to know the HTTP version to answer */
+				h->req_buf[h->req_buflen-1] = '\0';
+				p = strstr(h->req_buf, "\r\n");
+				if(p) {
+					int i;
+					while(p > h->req_buf && p[-1] != ' ') {
+						p--;
+					}
+					for(i = 0; i < 15 && p[i] != '\r'; i++) {
+						h->HttpVer[i] = p[i];
+					}
+					h->HttpVer[i] = '\0';
+				}
+				Send400(h);
 			}
 		}
 		break;

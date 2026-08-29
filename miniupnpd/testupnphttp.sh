@@ -26,7 +26,7 @@ else
   RET=1
 fi
 
-if dd bs=1024 count=4096 if=/dev/random | curl -vs --fail-with-body \
+if dd bs=1024 count=1024 if=/dev/random | curl -vs --fail-with-body \
  --data-binary @- \
  -H 'SoapAction: "Action#Test"' \
  "http://127.0.0.1:${PORT}/soap" ; then
@@ -35,6 +35,22 @@ if dd bs=1024 count=4096 if=/dev/random | curl -vs --fail-with-body \
 else
   echo
   echo "POST test FAILED"
+  RET=1
+fi
+
+
+http_code=`curl -s -o /dev/null -w "%{http_code}" \
+ -d xxx \
+ -H "SoapAction: \"$(dd bs=1024 count=60 if=/dev/random | base64 | tr -d '\n')\"" \
+ "http://127.0.0.1:${PORT}/soap" `
+
+echo "http_code=$http_code"
+if [ "$http_code" = "400" ] ; then
+  echo
+  echo "POST headers over limit => rejected"
+else
+  echo
+  echo "POST headers over limit test FAILED"
   RET=1
 fi
 
