@@ -1050,11 +1050,12 @@ Process_upnphttp(struct upnphttp * h)
 				/* at this point, the request buffer (h->req_buf)
 				 * is guaranteed to contain the \r\n\r\n character sequence */
 				h->req_contentoff = endheaders - h->req_buf + 4;
-				ProcessHttpQuery_upnphttp(h);
-			} else if (h->req_buflen >= HEADERS_LENGTH_LIMIT) {
-				/* the headers are still not finished but the buffer is over limit */
+			}
+			if ((h->req_contentoff >= HEADERS_LENGTH_LIMIT)
+			    || (!endheaders && h->req_buflen >= HEADERS_LENGTH_LIMIT)) {
+				/* the headers are over limit */
 				char * p;
-				/* we need to know the HTTP version to answer */
+				/* we need to know the HTTP version to answer properly */
 				h->req_buf[h->req_buflen-1] = '\0';
 				p = strstr(h->req_buf, "\r\n");
 				if(p) {
@@ -1068,6 +1069,10 @@ Process_upnphttp(struct upnphttp * h)
 					h->HttpVer[i] = '\0';
 				}
 				Send400(h);
+				return;
+			}
+			if(endheaders) {
+				ProcessHttpQuery_upnphttp(h);
 			}
 		}
 		break;
