@@ -954,13 +954,20 @@ upnphttp_adjust_buffer(struct upnphttp * h)
 {
 	if(h->req_bufalloc < (h->req_buflen + 2048)) {
 		char * h_tmp;
-		h->req_bufalloc += 8192;
+		int old_bufalloc = h->req_bufalloc;
+		if(h->req_bufalloc == 0) {
+			h->req_bufalloc = 4096;
+		} else if (h->req_bufalloc < 256*1024) {
+			h->req_bufalloc += h->req_bufalloc;	/* double the buffer */
+		} else {
+			h->req_bufalloc += 256*1024;
+		}
 		/* if 1st arg of realloc() is null,
 		 * realloc behaves the same as malloc() */
 		h_tmp = (char *)realloc(h->req_buf, h->req_bufalloc);
 		if (h_tmp == NULL) {
 			syslog(LOG_WARNING, "Unable to allocate new memory for h->req_buf (%d bytes)", h->req_bufalloc);
-			h->req_bufalloc -= 8192;
+			h->req_bufalloc = old_bufalloc;
 			Send500(h);
 		} else {
 			h->req_buf = h_tmp;
