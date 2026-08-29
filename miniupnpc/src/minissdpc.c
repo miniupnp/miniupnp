@@ -3,7 +3,7 @@
  * Project : miniupnp
  * Web : http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author : Thomas BERNARD
- * copyright (c) 2005-2025 Thomas Bernard
+ * copyright (c) 2005-2026 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #include <stdio.h>
@@ -966,11 +966,11 @@ ssdpDiscoverDevices(const char * const deviceTypes[],
 #endif /* DEBUG */
 						for(tmp=devlist; tmp; tmp = tmp->pNext) {
 							if(strncmp(tmp->descURL, descURL, urlsize) == 0 &&
-							   tmp->descURL[urlsize] == '\0' &&
+							   (int)strlen(tmp->descURL) == urlsize &&
 							   strncmp(tmp->st, st, stsize) == 0 &&
-							   tmp->st[stsize] == '\0' &&
+							   (int)strlen(tmp->st) == stsize &&
 							   (usnsize == 0 || strncmp(tmp->usn, usn, usnsize) == 0) &&
-							   tmp->usn[usnsize] == '\0')
+							   (int)strlen(tmp->usn) == usnsize)
 								break;
 						}
 						/* at the exit of the loop above, tmp is null if
