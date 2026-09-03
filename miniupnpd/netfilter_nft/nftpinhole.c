@@ -1,7 +1,7 @@
 /* $Id: nftpinhole.c,v 1.10 2025/04/26 12:58:38 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2012-2025 Thomas Bernard
+ * (c) 2012-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -85,14 +85,18 @@ int add_pinhole(const char * ifname,
 	d_printf(("add_pinhole(%s, %s, %hu, %s, %hu, %d, %s, %u)\n",
 	          ifname, rem_host, rem_port, int_client, int_port, proto, desc, timestamp));
 
+	rhost_addr_p = NULL;
 	if (rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
-		inet_pton(AF_INET6, rem_host, &rhost_addr);
-		rhost_addr_p = &rhost_addr;
-	} else {
-		rhost_addr_p = NULL;
+		if (inet_pton(AF_INET6, rem_host, &rhost_addr) == 1) {
+			rhost_addr_p = &rhost_addr;
+		} else {
+			syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", rem_host);
+		}
 	}
 
-	inet_pton(AF_INET6, int_client, &ihost_addr);
+	if (inet_pton(AF_INET6, int_client, &ihost_addr) != 1) {
+		syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", int_client);
+	}
 
 	snprintf(comment, NFT_DESCR_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
