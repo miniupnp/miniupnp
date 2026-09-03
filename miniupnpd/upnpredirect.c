@@ -82,8 +82,16 @@ lease_file_add(const char * rhost,
 
 #ifdef SUPPORT_REMOTEHOST
 	/* PROTO:eport:rhost:iaddr:iport:timestamp:desc */
-	fprintf(fd, "%s:%hu:%s:%s:%hu:%u:",
-	        proto_itoa(proto), eport, rhost ? rhost : "",
+	fprintf(fd, "%s:%hu:",
+	        proto_itoa(proto), eport);
+	if(rhost != NULL) {
+		while(*rhost) {
+			if(*rhost >= ' ' && *rhost != ':')
+				fputc(*rhost, fd);
+			rhost++;
+		}
+	}
+	fprintf(fd, ":%s:%hu:%u:",
 	        iaddr, iport,
 	        timestamp);
 #else
