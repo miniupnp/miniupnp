@@ -1155,12 +1155,12 @@ int update_ext_ip_addr_from_stun(void)
 
 	use_ext_ip_addr = ext_addr_str;
 	if (!restrictive_nat || GETFLAG(ALLOWFILTEREDSTUNMASK)) {
-		syslog(LOG_NOTICE, "Port forwarding is now enabled");
+		syslog(LOG_NOTICE, "IPv4 mapping enabled");
 		disable_port_forwarding = 0;
 	} else {
 		syslog(LOG_INFO, "STUN: ... done");
 		syslog(LOG_WARNING, "Set ext_perform_stun=allow-filtered if you still want to use port forwarding in current situation");
-		syslog(LOG_WARNING, "Port forwarding is now disabled");
+		syslog(LOG_WARNING, "IPv4 mapping disabled");
 		disable_port_forwarding = 1;
 	}
 	return 0;
@@ -1187,6 +1187,7 @@ static void update_disable_port_forwarding(void)
 		default:
 			syslog(LOG_ERR, "Error getting IPv4 address for ext interface %s. Network is down", ext_if_name);
 		}
+		syslog(LOG_WARNING, "IPv4 mapping disabled");
 		disable_port_forwarding = 1;
 	} else {
 		int reserved = addr_is_reserved(&addr);
@@ -1200,6 +1201,7 @@ static void update_disable_port_forwarding(void)
 		}
 
 		if (!reserved || GETFLAG(ALLOWPRIVATEIPV4MASK)) {
+			syslog(LOG_NOTICE, "IPv4 mapping enabled");
 			disable_port_forwarding = 0;
 		} else {
 			syslog(LOG_WARNING, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
@@ -1208,6 +1210,7 @@ static void update_disable_port_forwarding(void)
 			syslog(LOG_WARNING, "You can set option ext_allow_private_ipv4=yes to enable port forwarding");
 			syslog(LOG_WARNING, "But you may still need to configure stun server or ext_ip to make it work correctly");
 			syslog(LOG_WARNING, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+			syslog(LOG_WARNING, "IPv4 mapping disabled");
 			disable_port_forwarding = 1;
 		}
 	}
@@ -2810,6 +2813,7 @@ if (GETFLAG(ENABLEUPNPMASK)) {
 				if (update_ext_ip_addr_from_stun() != 0) {
 					/* if stun succeed it updates disable_port_forwarding;
 					 * if stun failed (non-zero return value) then port forwarding would not work, so disable it */
+					syslog(LOG_WARNING, "IPv4 mapping disabled");
 					disable_port_forwarding = 1;
 				}
 			}
