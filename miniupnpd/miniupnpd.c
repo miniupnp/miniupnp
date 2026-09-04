@@ -1141,10 +1141,10 @@ int update_ext_ip_addr_from_stun(int init)
 
 	if ((init || disable_port_forwarding) && !restrictive_nat) {
 		if (addr_is_reserved(&if_addr))
-			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str, ext_addr_str);
+			syslog(LOG_NOTICE, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str, ext_addr_str);
 		else
-			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str);
-		syslog(LOG_INFO, "Port forwarding is now enabled");
+			syslog(LOG_NOTICE, "STUN: ext interface %s has now public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str);
+		syslog(LOG_NOTICE, "Port forwarding is now enabled");
 	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
 		if (addr_is_reserved(&if_addr)) {
 			syslog(LOG_WARNING, "STUN: ext interface %s with private IP address %s is now possibly behind restrictive or symmetric NAT with public IP address %s which does not support port forwarding", ext_if_name, if_addr_str, ext_addr_str);
@@ -1197,17 +1197,17 @@ static void update_disable_port_forwarding(void)
 				syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
 			} else {
 				syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
-				syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-				syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-				syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-				syslog(LOG_INFO, "You can set option ext_allow_private_ipv4=yes to enable port forwarding");
-				syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
-				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+				syslog(LOG_WARNING, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
+				syslog(LOG_WARNING, "Or use ext_ip= / -o option to declare public IP address");
+				syslog(LOG_WARNING, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
+				syslog(LOG_WARNING, "You can set option ext_allow_private_ipv4=yes to enable port forwarding");
+				syslog(LOG_WARNING, "But you may still need to configure stun server or ext_ip to make it work correctly");
+				syslog(LOG_WARNING, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
 				disable_port_forwarding = 1;
 			}
 		} else if (disable_port_forwarding &&
 		           (!reserved || GETFLAG(ALLOWPRIVATEIPV4MASK))) {
-			syslog(LOG_INFO, "%s IP address %s on ext interface %s: Port forwarding is enabled",
+			syslog(LOG_NOTICE, "%s IP address %s on ext interface %s: Port forwarding is enabled",
 			       reserved ? "Reserved / private" : "Public", if_addr, ext_if_name);
 			disable_port_forwarding = 0;
 		}
