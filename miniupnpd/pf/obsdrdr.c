@@ -602,7 +602,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 			pr.nr = i;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
 			{
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				syslog(LOG_DEBUG, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				r = -1;
 			}
 			else
@@ -1292,7 +1292,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 			pr.nr = i;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
 			{
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				syslog(LOG_DEBUG, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				r = -1;
 				break;
 			}
@@ -1377,7 +1377,7 @@ syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
 			pr.nr = i;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
 			{
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				syslog(LOG_DEBUG, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				r = -1;
 			}
 			else
