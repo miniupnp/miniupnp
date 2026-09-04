@@ -1061,10 +1061,10 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 			}
 			if(addr_is_reserved(&lan_addr->ext_ip_addr)) {
 				if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-					syslog(LOG_WARNING, "IGNORED : option ext_ip address contains reserved / private address : %s", lan_addr->ext_ip_str);
+					syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check security note if not set");
 				} else {
 					/* error */
-					INIT_PRINT_ERR("Error: option ext_ip address contains reserved / private address : %s\n", lan_addr->ext_ip_str);
+					INIT_PRINT_ERR("Option ext_ip set to private/CGNAT-reserved (%s) IPv4, exiting\n", lan_addr->ext_ip_str);
 					return -1;
 				}
 			}
@@ -1124,14 +1124,13 @@ int update_ext_ip_addr_from_stun(void)
 	int restrictive_nat, reserved;
 	char if_addr_str[INET_ADDRSTRLEN];
 
-	syslog(LOG_INFO, "STUN: Performing with host=%s and port=%u ...", ext_stun_host, (unsigned)ext_stun_port);
-
 	if (getifaddr(ext_if_name, if_addr_str, INET_ADDRSTRLEN, &if_addr, NULL) < 0) {
-		syslog(LOG_ERR, "STUN: Cannot get IP address for ext interface %s", ext_if_name);
+		syslog(LOG_WARNING, "Detected no IPv4 address on external network interface %s", ext_if_name);
 		return 1;
 	}
+	syslog(LOG_INFO, "STUN: Detecting public IPv4 and testing for unrestricted endpoint-independent (1:1) CGNAT via %s:%u...", ext_stun_host, ext_stun_port ? ext_stun_port : 3478);
 	if (perform_stun(ext_if_name, if_addr_str, ext_stun_host, ext_stun_port, &ext_addr, &restrictive_nat) != 0) {
-		syslog(LOG_ERR, "STUN: Performing STUN failed: %s", strerror(errno));
+		syslog(LOG_ERR, "STUN: Performing test failed");
 		return 1;
 	}
 	if (!inet_ntop(AF_INET, &ext_addr, ext_addr_str, sizeof(ext_addr_str))) {
@@ -1141,26 +1140,28 @@ int update_ext_ip_addr_from_stun(void)
 
 	reserved = addr_is_reserved(&if_addr);
 	if (!restrictive_nat && !reserved) {
-		syslog(LOG_NOTICE, "STUN: ext interface %s has now public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str);
+		syslog(LOG_INFO, "STUN: Detected unrestricted public external IPv4 %s on %s", if_addr_str, ext_if_name);
 	} else if (!restrictive_nat && reserved) {
-		syslog(LOG_NOTICE, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str, ext_addr_str);
+		syslog(LOG_INFO, "STUN: Detected unrestricted endpoint-independent (1:1) CGNAT with public IPv4 %s and %s as external on %s", ext_addr_str, if_addr_str, ext_if_name);
 	} else if (restrictive_nat && !reserved) {
-		syslog(LOG_WARNING, "STUN: ext interface %s has now public IP address %s but firewall filters incoming connections set by miniunnpd", ext_if_name, if_addr_str);
-		syslog(LOG_WARNING, "Check configuration of firewall on local machine and also on upstream router");
+		syslog(LOG_INFO, "STUN: Detected restricted public external IPv4 %s on %s, IPv4 mapping may not work", if_addr_str, ext_if_name);
 	} else if (restrictive_nat && reserved) {
-		syslog(LOG_WARNING, "STUN: ext interface %s with private IP address %s is now possibly behind restrictive or symmetric NAT with public IP address %s which does not support port forwarding", ext_if_name, if_addr_str, ext_addr_str);
-		syslog(LOG_WARNING, "NAT on upstream router blocks incoming connections set by miniupnpd");
-		syslog(LOG_WARNING, "Turn off NAT on upstream router or change it to full-cone NAT 1:1 type");
+		syslog(LOG_INFO, "STUN: Detected restricted or address- and port-dependent (symmetric) CGNAT with public IPv4 %s and %s as external on %s, IPv4 mapping may not work", ext_addr_str, if_addr_str, ext_if_name);
+	}
+	if (GETFLAG(ALLOWFILTEREDSTUNMASK)) {
+		syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_perform_stun=allow-filtered set; check security note if not set");
 	}
 
 	use_ext_ip_addr = ext_addr_str;
 	if (!restrictive_nat || GETFLAG(ALLOWFILTEREDSTUNMASK)) {
-		syslog(LOG_NOTICE, "IPv4 mapping enabled");
+		if (!restrictive_nat) {
+			syslog(LOG_NOTICE, "IPv4 mapping enabled, and reachability/non-filtering tested via STUN");
+		} else {
+			syslog(LOG_NOTICE, "IPv4 mapping enabled");
+		}
 		disable_port_forwarding = 0;
 	} else {
-		syslog(LOG_INFO, "STUN: ... done");
-		syslog(LOG_WARNING, "Set ext_perform_stun=allow-filtered if you still want to use port forwarding in current situation");
-		syslog(LOG_WARNING, "IPv4 mapping disabled");
+		syslog(LOG_WARNING, "IPv4 mapping disabled, as own/upstream router filters incoming, or there is an address- and port-dependent (symmetric) CGNAT; to workaround current daemon limitation, or enable it anyway, set ext_perform_stun=allow-filtered; check security note if not set");
 		disable_port_forwarding = 1;
 	}
 	return 0;
@@ -1182,34 +1183,37 @@ static void update_disable_port_forwarding(void)
 			syslog(LOG_WARNING, "ext interface %s is down", ext_if_name);
 			break;
 		case GETIFADDR_NO_ADDRESS:
-			syslog(LOG_WARNING, "ext interface %s has no IPv4 address. Network is down", ext_if_name);
+			syslog(LOG_WARNING, "Detected no IPv4 address on external network interface %s", ext_if_name);
 			break;
 		default:
-			syslog(LOG_ERR, "Error getting IPv4 address for ext interface %s. Network is down", ext_if_name);
+			syslog(LOG_WARNING, "Detected no IPv4 address on external network interface %s", ext_if_name);
 		}
 		syslog(LOG_WARNING, "IPv4 mapping disabled");
 		disable_port_forwarding = 1;
 	} else {
 		int reserved = addr_is_reserved(&addr);
 		if (!reserved) {
-			syslog(LOG_NOTICE, "Public IP address %s on ext interface %s: Port forwarding is enabled", if_addr, ext_if_name);
+			syslog(LOG_INFO, "Detected public external IPv4 %s on %s", if_addr, ext_if_name);
 		} else {
-			syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
+			syslog(LOG_INFO, "Detected private/CGNAT-reserved external IPv4 %s on %s, IPv4 mapping may not work", if_addr, ext_if_name);
 		}
 		if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-			syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
+			syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check compatibility/security notes if not set");
 		}
 
 		if (!reserved || GETFLAG(ALLOWPRIVATEIPV4MASK)) {
 			syslog(LOG_NOTICE, "IPv4 mapping enabled");
 			disable_port_forwarding = 0;
 		} else {
-			syslog(LOG_WARNING, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-			syslog(LOG_WARNING, "Or use ext_ip= / -o option to declare public IP address");
-			syslog(LOG_WARNING, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-			syslog(LOG_WARNING, "You can set option ext_allow_private_ipv4=yes to enable port forwarding");
-			syslog(LOG_WARNING, "But you may still need to configure stun server or ext_ip to make it work correctly");
-			syslog(LOG_WARNING, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
+			syslog(LOG_WARNING, "IPv4 mapping disabled by default, as private/CGNAT-reserved external IPv4 detected. Prevented for:");
+			syslog(LOG_WARNING, "- Info, as port maps not reachable via internet without an unrestricted endpoint-independent (1:1) IPv4 CGNAT; possibly from within");
+			syslog(LOG_WARNING, "- Compatibility, as many UPnP IGD & PCP/NAT-PMP clients require a returned public external IPv4");
+			syslog(LOG_WARNING, "- Security, to prevent access via internet if the external/internal network interface has been configured swapped");
+			syslog(LOG_WARNING, "To enable IPv4 mapping anyway, select one of the following options, listed by priority:");
+			syslog(LOG_WARNING, "A) Detect public external IPv4 and test for unrestricted endpoint-independent (1:1) CGNAT via STUN server, set ext_perform_stun=yes");
+			syslog(LOG_WARNING, "B) As A, but workaround filtered CGNAT result daemon limitation (without an extra firewall rule), set ext_perform_stun=allow-filtered; check security note");
+			syslog(LOG_WARNING, "C) Manually override reported external IPv4 with public, set ext_ip; check security note");
+			syslog(LOG_WARNING, "D) Report private/CGNAT-reserved external IPv4 to clients, set ext_allow_private_ipv4=yes; check compatibility/security notes");
 			syslog(LOG_WARNING, "IPv4 mapping disabled");
 			disable_port_forwarding = 1;
 		}
@@ -2097,9 +2101,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 		if (addr_is_reserved(&addr)) {
 			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-				syslog(LOG_WARNING, "IGNORED : option ext_ip contains reserved / private address %s, not public routable", use_ext_ip_addr);
+				syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check compatibility/security notes if not set");
 			} else {
-				INIT_PRINT_ERR("Error: option ext_ip contains reserved / private address %s, not public routable\n", use_ext_ip_addr);
+				INIT_PRINT_ERR("Option ext_ip set to private/CGNAT-reserved (%s) IPv4, exiting\n", use_ext_ip_addr);
 				return 1;
 			}
 		}
@@ -2460,7 +2464,7 @@ main(int argc, char * * argv)
 	if(GETFLAG(PERFORMSTUNMASK))
 	{
 		if (update_ext_ip_addr_from_stun() != 0) {
-			syslog(LOG_ERR, "Performing STUN failed. EXITING");
+			syslog(LOG_ERR, "STUN: Performing test failed, exiting");
 			return_code = 1;
 			goto shutdown;
 		}
@@ -2807,7 +2811,7 @@ if (GETFLAG(ENABLEUPNPMASK)) {
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
 		{
-			syslog(LOG_INFO, "should send external iface address change notification(s)");
+			syslog(LOG_NOTICE, "External network interface link/address change detected");
 			if(GETFLAG(PERFORMSTUNMASK))
 			{
 				if (update_ext_ip_addr_from_stun() != 0) {
