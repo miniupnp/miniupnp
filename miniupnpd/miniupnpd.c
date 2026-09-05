@@ -496,7 +496,7 @@ ProcessIncomingHTTP(int shttpl, const char * protocol)
 		if(get_lan_for_peer((struct sockaddr *)&clientname) == NULL)
 		{
 			/* The peer is not a LAN ! */
-			syslog(LOG_WARNING,
+			syslog(LOG_DEBUG,
 			       "%s peer %s is not from a LAN, closing the connection",
 			       protocol, addr_str);
 			close(shttp);
@@ -867,7 +867,7 @@ set_startup_time(void)
 			}
 			else
 			{
-				syslog(LOG_INFO, "system uptime is %lu seconds", uptime);
+				syslog(LOG_DEBUG, "system uptime is %lu seconds", uptime);
 			}
 			fclose(f);
 			startup_time -= uptime;
@@ -1061,10 +1061,10 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 			}
 			if(addr_is_reserved(&lan_addr->ext_ip_addr)) {
 				if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-					syslog(LOG_WARNING, "IGNORED : option ext_ip address contains reserved / private address : %s", lan_addr->ext_ip_str);
+					syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check security note if not set");
 				} else {
 					/* error */
-					INIT_PRINT_ERR("Error: option ext_ip address contains reserved / private address : %s\n", lan_addr->ext_ip_str);
+					INIT_PRINT_ERR("Option ext_ip set to private/CGNAT-reserved (%s) IPv4, exiting\n", lan_addr->ext_ip_str);
 					return -1;
 				}
 			}
@@ -1118,20 +1118,19 @@ parselan_error:
 
 static char ext_addr_str[INET_ADDRSTRLEN];
 
-int update_ext_ip_addr_from_stun(int init)
+int update_ext_ip_addr_from_stun(void)
 {
 	struct in_addr if_addr, ext_addr;
-	int restrictive_nat;
+	int restrictive_nat, reserved;
 	char if_addr_str[INET_ADDRSTRLEN];
 
-	syslog(LOG_INFO, "STUN: Performing with host=%s and port=%u ...", ext_stun_host, (unsigned)ext_stun_port);
-
 	if (getifaddr(ext_if_name, if_addr_str, INET_ADDRSTRLEN, &if_addr, NULL) < 0) {
-		syslog(LOG_ERR, "STUN: Cannot get IP address for ext interface %s", ext_if_name);
+		syslog(LOG_WARNING, "Detected no IPv4 address on external network interface %s", ext_if_name);
 		return 1;
 	}
+	syslog(LOG_INFO, "STUN: Detecting public IPv4 and testing for unrestricted endpoint-independent (1:1) CGNAT via %s:%u...", ext_stun_host, ext_stun_port ? ext_stun_port : 3478);
 	if (perform_stun(ext_if_name, if_addr_str, ext_stun_host, ext_stun_port, &ext_addr, &restrictive_nat) != 0) {
-		syslog(LOG_ERR, "STUN: Performing STUN failed: %s", strerror(errno));
+		syslog(LOG_ERR, "STUN: Performing test failed");
 		return 1;
 	}
 	if (!inet_ntop(AF_INET, &ext_addr, ext_addr_str, sizeof(ext_addr_str))) {
@@ -1139,32 +1138,32 @@ int update_ext_ip_addr_from_stun(int init)
 		return 1;
 	}
 
-	if ((init || disable_port_forwarding) && !restrictive_nat) {
-		if (addr_is_reserved(&if_addr))
-			syslog(LOG_INFO, "STUN: ext interface %s with IP address %s is now behind unrestricted full-cone NAT 1:1 with public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str, ext_addr_str);
-		else
-			syslog(LOG_INFO, "STUN: ext interface %s has now public IP address %s and firewall does not block incoming connections set by miniupnpd", ext_if_name, if_addr_str);
-		syslog(LOG_INFO, "Port forwarding is now enabled");
-	} else if ((init || !disable_port_forwarding) && restrictive_nat) {
-		if (addr_is_reserved(&if_addr)) {
-			syslog(LOG_WARNING, "STUN: ext interface %s with private IP address %s is now possibly behind restrictive or symmetric NAT with public IP address %s which does not support port forwarding", ext_if_name, if_addr_str, ext_addr_str);
-			syslog(LOG_WARNING, "NAT on upstream router blocks incoming connections set by miniupnpd");
-			syslog(LOG_WARNING, "Turn off NAT on upstream router or change it to full-cone NAT 1:1 type");
-		} else {
-			syslog(LOG_WARNING, "STUN: ext interface %s has now public IP address %s but firewall filters incoming connections set by miniunnpd", ext_if_name, if_addr_str);
-			syslog(LOG_WARNING, "Check configuration of firewall on local machine and also on upstream router");
-		}
-		if (!GETFLAG(ALLOWFILTEREDSTUNMASK)) {
-			syslog(LOG_WARNING, "Port forwarding is now disabled");
-			syslog(LOG_WARNING, "Set ext_perform_stun=allow-filtered if you still want to use port forwarding in current situation");
-		}
-	} else {
-		syslog(LOG_INFO, "STUN: ... done");
+	reserved = addr_is_reserved(&if_addr);
+	if (!restrictive_nat && !reserved) {
+		syslog(LOG_INFO, "STUN: Detected unrestricted public external IPv4 %s on %s", if_addr_str, ext_if_name);
+	} else if (!restrictive_nat && reserved) {
+		syslog(LOG_INFO, "STUN: Detected unrestricted endpoint-independent (1:1) CGNAT with public IPv4 %s and %s as external on %s", ext_addr_str, if_addr_str, ext_if_name);
+	} else if (restrictive_nat && !reserved) {
+		syslog(LOG_INFO, "STUN: Detected restricted public external IPv4 %s on %s, IPv4 mapping may not work", if_addr_str, ext_if_name);
+	} else if (restrictive_nat && reserved) {
+		syslog(LOG_INFO, "STUN: Detected restricted or address- and port-dependent (symmetric) CGNAT with public IPv4 %s and %s as external on %s, IPv4 mapping may not work", ext_addr_str, if_addr_str, ext_if_name);
+	}
+	if (GETFLAG(ALLOWFILTEREDSTUNMASK)) {
+		syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_perform_stun=allow-filtered set; check security note if not set");
 	}
 
 	use_ext_ip_addr = ext_addr_str;
-	if (!GETFLAG(ALLOWFILTEREDSTUNMASK))
-		disable_port_forwarding = restrictive_nat;
+	if (!restrictive_nat || GETFLAG(ALLOWFILTEREDSTUNMASK)) {
+		if (!restrictive_nat) {
+			syslog(LOG_NOTICE, "IPv4 mapping enabled, and reachability/non-filtering tested via STUN");
+		} else {
+			syslog(LOG_NOTICE, "IPv4 mapping enabled");
+		}
+		disable_port_forwarding = 0;
+	} else {
+		syslog(LOG_WARNING, "IPv4 mapping disabled, as own/upstream router filters incoming, or there is an address- and port-dependent (symmetric) CGNAT; to workaround current daemon limitation, or enable it anyway, set ext_perform_stun=allow-filtered; check security note if not set");
+		disable_port_forwarding = 1;
+	}
 	return 0;
 }
 
@@ -1184,32 +1183,39 @@ static void update_disable_port_forwarding(void)
 			syslog(LOG_WARNING, "ext interface %s is down", ext_if_name);
 			break;
 		case GETIFADDR_NO_ADDRESS:
-			syslog(LOG_WARNING, "ext interface %s has no IPv4 address. Network is down", ext_if_name);
+			syslog(LOG_WARNING, "Detected no IPv4 address on external network interface %s", ext_if_name);
 			break;
 		default:
-			syslog(LOG_ERR, "Error getting IPv4 address for ext interface %s. Network is down", ext_if_name);
+			syslog(LOG_WARNING, "Detected no IPv4 address on external network interface %s", ext_if_name);
 		}
+		syslog(LOG_WARNING, "IPv4 mapping disabled");
 		disable_port_forwarding = 1;
 	} else {
 		int reserved = addr_is_reserved(&addr);
-		if (!disable_port_forwarding && reserved) {
-			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-				syslog(LOG_WARNING, "IGNORED : Reserved / private IP address %s on ext interface %s", if_addr, ext_if_name);
-			} else {
-				syslog(LOG_WARNING, "Reserved / private IP address %s on ext interface %s: Port forwarding is impossible", if_addr, ext_if_name);
-				syslog(LOG_INFO, "You are probably behind NAT, enable option ext_perform_stun=yes to detect public IP address");
-				syslog(LOG_INFO, "Or use ext_ip= / -o option to declare public IP address");
-				syslog(LOG_INFO, "In case that miniupnpd is thinking that it's behind symmetric NAT while it actually is full-cone");
-				syslog(LOG_INFO, "You can set option ext_allow_private_ipv4=yes to enable port forwarding");
-				syslog(LOG_INFO, "But you may still need to configure stun server or ext_ip to make it work correctly");
-				syslog(LOG_INFO, "Public IP address is required by UPnP/PCP/PMP protocols and clients do not work without it");
-				disable_port_forwarding = 1;
-			}
-		} else if (disable_port_forwarding &&
-		           (!reserved || GETFLAG(ALLOWPRIVATEIPV4MASK))) {
-			syslog(LOG_INFO, "%s IP address %s on ext interface %s: Port forwarding is enabled",
-			       reserved ? "Reserved / private" : "Public", if_addr, ext_if_name);
+		if (!reserved) {
+			syslog(LOG_INFO, "Detected public external IPv4 %s on %s", if_addr, ext_if_name);
+		} else {
+			syslog(LOG_INFO, "Detected private/CGNAT-reserved external IPv4 %s on %s, IPv4 mapping may not work", if_addr, ext_if_name);
+		}
+		if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
+			syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check compatibility/security notes if not set");
+		}
+
+		if (!reserved || GETFLAG(ALLOWPRIVATEIPV4MASK)) {
+			syslog(LOG_NOTICE, "IPv4 mapping enabled");
 			disable_port_forwarding = 0;
+		} else {
+			syslog(LOG_WARNING, "IPv4 mapping disabled by default, as private/CGNAT-reserved external IPv4 detected. Prevented for:");
+			syslog(LOG_WARNING, "- Info, as port maps not reachable via internet without an unrestricted endpoint-independent (1:1) IPv4 CGNAT; possibly from within");
+			syslog(LOG_WARNING, "- Compatibility, as many UPnP IGD & PCP/NAT-PMP clients require a returned public external IPv4");
+			syslog(LOG_WARNING, "- Security, to prevent access via internet if the external/internal network interface has been configured swapped");
+			syslog(LOG_WARNING, "To enable IPv4 mapping anyway, select one of the following options, listed by priority:");
+			syslog(LOG_WARNING, "A) Detect public external IPv4 and test for unrestricted endpoint-independent (1:1) CGNAT via STUN server, set ext_perform_stun=yes");
+			syslog(LOG_WARNING, "B) As A, but workaround filtered CGNAT result daemon limitation (without an extra firewall rule), set ext_perform_stun=allow-filtered; check security note");
+			syslog(LOG_WARNING, "C) Manually override reported external IPv4 with public, set ext_ip; check security note");
+			syslog(LOG_WARNING, "D) Report private/CGNAT-reserved external IPv4 to clients, set ext_allow_private_ipv4=yes; check compatibility/security notes");
+			syslog(LOG_WARNING, "IPv4 mapping disabled");
+			disable_port_forwarding = 1;
 		}
 	}
 }
@@ -2095,9 +2101,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 		if (addr_is_reserved(&addr)) {
 			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-				syslog(LOG_WARNING, "IGNORED : option ext_ip contains reserved / private address %s, not public routable", use_ext_ip_addr);
+				syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check compatibility/security notes if not set");
 			} else {
-				INIT_PRINT_ERR("Error: option ext_ip contains reserved / private address %s, not public routable\n", use_ext_ip_addr);
+				INIT_PRINT_ERR("Option ext_ip set to private/CGNAT-reserved (%s) IPv4, exiting\n", use_ext_ip_addr);
 				return 1;
 			}
 		}
@@ -2230,6 +2236,22 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		pidfilename = NULL;
 #endif
 
+	syslog(LOG_NOTICE, "MiniUPnP daemon " MINIUPNPD_VERSION " starting, enabled protocols %s%s%s, ext_ifname=%s BOOTID=%u",
+		GETFLAG(ENABLEUPNPMASK) ? "UPnP IGD" : "",
+#ifdef ENABLE_NATPMP
+		GETFLAG(ENABLEUPNPMASK) && GETFLAG(ENABLENATPMPMASK) ? " & " : "",
+#ifdef ENABLE_PCP
+		GETFLAG(ENABLENATPMPMASK) ? "PCP/NAT-PMP" : "",
+#else
+		GETFLAG(ENABLENATPMPMASK) ? "NAT-PMP" : "",
+#endif
+#else
+		"", "",
+#endif
+		ext_if_name, upnp_bootid);
+	syslog(LOG_INFO, "More information at https://miniupnp.tuxfamily.org/ or http://miniupnp.free.fr/");
+	syslog(LOG_NOTICE, "Extra logging with log level info (-v) or debug (-v -v)");
+
 #ifdef USE_SYSTEMD
 	if (systemd_flag) {
 		int r = sd_notify(0,
@@ -2242,7 +2264,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 
 #ifdef ENABLE_LEASEFILE
 	/*remove(lease_file);*/
-	syslog(LOG_INFO, "Reloading rules from lease file");
+	syslog(LOG_INFO, "Reloading port maps from lease file");
 	reload_from_lease_file();
 #ifdef ENABLE_UPNPPINHOLE
 	reload_from_lease_file6();
@@ -2433,28 +2455,16 @@ main(int argc, char * * argv)
 		goto shutdown;
 	}
 
-	syslog(LOG_INFO, "version " MINIUPNPD_VERSION " starting%s%sext if %s BOOTID=%u",
-#ifdef ENABLE_NATPMP
-#ifdef ENABLE_PCP
-	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP/PCP " : " ",
-#else
-	       GETFLAG(ENABLENATPMPMASK) ? " NAT-PMP " : " ",
-#endif
-#else
-	       " ",
-#endif
-	       GETFLAG(ENABLEUPNPMASK) ? "UPnP-IGD " : "",
-	       ext_if_name, upnp_bootid);
 #ifdef ENABLE_IPV6
 	if (strcmp(ext_if_name6, ext_if_name) != 0) {
-		syslog(LOG_INFO, "specific IPv6 ext if %s", ext_if_name6);
+		syslog(LOG_INFO, "Separate ext_ifname6=%s set", ext_if_name6);
 	}
 #endif
 
 	if(GETFLAG(PERFORMSTUNMASK))
 	{
-		if (update_ext_ip_addr_from_stun(1) != 0) {
-			syslog(LOG_ERR, "Performing STUN failed. EXITING");
+		if (update_ext_ip_addr_from_stun() != 0) {
+			syslog(LOG_ERR, "STUN: Performing test failed, exiting");
 			return_code = 1;
 			goto shutdown;
 		}
@@ -2496,7 +2506,7 @@ main(int argc, char * * argv)
 #ifdef ENABLE_NFQUEUE
 		nfqueue_data.http_port = listen_port;
 #endif /* ENABLE_NFQUEUE */
-		syslog(LOG_NOTICE, "HTTP listening on port %d", v.port);
+		syslog(LOG_NOTICE, "Listening for UPnP IGD (SOAP/HTTP) traffic on port %d/TCP, SSDP 1900/UDP", v.port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		if(!GETFLAG(IPV6DISABLEDMASK))
 		{
@@ -2527,7 +2537,7 @@ main(int argc, char * * argv)
 #ifdef ENABLE_NFQUEUE
 		nfqueue_data.https_port = listen_port;
 #endif /* ENABLE_NFQUEUE */
-		syslog(LOG_NOTICE, "HTTPS listening on port %d", v.https_port);
+		syslog(LOG_NOTICE, "Listening for UPnP IGD (SOAP/HTTPS) traffic on port %d/TCP", v.https_port);
 #if defined(V6SOCKETS_ARE_V6ONLY) && defined(ENABLE_IPV6)
 		shttpsl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
 		if(shttpsl_v4 < 0)
@@ -2542,11 +2552,11 @@ main(int argc, char * * argv)
 		if(!GETFLAG(IPV6DISABLEDMASK)) {
 			if(find_ipv6_addr(lan_addrs.lh_first ? lan_addrs.lh_first->ifname : NULL,
 			                  ipv6_addr_for_http_with_brackets, sizeof(ipv6_addr_for_http_with_brackets)) > 0) {
-				syslog(LOG_NOTICE, "HTTP IPv6 address given to control points : %s",
+				syslog(LOG_INFO, "IPv6 address given to UPnP IGD clients: %s",
 				       ipv6_addr_for_http_with_brackets);
 			} else {
 				memcpy(ipv6_addr_for_http_with_brackets, "[::1]", 6);
-				syslog(LOG_WARNING, "no HTTP IPv6 address, disabling IPv6");
+				syslog(LOG_DEBUG, "no HTTP IPv6 address, disabling IPv6");
 				SETFLAG(IPV6DISABLEDMASK);
 			}
 		}
@@ -2603,7 +2613,7 @@ main(int argc, char * * argv)
 			if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
 #endif
 			{
-				syslog(LOG_WARNING, "Failed to broadcast good-bye notifications");
+				syslog(LOG_DEBUG, "Failed to broadcast good-bye notifications");
 			}
 		}
 #endif /* UPNP_STRICT */
@@ -2628,16 +2638,16 @@ main(int argc, char * * argv)
 		if(OpenAndConfNATPMPSockets(snatpmp) < 0)
 #ifdef ENABLE_PCP
 		{
-			syslog(LOG_ERR, "Failed to open sockets for NAT-PMP/PCP.");
+			syslog(LOG_ERR, "Failed to open port 5351/UDP for PCP/NAT-PMP");
 		} else {
-			syslog(LOG_NOTICE, "Listening for NAT-PMP/PCP traffic on port %u",
+			syslog(LOG_NOTICE, "Listening for PCP/NAT-PMP traffic on port %u/UDP",
 			       NATPMP_PORT);
 		}
 #else
 		{
-			syslog(LOG_ERR, "Failed to open sockets for NAT PMP.");
+			syslog(LOG_ERR, "Failed to open port 5351/UDP for NAT-PMP");
 		} else {
-			syslog(LOG_NOTICE, "Listening for NAT-PMP traffic on port %u",
+			syslog(LOG_NOTICE, "Listening for NAT-PMP traffic on port %u/UDP",
 			       NATPMP_PORT);
 		}
 #endif
@@ -2748,6 +2758,30 @@ main(int argc, char * * argv)
 	}
 #endif /* HAS_LIBCAP_NG */
 
+if (GETFLAG(ENABLEUPNPMASK) && !GETFLAG(SECUREMODEMASK))
+	syslog(LOG_WARNING, "WARNING: Allow adding port maps for non-requesting IP addresses via UPnP IGD, as secure_mode=no set");
+#ifdef ENABLE_PCP
+if (GETFLAG(ENABLENATPMPMASK) && GETFLAG(PCP_ALLOWTHIRDPARTYMASK))
+	syslog(LOG_WARNING, "WARNING: Allow adding port maps for non-requesting IP addresses via PCP, as pcp_allow_thirdparty=yes set");
+#endif
+#ifdef ENABLE_IPV6
+if (GETFLAG(IPV6DISABLEDMASK))
+	syslog(LOG_NOTICE, "IPv6 mapping disabled");
+#else
+syslog(LOG_NOTICE, "IPv6 mapping disabled");
+#endif
+if (GETFLAG(ENABLEUPNPMASK)) {
+#ifdef IGD_V2
+	if (GETFLAG(FORCEIGDDESCV1MASK)) {
+		syslog(LOG_NOTICE, "UPnP IGD compatibility mode set to IGDv1 (IPv4 only)");
+	} else {
+		syslog(LOG_NOTICE, "UPnP IGD compatibility mode set to IGDv2 (with workarounds)");
+	}
+#else
+	syslog(LOG_NOTICE, "UPnP IGD compatibility mode set to IGDv1 (IPv4 only)");
+#endif
+}
+
 #ifdef USE_SYSTEMD
 	if (v.systemd_notify) {
 		upnp_update_status();
@@ -2777,12 +2811,13 @@ main(int argc, char * * argv)
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
 		{
-			syslog(LOG_INFO, "should send external iface address change notification(s)");
+			syslog(LOG_NOTICE, "External network interface link/address change detected");
 			if(GETFLAG(PERFORMSTUNMASK))
 			{
-				if (update_ext_ip_addr_from_stun(0) != 0) {
+				if (update_ext_ip_addr_from_stun() != 0) {
 					/* if stun succeed it updates disable_port_forwarding;
 					 * if stun failed (non-zero return value) then port forwarding would not work, so disable it */
+					syslog(LOG_WARNING, "IPv4 mapping disabled");
 					disable_port_forwarding = 1;
 				}
 			}
@@ -3058,7 +3093,7 @@ main(int argc, char * * argv)
 		}
 		i = try_sendto(&writeset);
 		if(i < 0) {
-			syslog(LOG_ERR, "try_sendto failed to send %d packets", -i);
+			/*syslog(LOG_DEBUG, "try_sendto failed to send %d packets", -i);*/
 		}
 #ifdef USE_MINIUPNPDCTL
 		for(ectl = ctllisthead.lh_first; ectl;)
@@ -3158,7 +3193,7 @@ main(int argc, char * * argv)
 					if(lan_addr == NULL) {
 						char sender_str[64];
 						sockaddr_to_string((struct sockaddr *)&senderaddr, sender_str, sizeof(sender_str));
-						syslog(LOG_WARNING, "NAT-PMP packet sender %s not from a LAN, ignoring",
+						syslog(LOG_DEBUG, "NAT-PMP packet sender %s not from a LAN, ignoring",
 						       sender_str);
 						continue;
 					}
@@ -3181,7 +3216,7 @@ main(int argc, char * * argv)
 				if(lan_addr == NULL) {
 					char sender_str[64];
 					sockaddr_to_string((struct sockaddr *)&senderaddr, sender_str, sizeof(sender_str));
-					syslog(LOG_WARNING, "NAT-PMP packet sender %s not from a LAN, ignoring",
+					syslog(LOG_DEBUG, "NAT-PMP packet sender %s not from a LAN, ignoring",
 					       sender_str);
 					continue;
 				}
@@ -3215,7 +3250,7 @@ main(int argc, char * * argv)
 		/* process SSDP packets */
 		if(sudp >= 0 && FD_ISSET(sudp, &readset))
 		{
-			/*syslog(LOG_INFO, "Received UDP Packet");*/
+			/*syslog(LOG_DEBUG, "Received UDP Packet");*/
 #ifdef ENABLE_HTTPS
 			ProcessSSDPRequest(sudp, (unsigned short)v.port, (unsigned short)v.https_port);
 #else
@@ -3225,7 +3260,7 @@ main(int argc, char * * argv)
 #ifdef ENABLE_IPV6
 		if(sudpv6 >= 0 && FD_ISSET(sudpv6, &readset))
 		{
-			syslog(LOG_INFO, "Received UDP Packet (IPv6)");
+			/*syslog(LOG_DEBUG, "Received UDP Packet (IPv6)");*/
 #ifdef ENABLE_HTTPS
 			ProcessSSDPRequest(sudpv6, (unsigned short)v.port, (unsigned short)v.https_port);
 #else
@@ -3327,7 +3362,7 @@ main(int argc, char * * argv)
 
 shutdown:
 
-	syslog(LOG_NOTICE, "shutting down MiniUPnPd");
+	syslog(LOG_NOTICE, "Shutting down MiniUPnPd");
 #ifdef USE_SYSTEMD
 	if (v.systemd_notify) {
 		sd_notify(0,
@@ -3346,7 +3381,7 @@ shutdown:
 		if(SendSSDPGoodbye(snotify, addr_count * 2) < 0)
 #endif
 		{
-			syslog(LOG_ERR, "Failed to broadcast good-bye notifications");
+			syslog(LOG_DEBUG, "Failed to broadcast good-bye notifications");
 		}
 	}
 	/* try to send pending packets */

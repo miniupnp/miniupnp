@@ -1,5 +1,12 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/09/04:
+  Improve start banner and add security warnings
+  Less excessive logging by default
+  Fix IPv4 mapping re-enable after external interface down/up with a
+    CGNAT option set
+  Clearer IPv4 mapping disabled/enabled logging, and by default #764
+
 2026/09/03:
   filter out non printable characters in description and remote host
     for ipv6 lease file
@@ -11,7 +18,6 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
   Support remote host in lease file
 
 2026/08/28:
-  re-enable port forwarding with reserved address when ext_allow_private_ipv4
   pf: set pool address family
 
 VERSION 2.3.11 : released on 2026/08/12
@@ -36,9 +42,6 @@ VERSION 2.3.11 : released on 2026/08/12
   print usage on stdout or stderr depending on command line
   increase maximum description length when possible (netfilter/nftables)
   fix nfqueue code
-
-2026/04/13:
-  Re-enable port forwarding properly (broken in 2.3.10)
 
 2026/04/07:
   Fix PCP option size parsing thanks to Sebastián Alba.
@@ -570,7 +573,7 @@ VERSION 1.9 : released on 2014/10/27
 2014/06/xx:
   Various fixes :
     e->ipv6.flags |= IP6T_F_PROTO; (netfilter)
-    fix natpmp.c byte order conversion 
+    fix natpmp.c byte order conversion
     add small delay before SSDP response to prevent flooding
 
 2014/05/22:
@@ -1652,4 +1655,3 @@ VERSION 1.0 :
 2006/07/20:
   Command line arguments processing
   Added possibility to listen internally on several interfaces
-
