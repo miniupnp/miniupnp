@@ -54,7 +54,7 @@ test_parsing(const char * buf, int len, FILE * f)
 
 int main(int argc, char * * argv)
 {
-	FILE * f;
+	FILE * f = NULL;
 	char * buffer;
 	long l;
 	int i;
