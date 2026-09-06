@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <syslog.h>
+#include <sys/select.h>
 #include "upnphttp.h"
 #include "upnputils.h"
 #include "miniupnpdtypes.h"
