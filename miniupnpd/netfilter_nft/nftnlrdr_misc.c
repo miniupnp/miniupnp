@@ -983,7 +983,7 @@ rule_set_snat(uint8_t family, uint8_t proto,
 struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
-	      in_addr_t ihost, uint32_t iport,
+	      in_addr_t ihost, unsigned short iport,
 	      const char *descr,
 	      const char *handle)
 {

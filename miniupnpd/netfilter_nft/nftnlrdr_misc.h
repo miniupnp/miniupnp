@@ -115,7 +115,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type)
 struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
-	      in_addr_t ihost, uint32_t iport,
+	      in_addr_t ihost, unsigned short iport,
 	      const char *descr,
 	      const char *handle);
 struct nftnl_rule *
