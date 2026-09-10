@@ -11,7 +11,7 @@
 #include <sys/utsname.h>
 #include <syslog.h>
 #include <string.h>
-#ifdef OS_VERSION_FILE
+#if defined(OS_VERSION_FILE) || defined(USE_ETC_OS_RELEASE)
 #include <stdio.h>
 #include <ctype.h>
 #endif
@@ -38,6 +38,47 @@ char * get_os_version(void)
 			    p++;
 			return strdup(p);
 		}
+	}
+#endif
+#ifdef USE_ETC_OS_RELEASE
+	FILE * f;
+	f = fopen("/etc/os-release", "r");
+	if (f != NULL) {
+		char line[256];
+		while (fgets(line, sizeof(line), f) != NULL) {
+			char * p, * key, * value;
+			key = line;
+			while(isspace(*key))
+				key++;
+			if (!*key || *key == '#')
+				continue;
+			p = key;
+			while(*p && !(isspace(*p) || *p == '='))
+				p++;
+			if(!*p)
+				continue;
+			while(isspace(*p))
+				*p++ = '\0';
+			if (*p != '=')
+				continue;
+			*p = '\0';
+			value = p + 1;
+			while (isspace(*value))
+				value++;
+			if (*value == '"')
+				value++;
+			p = value + strlen(value);
+			while(p > value && isspace(p[-1]))
+				*(--p) = '\0';
+			if (p > value && p[-1] == '"')
+				*(--p) = '\0';
+			syslog(LOG_DEBUG, "%s %s", key, value);
+			if (strcmp(key, "VERSION_ID") == 0) {
+				fclose(f);
+				return strdup(value);
+			}
+		}
+		fclose(f);
 	}
 #endif
 

@@ -862,6 +862,8 @@ if [ $DYNAMIC_OS_VERSION -ne 0 ] ; then
   echo "#define DYNAMIC_OS_VERSION 1" >> ${CONFIGFILE}
   if [ "$OS_VERSION_FILE" ] ; then
     echo "#define OS_VERSION_FILE \"${OS_VERSION_FILE}\"" >> ${CONFIGFILE}
+  elif [ "$OS_FAMILY" = "Linux" ] ; then
+    echo "#define USE_ETC_OS_RELEASE" >> ${CONFIGFILE}
   fi
 fi
 echo "#define OS_NAME		\"$OS_NAME\"" >> ${CONFIGFILE}
