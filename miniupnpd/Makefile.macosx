@@ -29,7 +29,7 @@ STD_OBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
           options.o upnppermissions.o minissdp.o natpmp.o \
           upnpevents.o getconnstatus.o upnputils.o \
-          upnpstun.o \
+          upnpstun.o getosversion.o \
           upnppinhole.o asyncsendto.o portinuse.o pcpserver.o
 MAC_OBJS = getifstats.o ifacewatcher.o getroute.o
 IPFW_OBJS = ipfwrdr.o ipfwaux.o

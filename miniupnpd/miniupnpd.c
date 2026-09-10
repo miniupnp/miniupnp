@@ -63,10 +63,6 @@
 #include <openssl/crypto.h>
 #endif
 
-#ifdef DYNAMIC_OS_VERSION
-#include <sys/utsname.h>
-#endif
-
 #ifdef TOMATO
 #include <sys/stat.h>
 #endif /* TOMATO */
@@ -86,6 +82,9 @@
 #include "daemonize.h"
 #include "upnpevents.h"
 #include "asyncsendto.h"
+#ifdef DYNAMIC_OS_VERSION
+#include "getosversion.h"
+#endif
 #ifdef ENABLE_NATPMP
 #include "natpmp.h"
 #ifdef ENABLE_PCP
@@ -2465,15 +2464,7 @@ main(int argc, char * * argv)
 	}
 
 #ifdef DYNAMIC_OS_VERSION
-	{
-		struct utsname utsname;
-		if (uname(&utsname) < 0) {
-			syslog(LOG_ERR, "uname(): %m");
-			os_version = strdup("unknown");
-		} else {
-			os_version = strdup(utsname.release);
-		}
-	}
+	os_version = get_os_version();
 #endif /* DYNAMIC_OS_VERSION */
 
 	if(GETFLAG(ENABLEUPNPMASK))
