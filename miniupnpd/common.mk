@@ -22,7 +22,8 @@ testminissdp:	testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
 
 testifacewatcher:	testifacewatcher.o ifacewatcher.o
 
-testupnphttp:	testupnphttp.o upnphttp.o upnputils.o getroute.o
+testupnphttp:	testupnphttp.o upnphttp.o upnputils.o getroute.o \
+	getosversion.o
 
 miniupnpdctl:	miniupnpdctl.o
 

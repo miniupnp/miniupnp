@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/09/10:
+  use /etc/debian-version or equivalent
+
 2026/09/03:
   filter out non printable characters in description and remote host
     for ipv6 lease file

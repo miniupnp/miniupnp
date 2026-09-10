@@ -11,9 +11,13 @@
 #include <time.h>
 #include <syslog.h>
 #include <sys/select.h>
+#include "config.h"
 #include "upnphttp.h"
 #include "upnputils.h"
 #include "miniupnpdtypes.h"
+#ifdef DYNAMIC_OS_VERSION
+#include "getosversion.h"
+#endif
 
 char * os_version = NULL;
 int runtime_flags = 0;
@@ -115,6 +119,10 @@ int main(int argc, char * * argv)
 
 	LIST_INIT(&upnphttphead);
 	openlog("testupnphttp", LOG_CONS|LOG_PERROR, LOG_USER);
+
+#ifdef DYNAMIC_OS_VERSION
+	os_version = get_os_version();
+#endif
 
 	startup_time = time(NULL);
 	/* TODO :

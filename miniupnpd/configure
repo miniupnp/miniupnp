@@ -473,13 +473,15 @@ case $OS_NAME in
 			# Debian GNU/Linux special case
 			if [ -f /etc/debian_version ]; then
 				OS_NAME=Debian
-				OS_VERSION=`cat /etc/debian_version`
+				OS_VERSION_FILE=/etc/debian_version
+				OS_VERSION=`cat ${OS_VERSION_FILE}`
 				OS_URL=https://www.debian.org/
 			fi
 			# same thing for Gentoo linux
 			if  [ -f /etc/gentoo-release ]; then
 				OS_NAME=Gentoo
-				OS_VERSION=`cat /etc/gentoo-release`
+				OS_VERSION_FILE=/etc/gentoo-release
+				OS_VERSION=`cat ${OS_VERSION_FILE}`
 				OS_URL=https://www.gentoo.org/
 			fi
 			# ClearOS special case
@@ -858,6 +860,9 @@ echo "" >> ${CONFIGFILE}
 if [ $DYNAMIC_OS_VERSION -ne 0 ] ; then
   OS_VERSION="%s"
   echo "#define DYNAMIC_OS_VERSION 1" >> ${CONFIGFILE}
+  if [ "$OS_VERSION_FILE" ] ; then
+    echo "#define OS_VERSION_FILE \"${OS_VERSION_FILE}\"" >> ${CONFIGFILE}
+  fi
 fi
 echo "#define OS_NAME		\"$OS_NAME\"" >> ${CONFIGFILE}
 if [ -z "$OS_VERSION" ] ; then

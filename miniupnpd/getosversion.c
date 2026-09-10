@@ -11,17 +11,41 @@
 #include <sys/utsname.h>
 #include <syslog.h>
 #include <string.h>
+#ifdef OS_VERSION_FILE
+#include <stdio.h>
+#include <ctype.h>
+#endif
 
 char * get_os_version(void)
 {
-	char * ret = NULL;
 	struct utsname utsname;
+#ifdef OS_VERSION_FILE
+	FILE * f;
+
+	f = fopen(OS_VERSION_FILE, "r");
+	if (f != NULL) {
+		char buffer[256];
+		char * p;
+		p = fgets(buffer, sizeof(buffer), f);
+		fclose(f);
+		if (p != NULL) {
+			/* trim the string */
+			char * p = buffer + strlen(buffer);
+			while (p > buffer && isspace(p[-1]))
+				*(--p) = '\0';
+			p = buffer;
+			while (isspace(*p))
+			    p++;
+			return strdup(p);
+		}
+	}
+#endif
+
 	if (uname(&utsname) < 0) {
 		syslog(LOG_ERR, "uname(): %m");
-		ret = strdup("unknown");
+		return strdup("unknown");
 	} else {
-		ret = strdup(utsname.release);
+		return strdup(utsname.release);
 	}
-	return ret;
 }
 #endif
