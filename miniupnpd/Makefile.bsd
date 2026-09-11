@@ -109,12 +109,14 @@ TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o \
                        getroute.o
 TESTSTUNOBJS = teststun.o upnpstun.o upnputils.o getroute.o $(FWOBJS) \
                getifaddr.o
+TESTUPNPHTTPOBJS = testupnphttp.o upnphttp.o upnputils.o getosversion.o \
+                   getroute.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp \
-              testifacewatcher teststun
+              testifacewatcher teststun testupnphttp
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -149,7 +151,7 @@ clean:
 	$(RM) $(TESTIFACEWATCHEROBJS)
 	$(RM) $(TESTGETROUTEOBJS)
 	$(RM) testssdppktgen.o
-	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
+	$(RM) validateupnppermissions validategetifaddr validatessdppktgen validateupnphttp
 
 install:	miniupnpd
 	$(STRIP) miniupnpd
@@ -161,7 +163,8 @@ install:	miniupnpd
 	$(INSTALL) -d $(DESTDIR)$(INSTALLMANDIR)/man8
 	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
 
-check:  validateupnppermissions validategetifaddr validatessdppktgen
+check:  validateupnppermissions validategetifaddr validatessdppktgen \
+        validateupnphttp
 
 validateupnppermissions: $(SRCDIR)/testupnppermissions.sh testupnppermissions
 	$(SRCDIR)/testupnppermissions.sh
@@ -173,6 +176,10 @@ validategetifaddr:	$(SRCDIR)/testgetifaddr.sh testgetifaddr
 
 validatessdppktgen:	testssdppktgen
 	./testssdppktgen
+	touch $@
+
+validateupnphttp:	$(SRCDIR)/testupnphttp.sh testupnphttp
+	$(SRCDIR)/testupnphttp.sh
 	touch $@
 
 depend:	$(ALLSRCS)
@@ -222,6 +229,9 @@ testssdppktgen:	testssdppktgen.o
 
 teststun: config.h $(TESTSTUNOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTSTUNOBJS) $(LIBS)
+
+testupnphttp:	config.h $(TESTUPNPHTTPOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTUPNPHTTPOBJS) $(LIBS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^
