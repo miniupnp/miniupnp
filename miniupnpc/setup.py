@@ -26,9 +26,9 @@ LIB_SOURCES = [
     "src/receivedata.c",
     "src/upnpdev.c",
     "src/addr_is_reserved.c",
+    # the Makefile only drops this one on AmigaOS
+    "src/minissdpc.c",
 ]
-if os.name != "nt":
-    LIB_SOURCES.append("src/minissdpc.c")
 
 
 def write_miniupnpcstrings_h(outdir: Path) -> None:
