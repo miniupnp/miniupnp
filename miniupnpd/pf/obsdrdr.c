@@ -1302,7 +1302,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 		}
 	}
 	if (r == -2)
-		syslog(LOG_NOTICE, "could not find redirect rule to delete eport=%hu", eport);
+		syslog(LOG_DEBUG, "could not find redirect rule to delete eport=%hu", eport);
 	release_ticket(dev, tnum);
 	return r;
 }

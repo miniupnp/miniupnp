@@ -232,13 +232,13 @@ int add_pinhole(const char * ifname,
 		strncpy(e->ipv6.iniface, ifname, IFNAMSIZ);
 	if(rem_host && (rem_host[0] != '\0')) {
 		if(inet_pton(AF_INET6, rem_host, &e->ipv6.src) < 1) {
-			syslog(LOG_WARNING, "failed to parse INET6 address \"%s\"", rem_host);
+			syslog(LOG_DEBUG, "failed to parse INET6 address \"%s\"", rem_host);
 		} else {
 			memset(&e->ipv6.smsk, 0xff, sizeof(e->ipv6.smsk));
 		}
 	}
 	if (inet_pton(AF_INET6, int_client, &e->ipv6.dst) < 1) {
-		syslog(LOG_WARNING, "failed to parse INET6 address \"%s\"", int_client);
+		syslog(LOG_DEBUG, "failed to parse INET6 address \"%s\"", int_client);
 	} else {
 		memset(&e->ipv6.dmsk, 0xff, sizeof(e->ipv6.dmsk));
 	}
@@ -295,14 +295,14 @@ find_pinhole(const char * ifname,
 
 	if(rem_host && (rem_host[0] != '\0')) {
 		if (inet_pton(AF_INET6, rem_host, &saddr) < 1) {
-			syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", rem_host);
+			syslog(LOG_DEBUG, "Failed to parse INET6 address \"%s\"", rem_host);
 			memset(&saddr, 0, sizeof(struct in6_addr));
 		}
 	} else {
 		memset(&saddr, 0, sizeof(struct in6_addr));
 	}
 	if (inet_pton(AF_INET6, int_client, &daddr) < 1) {
-		syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", int_client);
+		syslog(LOG_DEBUG, "Failed to parse INET6 address \"%s\"", int_client);
 		memset(&daddr, 0, sizeof(struct in6_addr));
 	}
 	for(p = pinhole_list.lh_first; p != NULL; p = p->entries.le_next) {
