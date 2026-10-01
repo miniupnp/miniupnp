@@ -370,8 +370,15 @@ intervening space) by either an integer or the keyword "infinite". */
 				p = colon + 1;
 				while((*p == ' ') || (*p == '\t'))
 					p++;
-				if(strncasecmp(p, "Second-", 7)==0) {
-					h->req_Timeout = atoi(p+7);
+				if((p + 8) < (h->req_buf + h->req_contentoff)
+				   && (strncasecmp(p, "Second-", 7) == 0)) {
+					p += 7;
+					if((p + 8) < (h->req_buf + h->req_contentoff)
+					   && (strncasecmp(p, "infinite", 8) == 0)) {
+						h->req_Timeout = 0;
+					} else if(*p >= '0' && *p <= '9') {
+						h->req_Timeout = atoi(p);
+					}
 				}
 			}
 #ifdef UPNP_STRICT
