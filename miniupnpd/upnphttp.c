@@ -995,14 +995,15 @@ Process_upnphttp(struct upnphttp * h)
 	{
 	case EWaitingForHttpRequest:
 		upnphttp_adjust_buffer(h);
+		/* keep at least one byte free at the end of the buffer - to null terminate it */
 #ifdef ENABLE_HTTPS
 		if(h->ssl) {
-			n = SSL_read(h->ssl, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen);
+			n = SSL_read(h->ssl, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen - 1);
 		} else {
-			n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen, 0);
+			n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen - 1, 0);
 		}
 #else
-		n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen, 0);
+		n = recv(h->socket, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen - 1, 0);
 #endif
 		if(n<0)
 		{
