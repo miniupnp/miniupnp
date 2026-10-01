@@ -243,16 +243,18 @@ ParseHttpHeaders(struct upnphttp * h)
 		{
 			if(strncasecmp(line, "Content-Length:", 15)==0)
 			{
-				unsigned long ul;
 				p = colon;
 				while((*p < '0' || *p > '9') && (*p != '\r') && (*p != '\n'))
 					p++;
-				ul = strtoul(p, NULL, 10);
-				if(ul > INT_MAX) {
-					h->req_contentlen = INT_MAX;
-					syslog(LOG_WARNING, "ParseHttpHeaders() Content-Length overflow : %lu", ul);
-				} else {
-					h->req_contentlen = (int)ul;
+				if (*p >= '0' && *p <= '9') {
+					unsigned long ul;
+					ul = strtoul(p, NULL, 10);
+					if(ul > INT_MAX) {
+						h->req_contentlen = INT_MAX;
+						syslog(LOG_WARNING, "ParseHttpHeaders() Content-Length overflow : %lu", ul);
+					} else {
+						h->req_contentlen = (int)ul;
+					}
 				}
 				/*printf("*** Content-Lenght = %d ***\n", h->req_contentlen);
 				printf("    readbufflen=%d contentoff = %d\n",
