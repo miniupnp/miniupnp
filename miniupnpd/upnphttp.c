@@ -957,8 +957,9 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 
 
 /*! make sure we have at least 2048 bytes available for receiving
+ * \return 0 for error
  */
-static void
+static int
 upnphttp_adjust_buffer(struct upnphttp * h)
 {
 	if(h->req_bufalloc < (h->req_buflen + 2048)) {
@@ -978,10 +979,12 @@ upnphttp_adjust_buffer(struct upnphttp * h)
 			syslog(LOG_WARNING, "Unable to allocate new memory for h->req_buf (%d bytes)", h->req_bufalloc);
 			h->req_bufalloc = old_bufalloc;
 			Send500(h);
+			return 0;
 		} else {
 			h->req_buf = h_tmp;
 		}
 	}
+	return 1;
 }
 
 void
@@ -994,7 +997,10 @@ Process_upnphttp(struct upnphttp * h)
 	switch(h->state)
 	{
 	case EWaitingForHttpRequest:
-		upnphttp_adjust_buffer(h);
+		if(!upnphttp_adjust_buffer(h)) {
+			h->state = EToDelete;
+			return;
+		}
 		/* keep at least one byte free at the end of the buffer - to null terminate it */
 #ifdef ENABLE_HTTPS
 		if(h->ssl) {
@@ -1087,7 +1093,10 @@ Process_upnphttp(struct upnphttp * h)
 		}
 		break;
 	case EWaitingForHttpContent:
-		upnphttp_adjust_buffer(h);
+		if(!upnphttp_adjust_buffer(h)) {
+			h->state = EToDelete;
+			return;
+		}
 #ifdef ENABLE_HTTPS
 		if(h->ssl) {
 			n = SSL_read(h->ssl, h->req_buf + h->req_buflen, h->req_bufalloc - h->req_buflen);
