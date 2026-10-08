@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/10/09:
+  nftables: adds a meta nfproto match when the rule family is NFPROTO_INET
+
 2026/09/10:
   use /etc/debian-version or equivalent
 

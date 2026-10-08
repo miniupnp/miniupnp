@@ -268,6 +268,9 @@ parse_rule_meta(struct nftnl_expr *e, rule_t *r)
 	case NFT_META_OIF:
 		set_reg(r, dreg, RULE_REG_IIF, 0);
 		break;
+	case NFT_META_NFPROTO:
+		set_reg(r, dreg, RULE_REG_PROTO, 0);
+		break;
 	default:
 		log_debug("parse_rule_meta: key %d unsupported\n", key);
 		break;
@@ -486,6 +489,10 @@ parse_rule_cmp(struct nftnl_expr *e, rule_t *r)
 			r->sport = ntohs(ports[0]);
 			r->dport = ntohs(ports[1]);
 		}
+		break;
+	case RULE_REG_PROTO:
+		/* value is 8bits either NFPROTO_IPV4=2 or NFPROTO_IPV6=10 */
+		/* we don't do anything with it for now */
 		break;
 	default:
 		log_debug("Unknown cmp (r1type:%d, data_len:%d, op:%d)",
@@ -830,6 +837,29 @@ expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
 	nftnl_rule_add_expr(r, e);
 }
 
+/*
+ * Add a "meta nfproto == <nfproto>" match.
+ * The rules built in this file compare raw network-header payload at fixed
+ * IPv4 (or IPv6) offsets. When the rule lives in an NFPROTO_INET table (the
+ * default nft_*_family, as used by OpenWrt's fw4), that table is also walked
+ * for packets of the other address family, where those offsets point at
+ * unrelated, sender-chosen bytes. Without a family match the rule can then
+ * match the wrong family. This pins the rule to its intended family.
+ * It is only needed (and only valid) in an inet table; for an ip/ip6 table
+ * the family is already implied, so emit nothing there.
+ */
+static void
+expr_add_nfproto(struct nftnl_rule *r, uint8_t nfproto)
+{
+	uint8_t family = (uint8_t)nftnl_rule_get_u32(r, NFTNL_RULE_FAMILY);
+
+	if (family != NFPROTO_INET)
+		return;
+
+	expr_add_meta(r, NFT_META_NFPROTO, NFT_REG_1);
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &nfproto, sizeof(uint8_t));
+}
+
 static void
 expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val)
 {
@@ -928,6 +958,10 @@ rule_set_snat(uint8_t family, uint8_t proto,
 							descr, MIN(len, NFTNL_RULE_USERDATA_MAX_LEN));
 	}
 
+	/* Family: these IPv4 offsets must not be evaluated against IPv6 packets
+	 * when the rule lives in an inet table. */
+	expr_add_nfproto(r, NFPROTO_IPV4);
+
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
 	                 offsetof(struct iphdr, daddr), sizeof(uint32_t));
@@ -1019,6 +1053,10 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	}
 #endif
 
+	/* Family: these IPv4 offsets must not be evaluated against IPv6 packets
+	 * when the rule lives in an inet table. */
+	expr_add_nfproto(r, NFPROTO_IPV4);
+
 	/* Source IP */
 	if (rhost != 0) {
 		expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
@@ -1071,6 +1109,10 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 
 	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, descr, handle);
 
+	/* Family: in an inet table the IPv4 payload offsets below would also be
+	 * evaluated against IPv6 packets, so constrain to IPv4 first. */
+	expr_add_nfproto(r, NFPROTO_IPV4);
+
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
 	                 offsetof(struct iphdr, daddr), sizeof(uint32_t));
@@ -1118,6 +1160,10 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 	}
 
 	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, descr, handle);
+
+	/* Family: mirror of the IPv4 case. In an inet table, constrain to IPv6
+	 * so these offsets are not evaluated against IPv4 packets. */
+	expr_add_nfproto(r, NFPROTO_IPV6);
 
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
