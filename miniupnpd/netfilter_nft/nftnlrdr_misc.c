@@ -990,7 +990,6 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	struct nftnl_rule *r = NULL;
 	uint16_t dport;
 	uint64_t handle_num;
-	uint32_t if_idx;
 
 	r = nftnl_rule_alloc();
 	if (r == NULL) {
@@ -1015,6 +1014,7 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 
 #ifdef USE_IFNAME_IN_RULES
 	if (ifname != NULL) {
+		uint32_t if_idx;
 		if_idx = (uint32_t)if_nametoindex(ifname);
 		expr_add_meta(r, NFT_META_IIF, NFT_REG_1);
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &if_idx,
@@ -1159,7 +1159,6 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 {
 	uint16_t dport, sport;
 	uint64_t handle_num;
-	uint32_t if_idx;
 	UNUSED(eport);
 
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
@@ -1179,6 +1178,7 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 
 #ifdef USE_IFNAME_IN_RULES
 	if (ifname != NULL) {
+		uint32_t if_idx;
 		if_idx = (uint32_t)if_nametoindex(ifname);
 		expr_add_meta(r, NFT_META_IIF, NFT_REG_1);
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &if_idx,
