@@ -259,20 +259,17 @@ parse_rule_meta(struct nftnl_expr *e, rule_t *r)
 {
 	uint32_t key = nftnl_expr_get_u32(e, NFTNL_EXPR_META_KEY);
 	uint32_t dreg = nftnl_expr_get_u32(e, NFTNL_EXPR_META_DREG);
-	enum rule_reg_type reg_type;
 
 	/* ToDo: body of both cases are identical - bug? */
 	switch (key) {
 	case NFT_META_IIF:
-		reg_type = RULE_REG_IIF;
-		set_reg(r, dreg, reg_type, 0);
+		set_reg(r, dreg, RULE_REG_IIF, 0);
 		break;
 	case NFT_META_OIF:
-		reg_type = RULE_REG_IIF;
-		set_reg(r, dreg, reg_type, 0);
+		set_reg(r, dreg, RULE_REG_IIF, 0);
 		break;
 	default:
-		log_debug("parse_rule_meta :Not support key %d\n", key);
+		log_debug("parse_rule_meta: key %d unsupported\n", key);
 		break;
 	}
 }
