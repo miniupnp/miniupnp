@@ -52,7 +52,7 @@ jobs:
             emoji: 🍎
             runs-on:
               arm: [macos-latest]
-              intel: [macos-15]
+              intel: [macos-15-intel]
               universal2: [macos-15]
             macosx-deployment-target:
               arm: 15.0
