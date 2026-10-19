@@ -590,6 +590,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 			memset(&pr, 0, sizeof(pr));
 			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 			pr.ticket = ri.ticket;
+			pr.rule.action = NAT_RULE_ACTION;	/* selects the ruleset for the DIOCCHANGERULE calls */
 #endif
 			pr.action = PF_CHANGE_GET_TICKET;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
