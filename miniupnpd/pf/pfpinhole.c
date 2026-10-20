@@ -344,8 +344,8 @@ int delete_pinhole(unsigned short uid)
 #ifdef USE_LIBPFCTL
 			/* TODO: convert DIOCCHANGERULE to libpfctl */
 			struct pfioc_rule pr;
-			pr.action = PF_CHANGE_GET_TICKET;
 			memset(&pr, 0, sizeof(pr));
+			pr.action = PF_CHANGE_GET_TICKET;
 			pr.ticket = ri.ticket;
 			pr.nr = i;
 			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
