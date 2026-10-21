@@ -2,10 +2,17 @@ include README
 include VERSION
 include LICENSE
 include DESCRIPTION
-include src/miniupnpcmodule.c
+include pyproject.toml
 include setup.py
-include Makefile
+include miniupnpcstrings.h.in
 include src/*.[ch]
 include include/*.h
-include *.h.in
+include Makefile
 include *.sh
+# Optional MinGW makefile path (not used by pip/setuptools)
+include Makefile.mingw
+include setupmingw32.py
+include wingenminiupnpcstrings.c
+include miniupnpc.def
+include miniupnpc.rc
+include mingw32make.bat
