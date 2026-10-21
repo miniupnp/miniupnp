@@ -497,13 +497,21 @@ int add_nat_rule(const char * ifname,
 #define NAT_RULE_ACTION	PF_PASS	/* or PF_MATCH as we dont expect outbound packets to be blocked */
 #endif
 
+/* external port of a NAT rule, as set by add_nat_rule() */
+#ifndef PF_NEWSTYLE
+#define NAT_RULE_EPORT(r) ((r).rpool.proxy_port[0])
+#else
+#define NAT_RULE_EPORT(r) ((r).nat.proxy_port[0])
+#endif
+
 /*
  * returns:  0 : OK
  *          -1 : ERROR
  *          -2 : Rule not found
  */
 static int
-delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t iaddr)
+delete_nat_rule(const char * ifname, unsigned short eport, unsigned short iport,
+                int proto, in_addr_t iaddr)
 {
 	int i, n, r;
 	unsigned int tnum;
@@ -574,14 +582,18 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 		       i, ntohs(RULE.src.port[0]), RULE.proto,
 		       RULE.src.addr.v.a.addr.v4.s_addr, iaddr);
 #endif /* TEST */
+		/* a client can have several mappings from the same iaddr:iport :
+		 * the external port (set by add_nat_rule()) tells them apart */
 #ifdef __APPLE__
 		if(iport == ntohs(RULE.src.xport.range.port[0])
 		 && RULE.proto == proto
-		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr)
+		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr
+		 && eport == NAT_RULE_EPORT(RULE))
 #else
 		if(iport == ntohs(RULE.src.port[0])
 		 && RULE.proto == proto
-		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr)
+		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr
+		 && eport == NAT_RULE_EPORT(RULE))
 #endif
 		{
 #ifdef USE_LIBPFCTL
@@ -614,7 +626,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 		}
 	}
 	if (r == -2)
-		syslog(LOG_NOTICE, "could not find nat rule to delete iport=%hu addr=%8x", iport, ntohl(iaddr));
+		syslog(LOG_NOTICE, "could not find nat rule to delete eport=%hu iport=%hu addr=%8x", eport, iport, ntohl(iaddr));
 	release_ticket(dev, tnum);
 	return r;
 }
@@ -1419,7 +1431,7 @@ delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
 	{
 #ifdef ENABLE_PORT_TRIGGERING
 		if (proto == IPPROTO_UDP) {
-			delete_nat_rule(ifname, iport, proto, iaddr);
+			delete_nat_rule(ifname, eport, iport, proto, iaddr);
 		}
 #endif
 		r = priv_delete_filter_rule(ifname, iport, proto, iaddr);
