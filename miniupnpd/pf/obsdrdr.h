@@ -30,6 +30,32 @@ add_filter_rule2(const char * ifname,
                  int proto, const char * desc);
 
 
+#ifdef USE_LIBPFCTL
+/* redirected_to_another()
+ * returns 1 when eport/proto is redirected to another address or port than
+ * iaddr:iport, 0 when it is free, redirected to iaddr:iport, or unknown.
+ * It reads the copy of the redirections that get_redirect_rule() keeps.
+ * Set *checked to 0 before the first call for a request : the copy is then
+ * checked against the ruleset, and not again for the next ports. Use it to
+ * skip ports that get_redirect_rule() would show taken by another; the
+ * ports it returns 0 for still need the usual checks. */
+int
+redirected_to_another(unsigned short eport, int proto,
+                      const char * iaddr, unsigned short iport, int * checked);
+
+/* renew_redirect_rule()
+ * set a new lease end (timestamp) on the redirection eport/proto without
+ * deleting and adding its rules again, when adding it again would give the
+ * same rules : same iaddr:iport, no remote host, same description, and for
+ * UDP with ENABLE_PORT_TRIGGERING, its NAT rule was added, with the external
+ * address that is still the current one.
+ * returns 0 when renewed, -1 otherwise (then delete it and add it again) */
+int
+renew_redirect_rule(const char * ifname, unsigned short eport, int proto,
+                    const char * iaddr, unsigned short iport,
+                    const char * desc, unsigned int timestamp);
+#endif /* USE_LIBPFCTL */
+
 /* get_redirect_rule() gets internal IP and port from
  * interface, external port and protocl
  */

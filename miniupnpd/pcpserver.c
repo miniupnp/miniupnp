@@ -87,6 +87,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnppinhole.h"
 #endif /* ENABLE_UPNPPINHOLE */
 
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+#include "pf/obsdrdr.h"
+#endif
+
 
 #ifdef PCP_PEER
 /* TODO make this platform independent */
@@ -917,6 +921,9 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	uint16_t iport_old, eport_first = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+	int rdr_checked = 0;
+#endif
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -952,6 +959,20 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			continue;
 		}
 		any_eport_allowed = 1;
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+		/* taken by another : the checks below would skip it too (unless
+		 * PREFER_FAILURE), this costs no port_in_use() and no pf call */
+		if (!pcp_msg_info->pfailure_present &&
+		    redirected_to_another(pcp_msg_info->ext_port, pcp_msg_info->protocol,
+		                          pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		                          &rdr_checked)) {
+			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
+			continue;
+		}
+#endif
 #ifdef CHECK_PORTINUSE
 		if (port_in_use(ext_if_name, pcp_msg_info->ext_port, pcp_msg_info->protocol,
 				pcp_msg_info->mapped_str, pcp_msg_info->int_port) > 0) {

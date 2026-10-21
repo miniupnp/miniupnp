@@ -148,6 +148,496 @@ add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
 extern int dev;	/* global also used in pfpinhole.c */
 int dev = -1;
 
+#ifdef ENABLE_PORT_TRIGGERING
+/* the external address add_nat_rule() writes in the NAT rule of a mapping.
+ * returns NULL if there is none */
+static const char *
+nat_rule_extaddr(const char * ifname, char * buf, int buflen, int quiet)
+{
+	struct in_addr wan_addr;
+
+	if(getifaddr(ifname, buf, buflen, &wan_addr, NULL) < 0) {
+		if(!quiet)
+			syslog(LOG_WARNING, "failed to get address for interface %s", ifname);
+		if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0')
+			return use_ext_ip_addr;
+		return NULL;	/* no address to use => failure */
+	}
+	if(addr_is_reserved(&wan_addr)) {
+		if(!quiet)
+			syslog(LOG_DEBUG, "WAN IP is reserved, it will be used for NAT");
+		return buf;
+	}
+	if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0')
+		return use_ext_ip_addr;
+	return buf;
+}
+#endif /* ENABLE_PORT_TRIGGERING */
+
+#ifdef USE_LIBPFCTL
+/* rdr_index : a copy of the redirections of our anchor, in rule order.
+ *
+ * pfctl_get_rule() unpacks an nvlist for every rule (about 0.1 ms each), so
+ * reading the anchor for each lookup costs O(n) per external port tried, and
+ * a NAT-PMP or PCP request probing many ports costs O(n^2). With the copy, a
+ * lookup costs one DIOCGETRULES ioctl and one rule read.
+ *
+ * The copy is valid while the ruleset ticket and rule count are the ones
+ * recorded and the last rule is the one expected. The kernel changes the
+ * ticket on every DIOCCHANGERULE (PF_CHANGE_GET_TICKET returns ++ticket, a
+ * successful change increments it again). A transaction installs a ticket
+ * from another counter, which can repeat a value we recorded: the check of
+ * the last rule is for that case. Our own changes are applied to the copy
+ * when the ticket shows that nothing else changed the ruleset in between;
+ * any other change makes the next lookup read the anchor again. */
+struct rdr_index_entry {
+	unsigned short port[2];	/* dst port range (host byte order) */
+	unsigned short iport;
+	unsigned char proto;
+	unsigned char addr_ok;	/* the rule has exactly one pool address */
+	in_addr_t iaddr;
+	in_addr_t rhost;	/* source address, 0 = any */
+	in_addr_t extaddr;	/* external address of its NAT rule, if ext_known */
+	unsigned char ext_known;	/* we added its NAT rule, with extaddr */
+	char ifname[IFNAMSIZ];
+	char desc[PF_RULE_LABEL_SIZE];
+};
+
+static struct {
+	struct rdr_index_entry * e;
+	unsigned int n;		/* number of rules */
+	unsigned int alloc;	/* number of allocated entries */
+	unsigned int ticket;
+	int valid;
+} rdr_index;
+
+/* returned by the rdr_index_*() lookups when the caller must read the anchor */
+#define RDR_INDEX_UNUSABLE (-3)
+
+/* sanity limit on the number of rules in the anchor */
+#define RDR_INDEX_MAX_RULES (1 << 20)
+
+/* number of rules and ticket of the rdr ruleset of our anchor.
+ * DIOCGETRULES : one syscall, no allocation (pfctl_get_rules_info() opens a
+ * netlink socket each time, and its _h variant grows the handle's buffer
+ * at each call) */
+static int
+rdr_index_rules_info(unsigned int * nr, unsigned int * ticket)
+{
+	struct pfioc_rule pr;
+
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+	pr.rule.action = PF_RDR;
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
+		syslog(LOG_DEBUG, "ioctl(dev, DIOCGETRULES, ...): %m");
+		return -1;
+	}
+	if(pr.nr > RDR_INDEX_MAX_RULES) {
+		syslog(LOG_WARNING, "%u rules in anchor %s: not keeping a copy", pr.nr, anchor_name);
+		return -1;
+	}
+	*nr = pr.nr;
+	*ticket = pr.ticket;
+	return 0;
+}
+
+static void
+rdr_index_invalidate(void)
+{
+	rdr_index.valid = 0;
+}
+
+static int
+rdr_index_reserve(unsigned int n)
+{
+	struct rdr_index_entry * tmp;
+	unsigned int alloc;
+
+	if(n <= rdr_index.alloc)
+		return 0;
+	if(n > RDR_INDEX_MAX_RULES)
+		return -1;
+	alloc = (rdr_index.alloc > 0) ? rdr_index.alloc : 64;
+	while(alloc < n)
+		alloc *= 2;
+	tmp = realloc(rdr_index.e, alloc * sizeof(struct rdr_index_entry));
+	if(tmp == NULL) {
+		syslog(LOG_ERR, "rdr_index_reserve(): realloc(%u entries) failed", alloc);
+		return -1;
+	}
+	rdr_index.e = tmp;
+	rdr_index.alloc = alloc;
+	return 0;
+}
+
+/* read rule i of the rdr ruleset having this ticket */
+static int
+rdr_index_read_rule(unsigned int i, unsigned int ticket,
+                    struct rdr_index_entry * entry)
+{
+	struct pfctl_rule rule;
+	char anchor_call[MAXPATHLEN] = "";
+	struct pfioc_pooladdr pp;
+
+	/* libpfctl returns an errno value, EBUSY when the ruleset changed */
+	if(pfctl_get_rule(dev, i, ticket, anchor_name, PF_RDR, &rule, anchor_call) != 0)
+		return -1;
+	entry->port[0] = ntohs(rule.dst.port[0]);
+	entry->port[1] = ntohs(rule.dst.port[1]);
+	entry->proto = rule.proto;
+	entry->iport = rule.rpool.proxy_port[0];
+#ifdef PFVAR_NEW_STYLE
+	entry->rhost = rule.src.addr.v.a.addr.v4addr.s_addr;
+#else
+	entry->rhost = rule.src.addr.v.a.addr.v4.s_addr;
+#endif
+	strlcpy(entry->ifname, rule.ifname, IFNAMSIZ);
+	strlcpy(entry->desc, rule.label[0], sizeof(entry->desc));
+	entry->extaddr = 0;
+	entry->ext_known = 0;
+	entry->iaddr = 0;
+	entry->addr_ok = 0;
+	memset(&pp, 0, sizeof(pp));
+	strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
+	pp.r_action = PF_RDR;
+	pp.r_num = i;
+	pp.ticket = ticket;
+	if(ioctl(dev, DIOCGETADDRS, &pp) < 0)
+		return -1;
+	if(pp.nr == 1) {
+		pp.nr = 0;	/* first */
+		if(ioctl(dev, DIOCGETADDR, &pp) < 0)
+			return -1;
+#ifdef PFVAR_NEW_STYLE
+		entry->iaddr = pp.addr.addr.v.a.addr.v4addr.s_addr;
+#else
+		entry->iaddr = pp.addr.addr.v.a.addr.v4.s_addr;
+#endif
+		entry->addr_ok = 1;
+	}
+	return 0;
+}
+
+/* is rule n-1 of the ruleset the last entry of the copy ?
+ * A transaction (pfctl -a <anchor> -f) installs a ticket from another
+ * counter, which can repeat a value we recorded : check the content too */
+static int
+rdr_index_tail_matches(unsigned int ticket)
+{
+	struct rdr_index_entry r;
+	const struct rdr_index_entry * e;
+
+	if(rdr_index.n == 0)
+		return 1;
+	if(rdr_index_read_rule(rdr_index.n - 1, ticket, &r) < 0)
+		return 0;
+	e = rdr_index.e + rdr_index.n - 1;
+	return (e->port[0] == r.port[0] && e->port[1] == r.port[1]
+	        && e->proto == r.proto && e->iport == r.iport
+	        && e->addr_ok == r.addr_ok && e->iaddr == r.iaddr
+	        && e->rhost == r.rhost
+	        && 0 == strcmp(e->ifname, r.ifname) && 0 == strcmp(e->desc, r.desc));
+}
+
+/* make the copy match the ruleset (nr rules, ticket).
+ * returns 0 when the copy is valid, -1 otherwise */
+static int
+rdr_index_sync(unsigned int nr, unsigned int ticket)
+{
+	unsigned int i, nr2, ticket2;
+
+	if(rdr_index.valid && rdr_index.ticket == ticket && rdr_index.n == nr
+	   && rdr_index_tail_matches(ticket))
+		return 0;
+	rdr_index.valid = 0;
+	if(rdr_index_reserve(nr) < 0)
+		return -1;
+	for(i = 0; i < nr; i++) {
+		if(rdr_index_read_rule(i, ticket, rdr_index.e + i) < 0) {
+			/* most likely the ruleset changed while we were reading it */
+			syslog(LOG_DEBUG, "rdr_index_sync(): failed to read rule %u", i);
+			return -1;
+		}
+	}
+	/* DIOCGETADDRS does not check the ticket : make sure nothing changed */
+	if(rdr_index_rules_info(&nr2, &ticket2) < 0 || nr2 != nr || ticket2 != ticket)
+		return -1;
+	rdr_index.n = nr;
+	rdr_index.ticket = ticket;
+	rdr_index.valid = 1;
+	return 0;
+}
+
+/* check the ruleset ticket and read the anchor again if it changed.
+ * returns 0 when the copy is valid, -1 otherwise */
+static int
+rdr_index_refresh(void)
+{
+	unsigned int nr, ticket;
+	int tries;
+
+	for(tries = 0; tries < 2; tries++) {
+		if(rdr_index_rules_info(&nr, &ticket) < 0)
+			break;
+		if(rdr_index_sync(nr, ticket) == 0)
+			return 0;
+	}
+	rdr_index.valid = 0;
+	return -1;
+}
+
+/* index of the rule get_redirect_rule() would return, or -1 */
+static int
+rdr_index_find(unsigned short eport, int proto)
+{
+	unsigned int i;
+
+	for(i = 0; i < rdr_index.n; i++) {
+		const struct rdr_index_entry * e = rdr_index.e + i;
+		if(e->port[0] == eport && e->port[1] == eport && e->proto == proto)
+			return (int)i;
+	}
+	return -1;
+}
+
+/* fill what get_redirect_rule() and get_redirect_rule_by_index() return */
+static int
+rdr_index_fill(const struct rdr_index_entry * e,
+               char * iaddr, int iaddrlen, unsigned short * iport,
+               char * desc, int desclen, char * rhost, int rhostlen)
+{
+	if(iport)
+		*iport = e->iport;
+	if(desc)
+		strlcpy(desc, e->desc, desclen);
+	if(!e->addr_ok) {
+		syslog(LOG_NOTICE, "No address associated with pf rule");
+		return -1;
+	}
+	if(iaddr && iaddrlen > 0)
+		inet_ntop(AF_INET, &e->iaddr, iaddr, iaddrlen);
+	if(rhost && rhostlen > 0) {
+		if(e->rhost == 0)
+			rhost[0] = '\0'; /* empty string */
+		else
+			inet_ntop(AF_INET, &e->rhost, rhost, rhostlen);
+	}
+	return 0;
+}
+
+/* we added a rule at the tail of the ruleset, PF_CHANGE_GET_TICKET gave t */
+static void
+rdr_index_added(unsigned int t, unsigned short eport, int proto,
+                const char * iaddr, unsigned short iport,
+                const char * rhost, const char * ifname, const char * desc)
+{
+	struct rdr_index_entry * e;
+
+	if(!rdr_index.valid || t != rdr_index.ticket + 1
+	   || rdr_index_reserve(rdr_index.n + 1) < 0) {
+		rdr_index_invalidate();
+		return;
+	}
+	e = rdr_index.e + rdr_index.n;
+	memset(e, 0, sizeof(struct rdr_index_entry));
+	e->port[0] = eport;
+	e->port[1] = eport;
+	e->proto = proto;
+	e->iport = iport;
+	if(inet_pton(AF_INET, iaddr, &e->iaddr) != 1) {
+		rdr_index_invalidate();
+		return;
+	}
+	e->addr_ok = 1;
+	if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		inet_pton(AF_INET, rhost, &e->rhost);
+	strlcpy(e->ifname, ifname, IFNAMSIZ);
+	strlcpy(e->desc, desc, sizeof(e->desc));
+	rdr_index.n++;
+	rdr_index.ticket = t + 1;
+}
+
+#ifdef ENABLE_PORT_TRIGGERING
+/* we added the NAT rule of the redirection we just added, with extaddr */
+static void
+rdr_index_nat_added(unsigned short eport, int proto, in_addr_t extaddr)
+{
+	struct rdr_index_entry * e;
+
+	if(!rdr_index.valid || rdr_index.n == 0)
+		return;
+	e = rdr_index.e + rdr_index.n - 1;
+	if(e->port[0] != eport || e->port[1] != eport || e->proto != proto)
+		return;
+	e->extaddr = extaddr;
+	e->ext_known = 1;
+}
+#endif /* ENABLE_PORT_TRIGGERING */
+
+/* get_redirect_rule() from the copy */
+static int
+rdr_index_get_redirect_rule(unsigned short eport, int proto,
+                            char * iaddr, int iaddrlen, unsigned short * iport,
+                            char * desc, int desclen,
+                            char * rhost, int rhostlen)
+{
+	int i;
+
+	if(rdr_index_refresh() < 0)
+		return RDR_INDEX_UNUSABLE;
+	i = rdr_index_find(eport, proto);
+	if(i < 0)
+		return -2;
+	return rdr_index_fill(rdr_index.e + i, iaddr, iaddrlen, iport,
+	                      desc, desclen, rhost, rhostlen);
+}
+
+/* renew_redirect_rule() : see obsdrdr.h */
+int
+renew_redirect_rule(const char * ifname, unsigned short eport, int proto,
+                    const char * iaddr, unsigned short iport,
+                    const char * desc, unsigned int timestamp)
+{
+#ifdef PF_SET_DST_ADDR
+	/* the rdr rule holds use_ext_ip_addr, which can change : add it again */
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto); UNUSED(iaddr); UNUSED(iport);
+	UNUSED(desc); UNUSED(timestamp);
+	return -1;
+#else
+	const struct rdr_index_entry * e;
+	char addr[INET_ADDRSTRLEN];
+	char label[PF_RULE_LABEL_SIZE];
+	int i;
+
+	if(rdr_index_refresh() < 0)
+		return -1;
+	i = rdr_index_find(eport, proto);
+	if(i < 0)
+		return -1;
+	e = rdr_index.e + i;
+	if(!e->addr_ok || e->iport != iport || e->rhost != 0)
+		return -1;
+	inet_ntop(AF_INET, &e->iaddr, addr, sizeof(addr));
+	strlcpy(label, desc, sizeof(label));
+	if(strcmp(addr, iaddr) != 0 || strcmp(label, e->desc) != 0)
+		return -1;
+#ifdef ENABLE_PORT_TRIGGERING
+	if(proto == IPPROTO_UDP) {
+		/* the NAT rule holds the external address of the time it was added,
+		 * and adding it may have failed : adding it again fixes both */
+		const char * ext;
+		in_addr_t extaddr;
+		if(!e->ext_known)
+			return -1;
+		ext = nat_rule_extaddr(ifname, addr, sizeof(addr), 1);
+		if(ext == NULL || inet_pton(AF_INET, ext, &extaddr) != 1 || extaddr != e->extaddr)
+			return -1;
+	}
+#else
+	UNUSED(ifname);
+#endif
+	remove_timestamp_entry(eport, proto);
+	add_timestamp_entry(eport, proto, timestamp);
+	return 0;
+#endif /* PF_SET_DST_ADDR */
+}
+
+/* redirected_to_another() : see obsdrdr.h */
+int
+redirected_to_another(unsigned short eport, int proto,
+                      const char * iaddr, unsigned short iport, int * checked)
+{
+	const struct rdr_index_entry * e;
+	char addr[INET_ADDRSTRLEN];
+	int i;
+
+	if(*checked == 0) {
+		*checked = 1;
+		if(rdr_index_refresh() < 0)
+			rdr_index_invalidate();
+	}
+	if(!rdr_index.valid)
+		return 0;
+	i = rdr_index_find(eport, proto);
+	if(i < 0)
+		return 0;
+	e = rdr_index.e + i;
+	if(!e->addr_ok)
+		return 0;	/* get_redirect_rule() fails on it : let the caller see that */
+	inet_ntop(AF_INET, &e->iaddr, addr, sizeof(addr));
+	return (strcmp(addr, iaddr) != 0 || e->iport != iport) ? 1 : 0;
+}
+
+/* priv_delete_redirect_rule_check_desc() from the copy */
+static int
+rdr_index_delete_redirect_rule(unsigned short eport, int proto,
+                               unsigned short * iport, in_addr_t * iaddr,
+                               char * rhost, int rhostlen,
+                               int check_desc, const char * desc)
+{
+	struct pfioc_rule pr;
+	const struct rdr_index_entry * e;
+	int i;
+
+	if(rdr_index_refresh() < 0)
+		return RDR_INDEX_UNUSABLE;
+	i = rdr_index_find(eport, proto);
+	if(i < 0) {
+		syslog(LOG_NOTICE, "could not find redirect rule to delete eport=%hu", eport);
+		return -2;
+	}
+	e = rdr_index.e + i;
+	if(iport)
+		*iport = e->iport;
+	if(iaddr) {
+		if(!e->addr_ok) {
+			syslog(LOG_NOTICE, "No address associated with pf rule");
+			return -1;
+		}
+		*iaddr = e->iaddr;
+	}
+	if(rhost && rhostlen > 0) {
+		if(e->rhost == 0)
+			rhost[0] = '\0'; /* empty string */
+		else
+			inet_ntop(AF_INET, &e->rhost, rhost, rhostlen);
+	}
+	if(check_desc) {
+		if((desc == NULL && e->desc[0] == '\0') ||
+		   (desc && 0 == strcmp(desc, e->desc)))
+			return 1;
+	}
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+	pr.rule.action = PF_RDR;	/* selects the ruleset for the DIOCCHANGERULE calls */
+	pr.action = PF_CHANGE_GET_TICKET;
+	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
+		syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
+		rdr_index_invalidate();
+		return -1;
+	}
+	if(pr.ticket != rdr_index.ticket + 1) {
+		/* changed since we checked : rule i may be another one */
+		rdr_index_invalidate();
+		return RDR_INDEX_UNUSABLE;
+	}
+	pr.action = PF_CHANGE_REMOVE;
+	pr.nr = i;
+	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
+		syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+		rdr_index_invalidate();
+		return -1;
+	}
+	memmove(rdr_index.e + i, rdr_index.e + i + 1,
+	        (rdr_index.n - i - 1) * sizeof(struct rdr_index_entry));
+	rdr_index.n--;
+	rdr_index.ticket = pr.ticket + 1;
+	remove_timestamp_entry(eport, proto);
+	return 0;
+}
+#endif /* USE_LIBPFCTL */
+
 /* shutdown_redirect() :
  * close the /dev/pf device */
 void
@@ -156,6 +646,10 @@ shutdown_redirect(void)
 	if(close(dev)<0)
 		syslog(LOG_ERR, "close(\"/dev/pf\"): %m");
 	dev = -1;
+#ifdef USE_LIBPFCTL
+	free(rdr_index.e);
+	memset(&rdr_index, 0, sizeof(rdr_index));
+#endif
 }
 
 /* open the device */
@@ -230,6 +724,9 @@ clear_redirect_rules(void)
 		syslog(LOG_ERR, "ioctl(dev, DIOCXCOMMIT, ...): %m");
 		goto error;
 	}
+#ifdef USE_LIBPFCTL
+	rdr_index_invalidate();
+#endif
 	return 0;
 error:
 	return -1;
@@ -315,11 +812,12 @@ error:
  * nat on re0 inet proto udp from 192.168.1.49 port 3074 to any -> (re0) port 3148
  * <re0> is ext_if, (re0) is ext_ip
  * should be created when a port mapping (3148 => 192.168.1.49:3074 UDP) is created.
- * for symetric NAT / UPnP IGD NAT Port Triggering */
+ * for symetric NAT / UPnP IGD NAT Port Triggering
+ * extaddr_used (may be NULL) : the external address of the rule, on success */
 int add_nat_rule(const char * ifname,
                  const char * rhost, unsigned short eport,
                  const char * iaddr, unsigned short iport, int proto,
-                 const char * desc)
+                 const char * desc, in_addr_t * extaddr_used)
 {
 	int r;
 	struct pfioc_rule pcr;
@@ -329,29 +827,14 @@ int add_nat_rule(const char * ifname,
 #endif
 	const char * extaddr;
 	char extaddr_buf[INET_ADDRSTRLEN];
-	struct in_addr wan_addr;
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
-	if(getifaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, &wan_addr, NULL) < 0) {
-		syslog(LOG_WARNING, "failed to get address for interface %s", ifname);
-		if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0') {
-			extaddr = use_ext_ip_addr;
-		} else {
-			return -1;	/* no address to use => failure */
-		}
-	} else {
-		if (addr_is_reserved(&wan_addr)) {
-			syslog(LOG_DEBUG, "WAN IP is reserved, it will be used for NAT");
-			extaddr = extaddr_buf;
-		} else if (use_ext_ip_addr && use_ext_ip_addr[0] != '\0') {
-			extaddr = use_ext_ip_addr;
-		} else {
-			extaddr = extaddr_buf;
-		}
-	}
+	extaddr = nat_rule_extaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, 0);
+	if(extaddr == NULL)
+		return -1;	/* no address to use => failure */
 	syslog(LOG_DEBUG, "use external ip %s", extaddr);
 	r = 0;
 	memset(&pcr, 0, sizeof(pcr));
@@ -483,6 +966,9 @@ int add_nat_rule(const char * ifname,
 		free(a);
 #endif
 	}
+	if(r == 0 && extaddr_used != NULL
+	   && inet_pton(AF_INET, extaddr, extaddr_used) != 1)
+		*extaddr_used = 0;
 	return r;
 }
 
@@ -497,13 +983,21 @@ int add_nat_rule(const char * ifname,
 #define NAT_RULE_ACTION	PF_PASS	/* or PF_MATCH as we dont expect outbound packets to be blocked */
 #endif
 
+/* external port of a NAT rule, as set by add_nat_rule() */
+#ifndef PF_NEWSTYLE
+#define NAT_RULE_EPORT(r) ((r).rpool.proxy_port[0])
+#else
+#define NAT_RULE_EPORT(r) ((r).nat.proxy_port[0])
+#endif
+
 /*
  * returns:  0 : OK
  *          -1 : ERROR
  *          -2 : Rule not found
  */
 static int
-delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t iaddr)
+delete_nat_rule(const char * ifname, unsigned short eport, unsigned short iport,
+                int proto, in_addr_t iaddr)
 {
 	int i, n, r;
 	unsigned int tnum;
@@ -574,14 +1068,18 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 		       i, ntohs(RULE.src.port[0]), RULE.proto,
 		       RULE.src.addr.v.a.addr.v4.s_addr, iaddr);
 #endif /* TEST */
+		/* a client can have several mappings from the same iaddr:iport :
+		 * the external port (set by add_nat_rule()) tells them apart */
 #ifdef __APPLE__
 		if(iport == ntohs(RULE.src.xport.range.port[0])
 		 && RULE.proto == proto
-		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr)
+		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr
+		 && eport == NAT_RULE_EPORT(RULE))
 #else
 		if(iport == ntohs(RULE.src.port[0])
 		 && RULE.proto == proto
-		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr)
+		 && iaddr == RULE.src.addr.v.a.addr.v4.s_addr
+		 && eport == NAT_RULE_EPORT(RULE))
 #endif
 		{
 #ifdef USE_LIBPFCTL
@@ -614,7 +1112,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 		}
 	}
 	if (r == -2)
-		syslog(LOG_NOTICE, "could not find nat rule to delete iport=%hu addr=%8x", iport, ntohl(iaddr));
+		syslog(LOG_NOTICE, "could not find nat rule to delete eport=%hu iport=%hu addr=%8x", eport, iport, ntohl(iaddr));
 	release_ticket(dev, tnum);
 	return r;
 }
@@ -775,6 +1273,13 @@ add_redirect_rule2(const char * ifname,
 					syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_ADD_TAIL: %m");
 					r = -1;
 				}
+#ifdef USE_LIBPFCTL
+				if(r == 0)
+					rdr_index_added(pcr.ticket, eport, proto, iaddr, iport,
+					                rhost, pcr.rule.ifname, desc);
+				else
+					rdr_index_invalidate();
+#endif
 			}
 		}
 #ifndef PF_NEWSTYLE
@@ -786,7 +1291,13 @@ add_redirect_rule2(const char * ifname,
 #ifdef ENABLE_PORT_TRIGGERING
 	if(r == 0 && proto == IPPROTO_UDP)
 	{
-		add_nat_rule(ifname, rhost, eport, iaddr, iport, proto, desc);
+		in_addr_t nat_extaddr = 0;
+		if(add_nat_rule(ifname, rhost, eport, iaddr, iport, proto, desc, &nat_extaddr) == 0) {
+#ifdef USE_LIBPFCTL
+			if(nat_extaddr != 0)
+				rdr_index_nat_added(eport, proto, nat_extaddr);
+#endif
+		}
 		/* TODO check error */
 	}
 #endif
@@ -977,6 +1488,17 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 		return -1;
 	}
 #ifdef USE_LIBPFCTL
+	if(packets == NULL && bytes == NULL) {
+		r = rdr_index_get_redirect_rule(eport, proto, iaddr, iaddrlen, iport,
+		                                desc, desclen, rhost, rhostlen);
+		if(r != RDR_INDEX_UNUSABLE) {
+			if(r == 0 && timestamp)
+				*timestamp = get_timestamp(eport, proto);
+			return r;
+		}
+	}
+#endif /* USE_LIBPFCTL */
+#ifdef USE_LIBPFCTL
 	if(pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
@@ -1156,6 +1678,12 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
+#ifdef USE_LIBPFCTL
+	r = rdr_index_delete_redirect_rule(eport, proto, iport, iaddr,
+	                                   rhost, rhostlen, check_desc, desc);
+	if(r != RDR_INDEX_UNUSABLE)
+		return r;
+#endif /* USE_LIBPFCTL */
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
@@ -1419,7 +1947,7 @@ delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
 	{
 #ifdef ENABLE_PORT_TRIGGERING
 		if (proto == IPPROTO_UDP) {
-			delete_nat_rule(ifname, iport, proto, iaddr);
+			delete_nat_rule(ifname, eport, iport, proto, iaddr);
 		}
 #endif
 		r = priv_delete_filter_rule(ifname, iport, proto, iaddr);
@@ -1456,6 +1984,23 @@ get_redirect_rule_by_index(int index,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
+#ifdef USE_LIBPFCTL
+	if(packets == NULL && bytes == NULL && rdr_index_refresh() == 0) {
+		const struct rdr_index_entry * e;
+		if((unsigned int)index >= rdr_index.n)
+			return -1;
+		e = rdr_index.e + index;
+		*proto = e->proto;
+		*eport = e->port[0];
+		if(ifname)
+			strlcpy(ifname, e->ifname, IFNAMSIZ);
+		r = rdr_index_fill(e, iaddr, iaddrlen, iport, desc, desclen,
+		                   rhost, rhostlen);
+		if(r == 0 && timestamp)
+			*timestamp = get_timestamp(*eport, *proto);
+		return r;
+	}
+#endif /* USE_LIBPFCTL */
 #ifdef USE_LIBPFCTL
 	if(pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
 	{
