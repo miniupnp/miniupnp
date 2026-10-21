@@ -353,7 +353,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 			}
 		}
 	} else {
-		syslog(LOG_WARNING, "%s: redirect rule with eport=%hu proto %d NOT FOUND",
+		syslog(LOG_INFO, "%s: redirect rule with eport=%hu proto %d NOT FOUND",
 		       "delete_redirect_and_filter_rules", eport, proto);
 	}
 
