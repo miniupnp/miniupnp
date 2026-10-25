@@ -120,6 +120,10 @@ new_match(int proto, unsigned short sport, unsigned short dport)
 	size =   XT_ALIGN(sizeof(struct ip6t_entry_match))
 	       + XT_ALIGN(sizeof(struct ip6t_tcp));
 	match = calloc(1, size);
+	if(!match) {
+		syslog(LOG_ERR, "%s: calloc(%d) error", "new_match", (int)size);
+		return NULL;
+	}
 	match->u.user.match_size = size;
 	switch(proto) {
 	case IPPROTO_TCP:
@@ -159,6 +163,10 @@ get_accept_target(void)
 	size =   XT_ALIGN(sizeof(struct ip6t_entry_target))
 	       + XT_ALIGN(sizeof(int));
 	target = calloc(1, size);
+	if(!target) {
+		syslog(LOG_ERR, "%s: calloc(%d) error", "get_accept_target", (int)size);
+		return NULL;
+	}
 	target->u.user.target_size = size;
 	strncpy(target->u.user.name, "ACCEPT", sizeof(target->u.user.name));
 	return target;
@@ -248,6 +256,13 @@ int add_pinhole(const char * ifname,
 
 	match = new_match(proto, rem_port, int_port);
 	target = get_accept_target();
+	if(!match || !target) {
+		syslog(LOG_ERR, "%s: failed to build match/target", "add_pinhole");
+		free(match);
+		free(target);
+		free(e);
+		return -1;
+	}
 	tmp = realloc(e, sizeof(struct ip6t_entry)
 	               + match->u.match_size
 	               + target->u.target_size);
