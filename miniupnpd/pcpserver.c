@@ -1035,7 +1035,10 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 		       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
 		       proto_itoa(pcp_msg_info->protocol));
 		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
-		return r >= 0 ? PCP_SUCCESS : PCP_ERR_NO_RESOURCES;
+		if (r < 0)
+			return PCP_ERR_NO_RESOURCES;
+		pcp_msg_info->ext_port = pcp_msg_info->int_port;
+		return PCP_SUCCESS;
 	} else {
 		/* create new */
 		r = upnp_add_inboundpinhole(NULL, 0,
