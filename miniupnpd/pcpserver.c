@@ -1510,7 +1510,7 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	case PCP_ERR_ADDRESS_MISMATCH:
 	case PCP_ERR_CANNOT_PROVIDE_EXTERNAL:
 	case PCP_ERR_EXCESSIVE_REMOTE_PEERS:
-		WRITENU32(response + 4, 0);	/* lifetime */
+		WRITENU32(response + 4, 1800);	/* lifetime, 30 minutes as RFC 6887 recommends */
 		break;
 
 	case PCP_ERR_NETWORK_FAILURE:
