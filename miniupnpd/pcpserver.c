@@ -1247,11 +1247,9 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	}
 
 	if (pcp_msg_info->pfailure_present) {
-		if ( (IN6_IS_ADDR_UNSPECIFIED(pcp_msg_info->ext_ip) ||
-		      ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->ext_ip)) &&
-		       (((uint32_t*)pcp_msg_info->ext_ip->s6_addr)[3] == 0))) &&
-		     (pcp_msg_info->ext_port == 0)
-		   )
+		/* RFC 6887 section 13.2 requires a nonzero suggested port,
+		 * even when a suggested external address is supplied. */
+		if (pcp_msg_info->ext_port == 0)
 		{
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
