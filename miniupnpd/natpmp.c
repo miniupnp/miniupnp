@@ -222,6 +222,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 {
 	unsigned char *req=msg_buff;	/* request udp packet */
 	unsigned char resp[32];	/* response udp packet */
+	unsigned char *response = resp;
 	int resplen;
 	int n = len;
 	char senderaddrstr[16];
@@ -409,8 +410,15 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		break;
 	default:
 		resp[3] = 5;	/* Unsupported OPCODE */
+		/* RFC 6886 section 3.5: preserve the unsupported request's
+		 * payload after the common response header. */
+		if (n > 8) {
+			memcpy(msg_buff, resp, 8);
+			response = msg_buff;
+			resplen = n;
+		}
 	}
-	n = sendto_or_schedule(s, resp, resplen, 0,
+	n = sendto_or_schedule(s, response, resplen, 0,
 	           (struct sockaddr *)senderaddr, sizeof(*senderaddr));
 	if(n<0) {
 		syslog(LOG_ERR, "sendto(natpmp): %m");
