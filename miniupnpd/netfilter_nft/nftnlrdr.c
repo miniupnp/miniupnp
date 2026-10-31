@@ -194,13 +194,16 @@ add_redirect_rule2(const char * ifname,
 {
 	int ret;
 	struct nftnl_rule *r;
-	UNUSED(rhost);
+	in_addr_t rhost_addr = 0;
 
 	d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
 	          ifname, rhost, eport, iaddr, iport, proto, desc));
 
+	if (rhost != NULL && strcmp(rhost, "") != 0 && strcmp(rhost, "*") != 0) {
+		rhost_addr = inet_addr(rhost);
+	}
 	r = rule_set_dnat(nft_nat_family, ifname, proto,
-	                  0, eport,
+	                  rhost_addr, eport,
 	                  inet_addr(iaddr), iport,  desc, NULL);
 
 	ret = nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
@@ -601,14 +604,25 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 	struct in_addr addr;
 	UNUSED(nat_chain_name);
 	UNUSED(ifname);
-	UNUSED(rhost);
-	UNUSED(rhostlen);
 
 	refresh_nft_cache_redirect();
 
 	LIST_FOREACH(p, &head_redirect, entry) {
 		if (p->proto == proto &&
 		    p->dport == eport) {
+
+			if (rhost != NULL && rhostlen > 0) {
+				if (p->saddr) {
+					addr.s_addr = p->saddr;
+					if (inet_ntop(AF_INET, &addr, rhost, rhostlen) == NULL) {
+						syslog(LOG_ERR, "%s: inet_ntop: %m",
+						       "get_nat_redirect_rule");
+						rhost[0] = '\0';
+					}
+				} else {
+					rhost[0] = '\0';
+				}
+			}
 
 			if (p->nat_addr && iaddr) {
 				addr.s_addr = p->nat_addr;
