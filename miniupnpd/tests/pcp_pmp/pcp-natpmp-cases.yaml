@@ -25,6 +25,7 @@ sections:
       kind: pcp_header
       version: 2
       opcode: 0
+      client: source
     expect:
       kind: response
       length: 24
