@@ -1641,7 +1641,12 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 		createPCPResponse(buff, &pcp_msg_info);
 
-		if(len < PCP_MIN_LEN)
+		/* ANNOUNCE has no opcode payload or response options.  Keep
+		 * the request payload only when returning an error (section 8.2). */
+		if(pcp_msg_info.opcode == PCP_OPCODE_ANNOUNCE &&
+		   pcp_msg_info.result_code == PCP_SUCCESS)
+			len = PCP_COMMON_RESPONSE_SIZE;
+		else if(len < PCP_MIN_LEN)
 			len = PCP_MIN_LEN;
 		else if(len > PCP_MAX_LEN)
 			len = PCP_MAX_LEN;
