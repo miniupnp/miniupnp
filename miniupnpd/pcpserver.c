@@ -1612,6 +1612,11 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		/* discarding PCP responses silently */
 		return 0;
 	}
+	/* Preserve the request header even when the packet is too short for
+	 * processPCPRequest() to parse the common PCP header. Error responses for
+	 * malformed requests still need to identify the request's version/opcode. */
+	pcp_msg_info.version = buff[0];
+	pcp_msg_info.opcode = buff[1] & 0x7f;
 
 	/* If we're in allow third party-mode, we probably don't care
 	 * about locality either. Let's hope firewall is ok. */
