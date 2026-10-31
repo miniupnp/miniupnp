@@ -972,6 +972,14 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			/* at least one eport allowed (but none available) */
 			return PCP_ERR_NO_RESOURCES;
 		}
+		/* RFC 6887 section 11.3 reserves this UDP port for PCP. */
+		if (pcp_msg_info->protocol == IPPROTO_UDP &&
+		    pcp_msg_info->ext_port == 5350) {
+			if (pcp_msg_info->pfailure_present)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			pcp_msg_info->ext_port++;
+			continue;
+		}
 		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
 		     (!check_upnp_rule_against_permissions(upnppermlist,
 							   num_upnpperm, pcp_msg_info->ext_port,
