@@ -924,10 +924,28 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
+	int index, proto_old;
 	char iaddr_old[INET6_ADDRSTRLEN];
 	uint16_t iport_old, eport_first = 0;
+	unsigned short eport_old;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+
+	/* RFC 6887 section 11.3: the mapping key uses the internal
+	 * address, protocol and port, not the suggested external port. */
+	for (index = 0;
+	     get_redirect_rule_by_index(index, NULL, &eport_old,
+	                               iaddr_old, sizeof(iaddr_old), &iport_old,
+	                               &proto_old, NULL, 0, NULL, 0,
+	                               NULL, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == pcp_msg_info->protocol &&
+		    iport_old == pcp_msg_info->int_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
+			pcp_msg_info->ext_port = eport_old;
+			break;
+		}
+	}
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
