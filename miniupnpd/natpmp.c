@@ -334,6 +334,27 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
 				char desc[64];
+				int index, proto_old;
+				unsigned short eport_old;
+				/* RFC 6886 section 3.3: a retry is identified by its
+				 * internal tuple, regardless of the suggested port. */
+				for (index = 0;
+				     get_redirect_rule_by_index(index, NULL, &eport_old,
+				                                iaddr_old, sizeof(iaddr_old),
+				                                &iport_old, &proto_old,
+				                                desc, sizeof(desc), NULL, 0,
+				                                NULL, NULL, NULL) >= 0;
+				     index++) {
+					if (proto_old == proto && iport_old == iport &&
+					    strcmp(senderaddrstr, iaddr_old) == 0) {
+						if (strncmp(desc, "NAT-PMP ", 8) != 0) {
+							resp[3] = 2; /* Not Authorized/Refused */
+							break;
+						}
+						eport = eport_old;
+						break;
+					}
+				}
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {
