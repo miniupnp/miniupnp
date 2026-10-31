@@ -1381,8 +1381,13 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 		 * http://tools.ietf.org/html/rfc6887 */
 		switch (pcp_msg_info->opcode) {
 		case PCP_OPCODE_ANNOUNCE:
-			/* should check PCP Client's IP Address in request */
-			/* see http://tools.ietf.org/html/rfc6887#section-14.1 */
+			/* RFC 6887 section 14.1: the client address must match
+			 * the packet source address. */
+			if (memcmp(pcp_msg_info->int_ip, &pcp_msg_info->sender_ip,
+			           sizeof(pcp_msg_info->sender_ip)) != 0) {
+				pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
+				break;
+			}
 			break;
 		case PCP_OPCODE_MAP:
 
