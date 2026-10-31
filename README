@@ -66,6 +66,7 @@ Thanks to :
     * Pali Rohár
     * Brian John
     * Ivan Shapovalov
+    * Thomas Gallaway
 
 # Foreword
 The MiniUPnP project offers software which supports the UPnP Internet Gateway Device (IGD) specifications. NAT-PMP and PCP support was added to MiniUPnPd. For client side NAT-PMP support, use libnatpmp.
