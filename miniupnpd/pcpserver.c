@@ -1551,6 +1551,11 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 
 	if (response[1] == 0x81) { /* MAP response */
+		if (pcp_msg_info->is_map_op) {
+			/* Reserved bytes follow Protocol in either MAP version. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+		}
 		if (response[0] == 1) {	/* version */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
