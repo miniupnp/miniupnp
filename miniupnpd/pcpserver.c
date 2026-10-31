@@ -1135,6 +1135,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	uint16_t iport = pcp_msg_info->int_port;  /* private port */
 	uint8_t  proto = pcp_msg_info->protocol;
 	int r=-1;
+	int found = 0;
 	/* remove the mapping */
 	/* remove all the mappings for this client */
 	unsigned short eport2, iport2;
@@ -1159,6 +1160,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
 			   && (proto2==proto)
 			   && ((iport2==iport) || (iport==0))) {
+				found = 1;
 				if(0 != strcmp(desc, pcp_msg_info->desc)) {
 					/* nonce does not match */
 					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
@@ -1171,6 +1173,9 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				break;
 			}
 		}
+		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */
+		if (!found)
+			return;
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
