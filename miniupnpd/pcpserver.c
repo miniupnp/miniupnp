@@ -972,9 +972,9 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			/* at least one eport allowed (but none available) */
 			return PCP_ERR_NO_RESOURCES;
 		}
-		/* RFC 6887 section 11.3 reserves this UDP port for PCP. */
+		/* RFC 6887 section 11.3 reserves these UDP ports for PCP. */
 		if (pcp_msg_info->protocol == IPPROTO_UDP &&
-		    pcp_msg_info->ext_port == 5350) {
+		    (pcp_msg_info->ext_port == 5350 || pcp_msg_info->ext_port == 5351)) {
 			if (pcp_msg_info->pfailure_present)
 				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			pcp_msg_info->ext_port++;
