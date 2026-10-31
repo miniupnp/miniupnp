@@ -1612,6 +1612,10 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		/* discarding PCP responses silently */
 		return 0;
 	}
+	/* Preserve the request header so malformed and oversized packets can
+	 * receive an error response with the correct version and opcode. */
+	pcp_msg_info.version = buff[0];
+	pcp_msg_info.opcode = buff[1] & 0x7f;
 
 	/* If we're in allow third party-mode, we probably don't care
 	 * about locality either. Let's hope firewall is ok. */
