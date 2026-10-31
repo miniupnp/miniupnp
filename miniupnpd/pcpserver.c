@@ -475,6 +475,13 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 	case PCP_OPTION_PREF_FAIL:
 
+		/* RFC 6887 section 12.1 forbids PREFER_FAILURE on PEER,
+		 * including deletion requests. */
+		if (pcp_msg_info->opcode == PCP_OPCODE_PEER) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
+			return 0;
+		}
+
 		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE ||
 		    pcp_msg_info->lifetime == 0) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
@@ -708,7 +715,7 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
 	struct sockaddr_storage extip;
-	struct sockaddr_storage ret_extip;
+	struct sockaddr_storage ret_extip = {0};
 
 	uint8_t  proto = pcp_msg_info->protocol;
 
@@ -718,6 +725,10 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	time_t timestamp = upnp_time() + pcp_msg_info->lifetime;
 	int r;
 	const char * ext_if = ext_if_name;
+	int index, proto_old;
+	unsigned short eport_old, iport_old, rport_old;
+	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
@@ -728,6 +739,26 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 
 	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
+
+	/* RFC 6887 sections 12.3 and 15.1: authenticate the full PEER
+	 * mapping key before refreshing it or adding any rules. */
+	for (index = 0;
+	     get_peer_rule_by_index(index, NULL, &eport_old,
+	                            iaddr_old, sizeof(iaddr_old), &iport_old,
+	                            &proto_old, desc_old, sizeof(desc_old),
+	                            rhost_old, sizeof(rhost_old), &rport_old,
+	                            NULL, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
+		    rport_old == pcp_msg_info->peer_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0 &&
+		    strcmp(rhost_old, peerip_s) == 0) {
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0)
+				return PCP_ERR_NOT_AUTHORIZED;
+			eport = eport_old;
+			break;
+		}
+	}
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
@@ -924,10 +955,37 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
+	int index, proto_old;
 	char iaddr_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
+	unsigned short eport_old;
+	unsigned int timestamp_old;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+
+	/* RFC 6887 section 11.3: the mapping key uses the internal
+	 * address, protocol and port, not the suggested external port. */
+	for (index = 0;
+	     get_redirect_rule_by_index(index, NULL, &eport_old,
+	                               iaddr_old, sizeof(iaddr_old), &iport_old,
+	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
+	                               &timestamp_old, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == pcp_msg_info->protocol &&
+		    iport_old == pcp_msg_info->int_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
+			/* Check ownership before changing any state, even when the
+			 * client suggests a different external port. */
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
+				if (timestamp_old > upnp_time())
+					pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+			pcp_msg_info->ext_port = eport_old;
+			break;
+		}
+	}
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -947,6 +1005,14 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				return PCP_ERR_NOT_AUTHORIZED;
 			/* at least one eport allowed (but none available) */
 			return PCP_ERR_NO_RESOURCES;
+		}
+		/* RFC 6887 section 11.3 reserves these UDP ports for PCP. */
+		if (pcp_msg_info->protocol == IPPROTO_UDP &&
+		    (pcp_msg_info->ext_port == 5350 || pcp_msg_info->ext_port == 5351)) {
+			if (pcp_msg_info->pfailure_present)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			pcp_msg_info->ext_port++;
+			continue;
 		}
 		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
 		     (!check_upnp_rule_against_permissions(upnppermlist,
@@ -1127,6 +1193,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	uint16_t iport = pcp_msg_info->int_port;  /* private port */
 	uint8_t  proto = pcp_msg_info->protocol;
 	int r=-1;
+	int found = 0;
 	/* remove the mapping */
 	/* remove all the mappings for this client */
 	unsigned short eport2, iport2;
@@ -1151,6 +1218,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
 			   && (proto2==proto)
 			   && ((iport2==iport) || (iport==0))) {
+				found = 1;
 				if(0 != strcmp(desc, pcp_msg_info->desc)) {
 					/* nonce does not match */
 					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
@@ -1163,6 +1231,9 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				break;
 			}
 		}
+		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */
+		if (!found)
+			return;
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
