@@ -1630,6 +1630,8 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 		if(len < PCP_MIN_LEN)
 			len = PCP_MIN_LEN;
+		else if(len > PCP_MAX_LEN)
+			len = PCP_MAX_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
 		len = sendto_or_schedule2(s, buff, len, 0, senderaddr,
