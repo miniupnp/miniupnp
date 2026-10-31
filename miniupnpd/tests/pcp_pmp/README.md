@@ -161,6 +161,8 @@ python3 miniupnpd/tests/pcp_pmp/tools/compare_pcaps.py \
 
 The report includes a packet overview with frame numbers, UTC times and UDP
 endpoints, followed by before/after field tables. It decodes PCP common headers,
+IPv4 and IPv6 headers (including source and destination addresses, IPv4 options,
+and supported IPv6 extension headers), UDP ports,
 v1/v2 MAP and PEER bodies, option framing and padding, THIRD_PARTY, FILTER and
 PORT_SET payloads, and NAT-PMP public-address and TCP/UDP mapping messages.
 Result codes are shown with names. Nonces, reserved bytes, option padding and

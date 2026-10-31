@@ -92,6 +92,7 @@ def udp_payload(frame, linktype):
     if not packet:
         raise ValueError('missing IP header')
     version = packet[0] >> 4
+    ip_fields = {'IP version': str(version)}
     if version == 4:
         if len(packet) < 20:
             raise ValueError('truncated IPv4 header')
@@ -104,11 +105,35 @@ def udp_payload(frame, linktype):
         if packet[9] != 17:
             return None
         source, dest = str(ipaddress.ip_address(packet[12:16])), str(ipaddress.ip_address(packet[16:20]))
+        fragment = int.from_bytes(packet[6:8], 'big')
+        ip_fields.update({
+            'IPv4 header length (bytes)': str(offset),
+            'IPv4 DSCP': str(packet[1] >> 2),
+            'IPv4 ECN': str(packet[1] & 3),
+            'IPv4 total length (bytes)': str(total),
+            'IPv4 identification': packet[4:6].hex(),
+            'IPv4 flags': str(fragment >> 13),
+            'IPv4 fragment offset': str(fragment & 0x1fff),
+            'IPv4 TTL': str(packet[8]),
+            'IPv4 protocol': named(packet[9], {17: 'UDP'}),
+            'IPv4 header checksum': packet[10:12].hex(),
+            'IPv4 options hex': packet[20:offset].hex(),
+        })
         packet = packet[:total]
     elif version == 6:
         if len(packet) < 40:
             raise ValueError('truncated IPv6 header')
         source, dest = str(ipaddress.ip_address(packet[8:24])), str(ipaddress.ip_address(packet[24:40]))
+        first_word = int.from_bytes(packet[:4], 'big')
+        ip_fields.update({
+            'IPv6 traffic class': str((first_word >> 20) & 255),
+            'IPv6 flow label': str(first_word & 0xfffff),
+            'IPv6 payload length (bytes)': str(int.from_bytes(packet[4:6], 'big')),
+            'IPv6 next header': named(packet[6], {0: 'HOP_BY_HOP', 17: 'UDP',
+                                                43: 'ROUTING', 44: 'FRAGMENT',
+                                                51: 'AH', 60: 'DESTINATION_OPTIONS'}),
+            'IPv6 hop limit': str(packet[7]),
+        })
         packet = packet[:40 + int.from_bytes(packet[4:6], 'big')]
         protocol, offset = packet[6], 40
         while protocol in (0, 43, 44, 51, 60):
@@ -117,6 +142,13 @@ def udp_payload(frame, linktype):
             if protocol == 44:
                 raise ValueError('IPv6 fragment header; reassembly is not supported')
             length = (packet[offset + 1] + 2) * 4 if protocol == 51 else (packet[offset + 1] + 1) * 8
+            if len(packet) < offset + length:
+                raise ValueError('truncated IPv6 extension header')
+            label = f'IPv6 extension at offset {offset}'
+            ip_fields[f'{label}: type'] = str(protocol)
+            ip_fields[f'{label}: next header'] = str(packet[offset])
+            ip_fields[f'{label}: length (bytes)'] = str(length)
+            ip_fields[f'{label}: hex'] = packet[offset:offset + length].hex()
             protocol, offset = packet[offset], offset + length
         if protocol != 17:
             return None
@@ -128,7 +160,9 @@ def udp_payload(frame, linktype):
     if length < 8:
         raise ValueError('invalid UDP length')
     payload = packet[offset + 8:offset + length]
-    return source, sport, dest, dport, payload, length - 8
+    ip_fields = {'IP version': str(version), 'IP source address': source,
+                 'IP destination address': dest, **ip_fields}
+    return source, sport, dest, dport, payload, length - 8, ip_fields
 
 
 class Fields:
@@ -275,11 +309,13 @@ def load_capture(path, port):
             continue
         if udp is None:
             continue
-        source, sport, dest, dport, data, declared = udp
+        source, sport, dest, dport, data, declared, ip_fields = udp
         if port not in (sport, dport):
             continue
         protocol, direction, opcode, fields = decode_protocol(data)
-        fields.values = {'UDP payload length (declared bytes)': str(declared), **fields.values}
+        fields.values = {**ip_fields, 'UDP source port': str(sport),
+                         'UDP destination port': str(dport),
+                         'UDP payload length (declared bytes)': str(declared), **fields.values}
         if truncated or len(data) != declared:
             fields.notes.append('capture or datagram is truncated; fields may be incomplete')
         packets.append({'frame': number, 'time': timestamp, 'source': f'[{source}]:{sport}',

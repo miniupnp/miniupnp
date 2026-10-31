@@ -135,6 +135,56 @@ class DecodeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'truncated pcap record'):
                 compare.load_capture(path, 5351)
 
+    def test_ip_headers_in_comparison(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / 'capture.pcap'
+            for ipv6, source, dest in ((False, '192.0.2.1', '192.0.2.2'),
+                                       (True, '2001:db8::1', '2001:db8::2')):
+                packet = bytearray(udp_packet(pcp(), ipv6=ipv6))
+                path.write_bytes(pcap_file(packet))
+                before, warnings = compare.load_capture(path, 5351)
+                self.assertFalse(warnings)
+                fields = before[0]['fields'].values
+                self.assertEqual(fields['IP source address'], source)
+                self.assertEqual(fields['IP destination address'], dest)
+                self.assertEqual(fields['UDP source port'], '12345')
+                self.assertEqual(fields['UDP destination port'], '5351')
+                self.assertIn('Client address', fields)
+                if ipv6:
+                    self.assertEqual(fields['IPv6 next header'], '0 (HOP_BY_HOP)')
+                    self.assertEqual(fields['IPv6 hop limit'], '64')
+                    self.assertEqual(fields['IPv6 extension at offset 40: hex'], '1100000000000000')
+                    source_offset = 8
+                else:
+                    self.assertEqual(fields['IPv4 header length (bytes)'], '20')
+                    self.assertEqual(fields['IPv4 protocol'], '17 (UDP)')
+                    self.assertEqual(fields['IPv4 TTL'], '64')
+                    source_offset = 12
+                # Change only the IP source; keep the PCP client address intact.
+                packet[source_offset] ^= 1
+                path.write_bytes(pcap_file(packet))
+                after, warnings = compare.load_capture(path, 5351)
+                report = compare.markdown(path, path, before, after, ([], warnings), False)
+                self.assertIn(f'| IP source address | {source} |', report)
+                self.assertIn(f"| IP destination address | {dest} | {dest} |  |", report)
+                self.assertIn('| Client address |', report)
+                changed = compare.markdown(path, path, before, after, ([], warnings), True)
+                self.assertIn('| IP source address |', changed)
+                self.assertNotIn('| IP destination address |', changed)
+
+    def test_ip_options_and_truncated_extension(self):
+        packet = bytearray(udp_packet(pcp()))
+        packet[0] = 0x46
+        packet[2:4] = (len(packet) + 4).to_bytes(2, 'big')
+        packet[20:20] = bytes.fromhex('01010000')
+        fields = compare.udp_payload(bytes(packet), 101)[6]
+        self.assertEqual(fields['IPv4 header length (bytes)'], '24')
+        self.assertEqual(fields['IPv4 options hex'], '01010000')
+        packet = bytearray(udp_packet(pcp(), ipv6=True))
+        packet[41] = 255
+        with self.assertRaisesRegex(ValueError, 'truncated IPv6 extension'):
+            compare.udp_payload(bytes(packet), 101)
+
 
 if __name__ == '__main__':
     unittest.main()
