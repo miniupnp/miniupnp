@@ -1640,6 +1640,10 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		/* discarding PCP responses silently */
 		return 0;
 	}
+	/* Preserve the request header so malformed and oversized packets can
+	 * receive an error response with the correct version and opcode. */
+	pcp_msg_info.version = buff[0];
+	pcp_msg_info.opcode = buff[1] & 0x7f;
 
 	/* If we're in allow third party-mode, we probably don't care
 	 * about locality either. Let's hope firewall is ok. */
@@ -1663,6 +1667,8 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			len = PCP_COMMON_RESPONSE_SIZE;
 		else if(len < PCP_MIN_LEN)
 			len = PCP_MIN_LEN;
+		else if(len > PCP_MAX_LEN)
+			len = PCP_MAX_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
 		len = sendto_or_schedule2(s, buff, len, 0, senderaddr,
