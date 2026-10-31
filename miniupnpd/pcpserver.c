@@ -705,7 +705,7 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
 	struct sockaddr_storage extip;
-	struct sockaddr_storage ret_extip;
+	struct sockaddr_storage ret_extip = {0};
 
 	uint8_t  proto = pcp_msg_info->protocol;
 
@@ -715,6 +715,10 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	time_t timestamp = upnp_time() + pcp_msg_info->lifetime;
 	int r;
 	const char * ext_if = ext_if_name;
+	int index, proto_old;
+	unsigned short eport_old, iport_old, rport_old;
+	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
@@ -725,6 +729,26 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 
 	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
+
+	/* RFC 6887 sections 12.3 and 15.1: authenticate the full PEER
+	 * mapping key before refreshing it or adding any rules. */
+	for (index = 0;
+	     get_peer_rule_by_index(index, NULL, &eport_old,
+	                            iaddr_old, sizeof(iaddr_old), &iport_old,
+	                            &proto_old, desc_old, sizeof(desc_old),
+	                            rhost_old, sizeof(rhost_old), &rport_old,
+	                            NULL, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
+		    rport_old == pcp_msg_info->peer_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0 &&
+		    strcmp(rhost_old, peerip_s) == 0) {
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0)
+				return PCP_ERR_NOT_AUTHORIZED;
+			eport = eport_old;
+			break;
+		}
+	}
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
