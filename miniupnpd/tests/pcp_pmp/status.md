@@ -1,6 +1,6 @@
 # PCP/NAT-PMP Test Status
 
-Updated: 2026-10-31T19:49:43+00:00
+Updated: 2026-10-31T21:27:04+00:00
 
 ## Run
 
@@ -9,8 +9,8 @@ Updated: 2026-10-31T19:49:43+00:00
 - Address family: `ipv4`
 - Server profile: `baseline`
 - Mapping lifecycle tests: `enabled`
-- Totals: **112 PASS**, **38 XFAIL**, **40 FAIL**, **15 SKIP**
-- Capture directory: `/pcp-pmp-captures/2026-10-31_20-49-10.894844616_all`
+- Totals: **141 PASS**, **33 XFAIL**, **16 FAIL**, **15 SKIP**
+- Capture directory: `/pcp-pmp-captures/2026-10-31_22-26-33.637170796_all`
 
 ## Results by section
 
@@ -24,15 +24,15 @@ Header handling, core opcodes, error responses, address-family behavior, and mal
 | unsupported-version | pcp | PASS | Send unsupported PCP version 3 and check the supported-version error response. |
 | unsupported-opcode-v2 | pcp | PASS | Send an unknown PCP v2 opcode and check UNSUPP_OPCODE. |
 | short-header | pcp | PASS | Send a two-byte PCP datagram; the server should silently discard it. |
-| minimum-short-header | pcp | FAIL | unexpected PCP response version 0 |
-| reserved-common-header | pcp | PASS | Set reserved common-header bits and check the server response. |
-| truncated-common-header | pcp | FAIL | unexpected PCP response version 0 |
+| minimum-short-header | pcp | PASS | Send a three-byte PCP header and check the malformed-request response. |
+| reserved-common-header | pcp | FAIL | unexpected result code 12 |
+| truncated-common-header | pcp | PASS | Remove one byte from the common PCP header. |
 | truncated-map-v1 | pcp | PASS | Send a PCP v1 MAP request without its MAP body. |
 | truncated-map-v2 | pcp | PASS | Send a PCP v2 MAP request without its MAP body. |
 | truncated-map-nonce-four-bytes | pcp | PASS | Truncate a v2 MAP body after only four of the twelve nonce bytes. |
 | truncated-map-nonce-eight-bytes | pcp | PASS | Truncate a v2 MAP body after only eight of the twelve nonce bytes. |
-| misaligned-length | pcp | FAIL | unexpected PCP response version 0 |
-| oversized-packet | pcp | FAIL | unexpected result code 0 |
+| misaligned-length | pcp | PASS | Append one byte to ANNOUNCE and verify error-response padding. |
+| oversized-packet | pcp | PASS | Send a datagram larger than PCP_MAX_LEN and check the capped error response. |
 | response-as-request | pcp | PASS | Set the response bit on a PCP packet and verify it is ignored. |
 | protocol-zero-nonzero-port | pcp | PASS | Send a MAP request using IP protocol zero and check invalid-parameter handling. |
 | prefer-failure-address-mismatch | pcp | PASS | Suggest a non-local external address with PREFER_FAILURE and check the mismatch error. |
@@ -61,7 +61,7 @@ Mutating MAP and PEER create, renew, and delete flows; enabled with --mutating.
 
 | Case | Protocol | Status | Result / note |
 |---|---|---|---|
-| pcp-then-pmp-same-mapping-refused | both | XFAIL | step 2 (natpmp): response matched none of the expected replies: unexpected natpmp result code 0; expected: Current backend allows NAT-PMP to replace a PCP-owned mapping with the same tuple; this case requires the PMP attempt to be refused. |
+| pcp-then-pmp-same-mapping-refused | both | PASS | Known-failure case met its expected behavior. |
 | pcp-then-pmp-port-conflict-preserves-pcp | both | PASS | Keep a PCP mapping on a requested public port, make a conflicting PMP request for another private port, then verify PMP uses a different port and PCP still renews its original mapping. |
 | map-v1-lifecycle | pcp | PASS | Create, renew with changed lifetimes, and delete a PCP v1 MAP. |
 | map-v2-lifecycle | pcp | PASS | Create, renew with changed lifetimes, and delete a PCP v2 MAP while checking its nonce. |
@@ -76,12 +76,12 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 
 | Case | Protocol | Status | Result / note |
 |---|---|---|---|
-| common-header-truncated-4 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-7 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-8 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-12 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-16 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-20 | pcp | FAIL | unexpected PCP response version 0 |
+| common-header-truncated-4 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-7 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-8 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-12 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-16 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-20 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
 | map-body-truncated-28 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | map-body-truncated-36 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | map-body-truncated-40 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
@@ -97,25 +97,25 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 | peer-body-truncated-68 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | peer-body-truncated-72 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | peer-body-truncated-76 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
-| announce-client-address-mismatch | pcp | FAIL | unexpected result code 0 |
+| announce-client-address-mismatch | pcp | PASS | RFC 6887 §8.2: reject a replicated client address that differs from the packet source. |
 | map-client-address-mismatch | pcp | PASS | RFC 6887 §8.2: reject a replicated client address that differs from the packet source. |
-| announce-misaligned-1 | pcp | FAIL | unexpected PCP response version 0 |
-| announce-misaligned-2 | pcp | FAIL | unexpected PCP response version 0 |
-| announce-misaligned-3 | pcp | FAIL | unexpected PCP response version 0 |
-| oversized-announce-1101 | pcp | FAIL | unexpected result code 0 |
-| oversized-announce-1102 | pcp | FAIL | unexpected result code 0 |
-| oversized-announce-1103 | pcp | FAIL | unexpected result code 0 |
-| oversized-announce-1105 | pcp | FAIL | unexpected result code 0 |
+| announce-misaligned-1 | pcp | PASS | RFC 6887 §8.2: pad a misaligned request to a multiple of four bytes in its error response. |
+| announce-misaligned-2 | pcp | PASS | RFC 6887 §8.2: pad a misaligned request to a multiple of four bytes in its error response. |
+| announce-misaligned-3 | pcp | PASS | RFC 6887 §8.2: pad a misaligned request to a multiple of four bytes in its error response. |
+| oversized-announce-1101 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
+| oversized-announce-1102 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
+| oversized-announce-1103 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
+| oversized-announce-1105 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
 | prefer-failure-invalid-length-1 | pcp | PASS | RFC 6887 §§7.3, 13.2: PREFER_FAILURE has a zero-byte payload; reject other lengths. |
 | prefer-failure-invalid-length-2 | pcp | PASS | RFC 6887 §§7.3, 13.2: PREFER_FAILURE has a zero-byte payload; reject other lengths. |
 | prefer-failure-invalid-length-4 | pcp | PASS | RFC 6887 §§7.3, 13.2: PREFER_FAILURE has a zero-byte payload; reject other lengths. |
 | optional-option-length-overrun | pcp | PASS | RFC 6887 §7.3: malformed overall option structure is an error even when its option code is optional. |
-| filter-invalid-ipv4-prefix-129 | pcp | XFAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0; expected: FILTER handling is incomplete; miniupnpd checks the option length but does not validate its prefix length. |
-| filter-invalid-ipv4-prefix-95 | pcp | XFAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0; expected: FILTER handling is incomplete; miniupnpd checks the option length but does not validate its prefix length. |
-| filter-invalid-ipv6-prefix-129 | pcp | XFAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0; expected: FILTER handling is incomplete; miniupnpd checks the option length but does not validate its prefix length. |
-| filter-on-map-deletion | pcp | FAIL | unexpected result code 8 |
-| prefer-failure-on-map-deletion | pcp | FAIL | unexpected result code 8 |
-| prefer-failure-zero-port-explicit-address | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0 |
+| filter-invalid-ipv4-prefix-129 | pcp | PASS | Known-failure case met its expected behavior. |
+| filter-invalid-ipv4-prefix-95 | pcp | PASS | Known-failure case met its expected behavior. |
+| filter-invalid-ipv6-prefix-129 | pcp | PASS | Known-failure case met its expected behavior. |
+| filter-on-map-deletion | pcp | PASS | RFC 6887 §13.3: FILTER in a MAP deletion must return MALFORMED_OPTION. |
+| prefer-failure-on-map-deletion | pcp | PASS | RFC 6887 §11.3: a mandatory option that does not make sense for deletion returns MALFORMED_OPTION. |
+| prefer-failure-zero-port-explicit-address | pcp | PASS | RFC 6887 §13.2: PREFER_FAILURE with zero suggested port is malformed even with a nonzero suggested address. |
 | map-udp-renew-changed-suggestion | pcp | FAIL | step 2 (pcp_map): response matched none of the expected replies: port was 50217, expected 50117 |
 | map-udp-renew-zero-suggestion | pcp | PASS | RFC 6887 §11.3: renewal with the same mapping key and nonce must return the existing external port, regardless of a changed or zero suggestion. |
 | map-udp-delete-nonexistent | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 8 |
@@ -131,14 +131,14 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 | optional-unknown-option-padding-1 | pcp | XFAIL | step 1 (pcp_map): response matched none of the expected replies: expected 60-byte pcp response, got 68; expected: miniupnpd echoes unprocessed optional options in replies; response option omission is not implemented. |
 | optional-unknown-option-padding-2 | pcp | XFAIL | step 1 (pcp_map): response matched none of the expected replies: expected 60-byte pcp response, got 68; expected: miniupnpd echoes unprocessed optional options in replies; response option omission is not implemented. |
 | optional-unknown-option-padding-3 | pcp | XFAIL | step 1 (pcp_map): response matched none of the expected replies: expected 60-byte pcp response, got 68; expected: miniupnpd echoes unprocessed optional options in replies; response option omission is not implemented. |
-| map-reserved-body-ignored-and-cleared | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: protocol_and_reserved was 301989887, expected 285212672 |
-| peer-reserved-body-ignored-and-cleared | pcp | FAIL | step 1 (pcp_peer): response matched none of the expected replies: protocol_and_reserved was 301989887, expected 285212672 |
-| peer-prefer-failure-forbidden | pcp | PASS | RFC 6887 §12.1: PREFER_FAILURE is not allowed on PEER and must return MALFORMED_REQUEST. |
+| map-reserved-body-ignored-and-cleared | pcp | PASS | RFC 6887 §11.1: ignore MAP reserved bytes on reception, but clear them in responses. |
+| peer-reserved-body-ignored-and-cleared | pcp | PASS | RFC 6887 §12.1: ignore PEER reserved fields in requests and transmit zeros in responses. |
+| peer-prefer-failure-forbidden | pcp | FAIL | unexpected result code 6 |
 | announce-epoch-and-reserved-response | pcp | PASS | RFC 6887 §§7.2, 8.5: repeated ANNOUNCE replies have nondecreasing epochs and zero common reserved fields; this does not check reboot reset or clock rate. |
-| announce-ignores-lifetime-300 | pcp | FAIL | ANNOUNCE lifetime was 300, expected 0 |
-| announce-ignores-lifetime-4294967295 | pcp | FAIL | ANNOUNCE lifetime was 600, expected 0 |
-| announce-mandatory-unknown-option | pcp | FAIL | unexpected result code 0 |
-| announce-optional-unknown-option | pcp | XFAIL | expected 24-byte response, got 28; expected: miniupnpd echoes unprocessed optional options in replies; response option omission is not implemented. |
+| announce-ignores-lifetime-300 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
+| announce-ignores-lifetime-4294967295 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
+| announce-mandatory-unknown-option | pcp | PASS | RFC 6887 §§7.3, 14.1: apply mandatory/optional option processing to ANNOUNCE; omit ignored options on success. |
+| announce-optional-unknown-option | pcp | PASS | Known-failure case met its expected behavior. |
 | map-reserved-pcp-udp-port-5350 | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0 |
 | map-reserved-pcp-udp-port-5351 | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0 |
 | peer-wrong-nonce-refresh | pcp | FAIL | step 2 (pcp_peer): response matched none of the expected replies: unexpected pcp result code 0 |
@@ -273,7 +273,7 @@ Public address, mapping request validation, malformed traffic, and mutating UDP/
 
 # PCP/NAT-PMP Test Status
 
-Updated: 2026-10-31T19:49:49+00:00
+Updated: 2026-10-31T21:27:10+00:00
 
 ## Run
 
@@ -282,8 +282,8 @@ Updated: 2026-10-31T19:49:49+00:00
 - Address family: `ipv6`
 - Server profile: `baseline`
 - Mapping lifecycle tests: `enabled`
-- Totals: **58 PASS**, **30 XFAIL**, **23 FAIL**, **13 SKIP**
-- Capture directory: `/pcp-pmp-captures/2026-10-31_20-49-10.894844616_all`
+- Totals: **81 PASS**, **29 XFAIL**, **1 FAIL**, **13 SKIP**
+- Capture directory: `/pcp-pmp-captures/2026-10-31_22-26-33.637170796_all`
 
 ## Results by section
 
@@ -297,15 +297,15 @@ Header handling, core opcodes, error responses, address-family behavior, and mal
 | unsupported-version | pcp | PASS | Send unsupported PCP version 3 and check the supported-version error response. |
 | unsupported-opcode-v2 | pcp | PASS | Send an unknown PCP v2 opcode and check UNSUPP_OPCODE. |
 | short-header | pcp | PASS | Send a two-byte PCP datagram; the server should silently discard it. |
-| minimum-short-header | pcp | FAIL | unexpected PCP response version 0 |
-| reserved-common-header | pcp | PASS | Set reserved common-header bits and check the server response. |
-| truncated-common-header | pcp | FAIL | unexpected PCP response version 0 |
+| minimum-short-header | pcp | PASS | Send a three-byte PCP header and check the malformed-request response. |
+| reserved-common-header | pcp | FAIL | unexpected result code 12 |
+| truncated-common-header | pcp | PASS | Remove one byte from the common PCP header. |
 | truncated-map-v1 | pcp | PASS | Send a PCP v1 MAP request without its MAP body. |
 | truncated-map-v2 | pcp | PASS | Send a PCP v2 MAP request without its MAP body. |
 | truncated-map-nonce-four-bytes | pcp | PASS | Truncate a v2 MAP body after only four of the twelve nonce bytes. |
 | truncated-map-nonce-eight-bytes | pcp | PASS | Truncate a v2 MAP body after only eight of the twelve nonce bytes. |
-| misaligned-length | pcp | FAIL | unexpected PCP response version 0 |
-| oversized-packet | pcp | FAIL | unexpected result code 0 |
+| misaligned-length | pcp | PASS | Append one byte to ANNOUNCE and verify error-response padding. |
+| oversized-packet | pcp | PASS | Send a datagram larger than PCP_MAX_LEN and check the capped error response. |
 | response-as-request | pcp | PASS | Set the response bit on a PCP packet and verify it is ignored. |
 | protocol-zero-nonzero-port | pcp | PASS | Send a MAP request using IP protocol zero and check invalid-parameter handling. |
 | ipv6-source-address | pcp | PASS | Send PCP over IPv6 using the actual IPv6 source address in the client field. |
@@ -333,12 +333,12 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 
 | Case | Protocol | Status | Result / note |
 |---|---|---|---|
-| common-header-truncated-4 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-7 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-8 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-12 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-16 | pcp | FAIL | unexpected PCP response version 0 |
-| common-header-truncated-20 | pcp | FAIL | unexpected PCP response version 0 |
+| common-header-truncated-4 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-7 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-8 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-12 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-16 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
+| common-header-truncated-20 | pcp | PASS | RFC 6887 §8.2: a common header shorter than 24 bytes gets a 24-byte MALFORMED_REQUEST response. |
 | map-body-truncated-28 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | map-body-truncated-36 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | map-body-truncated-40 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
@@ -354,26 +354,26 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 | peer-body-truncated-68 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | peer-body-truncated-72 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
 | peer-body-truncated-76 | pcp | PASS | RFC 6887 §§8.2, 11.1, 12.1: reject an incomplete opcode body; preserve the opcode in the padded error response. |
-| announce-client-address-mismatch | pcp | FAIL | unexpected result code 0 |
+| announce-client-address-mismatch | pcp | PASS | RFC 6887 §8.2: reject a replicated client address that differs from the packet source. |
 | map-client-address-mismatch | pcp | PASS | RFC 6887 §8.2: reject a replicated client address that differs from the packet source. |
-| announce-misaligned-1 | pcp | FAIL | unexpected PCP response version 0 |
-| announce-misaligned-2 | pcp | FAIL | unexpected PCP response version 0 |
-| announce-misaligned-3 | pcp | FAIL | unexpected PCP response version 0 |
-| oversized-announce-1101 | pcp | FAIL | unexpected result code 0 |
-| oversized-announce-1102 | pcp | FAIL | unexpected result code 0 |
-| oversized-announce-1103 | pcp | FAIL | unexpected result code 0 |
-| oversized-announce-1105 | pcp | FAIL | unexpected result code 0 |
+| announce-misaligned-1 | pcp | PASS | RFC 6887 §8.2: pad a misaligned request to a multiple of four bytes in its error response. |
+| announce-misaligned-2 | pcp | PASS | RFC 6887 §8.2: pad a misaligned request to a multiple of four bytes in its error response. |
+| announce-misaligned-3 | pcp | PASS | RFC 6887 §8.2: pad a misaligned request to a multiple of four bytes in its error response. |
+| oversized-announce-1101 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
+| oversized-announce-1102 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
+| oversized-announce-1103 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
+| oversized-announce-1105 | pcp | PASS | RFC 6887 §§7, 8.2: detect a request beyond 1100 bytes and cap the error at 1100 bytes. |
 | prefer-failure-invalid-length-1 | pcp | PASS | RFC 6887 §§7.3, 13.2: PREFER_FAILURE has a zero-byte payload; reject other lengths. |
 | prefer-failure-invalid-length-2 | pcp | PASS | RFC 6887 §§7.3, 13.2: PREFER_FAILURE has a zero-byte payload; reject other lengths. |
 | prefer-failure-invalid-length-4 | pcp | PASS | RFC 6887 §§7.3, 13.2: PREFER_FAILURE has a zero-byte payload; reject other lengths. |
 | optional-option-length-overrun | pcp | PASS | RFC 6887 §7.3: malformed overall option structure is an error even when its option code is optional. |
-| filter-on-map-deletion | pcp | FAIL | unexpected result code 0 |
-| prefer-failure-on-map-deletion | pcp | FAIL | unexpected result code 0 |
+| filter-on-map-deletion | pcp | PASS | RFC 6887 §13.3: FILTER in a MAP deletion must return MALFORMED_OPTION. |
+| prefer-failure-on-map-deletion | pcp | PASS | RFC 6887 §11.3: a mandatory option that does not make sense for deletion returns MALFORMED_OPTION. |
 | announce-epoch-and-reserved-response | pcp | PASS | RFC 6887 §§7.2, 8.5: repeated ANNOUNCE replies have nondecreasing epochs and zero common reserved fields; this does not check reboot reset or clock rate. |
-| announce-ignores-lifetime-300 | pcp | FAIL | ANNOUNCE lifetime was 300, expected 0 |
-| announce-ignores-lifetime-4294967295 | pcp | FAIL | ANNOUNCE lifetime was 600, expected 0 |
-| announce-mandatory-unknown-option | pcp | FAIL | unexpected result code 0 |
-| announce-optional-unknown-option | pcp | XFAIL | expected 24-byte response, got 28; expected: miniupnpd echoes unprocessed optional options in replies; response option omission is not implemented. |
+| announce-ignores-lifetime-300 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
+| announce-ignores-lifetime-4294967295 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
+| announce-mandatory-unknown-option | pcp | PASS | RFC 6887 §§7.3, 14.1: apply mandatory/optional option processing to ANNOUNCE; omit ignored options on success. |
+| announce-optional-unknown-option | pcp | PASS | Known-failure case met its expected behavior. |
 | map-error-echo-opcode-and-options | pcp | PASS | RFC 6887 §§7.3, 8.2: error responses preserve the complete opcode body and options. |
 | unsupported-opcode-echo-payload | pcp | PASS | RFC 6887 §8.2: preserve unknown opcode payload bytes in error responses. |
 | long-error-lifetime-default | pcp | PASS | RFC 6887 §7.4: long-lived errors SHOULD default to a 30-minute error lifetime. |
