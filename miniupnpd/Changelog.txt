@@ -5,6 +5,7 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
   netfilter: check calloc() failures in iptables rule builders
   nftables: support remote host in IPv4 port mappings
   PCP: fix answer a renewed PCP pinhole with its internal port
+  PCP: give long lifetime errors a lifetime
 
 2026/10/20:
   pf: fix IPv6 pinhole delete and IPv4 delete_nat_rule()
