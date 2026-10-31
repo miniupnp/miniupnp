@@ -142,8 +142,6 @@ addpeerdscprule(int proto, unsigned char dscp,
            const char * iaddr, unsigned short iport,
            const char * rhost, unsigned short rport);
 
-/* dummy init and shutdown functions
- * Only test iptc_init() */
 /* iptables >= 1.8.8 only registers the highest DNAT revision the kernel
  * supports, so a revision 0 rule is listed as "DNAT [unsupported revision]"
  * on Linux >= 4.18. Create DNAT rules with that same revision. (#837) */
@@ -217,6 +215,8 @@ set_dnat_target_port(struct ipt_entry_target * target, unsigned short port)
 	mr->range[0].min.all = mr->range[0].max.all = htons(port);
 }
 
+/* dummy init and shutdown functions
+ * Only test iptc_init() */
 int init_redirect(void)
 {
 	IPTC_HANDLE h;
