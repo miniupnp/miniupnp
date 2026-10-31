@@ -1390,6 +1390,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 				pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
 				break;
 			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 			break;
 		case PCP_OPCODE_MAP:
 
