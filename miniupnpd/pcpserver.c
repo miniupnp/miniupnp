@@ -475,7 +475,8 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 	case PCP_OPTION_PREF_FAIL:
 
-		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE) {
+		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE ||
+		    pcp_msg_info->lifetime == 0) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
@@ -496,7 +497,16 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 	case PCP_OPTION_FILTER:
 		/* TODO fully implement filter */
-		if (option_length != PCP_FILTER_OPTION_SIZE) {
+		if (option_length != PCP_FILTER_OPTION_SIZE ||
+		    pcp_msg_info->lifetime == 0) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+			return 0;
+		}
+		/* RFC 6887 section 13.3: IPv4 prefixes include the 96-bit
+		 * IPv4-mapped prefix; IPv6 prefixes range from 0 to 128. */
+		if (pcp_buf[5] > 128 ||
+		    (memcmp(pcp_buf + 8, "\0\0\0\0\0\0\0\0\0\0\xff\xff", 12) == 0 &&
+		     pcp_buf[5] < 96)) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
@@ -1237,11 +1247,9 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	}
 
 	if (pcp_msg_info->pfailure_present) {
-		if ( (IN6_IS_ADDR_UNSPECIFIED(pcp_msg_info->ext_ip) ||
-		      ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->ext_ip)) &&
-		       (((uint32_t*)pcp_msg_info->ext_ip->s6_addr)[3] == 0))) &&
-		     (pcp_msg_info->ext_port == 0)
-		   )
+		/* RFC 6887 section 13.2 requires a nonzero suggested port,
+		 * even when a suggested external address is supplied. */
+		if (pcp_msg_info->ext_port == 0)
 		{
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
@@ -1381,8 +1389,16 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 		 * http://tools.ietf.org/html/rfc6887 */
 		switch (pcp_msg_info->opcode) {
 		case PCP_OPCODE_ANNOUNCE:
-			/* should check PCP Client's IP Address in request */
-			/* see http://tools.ietf.org/html/rfc6887#section-14.1 */
+			/* Ignore Requested Lifetime (RFC 6887 section 14.1.1). */
+			pcp_msg_info->lifetime = 0;
+			/* RFC 6887 section 14.1: the client address must match
+			 * the packet source address. */
+			if (memcmp(pcp_msg_info->int_ip, &pcp_msg_info->sender_ip,
+			           sizeof(pcp_msg_info->sender_ip)) != 0) {
+				pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
+				break;
+			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 			break;
 		case PCP_OPCODE_MAP:
 
@@ -1535,6 +1551,11 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 
 	if (response[1] == 0x81) { /* MAP response */
+		if (pcp_msg_info->is_map_op) {
+			/* Reserved bytes follow Protocol in either MAP version. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+		}
 		if (response[0] == 1) {	/* version */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
@@ -1550,6 +1571,13 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 #ifdef PCP_PEER
 	else if (response[1] == 0x82) { /* PEER response */
+		if (pcp_msg_info->is_peer_op) {
+			/* Clear the reserved fields in a complete PEER body. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 38 : 26), 0, 2);
+		}
 		if (response[0] == 1) {
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
@@ -1628,7 +1656,12 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 		createPCPResponse(buff, &pcp_msg_info);
 
-		if(len < PCP_MIN_LEN)
+		/* ANNOUNCE has no opcode payload or response options.  Keep
+		 * the request payload only when returning an error (section 8.2). */
+		if(pcp_msg_info.opcode == PCP_OPCODE_ANNOUNCE &&
+		   pcp_msg_info.result_code == PCP_SUCCESS)
+			len = PCP_COMMON_RESPONSE_SIZE;
+		else if(len < PCP_MIN_LEN)
 			len = PCP_MIN_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
