@@ -500,6 +500,14 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
+		/* RFC 6887 section 13.3: IPv4 prefixes include the 96-bit
+		 * IPv4-mapped prefix; IPv6 prefixes range from 0 to 128. */
+		if (pcp_buf[5] > 128 ||
+		    (memcmp(pcp_buf + 8, "\0\0\0\0\0\0\0\0\0\0\xff\xff", 12) == 0 &&
+		     pcp_buf[5] < 96)) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+			return 0;
+		}
 #ifdef DEBUG
 		syslog(LOG_DEBUG, "PCP OPTION: \t Filter\n");
 #endif
