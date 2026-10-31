@@ -1381,6 +1381,8 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 		 * http://tools.ietf.org/html/rfc6887 */
 		switch (pcp_msg_info->opcode) {
 		case PCP_OPCODE_ANNOUNCE:
+			/* Ignore Requested Lifetime (RFC 6887 section 14.1.1). */
+			pcp_msg_info->lifetime = 0;
 			/* RFC 6887 section 14.1: the client address must match
 			 * the packet source address. */
 			if (memcmp(pcp_msg_info->int_ip, &pcp_msg_info->sender_ip,
