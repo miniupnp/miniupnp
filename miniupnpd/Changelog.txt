@@ -2,6 +2,7 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
 2026/10/31:
   pf: fix delete_nat_rule() to match the external port too.
+  netfilter: check calloc() failures in iptables rule builders
 
 2026/10/20:
   pf: fix IPv6 pinhole delete and IPv4 delete_nat_rule()
