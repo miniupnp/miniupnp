@@ -918,6 +918,34 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	uint16_t iport_old, eport_first = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+	unsigned short eport2, iport2;
+	char iaddr2[INET6_ADDRSTRLEN];
+	int proto2;
+	char desc[64];
+	int index;
+
+	/* In the Simple Threat Model, an existing PCP MAP mapping is identified
+	 * by its client address, protocol, internal port, and mapping nonce. */
+	for (index = 0;
+	     get_redirect_rule_by_index(index, 0,
+					&eport2, iaddr2, sizeof(iaddr2),
+					&iport2, &proto2,
+					desc, sizeof(desc),
+					0, 0, &timestamp, 0, 0) >= 0;
+	     index++) {
+		if (0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
+		    && proto2 == pcp_msg_info->protocol
+		    && iport2 == pcp_msg_info->int_port
+		    && 0 == strncmp(desc, "PCP MAP ", 8)
+		    && 0 != strcmp(desc, pcp_msg_info->desc)) {
+			syslog(LOG_ERR, "Unauthorized to update PCP MAP mapping internal port %hu, protocol %s",
+			       pcp_msg_info->int_port,
+			       proto_itoa(pcp_msg_info->protocol));
+			if (timestamp > upnp_time())
+				pcp_msg_info->error_lifetime = timestamp - upnp_time();
+			return PCP_ERR_NOT_AUTHORIZED;
+		}
+	}
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
