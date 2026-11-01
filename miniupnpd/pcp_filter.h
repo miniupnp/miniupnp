@@ -30,6 +30,42 @@ int nft_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
 int nft_pcp_filter_finish(struct pcp_filter_update *update, int commit);
 int nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
                          unsigned char protocol);
+#define PCP_FILTER_SUPPORTED
+#define pcp_filter_begin nft_pcp_filter_begin
+#define pcp_filter_finish nft_pcp_filter_finish
+#define pcp_filter_delete nft_pcp_filter_delete
+#endif
+
+#ifdef USE_PF
+struct pcp_filter_update;
+
+/* Same contract as the nftables functions, but the policy is stored in the
+ * rules of the mapping.  -3 means the address family is not supported. */
+int pf_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
+                        unsigned char protocol, const char *ifname,
+                        const struct pcp_filter *filters, unsigned int count,
+                        struct pcp_filter_update **update);
+int pf_pcp_filter_finish(struct pcp_filter_update *update, int commit);
+int pf_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
+                         unsigned char protocol);
+/* used by pf/pfpinhole.c */
+unsigned int pf_pcp_pending_filters6(const struct in6_addr *address,
+                                     unsigned short port, int protocol,
+                                     const struct pcp_filter **filters);
+unsigned int pf_pinhole_group_get(const struct in6_addr *dst, unsigned short port,
+                                  int proto, struct pcp_filter *filters,
+                                  unsigned int max, unsigned int *nfilters,
+                                  char *desc, int desclen,
+                                  unsigned int *timestamp, char *ifname);
+int pf_pinhole_group_add(const char *ifname, const struct in6_addr *dst,
+                         unsigned short port, int proto, const char *desc,
+                         unsigned int timestamp, const struct pcp_filter *f);
+int pf_pinhole_group_remove(const struct in6_addr *dst, unsigned short port,
+                            int proto, const struct pcp_filter *f);
+#define PCP_FILTER_SUPPORTED
+#define pcp_filter_begin pf_pcp_filter_begin
+#define pcp_filter_finish pf_pcp_filter_finish
+#define pcp_filter_delete pf_pcp_filter_delete
 #endif
 
 #endif

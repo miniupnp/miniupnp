@@ -97,8 +97,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifdef USE_NFTABLES
 #include "netfilter_nft/nftnlrdr.h"
 #endif
+#elif defined(USE_PF)
+#include "pf/obsdrdr.h"
 #else
-#error "PCP Peer is only supported with NETFILTER"
+#error "PCP Peer is only supported with NETFILTER or PF"
 #endif /* USE_NETFILTER */
 #endif /* PCP_PEER */
 
@@ -532,7 +534,7 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 			return 0;
 		}
-#ifndef USE_NFTABLES
+#ifndef PCP_FILTER_SUPPORTED
 		/* Never acknowledge a filter that the firewall cannot enforce. */
 		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
 		return 0;
@@ -1028,7 +1030,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 				return;
 			}
 			if (!pcp_msg_info->is_fw) {
-#ifdef USE_NFTABLES
+#if defined(USE_NFTABLES) || defined(USE_PF)
 				r = delete_peer_rule(iaddr2, iport2, rhost2, rport2, proto2);
 #else
 				r = _upnp_delete_redir(eport2, proto2);
@@ -1281,7 +1283,7 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
  * expresses the IPv6 address from its perspective.     */
 
 /* TODO: Support more than basic NAT44 / IPv6 firewall cases. */
-#ifdef USE_NFTABLES
+#ifdef PCP_FILTER_SUPPORTED
 /* FILTER changes must not precede mapping ownership checks.  The MAP paths
  * repeat these checks as part of their normal create/refresh operation. */
 static int CheckPCPFilterOwner(pcp_info_t *info, int *exists)
@@ -1327,7 +1329,7 @@ static int CheckPCPFilterOwner(pcp_info_t *info, int *exists)
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
 	int r;
-#ifdef USE_NFTABLES
+#ifdef PCP_FILTER_SUPPORTED
 	struct pcp_filter_update *update = NULL;
 	int exists;
 	r = CheckPCPFilterOwner(pcp_msg_info, &exists);
@@ -1337,7 +1339,7 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 	}
 	/* A previous failed deletion or daemon restart may have left a guard
 	 * after its mapping disappeared.  New mappings start without filters. */
-	if (!exists && nft_pcp_filter_delete(pcp_msg_info->mapped_ip,
+	if (!exists && pcp_filter_delete(pcp_msg_info->mapped_ip,
 	            pcp_msg_info->int_port, pcp_msg_info->protocol) < 0) {
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 		return;
@@ -1348,12 +1350,13 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 		if (pcp_msg_info->is_fw && ext_if_name6 && *ext_if_name6)
 			ifname = ext_if_name6;
 #endif
-		r = nft_pcp_filter_begin(pcp_msg_info->mapped_ip, pcp_msg_info->int_port,
+		r = pcp_filter_begin(pcp_msg_info->mapped_ip, pcp_msg_info->int_port,
 		                         pcp_msg_info->protocol, ifname,
 		                         pcp_msg_info->filters, pcp_msg_info->filter_count,
 		                         &update);
 		if (r < 0) {
-			pcp_msg_info->result_code = r == -2 ? PCP_ERR_EXCESSIVE_REMOTE_PEERS : PCP_ERR_NO_RESOURCES;
+			pcp_msg_info->result_code = r == -2 ? PCP_ERR_EXCESSIVE_REMOTE_PEERS :
+			                            r == -3 ? PCP_ERR_UNSUPP_OPTION : PCP_ERR_NO_RESOURCES;
 			return;
 		}
 	}
@@ -1363,8 +1366,8 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 		r = CreatePCPMap_FW(pcp_msg_info);
 	else
 		r = CreatePCPMap_NAT(pcp_msg_info);
-#ifdef USE_NFTABLES
-	if (nft_pcp_filter_finish(update, r == PCP_SUCCESS) < 0)
+#ifdef PCP_FILTER_SUPPORTED
+	if (pcp_filter_finish(update, r == PCP_SUCCESS) < 0)
 		r = PCP_ERR_NO_RESOURCES;
 #endif
 	pcp_msg_info->result_code = r;

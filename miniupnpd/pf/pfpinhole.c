@@ -38,6 +38,7 @@
 #include "../macros.h"
 #include "../upnputils.h"
 #include "rtickets.h"
+#include "../pcp_filter.h"
 
 /* the pass rules created by add_pinhole() are as follow :
  *
@@ -61,8 +62,12 @@ static int next_uid = 1;
 
 #define RULE (pr.rule)
 
-int add_pinhole(const char * ifname,
-                const char * rem_host, unsigned short rem_port,
+static int delete_pinhole_one(unsigned short uid);
+
+/* uid_in : the uid to use, 0 to allocate a new one
+ * prefix : length of the prefix of rem_host the source must match (1-128) */
+static int add_pinhole_ex(int uid_in, const char * ifname,
+                const char * rem_host, unsigned int prefix, unsigned short rem_port,
                 const char * int_client, unsigned short int_port,
                 int proto, const char * desc, unsigned int timestamp)
 {
@@ -116,7 +121,7 @@ int add_pinhole(const char * ifname,
 		RULE.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		RULE.keep_state = 1;
-		uid = next_uid;
+		uid = uid_in > 0 ? uid_in : next_uid;
 		snprintf(RULE.label, PF_RULE_LABEL_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
 		if(queue)
@@ -133,7 +138,12 @@ int add_pinhole(const char * ifname,
 			if(inet_pton(AF_INET6, rem_host, &RULE.src.addr.v.a.addr.v6) != 1) {
 				syslog(LOG_ERR, "inet_pton(%s) failed", rem_host);
 			}
-			memset(&RULE.src.addr.v.a.mask.addr8, 255, 16);
+			memset(&RULE.src.addr.v.a.mask.addr8, 0, 16);
+			{
+				unsigned int i;
+				for(i = 0; i < 16 && prefix > 0; i++, prefix = prefix >= 8 ? prefix - 8 : 0)
+					RULE.src.addr.v.a.mask.addr8[i] = prefix >= 8 ? 255 : (255 << (8 - prefix)) & 255;
+			}
 		}
 
 		RULE.dst.port_op = PF_OP_EQ;
@@ -160,10 +170,237 @@ int add_pinhole(const char * ifname,
 		}
 	}
 
-	if(++next_uid >= 65535) {
+	if(uid_in <= 0 && ++next_uid >= 65535) {
 		next_uid = 1;
 	}
 	return uid;
+}
+
+#ifdef USE_LIBPFCTL
+#define RULE_LABEL(r)	((r).label[0])
+#else
+#define RULE_LABEL(r)	((r).label)
+#endif
+
+/* pinholes created for a PCP MAP request have the description
+ * "PCP MAP <nonce>".  The pinholes of one mapping which has a FILTER policy
+ * (one pinhole per allowed remote peer) are managed as a group. */
+static int
+label_is_pcp_map(const char * label)
+{
+	const char * p = strchr(label, ':');
+	return p != NULL && strncmp(p + 1, " PCP MAP ", 9) == 0;
+}
+
+struct pinhole_rec {
+	int uid;
+	unsigned int ts;
+	struct in6_addr src, dst;
+	unsigned int prefix;
+	unsigned short sport, dport;
+	int proto;
+	char desc[PF_RULE_LABEL_SIZE];
+	char ifname[IFNAMSIZ];
+};
+
+/* get the index-th pinhole. returns 0 if found, -1 at the end of the list */
+static int
+pinhole_walk(int index, struct pinhole_rec * rec)
+{
+	int i, n, r = -1, count = 0;
+	unsigned int tnum = 0;
+#undef RULE
+#ifdef USE_LIBPFCTL
+	struct pfctl_rules_info ri;
+	struct pfctl_rule rule;
+#define RULE (rule)
+	char anchor_call[MAXPATHLEN] = "";
+#else
+	struct pfioc_rule pr;
+#define RULE (pr.rule)
+#endif
+	if(dev<0)
+		return -1;
+#ifdef USE_LIBPFCTL
+	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
+		return -1;
+	n = ri.nr;
+#ifdef PF_RELEASETICKETS
+	tnum = ri.ticket;
+#endif
+#else
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+#ifndef PF_NEWSTYLE
+	RULE.action = PF_PASS;
+#endif
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
+		return -1;
+	n = pr.nr;
+#ifdef PF_RELEASETICKETS
+	tnum = pr.ticket;
+#endif
+#endif
+	for(i=0; i<n; i++) {
+		unsigned int ts;
+		int uid, k;
+		const char * p;
+#ifdef USE_LIBPFCTL
+		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_PASS, &rule, anchor_call) < 0)
+			break;
+#else
+		pr.nr = i;
+		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
+			break;
+#endif
+		if(RULE.af != AF_INET6 ||
+		   sscanf(RULE_LABEL(RULE), PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
+			continue;
+		if(count++ != index)
+			continue;
+		rec->uid = uid;
+		rec->ts = ts;
+		rec->src = RULE.src.addr.v.a.addr.v6;
+		rec->dst = RULE.dst.addr.v.a.addr.v6;
+		rec->prefix = 0;
+		for(k = 0; k < 16; k++) {
+			unsigned char m = RULE.src.addr.v.a.mask.addr8[k];
+			while(m & 0x80) { rec->prefix++; m <<= 1; }
+		}
+		rec->sport = RULE.src.port_op == PF_OP_EQ ? ntohs(RULE.src.port[0]) : 0;
+		rec->dport = ntohs(RULE.dst.port[0]);
+		rec->proto = RULE.proto;
+		p = strchr(RULE_LABEL(RULE), ':');
+		strlcpy(rec->desc, p ? p + 2 : "", sizeof(rec->desc));
+		strlcpy(rec->ifname, RULE.ifname, sizeof(rec->ifname));
+		r = 0;
+		break;
+	}
+	release_ticket(dev, tnum);
+	return r;
+}
+
+/* the first pinhole of the group of a mapping, from a PCP MAP request,
+ * or -1. If rec is not NULL it is filled. */
+static int
+pcp_group_first(const struct in6_addr * dst, unsigned short port, int proto,
+                const char * desc, struct pinhole_rec * rec)
+{
+	struct pinhole_rec tmp;
+	int i;
+	if(rec == NULL)
+		rec = &tmp;
+	for(i = 0; pinhole_walk(i, rec) == 0; i++) {
+		if(rec->dport == port && rec->proto == proto &&
+		   memcmp(&rec->dst, dst, sizeof(*dst)) == 0 &&
+		   strncmp(rec->desc, "PCP MAP ", 8) == 0 &&
+		   (desc == NULL || strcmp(rec->desc, desc) == 0))
+			return 0;
+	}
+	return -1;
+}
+
+int add_pinhole(const char * ifname,
+                const char * rem_host, unsigned short rem_port,
+                const char * int_client, unsigned short int_port,
+                int proto, const char * desc, unsigned int timestamp)
+{
+	struct in6_addr d;
+	const struct pcp_filter * f = NULL;
+	unsigned int n, k;
+	int uid, first = -1;
+	int added[PCP_FILTER_PEER_MAX];
+	if((rem_host == NULL || rem_host[0] == '\0' || rem_host[0] == '*') && rem_port == 0
+	   && inet_pton(AF_INET6, int_client, &d) == 1
+	   && (n = pf_pcp_pending_filters6(&d, int_port, proto, &f)) > 0) {
+		/* PCP MAP with FILTER options : a pinhole per allowed peer */
+		if(n > PCP_FILTER_PEER_MAX)
+			return -1;
+		for(k = 0; k < n; k++) {
+			char host[INET6_ADDRSTRLEN];
+			inet_ntop(AF_INET6, &f[k].address, host, sizeof(host));
+			uid = add_pinhole_ex(0, ifname, host, f[k].prefix, f[k].port,
+			                     int_client, int_port, proto, desc, timestamp);
+			if(uid < 0) {
+				while(k-- > 0)
+					delete_pinhole_one((unsigned short)added[k]);
+				return -1;
+			}
+			added[k] = uid;
+			if(first < 0)
+				first = uid;
+		}
+		return first;
+	}
+	return add_pinhole_ex(0, ifname, rem_host, 128, rem_port,
+	                      int_client, int_port, proto, desc, timestamp);
+}
+
+/* ---- groups of pinholes of PCP MAP mappings (FILTER) ---- */
+
+/* read the policy of a mapping. returns the number of pinholes */
+unsigned int
+pf_pinhole_group_get(const struct in6_addr * dst, unsigned short port, int proto,
+                     struct pcp_filter * filters, unsigned int max,
+                     unsigned int * nfilters, char * desc, int desclen,
+                     unsigned int * timestamp, char * ifname)
+{
+	struct pinhole_rec rec;
+	unsigned int count = 0;
+	int i;
+	*nfilters = 0;
+	for(i = 0; pinhole_walk(i, &rec) == 0; i++) {
+		if(rec.dport != port || rec.proto != proto ||
+		   memcmp(&rec.dst, dst, sizeof(*dst)) != 0 ||
+		   strncmp(rec.desc, "PCP MAP ", 8) != 0)
+			continue;
+		if(count++ == 0) {
+			if(desc) strlcpy(desc, rec.desc, desclen);
+			if(timestamp) *timestamp = rec.ts;
+			if(ifname) strlcpy(ifname, rec.ifname, IFNAMSIZ);
+		}
+		if(rec.prefix > 0 && *nfilters < max) {
+			filters[*nfilters].address = rec.src;
+			filters[*nfilters].prefix = rec.prefix;
+			filters[*nfilters].port = rec.sport;
+			(*nfilters)++;
+		}
+	}
+	return count;
+}
+
+/* add a pinhole for a peer (NULL : any source) to a mapping */
+int
+pf_pinhole_group_add(const char * ifname, const struct in6_addr * dst,
+                     unsigned short port, int proto, const char * desc,
+                     unsigned int timestamp, const struct pcp_filter * f)
+{
+	char host[INET6_ADDRSTRLEN], client[INET6_ADDRSTRLEN];
+	inet_ntop(AF_INET6, dst, client, sizeof(client));
+	if(f)
+		inet_ntop(AF_INET6, &f->address, host, sizeof(host));
+	return add_pinhole_ex(0, ifname, f ? host : NULL, f ? f->prefix : 0,
+	                      f ? f->port : 0, client, port, proto, desc, timestamp);
+}
+
+/* remove the pinhole for a peer (NULL : any source) of a mapping */
+int
+pf_pinhole_group_remove(const struct in6_addr * dst, unsigned short port,
+                        int proto, const struct pcp_filter * f)
+{
+	struct pinhole_rec rec;
+	int i;
+	for(i = 0; pinhole_walk(i, &rec) == 0; i++) {
+		if(rec.dport != port || rec.proto != proto ||
+		   memcmp(&rec.dst, dst, sizeof(*dst)) != 0 ||
+		   strncmp(rec.desc, "PCP MAP ", 8) != 0)
+			continue;
+		if(f == NULL ? rec.prefix == 0 :
+		   (rec.prefix == f->prefix && rec.sport == f->port &&
+		    memcmp(&rec.src, &f->address, sizeof(rec.src)) == 0))
+			return delete_pinhole_one((unsigned short)rec.uid);
+	}
+	return -2;
 }
 
 int find_pinhole(const char * ifname,
@@ -240,8 +477,12 @@ int find_pinhole(const char * ifname,
 			return -1;
 		}
 #endif /* USE_LIBPFCTL */
-		if((proto == RULE.proto) && (rem_port == ntohs(RULE.src.port[0]))
-		   && (0 == memcmp(&saddr, &RULE.src.addr.v.a.addr.v6, sizeof(struct in6_addr)))
+		if((proto == RULE.proto)
+		   && (((rem_port == ntohs(RULE.src.port[0]))
+		        && (0 == memcmp(&saddr, &RULE.src.addr.v.a.addr.v6, sizeof(struct in6_addr))))
+		       /* any source : also find the filtered pinholes of a PCP mapping */
+		       || (rem_port == 0 && IN6_IS_ADDR_UNSPECIFIED(&saddr)
+		           && label_is_pcp_map(RULE_LABEL(RULE))))
 		   && (int_port == ntohs(RULE.dst.port[0])) &&
 		   (0 == memcmp(&daddr, &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)))) {
 #ifdef USE_LIBPFCTL
@@ -275,7 +516,7 @@ int find_pinhole(const char * ifname,
 	return -2;
 }
 
-int delete_pinhole(unsigned short uid)
+static int delete_pinhole_one(unsigned short uid)
 {
 	int i, n;
 	unsigned int tnum;
@@ -371,6 +612,33 @@ int delete_pinhole(unsigned short uid)
 	release_ticket(dev, tnum);
 	/* not found */
 	return -2;
+}
+
+int delete_pinhole(unsigned short uid)
+{
+	struct pinhole_rec rec;
+	int i, r, found = 0;
+	/* find out if it is a pinhole of a PCP mapping */
+	for(i = 0; pinhole_walk(i, &rec) == 0; i++) {
+		if(rec.uid == uid) { found = 1; break; }
+	}
+	if(!found || strncmp(rec.desc, "PCP MAP ", 8) != 0)
+		return delete_pinhole_one(uid);
+	/* delete all the pinholes of the mapping */
+	r = -2;
+	{
+		struct in6_addr dst = rec.dst;
+		unsigned short dport = rec.dport;
+		int proto = rec.proto;
+		char desc[PF_RULE_LABEL_SIZE];
+		strlcpy(desc, rec.desc, sizeof(desc));
+		while(pcp_group_first(&dst, dport, proto, desc, &rec) == 0) {
+			r = delete_pinhole_one((unsigned short)rec.uid);
+			if(r < 0)
+				return r;
+		}
+	}
+	return r < 0 ? delete_pinhole_one(uid) : 0;
 }
 
 int
@@ -493,15 +761,54 @@ get_pinhole_info(unsigned short uid,
 	return -2;
 }
 
+/* the label of a rule can not be changed : the pinhole is added again with the
+ * same uid and a new timestamp, then the old one is removed.
+ * The stats of the rule are reset. */
+static int update_pinhole_one(const struct pinhole_rec * rec, unsigned int timestamp)
+{
+	char host[INET6_ADDRSTRLEN], client[INET6_ADDRSTRLEN];
+	if(rec->ts == timestamp)
+		return 0;
+	inet_ntop(AF_INET6, &rec->src, host, sizeof(host));
+	inet_ntop(AF_INET6, &rec->dst, client, sizeof(client));
+	if(add_pinhole_ex(rec->uid, rec->ifname, rec->prefix ? host : NULL,
+	                  rec->prefix, rec->sport, client, rec->dport, rec->proto,
+	                  rec->desc, timestamp) < 0)
+		return -1;
+	/* the first rule of the uid is the old one */
+	return delete_pinhole_one((unsigned short)rec->uid);
+}
+
 int update_pinhole(unsigned short uid, unsigned int timestamp)
 {
-	/* TODO :
-	 * As it is not possible to change rule label, we should :
-	 * 1 - delete
-	 * 2 - Add new
-	 * the stats of the rule will then be reset :( */
-	UNUSED(uid); UNUSED(timestamp);
-	return -42; /* not implemented */
+	struct pinhole_rec rec, member;
+	int uids[PCP_FILTER_PEER_MAX + 1];
+	unsigned int n = 0, k;
+	int i, found = 0;
+	for(i = 0; pinhole_walk(i, &rec) == 0; i++) {
+		if(rec.uid == uid) { found = 1; break; }
+	}
+	if(!found)
+		return -2;
+	if(strncmp(rec.desc, "PCP MAP ", 8) != 0)
+		return update_pinhole_one(&rec, timestamp);
+	/* all the pinholes of the mapping */
+	for(i = 0; pinhole_walk(i, &member) == 0 && n < PCP_FILTER_PEER_MAX + 1; i++) {
+		if(member.dport == rec.dport && member.proto == rec.proto &&
+		   memcmp(&member.dst, &rec.dst, sizeof(rec.dst)) == 0 &&
+		   strcmp(member.desc, rec.desc) == 0)
+			uids[n++] = member.uid;
+	}
+	for(k = 0; k < n; k++) {
+		for(i = 0; pinhole_walk(i, &member) == 0; i++) {
+			if(member.uid == uids[k]) {
+				if(update_pinhole_one(&member, timestamp) < 0)
+					return -1;
+				break;
+			}
+		}
+	}
+	return 0;
 }
 
 /* return the number of rules removed

@@ -647,7 +647,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 			break;
 	}
 #ifdef PCP_PEER
-#ifdef USE_NFTABLES
+#if defined(USE_NFTABLES) || defined(USE_PF)
 	/* PEER mappings may share external ports; expire them by endpoint key. */
 	timestamp = expire_peer_rules((unsigned int)current_time);
 	if (timestamp != 0 && (nextruletoclean_timestamp == 0 || timestamp < nextruletoclean_timestamp))
@@ -677,7 +677,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		if(!tmp)
 			break;
 	}
-#endif /* USE_NFTABLES */
+#endif /* USE_NFTABLES || USE_PF */
 #endif
 	free(tmp);
 	/* remove the redirections that need to be removed */
