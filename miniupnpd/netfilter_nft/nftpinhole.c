@@ -56,6 +56,15 @@ static int next_uid = 1;
 #define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
 #define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
 
+/* MAP FILTER policy belongs to the wildcard inbound MAP pinhole.  PEER
+ * endpoints may share its local tuple and must not remove its policy. */
+static int
+pinhole_owns_pcp_filter(const rule_t *rule)
+{
+	const char *desc = strchr(rule->desc, ':');
+	return desc != NULL && strncmp(desc + 1, " PCP MAP ", 9) == 0;
+}
+
 void init_iptpinhole(void)
 {
 	return;
@@ -217,7 +226,9 @@ delete_pinhole(unsigned short uid)
 			r = rule_del_handle(p);
 			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0)
 				return -1;
-			return nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto);
+			if (pinhole_owns_pcp_filter(p))
+				return nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto);
+			return 0;
 		}
 	}
 
@@ -470,7 +481,8 @@ clean_pinhole_list(unsigned int * next_timestamp)
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
 			r = rule_del_handle(p);
 			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0 ||
-			    nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto) < 0) {
+			    (pinhole_owns_pcp_filter(p) &&
+			     nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto) < 0)) {
 				/* Retry cleanup soon, including when all pinholes expired. */
 				min_ts = (unsigned int)current_time + 1;
 				continue;
