@@ -61,6 +61,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -1827,6 +1828,7 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	unsigned char buff[PCP_MIN_LEN];
 	pcp_info_t info;
 	ssize_t len;
+	struct lan_addr_s * lan_addr;
 	struct sockaddr_in addr;
 #ifdef ENABLE_IPV6
 	struct sockaddr_in6 addr6;
@@ -1844,8 +1846,18 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr("224.0.0.1");
 	addr.sin_port = htons(5350);
-	for(i = 0; i < n_sockets; i++) {
+	/* sockets[] are in the same order as lan_addrs : force the multicast
+	 * output interface to the LAN one so the announce never goes out
+	 * through the external interface */
+	for(i = 0, lan_addr = lan_addrs.lh_first;
+	    i < n_sockets && lan_addr != NULL;
+	    i++, lan_addr = lan_addr->list.le_next) {
 		if (sockets[i] < 0) {
+			continue;
+		}
+		if (setsockopt(sockets[i], IPPROTO_IP, IP_MULTICAST_IF,
+		               &lan_addr->addr, sizeof(lan_addr->addr)) < 0) {
+			syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce(sockets[%d]) setsockopt(IP_MULTICAST_IF): %m", i);
 			continue;
 		}
 		len = sendto_or_schedule(sockets[i], buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
@@ -1855,13 +1867,28 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	}
 #ifdef ENABLE_IPV6
 	if (socket6 >= 0) {
-		memset(&addr6, 0, sizeof(struct sockaddr_in6));
-		addr6.sin6_family = AF_INET6;
-		inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
-		addr6.sin6_port = htons(5350);
-		len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
-		if( len < 0 ) {
-			syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(): %m");
+		/* send on each LAN interface only (link-local scope) */
+		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL;
+		    lan_addr = lan_addr->list.le_next) {
+			unsigned int ifindex = lan_addr->index;
+			if (ifindex == 0 && lan_addr->ifname[0] != '\0')
+				ifindex = if_nametoindex(lan_addr->ifname);
+			if (ifindex == 0)
+				continue;
+			memset(&addr6, 0, sizeof(struct sockaddr_in6));
+			addr6.sin6_family = AF_INET6;
+			inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
+			addr6.sin6_port = htons(5350);
+			addr6.sin6_scope_id = ifindex;
+			if (setsockopt(socket6, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+			               &ifindex, sizeof(ifindex)) < 0) {
+				syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce() setsockopt(IPV6_MULTICAST_IF, %s): %m", lan_addr->ifname);
+				continue;
+			}
+			len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
+			if( len < 0 ) {
+				syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(%s): %m", lan_addr->ifname);
+			}
 		}
 	}
 #endif /* ENABLE_IPV6 */
