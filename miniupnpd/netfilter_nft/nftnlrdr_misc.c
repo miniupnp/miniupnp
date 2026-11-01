@@ -28,6 +28,7 @@
 #include <errno.h>
 
 #include <linux/netfilter.h>
+#include <linux/netfilter/nf_conntrack_tuple_common.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nf_tables.h>
 #include <linux/ipv6.h>
@@ -1596,7 +1597,8 @@ pcp_filter_rule(const struct pcp_filter_policy *policy,
                 const struct pcp_filter *filter, const char *chain)
 {
 	struct nftnl_rule *r;
-	struct nftnl_expr *bitwise;
+	struct nftnl_expr *bitwise, *ct;
+	uint8_t direction = IP_CT_DIR_ORIGINAL;
 	unsigned char mask[16], zero[16] = {0}, network[16];
 	const unsigned char *remote;
 	uint16_t port;
@@ -1623,6 +1625,18 @@ pcp_filter_rule(const struct pcp_filter_policy *policy,
 	nftnl_rule_set_str(r, NFTNL_RULE_TABLE, nft_table);
 	nftnl_rule_set_str(r, NFTNL_RULE_CHAIN, chain);
 	expr_add_nfproto(r, v4 ? NFPROTO_IPV4 : NFPROTO_IPV6);
+	/* RFC 6887 section 16.1 prioritizes outbound mappings over inbound
+	 * MAP policy.  Replies to implicit or PEER outbound flows must not be
+	 * rejected by a FILTER attached to the same local address and port. */
+	ct = nftnl_expr_alloc("ct");
+	if (!ct) {
+		nftnl_rule_free(r);
+		return NULL;
+	}
+	nftnl_expr_set_u32(ct, NFTNL_EXPR_CT_KEY, NFT_CT_DIRECTION);
+	nftnl_expr_set_u32(ct, NFTNL_EXPR_CT_DREG, NFT_REG_1);
+	nftnl_rule_add_expr(r, ct);
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &direction, sizeof(direction));
 	/* Apply only to traffic arriving from the public interface, including
 	 * installations which do not enable USE_IFNAME_IN_RULES. */
 	expr_add_meta(r, NFT_META_IIFNAME, NFT_REG_1);
