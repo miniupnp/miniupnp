@@ -1,6 +1,6 @@
 # PCP E2E Status
 
-Updated: 2026-11-01T11:45:46Z
+Updated: 2026-11-01T11:55:10Z
 
 ## Run
 
@@ -8,7 +8,7 @@ Updated: 2026-11-01T11:45:46Z
 - Address families: IPv4 and IPv6
 - Scenario selection: all
 - Totals: **66 PASS**, **0 FAIL** (66 family runs)
-- Artifacts: .tmp/pcp-e2e/2026-11-01T11-42-40Z (daemon startup/final logs and per-case captures/snapshots)
+- Artifacts: .tmp/pcp-e2e/2026-11-01T11-52-02Z (daemon startup/final logs and per-case captures/snapshots)
 
 ## Results
 
