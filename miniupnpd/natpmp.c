@@ -66,6 +66,18 @@ int OpenAndConfNATPMPSocket(in_addr_t addr)
 			return -1;
 		}
 	}
+	/* multicast (PCP ANNOUNCE, NAT-PMP address change) goes out
+	 * through this LAN interface, never through the external one */
+	if(addr != INADDR_ANY) {
+		struct in_addr mc_if;
+		mc_if.s_addr = addr;
+		if(setsockopt(snatpmp, IPPROTO_IP, IP_MULTICAST_IF,
+		              &mc_if, sizeof(mc_if)) < 0)
+		{
+			syslog(LOG_WARNING, "%s: setsockopt(IP_MULTICAST_IF): %m",
+			       "OpenAndConfNATPMPSocket");
+		}
+	}
 	return snatpmp;
 }
 
