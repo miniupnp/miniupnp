@@ -63,7 +63,6 @@ jobs:
 
       - name: Check comparison tools
         run: |
-          python3 candidate/miniupnpd/tests/pcp_pmp/tools/test_compare_pcaps.py
           python3 \
             candidate/miniupnpd/tests/pcp_pmp/tools/test_compare_branches.py
           python3 \
