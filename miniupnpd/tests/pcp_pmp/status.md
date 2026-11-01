@@ -1,6 +1,6 @@
 # PCP/NAT-PMP Test Status
 
-Updated: 2026-10-31T21:27:04+00:00
+Updated: 2026-11-01T11:59:35+00:00
 
 ## Run
 
@@ -9,8 +9,8 @@ Updated: 2026-10-31T21:27:04+00:00
 - Address family: `ipv4`
 - Server profile: `baseline`
 - Mapping lifecycle tests: `enabled`
-- Totals: **141 PASS**, **33 XFAIL**, **16 FAIL**, **15 SKIP**
-- Capture directory: `/pcp-pmp-captures/2026-10-31_22-26-33.637170796_all`
+- Totals: **162 PASS**, **32 XFAIL**, **3 FAIL**, **13 SKIP**
+- Capture directory: `/pcp-pmp-captures/2026-11-01_12-58-47.615573361_all`
 
 ## Results by section
 
@@ -66,7 +66,7 @@ Mutating MAP and PEER create, renew, and delete flows; enabled with --mutating.
 | map-v1-lifecycle | pcp | PASS | Create, renew with changed lifetimes, and delete a PCP v1 MAP. |
 | map-v2-lifecycle | pcp | PASS | Create, renew with changed lifetimes, and delete a PCP v2 MAP while checking its nonce. |
 | map-v2-nonce-pattern-echo | pcp | PASS | Create and remove four mappings while checking zero, all-one, alternating-byte, and boundary-bit nonce echoes. Zero and all-one values are wire test patterns, not client randomness guidance. |
-| map-v2-nonce-mismatch-refresh | pcp | XFAIL | unexpected lifecycle result code 0; expected: The current backend accepts a MAP refresh with a mismatched nonce; RFC 6887 requires NOT_AUTHORIZED in the Simple Threat Model. |
+| map-v2-nonce-mismatch-refresh | pcp | PASS | Known-failure case met its expected behavior. |
 | map-v2-nonce-identical-retry | pcp | PASS | Retry a create request with the same key and nonce, and require the existing external port to be reused. |
 | peer-v2-lifecycle | pcp | PASS | Create and delete a PCP v2 PEER mapping for the configured remote peer. |
 
@@ -116,15 +116,15 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 | filter-on-map-deletion | pcp | PASS | RFC 6887 §13.3: FILTER in a MAP deletion must return MALFORMED_OPTION. |
 | prefer-failure-on-map-deletion | pcp | PASS | RFC 6887 §11.3: a mandatory option that does not make sense for deletion returns MALFORMED_OPTION. |
 | prefer-failure-zero-port-explicit-address | pcp | PASS | RFC 6887 §13.2: PREFER_FAILURE with zero suggested port is malformed even with a nonzero suggested address. |
-| map-udp-renew-changed-suggestion | pcp | FAIL | step 2 (pcp_map): response matched none of the expected replies: port was 50217, expected 50117 |
+| map-udp-renew-changed-suggestion | pcp | PASS | RFC 6887 §11.3: renewal with the same mapping key and nonce must return the existing external port, regardless of a changed or zero suggestion. |
 | map-udp-renew-zero-suggestion | pcp | PASS | RFC 6887 §11.3: renewal with the same mapping key and nonce must return the existing external port, regardless of a changed or zero suggestion. |
-| map-udp-delete-nonexistent | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 8 |
-| map-udp-delete-identical-retry | pcp | FAIL | step 3 (pcp_map): response matched none of the expected replies: unexpected pcp result code 8 |
-| map-tcp-renew-changed-suggestion | pcp | FAIL | step 2 (pcp_map): response matched none of the expected replies: port was 50206, expected 50106 |
+| map-udp-delete-nonexistent | pcp | PASS | RFC 6887 §15.1: deleting a nonexistent mapping succeeds, making deletion retransmissions safe. |
+| map-udp-delete-identical-retry | pcp | PASS | RFC 6887 §15.1: repeated deletion returns SUCCESS with lifetime zero. |
+| map-tcp-renew-changed-suggestion | pcp | PASS | RFC 6887 §11.3: renewal with the same mapping key and nonce must return the existing external port, regardless of a changed or zero suggestion. |
 | map-tcp-renew-zero-suggestion | pcp | PASS | RFC 6887 §11.3: renewal with the same mapping key and nonce must return the existing external port, regardless of a changed or zero suggestion. |
-| map-tcp-delete-nonexistent | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 8 |
-| map-tcp-delete-identical-retry | pcp | FAIL | step 3 (pcp_map): response matched none of the expected replies: unexpected pcp result code 8 |
-| map-nonce-mismatch-changed-port | pcp | FAIL | step 2 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0 |
+| map-tcp-delete-nonexistent | pcp | PASS | RFC 6887 §15.1: deleting a nonexistent mapping succeeds, making deletion retransmissions safe. |
+| map-tcp-delete-identical-retry | pcp | PASS | RFC 6887 §15.1: repeated deletion returns SUCCESS with lifetime zero. |
+| map-nonce-mismatch-changed-port | pcp | PASS | RFC 6887 §11.3: nonce authorization is keyed by internal address, protocol and port, not by the external suggestion. |
 | map-wrong-nonce-delete-preserves-original | pcp | PASS | RFC 6887 §§11.3, 15.1: a deletion with a wrong nonce is refused and the original mapping remains renewable. |
 | map-error-no-state-unknown-mandatory | pcp | PASS | RFC 6887 §7.3: a rejected create must leave no nonce ownership behind; a fresh nonce must subsequently create the same tuple. |
 | map-error-no-state-bad-prefer-failure | pcp | PASS | RFC 6887 §7.3: a rejected create must leave no nonce ownership behind; a fresh nonce must subsequently create the same tuple. |
@@ -133,15 +133,20 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 | optional-unknown-option-padding-3 | pcp | XFAIL | step 1 (pcp_map): response matched none of the expected replies: expected 60-byte pcp response, got 68; expected: miniupnpd echoes unprocessed optional options in replies; response option omission is not implemented. |
 | map-reserved-body-ignored-and-cleared | pcp | PASS | RFC 6887 §11.1: ignore MAP reserved bytes on reception, but clear them in responses. |
 | peer-reserved-body-ignored-and-cleared | pcp | PASS | RFC 6887 §12.1: ignore PEER reserved fields in requests and transmit zeros in responses. |
-| peer-prefer-failure-forbidden | pcp | FAIL | unexpected result code 6 |
+| peer-prefer-failure-forbidden | pcp | PASS | RFC 6887 §12.1: PREFER_FAILURE is not allowed on PEER and must return MALFORMED_REQUEST. |
+| peer-prefer-failure-forbidden-create | pcp | PASS | RFC 6887 §12.1: PREFER_FAILURE on a PEER create request returns MALFORMED_REQUEST. |
+| peer-implied-prefer-failure-external-address | pcp | PASS | RFC 6887 §12.1: PEER implies PREFER_FAILURE, so an external address the server cannot provide returns CANNOT_PROVIDE_EXTERNAL. |
 | announce-epoch-and-reserved-response | pcp | PASS | RFC 6887 §§7.2, 8.5: repeated ANNOUNCE replies have nondecreasing epochs and zero common reserved fields; this does not check reboot reset or clock rate. |
 | announce-ignores-lifetime-300 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
 | announce-ignores-lifetime-4294967295 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
 | announce-mandatory-unknown-option | pcp | PASS | RFC 6887 §§7.3, 14.1: apply mandatory/optional option processing to ANNOUNCE; omit ignored options on success. |
 | announce-optional-unknown-option | pcp | PASS | Known-failure case met its expected behavior. |
-| map-reserved-pcp-udp-port-5350 | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0 |
-| map-reserved-pcp-udp-port-5351 | pcp | FAIL | step 1 (pcp_map): response matched none of the expected replies: unexpected pcp result code 0 |
-| peer-wrong-nonce-refresh | pcp | FAIL | step 2 (pcp_peer): response matched none of the expected replies: unexpected pcp result code 0 |
+| map-reserved-pcp-udp-port-5350 | pcp | PASS | RFC 6887 §11.3: external UDP ports 5350 and 5351 cannot be mapped to clients; with PREFER_FAILURE return CANNOT_PROVIDE_EXTERNAL. |
+| map-reserved-pcp-udp-port-5351 | pcp | PASS | RFC 6887 §11.3: external UDP ports 5350 and 5351 cannot be mapped to clients; with PREFER_FAILURE return CANNOT_PROVIDE_EXTERNAL. |
+| peer-wrong-nonce-refresh | pcp | PASS | RFC 6887 §12.3: an existing PEER five-tuple may only be refreshed with its original nonce in the Simple Threat Model. |
+| peer-wrong-nonce-delete | pcp | PASS | RFC 6887 §12.3: an existing PEER five-tuple may only be deleted with its original nonce in the Simple Threat Model. |
+| peer-shared-external-port-lifecycle | pcp | FAIL | step 9 (pcp_peer): response matched none of the expected replies: unexpected pcp result code 11 |
+| peer-survives-shared-map-expiration | pcp | PASS | Expiration of a one-second NAT-PMP mapping preserves a longer PEER mapping sharing its external port and protocol. |
 | map-tcp-create-renew-delete | pcp | PASS | RFC 6887 §§11, 15.1: exercise a TCP MAP lifecycle separately from the existing UDP lifecycle. |
 | map-error-echo-opcode-and-options | pcp | PASS | RFC 6887 §§7.3, 8.2: error responses preserve the complete opcode body and options. |
 | unsupported-opcode-echo-payload | pcp | PASS | RFC 6887 §8.2: preserve unknown opcode payload bytes in error responses. |
@@ -251,29 +256,29 @@ Public address, mapping request validation, malformed traffic, and mutating UDP/
 | response-opcode-129-ignored | natpmp | PASS | RFC 6886 §3.5: silently ignore packets with the response bit set, including mapping opcodes. |
 | response-opcode-130-ignored | natpmp | PASS | RFC 6886 §3.5: silently ignore packets with the response bit set, including mapping opcodes. |
 | response-opcode-255-ignored | natpmp | PASS | RFC 6886 §3.5: silently ignore packets with the response bit set, including mapping opcodes. |
-| unsupported-opcode-echo-body | natpmp | FAIL | expected 12-byte response, got 8 |
-| refused-mapping-response-fields | natpmp | FAIL | unassigned external port was 49000, expected 0 |
+| unsupported-opcode-echo-body | natpmp | PASS | RFC 6886 §3.5: echo the entire unsupported-opcode request, preserving bytes after the response header. |
+| refused-mapping-response-fields | natpmp | PASS | RFC 6886 §3.5: a refused mapping echoes the internal port and returns zero external port and lifetime. |
 | reserved-mapping-bits-ignored | natpmp | PASS | RFC 6886 §3.3: ignore nonzero reserved request bits and grant an otherwise valid mapping. |
 | udp-delete-idempotent-and-ignore-public-port | natpmp | PASS | RFC 6886 §3.4: ignore the suggested public port when deleting; repeated deletion returns success, private port, external port zero and lifetime zero. |
-| udp-retry-changed-suggestion | natpmp | FAIL | step 2 (natpmp): response matched none of the expected replies: external_port was 49111, expected 49011 |
+| udp-retry-changed-suggestion | natpmp | PASS | RFC 6886 §3.3: a retry for the same internal tuple reuses its existing public port even when the suggestion changes. |
 | udp-identical-retry | natpmp | PASS | RFC 6886 §3.3: retransmitting an identical mapping request preserves the public port. |
 | udp-short-lease-not-increased | natpmp | PASS | RFC 6886 §3.3: a one-second request should not be granted a longer lifetime (SHOULD NOT). |
 | tcp-delete-idempotent-and-ignore-public-port | natpmp | PASS | RFC 6886 §3.4: ignore the suggested public port when deleting; repeated deletion returns success, private port, external port zero and lifetime zero. |
-| tcp-retry-changed-suggestion | natpmp | FAIL | step 2 (natpmp): response matched none of the expected replies: external_port was 49112, expected 49012 |
+| tcp-retry-changed-suggestion | natpmp | PASS | RFC 6886 §3.3: a retry for the same internal tuple reuses its existing public port even when the suggestion changes. |
 | tcp-identical-retry | natpmp | PASS | RFC 6886 §3.3: retransmitting an identical mapping request preserves the public port. |
 | tcp-short-lease-not-increased | natpmp | PASS | RFC 6886 §3.3: a one-second request should not be granted a longer lifetime (SHOULD NOT). |
 | same-protocol-conflict-retry | natpmp | PASS | RFC 6886 §3.3: a public-port conflict gets another port; retransmission keeps that alternate port and does not displace the first mapping. |
 | same-client-tcp-udp-companion-port | natpmp | PASS | RFC 6886 §3.3: the same client can map TCP and UDP to the same public port; deleting UDP must preserve the TCP mapping. |
 | public-address-epoch-monotonic | natpmp | PASS | RFC 6886 §§3.2, 3.6: repeated public-address replies use a nondecreasing epoch. This checks continuity, not clock rate or reset behavior. |
-| udp-delete-all-preserves-tcp | natpmp | SKIP | prerequisite did not pass: natpmp/udp-retry-changed-suggestion (FAIL), natpmp/tcp-retry-changed-suggestion (FAIL) |
-| udp-mapping-expires | natpmp | SKIP | prerequisite did not pass: natpmp/udp-retry-changed-suggestion (FAIL) |
+| udp-delete-all-preserves-tcp | natpmp | FAIL | step 5 (natpmp): response matched none of the expected replies: external_port was 49083, expected 49073 |
+| udp-mapping-expires | natpmp | PASS | RFC 6886 §3.4: after a one-second lease expires, a new request can use a different public port instead of renewing the expired rule. |
 
 
 ---
 
 # PCP/NAT-PMP Test Status
 
-Updated: 2026-10-31T21:27:10+00:00
+Updated: 2026-11-01T11:59:42+00:00
 
 ## Run
 
@@ -282,8 +287,8 @@ Updated: 2026-10-31T21:27:10+00:00
 - Address family: `ipv6`
 - Server profile: `baseline`
 - Mapping lifecycle tests: `enabled`
-- Totals: **81 PASS**, **29 XFAIL**, **1 FAIL**, **13 SKIP**
-- Capture directory: `/pcp-pmp-captures/2026-10-31_22-26-33.637170796_all`
+- Totals: **85 PASS**, **29 XFAIL**, **1 FAIL**, **13 SKIP**
+- Capture directory: `/pcp-pmp-captures/2026-11-01_12-58-47.615573361_all`
 
 ## Results by section
 
@@ -369,11 +374,15 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 | optional-option-length-overrun | pcp | PASS | RFC 6887 §7.3: malformed overall option structure is an error even when its option code is optional. |
 | filter-on-map-deletion | pcp | PASS | RFC 6887 §13.3: FILTER in a MAP deletion must return MALFORMED_OPTION. |
 | prefer-failure-on-map-deletion | pcp | PASS | RFC 6887 §11.3: a mandatory option that does not make sense for deletion returns MALFORMED_OPTION. |
+| peer-prefer-failure-forbidden-ipv6 | pcp | PASS | RFC 6887 §12.1: PREFER_FAILURE on an IPv6 PEER request returns MALFORMED_REQUEST. |
+| peer-implied-prefer-failure-external-address-ipv6 | pcp | PASS | RFC 6887 §12.1: PEER implies PREFER_FAILURE for IPv6; an unavailable external address returns CANNOT_PROVIDE_EXTERNAL. |
 | announce-epoch-and-reserved-response | pcp | PASS | RFC 6887 §§7.2, 8.5: repeated ANNOUNCE replies have nondecreasing epochs and zero common reserved fields; this does not check reboot reset or clock rate. |
 | announce-ignores-lifetime-300 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
 | announce-ignores-lifetime-4294967295 | pcp | PASS | RFC 6887 §14.1: ignore requested ANNOUNCE lifetime and transmit a zero response lifetime. |
 | announce-mandatory-unknown-option | pcp | PASS | RFC 6887 §§7.3, 14.1: apply mandatory/optional option processing to ANNOUNCE; omit ignored options on success. |
 | announce-optional-unknown-option | pcp | PASS | Known-failure case met its expected behavior. |
+| peer-wrong-nonce-refresh-ipv6 | pcp | PASS | RFC 6887 §12.3: an existing PEER five-tuple may only be refreshed with its original nonce in the Simple Threat Model. |
+| peer-zero-lifetime-query-ownership-ipv6 | pcp | PASS | RFC 6887 sections 12.3 and 15: a zero-lifetime PEER request queries the retained lease and requires its original nonce. |
 | map-error-echo-opcode-and-options | pcp | PASS | RFC 6887 §§7.3, 8.2: error responses preserve the complete opcode body and options. |
 | unsupported-opcode-echo-payload | pcp | PASS | RFC 6887 §8.2: preserve unknown opcode payload bytes in error responses. |
 | long-error-lifetime-default | pcp | PASS | RFC 6887 §7.4: long-lived errors SHOULD default to a 30-minute error lifetime. |
