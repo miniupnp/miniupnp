@@ -726,6 +726,42 @@ sections:
               protocol: tcp
               expect: delivered
 
+      - name: peer-rejects-unavailable-external-address
+        families: [ipv4]
+        description: IPv4 PEER with an external address the gateway does not own returns CANNOT_PROVIDE_EXTERNAL and creates nothing.
+        request:
+          opcode: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41048
+          suggested_external_port: 41048
+          suggested_external_address: 198.51.100.77
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: CANNOT_PROVIDE_EXTERNAL
+      - name: peer-rejects-mismatched-port-on-renewal
+        families: [ipv4, ipv6]
+        description: Renewing a PEER mapping while suggesting a different external port returns CANNOT_PROVIDE_EXTERNAL and keeps the mapping.
+        requests:
+          - opcode: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41049
+            suggested_external_port: {ipv4: 43049, ipv6: 41049}
+            remote_peer: allowed-peer
+            remote_peer_port: 42100
+          - opcode: PEER
+            lifetime: 240
+            protocol: udp
+            internal_port: 41049
+            suggested_external_port: {ipv4: 43050, ipv6: 43050}
+            remote_peer: allowed-peer
+            remote_peer_port: 42100
+        expect:
+          results: [SUCCESS, CANNOT_PROVIDE_EXTERNAL]
+          traffic:
+            - {from: allowed-peer, mode: peer, protocol: udp, expect: delivered}
       - name: peer-rejects-prefer-failure
         families: [ipv4, ipv6]
         description: RFC 6887 section 12.1 forbids PREFER_FAILURE on PEER; the request is malformed and creates nothing.

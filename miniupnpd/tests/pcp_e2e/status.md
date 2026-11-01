@@ -1,14 +1,14 @@
 # PCP E2E Status
 
-Updated: 2026-11-01T11:38:44Z
+Updated: 2026-11-01T11:45:46Z
 
 ## Run
 
 - Branch: dev/pcp-filter-peer_inc_pcp_fixes
 - Address families: IPv4 and IPv6
 - Scenario selection: all
-- Totals: **63 PASS**, **0 FAIL** (63 family runs)
-- Artifacts: .tmp/pcp-e2e/2026-11-01T11-35-41Z (daemon startup/final logs and per-case captures/snapshots)
+- Totals: **66 PASS**, **0 FAIL** (66 family runs)
+- Artifacts: .tmp/pcp-e2e/2026-11-01T11-42-40Z (daemon startup/final logs and per-case captures/snapshots)
 
 ## Results
 
@@ -52,6 +52,8 @@ Updated: 2026-11-01T11:38:44Z
 | peer-adopts-existing-udp-mapping | PASS | all configured assertions passed |
 | peer-adopts-existing-tcp-mapping | PASS | all configured assertions passed |
 | peer-recreates-remembered-tcp-mapping | PASS | all configured assertions passed |
+| peer-rejects-unavailable-external-address | PASS | all configured assertions passed |
+| peer-rejects-mismatched-port-on-renewal | PASS | all configured assertions passed |
 | peer-rejects-prefer-failure | PASS | all configured assertions passed |
 
 #### NAT
@@ -109,6 +111,7 @@ Updated: 2026-11-01T11:38:44Z
 | peer-adopts-existing-udp-mapping | PASS | all configured assertions passed |
 | peer-adopts-existing-tcp-mapping | PASS | all configured assertions passed |
 | peer-recreates-remembered-tcp-mapping | PASS | all configured assertions passed |
+| peer-rejects-mismatched-port-on-renewal | PASS | all configured assertions passed |
 | peer-rejects-prefer-failure | PASS | all configured assertions passed |
 | peer-ipv6-udp-pinhole-restricts-remote-endpoint | PASS | all configured assertions passed |
 | peer-ipv6-tcp-pinhole-restricts-remote-endpoint | PASS | all configured assertions passed |

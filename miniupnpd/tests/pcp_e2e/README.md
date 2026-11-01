@@ -136,6 +136,9 @@ check that restriction before outbound traffic; UDP renewal retains it.
 Unavailable external tuples are rejected, and a filtered MAP can coexist with
 a PEER pinhole on the same internal port. A zero-lifetime IPv6 PEER request
 queries the remaining lease; it does not delete the pinhole.
+PEER requests imply PREFER_FAILURE (RFC 6887 section 12.1): an unavailable
+suggested external address or port returns `CANNOT_PROVIDE_EXTERNAL`, and an
+explicit PREFER_FAILURE option returns `MALFORMED_REQUEST`.
 These scenarios use routed IPv6 without NAT66. IPv6 MAP opens a pinhole
 without translating ports, so a different suggested external port with
 `PREFER_FAILURE` is rejected. The latest run's per-family results are in
