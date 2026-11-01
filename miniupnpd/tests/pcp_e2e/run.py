@@ -431,7 +431,10 @@ def run_case(case, args, agents, pcp_sock):
                 raise AssertionError(f"cleanup of {protocol}/{internal_port} returned {result}")
 
     listeners = {}
-    peer_external_address = (args.client_address if args.family == "ipv6"
+    # A ULA client is masqueraded (NAT66); a GUA client is routed unchanged.
+    peer_external_address = (args.client_address
+                             if args.family == "ipv6" and
+                             ipaddress.ip_address(args.client_address) not in ipaddress.ip_network("fc00::/7")
                              else args.external_address)
     def run_traffic(traffic_items):
         for traffic in traffic_items:

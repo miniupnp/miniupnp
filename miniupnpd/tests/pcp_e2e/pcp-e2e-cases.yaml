@@ -726,6 +726,22 @@ sections:
               protocol: tcp
               expect: delivered
 
+      - name: peer-rejects-prefer-failure
+        families: [ipv4, ipv6]
+        description: RFC 6887 section 12.1 forbids PREFER_FAILURE on PEER; the request is malformed and creates nothing.
+        request:
+          opcode: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41047
+          suggested_external_port: 41047
+          prefer_failure: true
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: MALFORMED_REQUEST
+          traffic:
+            - {from: denied-peer, protocol: udp, source_port: 42100, service_port: 41047, external_port: 41047, expect: blocked}
       - name: peer-ipv6-udp-pinhole-restricts-remote-endpoint
         families: [ipv6]
         description: A UDP PEER pinhole permits its remote address and port before outbound traffic and after renewal.
@@ -875,6 +891,40 @@ sections:
           result: SUCCESS
           traffic:
             - {from: allowed-peer, protocol: udp, service_port: 41103, external_port: 41103, expect: delivered}
+      - name: ipv6-nat66-pcp-peer-reachability
+        families: [ipv6]
+        description: With a NAT66-only ULA client, a PEER request succeeds and its outbound flow is masqueraded to the WAN address.
+        request:
+          opcode: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41104
+          suggested_external_port: 41104
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, mode: peer, protocol: udp, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42100, expect: blocked}
+      - name: ipv6-nat66-pcp-map-filter
+        families: [ipv6]
+        description: With a NAT66-only ULA client, a MAP FILTER admits only the allowed peer.
+        request:
+          opcode: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41105
+          suggested_external_port: 41105
+          filter:
+            remote_peer: allowed-peer
+            remote_port: 0
+            prefix_length: 128
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42105, service_port: 41105, external_port: 41105, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42105, service_port: 41105, external_port: 41105, expect: blocked}
 
   - name: PMP
     description: NAT-PMP UDP and TCP mapping creation, renewal, and deletion.

@@ -1,14 +1,14 @@
 # PCP E2E Status
 
-Updated: 2026-11-01T11:12:31Z
+Updated: 2026-11-01T11:38:44Z
 
 ## Run
 
 - Branch: dev/pcp-filter-peer_inc_pcp_fixes
 - Address families: IPv4 and IPv6
 - Scenario selection: all
-- Totals: **48 PASS**, **11 FAIL** (59 family runs)
-- Artifacts: .tmp/pcp-e2e/2026-11-01T11-09-53Z (daemon startup/final logs and per-case captures/snapshots)
+- Totals: **63 PASS**, **0 FAIL** (63 family runs)
+- Artifacts: .tmp/pcp-e2e/2026-11-01T11-35-41Z (daemon startup/final logs and per-case captures/snapshots)
 
 ## Results
 
@@ -52,6 +52,7 @@ Updated: 2026-11-01T11:12:31Z
 | peer-adopts-existing-udp-mapping | PASS | all configured assertions passed |
 | peer-adopts-existing-tcp-mapping | PASS | all configured assertions passed |
 | peer-recreates-remembered-tcp-mapping | PASS | all configured assertions passed |
+| peer-rejects-prefer-failure | PASS | all configured assertions passed |
 
 #### NAT
 
@@ -102,23 +103,26 @@ Updated: 2026-11-01T11:12:31Z
 
 | Case | Status | Result / note |
 |---|---|---|
-| peer-create-before-first-packet-udp | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-create-before-first-packet-tcp | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-processes-options-at-message-limit | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-adopts-existing-udp-mapping | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-adopts-existing-tcp-mapping | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-recreates-remembered-tcp-mapping | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-ipv6-udp-pinhole-restricts-remote-endpoint | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-ipv6-tcp-pinhole-restricts-remote-endpoint | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
-| peer-ipv6-rejects-unavailable-external-port | FAIL | PCP response expected CANNOT_PROVIDE_EXTERNAL, got UNSUPP_OPCODE |
-| peer-ipv6-rejects-unavailable-external-address | FAIL | PCP response expected CANNOT_PROVIDE_EXTERNAL, got UNSUPP_OPCODE |
-| peer-ipv6-coexists-with-filtered-map | FAIL | PCP response expected SUCCESS, got UNSUPP_OPCODE |
+| peer-create-before-first-packet-udp | PASS | all configured assertions passed |
+| peer-create-before-first-packet-tcp | PASS | all configured assertions passed |
+| peer-processes-options-at-message-limit | PASS | all configured assertions passed |
+| peer-adopts-existing-udp-mapping | PASS | all configured assertions passed |
+| peer-adopts-existing-tcp-mapping | PASS | all configured assertions passed |
+| peer-recreates-remembered-tcp-mapping | PASS | all configured assertions passed |
+| peer-rejects-prefer-failure | PASS | all configured assertions passed |
+| peer-ipv6-udp-pinhole-restricts-remote-endpoint | PASS | all configured assertions passed |
+| peer-ipv6-tcp-pinhole-restricts-remote-endpoint | PASS | all configured assertions passed |
+| peer-ipv6-rejects-unavailable-external-port | PASS | all configured assertions passed |
+| peer-ipv6-rejects-unavailable-external-address | PASS | all configured assertions passed |
+| peer-ipv6-coexists-with-filtered-map | PASS | all configured assertions passed |
 
 #### NAT
 
 | Case | Status | Result / note |
 |---|---|---|
 | ipv6-pcp-map-reachability | PASS | all configured assertions passed |
+| ipv6-nat66-pcp-peer-reachability | PASS | all configured assertions passed |
+| ipv6-nat66-pcp-map-filter | PASS | all configured assertions passed |
 
 #### PMP
 
