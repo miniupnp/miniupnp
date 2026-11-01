@@ -1119,6 +1119,11 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	int r;
 	char desc[64];
 	unsigned int timestamp = 0;
+	/* A firewall pinhole cannot translate the internal port.  RFC 6887
+	 * section 13.2 forbids substituting it when PREFER_FAILURE is set. */
+	if (pcp_msg_info->pfailure_present &&
+	    pcp_msg_info->ext_port != pcp_msg_info->int_port)
+		return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 	/* first check if pinhole already exists */
 	uid = upnp_find_inboundpinhole(NULL, 0,
 					pcp_msg_info->mapped_str,
