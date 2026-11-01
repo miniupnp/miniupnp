@@ -16,7 +16,15 @@
 #   PCP_TEST_FREEBSD_CACHE     image cache dir (default: ~/.cache/miniupnpd-pcp-test)
 #   PCP_TEST_FREEBSD_MEMORY    VM memory in MB (default: 2048)
 #   PCP_TEST_FREEBSD_SSH_PORT  host port forwarded to the VM (default: 2222)
+#   PCP_TEST_OUT_DIR           where check.log, summary.txt, console.log and the
+#                              VM's announce-test/ logs are saved (default:
+#                              <repo>/.tmp/ci/out/freebsd/announce)
 #   PCP_TEST_KEEP_VM=1         leave the VM running and keep its work dir
+#
+# The first run boots the downloaded image once, installs gmake/pkgconf/rsync (and
+# the libpfctl.h header on FreeBSD 15) and caches the result as
+# prepared-<version>.qcow2 in the cache dir; later runs boot a throwaway
+# overlay on it.  Delete that file to rebuild it.
 set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -27,6 +35,7 @@ CACHE=${PCP_TEST_FREEBSD_CACHE:-"$HOME/.cache/miniupnpd-pcp-test"}
 MEMORY=${PCP_TEST_FREEBSD_MEMORY:-2048}
 SSH_PORT=${PCP_TEST_FREEBSD_SSH_PORT:-2222}
 KEEP_VM=${PCP_TEST_KEEP_VM:-0}
+OUT_DIR=${PCP_TEST_OUT_DIR:-"$REPO_ROOT/.tmp/ci/out/freebsd/announce"}
 
 for tool in qemu-system-x86_64 qemu-img xz curl ssh ssh-keygen tar; do
 	if ! command -v "$tool" >/dev/null 2>&1; then
@@ -47,11 +56,12 @@ fi
 
 WORK=$(mktemp -d)
 QEMU_PID=
+KEY=
 cleanup() {
 	status=$?
 	trap - EXIT HUP INT TERM
 	if [ "$KEEP_VM" = 1 ]; then
-		echo "Keeping VM (pid ${QEMU_PID:-none}); work dir $WORK; ssh -p $SSH_PORT -i $WORK/key freebsd@127.0.0.1" >&2
+		echo "Keeping VM (pid ${QEMU_PID:-none}); work dir $WORK; ssh -p $SSH_PORT -i $KEY freebsd@127.0.0.1" >&2
 	else
 		[ -n "$QEMU_PID" ] && kill "$QEMU_PID" 2>/dev/null || true
 		rm -rf "$WORK"
@@ -94,9 +104,11 @@ if [ ! -f "$CACHE/$IMAGE_NAME" ]; then
 	mv "$CACHE/$IMAGE_NAME.part" "$CACHE/$IMAGE_NAME"
 fi
 
-# Throwaway overlay so the cached base image is never modified.
-qemu-img create -q -f qcow2 -F qcow2 -b "$CACHE/$IMAGE_NAME" "$WORK/disk.qcow2" 10G
-ssh-keygen -q -t ed25519 -N '' -f "$WORK/key"
+# A fixed key lives in the cache so a prepared image keeps accepting it.
+KEY="$CACHE/id_ed25519"
+if [ ! -f "$KEY" ]; then
+	ssh-keygen -q -t ed25519 -N '' -f "$KEY"
+fi
 mkdir "$WORK/seed"
 cat >"$WORK/seed/meta-data" <<META
 instance-id: miniupnpd-pcp-test
@@ -111,7 +123,13 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     doas: permit nopass freebsd
     ssh_authorized_keys:
-      - $(cat "$WORK/key.pub")
+      - $(cat "$KEY.pub")
+# The cloud image ships neither sudo nor doas; install doas as root at boot.
+runcmd:
+  - mkdir -p /usr/local/etc
+  - echo 'IGNORE_OSVERSION = yes;' >> /usr/local/etc/pkg.conf
+  - yes | env IGNORE_OSVERSION=yes ASSUME_ALWAYS_YES=yes pkg install -y doas
+  - echo 'permit nopass freebsd' > /usr/local/etc/doas.conf
 USER
 mkseed "$WORK/seed.iso" "$WORK/seed"
 
@@ -121,41 +139,116 @@ if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
 else
 	echo "No usable /dev/kvm; using slow software emulation." >&2
 fi
-qemu-system-x86_64 -machine accel=$ACCEL -cpu max -smp 2 -m "$MEMORY" \
-	-display none -serial "file:$WORK/console.log" \
-	-drive "file=$WORK/disk.qcow2,if=virtio" \
-	-drive "file=$WORK/seed.iso,if=virtio,media=cdrom,readonly=on" \
-	-netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
-	-device virtio-net-pci,netdev=n0 &
-QEMU_PID=$!
 
-SSH="ssh -p $SSH_PORT -i $WORK/key -o StrictHostKeyChecking=no \
- -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 freebsd@127.0.0.1"
-echo "Waiting for the VM to accept SSH"
-ready=0
-attempt=0
-while [ "$attempt" -lt 120 ]; do
-	if ! kill -0 "$QEMU_PID" 2>/dev/null; then
-		echo "QEMU exited early; console log:" >&2
-		cat "$WORK/console.log" >&2
+RSH="ssh -p $SSH_PORT -i $KEY -o StrictHostKeyChecking=no \
+ -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+SSH="$RSH freebsd@127.0.0.1"
+
+# boot_vm DISK: start QEMU on DISK and wait for SSH and sudo/doas (sets PRIV).
+boot_vm() {
+	qemu-system-x86_64 -machine accel=$ACCEL -cpu max -smp 2 -m "$MEMORY" \
+		-display none -serial "file:$WORK/console.log" \
+		-drive "file=$1,if=virtio" \
+		-drive "file=$WORK/seed.iso,if=virtio,media=cdrom,readonly=on" \
+		-netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
+		-device virtio-net-pci,netdev=n0 &
+	QEMU_PID=$!
+	echo "Waiting for the VM to accept SSH"
+	attempt=0
+	until $SSH true 2>/dev/null; do
+		if ! kill -0 "$QEMU_PID" 2>/dev/null; then
+			echo "QEMU exited early; console log:" >&2
+			cat "$WORK/console.log" >&2
+			exit 1
+		fi
+		attempt=$((attempt + 1))
+		if [ "$attempt" -ge 120 ]; then
+			echo "FreeBSD VM did not become reachable over SSH." >&2
+			tail -40 "$WORK/console.log" >&2
+			exit 1
+		fi
+		sleep 5
+	done
+	echo "Waiting for a privilege-escalation tool (sudo/doas) in the VM"
+	PRIV=
+	attempt=0
+	while [ "$attempt" -lt 60 ]; do
+		PRIV=$($SSH 'for t in sudo doas; do
+			command -v $t >/dev/null || continue
+			if [ $t = doas ] && [ ! -s /usr/local/etc/doas.conf ]; then continue; fi
+			echo $t; break
+		done' 2>/dev/null || true)
+		[ -n "$PRIV" ] && break
+		attempt=$((attempt + 1))
+		sleep 5
+	done
+	if [ -z "$PRIV" ]; then
+		echo "No sudo or doas became available in the VM." >&2
+		tail -40 "$WORK/console.log" >&2
 		exit 1
 	fi
-	if $SSH true 2>/dev/null; then
-		ready=1
-		break
+}
+
+PREPARED="$CACHE/prepared-$VERSION.qcow2"
+if [ ! -f "$PREPARED" ]; then
+	echo "Preparing a cached FreeBSD $VERSION image (first run only)"
+	qemu-img create -q -f qcow2 -F qcow2 -b "$CACHE/$IMAGE_NAME" "$WORK/prep.qcow2" 10G
+	boot_vm "$WORK/prep.qcow2"
+	$SSH "yes | $PRIV env IGNORE_OSVERSION=yes ASSUME_ALWAYS_YES=yes pkg install -y gmake pkgconf rsync" >/dev/null
+	# libpfctl is a private base library: FreeBSD 15 ships neither its header
+	# nor an installable library, so build a static copy from the matching
+	# release branch (configure uses -I/usr/local/include -L/usr/local/lib).
+	if [ "${VERSION%%.*}" -ge 15 ]; then
+		$SSH "set -e
+		    rel=\$(freebsd-version -u | sed 's/-.*//')
+		    url=https://raw.githubusercontent.com/freebsd/freebsd-src/releng/\$rel/lib/libpfctl
+		    cd /tmp && fetch -q \$url/libpfctl.h \$url/libpfctl.c
+		    cc -O2 -I. -c libpfctl.c -o libpfctl.o
+		    ar rcs libpfctl.a libpfctl.o
+		    $PRIV mkdir -p /usr/local/include /usr/local/lib
+		    $PRIV install -m 644 libpfctl.h /usr/local/include/
+		    $PRIV install -m 644 libpfctl.a /usr/local/lib/"
 	fi
-	attempt=$((attempt + 1))
-	sleep 5
-done
-if [ "$ready" -ne 1 ]; then
-	echo "FreeBSD VM did not become reachable over SSH." >&2
-	tail -40 "$WORK/console.log" >&2
-	exit 1
+	$SSH "$PRIV sync; $PRIV shutdown -p now" || true
+	wait "$QEMU_PID" || true
+	QEMU_PID=
+	qemu-img convert -O qcow2 "$WORK/prep.qcow2" "$PREPARED.part"
+	mv "$PREPARED.part" "$PREPARED"
+	rm -f "$WORK/prep.qcow2"
 fi
 
-# Copy the tracked files plus uncommitted edits, without .git.
-echo "Copying the checkout into the VM"
-(cd "$REPO_ROOT" && git ls-files -co --exclude-standard -z | tar --null -T - -cf -) |
-	$SSH 'sudo rm -rf /root/miniupnp && sudo mkdir -p /root/miniupnp && sudo tar -xf - -C /root/miniupnp'
+# Throwaway overlay so the cached image is never modified.
+qemu-img create -q -f qcow2 -F qcow2 -b "$PREPARED" "$WORK/disk.qcow2" 10G
+boot_vm "$WORK/disk.qcow2"
 
-$SSH 'cd /root/miniupnp && sudo sh miniupnpd/tests/pcp_pmp/freebsd/check-announce.sh'
+# Copy the tracked files plus uncommitted edits, without .git.  rsync when the
+# VM has it (images prepared before rsync was added fall back to tar).
+echo "Copying the checkout into the VM"
+if $SSH 'command -v rsync >/dev/null'; then
+	(cd "$REPO_ROOT" && git ls-files -co --exclude-standard -z) |
+		rsync -rlpt --delete --from0 --files-from=- --ignore-missing-args \
+		    -e "$RSH" --rsync-path="$PRIV rsync" \
+		    "$REPO_ROOT/" freebsd@127.0.0.1:/root/miniupnp/
+else
+	(cd "$REPO_ROOT" && git ls-files -co --exclude-standard -z | tar --null -T - -cf -) |
+		$SSH "$PRIV rm -rf /root/miniupnp && $PRIV mkdir -p /root/miniupnp && $PRIV tar -xf - -C /root/miniupnp"
+fi
+
+# Run the check, keeping its output; the exit code goes through a file because
+# a pipeline through tee would hide it.
+rm -rf "$OUT_DIR"
+mkdir -p "$OUT_DIR"
+{
+	rc=0
+	$SSH "cd /root/miniupnp && $PRIV sh miniupnpd/tests/pcp_pmp/freebsd/check-announce.sh" 2>&1 || rc=$?
+	echo $rc >"$OUT_DIR/exit-status"
+} | tee "$OUT_DIR/check.log"
+status=$(cat "$OUT_DIR/exit-status")
+rm -f "$OUT_DIR/exit-status"
+
+# Collect the in-VM logs (build, miniupnpd, tcpdump captures, configs).
+$SSH "$PRIV tar -cf - -C /tmp announce-test" 2>/dev/null | tar -xf - -C "$OUT_DIR" || true
+cp "$WORK/console.log" "$OUT_DIR/console.log" 2>/dev/null || true
+echo "FreeBSD $VERSION, exit status $status" >"$OUT_DIR/summary.txt"
+echo "Results saved to $OUT_DIR" >&2
+exit "$status"

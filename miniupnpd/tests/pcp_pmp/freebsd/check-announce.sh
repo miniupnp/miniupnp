@@ -12,8 +12,14 @@ WORK=/tmp/announce-test
 rm -rf "$WORK"
 mkdir -p "$WORK"
 
-pkg install -y gmake pkgconf >/dev/null 2>&1 || true
+# gmake, pkgconf and (on FreeBSD 15) a static libpfctl plus its header come
+# from the prepared VM image.  On FreeBSD 14 libpfctl is a private base
+# library in /usr/lib/private, which is not on the default linker path.
+pfctl_dir=$(dirname "$(ls /usr/lib/private/libpfctl.* 2>/dev/null | head -n 1)")
 (cd miniupnpd && ./configure --firewall=pf --ipv6 --disable-tests >/dev/null \
+	&& if grep -q lpfctl bsdmake.inc && [ "$pfctl_dir" != . ]; then \
+		echo "LDFLAGS += -L$pfctl_dir -Wl,-rpath,$pfctl_dir" >> bsdmake.inc; fi \
+	&& if grep -q lpfctl bsdmake.inc; then echo "LIBS += -lnv" >> bsdmake.inc; fi \
 	&& make -f Makefile.bsd >"$WORK/build.log" 2>&1) || {
 	tail -40 "$WORK/build.log" >&2
 	echo "FAIL: build" >&2
@@ -27,13 +33,26 @@ for n in 0 1 2; do
 	ifconfig epair$n create >/dev/null
 done
 # epair0 = LAN1, epair1 = LAN2, epair2 = WAN
-ifconfig epair0a inet 192.168.1.1/24 inet6 fd42:1::1/64 up
+ifconfig epair0a up
+ifconfig epair0a inet 192.168.1.1/24
+ifconfig epair0a inet6 fd42:1::1/64
 ifconfig epair0b up
-ifconfig epair1a inet 192.168.2.1/24 inet6 fd42:2::1/64 up
+ifconfig epair1a up
+ifconfig epair1a inet 192.168.2.1/24
+ifconfig epair1a inet6 fd42:2::1/64
 ifconfig epair1b up
-ifconfig epair2a inet 198.51.100.1/24 inet6 fd42:3::1/64 up
-ifconfig epair2b inet 198.51.100.2/24 inet6 fd42:3::2/64 up
+ifconfig epair2a up
+ifconfig epair2a inet 198.51.100.1/24
+ifconfig epair2a inet6 fd42:3::1/64
+ifconfig epair2b up
+ifconfig epair2b inet 198.51.100.2/24
+ifconfig epair2b inet6 fd42:3::2/64
 sleep 3 # let IPv6 DAD finish
+
+# The VM's own QEMU NIC (vtnet0) also has default routes, which would win over
+# the WAN ones; remove them all (SSH keeps working over the connected route).
+while route -n delete -net default >/dev/null 2>&1; do :; done
+while route -n delete -inet6 default >/dev/null 2>&1; do :; done
 
 # Like a real router, send the default route out of the WAN so multicast
 # without an explicit output interface would leave through it.
@@ -61,8 +80,8 @@ enable_pcp_pmp=yes
 CONF
 
 for n in 0 1 2; do
-	tcpdump -i epair${n}b -n -l -Q in "udp and dst port 5350" \
-		>"$WORK/epair${n}b.log" 2>&1 &
+	tcpdump -i epair${n}b -n -U -Q in -w "$WORK/epair${n}b.pcap" \
+		"udp and dst port 5350" >"$WORK/epair${n}b.err" 2>&1 &
 	echo $! >>"$WORK/tcpdump.pids"
 done
 sleep 1
@@ -73,6 +92,10 @@ sleep 5
 kill "$(cat "$WORK/miniupnpd.pid")" 2>/dev/null || true
 kill $(cat "$WORK/tcpdump.pids") 2>/dev/null || true
 sleep 1
+# Text view of each capture; the .pcap files are kept for Wireshark.
+for n in 0 1 2; do
+	tcpdump -n -r "$WORK/epair${n}b.pcap" >"$WORK/epair${n}b.log" 2>&1 || true
+done
 
 status=0
 announces() { grep -E '\.5351 > (224\.0\.0\.1|ff02::1)\.5350' "$WORK/$1.log" || true; }
