@@ -80,7 +80,7 @@ if [ "$WAN_PEER" = 1 ]; then
 	"$DOCKER_BIN" start "$CONTAINER" >/dev/null
 	"$DOCKER_BIN" create --name "$PEER_CONTAINER" --network "$NETWORK" \
 		--cap-add NET_ADMIN --entrypoint python3 "$IMAGE" \
-		/src/miniupnpd/tests/common/traffic_agent.py --host 0.0.0.0 \
+		/src/miniupnpd/tests/common/traffic_agent.py --host :: \
 		--source4 198.51.100.2 --source6 fd42:5351:5352::2 \
 		--route6 fd42:5351:5351::/64 --gateway6 fd42:5351:5352::1 >/dev/null
 	"$DOCKER_BIN" network connect --ip 198.51.100.2 --ip6 fd42:5351:5352::2 "$WAN_NETWORK" "$PEER_CONTAINER"
@@ -100,7 +100,7 @@ if [ "$WAN_PEER" = 1 ]; then
 	fi
 	ROUTER4=$("$DOCKER_BIN" inspect -f "{{(index .NetworkSettings.Networks \"$NETWORK\").IPAddress}}" "$CONTAINER")
 	ROUTER6=$("$DOCKER_BIN" inspect -f "{{(index .NetworkSettings.Networks \"$NETWORK\").GlobalIPv6Address}}" "$CONTAINER")
-	PEER4=$("$DOCKER_BIN" inspect -f "{{(index .NetworkSettings.Networks \"$NETWORK\").IPAddress}}" "$PEER_CONTAINER")
+	PEER6=$("$DOCKER_BIN" inspect -f "{{(index .NetworkSettings.Networks \"$NETWORK\").GlobalIPv6Address}}" "$PEER_CONTAINER")
 else
 	"$DOCKER_BIN" run --detach \
 	--name "$CONTAINER" \
@@ -146,7 +146,7 @@ run_tests() {
 		set -- --mutating "$@"
 	fi
 	if [ "$WAN_PEER" = 1 ]; then
-		set -- --peer-url "http://$PEER4:18080" "$@"
+		set -- --peer-url "http://[$PEER6]:18080" "$@"
 	fi
 	if [ -n "${PCP_TEST_RESULTS_DIR:-}" ] || [ "$CAPTURE" = 0 ]; then
 		set -- --results-file "/pcp-pmp-results/results-$test_family.json" "$@"
