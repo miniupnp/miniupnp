@@ -125,18 +125,24 @@ The nftables backend implements MAP FILTER policy for IPv4 redirects and IPv6
 pinholes, with up to 256 distinct peer filters per mapping. Duplicate filters
 do not consume additional slots. Other firewall backends reject FILTER with
 `UNSUPP_OPTION` instead of acknowledging restrictions they cannot enforce.
-IPv4 PEER scenarios check the source tuple observed on the WAN for
+IPv4 and IPv6 PEER scenarios check the source tuple observed on the WAN for
 new, adopted, and restored mappings. The restoration case starts with a clean
 fixture to model loss of the previous mapping state; it does not restart a
 daemon mid-case.
 
-IPv6 PEER requests still return `UNSUPP_OPCODE`. Those cases assert rejection;
-they do not establish IPv6 PEER forwarding support. IPv6 MAP opens a pinhole
+IPv6 PEER preserves the client's GUA and internal port and opens a pinhole
+restricted to the requested remote address and port. Inbound UDP/TCP probes
+check that restriction before outbound traffic; UDP renewal retains it.
+Unavailable external tuples are rejected, and a filtered MAP can coexist with
+a PEER pinhole on the same internal port. A zero-lifetime IPv6 PEER request
+queries the remaining lease; it does not delete the pinhole.
+These scenarios use routed IPv6 without NAT66. IPv6 MAP opens a pinhole
 without translating ports, so a different suggested external port with
 `PREFER_FAILURE` is rejected. The latest run's per-family results are in
 `status.md`.
 
-Every PCP case in the MAP, FILTER, and PEER sections has IPv4 and IPv6 coverage.
+The MAP, FILTER, and PEER sections exercise both IPv4 and IPv6, with additional
+IPv6-specific cases for firewall pinhole behavior.
 NAT-PMP cases are IPv4-only because NAT-PMP does not define IPv6 operation.
 FILTER cases
 exercise exact peers, remote ports, prefixes, multiple options, refresh

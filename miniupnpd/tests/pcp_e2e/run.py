@@ -431,6 +431,8 @@ def run_case(case, args, agents, pcp_sock):
                 raise AssertionError(f"cleanup of {protocol}/{internal_port} returned {result}")
 
     listeners = {}
+    peer_external_address = (args.client_address if args.family == "ipv6"
+                             else args.external_address)
     def run_traffic(traffic_items):
         for traffic in traffic_items:
             if traffic.get("mode") in ("peer", "peer-implicit", "peer-existing"):
@@ -447,13 +449,13 @@ def run_case(case, args, agents, pcp_sock):
                 elif traffic["mode"] == "peer-existing":
                     _flow, observed = peer_flows[key]
                     mapping = active[key]
-                    _flow.check_mapping(args.external_address, mapping[1], observed)
+                    _flow.check_mapping(peer_external_address, mapping[1], observed)
                 else:
                     flow = PeerFlow(traffic["from"], peer, spec["remote_peer_port"],
                                     spec["protocol"], args.client_address,
                                     spec["internal_port"])
                     try:
-                        flow.check_mapping(args.external_address, active[key][1], flow.exchange())
+                        flow.check_mapping(peer_external_address, active[key][1], flow.exchange())
                     finally:
                         flow.close()
                 continue

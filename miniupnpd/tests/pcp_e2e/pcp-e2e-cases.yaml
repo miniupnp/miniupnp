@@ -605,20 +605,16 @@ sections:
           lifetime: 120
           protocol: udp
           internal_port: 41020
-          suggested_external_port: 43020
+          suggested_external_port: {ipv4: 43020, ipv6: 41020}
           remote_peer: allowed-peer
           remote_peer_port: 42100
         expect:
-          result:
-            ipv4: SUCCESS
-            ipv6: UNSUPP_OPCODE
+          result: SUCCESS
           traffic:
             - from: allowed-peer
               mode: peer
               protocol: udp
               expect: delivered
-              families:
-                - ipv4
       - name: peer-create-before-first-packet-tcp
         families:
           - ipv4
@@ -629,20 +625,16 @@ sections:
           lifetime: 120
           protocol: tcp
           internal_port: 41021
-          suggested_external_port: 43021
+          suggested_external_port: {ipv4: 43021, ipv6: 41021}
           remote_peer: allowed-peer
           remote_peer_port: 42100
         expect:
-          result:
-            ipv4: SUCCESS
-            ipv6: UNSUPP_OPCODE
+          result: SUCCESS
           traffic:
             - from: allowed-peer
               mode: peer
               protocol: tcp
               expect: delivered
-              families:
-                - ipv4
       - name: peer-processes-options-at-message-limit
         families:
           - ipv4
@@ -654,14 +646,12 @@ sections:
           lifetime: 120
           protocol: udp
           internal_port: 41041
-          suggested_external_port: 43041
+          suggested_external_port: {ipv4: 43041, ipv6: 41041}
           remote_peer: allowed-peer
           remote_peer_port: 42100
           unknown_optional_options: 255
         expect:
-          result:
-            ipv4: SUCCESS
-            ipv6: UNSUPP_OPCODE
+          result: SUCCESS
       - name: peer-adopts-existing-udp-mapping
         families:
           - ipv4
@@ -681,16 +671,12 @@ sections:
             protocol: udp
             expect: delivered
         expect:
-          result:
-            ipv4: SUCCESS
-            ipv6: UNSUPP_OPCODE
+          result: SUCCESS
           traffic:
             - from: allowed-peer
               mode: peer-existing
               protocol: udp
               expect: delivered
-              families:
-                - ipv4
       - name: peer-adopts-existing-tcp-mapping
         families:
           - ipv4
@@ -710,16 +696,12 @@ sections:
             protocol: tcp
             expect: delivered
         expect:
-          result:
-            ipv4: SUCCESS
-            ipv6: UNSUPP_OPCODE
+          result: SUCCESS
           traffic:
             - from: allowed-peer
               mode: peer-existing
               protocol: tcp
               expect: delivered
-              families:
-                - ipv4
       - name: peer-recreates-remembered-tcp-mapping
         families:
           - ipv4
@@ -730,23 +712,143 @@ sections:
           lifetime: 240
           protocol: tcp
           internal_port: 41040
-          suggested_external_port: 43040
+          suggested_external_port: {ipv4: 43040, ipv6: 41040}
           suggested_external_address:
             ipv4: 198.51.100.1
-            ipv6: 2001:db8:9000::1
+            ipv6: 2001:db8:1::2
           remote_peer: allowed-peer
           remote_peer_port: 42100
         expect:
-          result:
-            ipv4: SUCCESS
-            ipv6: UNSUPP_OPCODE
+          result: SUCCESS
           traffic:
             - from: allowed-peer
               mode: peer
               protocol: tcp
               expect: delivered
-              families:
-                - ipv4
+
+      - name: peer-ipv6-udp-pinhole-restricts-remote-endpoint
+        families: [ipv6]
+        description: A UDP PEER pinhole permits its remote address and port before outbound traffic and after renewal.
+        requests:
+          - opcode: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41042
+            suggested_external_port: 41042
+            remote_peer: allowed-peer
+            remote_peer_port: 42050
+          - opcode: PEER
+            lifetime: 240
+            protocol: udp
+            internal_port: 41042
+            suggested_external_port: 41042
+            remote_peer: allowed-peer
+            remote_peer_port: 42050
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, source_port: 42050, expect: delivered}
+                - {from: allowed-peer, protocol: udp, source_port: 42051, expect: blocked}
+                - {from: denied-peer, protocol: udp, source_port: 42050, expect: blocked}
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42050, expect: delivered}
+            - {from: allowed-peer, protocol: udp, source_port: 42052, expect: blocked}
+            - {from: third-peer, protocol: udp, source_port: 42050, expect: blocked}
+      - name: peer-ipv6-tcp-pinhole-restricts-remote-endpoint
+        families: [ipv6]
+        description: A TCP PEER pinhole permits only its specified remote address and port before outbound traffic.
+        request:
+          opcode: PEER
+          lifetime: 120
+          protocol: tcp
+          internal_port: 41043
+          suggested_external_port: 41043
+          remote_peer: allowed-peer
+          remote_peer_port: 42053
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: tcp, source_port: 42053, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, source_port: 42054, expect: blocked}
+            - {from: denied-peer, protocol: tcp, source_port: 42053, expect: blocked}
+            - {from: third-peer, protocol: tcp, source_port: 42053, expect: blocked}
+
+      - name: peer-ipv6-rejects-unavailable-external-port
+        families: [ipv6]
+        description: Reject an untranslatable external port without reserving the endpoint or preventing a valid retry with a fresh nonce.
+        requests:
+          - opcode: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41044
+            suggested_external_port: 43044
+            remote_peer: allowed-peer
+            remote_peer_port: 42055
+          - opcode: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41044
+            suggested_external_port: 41044
+            remote_peer: allowed-peer
+            remote_peer_port: 42055
+        expect:
+          results: [CANNOT_PROVIDE_EXTERNAL, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42055, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42055, expect: blocked}
+      - name: peer-ipv6-rejects-unavailable-external-address
+        families: [ipv6]
+        description: Reject an unavailable external address without reserving the endpoint or preventing a valid retry with a fresh nonce.
+        requests:
+          - opcode: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41045
+            suggested_external_port: 41045
+            suggested_external_address: 2001:db8:9000::1
+            remote_peer: allowed-peer
+            remote_peer_port: 42056
+          - opcode: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41045
+            suggested_external_port: 41045
+            remote_peer: allowed-peer
+            remote_peer_port: 42056
+        expect:
+          results: [CANNOT_PROVIDE_EXTERNAL, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42056, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42056, expect: blocked}
+      - name: peer-ipv6-coexists-with-filtered-map
+        families: [ipv6]
+        description: A filtered MAP still blocks unsolicited traffic while PEER permits replies from a different remote on the same internal port.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41046
+            suggested_external_port: 41046
+            filter:
+              remote_peer: allowed-peer
+              remote_port: 0
+              prefix_length: 128
+          - opcode: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41046
+            suggested_external_port: 41046
+            remote_peer: denied-peer
+            remote_peer_port: 42100
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: denied-peer, mode: peer, protocol: udp, expect: delivered}
+            - {from: allowed-peer, protocol: udp, source_port: 42060, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42060, expect: blocked}
+            - {from: third-peer, protocol: udp, source_port: 42060, expect: blocked}
 
   - name: NAT
     description: NAT-PMP IPv4 address discovery and IPv6 PCP mapping with NAT66.
