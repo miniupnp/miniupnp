@@ -9,7 +9,7 @@ response protocol behavior.
 From the repository root, with Docker available:
 
 ```sh
-./miniupnpd/tests/PCP_E2E/run-docker.sh
+./miniupnpd/tests/pcp_e2e/run-docker.sh
 ```
 
 The script builds miniupnpd from the current checkout, starts a dual-stack
@@ -23,17 +23,27 @@ networks are removed on exit.
 Run selected scenarios with `--case NAME`, repeating the option as needed:
 
 ```sh
-./miniupnpd/tests/PCP_E2E/run-docker.sh --case map-single-udp-only
+./miniupnpd/tests/pcp_e2e/run-docker.sh --case map-single-udp-only
 ```
 
-Set `PCP_E2E_KEEP=1` to retain containers and networks for debugging. Run the
-Python runner directly only when a compatible router, echo listener address,
-and HTTP traffic agents are already available. Set `PCP_E2E_ARTIFACT_DIR` to
-change the output root (default: `.tmp/pcp-e2e/`). Each run stores daemon
-startup and final logs, one timestamped daemon log snapshot and runner log per
-case, including `CASE START` and `CASE END` markers. These snapshots make the
-daemon log timeline easy to line up with per-case packet captures. YAML case
-definitions stay in `pcp-e2e-cases.yaml`.
+Set `PCP_E2E_KEEP=1` to retain containers and networks for debugging. Set
+`PCP_E2E_ARTIFACT_DIR` to change the output root (default: `.tmp/pcp-e2e/`).
+Each run stores daemon startup and final logs, one timestamped daemon log
+snapshot and runner log per case, including `CASE START` and `CASE END`
+markers. These snapshots make the daemon log timeline easy to line up with
+per-case packet captures. The runner writes a `status.md` report in this
+directory; override its path with `PCP_E2E_STATUS_FILE`.
+
+## Self-test
+
+Check YAML structure and IPv4/IPv6 MAP and FILTER wire encoding without Docker
+or a running daemon:
+
+```sh
+python3 miniupnpd/tests/pcp_e2e/run.py --self-test
+```
+
+Case definitions remain in `pcp-e2e-cases.yaml`.
 
 ## Current expected failures
 

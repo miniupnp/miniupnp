@@ -32,7 +32,7 @@ def v6_address(value):
     return socket.inet_pton(socket.AF_INET6, str(address))
 
 
-def map_request(sock, router, client, spec, peer_addresses, nonce=None):
+def build_map_packet(client, spec, peer_addresses, nonce=None):
     nonce = nonce or os.urandom(12)
     body = nonce + bytes(({"tcp": 6, "udp": 17}[spec["protocol"]], 0, 0, 0))
     body += struct.pack("!HH", spec["internal_port"], spec["suggested_external_port"])
@@ -55,6 +55,11 @@ def map_request(sock, router, client, spec, peer_addresses, nonce=None):
         packet += struct.pack("!H", remote_port) + v6_address(peer)
     if spec.get("prefer_failure"):
         packet += bytes((2, 0, 0, 0))
+    return packet, nonce, body
+
+
+def map_request(sock, router, client, spec, peer_addresses, nonce=None):
+    packet, nonce, body = build_map_packet(client, spec, peer_addresses, nonce)
     sock.sendto(packet, (router, 5351))
     response, _ = sock.recvfrom(2048)
     if len(response) < 60 or response[:2] != bytes((2, 0x81)):
@@ -66,6 +71,68 @@ def map_request(sock, router, client, spec, peer_addresses, nonce=None):
         if response[36] != body[12] or response[40:42] != body[16:18]:
             raise AssertionError("PCP response changed the mapped protocol or internal port")
     return result, struct.unpack("!H", response[42:44])[0], nonce
+
+
+def validate_corpus(corpus):
+    cases = corpus.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("corpus must contain a non-empty cases list")
+    names = [case.get("name") for case in cases]
+    if any(not name for name in names) or len(names) != len(set(names)):
+        raise ValueError("case names must be present and unique")
+    for case in cases:
+        if case.get("family", "ipv4") not in ("ipv4", "ipv6"):
+            raise ValueError(f"{case['name']}: invalid address family")
+        requests = case.get("requests", [case["request"]] if "request" in case else [])
+        expected = case.get("expect", {}).get("results", [case.get("expect", {}).get("result")])
+        if not requests or len(requests) != len(expected) or any(not code for code in expected):
+            raise ValueError(f"{case['name']}: request/result count mismatch")
+        for request in requests:
+            if request.get("opcode") != "MAP" or request.get("protocol") not in ("tcp", "udp"):
+                raise ValueError(f"{case['name']}: only MAP over TCP or UDP is supported")
+            for field in ("internal_port", "suggested_external_port"):
+                if type(request.get(field)) is not int or not 1 <= request[field] <= 65535:
+                    raise ValueError(f"{case['name']}: invalid {field}")
+            filters = request.get("filters", [request["filter"]] if request.get("filter") else [])
+            for filt in filters:
+                prefix = filt.get("prefix_length")
+                limit = 32 if case.get("family", "ipv4") == "ipv4" else 128
+                if type(prefix) is not int or not 0 <= prefix <= limit:
+                    raise ValueError(f"{case['name']}: invalid FILTER prefix for {case.get('family', 'ipv4')}")
+        traffic = list(case.get("expect", {}).get("traffic", []))
+        traffic.extend(probe for stage in case.get("expect", {}).get("traffic_stages", [])
+                       for probe in stage.get("traffic", []))
+        for probe_spec in traffic:
+            if probe_spec.get("protocol") not in ("tcp", "udp") or probe_spec.get("expect") not in (
+                    "delivered", "blocked"):
+                raise ValueError(f"{case['name']}: invalid traffic expectation")
+    return len(cases)
+
+
+def self_test(corpus):
+    count = validate_corpus(corpus)
+    addresses = {"allowed-peer": "198.51.100.2", "denied-peer": "198.51.100.130"}
+    spec = {"protocol": "udp", "lifetime": 120, "internal_port": 41000,
+            "suggested_external_port": 41000, "filter": {"remote_peer": "allowed-peer",
+            "remote_port": 42000, "prefix_length": 32}}
+    packet, nonce, _ = build_map_packet("172.28.41.2", spec, addresses, bytes(range(12)))
+    assert packet[24:36] == nonce
+    assert packet[60:64] == bytes((3, 0, 0, 20))
+    assert packet[64:68] == bytes((0, 128, 0xA4, 0x10))
+    assert packet[68:84] == v6_address(addresses["allowed-peer"])
+
+    spec["filters"] = [spec.pop("filter"), {"remote_peer": "denied-peer",
+                                             "remote_port": 0, "prefix_length": 128}]
+    spec["filters"][0]["prefix_length"] = 128
+    multi, _, _ = build_map_packet("fd42:5351:5351::2", spec, {
+        "allowed-peer": "fd42:5351:5352::2", "denied-peer": "fd42:5351:5352::130"}, nonce)
+    assert multi[60] == 3 and multi[84] == 3
+    assert multi[65] == 128 and multi[89] == 128
+    spec["filters"] = [{"remote_peer": "::", "remote_port": 0, "prefix_length": 0}]
+    cleared, _, _ = build_map_packet("fd42:5351:5351::2", spec, {}, nonce)
+    assert cleared[65:68] == bytes((0, 0, 0))
+    print(f"PASS YAML validation ({count} cases)")
+    print("PASS IPv4/IPv6 FILTER field encoding (single and multiple options)")
 
 
 def probe(agent, host, port, transport, expect, source_port=None):
@@ -189,6 +256,8 @@ def run_case(case, args, agents, pcp_sock):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", default=os.path.join(os.path.dirname(__file__), "pcp-e2e-cases.yaml"))
+    parser.add_argument("--self-test", action="store_true",
+                        help="validate YAML cases and PCP/FILTER packet encoding without a daemon")
     parser.add_argument("--router", default="172.28.41.1")
     parser.add_argument("--client-address", default="172.28.41.2")
     parser.add_argument("--external-address", default="198.51.100.1")
@@ -199,6 +268,12 @@ def main():
     parser.add_argument("--route-through-router", action="store_true",
                         help="route replies from the LAN echo service back through the test router")
     args = parser.parse_args()
+    with open(args.cases, encoding="utf-8") as source:
+        corpus = yaml.safe_load(source)
+    if args.self_test:
+        self_test(corpus)
+        return 0
+    validate_corpus(corpus)
     if args.route_through_router:
         if args.family == "ipv4":
             subprocess.run(["ip", "route", "replace", "198.51.100.0/24",
@@ -206,8 +281,6 @@ def main():
         else:
             subprocess.run(["ip", "-6", "route", "replace", "fd42:5351:5352::/64",
                             "via", "fd42:5351:5351::1"], check=True)
-    with open(args.cases, encoding="utf-8") as source:
-        corpus = yaml.safe_load(source)
     agents = dict(item.split("=", 1) for item in args.agent)
     args.peer_addresses = dict(item.split("=", 1) for item in args.peer_address)
     args.socket_family = socket.AF_INET6 if args.family == "ipv6" else socket.AF_INET

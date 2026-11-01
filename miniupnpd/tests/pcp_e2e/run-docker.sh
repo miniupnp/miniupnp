@@ -2,7 +2,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
-DIR=$ROOT/miniupnpd/tests/PCP_E2E
+DIR=$ROOT/miniupnpd/tests/pcp_e2e
 DOCKER=${DOCKER:-docker}
 IMAGE=${PCP_E2E_IMAGE:-miniupnpd-pcp-e2e:local}
 SUFFIX=$$
@@ -15,9 +15,11 @@ THIRD=pcp-e2e-third-$SUFFIX
 RUNNER=pcp-e2e-runner-$SUFFIX
 KEEP=${PCP_E2E_KEEP:-0}
 ARTIFACTS=${PCP_E2E_ARTIFACT_DIR:-$ROOT/.tmp/pcp-e2e}
+STATUS_FILE=${PCP_E2E_STATUS_FILE:-$DIR/status.md}
 RUN_ID=$(date -u +%Y-%m-%dT%H-%M-%SZ)
 SELECTED_CASES=
 STATUS=0
+EXECUTED=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -91,6 +93,8 @@ sleep 2
 
 RUN_DIR=$ARTIFACTS/$RUN_ID
 mkdir -p "$RUN_DIR"
+RESULTS_FILE=$RUN_DIR/results.tsv
+: > "$RESULTS_FILE"
 "$DOCKER" logs --timestamps "$ROUTER" > "$RUN_DIR/daemon-start.log" 2>&1 || true
 echo "Daemon startup log: $RUN_DIR/daemon-start.log"
 
@@ -127,6 +131,7 @@ run_family() {
       case " $SELECTED_CASES " in *" $case_name "*) ;; *) continue ;; esac
     fi
     case_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    EXECUTED=$((EXECUTED + 1))
     if "$DOCKER" run --rm --name "$RUNNER" --network "$LAN" "$ip_flag" "$lanip" \
       --cap-add NET_ADMIN --entrypoint python3 \
       --volume "$DIR:/pcp-e2e:ro" "$IMAGE" /pcp-e2e/run.py \
@@ -137,10 +142,15 @@ run_family() {
       --peer-address "allowed-peer=$allow_ip" --peer-address "denied-peer=$deny_ip" \
       --peer-address "third-peer=$third_ip" > "$family_dir/$case_name.runner.log" 2>&1; then
       cat "$family_dir/$case_name.runner.log"
+      case_result=PASS
+      case_note="all PCP and traffic assertions passed"
     else
       cat "$family_dir/$case_name.runner.log"
       STATUS=1
+      case_result=FAIL
+      case_note=$(sed -n 's/^FAIL [^:]*: //p' "$family_dir/$case_name.runner.log" | head -n 1)
     fi
+    printf '%s\t%s\t%s\t%s\n' "$family" "$case_name" "$case_result" "$case_note" >> "$RESULTS_FILE"
     "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" \
       > "$family_dir/$case_name.daemon.log" 2>&1 || true
   done
@@ -148,6 +158,38 @@ run_family() {
 
 run_family ipv4
 run_family ipv6
+if [ "$EXECUTED" -eq 0 ]; then
+  echo "No E2E cases matched the requested selection." >&2
+  STATUS=1
+fi
 "$DOCKER" logs --timestamps "$ROUTER" > "$RUN_DIR/daemon-final.log" 2>&1 || true
+PASS_TOTAL=$(awk -F '\t' '$3 == "PASS" { n++ } END { print n+0 }' "$RESULTS_FILE")
+FAIL_TOTAL=$(awk -F '\t' '$3 == "FAIL" { n++ } END { print n+0 }' "$RESULTS_FILE")
+SCENARIO_SELECTION=${SELECTED_CASES# }
+[ -n "$SCENARIO_SELECTION" ] || SCENARIO_SELECTION=all
+RUN_DIR_DISPLAY=${RUN_DIR#"$ROOT"/}
+mkdir -p "$(dirname -- "$STATUS_FILE")"
+{
+  cat <<EOF
+# PCP E2E Status
+
+Updated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+## Run
+
+- Branch: $(git -C "$ROOT" branch --show-current 2>/dev/null || echo unknown)
+- Address families: IPv4 and IPv6
+- Scenario selection: $SCENARIO_SELECTION
+- Totals: **$PASS_TOTAL PASS**, **$FAIL_TOTAL FAIL**
+- Artifacts: $RUN_DIR_DISPLAY
+
+## Results
+EOF
+  for family in ipv4 ipv6; do
+    printf '\n### %s\n\n| Case | Status | Result / note |\n|---|---|---|\n' "$family"
+    awk -F '\t' -v family="$family" '$1==family { note=$4; gsub(/\|/, "\\|", note); printf "| %s | %s | %s |\n", $2, $3, note }' "$RESULTS_FILE"
+  done
+} > "$STATUS_FILE"
+echo "Status report: $STATUS_FILE"
 echo "Daemon logs: $RUN_DIR (startup, per-case snapshots, final)"
 exit "$STATUS"
