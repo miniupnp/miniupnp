@@ -43,13 +43,21 @@ def probe(spec, source4='0.0.0.0', source6='::'):
         source = source6 if target.version == 6 else source4
         # Fresh tuples ensure conntrack entries from an earlier probe cannot
         # keep a deleted mapping looking usable. Never recycle actor ports.
-        for port in SOURCE_PORTS:
+        requested_source_port = spec.get('source_port')
+        if requested_source_port is not None and (
+                type(requested_source_port) is not int or not 1 <= requested_source_port <= 65535):
+            raise ValueError('source_port must be between 1 and 65535')
+        source_ports = ([requested_source_port] if requested_source_port is not None
+                        else SOURCE_PORTS)
+        for port in source_ports:
             if port > 65535:
                 raise ValueError('traffic agent exhausted its fresh source ports')
             try:
                 sock.bind((source, port))
             except OSError as error:
                 if error.errno != errno.EADDRINUSE:
+                    if requested_source_port is not None:
+                        return {'delivered': False, 'error': str(error)}
                     raise
             else:
                 break
@@ -97,7 +105,15 @@ def create_server(host='127.0.0.1', port=18080, source4='0.0.0.0', source6='::')
             self.end_headers()
             self.wfile.write(json.dumps(result).encode())
 
-    return ThreadingHTTPServer((host, port), Handler)
+    class AgentHTTPServer(ThreadingHTTPServer):
+        address_family = socket.AF_INET6 if ':' in host else socket.AF_INET
+
+        def server_bind(self):
+            if self.address_family == socket.AF_INET6:
+                self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            super().server_bind()
+
+    return AgentHTTPServer((host, port), Handler)
 
 
 def run_self_tests():
