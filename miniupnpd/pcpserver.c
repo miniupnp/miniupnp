@@ -93,6 +93,9 @@ POSSIBILITY OF SUCH DAMAGE.
 /* TODO make this platform independent */
 #ifdef USE_NETFILTER
 #include "netfilter/iptcrdr.h"
+#ifdef USE_NFTABLES
+#include "netfilter_nft/nftnlrdr.h"
+#endif
 #else
 #error "PCP Peer is only supported with NETFILTER"
 #endif /* USE_NETFILTER */
@@ -126,6 +129,7 @@ typedef struct pcp_info {
 #ifdef PCP_PEER
 	uint16_t    peer_port;
 	const struct in6_addr    *peer_ip; /* Destination IP in network order */
+	struct in6_addr peer_ext_ip; /* Actual tuple adopted from conntrack. */
 #endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
@@ -769,14 +773,23 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 			struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext4->sin_port);
 			eport = ret_eport;
+			memset(&pcp_msg_info->peer_ext_ip, 0, sizeof(pcp_msg_info->peer_ext_ip));
+			pcp_msg_info->peer_ext_ip.s6_addr[10] = 0xff;
+			pcp_msg_info->peer_ext_ip.s6_addr[11] = 0xff;
+			memcpy(pcp_msg_info->peer_ext_ip.s6_addr + 12,
+			       &ret_ext4->sin_addr, sizeof(ret_ext4->sin_addr));
+			pcp_msg_info->ext_ip = &pcp_msg_info->peer_ext_ip;
 		} else if (ret_extip.ss_family == AF_INET6) {
 			struct sockaddr_in6* ret_ext6 = (struct sockaddr_in6*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext6->sin6_port);
 			eport = ret_eport;
+			pcp_msg_info->peer_ext_ip = ret_ext6->sin6_addr;
+			pcp_msg_info->ext_ip = &pcp_msg_info->peer_ext_ip;
 		} else {
 			return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 		}
 	}
+	inet_n46top(pcp_msg_info->ext_ip, extip_s, sizeof(extip_s));
 	/* Create Peer Mapping */
 	if (eport == 0) {
 		eport = pcp_msg_info->int_port;
@@ -833,6 +846,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	if (r < 0)
 		return PCP_ERR_NO_RESOURCES;
 	pcp_msg_info->ext_port = eport;
+	if (!nextruletoclean_timestamp || timestamp < nextruletoclean_timestamp)
+		nextruletoclean_timestamp = timestamp;
 	return PCP_SUCCESS;
 }
 
@@ -929,10 +944,19 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		if((0 == strcmp(iaddr2, pcp_msg_info->mapped_str))
 		   && (0 == strcmp(rhost2, rhost))
 		   && (proto2==proto)
-		   && 0 == strcmp(desc, pcp_msg_info->desc)
 		   && (iport2==iport) && (rport2==rport)) {
-			if (!pcp_msg_info->is_fw)
+			/* Authenticate the full mapping key before deleting any rules. */
+			if (strcmp(desc, pcp_msg_info->desc) != 0) {
+				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+				return;
+			}
+			if (!pcp_msg_info->is_fw) {
+#ifdef USE_NFTABLES
+				r = delete_peer_rule(iaddr2, iport2, rhost2, rport2, proto2);
+#else
 				r = _upnp_delete_redir(eport2, proto2);
+#endif
+			}
 #if 0
 			else
 				r = upnp_delete_outboundpinhole(uid);

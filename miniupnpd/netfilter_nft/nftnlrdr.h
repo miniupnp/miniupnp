@@ -48,6 +48,10 @@ add_peer_dscp_rule2(const char * ifname,
 		    const char * iaddr, unsigned short iport, int proto,
 		    const char * desc, unsigned int timestamp);
 
+int delete_peer_rule(const char *iaddr, unsigned short iport,
+                     const char *raddr, unsigned short rport, int proto);
+unsigned int expire_peer_rules(unsigned int now);
+
 int
 get_peer_rule_by_index(int index,
 		       char * ifname, unsigned short * eport,

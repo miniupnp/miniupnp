@@ -28,6 +28,9 @@
 #include "upnputils.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
+#ifdef USE_NFTABLES
+#include "netfilter_nft/nftnlrdr.h"
+#endif
 #endif
 #if defined(USE_PF)
 #include "pf/obsdrdr.h"
@@ -644,6 +647,12 @@ get_upnp_rules_state_list(int max_rules_number_target)
 			break;
 	}
 #ifdef PCP_PEER
+#ifdef USE_NFTABLES
+	/* PEER mappings may share external ports; expire them by endpoint key. */
+	timestamp = expire_peer_rules((unsigned int)current_time);
+	if (timestamp != 0 && (nextruletoclean_timestamp == 0 || timestamp < nextruletoclean_timestamp))
+		nextruletoclean_timestamp = timestamp;
+#else
 	i=0;
 	while(get_peer_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
 		                              &iport, &proto, 0, 0, 0,0,0, &timestamp,
@@ -668,6 +677,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		if(!tmp)
 			break;
 	}
+#endif /* USE_NFTABLES */
 #endif
 	free(tmp);
 	/* remove the redirections that need to be removed */
