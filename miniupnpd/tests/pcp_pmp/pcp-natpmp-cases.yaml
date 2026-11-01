@@ -4145,6 +4145,399 @@ sections:
       - 0
     description: 'RFC 6887 §12.3: an existing PEER five-tuple may only be deleted with its original nonce in the
       Simple Threat Model.'
+  - name: peer-shared-external-port-lifecycle
+    protocol: pcp
+    families:
+    - ipv4
+    mutating: true
+    request:
+      kind: protocol_sequence
+      steps:
+      - protocol: pcp
+        request:
+          kind: pcp_map
+          version: 2
+          opcode: 1
+          lifetime: 300
+          client: source
+          nonce_hex: 0123456789abcdef01234567
+          protocol_number: 17
+          internal_port: 50371
+          external_port: 50371
+          external_address: '::'
+        expect:
+          version: 2
+          opcode: 129
+          result:
+          - 0
+          length: 60
+        captures:
+          external_port:
+            offset: 42
+            type: u16
+        assert:
+          external_port:
+            equals: 50371
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 123456789abcdef012345678
+          protocol_number: 17
+          internal_port: 50372
+          external_port: 50371
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+        captures:
+          external_port:
+            offset: 42
+            type: u16
+        assert:
+          external_port:
+            equals: 50371
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 23456789abcdef0123456789
+          protocol_number: 17
+          internal_port: 50373
+          external_port: 50371
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 444
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+        captures:
+          external_port:
+            offset: 42
+            type: u16
+        assert:
+          external_port:
+            equals: 50371
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: 123456789abcdef012345678
+          protocol_number: 17
+          internal_port: 50372
+          external_port: 50371
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: ffffffffffffffffffffffff
+          protocol_number: 17
+          internal_port: 50373
+          external_port: 50371
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 444
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 2
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_map
+          version: 2
+          opcode: 1
+          lifetime: 300
+          client: source
+          nonce_hex: ffffffffffffffffffffffff
+          protocol_number: 17
+          internal_port: 50371
+          external_port: 50371
+          external_address: '::'
+        expect:
+          version: 2
+          opcode: 129
+          result:
+          - 2
+          length: 60
+      - protocol: pcp
+        request:
+          kind: pcp_map
+          version: 2
+          opcode: 1
+          lifetime: 0
+          client: source
+          nonce_hex: 0123456789abcdef01234567
+          protocol_number: 17
+          internal_port: 50371
+          external_port: 50371
+          external_address: '::'
+        expect:
+          version: 2
+          opcode: 129
+          result:
+          - 0
+          length: 60
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: ffffffffffffffffffffffff
+          protocol_number: 17
+          internal_port: 50373
+          external_port: 50371
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 444
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 2
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 23456789abcdef0123456789
+          protocol_number: 17
+          internal_port: 50373
+          external_port: 50374
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 444
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+        captures:
+          external_port:
+            offset: 42
+            type: u16
+        assert:
+          external_port:
+            equals: 50371
+      cleanup:
+      - protocol: pcp
+        request:
+          kind: pcp_map
+          version: 2
+          opcode: 1
+          lifetime: 0
+          client: source
+          nonce_hex: 0123456789abcdef01234567
+          protocol_number: 17
+          internal_port: 50371
+          external_port: 50371
+          external_address: '::'
+        expect:
+          version: 2
+          opcode: 129
+          result:
+          - 0
+          length: 60
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: 123456789abcdef012345678
+          protocol_number: 17
+          internal_port: 50372
+          external_port: 50371
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: 23456789abcdef0123456789
+          protocol_number: 17
+          internal_port: 50373
+          external_port: 50371
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 444
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+    expect:
+      kind: lifecycle
+      result:
+      - 0
+    description: 'Independent PEER endpoints and a MAP can share an external port: deleting either mapping preserves
+      nonce ownership and renewal of the others.'
+  - name: peer-survives-shared-map-expiration
+    protocol: pcp
+    families:
+    - ipv4
+    mutating: true
+    request:
+      kind: protocol_sequence
+      steps:
+      - protocol: natpmp
+        request:
+          kind: natpmp
+          version: 0
+          opcode: 1
+          reserved: 0
+          private_port: 50375
+          public_port: 50375
+          lifetime: 1
+        expect:
+          version: 0
+          opcode: 129
+          result:
+          - 0
+          length: 16
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 123456789abcdef012345678
+          protocol_number: 17
+          internal_port: 50376
+          external_port: 50375
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: ffffffffffffffffffffffff
+          protocol_number: 17
+          internal_port: 50376
+          external_port: 50375
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 2
+          length: 80
+        delay_seconds: 2.1
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 123456789abcdef012345678
+          protocol_number: 17
+          internal_port: 50376
+          external_port: 50377
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+        captures:
+          external_port:
+            offset: 42
+            type: u16
+        assert:
+          external_port:
+            equals: 50375
+      cleanup:
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: 123456789abcdef012345678
+          protocol_number: 17
+          internal_port: 50376
+          external_port: 50375
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+    expect:
+      kind: lifecycle
+      result:
+      - 0
+    description: Expiration of a one-second NAT-PMP mapping preserves a longer PEER mapping sharing its external port
+      and protocol.
   - name: map-tcp-create-renew-delete
     protocol: pcp
     families:
