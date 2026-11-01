@@ -7,6 +7,7 @@ name: 'miniupnpd: PCP and NAT-PMP regression test'
     paths:
       - 'miniupnpd/**'
       - '.github/workflows/pcp-natpmp.yml'
+      - '.github/workflows/pcp-e2e.yml'
   workflow_dispatch:
     inputs:
       case_name:
@@ -31,6 +32,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  e2e:
+    name: Run PCP E2E coverage
+    uses: ./.github/workflows/pcp-e2e.yml
+
   compare:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.wan_peer && 60 || 30 }}
