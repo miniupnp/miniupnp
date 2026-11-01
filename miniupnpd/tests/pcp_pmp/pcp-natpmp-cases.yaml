@@ -3614,6 +3614,114 @@ sections:
       - 3
       length: 84
     description: 'RFC 6887 §12.1: PREFER_FAILURE is not allowed on PEER and must return MALFORMED_REQUEST.'
+  - name: peer-prefer-failure-forbidden-create
+    protocol: pcp
+    families:
+    - ipv4
+    mutating: true
+    request:
+      kind: pcp_peer
+      version: 2
+      opcode: 2
+      lifetime: 120
+      client: source
+      nonce_hex: 112233445566778899aabbcc
+      protocol_number: 17
+      internal_port: 50002
+      external_port: 50002
+      external_address: '::'
+      peer_address: 192.0.2.99
+      peer_port: 443
+      options:
+      - code: 2
+    expect:
+      kind: response
+      version: 2
+      opcode: 130
+      result:
+      - 3
+      length: 84
+    description: 'RFC 6887 §12.1: PREFER_FAILURE on a PEER create request returns MALFORMED_REQUEST.'
+  - name: peer-prefer-failure-forbidden-ipv6
+    protocol: pcp
+    families:
+    - ipv6
+    mutating: true
+    request:
+      kind: pcp_peer
+      version: 2
+      opcode: 2
+      lifetime: 120
+      client: source
+      nonce_hex: 112233445566778899aabbcc
+      protocol_number: 17
+      internal_port: 50003
+      external_port: 50003
+      external_address: '::'
+      peer_address: 2001:db8:9000::99
+      peer_port: 443
+      options:
+      - code: 2
+    expect:
+      kind: response
+      version: 2
+      opcode: 130
+      result:
+      - 3
+      length: 84
+    description: 'RFC 6887 §12.1: PREFER_FAILURE on an IPv6 PEER request returns MALFORMED_REQUEST.'
+  - name: peer-implied-prefer-failure-external-address
+    protocol: pcp
+    families:
+    - ipv4
+    mutating: true
+    request:
+      kind: pcp_peer
+      version: 2
+      opcode: 2
+      lifetime: 120
+      client: source
+      nonce_hex: 112233445566778899aabbcc
+      protocol_number: 17
+      internal_port: 50004
+      external_port: 50004
+      external_address: '::ffff:203.0.113.77'
+      peer_address: 192.0.2.99
+      peer_port: 443
+    expect:
+      kind: response
+      version: 2
+      opcode: 130
+      result:
+      - 11
+      length: 80
+    description: 'RFC 6887 §12.1: PEER implies PREFER_FAILURE, so an external address the server cannot provide returns CANNOT_PROVIDE_EXTERNAL.'
+  - name: peer-implied-prefer-failure-external-address-ipv6
+    protocol: pcp
+    families:
+    - ipv6
+    mutating: true
+    request:
+      kind: pcp_peer
+      version: 2
+      opcode: 2
+      lifetime: 120
+      client: source
+      nonce_hex: 112233445566778899aabbcc
+      protocol_number: 17
+      internal_port: 50005
+      external_port: 50005
+      external_address: '2001:db8:ffff::1'
+      peer_address: 2001:db8:9000::99
+      peer_port: 443
+    expect:
+      kind: response
+      version: 2
+      opcode: 130
+      result:
+      - 11
+      length: 80
+    description: 'RFC 6887 §12.1: PEER implies PREFER_FAILURE for IPv6; an unavailable external address returns CANNOT_PROVIDE_EXTERNAL.'
   - name: announce-epoch-and-reserved-response
     protocol: pcp
     families:
@@ -4711,6 +4819,26 @@ sections:
           protocol_number: 17
           internal_port: 50376
           external_port: 50377
+          external_address: '::'
+          peer_address: 192.0.2.99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 11
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 123456789abcdef012345678
+          protocol_number: 17
+          internal_port: 50376
+          external_port: 50375
           external_address: '::'
           peer_address: 192.0.2.99
           peer_port: 443
