@@ -101,6 +101,34 @@ sections:
               expect: delivered
               external_port: 41013
               service_port: 41013
+      - name: map-ipv6-prefer-failure-preserves-pinhole
+        families: [ipv6]
+        description: Reject a refresh requiring port translation without removing the existing firewall pinhole.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41018
+            suggested_external_port: 41018
+          - opcode: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41018
+            suggested_external_port: 43018
+            prefer_failure: true
+        expect:
+          results: [SUCCESS, CANNOT_PROVIDE_EXTERNAL]
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              external_port: 41018
+              service_port: 41018
+              expect: delivered
+            - from: allowed-peer
+              protocol: udp
+              external_port: 43018
+              service_port: 41018
+              expect: blocked
       - name: map-renewal-keeps-forwarding
         families:
           - ipv4
