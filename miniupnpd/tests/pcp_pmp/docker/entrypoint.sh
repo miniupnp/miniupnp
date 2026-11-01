@@ -32,6 +32,13 @@ else
 	ip address add 198.51.100.1/24 dev wan0
 fi
 
+# Like a real router, optionally send the default route out of the WAN so
+# multicast without an explicit output interface would leave through it.
+if [ "${PCP_TEST_WAN_DEFAULT_ROUTE:-0}" = 1 ]; then
+	ip route replace default via 198.51.100.254 dev wan0
+	ip -6 route replace default via fd42:5351:5352::ff dev wan0
+fi
+
 cat > /etc/miniupnpd.conf <<'EOF'
 ext_ifname=wan0
 ext_allow_private_ipv4=yes
@@ -43,6 +50,13 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 EOF
+
+# Bind the IPv6 PCP socket to the LAN address instead of "::", as routers with
+# several LANs effectively do (a single-LAN "::" socket is pinned to its device).
+if [ "${PCP_TEST_IPV6_LISTENING_IP:-0}" = 1 ]; then
+	lan6=$(ip -6 -o address show dev eth0 scope global | awk '{sub("/.*", "", $4); print $4; exit}')
+	echo "ipv6_listening_ip=$lan6" >> /etc/miniupnpd.conf
+fi
 
 /etc/miniupnpd/scripts/nft_init.sh
 if [ "${PCP_TEST_REAL_WAN:-0}" = 1 ]; then
