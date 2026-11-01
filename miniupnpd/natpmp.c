@@ -66,7 +66,31 @@ int OpenAndConfNATPMPSocket(in_addr_t addr)
 			return -1;
 		}
 	}
+	/* multicast (PCP ANNOUNCE, NAT-PMP address change) goes out
+	 * through this LAN interface, never through the external one */
+	if(addr != INADDR_ANY) {
+		struct in_addr mc_if;
+		mc_if.s_addr = addr;
+		if(setsockopt(snatpmp, IPPROTO_IP, IP_MULTICAST_IF,
+		              &mc_if, sizeof(mc_if)) < 0)
+		{
+			syslog(LOG_WARNING, "%s: setsockopt(IP_MULTICAST_IF): %m",
+			       "OpenAndConfNATPMPSocket");
+		}
+	}
 	return snatpmp;
+}
+
+/* 1 if the LAN of sockets[i] of OpenAndConfNATPMPSockets() has an IPv4
+ * address. An IPv6-only LAN (0.0.0.0) has no IPv4 interface to send
+ * multicast on: the datagram would go out by the default one, maybe the
+ * WAN */
+int natpmp_socket_has_ipv4(int i)
+{
+	struct lan_addr_s * lan_addr = lan_addrs.lh_first;
+	while(lan_addr != NULL && i-- > 0)
+		lan_addr = lan_addr->list.le_next;
+	return lan_addr != NULL && lan_addr->addr.s_addr != INADDR_ANY;
 }
 
 int OpenAndConfNATPMPSockets(int * sockets)
@@ -495,7 +519,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 
 	for(j=0; j<n_sockets; j++)
 	{
-		if(sockets[j] < 0)
+		if(sockets[j] < 0 || !natpmp_socket_has_ipv4(j))
 			continue;
 #ifdef MULTIPLE_EXTERNAL_IP
 		{
