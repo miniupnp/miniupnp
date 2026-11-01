@@ -2886,6 +2886,17 @@ main(int argc, char * * argv)
 		}
 #endif /* ENABLE_UPNPPINHOLE */
 
+#ifdef ENABLE_PCP
+		if(GETFLAG(ENABLENATPMPMASK))
+		{
+#ifdef ENABLE_IPV6
+			PCPAnnounceRetransmit(snatpmp, addr_count, spcp_v6, &timeout);
+#else /* IPv4 only */
+			PCPAnnounceRetransmit(snatpmp, addr_count, &timeout);
+#endif
+		}
+#endif /* ENABLE_PCP */
+
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
 		FD_ZERO(&readset);
 		FD_ZERO(&writeset);
@@ -3123,11 +3134,13 @@ main(int argc, char * * argv)
 		{
 			if((snatpmp[i] >= 0) && FD_ISSET(snatpmp[i], &readset))
 			{
-				unsigned char msg_buff[PCP_MAX_LEN];
+				/* Keep one byte beyond the protocol limit so truncated UDP datagrams
+				 * are still recognized as oversized PCP requests. */
+				unsigned char msg_buff[PCP_MAX_LEN + 1];
 				struct sockaddr_in senderaddr;
 				socklen_t senderaddrlen;
 				int len;
-				memset(msg_buff, 0, PCP_MAX_LEN);
+				memset(msg_buff, 0, sizeof(msg_buff));
 				senderaddrlen = sizeof(senderaddr);
 				len = ReceiveNATPMPOrPCPPacket(snatpmp[i],
 				                               (struct sockaddr *)&senderaddr,
@@ -3185,12 +3198,12 @@ main(int argc, char * * argv)
 		/* in IPv6, only PCP is supported, not NAT-PMP */
 		if(spcp_v6 >= 0 && FD_ISSET(spcp_v6, &readset))
 		{
-			unsigned char msg_buff[PCP_MAX_LEN];
+			unsigned char msg_buff[PCP_MAX_LEN + 1];
 			struct sockaddr_in6 senderaddr;
 			socklen_t senderaddrlen;
 			struct sockaddr_in6 receiveraddr;
 			int len;
-			memset(msg_buff, 0, PCP_MAX_LEN);
+			memset(msg_buff, 0, sizeof(msg_buff));
 			senderaddrlen = sizeof(senderaddr);
 			len = ReceiveNATPMPOrPCPPacket(spcp_v6,
 			                               (struct sockaddr *)&senderaddr,

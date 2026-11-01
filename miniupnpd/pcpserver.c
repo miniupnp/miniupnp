@@ -61,6 +61,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -475,7 +476,15 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 	case PCP_OPTION_PREF_FAIL:
 
-		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE) {
+		/* RFC 6887 section 12.1 forbids PREFER_FAILURE on PEER,
+		 * including deletion requests. */
+		if (pcp_msg_info->opcode == PCP_OPCODE_PEER) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
+			return 0;
+		}
+
+		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE ||
+		    pcp_msg_info->lifetime == 0) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
@@ -496,7 +505,16 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 	case PCP_OPTION_FILTER:
 		/* TODO fully implement filter */
-		if (option_length != PCP_FILTER_OPTION_SIZE) {
+		if (option_length != PCP_FILTER_OPTION_SIZE ||
+		    pcp_msg_info->lifetime == 0) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+			return 0;
+		}
+		/* RFC 6887 section 13.3: IPv4 prefixes include the 96-bit
+		 * IPv4-mapped prefix; IPv6 prefixes range from 0 to 128. */
+		if (pcp_buf[5] > 128 ||
+		    (memcmp(pcp_buf + 8, "\0\0\0\0\0\0\0\0\0\0\xff\xff", 12) == 0 &&
+		     pcp_buf[5] < 96)) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
@@ -698,7 +716,7 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
 	struct sockaddr_storage extip;
-	struct sockaddr_storage ret_extip;
+	struct sockaddr_storage ret_extip = {0};
 
 	uint8_t  proto = pcp_msg_info->protocol;
 
@@ -708,6 +726,10 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	time_t timestamp = upnp_time() + pcp_msg_info->lifetime;
 	int r;
 	const char * ext_if = ext_if_name;
+	int index, proto_old;
+	unsigned short eport_old, iport_old, rport_old;
+	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
@@ -718,6 +740,26 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 
 	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
+
+	/* RFC 6887 sections 12.3 and 15.1: authenticate the full PEER
+	 * mapping key before refreshing it or adding any rules. */
+	for (index = 0;
+	     get_peer_rule_by_index(index, NULL, &eport_old,
+	                            iaddr_old, sizeof(iaddr_old), &iport_old,
+	                            &proto_old, desc_old, sizeof(desc_old),
+	                            rhost_old, sizeof(rhost_old), &rport_old,
+	                            NULL, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
+		    rport_old == pcp_msg_info->peer_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0 &&
+		    strcmp(rhost_old, peerip_s) == 0) {
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0)
+				return PCP_ERR_NOT_AUTHORIZED;
+			eport = eport_old;
+			break;
+		}
+	}
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
@@ -914,10 +956,37 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
+	int index, proto_old;
 	char iaddr_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
+	unsigned short eport_old;
+	unsigned int timestamp_old;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+
+	/* RFC 6887 section 11.3: the mapping key uses the internal
+	 * address, protocol and port, not the suggested external port. */
+	for (index = 0;
+	     get_redirect_rule_by_index(index, NULL, &eport_old,
+	                               iaddr_old, sizeof(iaddr_old), &iport_old,
+	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
+	                               &timestamp_old, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == pcp_msg_info->protocol &&
+		    iport_old == pcp_msg_info->int_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
+			/* Check ownership before changing any state, even when the
+			 * client suggests a different external port. */
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
+				if (timestamp_old > upnp_time())
+					pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+			pcp_msg_info->ext_port = eport_old;
+			break;
+		}
+	}
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -937,6 +1006,14 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				return PCP_ERR_NOT_AUTHORIZED;
 			/* at least one eport allowed (but none available) */
 			return PCP_ERR_NO_RESOURCES;
+		}
+		/* RFC 6887 section 11.3 reserves these UDP ports for PCP. */
+		if (pcp_msg_info->protocol == IPPROTO_UDP &&
+		    (pcp_msg_info->ext_port == 5350 || pcp_msg_info->ext_port == 5351)) {
+			if (pcp_msg_info->pfailure_present)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			pcp_msg_info->ext_port++;
+			continue;
 		}
 		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
 		     (!check_upnp_rule_against_permissions(upnppermlist,
@@ -1117,6 +1194,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	uint16_t iport = pcp_msg_info->int_port;  /* private port */
 	uint8_t  proto = pcp_msg_info->protocol;
 	int r=-1;
+	int found = 0;
 	/* remove the mapping */
 	/* remove all the mappings for this client */
 	unsigned short eport2, iport2;
@@ -1141,6 +1219,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
 			   && (proto2==proto)
 			   && ((iport2==iport) || (iport==0))) {
+				found = 1;
 				if(0 != strcmp(desc, pcp_msg_info->desc)) {
 					/* nonce does not match */
 					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
@@ -1153,6 +1232,9 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				break;
 			}
 		}
+		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */
+		if (!found)
+			return;
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
@@ -1237,11 +1319,9 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	}
 
 	if (pcp_msg_info->pfailure_present) {
-		if ( (IN6_IS_ADDR_UNSPECIFIED(pcp_msg_info->ext_ip) ||
-		      ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->ext_ip)) &&
-		       (((uint32_t*)pcp_msg_info->ext_ip->s6_addr)[3] == 0))) &&
-		     (pcp_msg_info->ext_port == 0)
-		   )
+		/* RFC 6887 section 13.2 requires a nonzero suggested port,
+		 * even when a suggested external address is supplied. */
+		if (pcp_msg_info->ext_port == 0)
 		{
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
@@ -1381,8 +1461,16 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 		 * http://tools.ietf.org/html/rfc6887 */
 		switch (pcp_msg_info->opcode) {
 		case PCP_OPCODE_ANNOUNCE:
-			/* should check PCP Client's IP Address in request */
-			/* see http://tools.ietf.org/html/rfc6887#section-14.1 */
+			/* Ignore Requested Lifetime (RFC 6887 section 14.1.1). */
+			pcp_msg_info->lifetime = 0;
+			/* RFC 6887 section 14.1: the client address must match
+			 * the packet source address. */
+			if (memcmp(pcp_msg_info->int_ip, &pcp_msg_info->sender_ip,
+			           sizeof(pcp_msg_info->sender_ip)) != 0) {
+				pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
+				break;
+			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 			break;
 		case PCP_OPCODE_MAP:
 
@@ -1535,6 +1623,11 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 
 	if (response[1] == 0x81) { /* MAP response */
+		if (pcp_msg_info->is_map_op) {
+			/* Reserved bytes follow Protocol in either MAP version. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+		}
 		if (response[0] == 1) {	/* version */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
@@ -1550,6 +1643,13 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 #ifdef PCP_PEER
 	else if (response[1] == 0x82) { /* PEER response */
+		if (pcp_msg_info->is_peer_op) {
+			/* Clear the reserved fields in a complete PEER body. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 38 : 26), 0, 2);
+		}
 		if (response[0] == 1) {
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
@@ -1612,6 +1712,11 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		/* discarding PCP responses silently */
 		return 0;
 	}
+	/* Preserve the request header even when the packet is too short for
+	 * processPCPRequest() to parse the common PCP header. Error responses for
+	 * malformed requests still need to identify the request's version/opcode. */
+	pcp_msg_info.version = buff[0];
+	pcp_msg_info.opcode = buff[1] & 0x7f;
 
 	/* If we're in allow third party-mode, we probably don't care
 	 * about locality either. Let's hope firewall is ok. */
@@ -1628,8 +1733,15 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 		createPCPResponse(buff, &pcp_msg_info);
 
-		if(len < PCP_MIN_LEN)
+		/* ANNOUNCE has no opcode payload or response options.  Keep
+		 * the request payload only when returning an error (section 8.2). */
+		if(pcp_msg_info.opcode == PCP_OPCODE_ANNOUNCE &&
+		   pcp_msg_info.result_code == PCP_SUCCESS)
+			len = PCP_COMMON_RESPONSE_SIZE;
+		else if(len < PCP_MIN_LEN)
 			len = PCP_MIN_LEN;
+		else if(len > PCP_MAX_LEN)
+			len = PCP_MAX_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
 		len = sendto_or_schedule2(s, buff, len, 0, senderaddr,
@@ -1706,16 +1818,30 @@ int OpenAndConfPCPv6Socket(void)
 }
 #endif /*ENABLE_IPV6*/
 
+/* RFC 6887 section 14.1.3: restart announcements MAY be sent up to ten
+ * times, the first two at least 250 ms apart and every later interval at
+ * least double the previous one. Ten sends take about 127 s; test builds
+ * shorten that with -DPCP_ANNOUNCE_COUNT=5 (see tests/pcp_pmp). */
+#ifndef PCP_ANNOUNCE_COUNT
+#define PCP_ANNOUNCE_COUNT 10
+#endif
+#define PCP_ANNOUNCE_FIRST_INTERVAL_MS 250
+
+static unsigned int announce_remaining = 0;	/* retransmissions still due */
+static unsigned int announce_interval_ms = 0;	/* gap before the next one */
+static struct timeval announce_next;
+
 #ifdef ENABLE_IPV6
-void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets, int socket6)
+static void PCPSendAnnounceOnce(int * sockets, int n_sockets, int socket6)
 #else /* IPv4 only */
-void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
+static void PCPSendAnnounceOnce(int * sockets, int n_sockets)
 #endif
 {
 	int i;
 	unsigned char buff[PCP_MIN_LEN];
 	pcp_info_t info;
 	ssize_t len;
+	struct lan_addr_s * lan_addr;
 	struct sockaddr_in addr;
 #ifdef ENABLE_IPV6
 	struct sockaddr_in6 addr6;
@@ -1733,8 +1859,18 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr("224.0.0.1");
 	addr.sin_port = htons(5350);
-	for(i = 0; i < n_sockets; i++) {
+	/* sockets[] are in the same order as lan_addrs : force the multicast
+	 * output interface to the LAN one so the announce never goes out
+	 * through the external interface */
+	for(i = 0, lan_addr = lan_addrs.lh_first;
+	    i < n_sockets && lan_addr != NULL;
+	    i++, lan_addr = lan_addr->list.le_next) {
 		if (sockets[i] < 0) {
+			continue;
+		}
+		if (setsockopt(sockets[i], IPPROTO_IP, IP_MULTICAST_IF,
+		               &lan_addr->addr, sizeof(lan_addr->addr)) < 0) {
+			syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce(sockets[%d]) setsockopt(IP_MULTICAST_IF): %m", i);
 			continue;
 		}
 		len = sendto_or_schedule(sockets[i], buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
@@ -1744,16 +1880,99 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	}
 #ifdef ENABLE_IPV6
 	if (socket6 >= 0) {
-		memset(&addr6, 0, sizeof(struct sockaddr_in6));
-		addr6.sin6_family = AF_INET6;
-		inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
-		addr6.sin6_port = htons(5350);
-		len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
-		if( len < 0 ) {
-			syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(): %m");
+		/* send on each LAN interface only (link-local scope) */
+		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL;
+		    lan_addr = lan_addr->list.le_next) {
+			unsigned int ifindex = lan_addr->index;
+			if (ifindex == 0 && lan_addr->ifname[0] != '\0')
+				ifindex = if_nametoindex(lan_addr->ifname);
+			if (ifindex == 0)
+				continue;
+			memset(&addr6, 0, sizeof(struct sockaddr_in6));
+			addr6.sin6_family = AF_INET6;
+			inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
+			addr6.sin6_port = htons(5350);
+			addr6.sin6_scope_id = ifindex;
+			if (setsockopt(socket6, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+			               &ifindex, sizeof(ifindex)) < 0) {
+				syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce() setsockopt(IPV6_MULTICAST_IF, %s): %m", lan_addr->ifname);
+				continue;
+			}
+			len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
+			if( len < 0 ) {
+				syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(%s): %m", lan_addr->ifname);
+			}
 		}
 	}
 #endif /* ENABLE_IPV6 */
+}
+
+#ifdef ENABLE_IPV6
+void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets, int socket6)
+#else /* IPv4 only */
+void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
+#endif
+{
+#ifdef ENABLE_IPV6
+	PCPSendAnnounceOnce(sockets, n_sockets, socket6);
+#else
+	PCPSendAnnounceOnce(sockets, n_sockets);
+#endif
+	/* (re)start the retransmission schedule */
+	announce_remaining = PCP_ANNOUNCE_COUNT - 1;
+	announce_interval_ms = PCP_ANNOUNCE_FIRST_INTERVAL_MS;
+	if (announce_remaining > 0) {
+		if (upnp_gettimeofday(&announce_next) < 0) {
+			announce_remaining = 0;
+			return;
+		}
+		announce_next.tv_usec += announce_interval_ms * 1000;
+		announce_next.tv_sec += announce_next.tv_usec / 1000000;
+		announce_next.tv_usec %= 1000000;
+	}
+}
+
+#ifdef ENABLE_IPV6
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, int socket6, struct timeval * timeout)
+#else /* IPv4 only */
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, struct timeval * timeout)
+#endif
+{
+	struct timeval now;
+
+	if (announce_remaining == 0 || upnp_gettimeofday(&now) < 0)
+		return;
+	if (now.tv_sec > announce_next.tv_sec ||
+	    (now.tv_sec == announce_next.tv_sec && now.tv_usec >= announce_next.tv_usec)) {
+#ifdef ENABLE_IPV6
+		PCPSendAnnounceOnce(sockets, n_sockets, socket6);
+#else
+		PCPSendAnnounceOnce(sockets, n_sockets);
+#endif
+		if (--announce_remaining == 0)
+			return;
+		/* intervals double; schedule from the actual send time */
+		announce_interval_ms *= 2;
+		announce_next = now;
+		announce_next.tv_usec += announce_interval_ms * 1000;
+		announce_next.tv_sec += announce_next.tv_usec / 1000000;
+		announce_next.tv_usec %= 1000000;
+	}
+	/* shorten the caller's select() timeout to the next retransmission */
+	{
+		struct timeval wait;
+		wait.tv_sec = announce_next.tv_sec - now.tv_sec;
+		wait.tv_usec = announce_next.tv_usec - now.tv_usec;
+		if (wait.tv_usec < 0) {
+			wait.tv_usec += 1000000;
+			wait.tv_sec--;
+		}
+		if (wait.tv_sec < 0)
+			wait.tv_sec = wait.tv_usec = 0;
+		if (timeout->tv_sec > wait.tv_sec ||
+		    (timeout->tv_sec == wait.tv_sec && timeout->tv_usec > wait.tv_usec))
+			*timeout = wait;
+	}
 }
 
 #ifdef ENABLE_IPV6

@@ -33,6 +33,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifndef PCPSERVER_H_INCLUDED
 #define PCPSERVER_H_INCLUDED
 
+struct timeval;
+
 #define PCP_MIN_LEN           24
 #define PCP_MAX_LEN           1100
 
@@ -59,6 +61,16 @@ int OpenAndConfPCPv6Socket(void);
 void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets, int socket6);
 #else /* IPv4 only */
 void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets);
+#endif
+
+/*
+ * Send the scheduled repeats of the restart ANNOUNCE (RFC 6887 14.1.3) once
+ * they are due and lower *timeout to the time left before the next one.
+ */
+#ifdef ENABLE_IPV6
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, int socket6, struct timeval * timeout);
+#else /* IPv4 only */
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, struct timeval * timeout);
 #endif
 
 /*
