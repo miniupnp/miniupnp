@@ -1,6 +1,7 @@
+---
 name: 'miniupnpd: PCP end-to-end tests'
 
-on:
+'on':
   push:
     branches: [master]
     paths:
@@ -70,11 +71,14 @@ jobs:
           {
             echo '## Reproduce the PCP E2E run locally'
             echo
-            echo 'The workflow does not upload capture artifacts. Run the harness with Docker from the repository root:'
+            echo 'The workflow does not upload capture artifacts.'
+            echo 'Run the harness with Docker from the repository root:'
             echo
             echo '```sh'
             echo './miniupnpd/tests/pcp_e2e/run-docker.sh'
             echo '```'
             echo
-            echo 'To run one case, add `--case CASE_NAME`. The harness writes packet captures, daemon logs, and snapshots under `.tmp/pcp-e2e/`.'
+            echo 'To run one case, add `--case CASE_NAME`.'
+            echo 'Captures, daemon logs, and snapshots are written under:'
+            echo '`.tmp/pcp-e2e/`.'
           } >> "$GITHUB_STEP_SUMMARY"

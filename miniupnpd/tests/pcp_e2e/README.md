@@ -8,9 +8,11 @@ response protocol behavior.
 ## Sections
 
 - `MAP`: UDP/TCP mapping lifecycle and shared ports.
-- `FILTER`: IPv4/IPv6 prefix, port, multiple-option, refresh, and clear behavior.
+- `FILTER`: IPv4/IPv6 prefix, port, multiple-option, refresh, clear, and
+  1100-octet message-boundary behavior.
 - `PEER`: create a mapping before traffic, adopt an existing implicit UDP/TCP
-  mapping, and recreate a TCP mapping from a remembered external tuple.
+  mapping, recreate a TCP mapping from a remembered external tuple, and process
+  optional options at the 1100-octet message limit.
   The remote echo agent reports the source tuple observed on the WAN.
 - `NAT`: NAT-PMP public IPv4 address discovery and IPv6 PCP mapping with NAT66.
 - `PMP`: NAT-PMP UDP/TCP mapping creation, renewal, deletion, forwarding, and
@@ -133,8 +135,8 @@ Every PCP case in the MAP, FILTER, and PEER sections has IPv4 and IPv6 coverage.
 NAT-PMP cases are IPv4-only because NAT-PMP does not define IPv6 operation.
 FILTER cases
 exercise exact peers, remote ports, prefixes, multiple options, refresh
-updates, and prefix-zero clearing. Prefixes are chosen per address family to
-distinguish the allowed and denied traffic agents. The runner encodes FILTER
+updates, prefix-zero clearing, and a maximum-size request. Prefixes are chosen
+per address family to distinguish the allowed and denied traffic agents. The runner encodes FILTER
 fields in RFC order: reserved byte, prefix length, remote peer port, and
 address. RFC 6887 defines prefix zero as removing all prior filters and a
 refresh with additional FILTER options as adding those peers to the set.

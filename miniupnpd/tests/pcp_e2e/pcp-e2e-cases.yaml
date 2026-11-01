@@ -1,3 +1,4 @@
+---
 # End-to-end PCP cases grouped by operation. Each logical case runs for both IPv4 and IPv6.
 version: 1
 description: End-to-end checks for PCP mappings installed by miniupnpd. A passing case requires observing
@@ -328,6 +329,34 @@ sections:
             - from: third-peer
               protocol: udp
               expect: blocked
+      - name: map-filter-options-at-message-limit
+        families:
+          - ipv4
+          - ipv6
+        description: >-
+          Process 43 FILTER options, PREFER_FAILURE, and an unknown optional
+          option in a 1100-octet request.
+        request:
+          opcode: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41017
+          suggested_external_port: 41017
+          filter:
+            remote_peer: allowed-peer
+            remote_port: 0
+            prefix_length:
+              ipv4: 32
+              ipv6: 128
+            repeat: 43
+          prefer_failure: true
+          unknown_optional_options: 1
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
       - name: map-filter-refresh-adds-peer
         families:
           - ipv4
@@ -518,6 +547,25 @@ sections:
               expect: delivered
               families:
                 - ipv4
+      - name: peer-processes-options-at-message-limit
+        families:
+          - ipv4
+          - ipv6
+        description: >-
+          Process 255 unknown optional options in a 1100-octet PEER request.
+        request:
+          opcode: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41041
+          suggested_external_port: 43041
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+          unknown_optional_options: 255
+        expect:
+          result:
+            ipv4: SUCCESS
+            ipv6: UNSUPP_OPCODE
       - name: peer-adopts-existing-udp-mapping
         families:
           - ipv4

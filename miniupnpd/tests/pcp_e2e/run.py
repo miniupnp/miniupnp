@@ -57,10 +57,14 @@ def build_map_packet(client, spec, peer_addresses, nonce=None):
         remote_port = filt.get("remote_port", 0)
         if remote_port == "any":
             remote_port = 0
-        packet += bytes((3, 0, 0, 20)) + bytes((0, prefix))
-        packet += struct.pack("!H", remote_port) + v6_address(peer)
+        option = bytes((3, 0, 0, 20)) + bytes((0, prefix))
+        option += struct.pack("!H", remote_port) + v6_address(peer)
+        packet += option * filt.get("repeat", 1)
     if spec.get("prefer_failure"):
         packet += bytes((2, 0, 0, 0))
+    packet += bytes((128, 0, 0, 0)) * spec.get("unknown_optional_options", 0)
+    if len(packet) > 1100:
+        raise ValueError(f"PCP request exceeds 1100-octet limit ({len(packet)} octets)")
     return packet, nonce, body
 
 
@@ -241,6 +245,19 @@ def validate_corpus(corpus):
                     limit = 32 if family == "ipv4" else 128
                     if type(prefix) is not int or not 0 <= prefix <= limit:
                         raise ValueError(f"{case['name']} ({family}): invalid FILTER prefix")
+                    repeat = filt.get("repeat", 1)
+                    if type(repeat) is not int or repeat < 1:
+                        raise ValueError(f"{case['name']} ({family}): invalid FILTER repeat count")
+                unknown_options = request.get("unknown_optional_options", 0)
+                if type(unknown_options) is not int or unknown_options < 0:
+                    raise ValueError(f"{case['name']} ({family}): invalid optional option count")
+                filter_count = sum(filt.get("repeat", 1) for filt in filters)
+                request_size = (80 if request.get("opcode") == "PEER" else 60)
+                request_size += filter_count * 24
+                request_size += 4 if request.get("prefer_failure") else 0
+                request_size += unknown_options * 4
+                if request_size > 1100:
+                    raise ValueError(f"{case['name']} ({family}): PCP request exceeds 1100 octets")
                 if request.get("opcode") == "PEER":
                     if not request.get("remote_peer") or type(request.get("remote_peer_port")) is not int or not 1 <= request["remote_peer_port"] <= 65535:
                         raise ValueError(f"{case['name']} ({family}): PEER requires remote peer address and port")
@@ -275,6 +292,16 @@ def self_test(corpus):
         "allowed-peer": "2001:db8:9000::2", "denied-peer": "2001:db8:9000::130"}, nonce)
     assert multi[60] == 3 and multi[84] == 3
     assert multi[65] == 128 and multi[89] == 128
+    max_filter_spec = {
+        "protocol": "udp", "lifetime": 120, "internal_port": 41017,
+        "suggested_external_port": 41017, "prefer_failure": True,
+        "unknown_optional_options": 1,
+        "filter": {"remote_peer": "allowed-peer", "remote_port": 0,
+                    "prefix_length": 32, "repeat": 43},
+    }
+    max_filter, _, _ = build_map_packet("172.28.41.2", max_filter_spec, addresses, nonce)
+    assert len(max_filter) == 1100
+    assert max_filter[-8:] == bytes((2, 0, 0, 0, 128, 0, 0, 0))
     spec["filters"] = [{"remote_peer": "::", "remote_port": 0, "prefix_length": 0}]
     cleared, _, _ = build_map_packet("2001:db8:1::2", spec, {}, nonce)
     assert cleared[65:68] == bytes((0, 0, 0))
@@ -282,8 +309,9 @@ def self_test(corpus):
         "opcode": "PEER", "protocol": "udp", "lifetime": 120,
         "internal_port": 41020, "suggested_external_port": 41020,
         "remote_peer": "allowed-peer", "remote_peer_port": 42100,
+        "unknown_optional_options": 255,
     }, addresses, nonce)
-    assert len(peer) == 80 and peer[1] == 2
+    assert len(peer) == 1100 and peer[1] == 2
     assert peer[60:64] == bytes((0xA4, 0x74, 0, 0))
     assert peer[64:80] == v6_address(addresses["allowed-peer"])
     natpmp_address = bytes((0, 0))
@@ -394,6 +422,8 @@ def run_case(case, args, agents, pcp_sock):
             delete = dict(original, lifetime=0)
             delete.pop("filter", None)
             delete.pop("filters", None)
+            delete.pop("prefer_failure", None)
+            delete.pop("unknown_optional_options", None)
             result, _assigned, _ = map_request(
                 pcp_sock, args.router, args.client_address, delete,
                 args.peer_addresses, nonce)

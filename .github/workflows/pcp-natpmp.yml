@@ -15,7 +15,9 @@ name: 'miniupnpd: PCP and NAT-PMP regression test'
         required: false
         type: string
       profile:
-        description: 'Explicit server fixture contract (PORT_SET profiles require allocator support)'
+        description: >-
+          Explicit server fixture contract (PORT_SET profiles require allocator
+          support)
         type: choice
         default: baseline
         options: [baseline, port-set, port-set-limited]
@@ -62,8 +64,10 @@ jobs:
       - name: Check comparison tools
         run: |
           python3 candidate/miniupnpd/tests/pcp_pmp/tools/test_compare_pcaps.py
-          python3 candidate/miniupnpd/tests/pcp_pmp/tools/test_compare_branches.py
-          python3 candidate/miniupnpd/tests/pcp_pmp/testpcp_natpmp.py --self-test
+          python3 \
+            candidate/miniupnpd/tests/pcp_pmp/tools/test_compare_branches.py
+          python3 \
+            candidate/miniupnpd/tests/pcp_pmp/testpcp_natpmp.py --self-test
           python3 candidate/miniupnpd/tests/common/traffic_agent.py --self-test
           sh -n candidate/miniupnpd/tests/pcp_pmp/testpcp_natpmp_docker.sh
 

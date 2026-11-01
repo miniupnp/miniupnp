@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../../.." && pwd)
 DIR=$ROOT/miniupnpd/tests/pcp_e2e
 DOCKER=${DOCKER:-docker}
 IMAGE=${PCP_E2E_IMAGE:-miniupnpd-pcp-e2e:local}
@@ -88,7 +88,7 @@ start_agent "$DENY" 172.28.41.13 2001:db8:1::13 198.51.100.130 2001:db8:9000::13
 start_agent "$THIRD" 172.28.41.14 2001:db8:1::14 198.51.100.200 2001:db8:9000::200
 
 ready=0
-for attempt in 1 2 3 4 5 6 7 8 9 10; do
+for _attempt in 1 2 3 4 5 6 7 8 9 10; do
   if "$DOCKER" exec "$ALLOW" python3 -c \
     'import urllib.request; urllib.request.urlopen("http://127.0.0.1:18080/health", timeout=1)' >/dev/null 2>&1; then
     ready=1; break
@@ -177,7 +177,7 @@ start_packet_capture() {
     echo $! >"$pidfile"
   ' sh "$pcap_file" "$capture_pidfile"
   capture_ready=0
-  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  for _attempt in 1 2 3 4 5 6 7 8 9 10; do
     if "$DOCKER" exec "$ROUTER" sh -c \
       'pid=$(cat "$1" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && [ -s "$2" ]' \
       sh "$capture_pidfile" "$pcap_file" >/dev/null 2>&1; then
