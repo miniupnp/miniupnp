@@ -684,10 +684,7 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 		}
 #endif
 
-		/* RFC 6887 section 12.1: PREFER_FAILURE semantics are implied
-		 * for PEER, so a different suggested address is refused. */
-		if (pcp_msg_info->pfailure_present ||
-		    pcp_msg_info->opcode == PCP_OPCODE_PEER) {
+		if (pcp_msg_info->pfailure_present) {
 			pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			return -1;
 		} else {
@@ -782,7 +779,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		    strcmp(rhost_old, peerip_s) == 0) {
 			if (strcmp(desc_old, pcp_msg_info->desc) != 0)
 				return PCP_ERR_NOT_AUTHORIZED;
-			if (suggested_eport != 0 && suggested_eport != eport_old)
+			if (pcp_msg_info->pfailure_present &&
+			    suggested_eport != 0 && suggested_eport != eport_old)
 				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = eport_old;
 			break;
@@ -796,7 +794,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		if (ret_extip.ss_family == AF_INET) {
 			struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext4->sin_port);
-			if (suggested_eport != 0 && suggested_eport != ret_eport)
+			if (pcp_msg_info->pfailure_present &&
+			    suggested_eport != 0 && suggested_eport != ret_eport)
 				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = ret_eport;
 			memset(&pcp_msg_info->peer_ext_ip, 0, sizeof(pcp_msg_info->peer_ext_ip));
@@ -808,7 +807,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		} else if (ret_extip.ss_family == AF_INET6) {
 			struct sockaddr_in6* ret_ext6 = (struct sockaddr_in6*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext6->sin6_port);
-			if (suggested_eport != 0 && suggested_eport != ret_eport)
+			if (pcp_msg_info->pfailure_present &&
+			    suggested_eport != 0 && suggested_eport != ret_eport)
 				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = ret_eport;
 			pcp_msg_info->peer_ext_ip = ret_ext6->sin6_addr;
@@ -872,7 +872,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 				    pcp_msg_info->desc,
 				    timestamp);
 	if (r < 0)
-		return suggested_eport != 0 ? PCP_ERR_CANNOT_PROVIDE_EXTERNAL
+		return (pcp_msg_info->pfailure_present && suggested_eport != 0)
+		       ? PCP_ERR_CANNOT_PROVIDE_EXTERNAL
 		                            : PCP_ERR_NO_RESOURCES;
 	pcp_msg_info->ext_port = eport;
 	if (!nextruletoclean_timestamp || timestamp < nextruletoclean_timestamp)
@@ -889,7 +890,7 @@ static int CreatePCPPeer_FW(pcp_info_t *pcp_msg_info, const char *peerip_s)
 	char desc[64];
 	unsigned int timestamp = 0;
 
-	if (pcp_msg_info->ext_port != 0 &&
+	if (pcp_msg_info->pfailure_present && pcp_msg_info->ext_port != 0 &&
 	    pcp_msg_info->ext_port != pcp_msg_info->int_port)
 		return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 	uid = upnp_find_inboundpinhole(peerip_s, pcp_msg_info->peer_port,
@@ -1515,6 +1516,13 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 			return 0;
 		}
 	}
+
+	/* RFC 6887 section 12.1: PREFER_FAILURE semantics are implied for PEER.
+	 * The option itself is rejected in parsePCPOptions(), and a zero
+	 * suggested port stays valid, so set the flag only after the checks
+	 * above. */
+	if (pcp_msg_info->opcode == PCP_OPCODE_PEER)
+		pcp_msg_info->pfailure_present = 1;
 
 	if (CheckExternalAddress(pcp_msg_info)) {
 		return 0;
