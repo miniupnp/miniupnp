@@ -684,10 +684,10 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 		}
 #endif
 
-		/* An IPv6 PEER pinhole cannot translate the address, and PEER
-		 * has no PREFER_FAILURE option, so refuse a different one. */
+		/* RFC 6887 section 12.1: PREFER_FAILURE semantics are implied
+		 * for PEER, so a different suggested address is refused. */
 		if (pcp_msg_info->pfailure_present ||
-		    (pcp_msg_info->is_fw && pcp_msg_info->opcode == PCP_OPCODE_PEER)) {
+		    pcp_msg_info->opcode == PCP_OPCODE_PEER) {
 			pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			return -1;
 		} else {
@@ -746,6 +746,7 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	uint8_t  proto = pcp_msg_info->protocol;
 
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
+	const uint16_t suggested_eport = eport;  /* RFC 6887 section 12.1 */
 
 	char peerip_s[INET6_ADDRSTRLEN], extip_s[INET6_ADDRSTRLEN];
 	time_t timestamp = upnp_time() + pcp_msg_info->lifetime;
@@ -781,6 +782,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		    strcmp(rhost_old, peerip_s) == 0) {
 			if (strcmp(desc_old, pcp_msg_info->desc) != 0)
 				return PCP_ERR_NOT_AUTHORIZED;
+			if (suggested_eport != 0 && suggested_eport != eport_old)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = eport_old;
 			break;
 		}
@@ -793,6 +796,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		if (ret_extip.ss_family == AF_INET) {
 			struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext4->sin_port);
+			if (suggested_eport != 0 && suggested_eport != ret_eport)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = ret_eport;
 			memset(&pcp_msg_info->peer_ext_ip, 0, sizeof(pcp_msg_info->peer_ext_ip));
 			pcp_msg_info->peer_ext_ip.s6_addr[10] = 0xff;
@@ -803,6 +808,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		} else if (ret_extip.ss_family == AF_INET6) {
 			struct sockaddr_in6* ret_ext6 = (struct sockaddr_in6*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext6->sin6_port);
+			if (suggested_eport != 0 && suggested_eport != ret_eport)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = ret_eport;
 			pcp_msg_info->peer_ext_ip = ret_ext6->sin6_addr;
 			pcp_msg_info->ext_ip = &pcp_msg_info->peer_ext_ip;
@@ -865,7 +872,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 				    pcp_msg_info->desc,
 				    timestamp);
 	if (r < 0)
-		return PCP_ERR_NO_RESOURCES;
+		return suggested_eport != 0 ? PCP_ERR_CANNOT_PROVIDE_EXTERNAL
+		                            : PCP_ERR_NO_RESOURCES;
 	pcp_msg_info->ext_port = eport;
 	if (!nextruletoclean_timestamp || timestamp < nextruletoclean_timestamp)
 		nextruletoclean_timestamp = timestamp;
