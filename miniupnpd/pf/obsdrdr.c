@@ -77,6 +77,7 @@
 #include "../upnpglobalvars.h"
 #include "../getifaddr.h"
 #include "rtickets.h"
+#include "../pcp_filter.h"
 
 #ifndef USE_PF
 #error "USE_PF macro is undefined, check consistency between config.h and Makefile"
@@ -148,6 +149,10 @@ add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
 extern int dev;	/* global also used in pfpinhole.c */
 int dev = -1;
 
+#ifdef PCP_PEER
+static void free_peer_leases(void);
+#endif
+
 /* shutdown_redirect() :
  * close the /dev/pf device */
 void
@@ -156,6 +161,9 @@ shutdown_redirect(void)
 	if(close(dev)<0)
 		syslog(LOG_ERR, "close(\"/dev/pf\"): %m");
 	dev = -1;
+#ifdef PCP_PEER
+	free_peer_leases();
+#endif
 }
 
 /* open the device */
@@ -310,14 +318,17 @@ error:
 }
 #endif
 
-#ifdef ENABLE_PORT_TRIGGERING
-/* add_nat_rule()
+#if defined(ENABLE_PORT_TRIGGERING) || defined(PCP_PEER)
+/* add_nat_rule_full()
  * nat on re0 inet proto udp from 192.168.1.49 port 3074 to any -> (re0) port 3148
  * <re0> is ext_if, (re0) is ext_ip
  * should be created when a port mapping (3148 => 192.168.1.49:3074 UDP) is created.
- * for symetric NAT / UPnP IGD NAT Port Triggering */
-int add_nat_rule(const char * ifname,
-                 const char * rhost, unsigned short eport,
+ * for symetric NAT / UPnP IGD NAT Port Triggering
+ * If rport is not 0 the rule only matches that remote port (PCP PEER),
+ * if extaddr_arg is not NULL it is used as the translated address. */
+static int add_nat_rule_full(const char * ifname,
+                 const char * rhost, unsigned short rport,
+                 const char * extaddr_arg, unsigned short eport,
                  const char * iaddr, unsigned short iport, int proto,
                  const char * desc)
 {
@@ -335,7 +346,9 @@ int add_nat_rule(const char * ifname,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
-	if(getifaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, &wan_addr, NULL) < 0) {
+	if(extaddr_arg && extaddr_arg[0] != '\0') {
+		extaddr = extaddr_arg;
+	} else if(getifaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, &wan_addr, NULL) < 0) {
 		syslog(LOG_WARNING, "failed to get address for interface %s", ifname);
 		if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0') {
 			extaddr = use_ext_ip_addr;
@@ -428,9 +441,21 @@ int add_nat_rule(const char * ifname,
 #endif
 		}
 #ifdef __APPLE__
-		pcr.rule.dst.xport.range.op = PF_OP_NONE;
+		if(rport) {
+			pcr.rule.dst.xport.range.op = PF_OP_EQ;
+			pcr.rule.dst.xport.range.port[0] = htons(rport);
+			pcr.rule.dst.xport.range.port[1] = htons(rport);
+		} else {
+			pcr.rule.dst.xport.range.op = PF_OP_NONE;
+		}
 #else
-		pcr.rule.dst.port_op = PF_OP_NONE;
+		if(rport) {
+			pcr.rule.dst.port_op = PF_OP_EQ;
+			pcr.rule.dst.port[0] = htons(rport);
+			pcr.rule.dst.port[1] = htons(rport);
+		} else {
+			pcr.rule.dst.port_op = PF_OP_NONE;
+		}
 #endif
 		/* -> xxx.xxx.xxx.xxx port 1234 */
 #ifndef PF_NEWSTYLE
@@ -486,6 +511,16 @@ int add_nat_rule(const char * ifname,
 	return r;
 }
 
+#ifdef ENABLE_PORT_TRIGGERING
+int add_nat_rule(const char * ifname,
+                 const char * rhost, unsigned short eport,
+                 const char * iaddr, unsigned short iport, int proto,
+                 const char * desc)
+{
+	return add_nat_rule_full(ifname, rhost, 0, NULL, eport,
+	                         iaddr, iport, proto, desc);
+}
+#endif /* ENABLE_PORT_TRIGGERING */
 
 /* action of the rules created by add_nat_rule(), used to select the
  * ruleset to scan when looking for a rule to delete.
@@ -504,6 +539,7 @@ int add_nat_rule(const char * ifname,
 #define NAT_RULE_EPORT(r) ((r).nat.proxy_port[0])
 #endif
 
+#ifdef ENABLE_PORT_TRIGGERING
 /*
  * returns:  0 : OK
  *          -1 : ERROR
@@ -630,15 +666,563 @@ delete_nat_rule(const char * ifname, unsigned short eport, unsigned short iport,
 	release_ticket(dev, tnum);
 	return r;
 }
+#endif /* ENABLE_PORT_TRIGGERING */
+
+#ifdef PCP_PEER
+/* PCP PEER (IPv4 only, see RFC 6887 section 12) is a source NAT rule
+ *   nat on ext_if inet proto udp from iaddr port iport to rhost port rport \
+ *       -> eaddr port eport
+ * stored in the anchor.  Replies are handled by the state it creates.
+ * Rules are told apart from port triggering rules by their remote port. */
+#ifdef __APPLE__
+#define RULE_SPORT(r)	((r).src.xport.range.port[0])
+#define RULE_DPORT(r)	((r).dst.xport.range.port[0])
+#define RULE_DPORT_OP(r)	((r).dst.xport.range.op)
+#else
+#define RULE_SPORT(r)	((r).src.port[0])
+#define RULE_DPORT(r)	((r).dst.port[0])
+#define RULE_DPORT_OP(r)	((r).dst.port_op)
+#endif
+#ifdef PFVAR_NEW_STYLE
+#define RULE_V4(x)	((x).v.a.addr.v4addr.s_addr)
+#else
+#define RULE_V4(x)	((x).v.a.addr.v4.s_addr)
 #endif
 
-/* add_redirect_rule2() :
- * create a rdr rule */
+/* PEER leases use the full endpoint key */
+struct peer_lease {
+	struct peer_lease *next;
+	in_addr_t iaddr, raddr;
+	unsigned short iport, rport;
+	int proto;
+	unsigned int timestamp;
+};
+static struct peer_lease *peer_leases = NULL;
+
+static struct peer_lease **
+find_peer_lease(in_addr_t iaddr, unsigned short iport,
+                in_addr_t raddr, unsigned short rport, int proto)
+{
+	struct peer_lease **p = &peer_leases;
+	while (*p != NULL) {
+		if ((*p)->iaddr == iaddr && (*p)->iport == iport &&
+		    (*p)->raddr == raddr && (*p)->rport == rport && (*p)->proto == proto)
+			break;
+		p = &(*p)->next;
+	}
+	return p;
+}
+
+static void
+free_peer_leases(void)
+{
+	while (peer_leases != NULL) {
+		struct peer_lease *old = peer_leases;
+		peer_leases = old->next;
+		free(old);
+	}
+}
+
+struct peer_nat {
+	in_addr_t iaddr, raddr;	/* network byte order */
+	unsigned short iport, rport, eport;	/* host byte order */
+	int proto;
+	char desc[PF_RULE_LABEL_SIZE];
+	char ifname[IFNAMSIZ];
+	u_int64_t packets, bytes;
+};
+
+#define PEER_GET	0
+#define PEER_DELETE	1
+/* PEER_GET : fill *pn with the index-th PEER rule
+ * PEER_DELETE : delete the rule matching iaddr/iport/raddr/rport/proto of *pn
+ * returns:  0 : OK
+ *          -1 : Error
+ *          -2 : rule not found */
+static int
+peer_nat_walk(int op, int index, struct peer_nat * pn)
+{
+	int i, n, r, count;
+	unsigned int tnum = 0;
+#ifdef USE_LIBPFCTL
+	struct pfctl_rules_info ri;
+	struct pfctl_rule rule;
+#define RULE (rule)
+	char anchor_call[MAXPATHLEN] = "";
+#else
+	struct pfioc_rule pr;
+#define RULE (pr.rule)
+#endif
+	if(dev<0) {
+		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+#ifdef USE_LIBPFCTL
+	if(pfctl_get_rules_info(dev, &ri, NAT_RULE_ACTION, anchor_name) < 0)
+	{
+		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
+		return -1;
+	}
+	n = ri.nr;
+#ifdef PF_RELEASETICKETS
+	tnum = ri.ticket;
+#endif
+#else
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+#ifndef PF_NEWSTYLE
+	RULE.action = PF_NAT;
+#else
+	RULE.action = PF_PASS;
+	RULE.direction = PF_OUT;
+#endif
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
+		return -1;
+	}
+	n = pr.nr;
+#ifdef PF_RELEASETICKETS
+	tnum = pr.ticket;
+#endif
+#endif /* USE_LIBPFCTL */
+	r = -2;
+	count = 0;
+	for(i=0; i<n; i++)
+	{
+#ifdef USE_LIBPFCTL
+		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, NAT_RULE_ACTION, &rule, anchor_call) < 0)
+		{
+			syslog(LOG_ERR, "pfctl_get_rule(): %m");
+			r = -1;
+			break;
+		}
+#else
+		pr.nr = i;
+		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
+		{
+			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
+			r = -1;
+			break;
+		}
+#endif
+		if(RULE_DPORT_OP(RULE) != PF_OP_EQ || RULE.af != AF_INET)
+			continue;	/* not a PEER rule */
+		if(op == PEER_GET)
+		{
+			if(count++ != index)
+				continue;
+			pn->iaddr = RULE_V4(RULE.src.addr);
+			pn->raddr = RULE_V4(RULE.dst.addr);
+			pn->iport = ntohs(RULE_SPORT(RULE));
+			pn->rport = ntohs(RULE_DPORT(RULE));
+			pn->eport = NAT_RULE_EPORT(RULE);
+			pn->proto = RULE.proto;
+#ifdef USE_LIBPFCTL
+			strlcpy(pn->desc, RULE.label[0], sizeof(pn->desc));
+#else
+			strlcpy(pn->desc, RULE.label, sizeof(pn->desc));
+#endif
+			strlcpy(pn->ifname, RULE.ifname, sizeof(pn->ifname));
+#ifdef PFRULE_INOUT_COUNTS
+			pn->packets = RULE.packets[0] + RULE.packets[1];
+			pn->bytes = RULE.bytes[0] + RULE.bytes[1];
+#else
+			pn->packets = RULE.packets;
+			pn->bytes = RULE.bytes;
+#endif
+			r = 0;
+			break;
+		}
+		if(pn->iport == ntohs(RULE_SPORT(RULE))
+		 && pn->rport == ntohs(RULE_DPORT(RULE))
+		 && RULE.proto == pn->proto
+		 && pn->iaddr == RULE_V4(RULE.src.addr)
+		 && pn->raddr == RULE_V4(RULE.dst.addr))
+		{
+#ifdef USE_LIBPFCTL
+			struct pfioc_rule pr;
+			memset(&pr, 0, sizeof(pr));
+			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+			pr.ticket = ri.ticket;
+			pr.rule.action = NAT_RULE_ACTION;
+#endif
+			pr.action = PF_CHANGE_GET_TICKET;
+			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
+			{
+				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
+				r = -1;
+				break;
+			}
+			pr.action = PF_CHANGE_REMOVE;
+			pr.nr = i;
+			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
+			{
+				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+				r = -1;
+			}
+			else
+				r = 0;
+			break;
+		}
+	}
+	release_ticket(dev, tnum);
+	return r;
+#undef RULE
+}
+
+/* find the PEER rule with this key; returns 0 if found */
+static int
+find_peer_nat(in_addr_t iaddr, unsigned short iport,
+              in_addr_t raddr, unsigned short rport, int proto,
+              struct peer_nat * pn)
+{
+	int i;
+	for(i = 0; peer_nat_walk(PEER_GET, i, pn) == 0; i++)
+	{
+		if(pn->iaddr == iaddr && pn->iport == iport &&
+		   pn->raddr == raddr && pn->rport == rport && pn->proto == proto)
+			return 0;
+	}
+	return -1;
+}
+
 int
-add_redirect_rule2(const char * ifname,
-                   const char * rhost, unsigned short eport,
-                   const char * iaddr, unsigned short iport, int proto,
-                   const char * desc, unsigned int timestamp)
+delete_peer_rule(const char * iaddr, unsigned short iport,
+                 const char * raddr, unsigned short rport, int proto)
+{
+	struct peer_nat pn;
+	struct peer_lease **leasep;
+	int r;
+	memset(&pn, 0, sizeof(pn));
+	if(inet_pton(AF_INET, iaddr, &pn.iaddr) != 1 ||
+	   inet_pton(AF_INET, raddr, &pn.raddr) != 1)
+		return -1;
+	pn.iport = iport;
+	pn.rport = rport;
+	pn.proto = proto;
+	r = peer_nat_walk(PEER_DELETE, 0, &pn);
+	if(r == -1)
+		return -1;
+	/* also discard stale lease state if the rule was removed outside */
+	leasep = find_peer_lease(pn.iaddr, iport, pn.raddr, rport, proto);
+	if(*leasep != NULL) {
+		struct peer_lease *old = *leasep;
+		*leasep = old->next;
+		free(old);
+	}
+	return 0;
+}
+
+unsigned int
+expire_peer_rules(unsigned int now)
+{
+	struct peer_lease *lease = peer_leases;
+	unsigned int next = 0;
+	while(lease != NULL) {
+		struct peer_lease *following = lease->next;
+		if(lease->timestamp != 0 && lease->timestamp <= now) {
+			char iaddr[INET_ADDRSTRLEN], raddr[INET_ADDRSTRLEN];
+			inet_ntop(AF_INET, &lease->iaddr, iaddr, sizeof(iaddr));
+			inet_ntop(AF_INET, &lease->raddr, raddr, sizeof(raddr));
+			syslog(LOG_NOTICE, "remove PEER mapping %s:%hu -> %s:%hu because it has expired",
+			       iaddr, lease->iport, raddr, lease->rport);
+			if(delete_peer_rule(iaddr, lease->iport, raddr, lease->rport, lease->proto) < 0)
+				next = now + 1;
+		} else if(lease->timestamp != 0 && (next == 0 || lease->timestamp < next)) {
+			next = lease->timestamp;
+		}
+		lease = following;
+	}
+	return next;
+}
+
+int
+add_peer_redirect_rule2(const char * ifname,
+                        const char * rhost, unsigned short rport,
+                        const char * eaddr, unsigned short eport,
+                        const char * iaddr, unsigned short iport, int proto,
+                        const char * desc, unsigned int timestamp)
+{
+	struct peer_nat pn;
+	struct peer_lease **leasep, *lease;
+	in_addr_t ia, ra;
+	int new_lease, r;
+
+	if(inet_pton(AF_INET, iaddr, &ia) != 1 || inet_pton(AF_INET, rhost, &ra) != 1)
+		return -1;
+	leasep = find_peer_lease(ia, iport, ra, rport, proto);
+	lease = *leasep;
+	new_lease = (lease == NULL);
+	if(new_lease) {
+		lease = calloc(1, sizeof(*lease));
+		if(lease == NULL)
+			return -1;
+		lease->iaddr = ia;
+		lease->iport = iport;
+		lease->raddr = ra;
+		lease->rport = rport;
+		lease->proto = proto;
+	}
+	if(find_peer_nat(ia, iport, ra, rport, proto, &pn) == 0) {
+		if(pn.eport == eport && strcmp(pn.desc, desc) == 0) {
+			/* renewal : keep the rule, and its states */
+			r = 0;
+			goto done;
+		}
+		/* different external port or description : replace the rule.
+		 * delete_peer_rule() also frees the lease we found above. */
+		if(delete_peer_rule(iaddr, iport, rhost, rport, proto) < 0) {
+			r = -1;
+			goto done;
+		}
+		if(!new_lease) {
+			lease = calloc(1, sizeof(*lease));
+			if(lease == NULL)
+				return -1;
+			lease->iaddr = ia;
+			lease->iport = iport;
+			lease->raddr = ra;
+			lease->rport = rport;
+			lease->proto = proto;
+			new_lease = 1;
+		}
+	}
+	r = add_nat_rule_full(ifname, rhost, rport, eaddr, eport,
+	                      iaddr, iport, proto, desc);
+done:
+	if(r >= 0) {
+		lease->timestamp = timestamp;
+		if(new_lease) {
+			lease->next = peer_leases;
+			peer_leases = lease;
+		}
+	} else if(new_lease) {
+		free(lease);
+	}
+	return r;
+}
+
+/* DSCP marking is not supported with pf */
+int
+add_peer_dscp_rule2(const char * ifname,
+                    const char * rhost, unsigned short rport,
+                    unsigned char dscp,
+                    const char * iaddr, unsigned short iport, int proto,
+                    const char * desc, unsigned int timestamp)
+{
+	UNUSED(ifname); UNUSED(rhost); UNUSED(rport); UNUSED(dscp);
+	UNUSED(iaddr); UNUSED(iport); UNUSED(proto); UNUSED(desc);
+	UNUSED(timestamp);
+	syslog(LOG_ERR, "add_peer_dscp_rule2: not supported");
+	return -1;
+}
+
+int
+get_peer_rule_by_index(int index,
+                       char * ifname, unsigned short * eport,
+                       char * iaddr, int iaddrlen, unsigned short * iport,
+                       int * proto, char * desc, int desclen,
+                       char * rhost, int rhostlen, unsigned short * rport,
+                       unsigned int * timestamp,
+                       u_int64_t * packets, u_int64_t * bytes)
+{
+	struct peer_nat pn;
+	if(index < 0 || peer_nat_walk(PEER_GET, index, &pn) != 0)
+		return -1;
+	if(ifname)
+		strlcpy(ifname, pn.ifname, IFNAMSIZ);
+	if(eport)
+		*eport = pn.eport;
+	if(iaddr && iaddrlen > 0)
+		inet_ntop(AF_INET, &pn.iaddr, iaddr, iaddrlen);
+	if(iport)
+		*iport = pn.iport;
+	if(proto)
+		*proto = pn.proto;
+	if(desc && desclen > 0)
+		strlcpy(desc, pn.desc, desclen);
+	if(rhost && rhostlen > 0)
+		inet_ntop(AF_INET, &pn.raddr, rhost, rhostlen);
+	if(rport)
+		*rport = pn.rport;
+	if(timestamp) {
+		struct peer_lease * lease = *find_peer_lease(pn.iaddr, pn.iport,
+		                                             pn.raddr, pn.rport, pn.proto);
+		*timestamp = lease ? lease->timestamp : 0;
+	}
+	if(packets)
+		*packets = pn.packets;
+	if(bytes)
+		*bytes = pn.bytes;
+	return 0;
+}
+
+/* get_nat_ext_addr()
+ * Look in the pf state table for an existing translated flow
+ * src -> dst and return its external source address and port.
+ * returns 1 if found, 0 if not, -1 on error. IPv4 only. */
+#define PFA4(a)	((a).v4.s_addr)
+#ifdef PF_SK_STACK
+#define PFSK_STACK	PF_SK_STACK
+#define PFSK_WIRE	PF_SK_WIRE
+#else
+#define PFSK_WIRE	0
+#define PFSK_STACK	1
+#endif
+static int
+nat_state_ext(const struct pf_addr * ia, const uint16_t * ip,
+              const struct pf_addr * wa, const uint16_t * wp,
+              in_addr_t src, uint16_t sport, in_addr_t dst, uint16_t dport,
+              struct sockaddr_in * ext)
+{
+	int a;
+	for(a = 0; a < 2; a++)
+	{
+		if(PFA4(ia[a]) == src && ip[a] == htons(sport) &&
+		   PFA4(ia[1-a]) == dst && ip[1-a] == htons(dport) &&
+		   PFA4(wa[1-a]) == dst && wp[1-a] == htons(dport) &&
+		   (PFA4(wa[a]) != src || wp[a] != htons(sport)))
+		{
+			memset(ext, 0, sizeof(*ext));
+			ext->sin_family = AF_INET;
+			ext->sin_addr.s_addr = PFA4(wa[a]);
+			ext->sin_port = wp[a];
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int
+get_nat_ext_addr(struct sockaddr * src, struct sockaddr * dst, uint8_t proto,
+                 struct sockaddr_storage * ret_ext)
+{
+	struct sockaddr_in * s4 = (struct sockaddr_in *)src;
+	struct sockaddr_in * d4 = (struct sockaddr_in *)dst;
+	struct sockaddr_in ext;
+	int found = 0;
+	if(dev < 0 || !src || !dst || src->sa_family != AF_INET ||
+	   dst->sa_family != AF_INET)
+		return 0;
+#ifdef USE_LIBPFCTL
+	{
+		struct pfctl_states states;
+		struct pfctl_state * st;
+		memset(&states, 0, sizeof(states));
+		TAILQ_INIT(&states.states);
+		if(pfctl_get_states(dev, &states) != 0)
+		{
+			syslog(LOG_ERR, "pfctl_get_states: %m");
+			return -1;
+		}
+		TAILQ_FOREACH(st, &states.states, entry)
+		{
+			uint16_t ip[2], wp[2];
+			struct pf_addr ia[2], wa[2];
+			int k;
+			if(st->key[PFSK_STACK].proto != proto)
+				continue;
+			for(k = 0; k < 2; k++)
+			{
+				ia[k] = st->key[PFSK_STACK].addr[k];
+				ip[k] = st->key[PFSK_STACK].port[k];
+				wa[k] = st->key[PFSK_WIRE].addr[k];
+				wp[k] = st->key[PFSK_WIRE].port[k];
+			}
+			found = nat_state_ext(ia, ip, wa, wp,
+			                      s4->sin_addr.s_addr, ntohs(s4->sin_port),
+			                      d4->sin_addr.s_addr, ntohs(d4->sin_port), &ext);
+			if(found)
+				break;
+		}
+		pfctl_free_states(&states);
+	}
+#else
+	{
+		struct pfioc_states ps;
+		struct pfsync_state * st;
+		char * buf = NULL;
+		size_t len = 0;
+		int i, n;
+		memset(&ps, 0, sizeof(ps));
+		/* the size of the table may change between the 2 calls */
+		for(;;)
+		{
+			if(ioctl(dev, DIOCGETSTATES, &ps) < 0)
+			{
+				syslog(LOG_ERR, "ioctl(dev, DIOCGETSTATES, ...): %m");
+				free(buf);
+				return -1;
+			}
+			if(ps.ps_len <= (int)len && buf != NULL)
+				break;
+			len = ps.ps_len + 16 * sizeof(struct pfsync_state);
+			free(buf);
+			buf = malloc(len);
+			if(buf == NULL)
+				return -1;
+			ps.ps_len = len;
+			ps.ps_buf = buf;
+		}
+		n = ps.ps_len / sizeof(struct pfsync_state);
+		st = (struct pfsync_state *)ps.ps_buf;
+		for(i = 0; i < n && !found; i++, st++)
+		{
+			uint16_t ip[2], wp[2];
+			struct pf_addr ia[2], wa[2];
+			int k;
+			if(st->proto != proto)
+				continue;
+			for(k = 0; k < 2; k++)
+			{
+				ia[k] = st->key[PF_SK_STACK].addr[k];
+				ip[k] = st->key[PF_SK_STACK].port[k];
+				wa[k] = st->key[PF_SK_WIRE].addr[k];
+				wp[k] = st->key[PF_SK_WIRE].port[k];
+			}
+			found = nat_state_ext(ia, ip, wa, wp,
+			                      s4->sin_addr.s_addr, ntohs(s4->sin_port),
+			                      d4->sin_addr.s_addr, ntohs(d4->sin_port), &ext);
+		}
+		free(buf);
+	}
+#endif
+	if(found)
+		memcpy(ret_ext, &ext, sizeof(ext));
+	return found;
+}
+#endif /* PCP_PEER */
+#endif
+
+/* IPv4 netmask for a prefix length (network byte order) */
+static in_addr_t
+prefix_to_mask4(unsigned int prefix)
+{
+	return prefix == 0 ? 0 : htonl(0xffffffffU << (32 - prefix));
+}
+
+#ifdef __APPLE__
+#define SRC_PORT_SET(rule, p) do { \
+		(rule).src.xport.range.op = PF_OP_EQ; \
+		(rule).src.xport.range.port[0] = htons(p); \
+		(rule).src.xport.range.port[1] = htons(p); } while(0)
+#else
+#define SRC_PORT_SET(rule, p) do { \
+		(rule).src.port_op = PF_OP_EQ; \
+		(rule).src.port[0] = htons(p); \
+		(rule).src.port[1] = htons(p); } while(0)
+#endif
+
+/* add_redirect_rule_ex() :
+ * create a rdr rule. The source is restricted to saddr/prefix (network
+ * byte order address, prefix 0 means any) and to sport if not 0. */
+static int
+add_redirect_rule_ex(const char * ifname,
+                     in_addr_t saddr, unsigned int prefix, unsigned short sport,
+                     unsigned short eport,
+                     const char * iaddr, unsigned short iport, int proto,
+                     const char * desc)
 {
 	int r;
 	struct pfioc_rule pcr;
@@ -718,16 +1302,18 @@ add_redirect_rule2(const char * ifname,
 		if(tag)
 			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
 		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);
-		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		if(prefix > 0)
 		{
 #ifdef PFVAR_NEW_STYLE
-			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4addr.s_addr);
-			pcr.rule.src.addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
+			pcr.rule.src.addr.v.a.addr.v4addr.s_addr = saddr & prefix_to_mask4(prefix);
+			pcr.rule.src.addr.v.a.mask.v4addr.s_addr = prefix_to_mask4(prefix);
 #else
-			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4.s_addr);
-			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
+			pcr.rule.src.addr.v.a.addr.v4.s_addr = saddr & prefix_to_mask4(prefix);
+			pcr.rule.src.addr.v.a.mask.v4.s_addr = prefix_to_mask4(prefix);
 #endif
 		}
+		if(sport)
+			SRC_PORT_SET(pcr.rule, sport);
 #ifdef PF_SET_DST_ADDR
 		/* set dst address
 		 * see https://github.com/miniupnp/miniupnp/issues/231 */
@@ -793,6 +1379,89 @@ add_redirect_rule2(const char * ifname,
 		free(a);
 #endif
 	}
+	return r;
+}
+
+/* PCP MAP FILTER (RFC 6887 section 13.3) :
+ * a filtered mapping is a group of rdr (and pass) rules, one per allowed
+ * remote peer prefix/port, so traffic from other sources is never translated.
+ * A policy for a mapping which is about to be created is kept pending until
+ * add_redirect_rule2() and add_filter_rule2() have consumed it. */
+struct pf_pcp_policy {
+	struct in6_addr address;
+	unsigned short port;
+	unsigned char protocol;
+	unsigned int count;
+	struct pcp_filter filters[PCP_FILTER_PEER_MAX];
+};
+
+static struct pf_pcp_policy * pending_policy = NULL;
+
+/* same for an IPv6 mapping (pinholes) */
+unsigned int
+pf_pcp_pending_filters6(const struct in6_addr * address, unsigned short port,
+                        int protocol, const struct pcp_filter ** filters)
+{
+	if(pending_policy == NULL || pending_policy->count == 0 ||
+	   pending_policy->port != port || pending_policy->protocol != protocol ||
+	   memcmp(&pending_policy->address, address, sizeof(*address)) != 0)
+		return 0;
+	*filters = pending_policy->filters;
+	return pending_policy->count;
+}
+
+/* returns the number of filters to use for the mapping to iaddr:iport
+ * (0 if no policy is pending for it) */
+static unsigned int
+pending_filters(const char * iaddr, unsigned short iport, int proto,
+                const struct pcp_filter ** filters)
+{
+	struct in_addr a;
+	if(pending_policy == NULL || pending_policy->count == 0 ||
+	   pending_policy->port != iport || pending_policy->protocol != proto ||
+	   inet_pton(AF_INET, iaddr, &a) != 1 ||
+	   memcmp(pending_policy->address.s6_addr + 12, &a, 4) != 0)
+		return 0;
+	*filters = pending_policy->filters;
+	return pending_policy->count;
+}
+
+/* add_redirect_rule2() :
+ * create a rdr rule (or a rdr rule per allowed peer when a PCP FILTER
+ * policy is pending for this internal endpoint) */
+int
+add_redirect_rule2(const char * ifname,
+                   const char * rhost, unsigned short eport,
+                   const char * iaddr, unsigned short iport, int proto,
+                   const char * desc, unsigned int timestamp)
+{
+	int r = 0;
+	unsigned int k, count;
+	struct in_addr ra;
+	const struct pcp_filter * filters = NULL;
+	count = pending_filters(iaddr, iport, proto, &filters);
+	if(count == 0)
+	{
+		unsigned int prefix = 0;
+		ra.s_addr = 0;
+		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		{
+			if(inet_pton(AF_INET, rhost, &ra) == 1)
+				prefix = 32;
+		}
+		r = add_redirect_rule_ex(ifname, ra.s_addr, prefix, 0,
+		                         eport, iaddr, iport, proto, desc);
+	}
+	else
+	{
+		for(k = 0; k < count && r == 0; k++)
+		{
+			memcpy(&ra.s_addr, filters[k].address.s6_addr + 12, 4);
+			r = add_redirect_rule_ex(ifname, ra.s_addr, filters[k].prefix - 96,
+			                         filters[k].port,
+			                         eport, iaddr, iport, proto, desc);
+		}
+	}
 	if(r == 0 && timestamp > 0)
 		add_timestamp_entry(eport, proto, timestamp);
 #ifdef ENABLE_PORT_TRIGGERING
@@ -806,15 +1475,16 @@ add_redirect_rule2(const char * ifname,
 }
 
 /* thanks to Seth Mos for this function */
-int
-add_filter_rule2(const char * ifname,
-                 const char * rhost, const char * iaddr,
-                 unsigned short eport, unsigned short iport,
-				 int proto, const char * desc)
+static int
+add_filter_rule_ex(const char * ifname,
+                   in_addr_t saddr, unsigned int prefix, unsigned short sport,
+                   const char * iaddr,
+                   unsigned short eport, unsigned short iport,
+                   int proto, const char * desc)
 {
 #ifndef PF_ENABLE_FILTER_RULES
 	UNUSED(ifname);
-	UNUSED(rhost); UNUSED(iaddr);
+	UNUSED(saddr); UNUSED(prefix); UNUSED(sport); UNUSED(iaddr);
 	UNUSED(eport); UNUSED(iport);
 	UNUSED(proto); UNUSED(desc);
 	return 0;
@@ -880,11 +1550,13 @@ add_filter_rule2(const char * ifname,
 		if(tag)
 			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
 
-		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		if(prefix > 0)
 		{
-			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4.s_addr);
-			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
+			pcr.rule.src.addr.v.a.addr.v4.s_addr = saddr & prefix_to_mask4(prefix);
+			pcr.rule.src.addr.v.a.mask.v4.s_addr = prefix_to_mask4(prefix);
 		}
+		if(sport)
+			SRC_PORT_SET(pcr.rule, sport);
 		/* we want any - iaddr port = # keep state label */
 		inet_pton(AF_INET, iaddr, &pcr.rule.dst.addr.v.a.addr.v4.s_addr);
 		pcr.rule.dst.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
@@ -914,6 +1586,39 @@ add_filter_rule2(const char * ifname,
 	}
 	return r;
 #endif
+}
+
+int
+add_filter_rule2(const char * ifname,
+                 const char * rhost, const char * iaddr,
+                 unsigned short eport, unsigned short iport,
+                 int proto, const char * desc)
+{
+	int r = 0;
+	unsigned int k, count;
+	struct in_addr ra;
+	const struct pcp_filter * filters = NULL;
+	count = pending_filters(iaddr, iport, proto, &filters);
+	if(count == 0)
+	{
+		unsigned int prefix = 0;
+		ra.s_addr = 0;
+		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		{
+			if(inet_pton(AF_INET, rhost, &ra) == 1)
+				prefix = 32;
+		}
+		return add_filter_rule_ex(ifname, ra.s_addr, prefix, 0, iaddr,
+		                          eport, iport, proto, desc);
+	}
+	for(k = 0; k < count && r == 0; k++)
+	{
+		memcpy(&ra.s_addr, filters[k].address.s6_addr + 12, 4);
+		r = add_filter_rule_ex(ifname, ra.s_addr, filters[k].prefix - 96,
+		                       filters[k].port, iaddr,
+		                       eport, iport, proto, desc);
+	}
+	return r;
 }
 
 /* get_redirect_rule_count()
@@ -1145,6 +1850,9 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
  *            0 : rule deleted
  *            1 : rule untouched
  */
+/* set to avoid logging when looking for more rules of a filtered mapping */
+static int quiet_not_found = 0;
+
 static int
 priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
                           int proto, unsigned short * iport,
@@ -1314,9 +2022,21 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 			break;
 		}
 	}
-	if (r == -2)
+	if (r == -2 && !quiet_not_found)
 		syslog(LOG_NOTICE, "could not find redirect rule to delete eport=%hu", eport);
 	release_ticket(dev, tnum);
+	return r;
+}
+
+/* delete another rule of a mapping which has several (PCP FILTER) */
+static int
+priv_delete_redirect_rule_quiet(const char * ifname, unsigned short eport,
+                                int proto)
+{
+	int r;
+	quiet_not_found = 1;
+	r = priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
+	quiet_not_found = 0;
 	return r;
 }
 
@@ -1324,8 +2044,22 @@ int
 delete_redirect_rule(const char * ifname, unsigned short eport,
                     int proto)
 {
-	return priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
+	int r;
+	r = priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
+	/* a filtered PCP mapping has a rule per allowed peer */
+	while(r == 0 && priv_delete_redirect_rule_quiet(ifname, eport, proto) == 0)
+		;
+	return r;
 }
+
+/* when active, priv_delete_filter_rule() only removes the rule having this
+ * source (used for the rules of a PCP FILTER policy) */
+static struct {
+	int active;
+	in_addr_t addr;
+	unsigned int prefix;
+	unsigned short port;
+} filter_src_match;
 
 /* returns:  0 : OK
  *          -1 : Error
@@ -1376,7 +2110,14 @@ syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
 #endif
 		if( (iport == ntohs(RULE.dst.port[0]))
 		  && (RULE.proto == proto) &&
-		   (iaddr == 0 || iaddr == RULE.dst.addr.v.a.addr.v4.s_addr)
+		   (iaddr == 0 || iaddr == RULE.dst.addr.v.a.addr.v4.s_addr) &&
+		   (!filter_src_match.active ||
+		    (RULE.src.addr.v.a.addr.v4.s_addr ==
+		         (filter_src_match.addr & prefix_to_mask4(filter_src_match.prefix))
+		     && RULE.src.addr.v.a.mask.v4.s_addr ==
+		         prefix_to_mask4(filter_src_match.prefix)
+		     && (RULE.src.port_op == PF_OP_EQ ?
+		         ntohs(RULE.src.port[0]) : 0) == filter_src_match.port))
 		  )
 		{
 			pr.action = PF_CHANGE_GET_TICKET;
@@ -1426,18 +2167,30 @@ delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
 	int r;
 	unsigned short iport;
 	in_addr_t iaddr;
+	int n = 1;
 	r = priv_delete_redirect_rule(ifname, eport, proto, &iport, &iaddr, NULL, 0);
 	if(r == 0)
 	{
+		/* a filtered PCP mapping has a rule per allowed peer */
+		while(priv_delete_redirect_rule_quiet(ifname, eport, proto) == 0)
+			n++;
 #ifdef ENABLE_PORT_TRIGGERING
 		if (proto == IPPROTO_UDP) {
 			delete_nat_rule(ifname, eport, iport, proto, iaddr);
 		}
 #endif
 		r = priv_delete_filter_rule(ifname, iport, proto, iaddr);
+		while(--n > 0)
+			priv_delete_filter_rule(ifname, iport, proto, iaddr);
 	}
 	return r;
 }
+
+/* source restriction of the rule returned by the last successful call
+ * to get_redirect_rule_by_index() */
+static in_addr_t last_rdr_src_addr;
+static unsigned int last_rdr_src_prefix;
+static unsigned short last_rdr_src_port;
 
 int
 get_redirect_rule_by_index(int index,
@@ -1613,6 +2366,29 @@ get_redirect_rule_by_index(int index,
 	}
 	if(timestamp)
 		*timestamp = get_timestamp(*eport, *proto);
+	/* source restriction of the rule, used by the PCP FILTER code */
+	{
+		in_addr_t m;
+#ifdef PFVAR_NEW_STYLE
+		m = RULE.src.addr.v.a.mask.v4addr.s_addr;
+		last_rdr_src_addr = RULE.src.addr.v.a.addr.v4addr.s_addr;
+#else
+		m = RULE.src.addr.v.a.mask.v4.s_addr;
+		last_rdr_src_addr = RULE.src.addr.v.a.addr.v4.s_addr;
+#endif
+		last_rdr_src_prefix = 0;
+		m = ntohl(m);
+		while(m & 0x80000000U) { last_rdr_src_prefix++; m <<= 1; }
+		if(last_rdr_src_addr == 0)
+			last_rdr_src_prefix = 0;
+#ifdef __APPLE__
+		last_rdr_src_port = RULE.src.xport.range.op == PF_OP_EQ ?
+		                    ntohs(RULE.src.xport.range.port[0]) : 0;
+#else
+		last_rdr_src_port = RULE.src.port_op == PF_OP_EQ ?
+		                    ntohs(RULE.src.port[0]) : 0;
+#endif
+	}
 	r = 0;
 error:
 	release_ticket(dev, tnum);
@@ -1898,5 +2674,477 @@ list_rules(void)
 	release_ticket(dev, tnum);
 }
 #endif /* TEST */
+
+
+/* ---- PCP MAP FILTER policy ---- */
+struct pf_group_template {
+	unsigned short eport;
+	char desc[PF_RULE_LABEL_SIZE];
+	char ifname[IFNAMSIZ];
+	unsigned int nrules;
+};
+
+struct pcp_filter_update {
+	int existing;	/* the mapping already existed (its rules were rewritten) */
+	int v6;		/* IPv6 mapping (pinholes) */
+	struct pf_pcp_policy old;
+};
+
+/* remove the rdr rule at this index */
+static int
+remove_rdr_rule_at(int index)
+{
+	struct pfioc_rule pr;
+	unsigned int tnum = 0;
+	int r = -1;
+#ifdef USE_LIBPFCTL
+	struct pfctl_rules_info ri;
+#endif
+	if(dev<0)
+		return -1;
+	memset(&pr, 0, sizeof(pr));
+	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
+#ifndef PF_NEWSTYLE
+	pr.rule.action = PF_RDR;
+#endif
+#ifdef USE_LIBPFCTL
+	if(pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	{
+		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
+		return -1;
+	}
+	pr.ticket = ri.ticket;
+#ifdef PF_RELEASETICKETS
+	tnum = ri.ticket;
+#endif
+#else
+	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
+		return -1;
+	}
+#ifdef PF_RELEASETICKETS
+	tnum = pr.ticket;
+#endif
+#endif
+	pr.action = PF_CHANGE_GET_TICKET;
+	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
+		goto end;
+	}
+	pr.action = PF_CHANGE_REMOVE;
+	pr.nr = index;
+	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
+	{
+		syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+		goto end;
+	}
+	r = 0;
+end:
+	release_ticket(dev, tnum);
+	return r;
+}
+
+static void
+policy_iaddr_str(const struct in6_addr * address, char * buf, size_t len)
+{
+	inet_ntop(AF_INET, address->s6_addr + 12, buf, len);
+}
+
+/* read the rules of a mapping : the policy and the parameters of its rules.
+ * returns the number of rules */
+static unsigned int
+read_group(const struct in6_addr * address, unsigned short port,
+           unsigned char protocol,
+           struct pf_pcp_policy * policy, struct pf_group_template * tpl)
+{
+	char want[INET_ADDRSTRLEN], iaddr[INET_ADDRSTRLEN];
+	char ifname[IFNAMSIZ], desc[PF_RULE_LABEL_SIZE];
+	unsigned short eport, iport;
+	int i, proto;
+	memset(policy, 0, sizeof(*policy));
+	memset(tpl, 0, sizeof(*tpl));
+	policy->address = *address;
+	policy->port = port;
+	policy->protocol = protocol;
+	policy_iaddr_str(address, want, sizeof(want));
+	for(i = 0; get_redirect_rule_by_index(i, ifname, &eport, iaddr, sizeof(iaddr),
+	                                      &iport, &proto, desc, sizeof(desc),
+	                                      NULL, 0, NULL, NULL, NULL) == 0; i++)
+	{
+		if(iport != port || proto != protocol || strcmp(iaddr, want) != 0)
+			continue;
+		if(tpl->nrules++ == 0)
+		{
+			tpl->eport = eport;
+			strlcpy(tpl->desc, desc, sizeof(tpl->desc));
+			strlcpy(tpl->ifname, ifname, sizeof(tpl->ifname));
+		}
+		if(last_rdr_src_prefix > 0 && policy->count < PCP_FILTER_PEER_MAX)
+		{
+			struct pcp_filter * f = &policy->filters[policy->count++];
+			memset(&f->address, 0, sizeof(f->address));
+			f->address.s6_addr[10] = f->address.s6_addr[11] = 0xff;
+			memcpy(f->address.s6_addr + 12, &last_rdr_src_addr, 4);
+			f->prefix = last_rdr_src_prefix + 96;
+			f->port = last_rdr_src_port;
+		}
+	}
+	return tpl->nrules;
+}
+
+struct src_entry {
+	in_addr_t addr;	/* network byte order */
+	unsigned int prefix;
+	unsigned short port;
+};
+
+/* k-th source of the rules of a policy (the unfiltered rule if no filter) */
+static void
+policy_entry(const struct pf_pcp_policy * policy, unsigned int k,
+             struct src_entry * e)
+{
+	memset(e, 0, sizeof(*e));
+	if(policy->count)
+	{
+		memcpy(&e->addr, policy->filters[k].address.s6_addr + 12, 4);
+		e->prefix = policy->filters[k].prefix - 96;
+		e->port = policy->filters[k].port;
+	}
+}
+
+static int
+policy_has_entry(const struct pf_pcp_policy * policy, const struct src_entry * e)
+{
+	unsigned int k, n = policy->count ? policy->count : 1;
+	struct src_entry o;
+	for(k = 0; k < n; k++)
+	{
+		policy_entry(policy, k, &o);
+		if(o.prefix == e->prefix && o.port == e->port &&
+		   (o.addr & prefix_to_mask4(o.prefix)) == (e->addr & prefix_to_mask4(e->prefix)))
+			return 1;
+	}
+	return 0;
+}
+
+/* remove the rdr rule of the mapping having this source */
+static int
+remove_group_rule(const struct in6_addr * address, unsigned short port,
+                  unsigned char protocol, const struct src_entry * e)
+{
+	char want[INET_ADDRSTRLEN], iaddr[INET_ADDRSTRLEN];
+	unsigned short eport, iport;
+	int i, proto;
+	policy_iaddr_str(address, want, sizeof(want));
+	for(i = 0; get_redirect_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr),
+	                                      &iport, &proto, NULL, 0,
+	                                      NULL, 0, NULL, NULL, NULL) == 0; i++)
+	{
+		if(iport == port && proto == protocol && strcmp(iaddr, want) == 0 &&
+		   last_rdr_src_prefix == e->prefix && last_rdr_src_port == e->port &&
+		   (last_rdr_src_addr & prefix_to_mask4(e->prefix)) ==
+		       (e->addr & prefix_to_mask4(e->prefix)))
+			return remove_rdr_rule_at(i);
+	}
+	return -1;
+}
+
+/* change the rules of a mapping from the policy 'from' to the policy 'to' :
+ * the missing rules are added first, then the obsolete ones are removed */
+static int
+group_apply(const struct pf_pcp_policy * to, const struct pf_pcp_policy * from,
+            const struct pf_group_template * tpl)
+{
+	char iaddr[INET_ADDRSTRLEN];
+	unsigned int k, n;
+	struct src_entry e;
+	struct in_addr a;
+	int r = 0;
+	policy_iaddr_str(&to->address, iaddr, sizeof(iaddr));
+	n = to->count ? to->count : 1;
+	for(k = 0; k < n && r == 0; k++)
+	{
+		policy_entry(to, k, &e);
+		if(policy_has_entry(from, &e))
+			continue;
+		r = add_redirect_rule_ex(tpl->ifname, e.addr, e.prefix, e.port, tpl->eport,
+		                         iaddr, to->port, to->protocol, tpl->desc);
+		if(r == 0)
+			r = add_filter_rule_ex(tpl->ifname, e.addr, e.prefix, e.port, iaddr,
+			                       tpl->eport, to->port, to->protocol, tpl->desc);
+	}
+	if(r < 0)
+		return -1;
+	n = from->count ? from->count : 1;
+	for(k = 0; k < n; k++)
+	{
+		policy_entry(from, k, &e);
+		if(policy_has_entry(to, &e))
+			continue;
+		remove_group_rule(&to->address, to->port, to->protocol, &e);
+		inet_pton(AF_INET, iaddr, &a);
+		filter_src_match.active = 1;
+		filter_src_match.addr = e.addr;
+		filter_src_match.prefix = e.prefix;
+		filter_src_match.port = e.port;
+		priv_delete_filter_rule(tpl->ifname, to->port, to->protocol, a.s_addr);
+		filter_src_match.active = 0;
+	}
+	return 0;
+}
+
+/* ---- IPv6 : the policy is stored in the pinholes of the mapping ---- */
+#ifdef ENABLE_UPNPPINHOLE
+static void
+mask6(struct in6_addr * a, unsigned int prefix)
+{
+	unsigned int i;
+	for(i = 0; i < 16; i++, prefix = prefix >= 8 ? prefix - 8 : 0)
+		a->s6_addr[i] &= prefix >= 8 ? 255 : (255 << (8 - prefix)) & 255;
+}
+
+/* f == NULL is the unfiltered pinhole */
+static int
+policy6_has_entry(const struct pf_pcp_policy * policy, const struct pcp_filter * f)
+{
+	unsigned int k;
+	struct in6_addr a, b;
+	if(policy->count == 0)
+		return f == NULL;
+	if(f == NULL)
+		return 0;
+	a = f->address;
+	mask6(&a, f->prefix);
+	for(k = 0; k < policy->count; k++)
+	{
+		b = policy->filters[k].address;
+		mask6(&b, policy->filters[k].prefix);
+		if(policy->filters[k].prefix == f->prefix &&
+		   policy->filters[k].port == f->port && memcmp(&a, &b, sizeof(a)) == 0)
+			return 1;
+	}
+	return 0;
+}
+
+static int
+group_apply6(const struct pf_pcp_policy * to, const struct pf_pcp_policy * from,
+             const char * ifname, const char * desc, unsigned int timestamp)
+{
+	unsigned int k, n;
+	const struct pcp_filter * f;
+	n = to->count ? to->count : 1;
+	for(k = 0; k < n; k++)
+	{
+		f = to->count ? &to->filters[k] : NULL;
+		if(policy6_has_entry(from, f))
+			continue;
+		if(pf_pinhole_group_add(ifname, &to->address, to->port, to->protocol,
+		                        desc, timestamp, f) < 0)
+			return -1;
+	}
+	n = from->count ? from->count : 1;
+	for(k = 0; k < n; k++)
+	{
+		f = from->count ? &from->filters[k] : NULL;
+		if(policy6_has_entry(to, f))
+			continue;
+		pf_pinhole_group_remove(&to->address, to->port, to->protocol, f);
+	}
+	return 0;
+}
+
+#endif /* ENABLE_UPNPPINHOLE */
+
+/* merge the options of a request in a policy (RFC 6887 section 13.3) :
+ * a FILTER with a prefix length of 0 removes all the peers.
+ * returns 0, -1 (invalid) or -2 (too many peers) */
+static int
+policy_merge(struct pf_pcp_policy * p, const struct pcp_filter * filters,
+             unsigned int count, int v4)
+{
+	unsigned int i, j, bits;
+	struct pcp_filter f;
+	for(i = 0; i < count; i++)
+	{
+		if(!filters[i].prefix)
+		{
+			p->count = 0;
+			continue;
+		}
+		f = filters[i];
+		if(v4 ? (!IN6_IS_ADDR_V4MAPPED(&f.address) || f.prefix < 96) :
+		       (IN6_IS_ADDR_V4MAPPED(&f.address) || f.prefix > 128))
+			return -1;
+		/* canonicalize the unused suffix bits before deduplicating */
+		bits = f.prefix;
+		for(j = 0; j < sizeof(f.address.s6_addr); ++j)
+		{
+			f.address.s6_addr[j] &= bits >= 8 ? 255 : bits ? 255 << (8 - bits) : 0;
+			bits = bits >= 8 ? bits - 8 : 0;
+		}
+		for(j = 0; j < p->count; ++j)
+		{
+			if(p->filters[j].prefix == f.prefix && p->filters[j].port == f.port &&
+			   memcmp(&p->filters[j].address, &f.address, sizeof(f.address)) == 0)
+				break;
+		}
+		if(j != p->count)
+			continue;
+		if(p->count == PCP_FILTER_PEER_MAX)
+			return -2;
+		p->filters[p->count++] = f;
+	}
+	return 0;
+}
+
+/* returns 0 : OK
+ *        -1 : error
+ *        -2 : too many peers
+ *        -3 : not supported (IPv6 address) */
+int
+pf_pcp_filter_begin(const struct in6_addr * address, unsigned short port,
+                    unsigned char protocol, const char * ifname,
+                    const struct pcp_filter * filters, unsigned int count,
+                    struct pcp_filter_update ** update)
+{
+	struct pcp_filter_update * u;
+	struct pf_pcp_policy * merged;
+	struct pf_group_template tpl;
+	int r;
+	UNUSED(ifname);
+	*update = NULL;
+	u = calloc(1, sizeof(*u));
+	merged = calloc(1, sizeof(*merged));
+	if(u == NULL || merged == NULL)
+	{
+		free(u);
+		free(merged);
+		return -1;
+	}
+	if(!IN6_IS_ADDR_V4MAPPED(address))
+	{
+#ifndef ENABLE_UPNPPINHOLE
+		free(u);
+		free(merged);
+		return -3;
+	}
+	if(0)
+	{
+#else
+		char desc[PF_RULE_LABEL_SIZE], ifn[IFNAMSIZ];
+		unsigned int ts = 0;
+		u->v6 = 1;
+		memset(&u->old, 0, sizeof(u->old));
+		u->old.address = *address;
+		u->old.port = port;
+		u->old.protocol = protocol;
+		u->existing = pf_pinhole_group_get(address, port, protocol,
+		                  u->old.filters, PCP_FILTER_PEER_MAX, &u->old.count,
+		                  desc, sizeof(desc), &ts, ifn) > 0;
+		*merged = u->old;
+		r = policy_merge(merged, filters, count, 0);
+		if(r == 0 && u->existing)
+			r = group_apply6(merged, &u->old, ifn, desc, ts);
+		if(r < 0)
+		{
+			free(u);
+			free(merged);
+			return r == -2 ? -2 : -1;
+		}
+		if(u->existing)
+		{
+			free(merged);
+		}
+		else
+		{
+			free(pending_policy);
+			pending_policy = merged;
+		}
+		*update = u;
+		return 0;
+#endif /* ENABLE_UPNPPINHOLE */
+	}
+	u->existing = read_group(address, port, protocol, &u->old, &tpl) > 0;
+	*merged = u->old;
+	r = policy_merge(merged, filters, count, IN6_IS_ADDR_V4MAPPED(address));
+	if(r < 0)
+	{
+		free(u);
+		free(merged);
+		return r;
+	}
+	if(u->existing)
+	{
+		/* rewrite the rules of the existing mapping */
+		r = 0;
+		if(merged->count != u->old.count ||
+		   memcmp(merged->filters, u->old.filters,
+		          merged->count * sizeof(merged->filters[0])) != 0)
+			r = group_apply(merged, &u->old, &tpl);
+		free(merged);
+		if(r < 0)
+		{
+			free(u);
+			return -1;
+		}
+	}
+	else
+	{
+		/* the rules will be created with the mapping */
+		free(pending_policy);
+		pending_policy = merged;
+	}
+	*update = u;
+	return 0;
+}
+
+int
+pf_pcp_filter_finish(struct pcp_filter_update * update, int commit)
+{
+	int r = 0;
+	if(update == NULL)
+		return 0;
+	free(pending_policy);
+	pending_policy = NULL;
+#ifdef ENABLE_UPNPPINHOLE
+	if(update->existing && !commit && update->v6)
+	{
+		struct pf_pcp_policy cur;
+		char desc[PF_RULE_LABEL_SIZE], ifn[IFNAMSIZ];
+		unsigned int ts = 0;
+		memset(&cur, 0, sizeof(cur));
+		cur.address = update->old.address;
+		cur.port = update->old.port;
+		cur.protocol = update->old.protocol;
+		if(pf_pinhole_group_get(&cur.address, cur.port, cur.protocol, cur.filters,
+		                        PCP_FILTER_PEER_MAX, &cur.count,
+		                        desc, sizeof(desc), &ts, ifn) > 0)
+			r = group_apply6(&update->old, &cur, ifn, desc, ts);
+	}
+	else
+#endif
+	if(update->existing && !commit)
+	{
+		struct pf_pcp_policy cur;
+		struct pf_group_template tpl;
+		/* restore the previous policy */
+		if(read_group(&update->old.address, update->old.port,
+		              update->old.protocol, &cur, &tpl) > 0)
+			r = group_apply(&update->old, &cur, &tpl);
+	}
+	free(update);
+	return r;
+}
+
+int
+pf_pcp_filter_delete(const struct in6_addr * address, unsigned short port,
+                     unsigned char protocol)
+{
+	/* the policy is stored in the rules of the mapping */
+	UNUSED(address); UNUSED(port); UNUSED(protocol);
+	return 0;
+}
 
 #endif /* USE_PF */

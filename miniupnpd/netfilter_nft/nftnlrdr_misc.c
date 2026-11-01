@@ -28,6 +28,7 @@
 #include <errno.h>
 
 #include <linux/netfilter.h>
+#include <linux/netfilter/nf_conntrack_tuple_common.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nf_tables.h>
 #include <linux/ipv6.h>
@@ -41,6 +42,7 @@
 #include "../commonrdr.h"
 #include "nftnlrdr_misc.h"
 #include "../macros.h"
+#include "../pcp_filter.h"
 
 
 #ifdef DEBUG
@@ -81,6 +83,8 @@ int nft_ipv6_family = NFPROTO_INET;
 static struct mnl_socket *mnl_sock = NULL;
 static uint32_t mnl_portid = 0;
 static uint32_t mnl_seq = 0;
+/* Rule builders must not install a partially constructed PCP policy. */
+static int expr_alloc_failed;
 
 // FILTER
 struct rule_list head_filter = LIST_HEAD_INITIALIZER(head_filter);
@@ -773,6 +777,7 @@ expr_add_payload(struct nftnl_rule *r, uint32_t base, uint32_t dreg,
 
 	e = nftnl_expr_alloc("payload");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "payload");
 		return;
 	}
@@ -793,6 +798,7 @@ expr_add_cmp(struct nftnl_rule *r, uint32_t sreg, uint32_t op,
 
 	e = nftnl_expr_alloc("cmp");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "cmp");
 		return;
 	}
@@ -812,6 +818,7 @@ expr_add_counter(struct nftnl_rule *r)
 
 	e = nftnl_expr_alloc("counter");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "counter");
 		return;
 	}
@@ -827,6 +834,7 @@ expr_add_meta(struct nftnl_rule *r, uint32_t meta_key, uint32_t dreg)
 
 	e = nftnl_expr_alloc("meta");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "meta");
 		return;
 	}
@@ -866,6 +874,7 @@ expr_set_reg_val_u32(struct nftnl_rule *r, enum nft_registers dreg, uint32_t val
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "immediate");
 		return;
 	}
@@ -880,6 +889,7 @@ expr_set_reg_val_u16(struct nftnl_rule *r, enum nft_registers dreg, uint16_t val
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "immediate");
 		return;
 	}
@@ -894,6 +904,7 @@ expr_set_reg_verdict(struct nftnl_rule *r, uint32_t val)
 	struct nftnl_expr *e;
 	e = nftnl_expr_alloc("immediate");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "immediate");
 		return;
 	}
@@ -911,6 +922,7 @@ expr_add_nat(struct nftnl_rule *r, uint32_t t, uint32_t family,
 
 	e = nftnl_expr_alloc("nat");
 	if (e == NULL) {
+		expr_alloc_failed = 1;
 		log_error("nftnl_expr_alloc(\"%s\") FAILED", "nat");
 		return;
 	}
@@ -965,12 +977,12 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
 	                 offsetof(struct iphdr, daddr), sizeof(uint32_t));
-	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &ihost, sizeof(uint32_t));
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost, sizeof(uint32_t));
 
 	/* Source IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
 	                 offsetof(struct iphdr, saddr), sizeof(in_addr_t));
-	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost, sizeof(in_addr_t));
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &ihost, sizeof(in_addr_t));
 
 	/* Protocol */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
@@ -980,25 +992,25 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	/* Source and Destination Port of Protocol */
 	if (proto == IPPROTO_TCP) {
 		/* Destination Port */
-		dport = htons(iport);
+		dport = htons(rport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct tcphdr, dest), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 
 		/* Source Port */
-		sport = htons(rport);
+		sport = htons(iport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct tcphdr, source), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &sport, sizeof(uint16_t));
 	} else if (proto == IPPROTO_UDP) {
 		/* Destination Port */
-		dport = htons(iport);
+		dport = htons(rport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 
 		/* Source Port */
-		sport = htons(rport);
+		sport = htons(iport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct udphdr, source), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &sport, sizeof(uint16_t));
@@ -1302,9 +1314,16 @@ int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
 {
 	int result = -1;
+	uint16_t flags = NLM_F_CREATE | NLM_F_ACK;
 	struct nlmsghdr *nlh;
 	struct mnl_nlmsg_batch *batch;
 	char buf[MNL_SOCKET_BUFFER_SIZE*2];
+
+	/* PEER SNAT must run before a gateway's catch-all masquerade rule. */
+	if (chain_type != RULE_CHAIN_PEER)
+		flags |= NLM_F_APPEND;
+	if (cmd == NFT_MSG_NEWRULE && nftnl_rule_is_set(rule, NFTNL_RULE_HANDLE))
+		flags = NLM_F_REPLACE | NLM_F_ACK;
 
 	batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
 	if (batch != NULL)
@@ -1323,7 +1342,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
 		                                 cmd,
 		                                 nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
-		                                 NLM_F_APPEND|NLM_F_CREATE|NLM_F_ACK,
+		                                 flags,
 		                                 mnl_seq++);
 
 		nftnl_rule_nlmsg_build_payload(nlh, rule);
@@ -1524,4 +1543,462 @@ send_batch(struct mnl_nlmsg_batch *batch)
 	} while (ret >= 1 /*== MNL_CB_OK*/);
 	/* ret == MNL_CB_STOP */
 	return 0;
+}
+
+/* PCP FILTER runs before the normal forwarding chain.  An accept here only
+ * ends this base chain; the packet still has to pass the ordinary firewall.
+ * Each mapping has its own chain so replacing all its filters is one atomic
+ * netlink transaction, including the final deny rule. */
+struct pcp_filter_policy {
+	struct pcp_filter_policy *next;
+	struct in6_addr address;
+	unsigned short port;
+	unsigned char protocol;
+	char ifname[IFNAMSIZ];
+	unsigned int count;
+	int recovery_error;
+	struct pcp_filter filters[PCP_FILTER_PEER_MAX];
+};
+
+struct pcp_filter_update {
+	struct pcp_filter_policy *old;
+	struct pcp_filter_policy *replacement;
+};
+
+static struct pcp_filter_policy *pcp_filter_policies;
+
+static struct pcp_filter_policy **
+pcp_filter_find(const struct in6_addr *address, unsigned short port,
+                unsigned char protocol)
+{
+	struct pcp_filter_policy **p;
+	for (p = &pcp_filter_policies; *p; p = &(*p)->next) {
+		if ((*p)->port == port && (*p)->protocol == protocol &&
+		    memcmp(&(*p)->address, address, sizeof(*address)) == 0)
+			break;
+	}
+	return p;
+}
+
+static void
+pcp_filter_chain_name(const struct pcp_filter_policy *policy, char *name,
+                      size_t size)
+{
+	unsigned int i;
+	size_t pos;
+	pos = snprintf(name, size, "pcp-filter-");
+	for (i = 0; i < sizeof(policy->address.s6_addr); ++i)
+		pos += snprintf(name + pos, size - pos, "%02x", policy->address.s6_addr[i]);
+	snprintf(name + pos, size - pos, "-%04x-%02x", policy->port, policy->protocol);
+}
+
+static struct nftnl_rule *
+pcp_filter_rule(const struct pcp_filter_policy *policy,
+                const struct pcp_filter *filter, const char *chain)
+{
+	struct nftnl_rule *r;
+	struct nftnl_expr *bitwise, *ct;
+	uint8_t direction = IP_CT_DIR_ORIGINAL;
+	unsigned char mask[16], zero[16] = {0}, network[16];
+	const unsigned char *remote;
+	uint16_t port;
+	uint32_t len, offset, prefix;
+	int v4 = IN6_IS_ADDR_V4MAPPED(&policy->address);
+	unsigned int i;
+	unsigned char userdata[39] = {'P', 'C', 'P', 'F'};
+
+	expr_alloc_failed = 0;
+	r = nftnl_rule_alloc();
+	if (!r)
+		return NULL;
+	/* Retain policy independently of process memory so an additive refresh
+	 * after a daemon restart can reconstruct the existing peer set. */
+	if (filter) {
+		userdata[4] = filter->prefix;
+		userdata[5] = filter->port >> 8;
+		userdata[6] = filter->port & 255;
+		memcpy(userdata + 7, &filter->address, 16);
+	}
+	memcpy(userdata + 23, policy->ifname, IFNAMSIZ);
+	nftnl_rule_set_data(r, NFTNL_RULE_USERDATA, userdata, sizeof(userdata));
+	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, v4 ? nft_ipv4_family : nft_ipv6_family);
+	nftnl_rule_set_str(r, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set_str(r, NFTNL_RULE_CHAIN, chain);
+	expr_add_nfproto(r, v4 ? NFPROTO_IPV4 : NFPROTO_IPV6);
+	/* RFC 6887 section 16.1 prioritizes outbound mappings over inbound
+	 * MAP policy.  Replies to implicit or PEER outbound flows must not be
+	 * rejected by a FILTER attached to the same local address and port. */
+	ct = nftnl_expr_alloc("ct");
+	if (!ct) {
+		nftnl_rule_free(r);
+		return NULL;
+	}
+	nftnl_expr_set_u32(ct, NFTNL_EXPR_CT_KEY, NFT_CT_DIRECTION);
+	nftnl_expr_set_u32(ct, NFTNL_EXPR_CT_DREG, NFT_REG_1);
+	nftnl_rule_add_expr(r, ct);
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &direction, sizeof(direction));
+	/* Apply only to traffic arriving from the public interface, including
+	 * installations which do not enable USE_IFNAME_IN_RULES. */
+	expr_add_meta(r, NFT_META_IIFNAME, NFT_REG_1);
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, policy->ifname,
+	             strlen(policy->ifname) + 1);
+	expr_add_meta(r, NFT_META_L4PROTO, NFT_REG_1);
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &policy->protocol, 1);
+
+	len = v4 ? 4 : 16;
+	offset = v4 ? offsetof(struct iphdr, daddr) : offsetof(struct ipv6hdr, daddr);
+	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1, offset, len);
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ,
+	             policy->address.s6_addr + (v4 ? 12 : 0), len);
+	port = htons(policy->port);
+	expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1, 2, 2);
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &port, 2);
+
+	if (filter) {
+		prefix = filter->prefix - (v4 ? 96 : 0);
+		remote = filter->address.s6_addr + (v4 ? 12 : 0);
+		for (i = 0; i < len; ++i) {
+			mask[i] = prefix >= 8 ? 255 : prefix ? (255 << (8 - prefix)) : 0;
+			network[i] = remote[i] & mask[i];
+			prefix = prefix >= 8 ? prefix - 8 : 0;
+		}
+		offset = v4 ? offsetof(struct iphdr, saddr) : offsetof(struct ipv6hdr, saddr);
+		expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1, offset, len);
+		bitwise = nftnl_expr_alloc("bitwise");
+		if (!bitwise) {
+			nftnl_rule_free(r);
+			return NULL;
+		}
+		nftnl_expr_set_u32(bitwise, NFTNL_EXPR_BITWISE_SREG, NFT_REG_1);
+		nftnl_expr_set_u32(bitwise, NFTNL_EXPR_BITWISE_DREG, NFT_REG_1);
+		nftnl_expr_set_u32(bitwise, NFTNL_EXPR_BITWISE_LEN, len);
+		nftnl_expr_set(bitwise, NFTNL_EXPR_BITWISE_MASK, mask, len);
+		nftnl_expr_set(bitwise, NFTNL_EXPR_BITWISE_XOR, zero, len);
+		nftnl_rule_add_expr(r, bitwise);
+		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, network, len);
+		if (filter->port) {
+			port = htons(filter->port);
+			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1, 0, 2);
+			expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &port, 2);
+		}
+	}
+	expr_set_reg_verdict(r, filter ? NF_ACCEPT : NF_DROP);
+	if (expr_alloc_failed) {
+		nftnl_rule_free(r);
+		return NULL;
+	}
+	return r;
+}
+
+/* Flush and rebuild a mapping's private base chain in a single transaction.
+ * Creating an existing chain is idempotent.  A zero-filter policy removes
+ * the chain, so unfiltered MAPs have no additional forwarding hooks. */
+static int
+pcp_filter_install(const struct pcp_filter_policy *policy)
+{
+	struct nftnl_chain *chain;
+	struct nftnl_rule *rules[PCP_FILTER_PEER_MAX + 2];
+	struct mnl_nlmsg_batch *batch;
+	struct nlmsghdr *nlh;
+	char chain_name[64];
+	char *buf;
+	unsigned int i, nrules = 1;
+	uint16_t family;
+	int result = -1;
+	const size_t batch_size = 1024 * 1024;
+
+	memset(rules, 0, sizeof(rules));
+	family = IN6_IS_ADDR_V4MAPPED(&policy->address) ? nft_ipv4_family : nft_ipv6_family;
+	pcp_filter_chain_name(policy, chain_name, sizeof(chain_name));
+	chain = nftnl_chain_alloc();
+	buf = calloc(2, batch_size);
+	if (!chain || !buf)
+		goto out;
+	nftnl_chain_set_u32(chain, NFTNL_CHAIN_FAMILY, family);
+	nftnl_chain_set_str(chain, NFTNL_CHAIN_TABLE, nft_table);
+	nftnl_chain_set_str(chain, NFTNL_CHAIN_NAME, chain_name);
+	nftnl_chain_set_str(chain, NFTNL_CHAIN_TYPE, "filter");
+	nftnl_chain_set_u32(chain, NFTNL_CHAIN_HOOKNUM, NF_INET_FORWARD);
+	nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, -1);
+
+	/* DELRULE without a handle flushes only this mapping's chain. */
+	rules[0] = nftnl_rule_alloc();
+	if (!rules[0])
+		goto out;
+	nftnl_rule_set_u32(rules[0], NFTNL_RULE_FAMILY, family);
+	nftnl_rule_set_str(rules[0], NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set_str(rules[0], NFTNL_RULE_CHAIN, chain_name);
+	if (policy->count) {
+		for (i = 0; i <= policy->count; ++i) {
+			rules[nrules] = pcp_filter_rule(policy,
+			                    i < policy->count ? &policy->filters[i] : NULL,
+			                    chain_name);
+			if (!rules[nrules++])
+				goto out;
+		}
+	}
+	batch = start_batch(buf, batch_size);
+	if (!batch)
+		goto out;
+	nlh = nftnl_chain_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+	                                 NFT_MSG_NEWCHAIN, family, NLM_F_CREATE,
+	                                 mnl_seq++);
+	nftnl_chain_nlmsg_build_payload(nlh, chain);
+	mnl_nlmsg_batch_next(batch);
+	for (i = 0; i < nrules; ++i) {
+		nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+		                              i ? NFT_MSG_NEWRULE : NFT_MSG_DELRULE,
+		                              family, i ? NLM_F_CREATE | NLM_F_APPEND : 0,
+		                              mnl_seq++);
+		nftnl_rule_nlmsg_build_payload(nlh, rules[i]);
+		if (i + 1 < nrules || !policy->count)
+			mnl_nlmsg_batch_next(batch);
+	}
+	if (!policy->count) {
+		nlh = nftnl_chain_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+		                                 NFT_MSG_DELCHAIN, family, 0, mnl_seq++);
+		nftnl_chain_nlmsg_build_payload(nlh, chain);
+	}
+	/* One acknowledgement after the complete transaction avoids leaving
+	 * multiple ACKs pending on the backend's shared netlink socket. */
+	nlh->nlmsg_flags |= NLM_F_ACK;
+	result = send_batch(batch);
+out:
+	for (i = 0; i < nrules; ++i)
+		if (rules[i])
+			nftnl_rule_free(rules[i]);
+	if (chain)
+		nftnl_chain_free(chain);
+	free(buf);
+	return result;
+}
+
+static int
+pcp_filter_recover_cb(const struct nlmsghdr *nlh, void *data)
+{
+	struct pcp_filter_policy *policy = data;
+	struct nftnl_rule *rule;
+	const unsigned char *userdata;
+	uint32_t len;
+	struct pcp_filter *filter;
+	struct in6_addr remote;
+	int v4 = IN6_IS_ADDR_V4MAPPED(&policy->address);
+	rule = nftnl_rule_alloc();
+	if (!rule) {
+		policy->recovery_error = 1;
+		return MNL_CB_OK;
+	}
+	if (nftnl_rule_nlmsg_parse(nlh, rule) < 0)
+		goto invalid;
+	userdata = nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA, &len);
+	if (!userdata || len != 39 || memcmp(userdata, "PCPF", 4) != 0 ||
+	    userdata[4] > 128 || (userdata[4] && policy->count == PCP_FILTER_PEER_MAX) ||
+	    !userdata[23] || !memchr(userdata + 23, '\0', IFNAMSIZ))
+		goto invalid;
+	if (policy->ifname[0] && memcmp(policy->ifname, userdata + 23, IFNAMSIZ) != 0)
+		goto invalid;
+	memcpy(&remote, userdata + 7, sizeof(remote));
+	if (userdata[4] &&
+	    ((v4 != IN6_IS_ADDR_V4MAPPED(&remote)) || (v4 && userdata[4] < 96)))
+		goto invalid;
+	memcpy(policy->ifname, userdata + 23, IFNAMSIZ);
+	if (userdata[4]) {
+		filter = &policy->filters[policy->count++];
+		filter->prefix = userdata[4];
+		filter->port = ((unsigned short)userdata[5] << 8) | userdata[6];
+		filter->address = remote;
+	}
+	nftnl_rule_free(rule);
+	return MNL_CB_OK;
+invalid:
+	/* Always drain a multipart dump, even after invalid data or OOM, so
+	 * subsequent requests can safely reuse the shared netlink socket. */
+	policy->recovery_error = 1;
+	nftnl_rule_free(rule);
+	return MNL_CB_OK;
+}
+
+/* Kernel rules survive a daemon restart.  Recover only our private,
+ * self-describing rules, never infer prefix masks from firewall expressions. */
+static int
+pcp_filter_recover(const struct in6_addr *address, unsigned short port,
+                   unsigned char protocol)
+{
+	struct pcp_filter_policy *policy;
+	struct nftnl_rule *rule;
+	struct nlmsghdr *nlh;
+	char buf[MNL_SOCKET_BUFFER_SIZE], chain[64];
+	ssize_t n;
+	int result;
+	uint16_t family = IN6_IS_ADDR_V4MAPPED(address) ? nft_ipv4_family : nft_ipv6_family;
+	if (*pcp_filter_find(address, port, protocol))
+		return 0;
+	policy = calloc(1, sizeof(*policy));
+	rule = nftnl_rule_alloc();
+	if (!policy || !rule || !mnl_sock) {
+		free(policy);
+		if (rule)
+			nftnl_rule_free(rule);
+		return -1;
+	}
+	policy->address = *address;
+	policy->port = port;
+	policy->protocol = protocol;
+	pcp_filter_chain_name(policy, chain, sizeof(chain));
+	mnl_seq = time(NULL);
+	nlh = nftnl_rule_nlmsg_build_hdr(buf, NFT_MSG_GETRULE, family, NLM_F_DUMP, mnl_seq);
+	nftnl_rule_set_str(rule, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set_str(rule, NFTNL_RULE_CHAIN, chain);
+	nftnl_rule_nlmsg_build_payload(nlh, rule);
+	nftnl_rule_free(rule);
+	result = mnl_socket_sendto(mnl_sock, nlh, nlh->nlmsg_len);
+	if (result < 0)
+		goto fail;
+	do {
+		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+		if (n <= 0)
+			goto fail;
+		result = mnl_cb_run(buf, n, mnl_seq, mnl_portid, pcp_filter_recover_cb, policy);
+		if (result < 0) {
+			if (errno == ENOENT) {
+				free(policy);
+				return 0;
+			}
+			goto fail;
+		}
+	} while (result > 0);
+	if (policy->recovery_error)
+		goto fail;
+	if (policy->count) {
+		policy->next = pcp_filter_policies;
+		pcp_filter_policies = policy;
+	} else {
+		free(policy);
+	}
+	return 0;
+fail:
+	free(policy);
+	return -1;
+}
+
+int
+nft_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
+                     unsigned char protocol, const char *ifname,
+                     const struct pcp_filter *filters, unsigned int count,
+                     struct pcp_filter_update **update)
+{
+	struct pcp_filter_update *u;
+	struct pcp_filter_policy *p;
+	struct pcp_filter f;
+	unsigned int i, j, bits;
+	int v4 = IN6_IS_ADDR_V4MAPPED(address);
+
+	*update = NULL;
+	if (!ifname || !*ifname || strlen(ifname) >= IFNAMSIZ ||
+	    pcp_filter_recover(address, port, protocol) < 0)
+		return -1;
+	u = calloc(1, sizeof(*u));
+	p = calloc(1, sizeof(*p));
+	if (!u || !p) {
+		free(u);
+		free(p);
+		return -1;
+	}
+	u->old = *pcp_filter_find(address, port, protocol);
+	u->replacement = p;
+	if (u->old)
+		*p = *u->old;
+	p->next = NULL;
+	p->address = *address;
+	p->port = port;
+	p->protocol = protocol;
+	strcpy(p->ifname, ifname);
+	for (i = 0; i < count; ++i) {
+		if (!filters[i].prefix) {
+			p->count = 0;
+			continue;
+		}
+		f = filters[i];
+		/* Canonicalize unused suffix bits before deduplicating peers. */
+		bits = f.prefix;
+		for (j = 0; j < sizeof(f.address.s6_addr); ++j) {
+			f.address.s6_addr[j] &= bits >= 8 ? 255 : bits ? 255 << (8 - bits) : 0;
+			bits = bits >= 8 ? bits - 8 : 0;
+		}
+		for (j = 0; j < p->count; ++j) {
+			if (p->filters[j].prefix == f.prefix && p->filters[j].port == f.port &&
+			    memcmp(&p->filters[j].address, &f.address, sizeof(f.address)) == 0)
+				break;
+		}
+		if (j != p->count)
+			continue;
+		if (p->count == PCP_FILTER_PEER_MAX) {
+			free(p);
+			free(u);
+			return -2;
+		}
+		/* Address-family validation is done before any policy is changed. */
+		if (v4 != IN6_IS_ADDR_V4MAPPED(&f.address)) {
+			free(p);
+			free(u);
+			return -1;
+		}
+		p->filters[p->count++] = f;
+	}
+	if (pcp_filter_install(p) < 0) {
+		free(p);
+		free(u);
+		return -1;
+	}
+	*update = u;
+	return 0;
+}
+
+int
+nft_pcp_filter_finish(struct pcp_filter_update *update, int commit)
+{
+	struct pcp_filter_policy **p;
+	int result = 0;
+	if (!update)
+		return 0;
+	p = pcp_filter_find(&update->replacement->address,
+	                    update->replacement->port, update->replacement->protocol);
+	if (commit) {
+		update->replacement->next = update->old ? update->old->next : *p;
+		*p = update->replacement;
+		free(update->old);
+	} else {
+		if (update->old) {
+			result = pcp_filter_install(update->old);
+		} else {
+			update->replacement->count = 0;
+			result = pcp_filter_install(update->replacement);
+		}
+		free(update->replacement);
+	}
+	free(update);
+	return result;
+}
+
+int
+nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
+                      unsigned char protocol)
+{
+	struct pcp_filter_policy **p, *old;
+	struct pcp_filter_policy empty;
+	int result;
+	if (pcp_filter_recover(address, port, protocol) < 0)
+		return -1;
+	p = pcp_filter_find(address, port, protocol);
+	if (!*p)
+		return 0;
+	old = *p;
+	empty = *old;
+	empty.count = 0;
+	result = pcp_filter_install(&empty);
+	if (result >= 0) {
+		*p = old->next;
+		free(old);
+	}
+	return result;
 }

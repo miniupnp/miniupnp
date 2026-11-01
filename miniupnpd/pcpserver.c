@@ -61,6 +61,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -83,6 +84,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnputils.h"
 #include "portinuse.h"
 #include "pcp_msg_struct.h"
+#include "pcp_filter.h"
 #ifdef ENABLE_UPNPPINHOLE
 #include "upnppinhole.h"
 #endif /* ENABLE_UPNPPINHOLE */
@@ -92,8 +94,13 @@ POSSIBILITY OF SUCH DAMAGE.
 /* TODO make this platform independent */
 #ifdef USE_NETFILTER
 #include "netfilter/iptcrdr.h"
+#ifdef USE_NFTABLES
+#include "netfilter_nft/nftnlrdr.h"
+#endif
+#elif defined(USE_PF)
+#include "pf/obsdrdr.h"
 #else
-#error "PCP Peer is only supported with NETFILTER"
+#error "PCP Peer is only supported with NETFILTER or PF"
 #endif /* USE_NETFILTER */
 #endif /* PCP_PEER */
 
@@ -125,6 +132,7 @@ typedef struct pcp_info {
 #ifdef PCP_PEER
 	uint16_t    peer_port;
 	const struct in6_addr    *peer_ip; /* Destination IP in network order */
+	struct in6_addr peer_ext_ip; /* Actual tuple adopted from conntrack. */
 #endif /* PCP_PEER */
 
 #ifdef PCP_SADSCP
@@ -150,6 +158,8 @@ typedef struct pcp_info {
 	const struct in6_addr *mapped_ip;
 	char mapped_str[INET6_ADDRSTRLEN];
 	int pfailure_present;
+	unsigned int filter_count;
+	struct pcp_filter filters[PCP_FILTER_REQUEST_MAX];
 	struct in6_addr sender_ip;
 	int is_fw; /* is this firewall operation? if not, nat. */
 	char desc[64];
@@ -475,7 +485,15 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 	case PCP_OPTION_PREF_FAIL:
 
-		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE) {
+		/* RFC 6887 section 12.1 forbids PREFER_FAILURE on PEER,
+		 * including deletion requests. */
+		if (pcp_msg_info->opcode == PCP_OPCODE_PEER) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
+			return 0;
+		}
+
+		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE ||
+		    pcp_msg_info->lifetime == 0) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
@@ -495,8 +513,16 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 		break;
 
 	case PCP_OPTION_FILTER:
-		/* TODO fully implement filter */
-		if (option_length != PCP_FILTER_OPTION_SIZE) {
+		if (option_length != PCP_FILTER_OPTION_SIZE ||
+		    pcp_msg_info->lifetime == 0) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+			return 0;
+		}
+		/* RFC 6887 section 13.3: IPv4 prefixes include the 96-bit
+		 * IPv4-mapped prefix; IPv6 prefixes range from 0 to 128. */
+		if (pcp_buf[5] > 128 ||
+		    (memcmp(pcp_buf + 8, "\0\0\0\0\0\0\0\0\0\0\xff\xff", 12) == 0 &&
+		     pcp_buf[5] < 96)) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
@@ -508,6 +534,22 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 			return 0;
 		}
+#ifndef PCP_FILTER_SUPPORTED
+		/* Never acknowledge a filter that the firewall cannot enforce. */
+		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
+		return 0;
+#else
+		if (pcp_msg_info->filter_count == PCP_FILTER_REQUEST_MAX) {
+			pcp_msg_info->result_code = PCP_ERR_EXCESSIVE_REMOTE_PEERS;
+			return 0;
+		}
+		{
+			struct pcp_filter *filter = &pcp_msg_info->filters[pcp_msg_info->filter_count++];
+			filter->prefix = pcp_buf[5];
+			filter->port = READNU16(pcp_buf + 6);
+			memcpy(&filter->address, pcp_buf + 8, sizeof(filter->address));
+		}
+#endif
 		break;
 
 #ifdef PCP_FLOWP
@@ -698,16 +740,21 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
 	struct sockaddr_storage extip;
-	struct sockaddr_storage ret_extip;
+	struct sockaddr_storage ret_extip = {0};
 
 	uint8_t  proto = pcp_msg_info->protocol;
 
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
+	const uint16_t suggested_eport = eport;  /* RFC 6887 section 12.1 */
 
 	char peerip_s[INET6_ADDRSTRLEN], extip_s[INET6_ADDRSTRLEN];
 	time_t timestamp = upnp_time() + pcp_msg_info->lifetime;
 	int r;
 	const char * ext_if = ext_if_name;
+	int index, proto_old;
+	unsigned short eport_old, iport_old, rport_old;
+	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
@@ -719,6 +766,29 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
 
+	/* RFC 6887 sections 12.3 and 15.1: authenticate the full PEER
+	 * mapping key before refreshing it or adding any rules. */
+	for (index = 0;
+	     get_peer_rule_by_index(index, NULL, &eport_old,
+	                            iaddr_old, sizeof(iaddr_old), &iport_old,
+	                            &proto_old, desc_old, sizeof(desc_old),
+	                            rhost_old, sizeof(rhost_old), &rport_old,
+	                            NULL, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
+		    rport_old == pcp_msg_info->peer_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0 &&
+		    strcmp(rhost_old, peerip_s) == 0) {
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0)
+				return PCP_ERR_NOT_AUTHORIZED;
+			if (pcp_msg_info->pfailure_present &&
+			    suggested_eport != 0 && suggested_eport != eport_old)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			eport = eport_old;
+			break;
+		}
+	}
+
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
 	if (get_nat_ext_addr( (struct sockaddr*)&intip, (struct sockaddr*)&peerip,
@@ -726,15 +796,30 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		if (ret_extip.ss_family == AF_INET) {
 			struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext4->sin_port);
+			if (pcp_msg_info->pfailure_present &&
+			    suggested_eport != 0 && suggested_eport != ret_eport)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = ret_eport;
+			memset(&pcp_msg_info->peer_ext_ip, 0, sizeof(pcp_msg_info->peer_ext_ip));
+			pcp_msg_info->peer_ext_ip.s6_addr[10] = 0xff;
+			pcp_msg_info->peer_ext_ip.s6_addr[11] = 0xff;
+			memcpy(pcp_msg_info->peer_ext_ip.s6_addr + 12,
+			       &ret_ext4->sin_addr, sizeof(ret_ext4->sin_addr));
+			pcp_msg_info->ext_ip = &pcp_msg_info->peer_ext_ip;
 		} else if (ret_extip.ss_family == AF_INET6) {
 			struct sockaddr_in6* ret_ext6 = (struct sockaddr_in6*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext6->sin6_port);
+			if (pcp_msg_info->pfailure_present &&
+			    suggested_eport != 0 && suggested_eport != ret_eport)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			eport = ret_eport;
+			pcp_msg_info->peer_ext_ip = ret_ext6->sin6_addr;
+			pcp_msg_info->ext_ip = &pcp_msg_info->peer_ext_ip;
 		} else {
 			return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 		}
 	}
+	inet_n46top(pcp_msg_info->ext_ip, extip_s, sizeof(extip_s));
 	/* Create Peer Mapping */
 	if (eport == 0) {
 		eport = pcp_msg_info->int_port;
@@ -789,9 +874,53 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 				    pcp_msg_info->desc,
 				    timestamp);
 	if (r < 0)
-		return PCP_ERR_NO_RESOURCES;
+		return (pcp_msg_info->pfailure_present && suggested_eport != 0)
+		       ? PCP_ERR_CANNOT_PROVIDE_EXTERNAL
+		                            : PCP_ERR_NO_RESOURCES;
 	pcp_msg_info->ext_port = eport;
+	if (!nextruletoclean_timestamp || timestamp < nextruletoclean_timestamp)
+		nextruletoclean_timestamp = timestamp;
 	return PCP_SUCCESS;
+}
+
+/* IPv6 PEER: routed, no NAT66.  The internal endpoint keeps its address
+ * and port, so open a pinhole limited to the requested remote endpoint. */
+static int CreatePCPPeer_FW(pcp_info_t *pcp_msg_info, const char *peerip_s)
+{
+#ifdef ENABLE_UPNPPINHOLE
+	int uid, r;
+	char desc[64];
+	unsigned int timestamp = 0;
+
+	if (pcp_msg_info->pfailure_present && pcp_msg_info->ext_port != 0 &&
+	    pcp_msg_info->ext_port != pcp_msg_info->int_port)
+		return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+	uid = upnp_find_inboundpinhole(peerip_s, pcp_msg_info->peer_port,
+	                               pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+	                               pcp_msg_info->protocol, desc, sizeof(desc),
+	                               &timestamp);
+	if (uid >= 0) {
+		if (strcmp(desc, pcp_msg_info->desc) != 0) {
+			if (timestamp > upnp_time())
+				pcp_msg_info->error_lifetime = timestamp - upnp_time();
+			return PCP_ERR_NOT_AUTHORIZED;
+		}
+		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
+	} else {
+		r = upnp_add_inboundpinhole(peerip_s, pcp_msg_info->peer_port,
+		                            pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		                            pcp_msg_info->protocol, pcp_msg_info->desc,
+		                            pcp_msg_info->lifetime, &uid);
+	}
+	if (r < 0)
+		return PCP_ERR_NO_RESOURCES;
+	pcp_msg_info->ext_port = pcp_msg_info->int_port;
+	return PCP_SUCCESS;
+#else
+	UNUSED(peerip_s);
+	UNUSED(pcp_msg_info);
+	return PCP_ERR_UNSUPP_OPCODE;
+#endif
 }
 
 static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
@@ -805,21 +934,7 @@ static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 	}
 
 	if (pcp_msg_info->is_fw) {
-#if 0
-		/* Someday, something like this is available.. and we're ready! */
-#ifdef ENABLE_UPNPPINHOLE
-		pcp_msg_info->ext_port = pcp_msg_info->int_port;
-		r = upnp_add_outbound_pinhole(peerip_s,
-					      pcp_msg_info->peer_port,
-					      pcp_msg_info->mapped_str,
-					      pcp_msg_info->int_port,
-					      pcp_msg_info->protocol,
-					      pcp_msg_info->desc,
-					      pcp_msg_info->lifetime, NULL);
-#endif /* ENABLE_UPNPPINHOLE */
-#else
-		r = PCP_ERR_UNSUPP_OPCODE;
-#endif /* 0 */
+		r = CreatePCPPeer_FW(pcp_msg_info, peerip_s);
 	} else {
 		r = CreatePCPPeer_NAT(pcp_msg_info);
 	}
@@ -857,7 +972,28 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 #endif /* 0 */
 
 	if (pcp_msg_info->is_fw) {
+		/* Zero lifetime queries an IPv6 PEER pinhole; it never deletes. */
+#ifdef ENABLE_UPNPPINHOLE
+		char pdesc[64], phost[INET6_ADDRSTRLEN];
+		unsigned int pts = 0;
+		inet_n46top(pcp_msg_info->peer_ip, phost, sizeof(phost));
+		if (upnp_find_inboundpinhole(phost, pcp_msg_info->peer_port,
+		        pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		        pcp_msg_info->protocol, pdesc, sizeof(pdesc), &pts) < 0) {
+			pcp_msg_info->result_code = PCP_SUCCESS;
+			return;
+		}
+		if (strcmp(pdesc, pcp_msg_info->desc) != 0) {
+			pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+			return;
+		}
+		pcp_msg_info->ext_port = pcp_msg_info->int_port;
+		if (pts > upnp_time())
+			pcp_msg_info->lifetime = pts - upnp_time();
+		pcp_msg_info->result_code = PCP_SUCCESS;
+#else
 		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
+#endif
 		return;
 	}
 
@@ -887,10 +1023,19 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		if((0 == strcmp(iaddr2, pcp_msg_info->mapped_str))
 		   && (0 == strcmp(rhost2, rhost))
 		   && (proto2==proto)
-		   && 0 == strcmp(desc, pcp_msg_info->desc)
 		   && (iport2==iport) && (rport2==rport)) {
-			if (!pcp_msg_info->is_fw)
+			/* Authenticate the full mapping key before deleting any rules. */
+			if (strcmp(desc, pcp_msg_info->desc) != 0) {
+				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+				return;
+			}
+			if (!pcp_msg_info->is_fw) {
+#if defined(USE_NFTABLES) || defined(USE_PF)
+				r = delete_peer_rule(iaddr2, iport2, rhost2, rport2, proto2);
+#else
 				r = _upnp_delete_redir(eport2, proto2);
+#endif
+			}
 #if 0
 			else
 				r = upnp_delete_outboundpinhole(uid);
@@ -914,10 +1059,42 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
+	int index, proto_old;
 	char iaddr_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
+	unsigned short eport_old;
+	unsigned int timestamp_old;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+
+	/* RFC 6887 section 11.3: the mapping key uses the internal
+	 * address, protocol and port, not the suggested external port. */
+	for (index = 0;
+	     get_redirect_rule_by_index(index, NULL, &eport_old,
+	                               iaddr_old, sizeof(iaddr_old), &iport_old,
+	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
+	                               &timestamp_old, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == pcp_msg_info->protocol &&
+		    iport_old == pcp_msg_info->int_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
+			/* Check ownership before changing any state, even when the
+			 * client suggests a different external port. */
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
+				if (timestamp_old > upnp_time())
+					pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+			pcp_msg_info->ext_port = eport_old;
+			/* Preserve the existing redirect and its filters on renewal. */
+			r = update_portmapping_desc_timestamp(ext_if_name, eport_old,
+			                pcp_msg_info->protocol, pcp_msg_info->desc, timestamp);
+			if (r >= 0 && (!nextruletoclean_timestamp || timestamp < nextruletoclean_timestamp))
+				nextruletoclean_timestamp = timestamp;
+			return r < 0 ? PCP_ERR_NO_RESOURCES : PCP_SUCCESS;
+		}
+	}
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -937,6 +1114,14 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				return PCP_ERR_NOT_AUTHORIZED;
 			/* at least one eport allowed (but none available) */
 			return PCP_ERR_NO_RESOURCES;
+		}
+		/* RFC 6887 section 11.3 reserves these UDP ports for PCP. */
+		if (pcp_msg_info->protocol == IPPROTO_UDP &&
+		    (pcp_msg_info->ext_port == 5350 || pcp_msg_info->ext_port == 5351)) {
+			if (pcp_msg_info->pfailure_present)
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			pcp_msg_info->ext_port++;
+			continue;
 		}
 		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
 		     (!check_upnp_rule_against_permissions(upnppermlist,
@@ -1018,6 +1203,11 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	int r;
 	char desc[64];
 	unsigned int timestamp = 0;
+	/* A firewall pinhole cannot translate the internal port.  RFC 6887
+	 * section 13.2 forbids substituting it when PREFER_FAILURE is set. */
+	if (pcp_msg_info->pfailure_present &&
+	    pcp_msg_info->ext_port != pcp_msg_info->int_port)
+		return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 	/* first check if pinhole already exists */
 	uid = upnp_find_inboundpinhole(NULL, 0,
 					pcp_msg_info->mapped_str,
@@ -1093,14 +1283,93 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
  * expresses the IPv6 address from its perspective.     */
 
 /* TODO: Support more than basic NAT44 / IPv6 firewall cases. */
+#ifdef PCP_FILTER_SUPPORTED
+/* FILTER changes must not precede mapping ownership checks.  The MAP paths
+ * repeat these checks as part of their normal create/refresh operation. */
+static int CheckPCPFilterOwner(pcp_info_t *info, int *exists)
+{
+	char desc[64], address[INET6_ADDRSTRLEN];
+	unsigned short port, external;
+	unsigned int timestamp;
+	int protocol, index;
+	*exists = 0;
+	if (info->is_fw) {
+#ifdef ENABLE_UPNPPINHOLE
+		if (upnp_find_inboundpinhole(NULL, 0, info->mapped_str, info->int_port,
+		                           info->protocol, desc, sizeof(desc), &timestamp) >= 0) {
+			*exists = 1;
+			if (strcmp(desc, info->desc) != 0) {
+				if (timestamp > upnp_time())
+					info->error_lifetime = timestamp - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+		}
+#endif
+	} else {
+		for (index = 0;
+		     get_redirect_rule_by_index(index, NULL, &external,
+		         address, sizeof(address), &port, &protocol, desc, sizeof(desc),
+		         NULL, 0, &timestamp, NULL, NULL) >= 0; ++index) {
+			if (port == info->int_port && protocol == info->protocol &&
+			    strcmp(address, info->mapped_str) == 0) {
+				*exists = 1;
+				if (strcmp(desc, info->desc) != 0) {
+					if (timestamp > upnp_time())
+						info->error_lifetime = timestamp - upnp_time();
+					return PCP_ERR_NOT_AUTHORIZED;
+				}
+				break;
+			}
+		}
+	}
+	return PCP_SUCCESS;
+}
+#endif
+
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
 	int r;
+#ifdef PCP_FILTER_SUPPORTED
+	struct pcp_filter_update *update = NULL;
+	int exists;
+	r = CheckPCPFilterOwner(pcp_msg_info, &exists);
+	if (r != PCP_SUCCESS) {
+		pcp_msg_info->result_code = r;
+		return;
+	}
+	/* A previous failed deletion or daemon restart may have left a guard
+	 * after its mapping disappeared.  New mappings start without filters. */
+	if (!exists && pcp_filter_delete(pcp_msg_info->mapped_ip,
+	            pcp_msg_info->int_port, pcp_msg_info->protocol) < 0) {
+		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+		return;
+	}
+	if (pcp_msg_info->filter_count) {
+		const char *ifname = ext_if_name;
+#ifdef ENABLE_IPV6
+		if (pcp_msg_info->is_fw && ext_if_name6 && *ext_if_name6)
+			ifname = ext_if_name6;
+#endif
+		r = pcp_filter_begin(pcp_msg_info->mapped_ip, pcp_msg_info->int_port,
+		                         pcp_msg_info->protocol, ifname,
+		                         pcp_msg_info->filters, pcp_msg_info->filter_count,
+		                         &update);
+		if (r < 0) {
+			pcp_msg_info->result_code = r == -2 ? PCP_ERR_EXCESSIVE_REMOTE_PEERS :
+			                            r == -3 ? PCP_ERR_UNSUPP_OPTION : PCP_ERR_NO_RESOURCES;
+			return;
+		}
+	}
+#endif
 
 	if (pcp_msg_info->is_fw)
 		r = CreatePCPMap_FW(pcp_msg_info);
 	else
 		r = CreatePCPMap_NAT(pcp_msg_info);
+#ifdef PCP_FILTER_SUPPORTED
+	if (pcp_filter_finish(update, r == PCP_SUCCESS) < 0)
+		r = PCP_ERR_NO_RESOURCES;
+#endif
 	pcp_msg_info->result_code = r;
 	syslog(r == PCP_SUCCESS ? LOG_INFO : LOG_ERR,
 	      "PCP MAP: %s mapping %s %hu->%s:%hu '%s'",
@@ -1117,6 +1386,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	uint16_t iport = pcp_msg_info->int_port;  /* private port */
 	uint8_t  proto = pcp_msg_info->protocol;
 	int r=-1;
+	int found = 0;
 	/* remove the mapping */
 	/* remove all the mappings for this client */
 	unsigned short eport2, iport2;
@@ -1141,6 +1411,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
 			   && (proto2==proto)
 			   && ((iport2==iport) || (iport==0))) {
+				found = 1;
 				if(0 != strcmp(desc, pcp_msg_info->desc)) {
 					/* nonce does not match */
 					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
@@ -1153,6 +1424,9 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				break;
 			}
 		}
+		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */
+		if (!found)
+			return;
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
@@ -1237,16 +1511,21 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 	}
 
 	if (pcp_msg_info->pfailure_present) {
-		if ( (IN6_IS_ADDR_UNSPECIFIED(pcp_msg_info->ext_ip) ||
-		      ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->ext_ip)) &&
-		       (((uint32_t*)pcp_msg_info->ext_ip->s6_addr)[3] == 0))) &&
-		     (pcp_msg_info->ext_port == 0)
-		   )
+		/* RFC 6887 section 13.2 requires a nonzero suggested port,
+		 * even when a suggested external address is supplied. */
+		if (pcp_msg_info->ext_port == 0)
 		{
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
 	}
+
+	/* RFC 6887 section 12.1: PREFER_FAILURE semantics are implied for PEER.
+	 * The option itself is rejected in parsePCPOptions(), and a zero
+	 * suggested port stays valid, so set the flag only after the checks
+	 * above. */
+	if (pcp_msg_info->opcode == PCP_OPCODE_PEER)
+		pcp_msg_info->pfailure_present = 1;
 
 	if (CheckExternalAddress(pcp_msg_info)) {
 		return 0;
@@ -1381,8 +1660,16 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 		 * http://tools.ietf.org/html/rfc6887 */
 		switch (pcp_msg_info->opcode) {
 		case PCP_OPCODE_ANNOUNCE:
-			/* should check PCP Client's IP Address in request */
-			/* see http://tools.ietf.org/html/rfc6887#section-14.1 */
+			/* Ignore Requested Lifetime (RFC 6887 section 14.1.1). */
+			pcp_msg_info->lifetime = 0;
+			/* RFC 6887 section 14.1: the client address must match
+			 * the packet source address. */
+			if (memcmp(pcp_msg_info->int_ip, &pcp_msg_info->sender_ip,
+			           sizeof(pcp_msg_info->sender_ip)) != 0) {
+				pcp_msg_info->result_code = PCP_ERR_ADDRESS_MISMATCH;
+				break;
+			}
+			parsePCPOptions(req, remainingSize, pcp_msg_info);
 			break;
 		case PCP_OPCODE_MAP:
 
@@ -1535,6 +1822,11 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 
 	if (response[1] == 0x81) { /* MAP response */
+		if (pcp_msg_info->is_map_op) {
+			/* Reserved bytes follow Protocol in either MAP version. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+		}
 		if (response[0] == 1) {	/* version */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
@@ -1550,6 +1842,13 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 #ifdef PCP_PEER
 	else if (response[1] == 0x82) { /* PEER response */
+		if (pcp_msg_info->is_peer_op) {
+			/* Clear the reserved fields in a complete PEER body. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 38 : 26), 0, 2);
+		}
 		if (response[0] == 1) {
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
@@ -1612,6 +1911,11 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		/* discarding PCP responses silently */
 		return 0;
 	}
+	/* Preserve the request header even when the packet is too short for
+	 * processPCPRequest() to parse the common PCP header. Error responses for
+	 * malformed requests still need to identify the request's version/opcode. */
+	pcp_msg_info.version = buff[0];
+	pcp_msg_info.opcode = buff[1] & 0x7f;
 
 	/* If we're in allow third party-mode, we probably don't care
 	 * about locality either. Let's hope firewall is ok. */
@@ -1628,8 +1932,15 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 		createPCPResponse(buff, &pcp_msg_info);
 
-		if(len < PCP_MIN_LEN)
+		/* ANNOUNCE has no opcode payload or response options.  Keep
+		 * the request payload only when returning an error (section 8.2). */
+		if(pcp_msg_info.opcode == PCP_OPCODE_ANNOUNCE &&
+		   pcp_msg_info.result_code == PCP_SUCCESS)
+			len = PCP_COMMON_RESPONSE_SIZE;
+		else if(len < PCP_MIN_LEN)
 			len = PCP_MIN_LEN;
+		else if(len > PCP_MAX_LEN)
+			len = PCP_MAX_LEN;
 		else
 			len = (len + 3) & ~3;	/* round up resp. length to multiple of 4 */
 		len = sendto_or_schedule2(s, buff, len, 0, senderaddr,
@@ -1716,6 +2027,7 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	unsigned char buff[PCP_MIN_LEN];
 	pcp_info_t info;
 	ssize_t len;
+	struct lan_addr_s * lan_addr;
 	struct sockaddr_in addr;
 #ifdef ENABLE_IPV6
 	struct sockaddr_in6 addr6;
@@ -1733,8 +2045,18 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr("224.0.0.1");
 	addr.sin_port = htons(5350);
-	for(i = 0; i < n_sockets; i++) {
+	/* sockets[] are in the same order as lan_addrs : force the multicast
+	 * output interface to the LAN one so the announce never goes out
+	 * through the external interface */
+	for(i = 0, lan_addr = lan_addrs.lh_first;
+	    i < n_sockets && lan_addr != NULL;
+	    i++, lan_addr = lan_addr->list.le_next) {
 		if (sockets[i] < 0) {
+			continue;
+		}
+		if (setsockopt(sockets[i], IPPROTO_IP, IP_MULTICAST_IF,
+		               &lan_addr->addr, sizeof(lan_addr->addr)) < 0) {
+			syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce(sockets[%d]) setsockopt(IP_MULTICAST_IF): %m", i);
 			continue;
 		}
 		len = sendto_or_schedule(sockets[i], buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
@@ -1744,13 +2066,28 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	}
 #ifdef ENABLE_IPV6
 	if (socket6 >= 0) {
-		memset(&addr6, 0, sizeof(struct sockaddr_in6));
-		addr6.sin6_family = AF_INET6;
-		inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
-		addr6.sin6_port = htons(5350);
-		len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
-		if( len < 0 ) {
-			syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(): %m");
+		/* send on each LAN interface only (link-local scope) */
+		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL;
+		    lan_addr = lan_addr->list.le_next) {
+			unsigned int ifindex = lan_addr->index;
+			if (ifindex == 0 && lan_addr->ifname[0] != '\0')
+				ifindex = if_nametoindex(lan_addr->ifname);
+			if (ifindex == 0)
+				continue;
+			memset(&addr6, 0, sizeof(struct sockaddr_in6));
+			addr6.sin6_family = AF_INET6;
+			inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
+			addr6.sin6_port = htons(5350);
+			addr6.sin6_scope_id = ifindex;
+			if (setsockopt(socket6, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+			               &ifindex, sizeof(ifindex)) < 0) {
+				syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce() setsockopt(IPV6_MULTICAST_IF, %s): %m", lan_addr->ifname);
+				continue;
+			}
+			len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
+			if( len < 0 ) {
+				syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(%s): %m", lan_addr->ifname);
+			}
 		}
 	}
 #endif /* ENABLE_IPV6 */
