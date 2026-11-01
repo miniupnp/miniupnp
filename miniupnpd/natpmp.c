@@ -312,8 +312,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					       index, proto2, eport2, iaddr2, iport2, desc);
 					if(0 == strcmp(iaddr2, senderaddrstr)
 					  && 0 == memcmp(desc, "NAT-PMP", 7)) {
-						/* (iport == 0) => remove all the mappings for this client */
-						if((iport == 0) || ((iport == iport2) && (proto == proto2))) {
+						/* (iport == 0) => remove all the mappings for this client
+						 * using the requested protocol (RFC 6886 section 3.4) */
+						if((proto == proto2) && ((iport == 0) || (iport == iport2))) {
 							r = _upnp_delete_redir(eport2, proto2);
 							if(r < 0) {
 								syslog(LOG_ERR, "Failed to remove NAT-PMP mapping eport %hu, protocol %s",
