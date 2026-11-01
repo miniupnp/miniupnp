@@ -1,0 +1,106 @@
+---
+name: 'miniupnpd: PCP and NAT-PMP regression test'
+
+'on':
+  pull_request:
+    branches: [master]
+    paths:
+      - 'miniupnpd/**'
+      - '.github/workflows/pcp-natpmp.yml'
+      - '.github/workflows/pcp-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      case_name:
+        description: 'Optional single YAML case (empty runs all cases)'
+        required: false
+        type: string
+      profile:
+        description: >-
+          Explicit server fixture contract (PORT_SET profiles require allocator
+          support)
+        type: choice
+        default: baseline
+        options: [baseline, port-set, port-set-limited]
+      wan_peer:
+        description: 'Enable isolated WAN traffic checks (still no pcaps)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pcp-natpmp-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Run PCP E2E coverage
+    uses: ./.github/workflows/pcp-e2e.yml
+
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.wan_peer && 60 || 30 }}
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Check out master baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'master' }}
+          path: master
+          persist-credentials: false
+
+      - name: Install test corpus parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+
+      - name: Check comparison tools
+        run: |
+          python3 \
+            candidate/miniupnpd/tests/pcp_pmp/tools/test_compare_branches.py
+          python3 \
+            candidate/miniupnpd/tests/pcp_pmp/testpcp_natpmp.py --self-test
+          python3 candidate/miniupnpd/tests/common/traffic_agent.py --self-test
+          sh -n candidate/miniupnpd/tests/pcp_pmp/testpcp_natpmp_docker.sh
+
+      - name: Compare master with pull request (no packet capture)
+        env:
+          PCP_CASE: ${{ inputs.case_name }}
+          PCP_PROFILE: ${{ inputs.profile || 'baseline' }}
+          PCP_WAN_PEER: ${{ inputs.wan_peer }}
+        run: |
+          args=()
+          if [ -n "$PCP_CASE" ]; then
+            args+=(--case "$PCP_CASE")
+          fi
+          if [ "$PCP_WAN_PEER" = true ]; then
+            args+=(--wan-peer)
+          fi
+          python3 candidate/miniupnpd/tests/pcp_pmp/tools/compare_branches.py \
+            --master-source master \
+            --candidate-source candidate \
+            --profile "$PCP_PROFILE" \
+            --output pcp-natpmp-artifacts "${args[@]}"
+
+      - name: Publish comparison summary
+        if: always()
+        run: |
+          if [ -f pcp-natpmp-artifacts/summary.md ]; then
+            cat pcp-natpmp-artifacts/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results and comparison report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pcp-natpmp-${{ github.run_id }}-${{ github.run_attempt }}
+          path: pcp-natpmp-artifacts/
+          if-no-files-found: warn
+          retention-days: 14

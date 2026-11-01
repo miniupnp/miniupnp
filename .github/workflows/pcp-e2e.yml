@@ -1,0 +1,84 @@
+---
+name: 'miniupnpd: PCP end-to-end tests'
+
+'on':
+  push:
+    branches: [master]
+    paths:
+      - 'miniupnpd/**'
+      - '.github/workflows/pcp-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      case_name:
+        description: 'Optional single YAML case (empty runs all E2E cases)'
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      case_name:
+        description: 'Optional single YAML case (empty runs all E2E cases)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pcp-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install YAML parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+
+      - name: Run harness self-tests
+        run: |
+          python3 miniupnpd/tests/pcp_e2e/run.py --self-test
+          python3 miniupnpd/tests/common/traffic_agent.py --self-test
+          sh -n miniupnpd/tests/pcp_e2e/run-docker.sh
+
+      - name: Run Docker E2E cases
+        env:
+          CASE_NAME: ${{ inputs.case_name }}
+        run: |
+          args=()
+          if [ -n "$CASE_NAME" ]; then
+            args+=(--case "$CASE_NAME")
+          fi
+          ./miniupnpd/tests/pcp_e2e/run-docker.sh "${args[@]}"
+
+      - name: Add status report to job summary
+        if: always()
+        run: |
+          if [ -f miniupnpd/tests/pcp_e2e/status.md ]; then
+            cat miniupnpd/tests/pcp_e2e/status.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Show local reproduction instructions
+        if: failure()
+        run: |
+          {
+            echo '## Reproduce the PCP E2E run locally'
+            echo
+            echo 'The workflow does not upload capture artifacts.'
+            echo 'Run the harness with Docker from the repository root:'
+            echo
+            echo '```sh'
+            echo './miniupnpd/tests/pcp_e2e/run-docker.sh'
+            echo '```'
+            echo
+            echo 'To run one case, add `--case CASE_NAME`.'
+            echo 'Captures, daemon logs, and snapshots are written under:'
+            echo '`.tmp/pcp-e2e/`.'
+          } >> "$GITHUB_STEP_SUMMARY"
