@@ -69,6 +69,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <signal.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <limits.h>
 #include <syslog.h>
 
 #include "pcpserver.h"
@@ -1826,10 +1827,54 @@ int OpenAndConfPCPv6Socket(void)
 }
 #endif /*ENABLE_IPV6*/
 
+/* RFC 6887 section 14.1.3: restart announcements MAY be sent up to ten
+ * times, the first two at least 250 ms apart and every later interval at
+ * least double the previous one. Ten sends take about 127 s; test builds
+ * shorten that with -DPCP_ANNOUNCE_COUNT=5 (see tests/pcp_pmp). */
+#ifndef PCP_ANNOUNCE_COUNT
+#define PCP_ANNOUNCE_COUNT 10
+#endif
+#if PCP_ANNOUNCE_COUNT < 1
+#error "PCP_ANNOUNCE_COUNT must be at least 1"
+#endif
+#define PCP_ANNOUNCE_FIRST_INTERVAL_MS 250
+
+static unsigned int announce_remaining = 0;	/* retransmissions still due */
+static unsigned int announce_interval_ms = 0;	/* gap before the next one */
+static struct timeval announce_next;
+static struct timeval announce_last;	/* when the last one was sent */
+
+/* The intervals are measured on CLOCK_MONOTONIC, not on the clock of
+ * upnp_gettimeofday(): CLOCK_MONOTONIC_FAST counts in ticks on FreeBSD
+ * (10 ms at hz=100), enough to make an interval look shorter than it was
+ * and the next one less than double it. */
+static int announce_gettime(struct timeval * tv)
+{
+#ifdef CLOCK_MONOTONIC
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
+		return -1;
+	tv->tv_sec = ts.tv_sec;
+	tv->tv_usec = ts.tv_nsec / 1000;
+	return 0;
+#else
+	return upnp_gettimeofday(tv);
+#endif
+}
+
+/* *tv += ms, without overflow for any ms */
+static void announce_add_ms(struct timeval * tv, unsigned int ms)
+{
+	tv->tv_sec += ms / 1000;
+	tv->tv_usec += (long)(ms % 1000) * 1000;
+	tv->tv_sec += tv->tv_usec / 1000000;
+	tv->tv_usec %= 1000000;
+}
+
 #ifdef ENABLE_IPV6
-void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets, int socket6)
+static void PCPSendAnnounceOnce(int * sockets, int n_sockets, int socket6)
 #else /* IPv4 only */
-void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
+static void PCPSendAnnounceOnce(int * sockets, int n_sockets)
 #endif
 {
 	int i;
@@ -1893,6 +1938,81 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 		}
 	}
 #endif /* ENABLE_IPV6 */
+}
+
+#ifdef ENABLE_IPV6
+void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets, int socket6)
+#else /* IPv4 only */
+void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
+#endif
+{
+#ifdef ENABLE_IPV6
+	PCPSendAnnounceOnce(sockets, n_sockets, socket6);
+#else
+	PCPSendAnnounceOnce(sockets, n_sockets);
+#endif
+	/* (re)start the retransmission schedule */
+	announce_remaining = PCP_ANNOUNCE_COUNT - 1;
+	announce_interval_ms = PCP_ANNOUNCE_FIRST_INTERVAL_MS;
+	if (announce_remaining > 0) {
+		if (announce_gettime(&announce_next) < 0) {
+			announce_remaining = 0;
+			return;
+		}
+		announce_last = announce_next;
+		announce_add_ms(&announce_next, announce_interval_ms);
+	}
+}
+
+#ifdef ENABLE_IPV6
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, int socket6, struct timeval * timeout)
+#else /* IPv4 only */
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, struct timeval * timeout)
+#endif
+{
+	struct timeval now;
+	long gap_ms;
+
+	if (announce_remaining == 0 || announce_gettime(&now) < 0)
+		return;
+	if (now.tv_sec > announce_next.tv_sec ||
+	    (now.tv_sec == announce_next.tv_sec && now.tv_usec >= announce_next.tv_usec)) {
+#ifdef ENABLE_IPV6
+		PCPSendAnnounceOnce(sockets, n_sockets, socket6);
+#else
+		PCPSendAnnounceOnce(sockets, n_sockets);
+#endif
+		/* the interval actually measured: a late send must not make the
+		 * next interval less than double this one */
+		gap_ms = (long)(now.tv_sec - announce_last.tv_sec) * 1000 +
+		         (now.tv_usec - announce_last.tv_usec + 999) / 1000;	/* round up */
+		announce_last = now;
+		if (--announce_remaining == 0)
+			return;
+		if (gap_ms > (long)announce_interval_ms)
+			announce_interval_ms = gap_ms < (long)(UINT_MAX / 2) ?
+			                       (unsigned int)gap_ms : UINT_MAX / 2;
+		if (announce_interval_ms > UINT_MAX / 2)
+			announce_interval_ms = UINT_MAX / 2;
+		announce_interval_ms *= 2;
+		announce_next = now;
+		announce_add_ms(&announce_next, announce_interval_ms);
+	}
+	/* shorten the caller's select() timeout to the next retransmission */
+	{
+		struct timeval wait;
+		wait.tv_sec = announce_next.tv_sec - now.tv_sec;
+		wait.tv_usec = announce_next.tv_usec - now.tv_usec;
+		if (wait.tv_usec < 0) {
+			wait.tv_usec += 1000000;
+			wait.tv_sec--;
+		}
+		if (wait.tv_sec < 0)
+			wait.tv_sec = wait.tv_usec = 0;
+		if (timeout->tv_sec > wait.tv_sec ||
+		    (timeout->tv_sec == wait.tv_sec && timeout->tv_usec > wait.tv_usec))
+			*timeout = wait;
+	}
 }
 
 #ifdef ENABLE_IPV6
