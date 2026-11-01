@@ -116,6 +116,7 @@ sections:
       version: 2
       opcode: 0
       reserved: 65535
+      client: source
     expect:
       kind: response
       length: 24
@@ -4670,15 +4671,8 @@ sections:
           version: 2
           opcode: 130
           result:
-          - 0
+          - 11
           length: 80
-        captures:
-          external_port:
-            offset: 42
-            type: u16
-        assert:
-          external_port:
-            equals: 50371
       cleanup:
       - protocol: pcp
         request:

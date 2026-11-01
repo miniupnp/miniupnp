@@ -1,6 +1,6 @@
 # PCP/NAT-PMP Test Status
 
-Updated: 2026-11-01T11:59:35+00:00
+Updated: 2026-11-01T12:06:08+00:00
 
 ## Run
 
@@ -9,8 +9,8 @@ Updated: 2026-11-01T11:59:35+00:00
 - Address family: `ipv4`
 - Server profile: `baseline`
 - Mapping lifecycle tests: `enabled`
-- Totals: **162 PASS**, **32 XFAIL**, **3 FAIL**, **13 SKIP**
-- Capture directory: `/pcp-pmp-captures/2026-11-01_12-58-47.615573361_all`
+- Totals: **164 PASS**, **32 XFAIL**, **1 FAIL**, **13 SKIP**
+- Capture directory: `/pcp-pmp-captures/2026-11-01_13-05-19.343724854_all`
 
 ## Results by section
 
@@ -25,7 +25,7 @@ Header handling, core opcodes, error responses, address-family behavior, and mal
 | unsupported-opcode-v2 | pcp | PASS | Send an unknown PCP v2 opcode and check UNSUPP_OPCODE. |
 | short-header | pcp | PASS | Send a two-byte PCP datagram; the server should silently discard it. |
 | minimum-short-header | pcp | PASS | Send a three-byte PCP header and check the malformed-request response. |
-| reserved-common-header | pcp | FAIL | unexpected result code 12 |
+| reserved-common-header | pcp | PASS | Set reserved common-header bits and check the server response. |
 | truncated-common-header | pcp | PASS | Remove one byte from the common PCP header. |
 | truncated-map-v1 | pcp | PASS | Send a PCP v1 MAP request without its MAP body. |
 | truncated-map-v2 | pcp | PASS | Send a PCP v2 MAP request without its MAP body. |
@@ -145,7 +145,7 @@ Additional packet framing, option validation, nonce ownership, renewal, deletion
 | map-reserved-pcp-udp-port-5351 | pcp | PASS | RFC 6887 §11.3: external UDP ports 5350 and 5351 cannot be mapped to clients; with PREFER_FAILURE return CANNOT_PROVIDE_EXTERNAL. |
 | peer-wrong-nonce-refresh | pcp | PASS | RFC 6887 §12.3: an existing PEER five-tuple may only be refreshed with its original nonce in the Simple Threat Model. |
 | peer-wrong-nonce-delete | pcp | PASS | RFC 6887 §12.3: an existing PEER five-tuple may only be deleted with its original nonce in the Simple Threat Model. |
-| peer-shared-external-port-lifecycle | pcp | FAIL | step 9 (pcp_peer): response matched none of the expected replies: unexpected pcp result code 11 |
+| peer-shared-external-port-lifecycle | pcp | PASS | Independent PEER endpoints and a MAP can share an external port: deleting either mapping preserves nonce ownership and renewal of the others. |
 | peer-survives-shared-map-expiration | pcp | PASS | Expiration of a one-second NAT-PMP mapping preserves a longer PEER mapping sharing its external port and protocol. |
 | map-tcp-create-renew-delete | pcp | PASS | RFC 6887 §§11, 15.1: exercise a TCP MAP lifecycle separately from the existing UDP lifecycle. |
 | map-error-echo-opcode-and-options | pcp | PASS | RFC 6887 §§7.3, 8.2: error responses preserve the complete opcode body and options. |
@@ -278,7 +278,7 @@ Public address, mapping request validation, malformed traffic, and mutating UDP/
 
 # PCP/NAT-PMP Test Status
 
-Updated: 2026-11-01T11:59:42+00:00
+Updated: 2026-11-01T12:06:15+00:00
 
 ## Run
 
@@ -287,8 +287,8 @@ Updated: 2026-11-01T11:59:42+00:00
 - Address family: `ipv6`
 - Server profile: `baseline`
 - Mapping lifecycle tests: `enabled`
-- Totals: **85 PASS**, **29 XFAIL**, **1 FAIL**, **13 SKIP**
-- Capture directory: `/pcp-pmp-captures/2026-11-01_12-58-47.615573361_all`
+- Totals: **86 PASS**, **29 XFAIL**, **0 FAIL**, **13 SKIP**
+- Capture directory: `/pcp-pmp-captures/2026-11-01_13-05-19.343724854_all`
 
 ## Results by section
 
@@ -303,7 +303,7 @@ Header handling, core opcodes, error responses, address-family behavior, and mal
 | unsupported-opcode-v2 | pcp | PASS | Send an unknown PCP v2 opcode and check UNSUPP_OPCODE. |
 | short-header | pcp | PASS | Send a two-byte PCP datagram; the server should silently discard it. |
 | minimum-short-header | pcp | PASS | Send a three-byte PCP header and check the malformed-request response. |
-| reserved-common-header | pcp | FAIL | unexpected result code 12 |
+| reserved-common-header | pcp | PASS | Set reserved common-header bits and check the server response. |
 | truncated-common-header | pcp | PASS | Remove one byte from the common PCP header. |
 | truncated-map-v1 | pcp | PASS | Send a PCP v1 MAP request without its MAP body. |
 | truncated-map-v2 | pcp | PASS | Send a PCP v2 MAP request without its MAP body. |
