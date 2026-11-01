@@ -385,6 +385,12 @@ sections:
             - from: allowed-peer
               protocol: udp
               expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: blocked
+            - from: third-peer
+              protocol: udp
+              expect: blocked
       - name: map-filter-refresh-adds-peer
         families:
           - ipv4
@@ -524,6 +530,68 @@ sections:
                 - from: third-peer
                   protocol: udp
                   expect: blocked
+      - name: map-filter-refresh-without-options-preserves-policy
+        families: [ipv4, ipv6]
+        description: Renewing a filtered mapping without FILTER options retains its permitted peer set.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41019
+            suggested_external_port: 41019
+            filter:
+              remote_peer: allowed-peer
+              remote_port: 0
+              prefix_length: {ipv4: 32, ipv6: 128}
+          - opcode: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41019
+            suggested_external_port: 41019
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, expect: delivered}
+            - {from: denied-peer, protocol: udp, expect: blocked}
+            - {from: third-peer, protocol: udp, expect: blocked}
+      - name: map-filter-delete-and-recreate-clears-policy
+        families: [ipv4, ipv6]
+        description: Deleting a filtered mapping removes its rules and recreating the tuple without FILTER allows all peers.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41022
+            suggested_external_port: 41022
+            filter:
+              remote_peer: allowed-peer
+              remote_port: 0
+              prefix_length: {ipv4: 32, ipv6: 128}
+          - opcode: MAP
+            lifetime: 0
+            protocol: udp
+            internal_port: 41022
+            suggested_external_port: 41022
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41022
+            suggested_external_port: 41022
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, source_port: 42010, expect: delivered}
+                - {from: denied-peer, protocol: udp, source_port: 42010, expect: blocked}
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, source_port: 42011, expect: blocked}
+                - {from: denied-peer, protocol: udp, source_port: 42011, expect: blocked}
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42012, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42012, expect: delivered}
+            - {from: third-peer, protocol: udp, source_port: 42012, expect: delivered}
   - name: PEER
     description: PCP PEER mappings restricted to a remote endpoint.
     cases:

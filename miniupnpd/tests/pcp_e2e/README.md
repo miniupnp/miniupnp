@@ -119,17 +119,22 @@ python3 miniupnpd/tests/pcp_e2e/run.py --self-test
 
 Case definitions remain in `pcp-e2e-cases.yaml`.
 
-## Current expected failures
+## Implementation scope
 
-The ordinary MAP lifecycle scenarios pass on the current branch except for the
-IPv6 external-port conflict case. FILTER scenarios require excluded peers or
-source ports to be blocked; the current daemon delivers that traffic. On
-IPv4, PEER requests can adopt an existing implicit mapping, but newly created
-and restored mappings currently leave the outbound source port unchanged. The
-restoration case starts with a clean fixture to model loss of the previous
-mapping state; it does not restart a daemon mid-case. IPv6 PEER requests return
-`UNSUPP_OPCODE`, as the daemon currently handles PEER only on the NAT path. The
-latest run's per-family results are in `status.md`.
+The nftables backend implements MAP FILTER policy for IPv4 redirects and IPv6
+pinholes, with up to 256 distinct peer filters per mapping. Duplicate filters
+do not consume additional slots. Other firewall backends reject FILTER with
+`UNSUPP_OPTION` instead of acknowledging restrictions they cannot enforce.
+IPv4 PEER scenarios check the source tuple observed on the WAN for
+new, adopted, and restored mappings. The restoration case starts with a clean
+fixture to model loss of the previous mapping state; it does not restart a
+daemon mid-case.
+
+IPv6 PEER requests still return `UNSUPP_OPCODE`. Those cases assert rejection;
+they do not establish IPv6 PEER forwarding support. IPv6 MAP opens a pinhole
+without translating ports, so a different suggested external port with
+`PREFER_FAILURE` is rejected. The latest run's per-family results are in
+`status.md`.
 
 Every PCP case in the MAP, FILTER, and PEER sections has IPv4 and IPv6 coverage.
 NAT-PMP cases are IPv4-only because NAT-PMP does not define IPv6 operation.
