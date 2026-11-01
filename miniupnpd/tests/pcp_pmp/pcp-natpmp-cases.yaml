@@ -4044,6 +4044,125 @@ sections:
       - 0
     description: 'RFC 6887 §12.3: an existing PEER five-tuple may only be refreshed with its original nonce in the
       Simple Threat Model.'
+  - name: peer-wrong-nonce-refresh-ipv6
+    protocol: pcp
+    families:
+    - ipv6
+    mutating: true
+    request:
+      kind: protocol_sequence
+      steps:
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 112233445566778899aabbcc
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 50301
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: ffeeddccbbaa998877665544
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 50301
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 2
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 112233445566778899aabbcc
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 50301
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+      cleanup:
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: 112233445566778899aabbcc
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 0
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+        captures:
+          remaining_lifetime: {offset: 4, type: u32}
+        assert:
+          remaining_lifetime: {min: 1}
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: ffeeddccbbaa998877665544
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 0
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 2
+          length: 80
+    expect:
+      kind: lifecycle
+      result:
+      - 0
+    description: 'RFC 6887 §12.3: an existing PEER five-tuple may only be refreshed with its original nonce in the
+      Simple Threat Model.'
   - name: peer-wrong-nonce-delete
     protocol: pcp
     families:
@@ -4145,6 +4264,103 @@ sections:
       - 0
     description: 'RFC 6887 §12.3: an existing PEER five-tuple may only be deleted with its original nonce in the
       Simple Threat Model.'
+  - name: peer-zero-lifetime-query-ownership-ipv6
+    protocol: pcp
+    families:
+    - ipv6
+    mutating: true
+    request:
+      kind: protocol_sequence
+      steps:
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 112233445566778899aabbcc
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 50301
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: ffeeddccbbaa998877665544
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 50301
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 2
+          length: 80
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 300
+          client: source
+          nonce_hex: 112233445566778899aabbcc
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 50301
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result:
+          - 0
+          length: 80
+      cleanup:
+      - protocol: pcp
+        request:
+          kind: pcp_peer
+          version: 2
+          opcode: 2
+          lifetime: 0
+          client: source
+          nonce_hex: 112233445566778899aabbcc
+          protocol_number: 17
+          internal_port: 50301
+          external_port: 0
+          external_address: '::'
+          peer_address: 2001:db8:9000::99
+          peer_port: 443
+        expect:
+          version: 2
+          opcode: 130
+          result: [0]
+          length: 80
+        captures:
+          remaining_lifetime: {offset: 4, type: u32}
+        assert:
+          remaining_lifetime: {min: 1}
+    expect:
+      kind: lifecycle
+      result:
+      - 0
+    description: 'RFC 6887 sections 12.3 and 15: a zero-lifetime PEER request queries the retained lease and requires its original nonce.'
   - name: peer-shared-external-port-lifecycle
     protocol: pcp
     families:
