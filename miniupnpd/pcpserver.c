@@ -684,7 +684,10 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 		}
 #endif
 
-		if (pcp_msg_info->pfailure_present) {
+		/* An IPv6 PEER pinhole cannot translate the address, and PEER
+		 * has no PREFER_FAILURE option, so refuse a different one. */
+		if (pcp_msg_info->pfailure_present ||
+		    (pcp_msg_info->is_fw && pcp_msg_info->opcode == PCP_OPCODE_PEER)) {
 			pcp_msg_info->result_code = PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			return -1;
 		} else {
@@ -869,6 +872,46 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	return PCP_SUCCESS;
 }
 
+/* IPv6 PEER: routed, no NAT66.  The internal endpoint keeps its address
+ * and port, so open a pinhole limited to the requested remote endpoint. */
+static int CreatePCPPeer_FW(pcp_info_t *pcp_msg_info, const char *peerip_s)
+{
+#ifdef ENABLE_UPNPPINHOLE
+	int uid, r;
+	char desc[64];
+	unsigned int timestamp = 0;
+
+	if (pcp_msg_info->ext_port != 0 &&
+	    pcp_msg_info->ext_port != pcp_msg_info->int_port)
+		return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+	uid = upnp_find_inboundpinhole(peerip_s, pcp_msg_info->peer_port,
+	                               pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+	                               pcp_msg_info->protocol, desc, sizeof(desc),
+	                               &timestamp);
+	if (uid >= 0) {
+		if (strcmp(desc, pcp_msg_info->desc) != 0) {
+			if (timestamp > upnp_time())
+				pcp_msg_info->error_lifetime = timestamp - upnp_time();
+			return PCP_ERR_NOT_AUTHORIZED;
+		}
+		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
+	} else {
+		r = upnp_add_inboundpinhole(peerip_s, pcp_msg_info->peer_port,
+		                            pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		                            pcp_msg_info->protocol, pcp_msg_info->desc,
+		                            pcp_msg_info->lifetime, &uid);
+	}
+	if (r < 0)
+		return PCP_ERR_NO_RESOURCES;
+	pcp_msg_info->ext_port = pcp_msg_info->int_port;
+	return PCP_SUCCESS;
+#else
+	UNUSED(peerip_s);
+	UNUSED(pcp_msg_info);
+	return PCP_ERR_UNSUPP_OPCODE;
+#endif
+}
+
 static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 {
 	char peerip_s[INET6_ADDRSTRLEN];
@@ -880,21 +923,7 @@ static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 	}
 
 	if (pcp_msg_info->is_fw) {
-#if 0
-		/* Someday, something like this is available.. and we're ready! */
-#ifdef ENABLE_UPNPPINHOLE
-		pcp_msg_info->ext_port = pcp_msg_info->int_port;
-		r = upnp_add_outbound_pinhole(peerip_s,
-					      pcp_msg_info->peer_port,
-					      pcp_msg_info->mapped_str,
-					      pcp_msg_info->int_port,
-					      pcp_msg_info->protocol,
-					      pcp_msg_info->desc,
-					      pcp_msg_info->lifetime, NULL);
-#endif /* ENABLE_UPNPPINHOLE */
-#else
-		r = PCP_ERR_UNSUPP_OPCODE;
-#endif /* 0 */
+		r = CreatePCPPeer_FW(pcp_msg_info, peerip_s);
 	} else {
 		r = CreatePCPPeer_NAT(pcp_msg_info);
 	}
@@ -932,7 +961,28 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 #endif /* 0 */
 
 	if (pcp_msg_info->is_fw) {
+		/* Zero lifetime queries an IPv6 PEER pinhole; it never deletes. */
+#ifdef ENABLE_UPNPPINHOLE
+		char pdesc[64], phost[INET6_ADDRSTRLEN];
+		unsigned int pts = 0;
+		inet_n46top(pcp_msg_info->peer_ip, phost, sizeof(phost));
+		if (upnp_find_inboundpinhole(phost, pcp_msg_info->peer_port,
+		        pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		        pcp_msg_info->protocol, pdesc, sizeof(pdesc), &pts) < 0) {
+			pcp_msg_info->result_code = PCP_SUCCESS;
+			return;
+		}
+		if (strcmp(pdesc, pcp_msg_info->desc) != 0) {
+			pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+			return;
+		}
+		pcp_msg_info->ext_port = pcp_msg_info->int_port;
+		if (pts > upnp_time())
+			pcp_msg_info->lifetime = pts - upnp_time();
+		pcp_msg_info->result_code = PCP_SUCCESS;
+#else
 		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
+#endif
 		return;
 	}
 
