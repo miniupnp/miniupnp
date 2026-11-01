@@ -46,6 +46,7 @@
 #include "nftnlrdr.h"
 
 #include "nftnlrdr_misc.h"
+#include "../pcp_filter.h"
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -404,7 +405,8 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
+				return -1;
 			break;
 		}
 	}
@@ -421,10 +423,18 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				syslog(LOG_DEBUG, "%s: found forward/filter rule %08x:%hu proto %d",
 				       "delete_redirect_and_filter_rules", iaddr, iport, p->proto);
 				r = rule_del_handle(p);
-				/* Todo: send bulk request */
-				nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+				/* Keep FILTER enforcement if deleting the base rule fails. */
+				if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0)
+					return -1;
 				break;
 			}
+		}
+		{
+			struct in6_addr address = IN6ADDR_ANY_INIT;
+			address.s6_addr[10] = address.s6_addr[11] = 0xff;
+			memcpy(address.s6_addr + 12, &iaddr, sizeof(iaddr));
+			if (nft_pcp_filter_delete(&address, iport, proto) < 0)
+				return -1;
 		}
 	} else {
 		syslog(LOG_WARNING, "%s: redirect rule with eport=%hu proto %d NOT FOUND",

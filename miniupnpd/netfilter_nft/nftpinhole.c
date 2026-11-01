@@ -41,6 +41,7 @@
 #include "../upnpglobalvars.h"
 
 #include "nftnlrdr_misc.h"
+#include "../pcp_filter.h"
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -214,8 +215,9 @@ delete_pinhole(unsigned short uid)
 		/* compare the uid value */
 		if (0 == strcmp(tmp_label, label_start)) {
 			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
-			return 0;
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0)
+				return -1;
+			return nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto);
 		}
 	}
 
@@ -309,14 +311,8 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	if (proto == -1)
 		return -2;
 
-	// Delete rule
-	r = rule_del_handle(p);
-	res = nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
-
-	if (res < 0)
-		return -1;
-
-	// readd rule with new timestamp
+	/* Replace the rule atomically so an allocation or netlink error cannot
+	 * remove the working pinhole during a failed PCP renewal. */
 	snprintf(comment, NFT_DESCR_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
 
@@ -326,7 +322,9 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	r = rule_set_filter6(nft_ipv6_family, ifname, proto,
 			    rhost_addr_p, &ihost_addr,
 				0, iport, rport, comment, 0);
-
+	if (!r)
+		return -1;
+	nftnl_rule_set_u64(r, NFTNL_RULE_HANDLE, p->handle);
 	res = nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_FILTER);
 
 	if (res < 0)
@@ -471,7 +469,12 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		if (ts <= (unsigned int)current_time) {
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
 			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0 ||
+			    nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto) < 0) {
+				/* Retry cleanup soon, including when all pinholes expired. */
+				min_ts = (unsigned int)current_time + 1;
+				continue;
+			}
 			n++;
 		} else {
 			if (uid > max_uid)

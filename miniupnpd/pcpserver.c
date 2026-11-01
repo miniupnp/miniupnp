@@ -84,6 +84,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnputils.h"
 #include "portinuse.h"
 #include "pcp_msg_struct.h"
+#include "pcp_filter.h"
 #ifdef ENABLE_UPNPPINHOLE
 #include "upnppinhole.h"
 #endif /* ENABLE_UPNPPINHOLE */
@@ -155,6 +156,8 @@ typedef struct pcp_info {
 	const struct in6_addr *mapped_ip;
 	char mapped_str[INET6_ADDRSTRLEN];
 	int pfailure_present;
+	unsigned int filter_count;
+	struct pcp_filter filters[PCP_FILTER_REQUEST_MAX];
 	struct in6_addr sender_ip;
 	int is_fw; /* is this firewall operation? if not, nat. */
 	char desc[64];
@@ -508,7 +511,6 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 		break;
 
 	case PCP_OPTION_FILTER:
-		/* TODO fully implement filter */
 		if (option_length != PCP_FILTER_OPTION_SIZE ||
 		    pcp_msg_info->lifetime == 0) {
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
@@ -530,6 +532,22 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 			return 0;
 		}
+#ifndef USE_NFTABLES
+		/* Never acknowledge a filter that the firewall cannot enforce. */
+		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
+		return 0;
+#else
+		if (pcp_msg_info->filter_count == PCP_FILTER_REQUEST_MAX) {
+			pcp_msg_info->result_code = PCP_ERR_EXCESSIVE_REMOTE_PEERS;
+			return 0;
+		}
+		{
+			struct pcp_filter *filter = &pcp_msg_info->filters[pcp_msg_info->filter_count++];
+			filter->prefix = pcp_buf[5];
+			filter->port = READNU16(pcp_buf + 6);
+			memcpy(&filter->address, pcp_buf + 8, sizeof(filter->address));
+		}
+#endif
 		break;
 
 #ifdef PCP_FLOWP
@@ -1008,7 +1026,12 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				return PCP_ERR_NOT_AUTHORIZED;
 			}
 			pcp_msg_info->ext_port = eport_old;
-			break;
+			/* Preserve the existing redirect and its filters on renewal. */
+			r = update_portmapping_desc_timestamp(ext_if_name, eport_old,
+			                pcp_msg_info->protocol, pcp_msg_info->desc, timestamp);
+			if (r >= 0 && (!nextruletoclean_timestamp || timestamp < nextruletoclean_timestamp))
+				nextruletoclean_timestamp = timestamp;
+			return r < 0 ? PCP_ERR_NO_RESOURCES : PCP_SUCCESS;
 		}
 	}
 
@@ -1199,14 +1222,92 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
  * expresses the IPv6 address from its perspective.     */
 
 /* TODO: Support more than basic NAT44 / IPv6 firewall cases. */
+#ifdef USE_NFTABLES
+/* FILTER changes must not precede mapping ownership checks.  The MAP paths
+ * repeat these checks as part of their normal create/refresh operation. */
+static int CheckPCPFilterOwner(pcp_info_t *info, int *exists)
+{
+	char desc[64], address[INET6_ADDRSTRLEN];
+	unsigned short port, external;
+	unsigned int timestamp;
+	int protocol, index;
+	*exists = 0;
+	if (info->is_fw) {
+#ifdef ENABLE_UPNPPINHOLE
+		if (upnp_find_inboundpinhole(NULL, 0, info->mapped_str, info->int_port,
+		                           info->protocol, desc, sizeof(desc), &timestamp) >= 0) {
+			*exists = 1;
+			if (strcmp(desc, info->desc) != 0) {
+				if (timestamp > upnp_time())
+					info->error_lifetime = timestamp - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+		}
+#endif
+	} else {
+		for (index = 0;
+		     get_redirect_rule_by_index(index, NULL, &external,
+		         address, sizeof(address), &port, &protocol, desc, sizeof(desc),
+		         NULL, 0, &timestamp, NULL, NULL) >= 0; ++index) {
+			if (port == info->int_port && protocol == info->protocol &&
+			    strcmp(address, info->mapped_str) == 0) {
+				*exists = 1;
+				if (strcmp(desc, info->desc) != 0) {
+					if (timestamp > upnp_time())
+						info->error_lifetime = timestamp - upnp_time();
+					return PCP_ERR_NOT_AUTHORIZED;
+				}
+				break;
+			}
+		}
+	}
+	return PCP_SUCCESS;
+}
+#endif
+
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
 	int r;
+#ifdef USE_NFTABLES
+	struct pcp_filter_update *update = NULL;
+	int exists;
+	r = CheckPCPFilterOwner(pcp_msg_info, &exists);
+	if (r != PCP_SUCCESS) {
+		pcp_msg_info->result_code = r;
+		return;
+	}
+	/* A previous failed deletion or daemon restart may have left a guard
+	 * after its mapping disappeared.  New mappings start without filters. */
+	if (!exists && nft_pcp_filter_delete(pcp_msg_info->mapped_ip,
+	            pcp_msg_info->int_port, pcp_msg_info->protocol) < 0) {
+		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+		return;
+	}
+	if (pcp_msg_info->filter_count) {
+		const char *ifname = ext_if_name;
+#ifdef ENABLE_IPV6
+		if (pcp_msg_info->is_fw && ext_if_name6 && *ext_if_name6)
+			ifname = ext_if_name6;
+#endif
+		r = nft_pcp_filter_begin(pcp_msg_info->mapped_ip, pcp_msg_info->int_port,
+		                         pcp_msg_info->protocol, ifname,
+		                         pcp_msg_info->filters, pcp_msg_info->filter_count,
+		                         &update);
+		if (r < 0) {
+			pcp_msg_info->result_code = r == -2 ? PCP_ERR_EXCESSIVE_REMOTE_PEERS : PCP_ERR_NO_RESOURCES;
+			return;
+		}
+	}
+#endif
 
 	if (pcp_msg_info->is_fw)
 		r = CreatePCPMap_FW(pcp_msg_info);
 	else
 		r = CreatePCPMap_NAT(pcp_msg_info);
+#ifdef USE_NFTABLES
+	if (nft_pcp_filter_finish(update, r == PCP_SUCCESS) < 0)
+		r = PCP_ERR_NO_RESOURCES;
+#endif
 	pcp_msg_info->result_code = r;
 	syslog(r == PCP_SUCCESS ? LOG_INFO : LOG_ERR,
 	      "PCP MAP: %s mapping %s %hu->%s:%hu '%s'",
