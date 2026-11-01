@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Execute YAML PCP MAP scenarios and verify their real forwarding behavior."""
+"""Execute YAML PCP mapping scenarios and verify real forwarding behavior."""
 import argparse
+import copy
 import ipaddress
 import json
 import os
@@ -36,9 +37,14 @@ def build_map_packet(client, spec, peer_addresses, nonce=None):
     nonce = nonce or os.urandom(12)
     body = nonce + bytes(({"tcp": 6, "udp": 17}[spec["protocol"]], 0, 0, 0))
     body += struct.pack("!HH", spec["internal_port"], spec["suggested_external_port"])
-    body += b"\0" * 16
-    packet = bytes((2, 1, 0, 0)) + struct.pack("!I", spec["lifetime"])
+    suggested_address = spec.get("suggested_external_address")
+    body += v6_address(suggested_address) if suggested_address else b"\0" * 16
+    opcode = {"MAP": 1, "PEER": 2}[spec.get("opcode", "MAP")]
+    packet = bytes((2, opcode, 0, 0)) + struct.pack("!I", spec["lifetime"])
     packet += v6_address(client) + body
+    if opcode == 2:
+        peer = peer_addresses.get(spec["remote_peer"], spec["remote_peer"])
+        packet += struct.pack("!H", spec["remote_peer_port"]) + b"\0\0" + v6_address(peer)
     filters = spec.get("filters")
     if filters is None:
         filters = [spec["filter"]] if spec.get("filter") else []
@@ -62,55 +68,196 @@ def map_request(sock, router, client, spec, peer_addresses, nonce=None):
     packet, nonce, body = build_map_packet(client, spec, peer_addresses, nonce)
     sock.sendto(packet, (router, 5351))
     response, _ = sock.recvfrom(2048)
-    if len(response) < 60 or response[:2] != bytes((2, 0x81)):
-        raise AssertionError(f"malformed PCP MAP response ({len(response)} bytes)")
+    opcode = {"MAP": 1, "PEER": 2}[spec.get("opcode", "MAP")]
+    response_opcode = 0x80 | opcode
+    minimum_length = 80 if opcode == 2 else 60
+    if len(response) < minimum_length or response[:2] != bytes((2, response_opcode)):
+        raise AssertionError(f"malformed PCP {spec.get('opcode', 'MAP')} response ({len(response)} bytes)")
     result = RESULTS.get(response[3], f"UNKNOWN({response[3]})")
     if result == "SUCCESS":
         if response[24:36] != nonce:
             raise AssertionError("PCP response did not echo the MAP nonce")
         if response[36] != body[12] or response[40:42] != body[16:18]:
             raise AssertionError("PCP response changed the mapped protocol or internal port")
+        if ipaddress.ip_address(client).version == 6:
+            expected_address = spec.get("suggested_external_address", client)
+            if response[44:60] != v6_address(expected_address):
+                actual = socket.inet_ntop(socket.AF_INET6, response[44:60])
+                raise AssertionError(f"PCP response external IPv6 address expected "
+                                     f"{expected_address}, got {actual}")
+        if opcode == 2:
+            peer = peer_addresses.get(spec["remote_peer"], spec["remote_peer"])
+            if response[60:62] != struct.pack("!H", spec["remote_peer_port"]):
+                raise AssertionError("PCP PEER response changed the remote peer port")
+            if response[64:80] != v6_address(peer):
+                raise AssertionError("PCP PEER response changed the remote peer address")
+            suggested_address = spec.get("suggested_external_address")
+            if suggested_address and response[44:60] != v6_address(suggested_address):
+                raise AssertionError("PCP PEER response did not honor the suggested external address")
     return result, struct.unpack("!H", response[42:44])[0], nonce
 
 
+NATPMP_RESULTS = {0: "SUCCESS", 1: "UNSUPP_VERSION", 2: "NOT_AUTHORIZED",
+                  3: "NETWORK_FAILURE", 4: "OUT_OF_RESOURCES", 5: "UNSUPP_OPCODE"}
+
+
+def natpmp_request(sock, router, spec):
+    opcode = spec["opcode"]
+    if opcode == "PUBLIC_ADDRESS":
+        packet = bytes((0, 0))
+        expected_opcode = 128
+    else:
+        protocol_opcode = {"udp": 1, "tcp": 2}[spec["protocol"]]
+        packet = struct.pack("!BBHHHI", 0, protocol_opcode, 0,
+                             spec["private_port"], spec["public_port"], spec["lifetime"])
+        expected_opcode = 128 + protocol_opcode
+    sock.sendto(packet, (router, 5351))
+    response, _ = sock.recvfrom(64)
+    expected_length = 12 if opcode == "PUBLIC_ADDRESS" else 16
+    if len(response) != expected_length or response[:2] != bytes((0, expected_opcode)):
+        raise AssertionError(f"malformed NAT-PMP {opcode} response ({len(response)} bytes)")
+    result_code = struct.unpack("!H", response[2:4])[0]
+    result = NATPMP_RESULTS.get(result_code, f"UNKNOWN({result_code})")
+    if result == "SUCCESS" and opcode == "PUBLIC_ADDRESS":
+        address = socket.inet_ntop(socket.AF_INET, response[8:12])
+        return result, address, None
+    if result == "SUCCESS":
+        private_port, public_port, _lifetime = struct.unpack("!HHI", response[8:16])
+        if private_port != spec["private_port"]:
+            raise AssertionError("NAT-PMP response changed the private port")
+        if spec["lifetime"] and spec["public_port"] and public_port != spec["public_port"]:
+            raise AssertionError("NAT-PMP response changed the requested public port")
+        return result, public_port, None
+    return result, 0, None
+
+
+def send_mapping_request(sock, router, client, spec, peer_addresses, nonce=None):
+    if spec.get("protocol_family", "PCP") == "NAT-PMP":
+        return natpmp_request(sock, router, spec)
+    return map_request(sock, router, client, spec, peer_addresses, nonce)
+
+
+def flatten_cases(corpus):
+    cases = []
+    sections = corpus.get("sections")
+    if not isinstance(sections, list) or not sections:
+        raise ValueError("corpus must contain a non-empty sections list")
+    section_names = set()
+    for section in sections:
+        name = section.get("name")
+        section_cases = section.get("cases")
+        if not name or name in section_names or not isinstance(section_cases, list):
+            raise ValueError("sections must have unique names and cases lists")
+        section_names.add(name)
+        for case in section_cases:
+            case_copy = copy.deepcopy(case)
+            case_copy["section"] = name
+            cases.append(case_copy)
+    return cases
+
+
+def case_families(case):
+    families = case.get("families", ["ipv4", "ipv6"])
+    if not isinstance(families, list) or not families or any(
+            family not in ("ipv4", "ipv6") for family in families):
+        raise ValueError(f"{case.get('name', '<unnamed>')}: invalid families list")
+    return families
+
+
+def resolve_family(value, family):
+    if isinstance(value, dict):
+        if set(value) == {"ipv4", "ipv6"}:
+            return resolve_family(value[family], family)
+        return {key: resolve_family(item, family) for key, item in value.items()}
+    if isinstance(value, list):
+        return [resolve_family(item, family) for item in value]
+    return value
+
+
+def case_for_family(case, family):
+    resolved = resolve_family(case, family)
+    resolved.pop("families", None)
+    resolved["before_traffic"] = [
+        item for item in resolved.get("before_traffic", [])
+        if family in item.get("families", ["ipv4", "ipv6"])]
+    for traffic in resolved["before_traffic"]:
+        traffic.pop("families", None)
+    resolved["expect"]["traffic"] = [
+        item for item in resolved["expect"].get("traffic", [])
+        if family in item.get("families", ["ipv4", "ipv6"])]
+    for traffic in resolved["expect"]["traffic"]:
+        traffic.pop("families", None)
+    for stage in resolved.get("expect", {}).get("traffic_stages", []):
+        stage["traffic"] = [item for item in stage.get("traffic", [])
+                            if family in item.get("families", ["ipv4", "ipv6"])]
+        for traffic in stage["traffic"]:
+            traffic.pop("families", None)
+    return resolved
+
+
 def validate_corpus(corpus):
-    cases = corpus.get("cases")
-    if not isinstance(cases, list) or not cases:
-        raise ValueError("corpus must contain a non-empty cases list")
+    cases = flatten_cases(corpus)
+    if not cases:
+        raise ValueError("corpus must contain at least one case")
     names = [case.get("name") for case in cases]
     if any(not name for name in names) or len(names) != len(set(names)):
         raise ValueError("case names must be present and unique")
     for case in cases:
-        if case.get("family", "ipv4") not in ("ipv4", "ipv6"):
-            raise ValueError(f"{case['name']}: invalid address family")
-        requests = case.get("requests", [case["request"]] if "request" in case else [])
-        expected = case.get("expect", {}).get("results", [case.get("expect", {}).get("result")])
-        if not requests or len(requests) != len(expected) or any(not code for code in expected):
-            raise ValueError(f"{case['name']}: request/result count mismatch")
-        for request in requests:
-            if request.get("opcode") != "MAP" or request.get("protocol") not in ("tcp", "udp"):
-                raise ValueError(f"{case['name']}: only MAP over TCP or UDP is supported")
-            for field in ("internal_port", "suggested_external_port"):
-                if type(request.get(field)) is not int or not 1 <= request[field] <= 65535:
-                    raise ValueError(f"{case['name']}: invalid {field}")
-            filters = request.get("filters", [request["filter"]] if request.get("filter") else [])
-            for filt in filters:
-                prefix = filt.get("prefix_length")
-                limit = 32 if case.get("family", "ipv4") == "ipv4" else 128
-                if type(prefix) is not int or not 0 <= prefix <= limit:
-                    raise ValueError(f"{case['name']}: invalid FILTER prefix for {case.get('family', 'ipv4')}")
-        traffic = list(case.get("expect", {}).get("traffic", []))
-        traffic.extend(probe for stage in case.get("expect", {}).get("traffic_stages", [])
-                       for probe in stage.get("traffic", []))
-        for probe_spec in traffic:
-            if probe_spec.get("protocol") not in ("tcp", "udp") or probe_spec.get("expect") not in (
-                    "delivered", "blocked"):
-                raise ValueError(f"{case['name']}: invalid traffic expectation")
+        for family in case_families(case):
+            resolved = case_for_family(case, family)
+            requests = resolved.get("requests", [resolved["request"]] if "request" in resolved else [])
+            expected = resolved.get("expect", {}).get("results", [resolved.get("expect", {}).get("result")])
+            if not requests or len(requests) != len(expected) or any(not code for code in expected):
+                raise ValueError(f"{case['name']} ({family}): request/result count mismatch")
+            for request in requests:
+                request_family = request.get("protocol_family", "PCP")
+                if request_family == "NAT-PMP":
+                    if family != "ipv4":
+                        raise ValueError(f"{case['name']} ({family}): NAT-PMP is IPv4-only")
+                    if request.get("opcode") == "PUBLIC_ADDRESS":
+                        continue
+                    if request.get("opcode") not in ("UDP", "TCP"):
+                        raise ValueError(f"{case['name']} ({family}): invalid NAT-PMP opcode")
+                    if request.get("protocol") != request["opcode"].lower():
+                        raise ValueError(f"{case['name']} ({family}): NAT-PMP protocol/opcode mismatch")
+                    for field in ("private_port", "public_port"):
+                        minimum = 1 if field == "private_port" else 0
+                        if type(request.get(field)) is not int or not minimum <= request[field] <= 65535:
+                            raise ValueError(f"{case['name']} ({family}): invalid {field}")
+                    if type(request.get("lifetime")) is not int or request["lifetime"] < 0:
+                        raise ValueError(f"{case['name']} ({family}): invalid lifetime")
+                    continue
+                if request_family != "PCP" or request.get("opcode", "MAP") not in ("MAP", "PEER") or request.get("protocol") not in ("tcp", "udp"):
+                    raise ValueError(f"{case['name']} ({family}): unsupported mapping protocol or opcode")
+                for field in ("internal_port", "suggested_external_port"):
+                    minimum = 0 if field == "suggested_external_port" else 1
+                    if type(request.get(field)) is not int or not minimum <= request[field] <= 65535:
+                        raise ValueError(f"{case['name']} ({family}): invalid {field}")
+                if request.get("suggested_external_address"):
+                    ipaddress.ip_address(request["suggested_external_address"])
+                filters = request.get("filters", [request["filter"]] if request.get("filter") else [])
+                for filt in filters:
+                    prefix = filt.get("prefix_length")
+                    limit = 32 if family == "ipv4" else 128
+                    if type(prefix) is not int or not 0 <= prefix <= limit:
+                        raise ValueError(f"{case['name']} ({family}): invalid FILTER prefix")
+                if request.get("opcode") == "PEER":
+                    if not request.get("remote_peer") or type(request.get("remote_peer_port")) is not int or not 1 <= request["remote_peer_port"] <= 65535:
+                        raise ValueError(f"{case['name']} ({family}): PEER requires remote peer address and port")
+            traffic = list(resolved.get("before_traffic", []))
+            traffic.extend(resolved.get("expect", {}).get("traffic", []))
+            traffic.extend(probe for stage in resolved.get("expect", {}).get("traffic_stages", [])
+                           for probe in stage.get("traffic", []))
+            for probe_spec in traffic:
+                if probe_spec.get("protocol") not in ("tcp", "udp") or probe_spec.get("expect") not in (
+                        "delivered", "blocked"):
+                    raise ValueError(f"{case['name']} ({family}): invalid traffic expectation")
     return len(cases)
 
 
 def self_test(corpus):
     count = validate_corpus(corpus)
+    family_runs = sum(len(case_families(case)) for case in flatten_cases(corpus))
     addresses = {"allowed-peer": "198.51.100.2", "denied-peer": "198.51.100.130"}
     spec = {"protocol": "udp", "lifetime": 120, "internal_port": 41000,
             "suggested_external_port": 41000, "filter": {"remote_peer": "allowed-peer",
@@ -124,15 +271,26 @@ def self_test(corpus):
     spec["filters"] = [spec.pop("filter"), {"remote_peer": "denied-peer",
                                              "remote_port": 0, "prefix_length": 128}]
     spec["filters"][0]["prefix_length"] = 128
-    multi, _, _ = build_map_packet("fd42:5351:5351::2", spec, {
-        "allowed-peer": "fd42:5351:5352::2", "denied-peer": "fd42:5351:5352::130"}, nonce)
+    multi, _, _ = build_map_packet("2001:db8:1::2", spec, {
+        "allowed-peer": "2001:db8:9000::2", "denied-peer": "2001:db8:9000::130"}, nonce)
     assert multi[60] == 3 and multi[84] == 3
     assert multi[65] == 128 and multi[89] == 128
     spec["filters"] = [{"remote_peer": "::", "remote_port": 0, "prefix_length": 0}]
-    cleared, _, _ = build_map_packet("fd42:5351:5351::2", spec, {}, nonce)
+    cleared, _, _ = build_map_packet("2001:db8:1::2", spec, {}, nonce)
     assert cleared[65:68] == bytes((0, 0, 0))
-    print(f"PASS YAML validation ({count} cases)")
-    print("PASS IPv4/IPv6 FILTER field encoding (single and multiple options)")
+    peer, _, _ = build_map_packet("172.28.41.2", {
+        "opcode": "PEER", "protocol": "udp", "lifetime": 120,
+        "internal_port": 41020, "suggested_external_port": 41020,
+        "remote_peer": "allowed-peer", "remote_peer_port": 42100,
+    }, addresses, nonce)
+    assert len(peer) == 80 and peer[1] == 2
+    assert peer[60:64] == bytes((0xA4, 0x74, 0, 0))
+    assert peer[64:80] == v6_address(addresses["allowed-peer"])
+    natpmp_address = bytes((0, 0))
+    natpmp_udp = struct.pack("!BBHHHI", 0, 1, 0, 41100, 41100, 120)
+    assert natpmp_address == b"\0\0" and len(natpmp_udp) == 12 and natpmp_udp[1] == 1
+    print(f"PASS YAML sections ({count} logical cases, {family_runs} family runs)")
+    print("PASS IPv4/IPv6 PCP MAP, FILTER, and PEER encoding; NAT-PMP encoding")
 
 
 def probe(agent, host, port, transport, expect, source_port=None):
@@ -147,6 +305,34 @@ def probe(agent, host, port, transport, expect, source_port=None):
     delivered = outcome["delivered"]
     if delivered != (expect == "delivered"):
         raise AssertionError(f"{transport} {host}:{port}: expected {expect}; got {outcome}")
+
+
+class PeerFlow:
+    def __init__(self, peer, host, peer_port, protocol, client, internal_port):
+        family = socket.AF_INET6 if ipaddress.ip_address(host).version == 6 else socket.AF_INET
+        transport = socket.SOCK_DGRAM if protocol == "udp" else socket.SOCK_STREAM
+        self.sock = socket.socket(family, transport)
+        self.sock.settimeout(2)
+        self.sock.bind((client, internal_port))
+        self.sock.connect((host, peer_port))
+        self.peer = peer
+        self.protocol = protocol
+
+    def exchange(self):
+        token = os.urandom(16)
+        self.sock.sendall(token)
+        observed = json.loads(self.sock.recv(4096))
+        if observed.get("token_hex") != token.hex():
+            raise AssertionError(f"PCP PEER {self.protocol} payload was not echoed by {self.peer}")
+        return observed
+
+    def check_mapping(self, external, external_port, observed):
+        if observed.get("source") != external or observed.get("source_port") != external_port:
+            raise AssertionError(f"PCP PEER {self.protocol} expected WAN tuple "
+                                 f"{external}:{external_port}; got {observed}")
+
+    def close(self):
+        self.sock.close()
 
 
 class Echo:
@@ -192,9 +378,19 @@ def run_case(case, args, agents, pcp_sock):
     if len(requests) != len(expected):
         raise AssertionError("requests/results lengths differ")
     active = {}
+    peer_flows = {}
 
     def cleanup_mappings():
         for (protocol, internal_port), (original, _port, nonce) in active.items():
+            if original.get("protocol_family") == "NAT-PMP":
+                delete = dict(original, public_port=0, lifetime=0)
+                result, _assigned, _ = natpmp_request(pcp_sock, args.router, delete)
+                if result != "SUCCESS":
+                    raise AssertionError(f"cleanup of NAT-PMP {protocol}/{internal_port} returned {result}")
+                continue
+            if original.get("opcode") == "PEER":
+                # RFC 6887 does not define lifetime zero as PEER deletion.
+                continue
             delete = dict(original, lifetime=0)
             delete.pop("filter", None)
             delete.pop("filters", None)
@@ -207,6 +403,30 @@ def run_case(case, args, agents, pcp_sock):
     listeners = {}
     def run_traffic(traffic_items):
         for traffic in traffic_items:
+            if traffic.get("mode") in ("peer", "peer-implicit", "peer-existing"):
+                spec = next(request for request in requests
+                            if request.get("opcode") == "PEER"
+                            and request["protocol"] == traffic["protocol"])
+                peer = args.peer_addresses.get(spec["remote_peer"], spec["remote_peer"])
+                key = (spec["protocol"], spec["internal_port"])
+                if traffic["mode"] == "peer-implicit":
+                    flow = PeerFlow(traffic["from"], peer, spec["remote_peer_port"],
+                                    spec["protocol"], args.client_address,
+                                    spec["internal_port"])
+                    peer_flows[key] = (flow, flow.exchange())
+                elif traffic["mode"] == "peer-existing":
+                    _flow, observed = peer_flows[key]
+                    mapping = active[key]
+                    _flow.check_mapping(args.external_address, mapping[1], observed)
+                else:
+                    flow = PeerFlow(traffic["from"], peer, spec["remote_peer_port"],
+                                    spec["protocol"], args.client_address,
+                                    spec["internal_port"])
+                    try:
+                        flow.check_mapping(args.external_address, active[key][1], flow.exchange())
+                    finally:
+                        flow.close()
+                continue
             service_port = traffic.get("service_port")
             if service_port is None:
                 service_port = requests[0].get("internal_port")
@@ -227,16 +447,28 @@ def run_case(case, args, agents, pcp_sock):
                   traffic["protocol"], traffic["expect"], traffic.get("source_port"))
 
     try:
+        run_traffic(case.get("before_traffic", []))
         stages = case["expect"].get("traffic_stages", [])
         for request_index, (spec, wanted) in enumerate(zip(requests, expected), 1):
-            key = (spec["protocol"], spec["internal_port"])
+            protocol = spec.get("protocol", "address")
+            internal_port = spec.get("internal_port", spec.get("private_port", request_index))
+            key = (protocol, internal_port)
             prior = active.get(key)
-            result, port, nonce = map_request(
+            result, port, nonce = send_mapping_request(
                 pcp_sock, args.router, args.client_address, spec,
                 args.peer_addresses, prior[2] if prior else None)
+            if args.snapshot_gate_prefix:
+                gate = f"{args.snapshot_gate_prefix}-{request_index}.ready"
+                with open(gate, "w", encoding="utf-8"):
+                    pass
+                while os.path.exists(gate):
+                    time.sleep(0.02)
             if result != wanted:
-                raise AssertionError(f"PCP response expected {wanted}, got {result}")
-            if result == "SUCCESS" and spec["lifetime"]:
+                raise AssertionError(f"{spec.get('protocol_family', 'PCP')} response expected {wanted}, got {result}")
+            if (result == "SUCCESS" and spec.get("opcode") == "PUBLIC_ADDRESS"
+                    and port != args.external_address):
+                raise AssertionError(f"NAT-PMP public address expected {args.external_address}, got {port}")
+            if result == "SUCCESS" and spec.get("lifetime", 0):
                 active[key] = (spec, port, nonce)
             elif result == "SUCCESS":
                 active.pop(key, None)
@@ -249,6 +481,8 @@ def run_case(case, args, agents, pcp_sock):
     finally:
         for listener in listeners.values():
             listener.close()
+        for flow, _observed in peer_flows.values():
+            flow.close()
         cleanup_mappings()
     print(f"PASS {case['name']}")
 
@@ -257,7 +491,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", default=os.path.join(os.path.dirname(__file__), "pcp-e2e-cases.yaml"))
     parser.add_argument("--self-test", action="store_true",
-                        help="validate YAML cases and PCP/FILTER packet encoding without a daemon")
+                        help="validate YAML cases and PCP/NAT-PMP encoding without a daemon")
     parser.add_argument("--router", default="172.28.41.1")
     parser.add_argument("--client-address", default="172.28.41.2")
     parser.add_argument("--external-address", default="198.51.100.1")
@@ -265,9 +499,13 @@ def main():
     parser.add_argument("--agent", action="append", default=[], metavar="NAME=URL")
     parser.add_argument("--peer-address", action="append", default=[], metavar="NAME=ADDRESS")
     parser.add_argument("--case", action="append")
+    parser.add_argument("--snapshot-gate-prefix",
+                        help="pause before checking each PCP result until the harness snapshots daemon state")
     parser.add_argument("--route-through-router", action="store_true",
                         help="route replies from the LAN echo service back through the test router")
     args = parser.parse_args()
+    if args.family == "ipv6" and args.external_address == "198.51.100.1":
+        args.external_address = "2001:db8:9000::1"
     with open(args.cases, encoding="utf-8") as source:
         corpus = yaml.safe_load(source)
     if args.self_test:
@@ -279,21 +517,22 @@ def main():
             subprocess.run(["ip", "route", "replace", "198.51.100.0/24",
                             "via", args.router], check=True)
         else:
-            subprocess.run(["ip", "-6", "route", "replace", "fd42:5351:5352::/64",
-                            "via", "fd42:5351:5351::1"], check=True)
+            subprocess.run(["ip", "-6", "route", "replace", "2001:db8:9000::/64",
+                            "via", args.router], check=True)
     agents = dict(item.split("=", 1) for item in args.agent)
     args.peer_addresses = dict(item.split("=", 1) for item in args.peer_address)
     args.socket_family = socket.AF_INET6 if args.family == "ipv6" else socket.AF_INET
-    needed = {traffic["from"] for case in corpus["cases"]
-              for traffic in (case.get("expect", {}).get("traffic", []) +
+    all_cases = flatten_cases(corpus)
+    cases = [case_for_family(case, args.family) for case in all_cases
+             if args.family in case_families(case)
+             and (not args.case or case["name"] in args.case)]
+    needed = {traffic["from"] for case in cases
+              for traffic in (case.get("before_traffic", []) +
+                              case.get("expect", {}).get("traffic", []) +
                               [probe for stage in case.get("expect", {}).get("traffic_stages", [])
-                               for probe in stage["traffic"]])
-              if case.get("family", "ipv4") == args.family}
+                               for probe in stage["traffic"]])}
     if needed - agents.keys():
         parser.error("missing agents for: " + ", ".join(sorted(needed - agents.keys())))
-    cases = [case for case in corpus["cases"]
-             if case.get("family", "ipv4") == args.family
-             and (not args.case or case["name"] in args.case)]
     if not cases:
         parser.error("no matching cases")
     failures = 0

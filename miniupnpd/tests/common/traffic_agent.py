@@ -15,11 +15,64 @@ import errno
 import ipaddress
 import itertools
 import json
+import select
 import socket
 import subprocess
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SOURCE_PORTS = itertools.count(40000)
+
+
+class PeerEcho:
+    """Echo TCP/UDP peer traffic and report the source tuple seen on WAN."""
+    def __init__(self, host4, host6, port):
+        self.sockets = []
+        self.stop = threading.Event()
+        for family, host in ((socket.AF_INET, host4), (socket.AF_INET6, host6)):
+            for transport in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+                sock = socket.socket(family, transport)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                if family == socket.AF_INET6:
+                    sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+                sock.bind((host, port))
+                port = sock.getsockname()[1]
+                if transport == socket.SOCK_STREAM:
+                    sock.listen(8)
+                self.sockets.append(sock)
+        self.worker = threading.Thread(target=self.serve, daemon=True)
+        self.worker.start()
+
+    @staticmethod
+    def response(data, peer):
+        return json.dumps({"token_hex": data.hex(), "source": peer[0],
+                           "source_port": peer[1]}).encode()
+
+    def serve(self):
+        while not self.stop.is_set():
+            readable, _, _ = select.select(self.sockets, [], [], 0.2)
+            for sock in readable:
+                if sock.type == socket.SOCK_DGRAM:
+                    data, peer = sock.recvfrom(4096)
+                    sock.sendto(self.response(data, peer), peer)
+                else:
+                    connection, peer = sock.accept()
+                    threading.Thread(target=self.serve_tcp, args=(connection, peer),
+                                     daemon=True).start()
+
+    def serve_tcp(self, connection, peer):
+        with connection:
+            data = connection.recv(4096)
+            if data:
+                connection.sendall(self.response(data, peer))
+                while connection.recv(4096):
+                    pass
+
+    def close(self):
+        self.stop.set()
+        self.worker.join(timeout=1)
+        for sock in self.sockets:
+            sock.close()
 
 
 def probe(spec, source4='0.0.0.0', source6='::'):
@@ -215,22 +268,32 @@ def main():
     parser.add_argument('--port', type=int, default=18080)
     parser.add_argument('--source4', default='0.0.0.0')
     parser.add_argument('--source6', default='::')
-    parser.add_argument('--route6', help='IPv6 destination prefix routed through the gateway')
-    parser.add_argument('--gateway6', help='IPv6 gateway on the probe source interface')
+    parser.add_argument('--route6', action='append', default=[],
+                        help='IPv6 destination prefix routed through the gateway; repeatable')
+    parser.add_argument('--gateway6', action='append', default=[],
+                        help='IPv6 gateway corresponding to each --route6; repeatable')
+    parser.add_argument('--peer-port', type=int,
+                        help='serve PCP PEER TCP/UDP echo traffic on this port')
     args = parser.parse_args()
     if args.self_test:
         return run_self_tests()
-    if bool(args.route6) != bool(args.gateway6):
-        parser.error('--route6 and --gateway6 must be supplied together')
+    if len(args.route6) != len(args.gateway6):
+        parser.error('supply one --gateway6 for every --route6')
     if args.route6:
         interfaces = json.loads(subprocess.check_output(['ip', '-j', 'address']))
         interface = next(item['ifname'] for item in interfaces
                          if any(addr.get('local') == args.source4 for addr in item['addr_info']))
-        subprocess.run(['ip', '-6', 'route', 'replace', args.route6,
-                        'via', args.gateway6, 'dev', interface, 'metric', '1'], check=True)
+        for route6, gateway6 in zip(args.route6, args.gateway6):
+            subprocess.run(['ip', '-6', 'route', 'replace', route6,
+                            'via', gateway6, 'dev', interface, 'metric', '1'], check=True)
 
-    with create_server(args.host, args.port, args.source4, args.source6) as server:
-        server.serve_forever()
+    peer_echo = PeerEcho(args.source4, args.source6, args.peer_port) if args.peer_port else None
+    try:
+        with create_server(args.host, args.port, args.source4, args.source6) as server:
+            server.serve_forever()
+    finally:
+        if peer_echo:
+            peer_echo.close()
 
 
 if __name__ == '__main__':

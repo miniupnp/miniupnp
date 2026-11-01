@@ -45,10 +45,12 @@ Command-line arguments:
 - `--source6 ADDRESS`: IPv6 probe source (default: `::`, letting the OS choose
   the outgoing address).
 - `--route6 PREFIX`: optional IPv6 destination prefix routed through the
-  gateway. Requires `--gateway6`; the interface is selected by `--source4`.
-- `--gateway6 ADDRESS`: IPv6 gateway for `--route6`. Supply both route options
-  together; setup requires the Linux `ip` command and network administration
-  privileges. Without these options, the agent leaves routing unchanged.
+  gateway. Repeat with `--gateway6` for additional prefixes; the interface is
+  selected by `--source4`.
+- `--gateway6 ADDRESS`: IPv6 gateway corresponding to each `--route6`; supply
+  one for every route. Setup requires the Linux `ip` command and network
+  administration privileges. Without these options, the agent leaves routing
+  unchanged.
 - `--self-test`: run HTTP and IPv4/IPv6 TCP/UDP checks on loopback without a
   gateway, then exit.
 - `-h`, `--help`: show usage and exit.

@@ -1,542 +1,675 @@
-# End-to-end PCP scenarios.
-#
-# These cases describe an accepted PCP request and the traffic behavior that
-# must follow it. They are intentionally separate from the RFC packet corpus:
-# success means both a PCP response and the requested forwarding policy.
-#
+# End-to-end PCP cases grouped by operation. Each logical case runs for both IPv4 and IPv6.
 version: 1
-description: >-
-  End-to-end checks for PCP mappings installed by miniupnpd. A passing case
-  requires observing the expected packet delivery behavior through the
-  daemon's forwarding path.
-
-cases:
-  - name: map-single-udp-only
-    description: A UDP mapping forwards UDP traffic and does not create a TCP mapping.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41010
-      suggested_external_port: 41010
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
+description: End-to-end checks for PCP mappings installed by miniupnpd. A passing case requires observing
+  the expected packet delivery behavior through the daemon's forwarding path.
+sections:
+  - name: MAP
+    description: PCP MAP mapping lifecycle and protocol scenarios.
+    cases:
+      - name: map-single-udp-only
+        families:
+          - ipv4
+          - ipv6
+        description: A UDP mapping forwards UDP traffic and does not create a TCP mapping.
+        request:
+          opcode: MAP
+          lifetime: 120
           protocol: udp
-          expect: delivered
-        - from: allowed-peer
+          internal_port: 41010
+          suggested_external_port: 41010
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: allowed-peer
+              protocol: tcp
+              expect: blocked
+      - name: map-single-tcp-only
+        families:
+          - ipv4
+          - ipv6
+        description: A TCP mapping forwards TCP traffic and does not create a UDP mapping.
+        request:
+          opcode: MAP
+          lifetime: 120
           protocol: tcp
-          expect: blocked
-
-  - name: map-single-tcp-only
-    description: A TCP mapping forwards TCP traffic and does not create a UDP mapping.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: tcp
-      internal_port: 41011
-      suggested_external_port: 41011
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: tcp
-          expect: delivered
-        - from: allowed-peer
+          internal_port: 41011
+          suggested_external_port: 41011
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: tcp
+              expect: delivered
+            - from: allowed-peer
+              protocol: udp
+              expect: blocked
+      - name: map-udp-and-tcp-same-port
+        families:
+          - ipv4
+          - ipv6
+        description: UDP and TCP mappings can coexist on the same external and internal port.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41012
+            suggested_external_port: 41012
+          - opcode: MAP
+            lifetime: 120
+            protocol: tcp
+            internal_port: 41012
+            suggested_external_port: 41012
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: allowed-peer
+              protocol: tcp
+              expect: delivered
+      - name: map-same-protocol-and-port-conflicts
+        families:
+          - ipv4
+          - ipv6
+        description: A second mapping cannot steal an occupied external protocol and port tuple.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41013
+            suggested_external_port: 41013
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41014
+            suggested_external_port: 41013
+            prefer_failure: true
+        expect:
+          results:
+            - SUCCESS
+            - CANNOT_PROVIDE_EXTERNAL
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+              external_port: 41013
+              service_port: 41013
+      - name: map-renewal-keeps-forwarding
+        families:
+          - ipv4
+          - ipv6
+        description: Renewing a mapping keeps its forwarding behavior active.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41015
+            suggested_external_port: 41015
+          - opcode: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41015
+            suggested_external_port: 41015
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+      - name: map-delete-stops-forwarding
+        families:
+          - ipv4
+          - ipv6
+        description: Deleting a mapping removes the forwarding path for new flows.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: tcp
+            internal_port: 41016
+            suggested_external_port: 41016
+          - opcode: MAP
+            lifetime: 0
+            protocol: tcp
+            internal_port: 41016
+            suggested_external_port: 41016
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: tcp
+              expect: blocked
+              use_fresh_source_port: true
+      - name: map-unfiltered-allows-independent-peers
+        families:
+          - ipv4
+          - ipv6
+        description: An unrestricted PCP MAP accepts traffic from either WAN peer.
+        request:
+          opcode: MAP
+          lifetime: 120
           protocol: udp
-          expect: blocked
-
-  - name: map-udp-and-tcp-same-port
-    description: UDP and TCP mappings can coexist on the same external and internal port.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41012
-        suggested_external_port: 41012
-      - opcode: MAP
-        lifetime: 120
-        protocol: tcp
-        internal_port: 41012
-        suggested_external_port: 41012
-    expect:
-      results: [SUCCESS, SUCCESS]
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: allowed-peer
-          protocol: tcp
-          expect: delivered
-
-  - name: map-same-protocol-and-port-conflicts
-    description: A second mapping cannot steal an occupied external protocol and port tuple.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41013
-        suggested_external_port: 41013
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41014
-        suggested_external_port: 41013
-        prefer_failure: true
-    expect:
-      results: [SUCCESS, CANNOT_PROVIDE_EXTERNAL]
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-          external_port: 41013
-          service_port: 41013
-
-  - name: map-renewal-keeps-forwarding
-    description: Renewing a mapping keeps its forwarding behavior active.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41015
-        suggested_external_port: 41015
-      - opcode: MAP
-        lifetime: 240
-        protocol: udp
-        internal_port: 41015
-        suggested_external_port: 41015
-    expect:
-      results: [SUCCESS, SUCCESS]
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-
-  - name: map-delete-stops-forwarding
-    description: Deleting a mapping removes the forwarding path for new flows.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: tcp
-        internal_port: 41016
-        suggested_external_port: 41016
-      - opcode: MAP
-        lifetime: 0
-        protocol: tcp
-        internal_port: 41016
-        suggested_external_port: 41016
-    expect:
-      results: [SUCCESS, SUCCESS]
-      traffic:
-        - from: allowed-peer
-          protocol: tcp
-          expect: blocked
-          use_fresh_source_port: true
-
-  - name: map-unfiltered-allows-independent-peers
-    description: An unrestricted PCP MAP accepts traffic from either WAN peer.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41001
-      suggested_external_port: 41001
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: delivered
-        - from: third-peer
-          protocol: udp
-          expect: delivered
-
-  - name: map-filter-exact-peer-and-port
-    description: An IPv4 /32 FILTER allows the peer and port in the option and blocks mismatches.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41002
-      suggested_external_port: 41002
-      filter:
-        remote_peer: allowed-peer
-        remote_port: 42000
-        prefix_length: 32
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          source_port: 42000
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          source_port: 42000
-          protocol: udp
-          expect: blocked
-        - from: third-peer
-          source_port: 42000
-          protocol: udp
-          expect: blocked
-
-  - name: map-filter-restricts-remote-port
-    description: A matching peer address with a different source port is blocked.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: tcp
-      internal_port: 41003
-      suggested_external_port: 41003
-      filter:
-        remote_peer: allowed-peer
-        remote_port: 42000
-        prefix_length: 32
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          source_port: 42000
-          protocol: tcp
-          expect: delivered
-        - from: allowed-peer
-          source_port: 42001
-          protocol: tcp
-          expect: blocked
-        - from: denied-peer
-          source_port: 42000
-          protocol: tcp
-          expect: blocked
-
-  - name: map-filter-prefix-24-allows-subnet
-    description: An IPv4 /24 prefix permits both WAN peers in the same subnet.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41004
-      suggested_external_port: 41004
-      filter:
-        remote_peer: allowed-peer
-        remote_port: 0
-        prefix_length: 24
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: delivered
-        - from: third-peer
-          protocol: udp
-          expect: delivered
-
-  - name: map-filter-prefix-25-rejects-outside-subnet
-    description: An IPv4 /25 permits the lower half of the /24 and blocks the upper half.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41005
-      suggested_external_port: 41005
-      filter:
-        remote_peer: allowed-peer
-        remote_port: 0
-        prefix_length: 25
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: blocked
-
-  - name: map-filter-multiple-options-add-peers
-    description: Repeated FILTER options in one request allow traffic from either peer.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41006
-      suggested_external_port: 41006
-      filters:
-        - remote_peer: allowed-peer
-          remote_port: 0
-          prefix_length: 32
-        - remote_peer: denied-peer
-          remote_port: 0
-          prefix_length: 32
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: delivered
-        - from: third-peer
-          protocol: udp
-          expect: blocked
-
-  - name: map-filter-refresh-adds-peer
-    description: A refresh with a FILTER adds that peer to the existing mapping's allowed set.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41007
-        suggested_external_port: 41007
-        filter:
-          remote_peer: allowed-peer
-          remote_port: 0
-          prefix_length: 32
-      - opcode: MAP
-        lifetime: 240
-        protocol: udp
-        internal_port: 41007
-        suggested_external_port: 41007
-        filter:
-          remote_peer: denied-peer
-          remote_port: 0
-          prefix_length: 32
-    expect:
-      results: [SUCCESS, SUCCESS]
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: delivered
-        - from: third-peer
-          protocol: udp
-          expect: blocked
-
-  - name: map-filter-refresh-replaces-peer-set
-    description: Prefix zero clears previous filters before the replacement peer is installed.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41008
-        suggested_external_port: 41008
-        filter:
-          remote_peer: allowed-peer
-          remote_port: 0
-          prefix_length: 32
-      - opcode: MAP
-        lifetime: 240
-        protocol: udp
-        internal_port: 41008
-        suggested_external_port: 41008
-        filters:
-          - remote_peer: "::"
-            remote_port: 0
-            prefix_length: 0
-          - remote_peer: denied-peer
-            remote_port: 0
-            prefix_length: 32
-    expect:
-      results: [SUCCESS, SUCCESS]
-      traffic:
-        - from: denied-peer
-          protocol: udp
-          expect: delivered
-        - from: allowed-peer
-          protocol: udp
-          expect: blocked
-        - from: third-peer
-          protocol: udp
-          expect: blocked
-
-  - name: map-filter-prefix-zero-removes-all
-    description: A prefix-zero FILTER clears all filters and permits both peers on the mapping.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41009
-        suggested_external_port: 41009
-        filter:
-          remote_peer: allowed-peer
-          remote_port: 0
-          prefix_length: 32
-      - opcode: MAP
-        lifetime: 240
-        protocol: udp
-        internal_port: 41009
-        suggested_external_port: 41009
-        filter:
-          remote_peer: "::"
-          remote_port: 0
-          prefix_length: 0
-    expect:
-      results: [SUCCESS, SUCCESS]
-      traffic_stages:
-        - after_request: 1
+          internal_port: 41001
+          suggested_external_port: 41001
+        expect:
+          result: SUCCESS
           traffic:
             - from: allowed-peer
               protocol: udp
               expect: delivered
             - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: delivered
+  - name: FILTER
+    description: PCP MAP FILTER peer and source-port policy scenarios.
+    cases:
+      - name: map-filter-exact-peer-and-port
+        families:
+          - ipv4
+          - ipv6
+        description: An exact peer and port filter uses /32 for IPv4 and /128 for IPv6.
+        request:
+          opcode: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41002
+          suggested_external_port: 41002
+          filter:
+            remote_peer: allowed-peer
+            remote_port: 42000
+            prefix_length:
+              ipv4: 32
+              ipv6: 128
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+              source_port: 42000
+            - from: denied-peer
+              protocol: udp
+              expect: blocked
+              source_port: 42000
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+              source_port: 42000
+      - name: map-filter-restricts-remote-port
+        families:
+          - ipv4
+          - ipv6
+        description: A matching peer address with a different source port is blocked.
+        request:
+          opcode: MAP
+          lifetime: 120
+          protocol: tcp
+          internal_port: 41003
+          suggested_external_port: 41003
+          filter:
+            remote_peer: allowed-peer
+            remote_port: 42000
+            prefix_length:
+              ipv4: 32
+              ipv6: 128
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: tcp
+              expect: delivered
+              source_port: 42000
+            - from: allowed-peer
+              protocol: tcp
+              expect: blocked
+              source_port: 42001
+            - from: denied-peer
+              protocol: tcp
+              expect: blocked
+              source_port: 42000
+      - name: map-filter-prefix-allows-subnet
+        families:
+          - ipv4
+          - ipv6
+        description: A /24 IPv4 or /64 IPv6 prefix permits peers in the same subnet.
+        request:
+          opcode: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41004
+          suggested_external_port: 41004
+          filter:
+            remote_peer: allowed-peer
+            remote_port: 0
+            prefix_length:
+              ipv4: 24
+              ipv6: 64
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: delivered
+      - name: map-filter-narrow-prefix-rejects-outside-subnet
+        families:
+          - ipv4
+          - ipv6
+        description: A narrow prefix permits the allowed peer and blocks the peer outside it.
+        request:
+          opcode: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41005
+          suggested_external_port: 41005
+          filter:
+            remote_peer: allowed-peer
+            remote_port: 0
+            prefix_length:
+              ipv4: 25
+              ipv6: 127
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-multiple-options-add-peers
+        families:
+          - ipv4
+          - ipv6
+        description: Repeated FILTER options in one request allow traffic from either peer.
+        request:
+          opcode: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41006
+          suggested_external_port: 41006
+          filters:
+            - remote_peer: allowed-peer
+              remote_port: 0
+              prefix_length:
+                ipv4: 32
+                ipv6: 128
+            - remote_peer: denied-peer
+              remote_port: 0
+              prefix_length:
+                ipv4: 32
+                ipv6: 128
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-refresh-adds-peer
+        families:
+          - ipv4
+          - ipv6
+        description: A refresh with a FILTER adds that peer to the existing mapping's allowed set.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41007
+            suggested_external_port: 41007
+            filter:
+              remote_peer: allowed-peer
+              remote_port: 0
+              prefix_length:
+                ipv4: 32
+                ipv6: 128
+          - opcode: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41007
+            suggested_external_port: 41007
+            filter:
+              remote_peer: denied-peer
+              remote_port: 0
+              prefix_length:
+                ipv4: 32
+                ipv6: 128
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-refresh-replaces-peer-set
+        families:
+          - ipv4
+          - ipv6
+        description: Prefix zero clears previous filters before the replacement peer is installed.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41008
+            suggested_external_port: 41008
+            filter:
+              remote_peer: allowed-peer
+              remote_port: 0
+              prefix_length:
+                ipv4: 32
+                ipv6: 128
+          - opcode: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41008
+            suggested_external_port: 41008
+            filters:
+              - remote_peer: '::'
+                remote_port: 0
+                prefix_length: 0
+              - remote_peer: denied-peer
+                remote_port: 0
+                prefix_length:
+                  ipv4: 32
+                  ipv6: 128
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: allowed-peer
               protocol: udp
               expect: blocked
             - from: third-peer
               protocol: udp
               expect: blocked
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: delivered
-        - from: third-peer
-          protocol: udp
-          expect: delivered
-
-  - name: ipv6-map-single-udp-only
-    family: ipv6
-    description: An IPv6 MAP pinhole forwards UDP and does not admit TCP on that port.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41101
-      suggested_external_port: 41101
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: allowed-peer
-          protocol: tcp
-          expect: blocked
-
-  - name: ipv6-filter-prefix-128
-    family: ipv6
-    description: An IPv6 /128 FILTER admits only the exact source address.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41102
-      suggested_external_port: 41102
-      filter:
-        remote_peer: allowed-peer
-        remote_port: 0
-        prefix_length: 128
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: blocked
-
-  - name: ipv6-filter-prefix-64
-    family: ipv6
-    description: An IPv6 /64 FILTER admits all three peers in the same subnet.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: udp
-      internal_port: 41103
-      suggested_external_port: 41103
-      filter:
-        remote_peer: allowed-peer
-        remote_port: 0
-        prefix_length: 64
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: udp
-          expect: delivered
-        - from: denied-peer
-          protocol: udp
-          expect: delivered
-        - from: third-peer
-          protocol: udp
-          expect: delivered
-
-  - name: ipv6-filter-prefix-127
-    family: ipv6
-    description: An IPv6 /127 FILTER matches the source subnet boundary precisely.
-    request:
-      opcode: MAP
-      lifetime: 120
-      protocol: tcp
-      internal_port: 41104
-      suggested_external_port: 41104
-      filter:
-        remote_peer: allowed-peer
-        remote_port: 0
-        prefix_length: 127
-    expect:
-      result: SUCCESS
-      traffic:
-        - from: allowed-peer
-          protocol: tcp
-          expect: delivered
-        - from: denied-peer
-          protocol: tcp
-          expect: blocked
-        - from: third-peer
-          protocol: tcp
-          expect: blocked
-
-  - name: ipv6-filter-prefix-zero-clears
-    family: ipv6
-    description: Prefix zero removes the prior IPv6 filter and allows all peers.
-    requests:
-      - opcode: MAP
-        lifetime: 120
-        protocol: udp
-        internal_port: 41105
-        suggested_external_port: 41105
-        filter:
-          remote_peer: allowed-peer
-          remote_port: 0
-          prefix_length: 128
-      - opcode: MAP
-        lifetime: 240
-        protocol: udp
-        internal_port: 41105
-        suggested_external_port: 41105
-        filter:
-          remote_peer: "::"
-          remote_port: 0
-          prefix_length: 0
-    expect:
-      results: [SUCCESS, SUCCESS]
-      traffic_stages:
-        - after_request: 1
+      - name: map-filter-prefix-zero-removes-all
+        families:
+          - ipv4
+          - ipv6
+        description: A prefix-zero FILTER clears all filters and permits both peers on the mapping.
+        requests:
+          - opcode: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41009
+            suggested_external_port: 41009
+            filter:
+              remote_peer: allowed-peer
+              remote_port: 0
+              prefix_length:
+                ipv4: 32
+                ipv6: 128
+          - opcode: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41009
+            suggested_external_port: 41009
+            filter:
+              remote_peer: '::'
+              remote_port: 0
+              prefix_length: 0
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
           traffic:
             - from: allowed-peer
               protocol: udp
               expect: delivered
             - from: denied-peer
               protocol: udp
-              expect: blocked
-      traffic:
-        - from: allowed-peer
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: delivered
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - from: allowed-peer
+                  protocol: udp
+                  expect: delivered
+                - from: denied-peer
+                  protocol: udp
+                  expect: blocked
+                - from: third-peer
+                  protocol: udp
+                  expect: blocked
+  - name: PEER
+    description: PCP PEER mappings restricted to a remote endpoint.
+    cases:
+      - name: peer-create-before-first-packet-udp
+        families:
+          - ipv4
+          - ipv6
+        description: Create a UDP outbound mapping before the client sends its first packet.
+        request:
+          opcode: PEER
+          lifetime: 120
           protocol: udp
-          expect: delivered
-        - from: denied-peer
+          internal_port: 41020
+          suggested_external_port: 43020
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result:
+            ipv4: SUCCESS
+            ipv6: UNSUPP_OPCODE
+          traffic:
+            - from: allowed-peer
+              mode: peer
+              protocol: udp
+              expect: delivered
+              families:
+                - ipv4
+      - name: peer-create-before-first-packet-tcp
+        families:
+          - ipv4
+          - ipv6
+        description: Create a TCP outbound mapping before the client sends its first packet.
+        request:
+          opcode: PEER
+          lifetime: 120
+          protocol: tcp
+          internal_port: 41021
+          suggested_external_port: 43021
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result:
+            ipv4: SUCCESS
+            ipv6: UNSUPP_OPCODE
+          traffic:
+            - from: allowed-peer
+              mode: peer
+              protocol: tcp
+              expect: delivered
+              families:
+                - ipv4
+      - name: peer-adopts-existing-udp-mapping
+        families:
+          - ipv4
+          - ipv6
+        description: PEER learns and extends an existing implicit UDP outbound mapping.
+        request:
+          opcode: PEER
+          lifetime: 240
           protocol: udp
-          expect: delivered
-        - from: third-peer
+          internal_port: 41030
+          suggested_external_port: 0
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        before_traffic:
+          - from: allowed-peer
+            mode: peer-implicit
+            protocol: udp
+            expect: delivered
+        expect:
+          result:
+            ipv4: SUCCESS
+            ipv6: UNSUPP_OPCODE
+          traffic:
+            - from: allowed-peer
+              mode: peer-existing
+              protocol: udp
+              expect: delivered
+              families:
+                - ipv4
+      - name: peer-adopts-existing-tcp-mapping
+        families:
+          - ipv4
+          - ipv6
+        description: PEER learns and extends an existing implicit TCP outbound mapping.
+        request:
+          opcode: PEER
+          lifetime: 240
+          protocol: tcp
+          internal_port: 41031
+          suggested_external_port: 0
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        before_traffic:
+          - from: allowed-peer
+            mode: peer-implicit
+            protocol: tcp
+            expect: delivered
+        expect:
+          result:
+            ipv4: SUCCESS
+            ipv6: UNSUPP_OPCODE
+          traffic:
+            - from: allowed-peer
+              mode: peer-existing
+              protocol: tcp
+              expect: delivered
+              families:
+                - ipv4
+      - name: peer-recreates-remembered-tcp-mapping
+        families:
+          - ipv4
+          - ipv6
+        description: In a clean fixture, recreate a lost TCP mapping using its remembered external tuple.
+        request:
+          opcode: PEER
+          lifetime: 240
+          protocol: tcp
+          internal_port: 41040
+          suggested_external_port: 43040
+          suggested_external_address:
+            ipv4: 198.51.100.1
+            ipv6: 2001:db8:9000::1
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result:
+            ipv4: SUCCESS
+            ipv6: UNSUPP_OPCODE
+          traffic:
+            - from: allowed-peer
+              mode: peer
+              protocol: tcp
+              expect: delivered
+              families:
+                - ipv4
+
+  - name: NAT
+    description: NAT-PMP IPv4 address discovery and IPv6 PCP mapping with NAT66.
+    nat66: true
+    cases:
+      - name: natpmp-public-address
+        families: [ipv4]
+        description: Request and verify the gateway's external IPv4 address.
+        request:
+          protocol_family: NAT-PMP
+          opcode: PUBLIC_ADDRESS
+        expect:
+          result: SUCCESS
+      - name: ipv6-pcp-map-reachability
+        families: [ipv6]
+        description: With the client using the NAT66-only ULA, PCP MAP preserves that address and opens its pinhole.
+        request:
+          opcode: MAP
+          lifetime: 120
           protocol: udp
-          expect: delivered
+          internal_port: 41103
+          suggested_external_port: 41103
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41103, external_port: 41103, expect: delivered}
+
+  - name: PMP
+    description: NAT-PMP UDP and TCP mapping creation, renewal, and deletion.
+    cases:
+      - name: natpmp-single-udp-lifecycle
+        families: [ipv4]
+        description: Create, renew, and delete a UDP mapping, checking forwarding before deletion and blocking after.
+        requests:
+          - {protocol_family: NAT-PMP, opcode: UDP, protocol: udp, private_port: 41100, public_port: 41100, lifetime: 120}
+          - {protocol_family: NAT-PMP, opcode: UDP, protocol: udp, private_port: 41100, public_port: 41100, lifetime: 240}
+          - {protocol_family: NAT-PMP, opcode: UDP, protocol: udp, private_port: 41100, public_port: 0, lifetime: 0}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41100, external_port: 41100, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41100, external_port: 41100, expect: blocked}
+      - name: natpmp-single-tcp-lifecycle
+        families: [ipv4]
+        description: Create and delete a TCP mapping and verify its forwarding path is removed.
+        requests:
+          - {protocol_family: NAT-PMP, opcode: TCP, protocol: tcp, private_port: 41101, public_port: 41101, lifetime: 120}
+          - {protocol_family: NAT-PMP, opcode: TCP, protocol: tcp, private_port: 41101, public_port: 0, lifetime: 0}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 41101, external_port: 41101, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41101, external_port: 41101, expect: blocked}
+      - name: natpmp-udp-and-tcp-same-port
+        families: [ipv4]
+        description: UDP and TCP NAT-PMP mappings can share the same private and public port numbers.
+        requests:
+          - {protocol_family: NAT-PMP, opcode: UDP, protocol: udp, private_port: 41102, public_port: 41102, lifetime: 120}
+          - {protocol_family: NAT-PMP, opcode: TCP, protocol: tcp, private_port: 41102, public_port: 41102, lifetime: 120}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41102, external_port: 41102, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, service_port: 41102, external_port: 41102, expect: delivered}
