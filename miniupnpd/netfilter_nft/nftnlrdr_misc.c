@@ -533,6 +533,7 @@ struct table_cb_data {
 	const char * table;
 	const char * chain;
 	enum rule_type type;
+	int alloc_failed;
 };
 
 /* callback.
@@ -553,17 +554,18 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 	rule = nftnl_rule_alloc();
 	if (rule == NULL) {
 		log_error("nftnl_rule_alloc() FAILED");
-		return MNL_CB_ERROR;
+		CB_DATA(alloc_failed) = 1;
+		return MNL_CB_OK;
 	}
 	if (nftnl_rule_nlmsg_parse(nlh, rule) < 0) {
 		log_error("nftnl_rule_nlmsg_parse FAILED");
-		result = MNL_CB_ERROR;
+		CB_DATA(alloc_failed) = 1;
 	} else {
 		rule_t *r = malloc(sizeof(rule_t));
 		if (r == NULL) {
 			syslog(LOG_ERR, "%s: failed to allocate %u bytes",
 			       "table_cb", (unsigned)sizeof(rule_t));
-			result = MNL_CB_ERROR;
+			CB_DATA(alloc_failed) = 1;
 		} else {
 			const char *chain;
 
@@ -575,6 +577,15 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 				strcmp(chain, nft_forward_chain) == 0) {
 				r->table = strdup(nftnl_rule_get_str(rule, NFTNL_RULE_TABLE));
 				r->chain = strdup(chain);
+				if (r->table == NULL || r->chain == NULL) {
+					syslog(LOG_ERR, "%s: strdup() failed", "table_cb");
+					free(r->table);
+					free(r->chain);
+					free(r);
+					nftnl_rule_free(rule);
+					CB_DATA(alloc_failed) = 1;
+					return MNL_CB_OK;
+				}
 				r->family = nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY);
 				if (nftnl_rule_is_set(rule, NFTNL_RULE_USERDATA)) {
 					const char *descr;
@@ -742,6 +753,7 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	data.table = table;
 	data.chain = chain;
 	data.type = type;
+	data.alloc_failed = 0;
 	do {
 		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
 		if (n < 0) {
@@ -762,6 +774,12 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	} while(ret >= 1 /*== MNL_CB_OK*/);
 	/* ret == MNL_CB_STOP */
 
+	if (data.alloc_failed) {
+		/* the dump was read to the end, but the cache is incomplete */
+		syslog(LOG_ERR, "%s: rule cache refresh incomplete", "refresh_nft_cache");
+		flush_nft_cache(head);
+		return -1;
+	}
 	return 0;
 }
 
