@@ -558,6 +558,11 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 		/* Sending the 100 Continue response */
 		if(!h->res_buf) {
 			h->res_buf = malloc(256);
+			if(!h->res_buf) {
+				syslog(LOG_ERR, "malloc error in ProcessHTTPPOST_upnphttp()");
+				Send500(h);
+				return;
+			}
 			h->res_buf_alloclen = 256;
 		}
 		h->res_buflen = snprintf(h->res_buf, h->res_buf_alloclen,
