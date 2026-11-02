@@ -1608,8 +1608,8 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 		syslog(LOG_DEBUG, "PCP request received from %s %dbytes",
 		       addr_str, len);
 
-	if(buff[1] & 128) {
-		/* discarding PCP responses silently */
+	if(len < 2 || buff[1] & 128) {
+		/* discarding messages shorter than 2 bytes and PCP responses silently */
 		return 0;
 	}
 	/* Preserve the request header even when the packet is too short for
