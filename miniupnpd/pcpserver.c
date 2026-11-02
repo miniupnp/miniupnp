@@ -498,6 +498,9 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 		/* TODO fully implement filter */
 		if (option_length != PCP_FILTER_OPTION_SIZE ||
 		    pcp_msg_info->lifetime == 0) {
+			/* RFC 6887 section 13.3: If a MAP request has a lifetime of 0
+			 * and contains the FILTER option, the error MALFORMED_OPTION is
+			 * returned. */
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
