@@ -478,28 +478,8 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 		}
 #endif /* USE_LIBPFCTL */
 		if(ts <= (unsigned int)current_time) {
-#ifdef USE_LIBPFCTL
-			/* TODO: convert DIOCCHANGERULE to libpfctl */
-			struct pfioc_rule pr;
-			pr.action = PF_CHANGE_GET_TICKET;
-			memset(&pr, 0, sizeof(pr));
-			pr.ticket = ri.ticket;
-			pr.nr = i;
-			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label[0]);
-#else /* USE_LIBPFCTL */
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label);
-#endif /* USE_LIBPFCTL */
-			pr.action = PF_CHANGE_GET_TICKET;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
-				release_ticket(dev, tnum);
-				return -1;
-			}
-			pr.action = PF_CHANGE_REMOVE;
-			pr.nr = i;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
+			syslog(LOG_INFO, "removing expired pinhole '%s'", PF_RULE_LABEL_OF(RULE));
+			if(pf_rule_remove(PF_PASS, i) < 0) {
 				release_ticket(dev, tnum);
 				return -1;
 			}

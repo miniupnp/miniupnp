@@ -597,32 +597,7 @@ delete_nat_rule(const char * ifname, unsigned short eport, unsigned short iport,
 		 && eport == NAT_RULE_EPORT(RULE))
 #endif
 		{
-#ifdef USE_LIBPFCTL
-			/* to change with the libpfctl alternative to DIOCCHANGERULE */
-			struct pfioc_rule pr;
-			memset(&pr, 0, sizeof(pr));
-			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-			pr.ticket = ri.ticket;
-			pr.rule.action = NAT_RULE_ACTION;	/* selects the ruleset for the DIOCCHANGERULE calls */
-#endif
-			pr.action = PF_CHANGE_GET_TICKET;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
-			{
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
-				r = -1;
-				break;
-			}
-			pr.action = PF_CHANGE_REMOVE;
-			pr.nr = i;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
-			{
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
-				r = -1;
-			}
-			else
-			{
-				r = 0;
-			}
+			r = pf_rule_remove(NAT_RULE_ACTION, i) < 0 ? -1 : 0;
 			break;
 		}
 	}
@@ -1281,18 +1256,8 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 					break;
 				}
 			}
-			pr.action = PF_CHANGE_GET_TICKET;
-        	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
+			if(pf_rule_remove(PF_RDR, i) < 0)
 			{
-            	syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
-				r = -1;
-				break;
-			}
-			pr.action = PF_CHANGE_REMOVE;
-			pr.nr = i;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
-			{
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
 				r = -1;
 				break;
 			}
@@ -1366,24 +1331,7 @@ syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
 		   (iaddr == 0 || iaddr == RULE.dst.addr.v.a.addr.v4.s_addr)
 		  )
 		{
-			pr.action = PF_CHANGE_GET_TICKET;
-        	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
-			{
-            	syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
-				r = -1;
-				break;
-			}
-			pr.action = PF_CHANGE_REMOVE;
-			pr.nr = i;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
-			{
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
-				r = -1;
-			}
-			else
-			{
-				r = 0;
-			}
+			r = pf_rule_remove(PF_PASS, i) < 0 ? -1 : 0;
 			break;
 		}
 	}
