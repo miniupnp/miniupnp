@@ -477,6 +477,11 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 		if (option_length != PCP_PREFER_FAIL_OPTION_SIZE ||
 		    pcp_msg_info->lifetime == 0) {
+			/* RFC6887 section 11.3 :
+			 * If an option with value less than 128 exists (i.e., mandatory
+			 * to process) but that option does not make sense (e.g., the
+			 * PREFER_FAILURE option is included in a request with lifetime=0),
+			 * the request is invalid and generates a MALFORMED_OPTION error. */
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
 			return 0;
 		}
