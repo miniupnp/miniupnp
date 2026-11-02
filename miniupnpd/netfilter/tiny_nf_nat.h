@@ -5,6 +5,7 @@
 #define TINY_NF_NAT_H
 
 #include <linux/types.h>
+#include <linux/netfilter.h>
 
 #define IP_NAT_RANGE_MAP_IPS 1
 #define IP_NAT_RANGE_PROTO_SPECIFIED 2
@@ -33,5 +34,12 @@ struct nf_nat_multi_range_compat {
 };
 
 #define nf_nat_multi_range nf_nat_multi_range_compat
+
+/* DNAT target revision 2 data (Linux >= 4.18) */
+struct nf_nat_range2 {
+	unsigned int flags;
+	union nf_inet_addr min_addr, max_addr;
+	union nf_conntrack_man_proto min_proto, max_proto, base_proto;
+};
 
 #endif /*TINY_NF_NAT_H*/
