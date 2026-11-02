@@ -27,6 +27,9 @@
 #include "upnputils.h"
 #include "portinuse.h"
 #include "asyncsendto.h"
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+#include "pf/obsdrdr.h"
+#endif
 
 #ifdef ENABLE_NATPMP
 
@@ -333,6 +336,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
 				char desc[64];
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+				int rdr_checked = 0;
+#endif
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {
@@ -356,6 +362,15 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 					any_eport_allowed = 1;	/* at lease one eport is allowed */
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+					/* taken by another : the checks below would skip it too,
+					 * this costs no port_in_use() and no pf call */
+					if(redirected_to_another(eport, proto, senderaddrstr, iport, &rdr_checked)) {
+						eport++;
+						if(eport == 0) eport++; /* skip port zero */
+						continue;
+					}
+#endif
 #ifdef CHECK_PORTINUSE
 					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
 						syslog(LOG_INFO, "port %hu protocol %s already in use",
@@ -373,6 +388,18 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						if(strcmp(senderaddrstr, iaddr_old)==0
 						    && iport==iport_old) {
 							/* redirection already existing */
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+							/* adding it again would give the same rules : only renew the lifetime */
+							snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
+							         eport, proto_itoa(proto));
+							timestamp = upnp_time() + lifetime;
+							if(upnp_redirect_renew(eport, senderaddrstr, iport,
+							                       proto, desc, timestamp) == 0) {
+								syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, lifetime renewed",
+								       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
+								break;
+							}
+#endif /* defined(USE_PF) && defined(USE_LIBPFCTL) */
 							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
 							/* remove and then add again */

@@ -43,6 +43,18 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp);
 
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+/* upnp_redirect_renew()
+ * set a new lease end (timestamp) on the existing redirection
+ * eport -> iaddr:iport (no remote host) without deleting and adding its
+ * rules again, when adding them again would give the same rules.
+ * returns: 0 on success, -1 otherwise (then delete it and add it again) */
+int
+upnp_redirect_renew(unsigned short eport, const char * iaddr,
+                    unsigned short iport, int proto,
+                    const char * desc, unsigned int timestamp);
+#endif /* defined(USE_PF) && defined(USE_LIBPFCTL) */
+
 /* upnp_get_redirection_infos()
  * returns : 0 on success
  *           -1 failed to get the port mapping entry or no entry exists */

@@ -432,6 +432,34 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	}
 }
 
+#if defined(USE_PF) && defined(USE_LIBPFCTL)
+/* upnp_redirect_renew() : see upnpredirect.h */
+int
+upnp_redirect_renew(unsigned short eport, const char * iaddr,
+                    unsigned short iport, int proto,
+                    const char * desc, unsigned int timestamp)
+{
+	if(disable_port_forwarding)
+		return -1;	/* as upnp_redirect_internal() */
+	if(renew_redirect_rule(ext_if_name, eport, proto, iaddr, iport,
+	                       desc, timestamp) < 0)
+		return -1;
+	/* as upnp_redirect_internal() : the lifetime may be shorter */
+	if(timestamp > 0) {
+		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
+			nextruletoclean_timestamp = timestamp;
+	}
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(eport, proto);
+	lease_file_add(NULL, eport, iaddr, iport, proto, desc, timestamp);
+#else
+	UNUSED(iaddr);
+	UNUSED(iport);
+#endif
+	return 0;
+}
+#endif /* defined(USE_PF) && defined(USE_LIBPFCTL) */
+
 int
 upnp_redirect_internal(const char * rhost, unsigned short eport,
                        const char * iaddr, unsigned short iport,
