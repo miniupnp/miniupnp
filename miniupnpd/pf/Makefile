@@ -19,13 +19,15 @@ clean:
 testobsdrdr:	testobsdrdr.o obsdrdr.o getifaddr.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@ $>
 
-testpfpinhole:	testpfpinhole.o obsdrdr.o pfpinhole.o \
+testpfpinhole:	testpfpinhole.o obsdrdr.o pfpinhole.o pfrules.o \
 	getifaddr.o upnputils.o getroute.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@ $>
 
 obsdrdr.o:	obsdrdr.c obsdrdr.h
 
-pfpinhole.o:	pfpinhole.c pfpinhole.h
+pfpinhole.o:	pfpinhole.c pfpinhole.h pfrules.h
+
+pfrules.o:	pfrules.c pfrules.h
 
 testobsdrdr.o:	testobsdrdr.c obsdrdr.h
 
