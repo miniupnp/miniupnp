@@ -42,7 +42,10 @@ struct pcp_filter {
  *
  * pcp_find_map(iaddr, iport, proto, &eport, desc, desclen, &timestamp)
  *   Finds the IPv4 mapping to an internal endpoint (iport 0 : any port) in
- *   one pass over the rules. returns 0 if found, else -1. */
+ *   one pass over the rules. returns 0 if found, else -1.
+ * pcp_find_peer(iaddr, iport, raddr, rport, proto, &eport, desc, desclen,
+ *               &timestamp)
+ *   Same for a PEER mapping, by the two endpoints. */
 
 #ifdef USE_NFTABLES
 struct pcp_filter_update;
@@ -57,8 +60,13 @@ int nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
 int nft_pcp_find_map(const char *iaddr, unsigned short iport, int proto,
                      unsigned short *eport, char *desc, int desclen,
                      unsigned int *timestamp);
+int nft_pcp_find_peer(const char *iaddr, unsigned short iport,
+                      const char *raddr, unsigned short rport, int proto,
+                      unsigned short *eport, char *desc, int desclen,
+                      unsigned int *timestamp);
 #define PCP_FIND_SUPPORTED
 #define pcp_find_map nft_pcp_find_map
+#define pcp_find_peer nft_pcp_find_peer
 #define PCP_FILTER_SUPPORTED
 #define pcp_filter_begin nft_pcp_filter_begin
 #define pcp_filter_finish nft_pcp_filter_finish

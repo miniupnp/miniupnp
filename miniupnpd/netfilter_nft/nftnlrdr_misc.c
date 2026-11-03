@@ -995,12 +995,12 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	/* Destination IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
 	                 offsetof(struct iphdr, daddr), sizeof(uint32_t));
-	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &ihost, sizeof(uint32_t));
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost, sizeof(uint32_t));
 
 	/* Source IP */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
 	                 offsetof(struct iphdr, saddr), sizeof(in_addr_t));
-	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &rhost, sizeof(in_addr_t));
+	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &ihost, sizeof(in_addr_t));
 
 	/* Protocol */
 	expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG_1,
@@ -1010,25 +1010,25 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	/* Source and Destination Port of Protocol */
 	if (proto == IPPROTO_TCP) {
 		/* Destination Port */
-		dport = htons(iport);
+		dport = htons(rport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct tcphdr, dest), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 
 		/* Source Port */
-		sport = htons(rport);
+		sport = htons(iport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct tcphdr, source), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &sport, sizeof(uint16_t));
 	} else if (proto == IPPROTO_UDP) {
 		/* Destination Port */
-		dport = htons(iport);
+		dport = htons(rport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &dport, sizeof(uint16_t));
 
 		/* Source Port */
-		sport = htons(rport);
+		sport = htons(iport);
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct udphdr, source), sizeof(uint16_t));
 		expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, &sport, sizeof(uint16_t));
@@ -1332,11 +1332,14 @@ int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
 {
 	int result = -1;
-	uint16_t flags = NLM_F_APPEND | NLM_F_CREATE | NLM_F_ACK;
+	uint16_t flags = NLM_F_CREATE | NLM_F_ACK;
 	struct nlmsghdr *nlh;
 	struct mnl_nlmsg_batch *batch;
 	char buf[MNL_SOCKET_BUFFER_SIZE*2];
 
+	/* PEER SNAT must run before a gateway's catch-all masquerade rule. */
+	if (chain_type != RULE_CHAIN_PEER)
+		flags |= NLM_F_APPEND;
 	if (cmd == NFT_MSG_NEWRULE && nftnl_rule_is_set(rule, NFTNL_RULE_HANDLE))
 		flags = NLM_F_REPLACE | NLM_F_ACK;
 
