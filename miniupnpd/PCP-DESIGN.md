@@ -262,7 +262,7 @@ Each backend (nft, pf) provides the same functions, used through the `pcp_filter
 | `pcp_find_map` / `pcp_find_peer` | One-pass lookup of an IPv4 mapping or PEER mapping. |
 | PEER add / delete | PEER rules, with expiry through `peer_lease.c`. |
 
-Backend differences: nft implements IPv4 mappings and IPv6 pinholes, with an interface-aware FILTER. A filtered mapping has a regular chain of its own (an accept per peer, then a drop); one base chain per IP version on the forward hook (`pcp-filter-v4`, `pcp-filter-v6`, priority -1) dispatches to it with a verdict map on `daddr . l4proto . dport` (`pcp-filter-map4`, `pcp-filter-map6`), so a forwarded packet costs one lookup whatever the number of filtered mappings. pf has pinholes in `pfpinhole.c`, and its PCP code is in `pfpcp.c` (on 15.x, PEER NAT rules in an anchor are ignored by pf, see the KNOWN LIMITATION in the source).
+Backend differences: nft implements IPv4 mappings and IPv6 pinholes, with an interface-aware FILTER enforced by two sets (section 6c). pf has pinholes in `pfpinhole.c`, and its PCP code is in `pfpcp.c` (on 15.x, PEER NAT rules in an anchor are ignored by pf, see the KNOWN LIMITATION in the source).
 
 ## 6b. Scaling: indexes and caches
 
@@ -278,7 +278,7 @@ Every lookup used to walk the whole ruleset (a netlink dump on nft, one ioctl pe
 | Rule cache (`head_redirect`, `head_filter`, `head_peer`) | `nftnlrdr_misc.c` | linked lists, kept valid when a rule is added | O(N) walk in memory per lookup, no index yet |
 | `timestamp_list` (`get_timestamp()`) | `nftnlrdr.c` | linked list | O(N) walk, outside the lease save |
 | Pinhole uids | `pf/pfpinhole.c` | bitmap of the 65,536 uids, built by one walk | exact |
-| FILTER dispatch on the packet path | kernel (nft) | verdict map (hash) | one lookup per packet |
+| FILTER on the packet path | kernel (nft) | two sets per family: a concatenated-range set of the allowed peers and a hash set of the filtered mappings (section 6c) | two lookups per packet, whatever the number of mappings |
 
 Notes:
 
@@ -288,6 +288,70 @@ Notes:
 - A save of the lease file is one pass over the rules (`pcp_lease_maps()`, `pcp_lease_peers()`), with the external address looked up once, and at most one save every 2 seconds.
 - pf: the rules of a filtered mapping are deleted, and a pinhole group renewed or deleted, in one walk, the rules being removed from the last index (not yet tested on FreeBSD).
 - Measured on Linux (nft, Docker), 500 flows with 40 FILTER peers each: 0.7 s to create them, 0.7 s to restore 6,680 peers at startup, 1 to 6 s for the clients to be answered again after a restart. Before: 1,209 of 2,000 flows in 900 s.
+
+## 6c. nft FILTER layout: options and choice
+
+(Netfilter specific; it may move to a netfilter design document.)
+
+A filtered MAP (RFC 6887 section 13.3) lets a mapping's traffic in only from its peers: a source prefix, and a source port or any. The layout has to keep the packet path cheap, keep a rule change cheap, and change the peers of a mapping atomically. Three layouts were tried on this branch:
+
+| Layout | Packet path | A rule change (add, renew with new peers, delete) | Measured |
+|---|---|---|---|
+| A. A base chain per filtered mapping on the forward hook (an accept per peer, then a drop) | every forwarded packet goes through every filtered mapping's base chain: O(mappings) per packet | one transaction per mapping, and re-registers the hook array | 1,000 filtered mappings: 1,000 hook entries per packet |
+| B. One base chain per IP version with a verdict map `daddr . l4proto . dport` jumping to a regular chain per mapping | one map lookup per packet | each element carries a `jump`, which makes the kernel validate the whole table at every commit (`nft_chain_validate` walks every chain reachable from the base chains): O(all FILTER rules) per change | 2,500 flows, 833 filtered mappings with 40 peers: 12 s to create, about 70 % of it in the kernel's validation; 13 s to restore |
+| C. (chosen) One base chain per IP version with two rules on two sets, no verdicts in the elements | two set lookups per packet | element adds and deletes in one transaction, no table validation | 2,500 flows: 2.3 s with 1 peer each (B: 3.1 s), 2.7 s back after a restart (B: 6.4 s); but 22 s with 40 peers each (33,320 elements, B: 12 s): the range set (`pipapo`) costs more to insert into and to look up as it grows (`nft_pipapo_avx2_refill`) |
+
+Layout C, per family (`4` or `6`):
+
+```
+chain pcp-filter-v4 {   # type filter hook forward priority -1
+    ct direction original iifname "<ext if>"
+        ip daddr . meta l4proto . th dport . ip saddr . th sport @pcp-filter-allow4 accept
+    ct direction original iifname "<ext if>"
+        ip daddr . meta l4proto . th dport @pcp-filter-filtered4 drop
+}
+set pcp-filter-allow4 { type ipv4_addr . inet_proto . inet_service . ipv4_addr . inet_service; flags interval; }
+set pcp-filter-filtered4 { type ipv4_addr . inet_proto . inet_service; }
+```
+
+- An allowed peer is one element of `pcp-filter-allow4`: the mapping's address, protocol and port, the peer's prefix as an address range and its port as a range (0-65535 for any). The interval set of concatenations (`pipapo`, Linux 5.6 and later) matches every field as a range.
+- A filtered mapping is one element of `pcp-filter-filtered4`. A packet to it which matched no peer is dropped. An accept only ends this base chain: the packet still has to pass the ordinary firewall.
+- `ct direction original` leaves the replies of outbound flows alone (RFC 6887 section 16.1: the outbound PEER and implicit mappings come first). The interface is the external one (`ext_ifname`, `ext_ifname6`).
+- The kernel refuses an element whose start or end falls inside another element. A peer contained in another peer of the same mapping (a narrower prefix with the same or any port) adds nothing, so it is not installed; the daemon keeps the whole list in memory for the lease file and for the merge of later requests.
+- After a restart the daemon reads the elements back once (`pcp_filter_recover()`); the PCP lease file then gives the whole list again.
+- Next step for many peers: put the host peers (a /32 or /128, the common case) in hash sets, `... . saddr . sport` and `... . saddr` for any port, and keep the range set for the real prefixes only, so the common case is O(1).
+
+Not adopted:
+
+- Keeping B and putting all the restore installs in one transaction: one validation at startup, but every later change still validates the whole table.
+- Moving the chains of B into a table of their own: the validation then covers only the PCP chains, but still grows with the FILTER rules.
+- The `iifname` in the set key: it would make the allow key six fields, more than the 32-bit concatenated type can name, for an interface which is the same for all the mappings of a family.
+
+Rules left by an earlier build of this branch (layout A or B) are not migrated.
+
+Where the time goes at 10,000 flows (layout C, half of them IPv6, 1 FILTER peer each; `perf record -g` on the daemon from its restart). The call chains resolve, so the kernel's time can be traced to the daemon code that caused it:
+
+```
+__pi_memcpy 23.8 % / nf_tables_commit_chain_prepare 19.7 %   (the kernel rebuilding a chain at the commit)
+  <- nf_tables_commit <- sendto <- nft_send_rule
+       |- add_pinhole              ~11 %  (IPv6 pinholes: a forward rule each)
+       |- add_redirect_rule2       ~6 %   (IPv4 DNAT + forward rule)
+       `- upnp_redirect_internal   ~6 %   (the restore of the IPv4 mappings)
+```
+
+So most of the CPU is the kernel committing one rule per pinhole or mapping into chains which already hold thousands of them. The IPv6 pinholes are the largest single share, which makes "pinholes as a set" (below) the cheapest next win, before the bigger "port mappings as maps". The latency of each request shows the same (2,500 flows, from a LAN capture): p50 24 ms for IPv4 and 104 ms for IPv6 under the burst. The daemon does not wait on the kernel: during the restart it is on the CPU 64 % of the time and the rest is idle in `select()` or preempted (`perf sched timehist`). Measured: 10,000 flows in 23.5 s, 20,000 in 97.8 s, so O(N^2) in all.
+
+Further nftables changes, not done (possible future work, some for a branch of their own since they reshape the code shared with UPnP):
+
+- Port mappings as maps: every mapping, UPnP and PCP, is still a DNAT rule in `prerouting_miniupnpd` and an accept rule in the `miniupnpd` forward chain, so each incoming WAN packet and each forwarded packet goes through N rules. A map `dnat ip to meta l4proto . th dport map @...` (proto . eport : iaddr . iport) and a set `ip daddr . meta l4proto . th dport @... accept` make it one lookup each.
+- IPv6 pinholes as a set (`daddr . l4proto . dport`, with `. saddr . sport` for restricted ones) instead of a forward rule each.
+- PEER SNAT as a map on `saddr . sport . daddr . dport` instead of a postrouting rule each.
+- One transaction per request: a PCP MAP sends the redirect rule, the forward rule and the FILTER elements as separate transactions; one batch makes the request atomic and one commit.
+- The rule cache checked with the generation id (`NFT_MSG_GETGEN`): it could then stay valid after deletes and still notice changes made outside the daemon, without a dump.
+- Deletes which keep the cache valid: mark the entry dead and free it later, instead of invalidating the cache (callers delete while they walk the list).
+- The restore of the PCP lease file in one transaction (or a few) instead of one per mapping.
+- Element timeouts (`flags timeout`): the kernel would expire the elements itself, but the daemon's expiry, the lease file and the UPnP lifetimes would have to agree.
+- Counters per element, to keep the UPnP packet and byte statistics once the rules are elements.
 
 ## 7. Testing layout
 
