@@ -97,8 +97,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifdef USE_NFTABLES
 #include "netfilter_nft/nftnlrdr.h"
 #endif
+#elif defined(USE_PF)
+#include "pf/obsdrdr.h"
 #else
-#error "PCP Peer is only supported with NETFILTER"
+#error "PCP Peer is only supported with NETFILTER or PF"
 #endif /* USE_NETFILTER */
 #endif /* PCP_PEER */
 
@@ -1058,7 +1060,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 			pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
 			return;
 		}
-#ifdef USE_NFTABLES
+#if defined(USE_NFTABLES) || defined(USE_PF)
 		r = delete_peer_rule(iaddr2, iport, rhost, rport, proto);
 #else
 		r = _upnp_delete_redir(eport2, proto);

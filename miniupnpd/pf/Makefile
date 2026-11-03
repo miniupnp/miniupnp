@@ -16,18 +16,26 @@ all:	$(EXECUTABLES)
 clean:
 	rm -f *.o $(EXECUTABLES)
 
-testobsdrdr:	testobsdrdr.o obsdrdr.o getifaddr.o
+testobsdrdr:	testobsdrdr.o obsdrdr.o pfpinhole.o pfrules.o pfpcp.o pcp_filter.o \
+	peer_lease.o getifaddr.o upnputils.o getroute.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@ $>
 
-testpfpinhole:	testpfpinhole.o obsdrdr.o pfpinhole.o pfrules.o \
+testpfpinhole:	testpfpinhole.o obsdrdr.o pfpinhole.o pfrules.o pfpcp.o \
+	pcp_filter.o peer_lease.o \
 	getifaddr.o upnputils.o getroute.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@ $>
 
 obsdrdr.o:	obsdrdr.c obsdrdr.h
 
-pfpinhole.o:	pfpinhole.c pfpinhole.h pfrules.h
+pfpinhole.o:	pfpinhole.c pfpinhole.h
 
 pfrules.o:	pfrules.c pfrules.h
+
+pfpcp.o:	pfpcp.c pfpcp.h
+
+pcp_filter.o:	../pcp_filter.c ../pcp_filter.h
+
+peer_lease.o:	../peer_lease.c ../peer_lease.h
 
 testobsdrdr.o:	testobsdrdr.c obsdrdr.h
 

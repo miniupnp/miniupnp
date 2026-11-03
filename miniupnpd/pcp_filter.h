@@ -19,20 +19,20 @@ struct pcp_filter {
 	unsigned char prefix;
 };
 
-/* The functions each firewall backend provides (nft_ prefix, used
- * through the pcp_filter_* names below). They follow this contract :
+/* The functions each firewall backend provides (nft_ or pf_ prefix, used
+ * through the pcp_filter_* names below). Both follow this contract :
  *
  * pcp_filter_begin(address, port, protocol, ifname, filters, count, &update)
  *   Applies the FILTER options of a MAP request to the mapping of
  *   address:port/protocol : an IPv4 mapping (IPv4-mapped IPv6 address) or an
  *   IPv6 pinhole. The options are merged with the peers the mapping has
  *   (pcp_filter_merge()). ifname is the external interface, it must not be
- *   empty. A mapping which does not exist yet
+ *   empty (nft needs it, pf ignores it). A mapping which does not exist yet
  *   gets its peers when it is created.
  *   returns  0 : done, *update has to be given to pcp_filter_finish()
  *           -1 : error (firewall, memory, invalid option)
  *           -2 : too many peers (EXCESSIVE_REMOTE_PEERS)
- *           -3 : the address family is not supported
+ *           -3 : the address family is not supported (pf without pinholes)
  *   On error the peers of the mapping are unchanged.
  * pcp_filter_finish(update, commit)
  *   commit : keep the new peers. Else the previous peers are restored.
@@ -71,6 +71,47 @@ int nft_pcp_find_peer(const char *iaddr, unsigned short iport,
 #define pcp_filter_begin nft_pcp_filter_begin
 #define pcp_filter_finish nft_pcp_filter_finish
 #define pcp_filter_delete nft_pcp_filter_delete
+#endif
+
+#ifdef USE_PF
+struct pcp_filter_update;
+
+/* the policy is stored in the rules of the mapping */
+int pf_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
+                        unsigned char protocol, const char *ifname,
+                        const struct pcp_filter *filters, unsigned int count,
+                        struct pcp_filter_update **update);
+int pf_pcp_filter_finish(struct pcp_filter_update *update, int commit);
+int pf_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
+                         unsigned char protocol);
+/* used by pf/pfpinhole.c */
+unsigned int pf_pcp_pending_filters6(const struct in6_addr *address,
+                                     unsigned short port, int protocol,
+                                     const struct pcp_filter **filters);
+unsigned int pf_pinhole_group_get(const struct in6_addr *dst, unsigned short port,
+                                  int proto, struct pcp_filter *filters,
+                                  unsigned int max, unsigned int *nfilters,
+                                  char *desc, int desclen,
+                                  unsigned int *timestamp, char *ifname);
+int pf_pinhole_group_add(const char *ifname, const struct in6_addr *dst,
+                         unsigned short port, int proto, const char *desc,
+                         unsigned int timestamp, const struct pcp_filter *f);
+int pf_pinhole_group_remove(const struct in6_addr *dst, unsigned short port,
+                            int proto, const struct pcp_filter *f);
+int pf_pcp_find_map(const char *iaddr, unsigned short iport, int proto,
+                    unsigned short *eport, char *desc, int desclen,
+                    unsigned int *timestamp);
+int pf_pcp_find_peer(const char *iaddr, unsigned short iport,
+                     const char *raddr, unsigned short rport, int proto,
+                     unsigned short *eport, char *desc, int desclen,
+                     unsigned int *timestamp);
+#define PCP_FIND_SUPPORTED
+#define pcp_find_map pf_pcp_find_map
+#define pcp_find_peer pf_pcp_find_peer
+#define PCP_FILTER_SUPPORTED
+#define pcp_filter_begin pf_pcp_filter_begin
+#define pcp_filter_finish pf_pcp_filter_finish
+#define pcp_filter_delete pf_pcp_filter_delete
 #endif
 
 #ifdef PCP_FILTER_SUPPORTED

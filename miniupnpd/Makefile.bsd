@@ -55,13 +55,13 @@ CPPFLAGS += -DMINIUPNPD_GIT_REF=\"$(GITREF)\"
 
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
-          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
+          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o pcp_filter.o peer_lease.o \
           pcplearndscp.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
           upnppinhole.o asyncsendto.o portinuse.o
 OS_OBJS = getifstats.o ifacewatcher.o getroute.o
-PFOBJS = obsdrdr.o pfpinhole.o pfrules.o
+PFOBJS = obsdrdr.o pfpinhole.o pfpcp.o pfrules.o
 IPFOBJS = ipfrdr.o
 IPFWOBJS = ipfwrdr.o ipfwaux.o
 MISCOBJS = upnpreplyparse.o minixml.o
@@ -108,7 +108,7 @@ TESTMINISSDPOBJS = testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
 TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o \
                        getroute.o
 TESTSTUNOBJS = teststun.o upnpstun.o upnputils.o getroute.o $(FWOBJS) \
-               getifaddr.o
+               pcp_filter.o peer_lease.o getifaddr.o
 TESTUPNPHTTPOBJS = testupnphttp.o upnphttp.o upnputils.o getosversion.o \
                    getroute.o
 

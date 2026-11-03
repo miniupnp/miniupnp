@@ -73,10 +73,20 @@
 #endif
 
 #include "../macros.h"
+#include "../peer_lease.h"
+
+/* the structure returned by DIOCGETSTATES : renamed in FreeBSD 14 */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 1400000
+#define PF_STATE_STRUCT struct pfsync_state_1301
+#else
+#define PF_STATE_STRUCT struct pfsync_state
+#endif
 #include "obsdrdr.h"
 #include "../upnpglobalvars.h"
 #include "../getifaddr.h"
 #include "rtickets.h"
+#include "../pcp_filter.h"
+#include "pfpcp.h"
 #include "pfrules.h"
 
 #ifndef USE_PF
@@ -157,6 +167,9 @@ shutdown_redirect(void)
 	if(close(dev)<0)
 		syslog(LOG_ERR, "close(\"/dev/pf\"): %m");
 	dev = -1;
+#ifdef PCP_PEER
+	peer_lease_free_all();
+#endif
 }
 
 /* open the device */
@@ -311,14 +324,17 @@ error:
 }
 #endif
 
-#ifdef ENABLE_PORT_TRIGGERING
-/* add_nat_rule()
+#if defined(ENABLE_PORT_TRIGGERING) || defined(PCP_PEER)
+/* add_nat_rule_full()
  * nat on re0 inet proto udp from 192.168.1.49 port 3074 to any -> (re0) port 3148
  * <re0> is ext_if, (re0) is ext_ip
  * should be created when a port mapping (3148 => 192.168.1.49:3074 UDP) is created.
- * for symetric NAT / UPnP IGD NAT Port Triggering */
-int add_nat_rule(const char * ifname,
-                 const char * rhost, unsigned short eport,
+ * for symetric NAT / UPnP IGD NAT Port Triggering
+ * If rport is not 0 the rule only matches that remote port (PCP PEER),
+ * if extaddr_arg is not NULL it is used as the translated address. */
+static int add_nat_rule_full(const char * ifname,
+                 const char * rhost, unsigned short rport,
+                 const char * extaddr_arg, unsigned short eport,
                  const char * iaddr, unsigned short iport, int proto,
                  const char * desc)
 {
@@ -336,7 +352,9 @@ int add_nat_rule(const char * ifname,
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
 	}
-	if(getifaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, &wan_addr, NULL) < 0) {
+	if(extaddr_arg && extaddr_arg[0] != '\0') {
+		extaddr = extaddr_arg;
+	} else if(getifaddr(ifname, extaddr_buf, INET_ADDRSTRLEN, &wan_addr, NULL) < 0) {
 		syslog(LOG_WARNING, "failed to get address for interface %s", ifname);
 		if(use_ext_ip_addr && use_ext_ip_addr[0] != '\0') {
 			extaddr = use_ext_ip_addr;
@@ -429,9 +447,21 @@ int add_nat_rule(const char * ifname,
 #endif
 		}
 #ifdef __APPLE__
-		pcr.rule.dst.xport.range.op = PF_OP_NONE;
+		if(rport) {
+			pcr.rule.dst.xport.range.op = PF_OP_EQ;
+			pcr.rule.dst.xport.range.port[0] = htons(rport);
+			pcr.rule.dst.xport.range.port[1] = htons(rport);
+		} else {
+			pcr.rule.dst.xport.range.op = PF_OP_NONE;
+		}
 #else
-		pcr.rule.dst.port_op = PF_OP_NONE;
+		if(rport) {
+			pcr.rule.dst.port_op = PF_OP_EQ;
+			pcr.rule.dst.port[0] = htons(rport);
+			pcr.rule.dst.port[1] = htons(rport);
+		} else {
+			pcr.rule.dst.port_op = PF_OP_NONE;
+		}
 #endif
 		/* -> xxx.xxx.xxx.xxx port 1234 */
 #ifndef PF_NEWSTYLE
@@ -487,6 +517,16 @@ int add_nat_rule(const char * ifname,
 	return r;
 }
 
+#ifdef ENABLE_PORT_TRIGGERING
+int add_nat_rule(const char * ifname,
+                 const char * rhost, unsigned short eport,
+                 const char * iaddr, unsigned short iport, int proto,
+                 const char * desc)
+{
+	return add_nat_rule_full(ifname, rhost, 0, NULL, eport,
+	                         iaddr, iport, proto, desc);
+}
+#endif /* ENABLE_PORT_TRIGGERING */
 
 /* action of the rules created by add_nat_rule(), used to select the
  * ruleset to scan when looking for a rule to delete.
@@ -505,6 +545,7 @@ int add_nat_rule(const char * ifname,
 #define NAT_RULE_EPORT(r) ((r).nat.proxy_port[0])
 #endif
 
+#ifdef ENABLE_PORT_TRIGGERING
 /*
  * returns:  0 : OK
  *          -1 : ERROR
@@ -606,15 +647,463 @@ delete_nat_rule(const char * ifname, unsigned short eport, unsigned short iport,
 	release_ticket(dev, tnum);
 	return r;
 }
+#endif /* ENABLE_PORT_TRIGGERING */
+
+#ifdef PCP_PEER
+/* PCP PEER (IPv4 only, see RFC 6887 section 12) is a source NAT rule
+ *   nat on ext_if inet proto udp from iaddr port iport to rhost port rport \
+ *       -> eaddr port eport
+ * stored in the anchor.  Replies are handled by the state it creates.
+ * Rules are told apart from port triggering rules by their remote port.
+ *
+ * KNOWN LIMITATION (FreeBSD 15.1, low priority): IPv4 PEER NAT is affected
+ * (NAT66 fails the same way): the translation is not
+ * applied when the main ruleset has any other NAT rule, such as the usual
+ * "nat on ext_if from lan -> (ext_if)".  The generic rule is used instead and
+ * the flow leaves from a random port (50001+), not eport.  The rule is loaded
+ * correctly in the anchor (0 packets, see pfctl -a miniupnpd -vsn), and a rule
+ * loaded by pfctl with the same tuple behaves the same, so this is not the
+ * rule construction.  It works when the anchor holds the only NAT rule, or when
+ * the rule is placed in the main ruleset.  Filter-anchor "nat-to" rules were
+ * overridden too.  The PCP e2e cases that check the translated WAN port fail
+ * for this reason: peer-create-before-first-packet-{udp,tcp},
+ * peer-recreates-remembered-tcp-mapping,
+ * peer-rejects-mismatched-port-on-renewal and ipv6-nat66-pcp-peer-reachability.
+ * Flows that already have a state (peer-adopts-existing-*) are not affected. */
+#ifdef __APPLE__
+#define RULE_SPORT(r)	((r).src.xport.range.port[0])
+#define RULE_DPORT(r)	((r).dst.xport.range.port[0])
+#define RULE_DPORT_OP(r)	((r).dst.xport.range.op)
+#else
+#define RULE_SPORT(r)	((r).src.port[0])
+#define RULE_DPORT(r)	((r).dst.port[0])
+#define RULE_DPORT_OP(r)	((r).dst.port_op)
+#endif
+#ifdef PFVAR_NEW_STYLE
+#define RULE_V4(x)	((x).v.a.addr.v4addr.s_addr)
+#else
+#define RULE_V4(x)	((x).v.a.addr.v4.s_addr)
 #endif
 
-/* add_redirect_rule2() :
- * create a rdr rule */
+struct peer_nat {
+	in_addr_t iaddr, raddr;	/* network byte order */
+	unsigned short iport, rport, eport;	/* host byte order */
+	int proto;
+	char desc[PF_RULE_LABEL_SIZE];
+	char ifname[IFNAMSIZ];
+	u_int64_t packets, bytes;
+};
+
+#define PEER_GET	0
+#define PEER_DELETE	1
+#define PEER_FIND	2
+
+struct peer_walk_ctx {
+	int op;
+	int index;		/* PEER_GET : wanted rank among the PEER rules */
+	int count;
+	struct peer_nat * pn;	/* PEER_GET : result. PEER_DELETE/PEER_FIND : the key */
+	int rule_index;		/* PEER_DELETE/PEER_FIND : position of the rule found */
+};
+
+static int
+peer_nat_cb(int i, const pf_walk_rule_t * rule,
+            const struct pf_walk * walk, void * arg)
+{
+	struct peer_walk_ctx * c = arg;
+	struct peer_nat * pn = c->pn;
+#undef RULE
+#define RULE (*rule)
+	UNUSED(walk);
+	if(RULE_DPORT_OP(RULE) != PF_OP_EQ || RULE.af != AF_INET)
+		return 0;	/* not a PEER rule */
+	if(c->op == PEER_GET && c->count++ != c->index)
+		return 0;
+	if(c->op != PEER_GET)
+	{
+		if(!(pn->iport == ntohs(RULE_SPORT(RULE))
+		  && pn->rport == ntohs(RULE_DPORT(RULE))
+		  && RULE.proto == pn->proto
+		  && pn->iaddr == RULE_V4(RULE.src.addr)
+		  && pn->raddr == RULE_V4(RULE.dst.addr)))
+			return 0;
+		c->rule_index = i;
+		if(c->op == PEER_DELETE)
+			return 1;
+	}
+	pn->iaddr = RULE_V4(RULE.src.addr);
+	pn->raddr = RULE_V4(RULE.dst.addr);
+	pn->iport = ntohs(RULE_SPORT(RULE));
+	pn->rport = ntohs(RULE_DPORT(RULE));
+	pn->eport = NAT_RULE_EPORT(RULE);
+	pn->proto = RULE.proto;
+	strlcpy(pn->desc, PF_RULE_LABEL_OF(RULE), sizeof(pn->desc));
+	strlcpy(pn->ifname, RULE.ifname, sizeof(pn->ifname));
+#ifdef PFRULE_INOUT_COUNTS
+	pn->packets = RULE.packets[0] + RULE.packets[1];
+	pn->bytes = RULE.bytes[0] + RULE.bytes[1];
+#else
+	pn->packets = RULE.packets;
+	pn->bytes = RULE.bytes;
+#endif
+	return 1;
+#undef RULE
+}
+
+/* one pass over the NAT rules of the anchor :
+ * PEER_GET : fill *pn with the index-th PEER rule
+ * PEER_FIND : fill *pn with the rule matching iaddr/iport/raddr/rport/proto of *pn
+ * PEER_DELETE : delete the rule matching iaddr/iport/raddr/rport/proto of *pn
+ * returns:  0 : OK
+ *          -1 : Error
+ *          -2 : rule not found */
+static int
+peer_nat_walk(int op, int index, struct peer_nat * pn)
+{
+	struct peer_walk_ctx c;
+	int r;
+	c.op = op;
+	c.index = index;
+	c.count = 0;
+	c.pn = pn;
+	c.rule_index = -1;
+	r = pf_rule_foreach(NAT_RULE_ACTION, peer_nat_cb, &c);
+	if(r < 0)
+		return -1;
+	if(r == 0)
+		return -2;
+	if(op == PEER_DELETE)
+		return pf_rule_remove(NAT_RULE_ACTION, c.rule_index) < 0 ? -1 : 0;
+	return 0;
+}
+
+/* find the PEER rule with this key; returns 0 if found */
+static int
+find_peer_nat(in_addr_t iaddr, unsigned short iport,
+              in_addr_t raddr, unsigned short rport, int proto,
+              struct peer_nat * pn)
+{
+	memset(pn, 0, sizeof(*pn));
+	pn->iaddr = iaddr;
+	pn->iport = iport;
+	pn->raddr = raddr;
+	pn->rport = rport;
+	pn->proto = proto;
+	return peer_nat_walk(PEER_FIND, 0, pn) == 0 ? 0 : -1;
+}
+
+/* a PEER mapping by its two endpoints, in one pass. returns 0 if found */
 int
-add_redirect_rule2(const char * ifname,
-                   const char * rhost, unsigned short eport,
-                   const char * iaddr, unsigned short iport, int proto,
-                   const char * desc, unsigned int timestamp)
+pf_pcp_find_peer(const char * iaddr, unsigned short iport,
+                 const char * raddr, unsigned short rport, int proto,
+                 unsigned short * eport, char * desc, int desclen,
+                 unsigned int * timestamp)
+{
+	struct peer_nat pn;
+	in_addr_t ia, ra;
+	if(inet_pton(AF_INET, iaddr, &ia) != 1 || inet_pton(AF_INET, raddr, &ra) != 1)
+		return -1;
+	if(find_peer_nat(ia, iport, ra, rport, proto, &pn) != 0)
+		return -1;
+	*eport = pn.eport;
+	if(desc != NULL && desclen > 0)
+		strlcpy(desc, pn.desc, desclen);
+	if(timestamp != NULL)
+		*timestamp = peer_lease_get(ia, iport, ra, rport, proto);
+	return 0;
+}
+
+int
+delete_peer_rule(const char * iaddr, unsigned short iport,
+                 const char * raddr, unsigned short rport, int proto)
+{
+	struct peer_nat pn;
+	int r;
+	memset(&pn, 0, sizeof(pn));
+	if(inet_pton(AF_INET, iaddr, &pn.iaddr) != 1 ||
+	   inet_pton(AF_INET, raddr, &pn.raddr) != 1)
+		return -1;
+	pn.iport = iport;
+	pn.rport = rport;
+	pn.proto = proto;
+	r = peer_nat_walk(PEER_DELETE, 0, &pn);
+	if(r == -1)
+		return -1;
+	/* also discard stale lease state if the rule was removed outside */
+	peer_lease_remove(pn.iaddr, iport, pn.raddr, rport, proto);
+	return 0;
+}
+
+unsigned int
+expire_peer_rules(unsigned int now)
+{
+	return peer_lease_expire(now, delete_peer_rule);
+}
+
+int
+add_peer_redirect_rule2(const char * ifname,
+                        const char * rhost, unsigned short rport,
+                        const char * eaddr, unsigned short eport,
+                        const char * iaddr, unsigned short iport, int proto,
+                        const char * desc, unsigned int timestamp)
+{
+	struct peer_nat pn;
+	in_addr_t ia, ra;
+	unsigned int old_timestamp;
+	int had_lease, r;
+
+	if(inet_pton(AF_INET, iaddr, &ia) != 1 || inet_pton(AF_INET, rhost, &ra) != 1)
+		return -1;
+	had_lease = peer_lease_exists(ia, iport, ra, rport, proto);
+	old_timestamp = peer_lease_get(ia, iport, ra, rport, proto);
+	if(peer_lease_set(ia, iport, ra, rport, proto, timestamp) < 0)
+		return -1;
+	if(find_peer_nat(ia, iport, ra, rport, proto, &pn) == 0) {
+		if(pn.eport == eport && strcmp(pn.desc, desc) == 0) {
+			/* renewal : keep the rule, and its states */
+			return 0;
+		}
+		/* different external port or description : replace the rule,
+		 * the lease we found (if any) is kept */
+		syslog(LOG_INFO, "Replace peer map %s:%hu/%s remote %s port %hu ext port %hu -> %hu via PCP",
+		       iaddr, iport, proto == IPPROTO_TCP ? "TCP" : "UDP", rhost, rport,
+		       pn.eport, eport);
+		if(peer_nat_walk(PEER_DELETE, 0, &pn) == -1)
+			r = -1;
+		else
+			r = add_nat_rule_full(ifname, rhost, rport, eaddr, eport,
+			                      iaddr, iport, proto, desc);
+	} else {
+		r = add_nat_rule_full(ifname, rhost, rport, eaddr, eport,
+		                      iaddr, iport, proto, desc);
+	}
+	if(r < 0) {
+		/* back to the lease we had */
+		if(had_lease)
+			peer_lease_set(ia, iport, ra, rport, proto, old_timestamp);
+		else
+			peer_lease_remove(ia, iport, ra, rport, proto);
+	}
+	return r;
+}
+
+/* DSCP marking is not supported with pf */
+int
+add_peer_dscp_rule2(const char * ifname,
+                    const char * rhost, unsigned short rport,
+                    unsigned char dscp,
+                    const char * iaddr, unsigned short iport, int proto,
+                    const char * desc, unsigned int timestamp)
+{
+	UNUSED(ifname); UNUSED(rhost); UNUSED(rport); UNUSED(dscp);
+	UNUSED(iaddr); UNUSED(iport); UNUSED(proto); UNUSED(desc);
+	UNUSED(timestamp);
+	syslog(LOG_ERR, "add_peer_dscp_rule2: not supported");
+	return -1;
+}
+
+int
+get_peer_rule_by_index(int index,
+                       char * ifname, unsigned short * eport,
+                       char * iaddr, int iaddrlen, unsigned short * iport,
+                       int * proto, char * desc, int desclen,
+                       char * rhost, int rhostlen, unsigned short * rport,
+                       unsigned int * timestamp,
+                       u_int64_t * packets, u_int64_t * bytes)
+{
+	struct peer_nat pn;
+	if(index < 0 || peer_nat_walk(PEER_GET, index, &pn) != 0)
+		return -1;
+	if(ifname)
+		strlcpy(ifname, pn.ifname, IFNAMSIZ);
+	if(eport)
+		*eport = pn.eport;
+	if(iaddr && iaddrlen > 0)
+		inet_ntop(AF_INET, &pn.iaddr, iaddr, iaddrlen);
+	if(iport)
+		*iport = pn.iport;
+	if(proto)
+		*proto = pn.proto;
+	if(desc && desclen > 0)
+		strlcpy(desc, pn.desc, desclen);
+	if(rhost && rhostlen > 0)
+		inet_ntop(AF_INET, &pn.raddr, rhost, rhostlen);
+	if(rport)
+		*rport = pn.rport;
+	if(timestamp)
+		*timestamp = peer_lease_get(pn.iaddr, pn.iport, pn.raddr, pn.rport, pn.proto);
+	if(packets)
+		*packets = pn.packets;
+	if(bytes)
+		*bytes = pn.bytes;
+	return 0;
+}
+
+/* get_nat_ext_addr()
+ * Look in the pf state table for an existing translated flow
+ * src -> dst and return its external source address and port.
+ * returns 1 if found, 0 if not, -1 on error. IPv4 only. */
+#define PFA4(a)	((a).v4.s_addr)
+#ifdef PF_SK_STACK
+#define PFSK_STACK	PF_SK_STACK
+#define PFSK_WIRE	PF_SK_WIRE
+#else
+#define PFSK_WIRE	0
+#define PFSK_STACK	1
+#endif
+static int
+nat_state_ext(const struct pf_addr * ia, const uint16_t * ip,
+              const struct pf_addr * wa, const uint16_t * wp,
+              in_addr_t src, uint16_t sport, in_addr_t dst, uint16_t dport,
+              struct sockaddr_in * ext)
+{
+	int a;
+	for(a = 0; a < 2; a++)
+	{
+		if(PFA4(ia[a]) == src && ip[a] == htons(sport) &&
+		   PFA4(ia[1-a]) == dst && ip[1-a] == htons(dport) &&
+		   PFA4(wa[1-a]) == dst && wp[1-a] == htons(dport) &&
+		   (PFA4(wa[a]) != src || wp[a] != htons(sport)))
+		{
+			memset(ext, 0, sizeof(*ext));
+			ext->sin_family = AF_INET;
+			ext->sin_addr.s_addr = PFA4(wa[a]);
+			ext->sin_port = wp[a];
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int
+get_nat_ext_addr(struct sockaddr * src, struct sockaddr * dst, uint8_t proto,
+                 struct sockaddr * ret_ext)
+{
+	struct sockaddr_in * s4 = (struct sockaddr_in *)src;
+	struct sockaddr_in * d4 = (struct sockaddr_in *)dst;
+	struct sockaddr_in ext;
+	int found = 0;
+	if(dev < 0 || !src || !dst || src->sa_family != AF_INET ||
+	   dst->sa_family != AF_INET)
+		return 0;
+#ifdef USE_LIBPFCTL
+	{
+		struct pfctl_states states;
+		struct pfctl_state * st;
+		memset(&states, 0, sizeof(states));
+		TAILQ_INIT(&states.states);
+		if(pfctl_get_states(dev, &states) != 0)
+		{
+			syslog(LOG_ERR, "pfctl_get_states: %m");
+			return -1;
+		}
+		TAILQ_FOREACH(st, &states.states, entry)
+		{
+			uint16_t ip[2], wp[2];
+			struct pf_addr ia[2], wa[2];
+			int k;
+			if(st->key[PFSK_STACK].proto != proto)
+				continue;
+			for(k = 0; k < 2; k++)
+			{
+				ia[k] = st->key[PFSK_STACK].addr[k];
+				ip[k] = st->key[PFSK_STACK].port[k];
+				wa[k] = st->key[PFSK_WIRE].addr[k];
+				wp[k] = st->key[PFSK_WIRE].port[k];
+			}
+			found = nat_state_ext(ia, ip, wa, wp,
+			                      s4->sin_addr.s_addr, ntohs(s4->sin_port),
+			                      d4->sin_addr.s_addr, ntohs(d4->sin_port), &ext);
+			if(found)
+				break;
+		}
+		pfctl_free_states(&states);
+	}
+#else
+	{
+		struct pfioc_states ps;
+		PF_STATE_STRUCT * st;
+		char * buf = NULL;
+		size_t len = 0;
+		int i, n;
+		memset(&ps, 0, sizeof(ps));
+		/* the size of the table may change between the 2 calls */
+		for(;;)
+		{
+			if(ioctl(dev, DIOCGETSTATES, &ps) < 0)
+			{
+				syslog(LOG_ERR, "ioctl(dev, DIOCGETSTATES, ...): %m");
+				free(buf);
+				return -1;
+			}
+			if(ps.ps_len <= (int)len && buf != NULL)
+				break;
+			len = ps.ps_len + 16 * sizeof(PF_STATE_STRUCT);
+			free(buf);
+			buf = malloc(len);
+			if(buf == NULL)
+				return -1;
+			ps.ps_len = len;
+			ps.ps_buf = buf;
+		}
+		n = ps.ps_len / sizeof(PF_STATE_STRUCT);
+		st = (PF_STATE_STRUCT *)ps.ps_buf;
+		for(i = 0; i < n && !found; i++, st++)
+		{
+			uint16_t ip[2], wp[2];
+			struct pf_addr ia[2], wa[2];
+			int k;
+			if(st->proto != proto)
+				continue;
+			for(k = 0; k < 2; k++)
+			{
+				ia[k] = st->key[PF_SK_STACK].addr[k];
+				ip[k] = st->key[PF_SK_STACK].port[k];
+				wa[k] = st->key[PF_SK_WIRE].addr[k];
+				wp[k] = st->key[PF_SK_WIRE].port[k];
+			}
+			found = nat_state_ext(ia, ip, wa, wp,
+			                      s4->sin_addr.s_addr, ntohs(s4->sin_port),
+			                      d4->sin_addr.s_addr, ntohs(d4->sin_port), &ext);
+		}
+		free(buf);
+	}
+#endif
+	if(found)
+		memcpy(ret_ext, &ext, sizeof(ext));
+	return found;
+}
+#endif /* PCP_PEER */
+#endif
+
+/* IPv4 netmask for a prefix length (network byte order) */
+in_addr_t
+prefix_to_mask4(unsigned int prefix)
+{
+	return prefix == 0 ? 0 : htonl(0xffffffffU << (32 - prefix));
+}
+
+#ifdef __APPLE__
+#define SRC_PORT_SET(rule, p) do { \
+		(rule).src.xport.range.op = PF_OP_EQ; \
+		(rule).src.xport.range.port[0] = htons(p); \
+		(rule).src.xport.range.port[1] = htons(p); } while(0)
+#else
+#define SRC_PORT_SET(rule, p) do { \
+		(rule).src.port_op = PF_OP_EQ; \
+		(rule).src.port[0] = htons(p); \
+		(rule).src.port[1] = htons(p); } while(0)
+#endif
+
+/* add_redirect_rule_ex() :
+ * create a rdr rule. The source is restricted to saddr/prefix (network
+ * byte order address, prefix 0 means any) and to sport if not 0. */
+int
+add_redirect_rule_ex(const char * ifname,
+                     in_addr_t saddr, unsigned int prefix, unsigned short sport,
+                     unsigned short eport,
+                     const char * iaddr, unsigned short iport, int proto,
+                     const char * desc)
 {
 	int r;
 	struct pfioc_rule pcr;
@@ -694,16 +1183,18 @@ add_redirect_rule2(const char * ifname,
 		if(tag)
 			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
 		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);
-		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		if(prefix > 0)
 		{
 #ifdef PFVAR_NEW_STYLE
-			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4addr.s_addr);
-			pcr.rule.src.addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
+			pcr.rule.src.addr.v.a.addr.v4addr.s_addr = saddr & prefix_to_mask4(prefix);
+			pcr.rule.src.addr.v.a.mask.v4addr.s_addr = prefix_to_mask4(prefix);
 #else
-			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4.s_addr);
-			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
+			pcr.rule.src.addr.v.a.addr.v4.s_addr = saddr & prefix_to_mask4(prefix);
+			pcr.rule.src.addr.v.a.mask.v4.s_addr = prefix_to_mask4(prefix);
 #endif
 		}
+		if(sport)
+			SRC_PORT_SET(pcr.rule, sport);
 #ifdef PF_SET_DST_ADDR
 		/* set dst address
 		 * see https://github.com/miniupnp/miniupnp/issues/231 */
@@ -769,6 +1260,54 @@ add_redirect_rule2(const char * ifname,
 		free(a);
 #endif
 	}
+	return r;
+}
+
+static int priv_delete_redirect_rule_quiet(const char * ifname,
+                                       unsigned short eport, int proto);
+
+/* add_redirect_rule2() :
+ * create a rdr rule (or a rdr rule per allowed peer when a PCP FILTER
+ * policy is pending for this internal endpoint) */
+int
+add_redirect_rule2(const char * ifname,
+                   const char * rhost, unsigned short eport,
+                   const char * iaddr, unsigned short iport, int proto,
+                   const char * desc, unsigned int timestamp)
+{
+	int r = 0;
+	unsigned int k, count;
+	struct in_addr ra;
+	const struct pcp_filter * filters = NULL;
+	count = pf_pcp_pending_filters4(iaddr, iport, proto, &filters);
+	if(count == 0)
+	{
+		unsigned int prefix = 0;
+		ra.s_addr = 0;
+		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		{
+			if(inet_pton(AF_INET, rhost, &ra) == 1)
+				prefix = 32;
+		}
+		r = add_redirect_rule_ex(ifname, ra.s_addr, prefix, 0,
+		                         eport, iaddr, iport, proto, desc);
+	}
+	else
+	{
+		for(k = 0; k < count && r == 0; k++)
+		{
+			memcpy(&ra.s_addr, filters[k].address.s6_addr + 12, 4);
+			r = add_redirect_rule_ex(ifname, ra.s_addr, filters[k].prefix - 96,
+			                         filters[k].port,
+			                         eport, iaddr, iport, proto, desc);
+		}
+		if(r != 0)
+		{
+			/* do not keep a part of the rules of the mapping */
+			while(k-- > 1)
+				priv_delete_redirect_rule_quiet(ifname, eport, proto);
+		}
+	}
 	if(r == 0 && timestamp > 0)
 		add_timestamp_entry(eport, proto, timestamp);
 #ifdef ENABLE_PORT_TRIGGERING
@@ -783,14 +1322,15 @@ add_redirect_rule2(const char * ifname,
 
 /* thanks to Seth Mos for this function */
 int
-add_filter_rule2(const char * ifname,
-                 const char * rhost, const char * iaddr,
-                 unsigned short eport, unsigned short iport,
-				 int proto, const char * desc)
+add_filter_rule_ex(const char * ifname,
+                   in_addr_t saddr, unsigned int prefix, unsigned short sport,
+                   const char * iaddr,
+                   unsigned short eport, unsigned short iport,
+                   int proto, const char * desc)
 {
 #ifndef PF_ENABLE_FILTER_RULES
 	UNUSED(ifname);
-	UNUSED(rhost); UNUSED(iaddr);
+	UNUSED(saddr); UNUSED(prefix); UNUSED(sport); UNUSED(iaddr);
 	UNUSED(eport); UNUSED(iport);
 	UNUSED(proto); UNUSED(desc);
 	return 0;
@@ -856,11 +1396,13 @@ add_filter_rule2(const char * ifname,
 		if(tag)
 			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
 
-		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		if(prefix > 0)
 		{
-			inet_pton(AF_INET, rhost, &pcr.rule.src.addr.v.a.addr.v4.s_addr);
-			pcr.rule.src.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
+			pcr.rule.src.addr.v.a.addr.v4.s_addr = saddr & prefix_to_mask4(prefix);
+			pcr.rule.src.addr.v.a.mask.v4.s_addr = prefix_to_mask4(prefix);
 		}
+		if(sport)
+			SRC_PORT_SET(pcr.rule, sport);
 		/* we want any - iaddr port = # keep state label */
 		inet_pton(AF_INET, iaddr, &pcr.rule.dst.addr.v.a.addr.v4.s_addr);
 		pcr.rule.dst.addr.v.a.mask.v4.s_addr = htonl(INADDR_NONE);
@@ -890,6 +1432,55 @@ add_filter_rule2(const char * ifname,
 	}
 	return r;
 #endif
+}
+
+int
+add_filter_rule2(const char * ifname,
+                 const char * rhost, const char * iaddr,
+                 unsigned short eport, unsigned short iport,
+                 int proto, const char * desc)
+{
+	int r = 0;
+	unsigned int k, count;
+	struct in_addr ra;
+	const struct pcp_filter * filters = NULL;
+	count = pf_pcp_pending_filters4(iaddr, iport, proto, &filters);
+	if(count == 0)
+	{
+		unsigned int prefix = 0;
+		ra.s_addr = 0;
+		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
+		{
+			if(inet_pton(AF_INET, rhost, &ra) == 1)
+				prefix = 32;
+		}
+		return add_filter_rule_ex(ifname, ra.s_addr, prefix, 0, iaddr,
+		                          eport, iport, proto, desc);
+	}
+	for(k = 0; k < count && r == 0; k++)
+	{
+		memcpy(&ra.s_addr, filters[k].address.s6_addr + 12, 4);
+		r = add_filter_rule_ex(ifname, ra.s_addr, filters[k].prefix - 96,
+		                       filters[k].port, iaddr,
+		                       eport, iport, proto, desc);
+	}
+	if(r != 0)
+	{
+		/* do not keep a part of the rules of the mapping */
+		struct in_addr ia;
+		inet_pton(AF_INET, iaddr, &ia);
+		while(k-- > 1)
+		{
+			memcpy(&ra.s_addr, filters[k - 1].address.s6_addr + 12, 4);
+			filter_src_match.active = 1;
+			filter_src_match.addr = ra.s_addr;
+			filter_src_match.prefix = filters[k - 1].prefix - 96;
+			filter_src_match.port = filters[k - 1].port;
+			priv_delete_filter_rule(ifname, iport, proto, ia.s_addr);
+			filter_src_match.active = 0;
+		}
+	}
+	return r;
 }
 
 /* get_redirect_rule_count()
@@ -1107,6 +1698,9 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
  *            0 : rule deleted
  *            1 : rule untouched
  */
+/* set to avoid logging when looking for more rules of a filtered mapping */
+static int quiet_not_found = 0;
+
 static int
 priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
                           int proto, unsigned short * iport,
@@ -1266,9 +1860,21 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 			break;
 		}
 	}
-	if (r == -2)
+	if (r == -2 && !quiet_not_found)
 		syslog(LOG_NOTICE, "could not find redirect rule to delete eport=%hu", eport);
 	release_ticket(dev, tnum);
+	return r;
+}
+
+/* delete another rule of a mapping which has several (PCP FILTER) */
+static int
+priv_delete_redirect_rule_quiet(const char * ifname, unsigned short eport,
+                                int proto)
+{
+	int r;
+	quiet_not_found = 1;
+	r = priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
+	quiet_not_found = 0;
 	return r;
 }
 
@@ -1276,13 +1882,22 @@ int
 delete_redirect_rule(const char * ifname, unsigned short eport,
                     int proto)
 {
-	return priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
+	int r;
+	r = priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
+	/* a filtered PCP mapping has a rule per allowed peer */
+	while(r == 0 && priv_delete_redirect_rule_quiet(ifname, eport, proto) == 0)
+		;
+	return r;
 }
+
+/* when active, priv_delete_filter_rule() only removes the rule having this
+ * source (used for the rules of a PCP FILTER policy) */
+struct pf_filter_src_match filter_src_match;
 
 /* returns:  0 : OK
  *          -1 : Error
  *          -2 : rule not found */
-static int
+int
 priv_delete_filter_rule(const char * ifname, unsigned short iport,
                         int proto, in_addr_t iaddr)
 {
@@ -1328,7 +1943,14 @@ syslog(LOG_DEBUG, "%2d port=%hu proto=%d addr=%8x",
 #endif
 		if( (iport == ntohs(RULE.dst.port[0]))
 		  && (RULE.proto == proto) &&
-		   (iaddr == 0 || iaddr == RULE.dst.addr.v.a.addr.v4.s_addr)
+		   (iaddr == 0 || iaddr == RULE.dst.addr.v.a.addr.v4.s_addr) &&
+		   (!filter_src_match.active ||
+		    (RULE.src.addr.v.a.addr.v4.s_addr ==
+		         (filter_src_match.addr & prefix_to_mask4(filter_src_match.prefix))
+		     && RULE.src.addr.v.a.mask.v4.s_addr ==
+		         prefix_to_mask4(filter_src_match.prefix)
+		     && (RULE.src.port_op == PF_OP_EQ ?
+		         ntohs(RULE.src.port[0]) : 0) == filter_src_match.port))
 		  )
 		{
 			r = pf_rule_remove(PF_PASS, i) < 0 ? -1 : 0;
@@ -1361,17 +1983,56 @@ delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
 	int r;
 	unsigned short iport;
 	in_addr_t iaddr;
+	int n = 1;
 	r = priv_delete_redirect_rule(ifname, eport, proto, &iport, &iaddr, NULL, 0);
 	if(r == 0)
 	{
+		/* a filtered PCP mapping has a rule per allowed peer */
+		while(priv_delete_redirect_rule_quiet(ifname, eport, proto) == 0)
+			n++;
 #ifdef ENABLE_PORT_TRIGGERING
 		if (proto == IPPROTO_UDP) {
 			delete_nat_rule(ifname, eport, iport, proto, iaddr);
 		}
 #endif
 		r = priv_delete_filter_rule(ifname, iport, proto, iaddr);
+		while(--n > 0)
+			priv_delete_filter_rule(ifname, iport, proto, iaddr);
 	}
 	return r;
+}
+
+/* source restriction of the rule returned by the last successful call
+ * to get_redirect_rule_by_index() */
+in_addr_t last_rdr_src_addr;
+unsigned int last_rdr_src_prefix;
+unsigned short last_rdr_src_port;
+
+/* source restriction of a rdr rule : address (network byte order), prefix
+ * length (0 : any address) and port (0 : any port) */
+static void
+rdr_src_restriction(const pf_walk_rule_t * rule, in_addr_t * addr,
+                    unsigned int * prefix, unsigned short * port)
+{
+	in_addr_t m;
+#ifdef PFVAR_NEW_STYLE
+	m = rule->src.addr.v.a.mask.v4addr.s_addr;
+	*addr = rule->src.addr.v.a.addr.v4addr.s_addr;
+#else
+	m = rule->src.addr.v.a.mask.v4.s_addr;
+	*addr = rule->src.addr.v.a.addr.v4.s_addr;
+#endif
+	*prefix = 0;
+	m = ntohl(m);
+	while(m & 0x80000000U) { (*prefix)++; m <<= 1; }
+	if(*addr == 0)
+		*prefix = 0;
+#ifdef __APPLE__
+	*port = rule->src.xport.range.op == PF_OP_EQ ?
+	        ntohs(rule->src.xport.range.port[0]) : 0;
+#else
+	*port = rule->src.port_op == PF_OP_EQ ? ntohs(rule->src.port[0]) : 0;
+#endif
 }
 
 struct rdr_index_ctx {
@@ -1409,6 +2070,9 @@ get_redirect_rule_by_index_cb(int index, const pf_walk_rule_t * rule,
 		return -1;
 	if(c->timestamp)
 		*c->timestamp = get_timestamp(*c->eport, *c->proto);
+	/* source restriction of the rule, used by the PCP FILTER code */
+	rdr_src_restriction(rule, &last_rdr_src_addr, &last_rdr_src_prefix,
+	                    &last_rdr_src_port);
 	return 0;
 }
 
@@ -1442,6 +2106,44 @@ get_redirect_rule_by_index(int index,
 	c.packets = packets;
 	c.bytes = bytes;
 	return pf_rule_get(PF_RDR, index, get_redirect_rule_by_index_cb, &c) == 0 ? 0 : -1;
+}
+
+struct rdr_foreach_ctx {
+	pf_rdr_visit_cb visit;
+	void * arg;
+};
+
+static int
+rdr_foreach_cb(int index, const pf_walk_rule_t * rule,
+               const struct pf_walk * walk, void * arg)
+{
+	struct rdr_foreach_ctx * c = arg;
+	char iaddr[INET_ADDRSTRLEN], desc[PF_RULE_LABEL_SIZE];
+	unsigned short iport, eport, sport;
+	unsigned int prefix;
+	in_addr_t saddr;
+	if(rdr_rule_info(index, rule, walk, &iport, iaddr, sizeof(iaddr),
+	                 desc, sizeof(desc), NULL, 0, NULL, NULL) < 0)
+		return 0;	/* skip the rules we cannot read */
+#ifdef __APPLE__
+	eport = ntohs(rule->dst.xport.range.port[0]);
+#else
+	eport = ntohs(rule->dst.port[0]);
+#endif
+	rdr_src_restriction(rule, &saddr, &prefix, &sport);
+	return c->visit(index, rule->ifname, eport, iaddr, iport, rule->proto,
+	                desc, saddr, prefix, sport,
+	                get_timestamp(eport, rule->proto), c->arg);
+}
+
+/* see pfpcp.h */
+int
+get_redirect_rules_foreach(pf_rdr_visit_cb visit, void * arg)
+{
+	struct rdr_foreach_ctx c;
+	c.visit = visit;
+	c.arg = arg;
+	return pf_rule_foreach(PF_RDR, rdr_foreach_cb, &c);
 }
 
 /* return an (malloc'ed) array of "external" port for which there is
@@ -1723,5 +2425,6 @@ list_rules(void)
 	release_ticket(dev, tnum);
 }
 #endif /* TEST */
+
 
 #endif /* USE_PF */
