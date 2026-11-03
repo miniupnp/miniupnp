@@ -472,6 +472,10 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		if (p->desc_len == 0)
 			continue;
 
+		/* this runs at each pass of the main loop : the forward rules of
+		 * the port mappings are skipped without a log line each */
+		if (strncmp(p->desc, "pinhole-", 8) != 0)
+			continue;
 		if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
 			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
 			continue;
