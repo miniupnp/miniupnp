@@ -1372,6 +1372,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	int systemd_flag = 0;
 #endif
 	int verbosity_level = 0;	/* for determining setlogmask() */
+#ifdef ENABLE_PCP
+	unsigned long min_lifetime_override = 0;	/* 0 : not set */
+#endif
 	int openlog_option;
 	struct in_addr addr;
 	struct sigaction sa;
@@ -1633,6 +1636,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 						min_lifetime = 120;
 					}
 				break;
+			case UPNPPCPMINLIFETIMEOVERRIDE:
+				min_lifetime_override = strtoul(ary_options[i].value, NULL, 10);
+				if (min_lifetime_override == 0)
+					INIT_PRINT_ERR("pcp_min_lifetime_override must be at least 1, ignored\n");
+				break;
 			case UPNPPCPMAXLIFETIME:
 					max_lifetime = atoi(ary_options[i].value);
 					/* maximum is 24 hours */
@@ -1688,6 +1696,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 		}
 #ifdef ENABLE_PCP
+		/* pcp_min_lifetime_override sets the minimum lifetime as it is, also
+		 * under the 120 seconds of RFC 6887 section 15 (for tests) */
+		if (min_lifetime_override > 0)
+			min_lifetime = min_lifetime_override;
 		/* if lifetimes are inverse */
 		if (min_lifetime >= max_lifetime) {
 			INIT_PRINT_ERR("Minimum lifetime (%lu) is greater than or equal to maximum lifetime (%lu).\n", min_lifetime, max_lifetime);
