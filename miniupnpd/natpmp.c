@@ -341,6 +341,17 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				unsigned short eport_old;
 				/* RFC 6886 section 3.3: a retry is identified by its
 				 * internal tuple, regardless of the suggested port. */
+#ifdef PCP_FIND_SUPPORTED
+				/* in one pass over the rules */
+				UNUSED(index); UNUSED(proto_old);
+				if (pcp_find_map(senderaddrstr, iport, proto, &eport_old,
+				                 desc, sizeof(desc), NULL) == 0) {
+					if (strncmp(desc, "NAT-PMP ", 8) != 0)
+						resp[3] = 2; /* Not Authorized/Refused */
+					else
+						eport = eport_old;
+				}
+#else
 				for (index = 0;
 				     get_redirect_rule_by_index(index, NULL, &eport_old,
 				                                iaddr_old, sizeof(iaddr_old),
@@ -358,6 +369,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						break;
 					}
 				}
+#endif
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {
