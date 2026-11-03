@@ -1583,14 +1583,32 @@ struct pcp_filter_update {
 	struct pcp_filter_policy *replacement;
 };
 
-static struct pcp_filter_policy *pcp_filter_policies;
+/* The policies of the filtered mappings, in a hash table on (address, port,
+ * protocol). They are read from the kernel once (pcp_filter_recover()), then
+ * this table is authoritative : a mapping which is not in it has no filter. */
+#define PCP_FILTER_HASH_SIZE 1024
+static struct pcp_filter_policy *pcp_filter_policies[PCP_FILTER_HASH_SIZE];
+static int pcp_filter_recovered;
+
+static unsigned int
+pcp_filter_bucket(const struct in6_addr *address, unsigned short port,
+                  unsigned char protocol)
+{
+	unsigned int h = 2166136261u, i;
+	for (i = 0; i < sizeof(address->s6_addr); ++i)
+		h = (h ^ address->s6_addr[i]) * 16777619u;
+	h = (h ^ port) * 16777619u;
+	h = (h ^ protocol) * 16777619u;
+	return h % PCP_FILTER_HASH_SIZE;
+}
 
 static struct pcp_filter_policy **
 pcp_filter_find(const struct in6_addr *address, unsigned short port,
                 unsigned char protocol)
 {
 	struct pcp_filter_policy **p;
-	for (p = &pcp_filter_policies; *p; p = &(*p)->next) {
+	for (p = &pcp_filter_policies[pcp_filter_bucket(address, port, protocol)];
+	     *p; p = &(*p)->next) {
 		if ((*p)->port == port && (*p)->protocol == protocol &&
 		    memcmp(&(*p)->address, address, sizeof(*address)) == 0)
 			break;
@@ -1791,23 +1809,75 @@ out:
 	return result;
 }
 
+/* the mapping of a chain named by pcp_filter_chain_name(). returns 0 if it is one */
+static int
+pcp_filter_parse_chain_name(const char *name, struct in6_addr *address,
+                            unsigned short *port, unsigned char *protocol)
+{
+	unsigned int i, b, p, pr;
+	const char *prefix = "pcp-filter-";
+	size_t n = strlen(prefix);
+	if (strncmp(name, prefix, n) != 0 || strlen(name) != n + 32 + 8)
+		return -1;
+	name += n;
+	for (i = 0; i < 16; ++i) {
+		if (sscanf(name + 2 * i, "%2x", &b) != 1)
+			return -1;
+		address->s6_addr[i] = (unsigned char)b;
+	}
+	if (sscanf(name + 32, "-%4x-%2x", &p, &pr) != 2)
+		return -1;
+	*port = (unsigned short)p;
+	*protocol = (unsigned char)pr;
+	return 0;
+}
+
+struct pcp_filter_recover_ctx {
+	int error;	/* out of memory */
+};
+
+/* a rule of the table : if it is in the chain of a filtered mapping, add
+ * its peer to the policy of that mapping */
 static int
 pcp_filter_recover_cb(const struct nlmsghdr *nlh, void *data)
 {
-	struct pcp_filter_policy *policy = data;
+	struct pcp_filter_recover_ctx *ctx = data;
+	struct pcp_filter_policy *policy, **pp;
 	struct nftnl_rule *rule;
 	const unsigned char *userdata;
+	const char *chain;
 	uint32_t len;
 	struct pcp_filter *filter;
-	struct in6_addr remote;
-	int v4 = IN6_IS_ADDR_V4MAPPED(&policy->address);
+	struct in6_addr remote, address;
+	unsigned short port;
+	unsigned char protocol;
+	int v4;
 	rule = nftnl_rule_alloc();
 	if (!rule) {
-		policy->recovery_error = 1;
+		ctx->error = 1;
 		return MNL_CB_OK;
 	}
-	if (nftnl_rule_nlmsg_parse(nlh, rule) < 0)
-		goto invalid;
+	if (nftnl_rule_nlmsg_parse(nlh, rule) < 0 ||
+	    !(chain = nftnl_rule_get_str(rule, NFTNL_RULE_CHAIN)) ||
+	    pcp_filter_parse_chain_name(chain, &address, &port, &protocol) < 0) {
+		/* not a rule of a filtered mapping */
+		nftnl_rule_free(rule);
+		return MNL_CB_OK;
+	}
+	pp = pcp_filter_find(&address, port, protocol);
+	if (!*pp) {
+		*pp = calloc(1, sizeof(**pp));
+		if (!*pp) {
+			ctx->error = 1;
+			nftnl_rule_free(rule);
+			return MNL_CB_OK;
+		}
+		(*pp)->address = address;
+		(*pp)->port = port;
+		(*pp)->protocol = protocol;
+	}
+	policy = *pp;
+	v4 = IN6_IS_ADDR_V4MAPPED(&policy->address);
 	userdata = nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA, &len);
 	if (!userdata || len != 39 || memcmp(userdata, "PCPF", 4) != 0 ||
 	    userdata[4] > 128 || (userdata[4] && policy->count == PCP_FILTER_PEER_MAX) ||
@@ -1836,67 +1906,92 @@ invalid:
 	return MNL_CB_OK;
 }
 
+static void
+pcp_filter_free_all(void)
+{
+	unsigned int b;
+	for (b = 0; b < PCP_FILTER_HASH_SIZE; ++b) {
+		while (pcp_filter_policies[b]) {
+			struct pcp_filter_policy *p = pcp_filter_policies[b];
+			pcp_filter_policies[b] = p->next;
+			free(p);
+		}
+	}
+}
+
+/* dump the rules of the table in one family into the policies.
+ * returns <0 on error */
+static int
+pcp_filter_recover_family(uint16_t family, struct pcp_filter_recover_ctx *ctx)
+{
+	struct nftnl_rule *rule;
+	struct nlmsghdr *nlh;
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	ssize_t n;
+	int result;
+	rule = nftnl_rule_alloc();
+	if (!rule)
+		return -1;
+	mnl_seq = time(NULL);
+	nlh = nftnl_rule_nlmsg_build_hdr(buf, NFT_MSG_GETRULE, family, NLM_F_DUMP, mnl_seq);
+	nftnl_rule_set_str(rule, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_nlmsg_build_payload(nlh, rule);
+	nftnl_rule_free(rule);
+	if (mnl_socket_sendto(mnl_sock, nlh, nlh->nlmsg_len) < 0)
+		return -1;
+	do {
+		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+		if (n <= 0)
+			return -1;
+		result = mnl_cb_run(buf, n, mnl_seq, mnl_portid, pcp_filter_recover_cb, ctx);
+		if (result < 0)
+			return errno == ENOENT ? 0 : -1;	/* ENOENT : no table */
+	} while (result > 0);
+	return 0;
+}
+
 /* Kernel rules survive a daemon restart.  Recover only our private,
- * self-describing rules, never infer prefix masks from firewall expressions. */
+ * self-describing rules, never infer prefix masks from firewall expressions.
+ * The table is read once, in one dump per family : after that the policies
+ * in memory are authoritative. A mapping whose rules could not be read
+ * back is kept with recovery_error, so it is never changed blindly.
+ * returns <0 on error (the mapping of address:port/protocol could not be read) */
 static int
 pcp_filter_recover(const struct in6_addr *address, unsigned short port,
                    unsigned char protocol)
 {
-	struct pcp_filter_policy *policy;
-	struct nftnl_rule *rule;
-	struct nlmsghdr *nlh;
-	char buf[MNL_SOCKET_BUFFER_SIZE], chain[64];
-	ssize_t n;
-	int result;
-	uint16_t family = IN6_IS_ADDR_V4MAPPED(address) ? nft_ipv4_family : nft_ipv6_family;
-	if (*pcp_filter_find(address, port, protocol))
-		return 0;
-	policy = calloc(1, sizeof(*policy));
-	rule = nftnl_rule_alloc();
-	if (!policy || !rule || !mnl_sock) {
-		free(policy);
-		if (rule)
-			nftnl_rule_free(rule);
-		return -1;
-	}
-	policy->address = *address;
-	policy->port = port;
-	policy->protocol = protocol;
-	pcp_filter_chain_name(policy, chain, sizeof(chain));
-	mnl_seq = time(NULL);
-	nlh = nftnl_rule_nlmsg_build_hdr(buf, NFT_MSG_GETRULE, family, NLM_F_DUMP, mnl_seq);
-	nftnl_rule_set_str(rule, NFTNL_RULE_TABLE, nft_table);
-	nftnl_rule_set_str(rule, NFTNL_RULE_CHAIN, chain);
-	nftnl_rule_nlmsg_build_payload(nlh, rule);
-	nftnl_rule_free(rule);
-	result = mnl_socket_sendto(mnl_sock, nlh, nlh->nlmsg_len);
-	if (result < 0)
-		goto fail;
-	do {
-		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
-		if (n <= 0)
-			goto fail;
-		result = mnl_cb_run(buf, n, mnl_seq, mnl_portid, pcp_filter_recover_cb, policy);
-		if (result < 0) {
-			if (errno == ENOENT) {
-				free(policy);
-				return 0;
-			}
-			goto fail;
+	struct pcp_filter_recover_ctx ctx;
+	struct pcp_filter_policy *p;
+	unsigned int b;
+	if (!pcp_filter_recovered) {
+		if (!mnl_sock)
+			return -1;
+		memset(&ctx, 0, sizeof(ctx));
+		if (pcp_filter_recover_family(nft_ipv4_family, &ctx) < 0 ||
+		    (nft_ipv6_family != nft_ipv4_family &&
+		     pcp_filter_recover_family(nft_ipv6_family, &ctx) < 0) ||
+		    ctx.error) {
+			syslog(LOG_ERR, "%s: could not read the PCP FILTER rules", "pcp_filter_recover");
+			pcp_filter_free_all();
+			return -1;	/* tried again next time */
 		}
-	} while (result > 0);
-	if (policy->recovery_error)
-		goto fail;
-	if (policy->count) {
-		policy->next = pcp_filter_policies;
-		pcp_filter_policies = policy;
-	} else {
-		free(policy);
+		/* a chain with only its final rule has no peer */
+		for (b = 0; b < PCP_FILTER_HASH_SIZE; ++b) {
+			struct pcp_filter_policy **pp = &pcp_filter_policies[b];
+			while (*pp) {
+				if (!(*pp)->count && !(*pp)->recovery_error) {
+					p = *pp;
+					*pp = p->next;
+					free(p);
+				} else {
+					pp = &(*pp)->next;
+				}
+			}
+		}
+		pcp_filter_recovered = 1;
 	}
-	return 0;
-fail:
-	free(policy);
-	return -1;
+	p = *pcp_filter_find(address, port, protocol);
+	return (p && p->recovery_error) ? -1 : 0;
 }
 
 int
