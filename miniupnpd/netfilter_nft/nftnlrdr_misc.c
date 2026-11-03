@@ -1581,7 +1581,21 @@ struct pcp_filter_policy {
 struct pcp_filter_update {
 	struct pcp_filter_policy *old;
 	struct pcp_filter_policy *replacement;
+	int unchanged;	/* same peers as before : nothing was installed */
 };
+
+/* does the policy p have the same peers, in the same order, on the same
+ * interface as old (NULL : no peer) ? */
+static int
+pcp_filter_same(const struct pcp_filter_policy *p,
+                const struct pcp_filter_policy *old)
+{
+	if (!old)
+		return p->count == 0;
+	return p->count == old->count &&
+	       strcmp(p->ifname, old->ifname) == 0 &&
+	       memcmp(p->filters, old->filters, p->count * sizeof(p->filters[0])) == 0;
+}
 
 /* The policies of the filtered mappings, in a hash table on (address, port,
  * protocol). They are read from the kernel once (pcp_filter_recover()), then
@@ -2033,6 +2047,12 @@ nft_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
 		free(u);
 		return r;
 	}
+	/* a renewal with the peers the mapping has : the chain stays as it is */
+	if (pcp_filter_same(p, u->old)) {
+		u->unchanged = 1;
+		*update = u;
+		return 0;
+	}
 	if (pcp_filter_install(p) < 0) {
 		free(p);
 		free(u);
@@ -2049,6 +2069,12 @@ nft_pcp_filter_finish(struct pcp_filter_update *update, int commit)
 	int result = 0;
 	if (!update)
 		return 0;
+	if (update->unchanged) {
+		/* nothing was installed : the policy in memory stays */
+		free(update->replacement);
+		free(update);
+		return 0;
+	}
 	p = pcp_filter_find(&update->replacement->address,
 	                    update->replacement->port, update->replacement->protocol);
 	if (commit) {
