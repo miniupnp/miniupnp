@@ -37,6 +37,7 @@
 #include <libnftnl/table.h>
 #include <libnftnl/chain.h>
 #include <libnftnl/rule.h>
+#include <libnftnl/set.h>
 #include <libnftnl/expr.h>
 
 #include "../commonrdr.h"
@@ -1846,9 +1847,191 @@ pcp_filter_rule(const struct pcp_filter_policy *policy,
 	return r;
 }
 
-/* Flush and rebuild a mapping's private base chain in a single transaction.
- * Creating an existing chain is idempotent.  A zero-filter policy removes
- * the chain, so unfiltered MAPs have no additional forwarding hooks. */
+/* The FILTER policies on the packet path (RFC 6887 section 13.3).
+ * One base chain per IP version on the forward hook, before the forward chain
+ * of miniupnpd, holds one rule : a lookup of daddr . l4proto . dport in a
+ * verdict map, which jumps to the regular chain of the filtered mapping
+ * (pcp-filter-<address>-<port>-<protocol>). A forwarded packet costs one
+ * lookup, whatever the number of filtered mappings ; with a base chain per
+ * mapping it went through every one of them.
+ * The chain of a mapping accepts its peers and drops the rest of the traffic
+ * to the mapping ; an accept only ends that base chain, the packet still has
+ * to pass the ordinary firewall. */
+#define PCP_FILTER_BASE4	"pcp-filter-v4"
+#define PCP_FILTER_BASE6	"pcp-filter-v6"
+#define PCP_FILTER_MAP4		"pcp-filter-map4"
+#define PCP_FILTER_MAP6		"pcp-filter-map6"
+/* the types of the key of the maps, for nft list : ipv4_addr (7) or
+ * ipv6_addr (8) . inet_proto (12) . inet_service (13) */
+#define PCP_FILTER_KEY4_TYPE	((7u << 12) | (12u << 6) | 13u)
+#define PCP_FILTER_KEY6_TYPE	((8u << 12) | (12u << 6) | 13u)
+/* the base chain and the map of a family are set up by the first install of
+ * this process (again after an error) */
+static int pcp_filter_dispatch_ready[2];	/* [v4] */
+
+/* the next message of a batch : the previous one is ended first. The last
+ * one is ended by send_batch() */
+static void *
+pcp_filter_batch_msg(struct mnl_nlmsg_batch *batch, int *pending)
+{
+	if (*pending)
+		mnl_nlmsg_batch_next(batch);
+	*pending = 1;
+	return mnl_nlmsg_batch_current(batch);
+}
+
+/* the key of a mapping in its map : the address, the protocol and the port,
+ * each in 32 bit registers as the lookup reads them. returns its length */
+static uint32_t
+pcp_filter_key(const struct pcp_filter_policy *policy, unsigned char *key)
+{
+	int v4 = IN6_IS_ADDR_V4MAPPED(&policy->address);
+	uint32_t alen = v4 ? 4 : 16;
+	uint16_t port = htons(policy->port);
+	memset(key, 0, 24);
+	memcpy(key, policy->address.s6_addr + (v4 ? 12 : 0), alen);
+	key[alen] = policy->protocol;
+	memcpy(key + alen + 4, &port, 2);
+	return alen + 8;
+}
+
+static struct nftnl_set *
+pcp_filter_set(int v4)
+{
+	struct nftnl_set *set = nftnl_set_alloc();
+	if (!set)
+		return NULL;
+	nftnl_set_set_str(set, NFTNL_SET_TABLE, nft_table);
+	nftnl_set_set_str(set, NFTNL_SET_NAME, v4 ? PCP_FILTER_MAP4 : PCP_FILTER_MAP6);
+	nftnl_set_set_u32(set, NFTNL_SET_FAMILY, v4 ? nft_ipv4_family : nft_ipv6_family);
+	nftnl_set_set_u32(set, NFTNL_SET_ID, v4 ? 1 : 2);
+	return set;
+}
+
+/* the messages which create the base chain and the map of a family (or keep
+ * them) and replace the dispatch rule. returns <0 if out of memory */
+static int
+pcp_filter_dispatch_msgs(struct mnl_nlmsg_batch *batch, int *pending, int v4)
+{
+	uint16_t family = v4 ? nft_ipv4_family : nft_ipv6_family;
+	const char *base = v4 ? PCP_FILTER_BASE4 : PCP_FILTER_BASE6;
+	struct nftnl_chain *chain;
+	struct nftnl_set *set;
+	struct nftnl_rule *flush, *rule;
+	struct nftnl_expr *lookup;
+	struct nlmsghdr *nlh;
+	uint32_t alen = v4 ? 4 : 16;
+	int result = -1;
+
+	chain = nftnl_chain_alloc();
+	set = pcp_filter_set(v4);
+	flush = nftnl_rule_alloc();
+	rule = nftnl_rule_alloc();
+	lookup = nftnl_expr_alloc("lookup");
+	if (!chain || !set || !flush || !rule || !lookup)
+		goto out;
+	nftnl_chain_set_u32(chain, NFTNL_CHAIN_FAMILY, family);
+	nftnl_chain_set_str(chain, NFTNL_CHAIN_TABLE, nft_table);
+	nftnl_chain_set_str(chain, NFTNL_CHAIN_NAME, base);
+	nftnl_chain_set_str(chain, NFTNL_CHAIN_TYPE, "filter");
+	nftnl_chain_set_u32(chain, NFTNL_CHAIN_HOOKNUM, NF_INET_FORWARD);
+	nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, -1);
+	nlh = nftnl_chain_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
+	                                 NFT_MSG_NEWCHAIN, family, NLM_F_CREATE, mnl_seq++);
+	nftnl_chain_nlmsg_build_payload(nlh, chain);
+
+	nftnl_set_set_u32(set, NFTNL_SET_FLAGS, NFT_SET_MAP);
+	nftnl_set_set_u32(set, NFTNL_SET_KEY_TYPE, v4 ? PCP_FILTER_KEY4_TYPE : PCP_FILTER_KEY6_TYPE);
+	nftnl_set_set_u32(set, NFTNL_SET_KEY_LEN, alen + 8);
+	nftnl_set_set_u32(set, NFTNL_SET_DATA_TYPE, NFT_DATA_VERDICT);
+	nlh = nftnl_set_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
+	                               NFT_MSG_NEWSET, family, NLM_F_CREATE, mnl_seq++);
+	nftnl_set_nlmsg_build_payload(nlh, set);
+
+	/* the base chain holds only the dispatch rule : flush it, add it */
+	nftnl_rule_set_u32(flush, NFTNL_RULE_FAMILY, family);
+	nftnl_rule_set_str(flush, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set_str(flush, NFTNL_RULE_CHAIN, base);
+	nlh = nftnl_rule_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
+	                                NFT_MSG_DELRULE, family, 0, mnl_seq++);
+	nftnl_rule_nlmsg_build_payload(nlh, flush);
+
+	expr_alloc_failed = 0;
+	nftnl_rule_set_u32(rule, NFTNL_RULE_FAMILY, family);
+	nftnl_rule_set_str(rule, NFTNL_RULE_TABLE, nft_table);
+	nftnl_rule_set_str(rule, NFTNL_RULE_CHAIN, base);
+	expr_add_nfproto(rule, v4 ? NFPROTO_IPV4 : NFPROTO_IPV6);
+	/* daddr . l4proto . dport in consecutive 32 bit registers */
+	expr_add_payload(rule, NFT_PAYLOAD_NETWORK_HEADER, NFT_REG32_00,
+	                 v4 ? offsetof(struct iphdr, daddr) : offsetof(struct ipv6hdr, daddr),
+	                 alen);
+	expr_add_meta(rule, NFT_META_L4PROTO, NFT_REG32_00 + alen / 4);
+	expr_add_payload(rule, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG32_00 + alen / 4 + 1, 2, 2);
+	nftnl_expr_set_u32(lookup, NFTNL_EXPR_LOOKUP_SREG, NFT_REG32_00);
+	nftnl_expr_set_u32(lookup, NFTNL_EXPR_LOOKUP_DREG, NFT_REG_VERDICT);
+	nftnl_expr_set_str(lookup, NFTNL_EXPR_LOOKUP_SET, v4 ? PCP_FILTER_MAP4 : PCP_FILTER_MAP6);
+	nftnl_expr_set_u32(lookup, NFTNL_EXPR_LOOKUP_SET_ID, v4 ? 1 : 2);
+	nftnl_rule_add_expr(rule, lookup);
+	lookup = NULL;
+	if (expr_alloc_failed)
+		goto out;
+	nlh = nftnl_rule_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
+	                                NFT_MSG_NEWRULE, family,
+	                                NLM_F_CREATE | NLM_F_APPEND, mnl_seq++);
+	nftnl_rule_nlmsg_build_payload(nlh, rule);
+	result = 0;
+out:
+	if (lookup)
+		nftnl_expr_free(lookup);
+	if (rule)
+		nftnl_rule_free(rule);
+	if (flush)
+		nftnl_rule_free(flush);
+	if (set)
+		nftnl_set_free(set);
+	if (chain)
+		nftnl_chain_free(chain);
+	return result;
+}
+
+/* the message which adds (jump to chain_name) or removes the element of a
+ * mapping in its map. returns <0 if out of memory */
+static int
+pcp_filter_elem_msg(struct mnl_nlmsg_batch *batch, int *pending,
+                    const struct pcp_filter_policy *policy,
+                    const char *chain_name, int add)
+{
+	int v4 = IN6_IS_ADDR_V4MAPPED(&policy->address);
+	uint16_t family = v4 ? nft_ipv4_family : nft_ipv6_family;
+	unsigned char key[24];
+	uint32_t klen = pcp_filter_key(policy, key);
+	struct nftnl_set *set = pcp_filter_set(v4);
+	struct nftnl_set_elem *e = nftnl_set_elem_alloc();
+	struct nlmsghdr *nlh;
+	if (!set || !e) {
+		if (set)
+			nftnl_set_free(set);
+		if (e)
+			nftnl_set_elem_free(e);
+		return -1;
+	}
+	nftnl_set_elem_set(e, NFTNL_SET_ELEM_KEY, key, klen);
+	if (add) {
+		nftnl_set_elem_set_u32(e, NFTNL_SET_ELEM_VERDICT, NFT_JUMP);
+		nftnl_set_elem_set_str(e, NFTNL_SET_ELEM_CHAIN, chain_name);
+	}
+	nftnl_set_elem_add(set, e);	/* the set frees it */
+	nlh = nftnl_set_elem_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
+	                                    add ? NFT_MSG_NEWSETELEM : NFT_MSG_DELSETELEM,
+	                                    family, add ? NLM_F_CREATE : 0, mnl_seq++);
+	nftnl_set_elems_nlmsg_build_payload(nlh, set);
+	nftnl_set_free(set);
+	return 0;
+}
+
+/* Rebuild the chain of a mapping in a single transaction : its rules and its
+ * element in the map change together. Creating an existing chain or element
+ * is idempotent. A zero-filter policy removes the element and the chain. */
 static int
 pcp_filter_install(const struct pcp_filter_policy *policy)
 {
@@ -1860,13 +2043,16 @@ pcp_filter_install(const struct pcp_filter_policy *policy)
 	char *buf;
 	unsigned int i, nrules = 1;
 	uint16_t family;
-	int result = -1;
+	int result = -1, pending = 0;
+	int v4 = IN6_IS_ADDR_V4MAPPED(&policy->address);
+	int dispatch = policy->count && !pcp_filter_dispatch_ready[v4];
 	/* a rule of the chain is less than 1 KB of netlink messages : 2 KB
-	 * each, and 4 KB for the chain and the batch messages */
-	const size_t batch_size = 4096 + (policy->count + 2) * 2048;
+	 * each, and 8 KB for the chains, the map, the dispatch rule and the
+	 * batch messages */
+	const size_t batch_size = 8192 + (policy->count + 2) * 2048;
 
 	memset(rules, 0, sizeof(rules));
-	family = IN6_IS_ADDR_V4MAPPED(&policy->address) ? nft_ipv4_family : nft_ipv6_family;
+	family = v4 ? nft_ipv4_family : nft_ipv6_family;
 	pcp_filter_chain_name(policy, chain_name, sizeof(chain_name));
 	chain = nftnl_chain_alloc();
 	buf = malloc(2 * batch_size);	/* libmnl wants twice the limit */
@@ -1875,9 +2061,6 @@ pcp_filter_install(const struct pcp_filter_policy *policy)
 	nftnl_chain_set_u32(chain, NFTNL_CHAIN_FAMILY, family);
 	nftnl_chain_set_str(chain, NFTNL_CHAIN_TABLE, nft_table);
 	nftnl_chain_set_str(chain, NFTNL_CHAIN_NAME, chain_name);
-	nftnl_chain_set_str(chain, NFTNL_CHAIN_TYPE, "filter");
-	nftnl_chain_set_u32(chain, NFTNL_CHAIN_HOOKNUM, NF_INET_FORWARD);
-	nftnl_chain_set_s32(chain, NFTNL_CHAIN_PRIO, -1);
 
 	/* DELRULE without a handle flushes only this mapping's chain. */
 	rules[0] = nftnl_rule_alloc();
@@ -1898,29 +2081,39 @@ pcp_filter_install(const struct pcp_filter_policy *policy)
 	batch = start_batch(buf, batch_size);
 	if (!batch)
 		goto out;
-	nlh = nftnl_chain_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
-	                                 NFT_MSG_NEWCHAIN, family, NLM_F_CREATE,
-	                                 mnl_seq++);
-	nftnl_chain_nlmsg_build_payload(nlh, chain);
-	mnl_nlmsg_batch_next(batch);
+	/* start_batch() has put and ended the batch begin message */
+	if (dispatch && pcp_filter_dispatch_msgs(batch, &pending, v4) < 0)
+		goto out;
+	if (policy->count) {
+		/* a regular chain : the base chain jumps to it */
+		nlh = nftnl_chain_nlmsg_build_hdr(pcp_filter_batch_msg(batch, &pending),
+		                                 NFT_MSG_NEWCHAIN, family, NLM_F_CREATE,
+		                                 mnl_seq++);
+		nftnl_chain_nlmsg_build_payload(nlh, chain);
+	} else if (pcp_filter_elem_msg(batch, &pending, policy, chain_name, 0) < 0) {
+		goto out;	/* no jump to the chain any more, before it goes */
+	}
 	for (i = 0; i < nrules; ++i) {
-		nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+		nlh = nftnl_rule_nlmsg_build_hdr(pcp_filter_batch_msg(batch, &pending),
 		                              i ? NFT_MSG_NEWRULE : NFT_MSG_DELRULE,
 		                              family, i ? NLM_F_CREATE | NLM_F_APPEND : 0,
 		                              mnl_seq++);
 		nftnl_rule_nlmsg_build_payload(nlh, rules[i]);
-		if (i + 1 < nrules || !policy->count)
-			mnl_nlmsg_batch_next(batch);
 	}
-	if (!policy->count) {
-		nlh = nftnl_chain_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+	if (policy->count) {
+		if (pcp_filter_elem_msg(batch, &pending, policy, chain_name, 1) < 0)
+			goto out;
+	} else {
+		nlh = nftnl_chain_nlmsg_build_hdr(pcp_filter_batch_msg(batch, &pending),
 		                                 NFT_MSG_DELCHAIN, family, 0, mnl_seq++);
 		nftnl_chain_nlmsg_build_payload(nlh, chain);
 	}
 	/* One acknowledgement after the complete transaction avoids leaving
 	 * multiple ACKs pending on the backend's shared netlink socket. */
-	nlh->nlmsg_flags |= NLM_F_ACK;
+	((struct nlmsghdr *)mnl_nlmsg_batch_current(batch))->nlmsg_flags |= NLM_F_ACK;
 	result = send_batch(batch);
+	if (dispatch)
+		pcp_filter_dispatch_ready[v4] = result >= 0;
 out:
 	for (i = 0; i < nrules; ++i)
 		if (rules[i])
@@ -2183,7 +2376,14 @@ nft_pcp_filter_finish(struct pcp_filter_update *update, int commit)
 	}
 	p = pcp_filter_find(&update->replacement->address,
 	                    update->replacement->port, update->replacement->protocol);
-	if (commit) {
+	if (commit && update->replacement->count == 0) {
+		/* no peer left (a FILTER with prefix 0) : the chain and the
+		 * element are gone, the mapping is unfiltered */
+		if (update->old)
+			*p = update->old->next;
+		free(update->old);
+		free(update->replacement);
+	} else if (commit) {
 		update->replacement->next = update->old ? update->old->next : *p;
 		*p = update->replacement;
 		free(update->old);
@@ -2231,6 +2431,12 @@ nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
 	if (!*p)
 		return 0;
 	old = *p;
+	if (!old->count) {
+		/* nothing is installed for a policy without peers */
+		*p = old->next;
+		free(old);
+		return 0;
+	}
 	empty = *old;
 	empty.count = 0;
 	result = pcp_filter_install(&empty);
