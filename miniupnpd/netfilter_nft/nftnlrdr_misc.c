@@ -1741,13 +1741,15 @@ pcp_filter_install(const struct pcp_filter_policy *policy)
 	unsigned int i, nrules = 1;
 	uint16_t family;
 	int result = -1;
-	const size_t batch_size = 1024 * 1024;
+	/* a rule of the chain is less than 1 KB of netlink messages : 2 KB
+	 * each, and 4 KB for the chain and the batch messages */
+	const size_t batch_size = 4096 + (policy->count + 2) * 2048;
 
 	memset(rules, 0, sizeof(rules));
 	family = IN6_IS_ADDR_V4MAPPED(&policy->address) ? nft_ipv4_family : nft_ipv6_family;
 	pcp_filter_chain_name(policy, chain_name, sizeof(chain_name));
 	chain = nftnl_chain_alloc();
-	buf = calloc(2, batch_size);
+	buf = malloc(2 * batch_size);	/* libmnl wants twice the limit */
 	if (!chain || !buf)
 		goto out;
 	nftnl_chain_set_u32(chain, NFTNL_CHAIN_FAMILY, family);
