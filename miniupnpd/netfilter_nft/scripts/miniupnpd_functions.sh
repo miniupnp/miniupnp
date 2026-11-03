@@ -84,3 +84,20 @@ while getopts ":t:n:c:p:r:f:h" opt; do
 			;;
 	esac
 done
+
+# FILTER policies use private base chains so updates cannot briefly expose an
+# unrestricted mapping.  Remove only the exact names owned by the daemon.
+remove_pcp_filter_chains() {
+	pcp_filter_families=$af
+	if [ "$af" = ip ]; then
+		pcp_filter_families="ip ip6"
+	fi
+	for pcp_filter_family in $pcp_filter_families; do
+		$NFT list table "$pcp_filter_family" "$TABLE" 2>/dev/null |
+			sed -n 's/^[[:space:]]*chain \(pcp-filter-[0-9a-f]\{32\}-[0-9a-f]\{4\}-[0-9a-f]\{2\}\) {.*/\1/p' |
+			while IFS= read -r pcp_filter_chain; do
+				$NFT flush chain "$pcp_filter_family" "$TABLE" "$pcp_filter_chain"
+				$NFT delete chain "$pcp_filter_family" "$TABLE" "$pcp_filter_chain"
+			done
+	done
+}

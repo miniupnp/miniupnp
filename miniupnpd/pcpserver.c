@@ -84,6 +84,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnputils.h"
 #include "portinuse.h"
 #include "pcp_msg_struct.h"
+#include "pcp_filter.h"
 #ifdef ENABLE_UPNPPINHOLE
 #include "upnppinhole.h"
 #endif /* ENABLE_UPNPPINHOLE */
@@ -151,6 +152,8 @@ typedef struct pcp_info {
 	const struct in6_addr *mapped_ip;
 	char mapped_str[INET6_ADDRSTRLEN];
 	int pfailure_present;
+	unsigned int filter_count;
+	struct pcp_filter filters[PCP_FILTER_REQUEST_MAX];
 	struct in6_addr sender_ip;
 	int is_fw; /* is this firewall operation? if not, nat. */
 	char desc[64];
@@ -175,6 +178,33 @@ static const char * getPCPOpCodeStr(uint8_t opcode)
 	default:
 		return "UNKNOWN";
 	}
+}
+
+/* the IPv4 mapping to an internal endpoint (iport 0 : any port).
+ * returns 0 if found. One pass over the rules with the backends which have
+ * pcp_find_map(), else a scan by index. */
+static int FindMapByInternal(const char *iaddr, uint16_t iport, int proto,
+                             unsigned short *eport, char *desc, int desclen,
+                             unsigned int *timestamp)
+{
+#ifdef PCP_FIND_SUPPORTED
+	return pcp_find_map(iaddr, iport, proto, eport, desc, desclen, timestamp);
+#else
+	int index, proto_old;
+	unsigned short iport_old;
+	char iaddr_old[INET6_ADDRSTRLEN];
+	for (index = 0;
+	     get_redirect_rule_by_index(index, NULL, eport,
+	                                iaddr_old, sizeof(iaddr_old), &iport_old,
+	                                &proto_old, desc, desclen, NULL, 0,
+	                                timestamp, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == proto && (iport == 0 || iport_old == iport) &&
+		    strcmp(iaddr_old, iaddr) == 0)
+			return 0;
+	}
+	return -1;
+#endif
 }
 
 /* useful to copy ext_ip only if needed, as request and response
@@ -509,7 +539,6 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 		break;
 
 	case PCP_OPTION_FILTER:
-		/* TODO fully implement filter */
 		if (option_length != PCP_FILTER_OPTION_SIZE ||
 		    pcp_msg_info->lifetime == 0) {
 			/* RFC 6887 section 13.3: If a MAP request has a lifetime of 0
@@ -534,6 +563,22 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 			pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
 			return 0;
 		}
+#ifndef PCP_FILTER_SUPPORTED
+		/* Never acknowledge a filter that the firewall cannot enforce. */
+		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
+		return 0;
+#else
+		if (pcp_msg_info->filter_count == PCP_FILTER_REQUEST_MAX) {
+			pcp_msg_info->result_code = PCP_ERR_EXCESSIVE_REMOTE_PEERS;
+			return 0;
+		}
+		{
+			struct pcp_filter *filter = &pcp_msg_info->filters[pcp_msg_info->filter_count++];
+			filter->prefix = pcp_buf[5];
+			filter->port = READNU16(pcp_buf + 6);
+			memcpy(&filter->address, pcp_buf + 8, sizeof(filter->address));
+		}
+#endif
 		break;
 
 #ifdef PCP_FLOWP
@@ -964,7 +1009,6 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
-	int index, proto_old;
 	char iaddr_old[INET6_ADDRSTRLEN];
 	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
@@ -975,25 +1019,23 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
 	 * address, protocol and port, not the suggested external port. */
-	for (index = 0;
-	     get_redirect_rule_by_index(index, NULL, &eport_old,
-	                               iaddr_old, sizeof(iaddr_old), &iport_old,
-	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
-	                               &timestamp_old, NULL, NULL) >= 0;
-	     index++) {
-		if (proto_old == pcp_msg_info->protocol &&
-		    iport_old == pcp_msg_info->int_port &&
-		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
-			/* Check ownership before changing any state, even when the
-			 * client suggests a different external port. */
-			if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
-				if (timestamp_old > upnp_time())
-					pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
-				return PCP_ERR_NOT_AUTHORIZED;
-			}
-			pcp_msg_info->ext_port = eport_old;
-			break;
+	if (FindMapByInternal(pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+	                      pcp_msg_info->protocol, &eport_old,
+	                      desc_old, sizeof(desc_old), &timestamp_old) == 0) {
+		/* Check ownership before changing any state, even when the
+		 * client suggests a different external port. */
+		if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
+			if (timestamp_old > upnp_time())
+				pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
+			return PCP_ERR_NOT_AUTHORIZED;
 		}
+		pcp_msg_info->ext_port = eport_old;
+		/* Preserve the existing redirect and its filters on renewal. */
+		r = update_portmapping_desc_timestamp(ext_if_name, eport_old,
+		                pcp_msg_info->protocol, pcp_msg_info->desc, timestamp);
+		if (r >= 0 && (!nextruletoclean_timestamp || timestamp < nextruletoclean_timestamp))
+			nextruletoclean_timestamp = timestamp;
+		return r < 0 ? PCP_ERR_NO_RESOURCES : PCP_SUCCESS;
 	}
 
 	if (pcp_msg_info->ext_port == 0) {
@@ -1183,14 +1225,86 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
  * expresses the IPv6 address from its perspective.     */
 
 /* TODO: Support more than basic NAT44 / IPv6 firewall cases. */
+#ifdef PCP_FILTER_SUPPORTED
+/* FILTER changes must not precede mapping ownership checks.  The MAP paths
+ * repeat these checks as part of their normal create/refresh operation. */
+static int CheckPCPFilterOwner(pcp_info_t *info, int *exists)
+{
+	char desc[64];
+	unsigned short external;
+	unsigned int timestamp;
+	*exists = 0;
+	if (info->is_fw) {
+#ifdef ENABLE_UPNPPINHOLE
+		if (upnp_find_inboundpinhole(NULL, 0, info->mapped_str, info->int_port,
+		                           info->protocol, desc, sizeof(desc), &timestamp) >= 0) {
+			*exists = 1;
+			if (strcmp(desc, info->desc) != 0) {
+				if (timestamp > upnp_time())
+					info->error_lifetime = timestamp - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+		}
+#endif
+	} else {
+		if (FindMapByInternal(info->mapped_str, info->int_port, info->protocol,
+		                      &external, desc, sizeof(desc), &timestamp) == 0) {
+			*exists = 1;
+			if (strcmp(desc, info->desc) != 0) {
+				if (timestamp > upnp_time())
+					info->error_lifetime = timestamp - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+		}
+	}
+	return PCP_SUCCESS;
+}
+#endif
+
 static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
 	int r;
+#ifdef PCP_FILTER_SUPPORTED
+	struct pcp_filter_update *update = NULL;
+	int exists;
+	r = CheckPCPFilterOwner(pcp_msg_info, &exists);
+	if (r != PCP_SUCCESS) {
+		pcp_msg_info->result_code = r;
+		return;
+	}
+	/* A previous failed deletion or daemon restart may have left a guard
+	 * after its mapping disappeared.  New mappings start without filters. */
+	if (!exists && pcp_filter_delete(pcp_msg_info->mapped_ip,
+	            pcp_msg_info->int_port, pcp_msg_info->protocol) < 0) {
+		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+		return;
+	}
+	if (pcp_msg_info->filter_count) {
+		const char *ifname = ext_if_name;
+#ifdef ENABLE_IPV6
+		if (pcp_msg_info->is_fw && ext_if_name6 && *ext_if_name6)
+			ifname = ext_if_name6;
+#endif
+		r = pcp_filter_begin(pcp_msg_info->mapped_ip, pcp_msg_info->int_port,
+		                         pcp_msg_info->protocol, ifname,
+		                         pcp_msg_info->filters, pcp_msg_info->filter_count,
+		                         &update);
+		if (r < 0) {
+			pcp_msg_info->result_code = r == -2 ? PCP_ERR_EXCESSIVE_REMOTE_PEERS :
+			                            r == -3 ? PCP_ERR_UNSUPP_OPTION : PCP_ERR_NO_RESOURCES;
+			return;
+		}
+	}
+#endif
 
 	if (pcp_msg_info->is_fw)
 		r = CreatePCPMap_FW(pcp_msg_info);
 	else
 		r = CreatePCPMap_NAT(pcp_msg_info);
+#ifdef PCP_FILTER_SUPPORTED
+	if (pcp_filter_finish(update, r == PCP_SUCCESS) < 0)
+		r = PCP_ERR_NO_RESOURCES;
+#endif
 	pcp_msg_info->result_code = r;
 	syslog(r == PCP_SUCCESS ? LOG_INFO : LOG_ERR,
 	      "PCP MAP: %s mapping %s %hu->%s:%hu '%s'",
@@ -1210,39 +1324,25 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	int found = 0;
 	/* remove the mapping */
 	/* remove all the mappings for this client */
-	unsigned short eport2, iport2;
-	char iaddr2[INET6_ADDRSTRLEN];
-	int proto2;
+	unsigned short eport2;
 	char desc[64];
 	unsigned int timestamp;
 
 	syslog(LOG_DEBUG, "is_fw=%d addr=%s iport=%hu proto=%d",
 	       pcp_msg_info->is_fw,  pcp_msg_info->mapped_str, iport, (int)proto);
 	if (!pcp_msg_info->is_fw) {
-		int index;
-		/* iterate through all rules and delete the requested ones */
-		for (index = 0;
-		     get_redirect_rule_by_index(index, 0,
-					 &eport2, iaddr2, sizeof(iaddr2),
-					 &iport2, &proto2,
-					 desc, sizeof(desc),
-					 0, 0, &timestamp, 0, 0) >= 0;
-		     index++) {
-			syslog(LOG_DEBUG, "%d: %s %hu %d", index, iaddr2, iport2, proto2);
-			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
-			   && (proto2==proto)
-			   && ((iport2==iport) || (iport==0))) {
-				found = 1;
-				if(0 != strcmp(desc, pcp_msg_info->desc)) {
-					/* nonce does not match */
-					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-					syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
-					       iport, proto_itoa(pcp_msg_info->protocol));
-					return;
-				} else {
-					r = _upnp_delete_redir(eport2, proto2);
-				}
-				break;
+		/* the mapping to this endpoint (any port if iport is 0) */
+		if (FindMapByInternal(pcp_msg_info->mapped_str, iport, proto,
+		                      &eport2, desc, sizeof(desc), &timestamp) == 0) {
+			found = 1;
+			if(0 != strcmp(desc, pcp_msg_info->desc)) {
+				/* nonce does not match */
+				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+				syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
+				       iport, proto_itoa(pcp_msg_info->protocol));
+				return;
+			} else {
+				r = _upnp_delete_redir(eport2, proto);
 			}
 		}
 		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */

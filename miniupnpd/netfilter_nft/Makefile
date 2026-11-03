@@ -19,9 +19,11 @@ clean:
 config.h:
 	touch $@
 
-testnftnlrdr:	nftnlrdr.o nftnlrdr_misc.o testnftnlrdr.o $(LIBS)
+testnftnlrdr:	nftnlrdr.o nftnlrdr_misc.o testnftnlrdr.o \
+	../pcp_filter.o $(LIBS)
 
 testnftpinhole:	nftpinhole.o nftnlrdr.o nftnlrdr_misc.o testnftpinhole.o \
+	../pcp_filter.o \
 	../upnputils.o ../linux/getroute.o $(LIBS)
 
 test_nfct_get:	test_nfct_get.o test_nfct_get.o -lmnl -lnetfilter_conntrack

@@ -8,6 +8,8 @@
 
 . "$(dirname "$0")/miniupnpd_functions.sh"
 
+remove_pcp_filter_chains
+
 # remove table if created by us
 remove_table() {
 	if $NFT list table $af $1 | sed -n '2p' | \

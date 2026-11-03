@@ -46,6 +46,7 @@
 #include "nftnlrdr.h"
 
 #include "nftnlrdr_misc.h"
+#include "../pcp_filter.h"
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -333,7 +334,8 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
+				return -1;
 			break;
 		}
 	}
@@ -350,10 +352,18 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				syslog(LOG_DEBUG, "%s: found forward/filter rule %08x:%hu proto %d",
 				       "delete_redirect_and_filter_rules", iaddr, iport, p->proto);
 				r = rule_del_handle(p);
-				/* Todo: send bulk request */
-				nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+				/* Keep FILTER enforcement if deleting the base rule fails. */
+				if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0)
+					return -1;
 				break;
 			}
+		}
+		{
+			struct in6_addr address = IN6ADDR_ANY_INIT;
+			address.s6_addr[10] = address.s6_addr[11] = 0xff;
+			memcpy(address.s6_addr + 12, &iaddr, sizeof(iaddr));
+			if (nft_pcp_filter_delete(&address, iport, proto) < 0)
+				return -1;
 		}
 	} else {
 		syslog(LOG_WARNING, "%s: redirect rule with eport=%hu proto %d NOT FOUND",
@@ -584,6 +594,39 @@ get_redirect_rule_by_index(int index,
 		}
 	}
 
+	return -1;
+}
+
+/*
+ * nft_pcp_find_map() : the IPv4 mapping to an internal endpoint
+ * (iport 0 : any port). returns 0 if found
+ */
+int
+nft_pcp_find_map(const char * iaddr, unsigned short iport, int proto,
+                 unsigned short * eport, char * desc, int desclen,
+                 unsigned int * timestamp)
+{
+	rule_t *r;
+	struct in_addr ia;
+
+	if (inet_pton(AF_INET, iaddr, &ia) != 1)
+		return -1;
+	refresh_nft_cache_redirect();
+	LIST_FOREACH(r, &head_redirect, entry) {
+		if (r->nat_addr == ia.s_addr && r->proto == proto &&
+		    (iport == 0 || r->nat_port == iport)) {
+			*eport = r->dport;
+			if (desc != NULL && desclen > 0) {
+				desc[0] = '\0';
+				if (r->desc)
+					strncpy(desc, r->desc, desclen - 1);
+				desc[desclen - 1] = '\0';
+			}
+			if (timestamp != NULL)
+				*timestamp = get_timestamp(r->dport, proto);
+			return 0;
+		}
+	}
 	return -1;
 }
 

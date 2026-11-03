@@ -20,6 +20,7 @@
 
 #include "nftnlrdr.h"
 #include "nftnlrdr_misc.h"
+#include "../pcp_filter.h"
 #include "../commonrdr.h"
 
 #ifndef PRIu64
