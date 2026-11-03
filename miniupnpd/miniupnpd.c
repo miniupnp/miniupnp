@@ -2886,7 +2886,7 @@ main(int argc, char * * argv)
 			get_upnp_rules_state_list(0);
 #ifdef PCP_LEASE_SUPPORTED
 			/* the PCP lease file is not to keep what expired */
-			pcp_lease_save();
+			pcp_lease_changed();
 #endif
 		}
 		if(nextruletoclean_timestamp
@@ -2903,7 +2903,7 @@ main(int argc, char * * argv)
 		if(upnp_clean_expired_pinholes(&next_pinhole_ts) > 0)
 		{
 #ifdef PCP_LEASE_SUPPORTED
-			pcp_lease_save();
+			pcp_lease_changed();
 #endif
 		}
 		if(next_pinhole_ts &&
@@ -2912,6 +2912,11 @@ main(int argc, char * * argv)
 			timeout.tv_usec = 0;
 		}
 #endif /* ENABLE_UPNPPINHOLE */
+#ifdef PCP_LEASE_SUPPORTED
+		/* write the PCP lease file if a save is pending and due, else wake
+		 * up when it is */
+		pcp_lease_flush(0, &timeout);
+#endif
 
 #ifdef ENABLE_PCP
 		if(GETFLAG(ENABLENATPMPMASK))
@@ -3389,6 +3394,9 @@ shutdown:
 #if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 	lease_file_rewrite();
 #endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#ifdef PCP_LEASE_SUPPORTED
+	pcp_lease_flush(1, NULL);	/* the changes not written yet */
+#endif
 	/* close out open sockets */
 	while(upnphttphead.lh_first != NULL)
 	{

@@ -2205,7 +2205,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 #if defined(PCP_LEASE_SUPPORTED) && defined(ENABLE_LEASEFILE)
 		else if (pcp_msg_info.opcode == PCP_OPCODE_MAP ||
 		         pcp_msg_info.opcode == PCP_OPCODE_PEER)
-			pcp_lease_save();
+			pcp_lease_changed();
 #endif
 		createPCPResponse(buff, &pcp_msg_info);
 		len = setDescriptionResponse(buff, len, &pcp_msg_info);

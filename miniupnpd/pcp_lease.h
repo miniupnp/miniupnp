@@ -24,8 +24,19 @@ void pcp_lease_note_peer(int proto, const char *iaddr, unsigned short iport,
                          const char *eaddr, const uint32_t *nonce,
                          int prefer_failure, const char *label);
 
-/* rewrite the PCP lease file from the state of the firewall */
+/* rewrite the PCP lease file from the state of the firewall, now */
 int pcp_lease_save(void);
+/* a mapping was created, renewed or removed : the file is rewritten now if
+ * the last save is PCP_LEASE_SAVE_DELAY seconds old, else it is pending and
+ * pcp_lease_flush() writes it when that time is over. So a burst of requests
+ * costs one save per PCP_LEASE_SAVE_DELAY, not one per request. */
+#define PCP_LEASE_SAVE_DELAY 2
+void pcp_lease_changed(void);
+/* for the main loop : write the pending save if it is due (or if force,
+ * at shutdown), else lower *timeout (if not NULL) to the time it is due.
+ * Nothing is written if nothing is pending. returns <0 if a save failed */
+struct timeval;
+int pcp_lease_flush(int force, struct timeval *timeout);
 /* create again the mappings of the PCP lease file */
 int pcp_lease_load(void);
 

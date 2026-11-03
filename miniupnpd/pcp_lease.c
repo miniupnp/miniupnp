@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <syslog.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -74,8 +75,10 @@
  * The details only the protocol layer sees (prefer_failure, since, label) are
  * kept in a table filled by pcp_lease_note_*(). since is the time the
  * mapping was first created : a renewal with the same nonce keeps it.
- * The file is rewritten after each change. At startup the mappings are
- * created again from it (pcp_lease_load()). */
+ * The file is rewritten after a change, at most once per
+ * PCP_LEASE_SAVE_DELAY seconds (pcp_lease_changed(), pcp_lease_flush()), and
+ * at shutdown. At startup the mappings are created again from it
+ * (pcp_lease_load()). */
 
 #define LEASE_HEADER		"PCP-LEASE 1"
 #define LEASE_SEP		'|'
@@ -582,8 +585,47 @@ save_peer_cb(const struct pcp_lease_peer * p, void * arg)
 }
 #endif /* PCP_PEER */
 
+static int pcp_lease_write(void);
+static int lease_pending;	/* a change is not in the file yet */
+static time_t lease_last_save;	/* upnp_time() of the last save, 0 : none */
+
+void
+pcp_lease_changed(void)
+{
+	if(lease_last_save == 0 || upnp_time() - lease_last_save >= PCP_LEASE_SAVE_DELAY)
+		pcp_lease_save();
+	else
+		lease_pending = 1;
+}
+
+int
+pcp_lease_flush(int force, struct timeval * timeout)
+{
+	time_t left;
+	if(!lease_pending)
+		return 0;
+	left = lease_last_save + PCP_LEASE_SAVE_DELAY - upnp_time();
+	if(force || left <= 0)
+		return pcp_lease_save();
+	if(timeout != NULL && timeout->tv_sec >= left)
+	{
+		timeout->tv_sec = left;
+		timeout->tv_usec = 0;
+	}
+	return 0;
+}
+
 int
 pcp_lease_save(void)
+{
+	int r = pcp_lease_write();
+	lease_last_save = upnp_time();
+	lease_pending = r < 0;	/* tried again PCP_LEASE_SAVE_DELAY later */
+	return r;
+}
+
+static int
+pcp_lease_write(void)
 {
 	char path[MAXPATHLEN], tmp[MAXPATHLEN + 8];
 	char ext[INET6_ADDRSTRLEN];
@@ -1142,6 +1184,12 @@ void pcp_lease_note_peer(int proto, const char * iaddr, unsigned short iport,
 	UNUSED(label);
 }
 int pcp_lease_save(void) { return 0; }
+void pcp_lease_changed(void) { }
+int pcp_lease_flush(int force, struct timeval * timeout)
+{
+	UNUSED(force); UNUSED(timeout);
+	return 0;
+}
 int pcp_lease_load(void) { return 0; }
 #endif
 

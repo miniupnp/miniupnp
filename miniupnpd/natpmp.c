@@ -445,7 +445,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			}
 #ifdef PCP_LEASE_SUPPORTED
 			else
-				pcp_lease_save();	/* created, renewed or deleted */
+				pcp_lease_changed();	/* created, renewed or deleted */
 #endif
 			WRITENU16(resp+8, iport);	/* private port */
 			WRITENU16(resp+10, eport);	/* public port */
