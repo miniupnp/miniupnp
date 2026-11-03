@@ -64,6 +64,8 @@ static int next_uid = 1;
 #define RULE (pr.rule)
 
 static int delete_pinhole_one(unsigned short uid);
+static int pinhole_alloc_uid(void);
+static void pinhole_uid_set(int uid);
 
 /* uid_in : the uid to use, 0 to allocate a new one
  * prefix : length of the prefix of rem_host the source must match (1-128) */
@@ -80,6 +82,12 @@ static int add_pinhole_ex(int uid_in, const char * ifname,
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	/* a uid no live pinhole has : next_uid wraps at 65535, and a FILTER
+	 * group takes a uid per peer */
+	if(uid_in <= 0 && pinhole_alloc_uid() < 0) {
+		syslog(LOG_ERR, "no free pinhole uid");
 		return -1;
 	}
 	memset(&pr, 0, sizeof(pr));
@@ -171,6 +179,7 @@ static int add_pinhole_ex(int uid_in, const char * ifname,
 		}
 	}
 
+	pinhole_uid_set(uid);
 	if(uid_in <= 0 && ++next_uid >= 65535) {
 		next_uid = 1;
 	}
@@ -190,6 +199,7 @@ label_is_pcp_map(const char * label)
 }
 
 struct pinhole_rec {
+	int index;	/* position in the PASS rules during the walk */
 	int uid;
 	unsigned int ts;
 	struct in6_addr src, dst;
@@ -218,12 +228,13 @@ pinhole_walk_cb(int i, const pf_walk_rule_t * rule,
 	unsigned int ts;
 	int uid, k;
 	const char * p;
-	UNUSED(i); UNUSED(walk);
+	UNUSED(walk);
 	if(rule->af != AF_INET6 ||
 	   sscanf(RULE_LABEL(*rule), PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
 		return 0;
 	rec.uid = uid;
 	rec.ts = ts;
+	rec.index = i;
 	rec.src = rule->src.addr.v.a.addr.v6;
 	rec.dst = rule->dst.addr.v.a.addr.v6;
 	rec.prefix = 0;
@@ -266,6 +277,52 @@ find_uid_cb(const struct pinhole_rec * rec, void * arg)
 	return 1;
 }
 
+/* The uids of the pinholes : a bit per uid, set when a pinhole is added. It
+ * is built by a walk of the rules the first time (pinholes may be left from
+ * an earlier run), and again when no free uid is found : a bit of a pinhole
+ * which is gone only wastes its uid until then. */
+static unsigned char uid_used[65536 / 8];
+static int uid_map_valid = 0;
+
+#define UID_BIT_SET(u)	(uid_used[(u) >> 3] & (1 << ((u) & 7)))
+
+static void
+pinhole_uid_set(int uid)
+{
+	if(uid > 0 && uid < 65536)
+		uid_used[uid >> 3] |= (unsigned char)(1 << (uid & 7));
+}
+
+static int
+uid_map_cb(const struct pinhole_rec * rec, void * arg)
+{
+	UNUSED(arg);
+	pinhole_uid_set(rec->uid);
+	return 0;
+}
+
+/* make next_uid a uid which no pinhole has. returns <0 if none */
+static int
+pinhole_alloc_uid(void)
+{
+	int pass, tries;
+	for(pass = 0; pass < 2; pass++) {
+		if(!uid_map_valid || pass == 1) {
+			memset(uid_used, 0, sizeof(uid_used));
+			if(pinhole_foreach(uid_map_cb, NULL) < 0)
+				return -1;
+			uid_map_valid = 1;
+		}
+		for(tries = 0; tries < 65534; tries++) {
+			if(!UID_BIT_SET(next_uid))
+				return next_uid;
+			if(++next_uid >= 65535)
+				next_uid = 1;
+		}
+	}
+	return -1;
+}
+
 /* get the first rule of this uid. returns 0 if found */
 static int
 pinhole_find_uid(int uid, struct pinhole_rec * rec)
@@ -276,42 +333,24 @@ pinhole_find_uid(int uid, struct pinhole_rec * rec)
 	return pinhole_foreach(find_uid_cb, &c) == 1 ? 0 : -1;
 }
 
-struct group_first_ctx {
-	const struct in6_addr * dst;
-	unsigned short port;
-	int proto;
-	const char * desc;
-	struct pinhole_rec * rec;
+/* the pinholes of the group of a mapping (from a PCP MAP request) : those
+ * with the destination, port, protocol and description of rec, up to
+ * PCP_FILTER_PEER_MAX + 1 per walk */
+struct members_ctx {
+	const struct pinhole_rec * rec;	/* a member of the group */
+	struct pinhole_rec * members;
+	unsigned int n;
 };
 
 static int
-group_first_cb(const struct pinhole_rec * rec, void * arg)
+members_cb(const struct pinhole_rec * rec, void * arg)
 {
-	struct group_first_ctx * c = arg;
-	if(rec->dport == c->port && rec->proto == c->proto &&
-	   memcmp(&rec->dst, c->dst, sizeof(*c->dst)) == 0 &&
-	   strncmp(rec->desc, "PCP MAP ", 8) == 0 &&
-	   (c->desc == NULL || strcmp(rec->desc, c->desc) == 0)) {
-		*c->rec = *rec;
-		return 1;
-	}
-	return 0;
-}
-
-/* the first pinhole of the group of a mapping, from a PCP MAP request,
- * or -1. If rec is not NULL it is filled. */
-static int
-pcp_group_first(const struct in6_addr * dst, unsigned short port, int proto,
-                const char * desc, struct pinhole_rec * rec)
-{
-	struct pinhole_rec tmp;
-	struct group_first_ctx c;
-	c.dst = dst;
-	c.port = port;
-	c.proto = proto;
-	c.desc = desc;
-	c.rec = rec ? rec : &tmp;
-	return pinhole_foreach(group_first_cb, &c) == 1 ? 0 : -1;
+	struct members_ctx * c = arg;
+	if(rec->dport == c->rec->dport && rec->proto == c->rec->proto &&
+	   memcmp(&rec->dst, &c->rec->dst, sizeof(rec->dst)) == 0 &&
+	   strcmp(rec->desc, c->rec->desc) == 0)
+		c->members[c->n++] = *rec;
+	return c->n == PCP_FILTER_PEER_MAX + 1;
 }
 
 int add_pinhole(const char * ifname,
@@ -663,21 +702,33 @@ int delete_pinhole(unsigned short uid)
 	/* find out if it is a pinhole of a PCP mapping */
 	if(pinhole_find_uid(uid, &rec) < 0 || strncmp(rec.desc, "PCP MAP ", 8) != 0)
 		return delete_pinhole_one(uid);
-	/* delete all the pinholes of the mapping */
-	r = -2;
+	/* delete all the pinholes of the mapping : found in one walk, removed
+	 * from the last (a group has at most PCP_FILTER_PEER_MAX + 1, walk again
+	 * if there are more) */
 	{
-		struct in6_addr dst = rec.dst;
-		unsigned short dport = rec.dport;
-		int proto = rec.proto;
-		char desc[PF_RULE_LABEL_SIZE];
-		strlcpy(desc, rec.desc, sizeof(desc));
-		while(pcp_group_first(&dst, dport, proto, desc, &rec) == 0) {
-			r = delete_pinhole_one((unsigned short)rec.uid);
-			if(r < 0)
-				return r;
-		}
+		struct members_ctx c;
+		unsigned int k;
+		c.rec = &rec;
+		c.members = calloc(PCP_FILTER_PEER_MAX + 1, sizeof(*c.members));
+		if(c.members == NULL)
+			return -1;
+		do {
+			c.n = 0;
+			if(pinhole_foreach(members_cb, &c) < 0) {
+				free(c.members);
+				return -1;
+			}
+			for(k = c.n; k-- > 0; ) {
+				if(pf_rule_remove(PF_PASS, c.members[k].index) < 0) {
+					free(c.members);
+					return -1;
+				}
+			}
+		} while(c.n == PCP_FILTER_PEER_MAX + 1);
+		free(c.members);
 	}
-	return r < 0 ? delete_pinhole_one(uid) : 0;
+	r = 0;
+	return r;
 }
 
 int
@@ -818,23 +869,6 @@ static int update_pinhole_one(const struct pinhole_rec * rec, unsigned int times
 	return delete_pinhole_one((unsigned short)rec->uid);
 }
 
-struct members_ctx {
-	const struct pinhole_rec * rec;	/* a member of the group */
-	struct pinhole_rec * members;
-	unsigned int n;
-};
-
-static int
-members_cb(const struct pinhole_rec * rec, void * arg)
-{
-	struct members_ctx * c = arg;
-	if(rec->dport == c->rec->dport && rec->proto == c->rec->proto &&
-	   memcmp(&rec->dst, &c->rec->dst, sizeof(rec->dst)) == 0 &&
-	   strcmp(rec->desc, c->rec->desc) == 0)
-		c->members[c->n++] = *rec;
-	return c->n == PCP_FILTER_PEER_MAX + 1;
-}
-
 int update_pinhole(unsigned short uid, unsigned int timestamp)
 {
 	struct pinhole_rec rec;
@@ -851,12 +885,31 @@ int update_pinhole(unsigned short uid, unsigned int timestamp)
 	c.members = calloc(PCP_FILTER_PEER_MAX + 1, sizeof(*c.members));
 	if(c.members == NULL)
 		return -1;
-	pinhole_foreach(members_cb, &c);
+	if(pinhole_foreach(members_cb, &c) < 0) {
+		free(c.members);
+		return -1;
+	}
+	/* add each pinhole again with the new timestamp (at the end of the
+	 * rules), then remove the old ones from the last : their indices from
+	 * the walk do not move. Not one walk per pinhole. */
 	for(k = 0; k < c.n; k++) {
-		if(update_pinhole_one(&c.members[k], timestamp) < 0) {
+		const struct pinhole_rec * m = &c.members[k];
+		char host[INET6_ADDRSTRLEN], client[INET6_ADDRSTRLEN];
+		if(m->ts == timestamp)
+			continue;
+		inet_ntop(AF_INET6, &m->src, host, sizeof(host));
+		inet_ntop(AF_INET6, &m->dst, client, sizeof(client));
+		if(add_pinhole_ex(m->uid, m->ifname, m->prefix ? host : NULL,
+		                  m->prefix, m->sport, client, m->dport, m->proto,
+		                  m->desc, timestamp) < 0) {
 			r = -1;
-			break;
+			break;	/* the members re-added so far : their old rule goes */
 		}
+	}
+	while(k-- > 0) {
+		if(c.members[k].ts != timestamp &&
+		   pf_rule_remove(PF_PASS, c.members[k].index) < 0)
+			r = -1;
 	}
 	free(c.members);
 	return r;

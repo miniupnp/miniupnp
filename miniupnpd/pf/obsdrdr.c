@@ -1298,8 +1298,7 @@ add_redirect_rule_ex(const char * ifname,
 	return r;
 }
 
-static int priv_delete_redirect_rule_quiet(const char * ifname,
-                                       unsigned short eport, int proto);
+static int remove_rdr_rules(unsigned short eport, int proto, int max);
 
 /* add_redirect_rule2() :
  * create a rdr rule (or a rdr rule per allowed peer when a PCP FILTER
@@ -1339,8 +1338,8 @@ add_redirect_rule2(const char * ifname,
 		if(r != 0)
 		{
 			/* do not keep a part of the rules of the mapping */
-			while(k-- > 1)
-				priv_delete_redirect_rule_quiet(ifname, eport, proto);
+			if(k > 1)
+				remove_rdr_rules(eport, proto, (int)k - 1);
 		}
 	}
 	if(r == 0 && timestamp > 0)
@@ -1733,9 +1732,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
  *            0 : rule deleted
  *            1 : rule untouched
  */
-/* set to avoid logging when looking for more rules of a filtered mapping */
-static int quiet_not_found = 0;
-
 static int
 priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
                           int proto, unsigned short * iport,
@@ -1895,23 +1891,127 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 			break;
 		}
 	}
-	if (r == -2 && !quiet_not_found)
+	if (r == -2)
 		syslog(LOG_NOTICE, "could not find redirect rule to delete eport=%hu", eport);
 	release_ticket(dev, tnum);
 	return r;
 }
 
-/* delete another rule of a mapping which has several (PCP FILTER) */
+/* The indices of the rules a walk found, to remove them afterwards from the
+ * last one : removing a rule moves the rules after it, not those before. */
+struct rule_index_list {
+	int * idx;
+	int n, cap;
+	int max;		/* at most this many, < 0 : no limit */
+	unsigned short port;	/* rdr : eport, pass : iport */
+	int proto;
+	in_addr_t iaddr;	/* pass : 0 for any */
+};
+
 static int
-priv_delete_redirect_rule_quiet(const char * ifname, unsigned short eport,
-                                int proto)
+rule_index_add(struct rule_index_list * l, int index)
 {
-	int r;
-	quiet_not_found = 1;
-	r = priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
-	quiet_not_found = 0;
-	return r;
+	if(l->n == l->cap)
+	{
+		int cap = l->cap ? l->cap * 2 : 16;
+		int * p = realloc(l->idx, cap * sizeof(*p));
+		if(p == NULL)
+			return -1;
+		l->idx = p;
+		l->cap = cap;
+	}
+	l->idx[l->n++] = index;
+	return (l->max >= 0 && l->n >= l->max) ? 1 : 0;	/* 1 : stop the walk */
 }
+
+/* remove the rules of the list, from the last one. returns the number removed,
+ * -1 on error */
+static int
+rule_index_remove(int action, struct rule_index_list * l, int walk_result)
+{
+	int i, removed = 0;
+	if(walk_result < 0 || (l->n > 0 && l->idx == NULL))
+	{
+		free(l->idx);
+		return -1;
+	}
+	for(i = l->n; i-- > 0; )
+	{
+		if(pf_rule_remove(action, l->idx[i]) < 0)
+		{
+			free(l->idx);
+			return -1;
+		}
+		removed++;
+	}
+	free(l->idx);
+	return removed;
+}
+
+static int
+rdr_index_cb(int index, const pf_walk_rule_t * rule,
+             const struct pf_walk * walk, void * arg)
+{
+	struct rule_index_list * l = arg;
+	UNUSED(walk);
+#ifdef __APPLE__
+	if(l->port != ntohs(rule->dst.xport.range.port[0]) ||
+	   l->port != ntohs(rule->dst.xport.range.port[1]))
+#else
+	if(l->port != ntohs(rule->dst.port[0]) ||
+	   l->port != ntohs(rule->dst.port[1]))
+#endif
+		return 0;
+	if(rule->proto != l->proto)
+		return 0;
+	return rule_index_add(l, index) != 0;	/* also stop when out of memory */
+}
+
+/* remove at most max (< 0 : all) rdr rules of eport/proto in one walk : the
+ * other rules of a mapping which has several (PCP FILTER).
+ * returns the number removed, -1 on error */
+static int
+remove_rdr_rules(unsigned short eport, int proto, int max)
+{
+	struct rule_index_list l;
+	memset(&l, 0, sizeof(l));
+	l.max = max;
+	l.port = eport;
+	l.proto = proto;
+	if(max == 0)
+		return 0;
+	return rule_index_remove(PF_RDR, &l, pf_rule_foreach(PF_RDR, rdr_index_cb, &l));
+}
+
+#ifdef PF_ENABLE_FILTER_RULES
+static int
+pass_index_cb(int index, const pf_walk_rule_t * rule,
+              const struct pf_walk * walk, void * arg)
+{
+	struct rule_index_list * l = arg;
+	UNUSED(walk);
+	if(l->port != ntohs(rule->dst.port[0]) || rule->proto != l->proto ||
+	   (l->iaddr != 0 && l->iaddr != rule->dst.addr.v.a.addr.v4.s_addr))
+		return 0;
+	return rule_index_add(l, index) != 0;
+}
+
+/* remove the first max pass rules of iport/proto/iaddr in one walk.
+ * returns the number removed, -1 on error */
+static int
+remove_pass_rules(unsigned short iport, int proto, in_addr_t iaddr, int max)
+{
+	struct rule_index_list l;
+	memset(&l, 0, sizeof(l));
+	l.max = max;
+	l.port = iport;
+	l.proto = proto;
+	l.iaddr = iaddr;
+	if(max == 0)
+		return 0;
+	return rule_index_remove(PF_PASS, &l, pf_rule_foreach(PF_PASS, pass_index_cb, &l));
+}
+#endif /* PF_ENABLE_FILTER_RULES */
 
 int
 delete_redirect_rule(const char * ifname, unsigned short eport,
@@ -1920,8 +2020,8 @@ delete_redirect_rule(const char * ifname, unsigned short eport,
 	int r;
 	r = priv_delete_redirect_rule(ifname, eport, proto, NULL, NULL, NULL, 0);
 	/* a filtered PCP mapping has a rule per allowed peer */
-	while(r == 0 && priv_delete_redirect_rule_quiet(ifname, eport, proto) == 0)
-		;
+	if(r == 0 && remove_rdr_rules(eport, proto, -1) < 0)
+		r = -1;
 	return r;
 }
 
@@ -2015,24 +2115,27 @@ int
 delete_redirect_and_filter_rules(const char * ifname, unsigned short eport,
                                  int proto)
 {
-	int r;
+	int r, others;
 	unsigned short iport;
 	in_addr_t iaddr;
-	int n = 1;
 	r = priv_delete_redirect_rule(ifname, eport, proto, &iport, &iaddr, NULL, 0);
 	if(r == 0)
 	{
-		/* a filtered PCP mapping has a rule per allowed peer */
-		while(priv_delete_redirect_rule_quiet(ifname, eport, proto) == 0)
-			n++;
+		/* a filtered PCP mapping has a rule per allowed peer, and a pass
+		 * rule for each : one walk each, not one per rule */
+		others = remove_rdr_rules(eport, proto, -1);
 #ifdef ENABLE_PORT_TRIGGERING
 		if (proto == IPPROTO_UDP) {
 			delete_nat_rule(ifname, eport, iport, proto, iaddr);
 		}
 #endif
 		r = priv_delete_filter_rule(ifname, iport, proto, iaddr);
-		while(--n > 0)
-			priv_delete_filter_rule(ifname, iport, proto, iaddr);
+#ifdef PF_ENABLE_FILTER_RULES
+		if(others > 0)
+			remove_pass_rules(iport, proto, iaddr, others);
+#endif
+		if(others < 0)
+			r = -1;
 	}
 	return r;
 }
