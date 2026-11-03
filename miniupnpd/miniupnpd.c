@@ -2257,10 +2257,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	/*remove(lease_file);*/
 	syslog(LOG_INFO, "Reloading rules from lease file");
 	reload_from_lease_file();
-#ifdef PCP_LEASE_SUPPORTED
-	/* FILTER peers and PEER mappings are kept in a file next to the lease file */
-	pcp_lease_load();
-#endif
+	/* the PCP lease file is loaded in main(), once the PCP sockets are open */
 #ifdef ENABLE_UPNPPINHOLE
 	reload_from_lease_file6();
 #endif
@@ -2657,6 +2654,15 @@ main(int argc, char * * argv)
 	if(!GETFLAG(IPV6DISABLEDMASK)) {
 		spcp_v6 = OpenAndConfPCPv6Socket();
 	}
+#endif
+
+#if defined(ENABLE_LEASEFILE) && defined(PCP_LEASE_SUPPORTED)
+	/* Create again the PCP and NAT-PMP mappings, their FILTER peers and the
+	 * PEER mappings of the PCP lease file. The sockets are open : a request
+	 * which comes during the restore waits in the socket and is answered
+	 * after it, instead of being refused (a client then takes the server for
+	 * down, libpcpnatpmp for 5 minutes). */
+	pcp_lease_load();
 #endif
 
 	/* for miniupnpdctl */
