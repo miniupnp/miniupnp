@@ -290,21 +290,26 @@ label_column(const char * label, char * out, size_t len)
 		strlcpy(out, "\\x4EA", len);
 }
 
-/* the external address of a mapping, for the user who reads the file (it is
- * not used to restore). IPv4 : the address of the external interface (or
- * use_ext_ip_addr). IPv6 : a pinhole has no translation, the external address
- * is the internal one, as in the PCP response. NA if unknown. */
-static const char *
-map_eaddr(const char * iaddr, char * buf, size_t len)
+/* the address of the external interface (or use_ext_ip_addr), looked up
+ * once per save. Empty if unknown. */
+static void
+ext_eaddr(char * buf, size_t len)
 {
 	buf[0] = '\0';
-	if(strchr(iaddr, ':') != NULL)
-		strlcpy(buf, iaddr, len);
-	else if(use_ext_ip_addr)
+	if(use_ext_ip_addr)
 		strlcpy(buf, use_ext_ip_addr, len);
 	else if(ext_if_name == NULL || getifaddr(ext_if_name, buf, (int)len, NULL, NULL) < 0)
 		buf[0] = '\0';
-	return na(buf);
+}
+
+/* the external address of a mapping, for the user who reads the file (it is
+ * not used to restore). IPv4 : ext, the address of the external interface.
+ * IPv6 : a pinhole has no translation, the external address is the internal
+ * one, as in the PCP response. NA if unknown. */
+static const char *
+map_eaddr(const char * iaddr, const char * ext)
+{
+	return na(strchr(iaddr, ':') != NULL ? iaddr : ext);
 }
 
 /* The nonce is shown as it was sent on the wire (24 hex digits). The daemon
@@ -551,21 +556,47 @@ nonce_column(const char * nonce)
 	return strcmp(nonce, "-") == 0 ? LEASE_NA : nonce;
 }
 
+#ifdef PCP_PEER
+/* write the PCP-P line of an IPv4 PEER mapping */
+static void
+save_peer_cb(const struct pcp_lease_peer * p, void * arg)
+{
+	FILE * f = arg;
+	char nonce[25], label[STATE_LABEL_MAX * 4 + 1];
+	struct state_entry * e;
+	if(p->timestamp != 0 && p->timestamp <= upnp_time())
+		return;	/* expired */
+	if(strncmp(p->desc, "PCP PEER ", 9) == 0)
+		nonce_of_desc(p->desc + 9, nonce, sizeof(nonce));
+	else
+		strlcpy(nonce, "-", sizeof(nonce));
+	e = state_get(1, p->proto, p->iaddr, p->iport, p->raddr, p->rport, nonce, time(NULL));
+	if(e != NULL)
+		e->seen = 1;
+	label_column(e ? e->label : "", label, sizeof(label));
+	fprintf(f, "PCP-P|%s|%hu|IPv4|%s|%hu|%s|%s|%d|%u|%u|%s|%s|%hu|%s\n",
+	        proto_itoa(p->proto), p->eport, p->iaddr, p->iport, na(p->ifname),
+	        nonce_column(e ? e->nonce : "-"), e ? e->prefer_failure : 0,
+	        e ? (unsigned)e->since : (unsigned)time(NULL),
+	        unix_expiry(p->timestamp), na(e ? e->eaddr : ""), p->raddr, p->rport, label);
+}
+#endif /* PCP_PEER */
+
 int
 pcp_lease_save(void)
 {
 	char path[MAXPATHLEN], tmp[MAXPATHLEN + 8];
+	char ext[INET6_ADDRSTRLEN];
 	struct save_ctx c;
 	struct state_entry * e, ** pe;
 	unsigned int i;
 	FILE * f;
-#ifdef PCP_PEER
-	int j;
-#endif
 	if(state_path(path, sizeof(path)) < 0)
 		return 0;
 	memset(&c, 0, sizeof(c));
-	pcp_lease_maps(save_map_cb, &c);
+	/* never write a file without the mappings which could not be read */
+	if(pcp_lease_maps(save_map_cb, &c) < 0)
+		c.error = 1;
 	free(c.tab);
 	if(c.error)
 	{
@@ -580,12 +611,13 @@ pcp_lease_save(void)
 		free(c.maps);
 		return -1;
 	}
+	ext_eaddr(ext, sizeof(ext));
 	fprintf(f, "%s\n", LEASE_HEADER);
 	for(i = 0; i < c.n; i++)
 	{
 		const struct pcp_lease_map * m = &c.maps[i];
 		int pmp = m->desc[0] == 'N';
-		char nonce[25], label[STATE_LABEL_MAX * 4 + 1], eaddr[INET6_ADDRSTRLEN];
+		char nonce[25], label[STATE_LABEL_MAX * 4 + 1];
 		if(desc_is_peer(m->desc))
 			continue;	/* a PEER pinhole : PCP-P, below */
 		if(pmp)
@@ -605,7 +637,7 @@ pcp_lease_save(void)
 		        nonce_column(nonce), e ? e->prefer_failure : 0,
 		        e ? (unsigned)e->since : (unsigned)time(NULL),
 		        unix_expiry(m->timestamp),
-		        map_eaddr(m->iaddr, eaddr, sizeof(eaddr)), label);
+		        map_eaddr(m->iaddr, ext), label);
 	}
 	for(i = 0; i < c.n; i++)
 	{
@@ -665,33 +697,15 @@ pcp_lease_save(void)
 #endif
 	free(c.maps);
 #ifdef PCP_PEER
-	for(j = 0; ; j++)
+	/* the IPv4 PEER mappings, in one pass over the rules */
+	if(pcp_lease_peers(save_peer_cb, f) < 0)
 	{
-		char iaddr[INET_ADDRSTRLEN], raddr[INET_ADDRSTRLEN];
-		char desc[64], ifname[IFNAMSIZ] = "", nonce[25];
-		char label[STATE_LABEL_MAX * 4 + 1];
-		unsigned short eport, iport, rport;
-		unsigned int ts;
-		int proto;
-		if(get_peer_rule_by_index(j, ifname, &eport, iaddr, sizeof(iaddr), &iport,
-		                          &proto, desc, sizeof(desc), raddr, sizeof(raddr),
-		                          &rport, &ts, NULL, NULL) < 0)
-			break;
-		if(ts != 0 && ts <= upnp_time())
-			continue;	/* expired */
-		if(strncmp(desc, "PCP PEER ", 9) == 0)
-			nonce_of_desc(desc + 9, nonce, sizeof(nonce));
-		else
-			strlcpy(nonce, "-", sizeof(nonce));
-		e = state_get(1, proto, iaddr, iport, raddr, rport, nonce, time(NULL));
-		if(e != NULL)
-			e->seen = 1;
-		label_column(e ? e->label : "", label, sizeof(label));
-		fprintf(f, "PCP-P|%s|%hu|IPv4|%s|%hu|%s|%s|%d|%u|%u|%s|%s|%hu|%s\n",
-		        proto_itoa(proto), eport, iaddr, iport, na(ifname),
-		        nonce_column(e ? e->nonce : "-"), e ? e->prefer_failure : 0,
-		        e ? (unsigned)e->since : (unsigned)time(NULL),
-		        unix_expiry(ts), na(e ? e->eaddr : ""), raddr, rport, label);
+		syslog(LOG_ERR, "could not read the PEER mappings, %s not written", path);
+		fclose(f);
+		remove(tmp);
+		for(e = state_entries; e != NULL; e = e->next)
+			e->seen = 0;
+		return -1;
 	}
 #endif
 	/* forget the mappings which are gone */

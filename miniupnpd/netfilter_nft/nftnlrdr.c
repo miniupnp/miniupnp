@@ -529,6 +529,47 @@ get_peer_rule_by_index(int index,
 	return -1;
 }
 
+#ifdef PCP_PEER
+/*
+ * nft_pcp_lease_peers()
+ * call cb for each PEER rule, in one pass (for pcp_lease.c)
+ */
+int
+nft_pcp_lease_peers(pcp_lease_peer_cb cb, void * ctx)
+{
+	rule_t *r;
+	uint32_t last_ifidx = 0;
+	char last_ifname[IFNAMSIZ] = "";
+
+	refresh_nft_cache_peer();
+	LIST_FOREACH(r, &head_peer, entry) {
+		struct pcp_lease_peer p;
+
+		memset(&p, 0, sizeof(p));
+		if (inet_ntop(AF_INET, &r->saddr, p.iaddr, sizeof(p.iaddr)) == NULL ||
+		    inet_ntop(AF_INET, &r->daddr, p.raddr, sizeof(p.raddr)) == NULL)
+			continue;
+		/* one name lookup per interface, not per rule */
+		if (r->ingress_ifidx && r->ingress_ifidx != last_ifidx) {
+			if (if_indextoname(r->ingress_ifidx, last_ifname) == NULL)
+				last_ifname[0] = '\0';
+			last_ifidx = r->ingress_ifidx;
+		}
+		if (r->ingress_ifidx)
+			strncpy(p.ifname, last_ifname, sizeof(p.ifname) - 1);
+		p.proto = r->proto;
+		p.eport = r->nat_port;
+		p.iport = r->sport;
+		p.rport = r->dport;
+		if (r->desc)
+			strncpy(p.desc, r->desc, sizeof(p.desc) - 1);
+		p.timestamp = peer_lease_get(r->saddr, r->sport, r->daddr, r->dport, r->proto);
+		cb(&p, ctx);
+	}
+	return 0;
+}
+#endif /* PCP_PEER */
+
 /*
  * get_redirect_rule()
  * returns -1 if the rule is not found

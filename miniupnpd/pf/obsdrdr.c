@@ -697,6 +697,7 @@ struct peer_nat {
 #define PEER_GET	0
 #define PEER_DELETE	1
 #define PEER_FIND	2
+#define PEER_EACH	3
 
 struct peer_walk_ctx {
 	int op;
@@ -704,6 +705,8 @@ struct peer_walk_ctx {
 	int count;
 	struct peer_nat * pn;	/* PEER_GET : result. PEER_DELETE/PEER_FIND : the key */
 	int rule_index;		/* PEER_DELETE/PEER_FIND : position of the rule found */
+	pcp_lease_peer_cb each;	/* PEER_EACH : called for each PEER rule */
+	void * each_arg;
 };
 
 static int
@@ -719,6 +722,23 @@ peer_nat_cb(int i, const pf_walk_rule_t * rule,
 		return 0;	/* not a PEER rule */
 	if(c->op == PEER_GET && c->count++ != c->index)
 		return 0;
+	if(c->op == PEER_EACH)
+	{
+		struct pcp_lease_peer p;
+		in_addr_t ia = RULE_V4(RULE.src.addr), ra = RULE_V4(RULE.dst.addr);
+		memset(&p, 0, sizeof(p));
+		inet_ntop(AF_INET, &ia, p.iaddr, sizeof(p.iaddr));
+		inet_ntop(AF_INET, &ra, p.raddr, sizeof(p.raddr));
+		p.iport = ntohs(RULE_SPORT(RULE));
+		p.rport = ntohs(RULE_DPORT(RULE));
+		p.eport = NAT_RULE_EPORT(RULE);
+		p.proto = RULE.proto;
+		strlcpy(p.desc, PF_RULE_LABEL_OF(RULE), sizeof(p.desc));
+		strlcpy(p.ifname, RULE.ifname, sizeof(p.ifname));
+		p.timestamp = peer_lease_get(ia, p.iport, ra, p.rport, p.proto);
+		c->each(&p, c->each_arg);
+		return 0;
+	}
 	if(c->op != PEER_GET)
 	{
 		if(!(pn->iport == ntohs(RULE_SPORT(RULE))
@@ -767,6 +787,8 @@ peer_nat_walk(int op, int index, struct peer_nat * pn)
 	c.count = 0;
 	c.pn = pn;
 	c.rule_index = -1;
+	c.each = NULL;
+	c.each_arg = NULL;
 	r = pf_rule_foreach(NAT_RULE_ACTION, peer_nat_cb, &c);
 	if(r < 0)
 		return -1;
@@ -832,6 +854,19 @@ delete_peer_rule(const char * iaddr, unsigned short iport,
 	/* also discard stale lease state if the rule was removed outside */
 	peer_lease_remove(pn.iaddr, iport, pn.raddr, rport, proto);
 	return 0;
+}
+
+/* call cb for each PEER rule, in one pass (for pcp_lease.c) */
+int
+pf_pcp_lease_peers(pcp_lease_peer_cb cb, void * arg)
+{
+	struct peer_walk_ctx c;
+	memset(&c, 0, sizeof(c));
+	c.op = PEER_EACH;
+	c.rule_index = -1;
+	c.each = cb;
+	c.each_arg = arg;
+	return pf_rule_foreach(NAT_RULE_ACTION, peer_nat_cb, &c) < 0 ? -1 : 0;
 }
 
 unsigned int
