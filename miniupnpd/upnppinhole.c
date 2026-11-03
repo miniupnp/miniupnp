@@ -160,7 +160,7 @@ lease_file6_update(int uid, unsigned int leaseduration)
 	char * rem_client;
 	unsigned int timestamp_rule;
 	unsigned int timestamp;
-	char line[128];
+	char line[2048];
 	char tmpfilename[128];
 	int uid_rule;
 	int tmp;
@@ -247,6 +247,7 @@ lease_file6_update(int uid, unsigned int leaseduration)
 			continue;
 		}
 		*(desc++) = '\0';
+		desc[strcspn(desc, "\r\n")] = '\0';
 		timestamp_rule = (unsigned int)strtoul(p2, NULL, 10);
 
 		if (uid == uid_rule) {
@@ -255,7 +256,7 @@ lease_file6_update(int uid, unsigned int leaseduration)
 
 		fprintf(fdt, "%s;%s;%hu;%s;%hu;%u;%u;%s\n",
 	        proto, int_client, int_port, rem_client, rem_port,
-	        uid, timestamp_rule, desc);
+	        uid_rule, timestamp_rule, desc);
 	}
 
 	fclose(fdt);
@@ -311,7 +312,7 @@ lease_file6_remove(const char * int_client, unsigned short int_port, int proto, 
 	while( fgets(buf, sizeof(buf)-1, fd) != NULL) {
 		buf_size = strlen(buf);
 
-		if (uid > 0) {
+		if (uid >= 0) {
 			strncpy(buf2, buf, buf_size);
 			// Internal Host
 			p = strchr(buf2, ';');
@@ -656,7 +657,9 @@ upnp_add_inboundpinhole(const char * raddr,
 		r = upnp_update_inboundpinhole(*uid, leasetime);
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {
-			lease_file6_remove(iaddr, iport, proto, -1);
+			/* RFC 6887 section 16.2: MAP and outbound PEER mappings on
+			 * one local endpoint have independent lifetimes. */
+			lease_file6_remove(iaddr, iport, proto, *uid);
 			lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
 		}
 #endif /* ENABLE_LEASEFILE */
@@ -667,7 +670,9 @@ upnp_add_inboundpinhole(const char * raddr,
 	                    iaddr, iport, proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (*uid >= 0) {
-		lease_file6_remove(iaddr, iport, proto, -1);
+		/* Replace only this pinhole's persisted entry, preserving other
+		 * remote endpoints and a coexisting MAP on the same local tuple. */
+		lease_file6_remove(iaddr, iport, proto, *uid);
 		lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
 	}
 #endif /* ENABLE_LEASEFILE */
