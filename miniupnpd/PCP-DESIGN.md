@@ -9,7 +9,7 @@ Scope: the `enable_pcp_pmp` part of miniupnpd (NAT-PMP and PCP), as on branch `f
 | RFC 6886 NAT-PMP | Implemented (`natpmp.c`): external address, UDP/TCP mapping, public address change notification. |
 | RFC 6887 PCP (version 2) | Implemented (`pcpserver.c`): ANNOUNCE, MAP, PEER (needs `--pcp-peer`), THIRD_PARTY, PREFER_FAILURE and FILTER options, epoch time, unsolicited ANNOUNCE on multicast 224.0.0.1 / ff02::1 port 5350. Both IPv4 NAT mappings and IPv6 firewall pinholes (a pinhole cannot translate the internal port). |
 | PCP version 1 (draft) | MAP/PEER v1 message sizes are parsed (`PCP_MAP_V1_SIZE`, `PCP_PEER_V1_SIZE`). |
-| RFC 7220 (DESCRIPTION option) | Only the lease file has a `label` column. The option is **not parsed** from requests yet, so the label is empty in practice. |
+| RFC 7220 (DESCRIPTION option) | Implemented for MAP and PEER (`pcpserver.c`). The text must be UTF-8 without NUL; up to 128 bytes are kept (cut on a character boundary) and sent back in the response. Invalid text is ignored and left out of the response. A renewal with the option replaces the text, an empty option clears it, a renewal without it keeps it. More than one DESCRIPTION, or more than 1016 octets, is MALFORMED_OPTION. The text is the `label` column of the PCP lease file; it is not put in the firewall rule description. |
 | RFC 7652 (authentication) | Option codes are reserved in `pcp_msg_struct.h`. Not implemented. |
 | `SADSCP` opcode, `FLOWP` option | Compile-time options (`PCP_SADSCP`, `PCP_FLOWP`), off by default. Use `pcplearndscp.c`. |
 
@@ -301,7 +301,6 @@ The `tests/` directories are local to the development checkout and not in the re
 
 ## 8. Known gaps
 
-- DESCRIPTION option (RFC 7220) is not parsed.
 - The IPv6 PEER is a pinhole to the remote endpoint (no NAT66). It is kept in the PCP lease file as a `PCP-P` line with family `IPv6`, and lifetime 0 deletes it. Checked end to end with nft and with pf on FreeBSD 14.5.
 - `CreatePCPPeer()` in `pcpserver.c` has a `TODO` for a UPnP-side function for PEER; PEER filtering has no shared function yet.
 - Reject-reason logging is not yet in the same format as the UPnP / NAT-PMP logs.

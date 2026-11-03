@@ -165,6 +165,10 @@ typedef struct pcp_info {
 	int is_fw; /* is this firewall operation? if not, nat. */
 	int existed; /* the mapping existed, the request renewed it */
 	char desc[64];
+	/* DESCRIPTION option (RFC 7220) */
+	uint8_t *descr_opt;	/* the option in the request buffer, NULL if none */
+	int descr_valid;	/* UTF-8 text, stored in descr */
+	char descr[PCP_DESCRIPTION_STORE_MAX + 1];
 } pcp_info_t;
 
 /* getPCPOpCodeStr()
@@ -555,6 +559,59 @@ static int parseSADSCP(const uint8_t *buf, pcp_info_t *pcp_msg_info)
 #endif	/* PCP_SADSCP */
 
 
+/* length of the UTF-8 sequence at s (at most len bytes), 0 if it is not valid
+ * UTF-8 (RFC 3629 : no overlong forms, no surrogates, at most U+10FFFF).
+ * NUL is refused too : the text is kept as a C string. */
+static int utf8_seq_len(const uint8_t *s, int len)
+{
+	int n, i;
+	uint8_t c = s[0];
+
+	if (c == 0)
+		return 0;
+	if (c < 0x80)
+		return 1;
+	if (c >= 0xc2 && c <= 0xdf)
+		n = 2;
+	else if (c >= 0xe0 && c <= 0xef)
+		n = 3;
+	else if (c >= 0xf0 && c <= 0xf4)
+		n = 4;
+	else
+		return 0;
+	if (len < n)
+		return 0;
+	for (i = 1; i < n; i++)
+		if ((s[i] & 0xc0) != 0x80)
+			return 0;
+	if ((c == 0xe0 && s[1] < 0xa0) ||	/* overlong */
+	    (c == 0xed && s[1] > 0x9f) ||	/* surrogates */
+	    (c == 0xf0 && s[1] < 0x90) ||	/* overlong */
+	    (c == 0xf4 && s[1] > 0x8f))	/* above U+10FFFF */
+		return 0;
+	return n;
+}
+
+/* RFC 7220 section 3 : check the DESCRIPTION text and store it, truncated to
+ * PCP_DESCRIPTION_STORE_MAX bytes on a character boundary.
+ * Return 0 if the text is not legal UTF-8. */
+static int store_description(const uint8_t *text, int len, char *out)
+{
+	int i = 0, stored = 0;
+
+	while (i < len) {
+		int n = utf8_seq_len(text + i, len - i);
+		if (n == 0)
+			return 0;
+		if (i + n <= PCP_DESCRIPTION_STORE_MAX)
+			stored = i + n;
+		i += n;
+	}
+	memcpy(out, text, stored);
+	out[stored] = '\0';
+	return 1;
+}
+
 static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info)
 {
 #ifdef DEBUG
@@ -706,6 +763,37 @@ static int parsePCPOption(uint8_t* pcp_buf, int remain, pcp_info_t *pcp_msg_info
 
 		break;
 #endif
+	case PCP_OPTION_DESCRIPTION:
+		/* RFC 7220 : valid for MAP and PEER only. It is optional to
+		 * process, so with another opcode it is ignored. */
+		if (pcp_msg_info->opcode != PCP_OPCODE_MAP &&
+		    pcp_msg_info->opcode != PCP_OPCODE_PEER)
+			break;
+		if (pcp_msg_info->descr_opt != NULL) {
+			/* Maximum occurrences: 1 (RFC 6887 section 7.3) */
+			syslog(LOG_DEBUG, "PCP: DESCRIPTION OPTION was already present.\n");
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+			return 0;
+		}
+		if (option_length > PCP_DESCRIPTION_OPTION_MAX) {
+			pcp_msg_info->result_code = PCP_ERR_MALFORMED_OPTION;
+			return 0;
+		}
+		pcp_msg_info->descr_opt = pcp_buf;
+		/* Not legal UTF-8 : ignore the option, it is then left out of the
+		 * response (RFC 7220 section 3). */
+		pcp_msg_info->descr_valid = store_description(pcp_buf + 4,
+		                                              option_length,
+		                                              pcp_msg_info->descr);
+		if (!pcp_msg_info->descr_valid)
+			syslog(LOG_INFO, "PCP: DESCRIPTION OPTION is not UTF-8, ignored");
+#ifdef DEBUG
+		else
+			syslog(LOG_DEBUG, "PCP OPTION: \t Description \"%s\"\n",
+			       pcp_msg_info->descr);
+#endif
+		break;
+
 	default:
 		if (pcp_buf[0] < 128) {
 			syslog(LOG_ERR, "PCP: Unrecognized mandatory PCP OPTION: %d\n", (int)pcp_buf[0]);
@@ -1077,7 +1165,8 @@ static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 			                    pcp_msg_info->int_port, peerip_s,
 			                    pcp_msg_info->peer_port, eaddr_s,
 			                    pcp_msg_info->nonce,
-			                    pcp_msg_info->pfailure_present, NULL);
+			                    pcp_msg_info->pfailure_present,
+			                    pcp_msg_info->descr_valid ? pcp_msg_info->descr : NULL);
 		}
 #endif
 	}
@@ -1538,7 +1627,8 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 #ifdef PCP_LEASE_SUPPORTED
 		pcp_lease_note_map(0, pcp_msg_info->protocol, pcp_msg_info->mapped_str,
 		                   pcp_msg_info->int_port, pcp_msg_info->nonce,
-		                   pcp_msg_info->pfailure_present, NULL);
+		                   pcp_msg_info->pfailure_present,
+		                   pcp_msg_info->descr_valid ? pcp_msg_info->descr : NULL);
 #endif
 	}
 }
@@ -2025,6 +2115,36 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 #endif /* PCP_SADSCP */
 }
 
+/* RFC 7220 section 3 : the response carries the DESCRIPTION text the server
+ * stored (it may be truncated), and no DESCRIPTION option when the text was
+ * ignored. The response is built in the request buffer, so the option of the
+ * request is rewritten in place and the options after it are moved.
+ * Error responses keep the request options as they are.
+ * Return the new length of the response. */
+static int setDescriptionResponse(unsigned char *buff, int len,
+                                  const pcp_info_t *pcp_msg_info)
+{
+	uint8_t *opt = pcp_msg_info->descr_opt;
+	int old_size, new_size = 0, tail;
+
+	if (opt == NULL || pcp_msg_info->result_code != PCP_SUCCESS)
+		return len;
+	old_size = 4 + ((READNU16(opt + 2) + 3) & ~3);
+	tail = len - (int)(opt - buff) - old_size;
+	if (tail < 0)
+		return len;	/* cannot happen : the request length is a multiple of 4 */
+	if (pcp_msg_info->descr_valid) {
+		/* the stored text is a prefix of the text already in place */
+		int text_len = (int)strlen(pcp_msg_info->descr);
+		new_size = 4 + ((text_len + 3) & ~3);
+		opt[1] = 0;	/* reserved */
+		WRITENU16(opt + 2, text_len);
+		memset(opt + 4 + text_len, 0, new_size - 4 - text_len);
+	}
+	memmove(opt + new_size, opt + old_size, tail);
+	return len - (old_size - new_size);
+}
+
 int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
                              const struct sockaddr *senderaddr,
                              const struct sockaddr_in6 *receiveraddr)
@@ -2088,6 +2208,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 			pcp_lease_save();
 #endif
 		createPCPResponse(buff, &pcp_msg_info);
+		len = setDescriptionResponse(buff, len, &pcp_msg_info);
 
 		/* ANNOUNCE has no opcode payload or response options.  Keep
 		 * the request payload only when returning an error (section 8.2). */
