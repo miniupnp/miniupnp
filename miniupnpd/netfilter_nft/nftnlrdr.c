@@ -709,6 +709,58 @@ nft_pcp_find_peer(const char * iaddr, unsigned short iport,
 	return -1;
 }
 
+/* the timestamps of timestamp_list in a hash set on (eport, proto), for a
+ * walk over all the rules : get_timestamp() scans the list (and logs) for
+ * each rule */
+struct timestamp_index {
+	const struct timestamp_entry ** tab;	/* NULL : free */
+	unsigned int size;			/* a power of 2 */
+};
+
+static unsigned int
+timestamp_slot(unsigned short eport, int proto, unsigned int size)
+{
+	return ((eport * 2654435761u) ^ (unsigned int)proto) & (size - 1);
+}
+
+/* returns <0 if out of memory */
+static int
+timestamp_index_build(struct timestamp_index * x)
+{
+	const struct timestamp_entry * e;
+	unsigned int n = 0, i;
+	for (e = timestamp_list; e; e = e->next)
+		n++;
+	x->size = 64;
+	while (x->size < 2 * n)
+		x->size *= 2;
+	x->tab = calloc(x->size, sizeof(*x->tab));
+	if (x->tab == NULL)
+		return -1;
+	for (e = timestamp_list; e; e = e->next) {
+		for (i = timestamp_slot(e->eport, e->protocol, x->size); x->tab[i];
+		     i = (i + 1) & (x->size - 1)) {
+			if (x->tab[i]->eport == e->eport && x->tab[i]->protocol == e->protocol)
+				break;	/* the first one in the list wins, as in get_timestamp() */
+		}
+		if (!x->tab[i])
+			x->tab[i] = e;
+	}
+	return 0;
+}
+
+static unsigned int
+timestamp_index_get(const struct timestamp_index * x, unsigned short eport, int proto)
+{
+	unsigned int i;
+	for (i = timestamp_slot(eport, proto, x->size); x->tab[i];
+	     i = (i + 1) & (x->size - 1)) {
+		if (x->tab[i]->eport == eport && x->tab[i]->protocol == (short)proto)
+			return x->tab[i]->timestamp;
+	}
+	return 0;
+}
+
 /*
  * nft_pcp_lease_maps()
  * call cb for each redirect rule (for pcp_lease.c)
@@ -717,7 +769,12 @@ int
 nft_pcp_lease_maps(pcp_lease_map_cb cb, void * ctx)
 {
 	rule_t *r;
+	struct timestamp_index tx;
+	uint32_t last_ifidx = 0;
+	char last_ifname[IFNAMSIZ] = "";
 
+	if (timestamp_index_build(&tx) < 0)
+		return -1;
 	refresh_nft_cache_redirect();
 	LIST_FOREACH(r, &head_redirect, entry) {
 		struct pcp_lease_map m;
@@ -728,13 +785,19 @@ nft_pcp_lease_maps(pcp_lease_map_cb cb, void * ctx)
 		m.proto = r->proto;
 		m.eport = r->dport;
 		m.iport = r->nat_port;
+		if (r->ingress_ifidx && r->ingress_ifidx != last_ifidx) {
+			if (if_indextoname(r->ingress_ifidx, last_ifname) == NULL)
+				last_ifname[0] = '\0';
+			last_ifidx = r->ingress_ifidx;
+		}
 		if (r->ingress_ifidx)
-			if_indextoname(r->ingress_ifidx, m.ifname);
+			strncpy(m.ifname, last_ifname, sizeof(m.ifname) - 1);
 		if (r->desc)
 			strncpy(m.desc, r->desc, sizeof(m.desc) - 1);
-		m.timestamp = get_timestamp(m.eport, m.proto);
+		m.timestamp = timestamp_index_get(&tx, m.eport, m.proto);
 		cb(&m, ctx);
 	}
+	free(tx.tab);
 #ifdef ENABLE_UPNPPINHOLE
 	nft_pinhole_state_maps(cb, ctx);
 #endif
