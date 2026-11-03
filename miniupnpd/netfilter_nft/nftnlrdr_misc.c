@@ -1971,6 +1971,24 @@ nft_pcp_filter_finish(struct pcp_filter_update *update, int commit)
 	return result;
 }
 
+/* the FILTER peers of a mapping, IPv4 or IPv6 */
+unsigned int
+nft_pcp_filter_get(const struct in6_addr *address, unsigned short port,
+                   unsigned char protocol, struct pcp_filter *filters,
+                   unsigned int max)
+{
+	struct pcp_filter_policy *p;
+	unsigned int n;
+	if (pcp_filter_recover(address, port, protocol) < 0)
+		return 0;
+	p = *pcp_filter_find(address, port, protocol);
+	if (!p)
+		return 0;
+	n = p->count < max ? p->count : max;
+	memcpy(filters, p->filters, n * sizeof(*filters));
+	return n;
+}
+
 int
 nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
                       unsigned char protocol)

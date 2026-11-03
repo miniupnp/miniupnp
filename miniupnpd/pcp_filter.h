@@ -39,6 +39,8 @@ struct pcp_filter {
  *   returns <0 if they could not be restored.
  * pcp_filter_delete(address, port, protocol)
  *   Forget the peers of a mapping which is deleted. returns <0 on error.
+ * pcp_filter_get(address, port, protocol, filters, max)
+ *   The peers of a mapping (0 : none, any source is allowed).
  *
  * pcp_find_map(iaddr, iport, proto, &eport, desc, desclen, &timestamp)
  *   Finds the IPv4 mapping to an internal endpoint (iport 0 : any port) in
@@ -57,6 +59,9 @@ int nft_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
 int nft_pcp_filter_finish(struct pcp_filter_update *update, int commit);
 int nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
                          unsigned char protocol);
+unsigned int nft_pcp_filter_get(const struct in6_addr *address, unsigned short port,
+                                unsigned char protocol, struct pcp_filter *filters,
+                                unsigned int max);
 int nft_pcp_find_map(const char *iaddr, unsigned short iport, int proto,
                      unsigned short *eport, char *desc, int desclen,
                      unsigned int *timestamp);
@@ -64,6 +69,7 @@ int nft_pcp_find_peer(const char *iaddr, unsigned short iport,
                       const char *raddr, unsigned short rport, int proto,
                       unsigned short *eport, char *desc, int desclen,
                       unsigned int *timestamp);
+#define pcp_filter_get nft_pcp_filter_get
 #define PCP_FIND_SUPPORTED
 #define pcp_find_map nft_pcp_find_map
 #define pcp_find_peer nft_pcp_find_peer
@@ -98,6 +104,9 @@ int pf_pinhole_group_add(const char *ifname, const struct in6_addr *dst,
                          unsigned int timestamp, const struct pcp_filter *f);
 int pf_pinhole_group_remove(const struct in6_addr *dst, unsigned short port,
                             int proto, const struct pcp_filter *f);
+unsigned int pf_pcp_filter_get(const struct in6_addr *address, unsigned short port,
+                               unsigned char protocol, struct pcp_filter *filters,
+                               unsigned int max);
 int pf_pcp_find_map(const char *iaddr, unsigned short iport, int proto,
                     unsigned short *eport, char *desc, int desclen,
                     unsigned int *timestamp);
@@ -105,6 +114,7 @@ int pf_pcp_find_peer(const char *iaddr, unsigned short iport,
                      const char *raddr, unsigned short rport, int proto,
                      unsigned short *eport, char *desc, int desclen,
                      unsigned int *timestamp);
+#define pcp_filter_get pf_pcp_filter_get
 #define PCP_FIND_SUPPORTED
 #define pcp_find_map pf_pcp_find_map
 #define pcp_find_peer pf_pcp_find_peer

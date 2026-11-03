@@ -632,4 +632,30 @@ pf_pcp_find_map(const char * iaddr, unsigned short iport, int proto,
 	return c.found ? 0 : -1;
 }
 
+/* the FILTER peers of a mapping, IPv4 or IPv6 */
+unsigned int
+pf_pcp_filter_get(const struct in6_addr * address, unsigned short port,
+                  unsigned char protocol, struct pcp_filter * filters,
+                  unsigned int max)
+{
+	struct pf_pcp_policy policy;
+	struct pf_group_template tpl;
+	unsigned int n;
+	if(!IN6_IS_ADDR_V4MAPPED(address))
+	{
+#ifdef ENABLE_UPNPPINHOLE
+		unsigned int count = 0;
+		pf_pinhole_group_get(address, port, protocol, filters, max, &count,
+		                     NULL, 0, NULL, NULL);
+		return count;
+#else
+		return 0;
+#endif
+	}
+	read_group(address, port, protocol, &policy, &tpl);
+	n = policy.count < max ? policy.count : max;
+	memcpy(filters, policy.filters, n * sizeof(*filters));
+	return n;
+}
+
 #endif /* USE_PF */
