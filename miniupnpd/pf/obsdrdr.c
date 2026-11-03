@@ -919,7 +919,7 @@ get_redirect_rule_count(const char * ifname)
 	memset(&pr, 0, sizeof(pr));
 	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
 #ifndef PF_NEWSTYLE
-	RULE.action = PF_RDR;
+	pr.rule.action = PF_RDR;
 #endif
 	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
 	{
