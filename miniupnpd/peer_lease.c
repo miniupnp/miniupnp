@@ -29,13 +29,28 @@ struct peer_lease {
 	int proto;
 	unsigned int timestamp;
 };
-static struct peer_lease * peer_leases = NULL;
+/* a hash table on the key, as there can be thousands of PEER mappings */
+#define PEER_LEASE_HASH_SIZE	4096
+static struct peer_lease * peer_leases[PEER_LEASE_HASH_SIZE];
+
+static struct peer_lease **
+peer_lease_bucket(in_addr_t iaddr, unsigned short iport,
+                  in_addr_t raddr, unsigned short rport, int proto)
+{
+	unsigned int h = 2166136261u;
+	h = (h ^ (unsigned int)iaddr) * 16777619u;
+	h = (h ^ (unsigned int)raddr) * 16777619u;
+	h = (h ^ iport) * 16777619u;
+	h = (h ^ rport) * 16777619u;
+	h = (h ^ (unsigned int)proto) * 16777619u;
+	return &peer_leases[h % PEER_LEASE_HASH_SIZE];
+}
 
 static struct peer_lease **
 find_peer_lease(in_addr_t iaddr, unsigned short iport,
                 in_addr_t raddr, unsigned short rport, int proto)
 {
-	struct peer_lease ** p = &peer_leases;
+	struct peer_lease ** p = peer_lease_bucket(iaddr, iport, raddr, rport, proto);
 	while(*p != NULL)
 	{
 		if((*p)->iaddr == iaddr && (*p)->iport == iport &&
@@ -77,9 +92,8 @@ peer_lease_set(in_addr_t iaddr, unsigned short iport,
 		l->raddr = raddr;
 		l->rport = rport;
 		l->proto = proto;
-		l->next = peer_leases;
-		peer_leases = l;
-		p = &peer_leases;
+		l->next = NULL;
+		*p = l;	/* the end of the chain of its bucket */
 	}
 	(*p)->timestamp = timestamp;
 	return 0;
@@ -101,20 +115,25 @@ peer_lease_remove(in_addr_t iaddr, unsigned short iport,
 void
 peer_lease_free_all(void)
 {
-	while(peer_leases != NULL)
+	unsigned int b;
+	for(b = 0; b < PEER_LEASE_HASH_SIZE; b++)
 	{
-		struct peer_lease * old = peer_leases;
-		peer_leases = old->next;
-		free(old);
+		while(peer_leases[b] != NULL)
+		{
+			struct peer_lease * old = peer_leases[b];
+			peer_leases[b] = old->next;
+			free(old);
+		}
 	}
 }
 
 unsigned int
 peer_lease_expire(unsigned int now, peer_lease_delete_cb delete)
 {
-	struct peer_lease * lease = peer_leases;
-	unsigned int next = 0;
-	while(lease != NULL)
+	struct peer_lease * lease;
+	unsigned int next = 0, b;
+	for(b = 0; b < PEER_LEASE_HASH_SIZE; b++)
+	for(lease = peer_leases[b]; lease != NULL; )
 	{
 		struct peer_lease * following = lease->next;
 		if(lease->timestamp != 0 && lease->timestamp <= now)
