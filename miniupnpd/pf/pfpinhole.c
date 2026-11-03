@@ -401,24 +401,59 @@ int update_pinhole(unsigned short uid, unsigned int timestamp)
 	return -42; /* not implemented */
 }
 
+struct clean_entry {
+	int index;
+	int uid;
+	unsigned int ts;
+	char label[PF_RULE_LABEL_SIZE];
+};
+
+struct clean_ctx {
+	struct clean_entry * entries;
+	unsigned int count, capacity;
+};
+
+/* collect the pinholes. They are removed after the walk because a rule
+ * cannot be removed while the walk holds the ruleset ticket. */
+static int
+clean_collect_cb(int index, const pf_walk_rule_t * rule,
+                 const struct pf_walk * walk, void * arg)
+{
+	struct clean_ctx * c = arg;
+	struct clean_entry * e;
+	int uid;
+	unsigned int ts;
+	UNUSED(walk);
+
+	if(sscanf(PF_RULE_LABEL_OF(*rule), PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
+		syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", PF_RULE_LABEL_OF(*rule));
+		return 0;
+	}
+	if(c->count == c->capacity) {
+		unsigned int capacity = c->capacity ? c->capacity * 2 : 16;
+		e = realloc(c->entries, capacity * sizeof(struct clean_entry));
+		if(e == NULL) {
+			syslog(LOG_ERR, "clean_pinhole_list: realloc(%u) failed", capacity);
+			return -1;
+		}
+		c->entries = e;
+		c->capacity = capacity;
+	}
+	e = &c->entries[c->count++];
+	e->index = index;
+	e->uid = uid;
+	e->ts = ts;
+	strlcpy(e->label, PF_RULE_LABEL_OF(*rule), sizeof(e->label));
+	return 0;
+}
+
 /* return the number of rules removed
  * or a negative integer in case of error */
 int clean_pinhole_list(unsigned int * next_timestamp)
 {
-	int i;
-#undef RULE
-#ifdef USE_LIBPFCTL
-	struct pfctl_rules_info ri;
-	struct pfctl_rule rule;
-#define RULE (rule)
-	char anchor_call[MAXPATHLEN] = "";
-#else /* USE_LIBPFCTL */
-	struct pfioc_rule pr;
-#define RULE (pr.rule)
-#endif /* USE_LIBPFCTL */
+	struct clean_ctx c;
+	unsigned int i;
 	time_t current_time;
-	unsigned int ts, tnum;
-	int uid;
 	unsigned int min_ts = UINT_MAX;
 	int min_uid = INT_MAX, max_uid = -1;
 	int n = 0;
@@ -428,93 +463,33 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 		return -1;
 	}
 	current_time = upnp_time();
-#ifdef USE_LIBPFCTL
-	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
-	{
-		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
+	memset(&c, 0, sizeof(c));
+	if(pf_rule_foreach(PF_PASS, clean_collect_cb, &c) != 0) {
+		/* error, or stopped by a failed realloc */
+		free(c.entries);
 		return -1;
 	}
-	i = ri.nr - 1;
-#ifdef PF_RELEASETICKETS
-	tnum = ri.ticket;
-#endif /* PF_RELEASETICKETS */
-#else /* USE_LIBPFCTL */
-	memset(&pr, 0, sizeof(pr));
-	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-#ifndef PF_NEWSTYLE
-	RULE.action = PF_PASS;
-#endif
-	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
-		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
-		return -1;
-	}
-	i = pr.nr - 1;
-#ifdef PF_RELEASETICKETS
-	tnum = pr.ticket;
-#endif
-#endif /* USE_LIBPFCTL */
-	for(; i >= 0; i--) {
-#ifdef USE_LIBPFCTL
-		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_PASS, &rule, anchor_call) < 0)
-		{
-			syslog(LOG_ERR, "pfctl_get_rule: %m");
-			release_ticket(dev, tnum);
-			return -1;
-		}
-		if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
-			continue;
-		}
-#else /* USE_LIBPFCTL */
-		pr.nr = i;
-		if(ioctl(dev, DIOCGETRULE, &pr) < 0) {
-			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
-			release_ticket(dev, tnum);
-			return -1;
-		}
-		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
-			continue;
-		}
-#endif /* USE_LIBPFCTL */
-		if(ts <= (unsigned int)current_time) {
-			syslog(LOG_INFO, "removing expired pinhole '%s'", PF_RULE_LABEL_OF(RULE));
-			if(pf_rule_remove(PF_PASS, i) < 0) {
-				release_ticket(dev, tnum);
+	/* from the last rule to the first one : removing a rule does not
+	 * change the index of the rules before it */
+	for(i = c.count; i-- > 0; ) {
+		const struct clean_entry * e = &c.entries[i];
+		if(e->ts <= (unsigned int)current_time) {
+			syslog(LOG_INFO, "removing expired pinhole '%s'", e->label);
+			if(pf_rule_remove(PF_PASS, e->index) < 0) {
+				free(c.entries);
 				return -1;
 			}
 			n++;
-#ifdef USE_LIBPFCTL
-			if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
-			{
-				syslog(LOG_ERR, "pfctl_get_rules_info: %m");
-				return -1;
-			}
-#ifdef PF_RELEASETICKETS
-			tnum = ri.ticket;
-#endif /* PF_RELEASETICKETS */
-#else /* USE_LIBPFCTL */
-#ifndef PF_NEWSTYLE
-			RULE.action = PF_PASS;
-#endif
-			release_ticket(dev, tnum);
-			if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
-				return -1;
-			}
-#ifdef PF_RELEASETICKETS
-			tnum = pr.ticket;
-#endif
-#endif /* USE_LIBPFCTL */
 		} else {
-			if(uid > max_uid)
-				max_uid = uid;
-			else if(uid < min_uid)
-				min_uid = uid;
-			if(ts < min_ts)
-				min_ts = ts;
+			if(e->uid > max_uid)
+				max_uid = e->uid;
+			else if(e->uid < min_uid)
+				min_uid = e->uid;
+			if(e->ts < min_ts)
+				min_ts = e->ts;
 		}
 	}
+	free(c.entries);
 	if(next_timestamp && (min_ts != UINT_MAX))
 		*next_timestamp = min_ts;
 	if(max_uid > 0) {
@@ -525,7 +500,6 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			next_uid = 1;
 		}
 	}
-	release_ticket(dev, tnum);
 	return n;	/* number of rules removed */
 }
 
