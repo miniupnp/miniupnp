@@ -25,6 +25,7 @@
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
 #include "upnputils.h"
+#include "pcp_lease.h"
 #include "upnppinhole.h"
 #ifdef __APPLE__
 /* XXX - Apple version of PF API seems to differ from what
@@ -107,6 +108,8 @@ lease_file6_add(const char * rem_client,
 	FILE * fd;
 
 	if (lease_file6 == NULL) return 0;
+	/* the pinholes of PCP are in the PCP lease file */
+	if (PCP_LEASE_OWNS(desc, 0, -1)) return 0;
 
 	fd = fopen( lease_file6, "a");
 	if (fd==NULL) {

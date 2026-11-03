@@ -710,6 +710,38 @@ nft_pcp_find_peer(const char * iaddr, unsigned short iport,
 }
 
 /*
+ * nft_pcp_lease_maps()
+ * call cb for each redirect rule (for pcp_lease.c)
+ */
+int
+nft_pcp_lease_maps(pcp_lease_map_cb cb, void * ctx)
+{
+	rule_t *r;
+
+	refresh_nft_cache_redirect();
+	LIST_FOREACH(r, &head_redirect, entry) {
+		struct pcp_lease_map m;
+
+		memset(&m, 0, sizeof(m));
+		if (inet_ntop(AF_INET, &r->nat_addr, m.iaddr, sizeof(m.iaddr)) == NULL)
+			continue;
+		m.proto = r->proto;
+		m.eport = r->dport;
+		m.iport = r->nat_port;
+		if (r->ingress_ifidx)
+			if_indextoname(r->ingress_ifidx, m.ifname);
+		if (r->desc)
+			strncpy(m.desc, r->desc, sizeof(m.desc) - 1);
+		m.timestamp = get_timestamp(m.eport, m.proto);
+		cb(&m, ctx);
+	}
+#ifdef ENABLE_UPNPPINHOLE
+	nft_pinhole_state_maps(cb, ctx);
+#endif
+	return 0;
+}
+
+/*
  * return -1 not found.
  * return 0 found
  */

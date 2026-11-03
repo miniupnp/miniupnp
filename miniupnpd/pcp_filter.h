@@ -19,6 +19,19 @@ struct pcp_filter {
 	unsigned char prefix;
 };
 
+/* a mapping of the firewall, as reported to pcp_lease.c */
+struct pcp_lease_map {
+	int proto;
+	unsigned short eport, iport;
+	char iaddr[46];		/* INET6_ADDRSTRLEN : IPv4 mapping or IPv6 pinhole */
+	char ifname[16];	/* IFNAMSIZ, empty if unknown */
+	char desc[64];
+	char raddr[46];		/* an IPv6 pinhole limited to a remote address, else empty */
+	unsigned short rport;	/* its remote port, 0 : any */
+	unsigned int timestamp;	/* expiry (our time), 0 : none */
+};
+typedef void (*pcp_lease_map_cb)(const struct pcp_lease_map *map, void *ctx);
+
 /* The functions each firewall backend provides (nft_ or pf_ prefix, used
  * through the pcp_filter_* names below). Both follow this contract :
  *
@@ -59,9 +72,11 @@ int nft_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
 int nft_pcp_filter_finish(struct pcp_filter_update *update, int commit);
 int nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
                          unsigned char protocol);
+/* for pcp_lease.c */
 unsigned int nft_pcp_filter_get(const struct in6_addr *address, unsigned short port,
                                 unsigned char protocol, struct pcp_filter *filters,
                                 unsigned int max);
+int nft_pcp_lease_maps(pcp_lease_map_cb cb, void *ctx);
 int nft_pcp_find_map(const char *iaddr, unsigned short iport, int proto,
                      unsigned short *eport, char *desc, int desclen,
                      unsigned int *timestamp);
@@ -69,7 +84,10 @@ int nft_pcp_find_peer(const char *iaddr, unsigned short iport,
                       const char *raddr, unsigned short rport, int proto,
                       unsigned short *eport, char *desc, int desclen,
                       unsigned int *timestamp);
+int nft_pinhole_state_maps(pcp_lease_map_cb cb, void *ctx);
+#define PCP_LEASE_SUPPORTED
 #define pcp_filter_get nft_pcp_filter_get
+#define pcp_lease_maps nft_pcp_lease_maps
 #define PCP_FIND_SUPPORTED
 #define pcp_find_map nft_pcp_find_map
 #define pcp_find_peer nft_pcp_find_peer
@@ -104,9 +122,12 @@ int pf_pinhole_group_add(const char *ifname, const struct in6_addr *dst,
                          unsigned int timestamp, const struct pcp_filter *f);
 int pf_pinhole_group_remove(const struct in6_addr *dst, unsigned short port,
                             int proto, const struct pcp_filter *f);
+/* for pcp_lease.c : the mappings and the FILTER peers of the firewall */
 unsigned int pf_pcp_filter_get(const struct in6_addr *address, unsigned short port,
                                unsigned char protocol, struct pcp_filter *filters,
                                unsigned int max);
+int pf_pcp_lease_maps(pcp_lease_map_cb cb, void *ctx);
+int pf_pinhole_state_maps(pcp_lease_map_cb cb, void *ctx);
 int pf_pcp_find_map(const char *iaddr, unsigned short iport, int proto,
                     unsigned short *eport, char *desc, int desclen,
                     unsigned int *timestamp);
@@ -114,7 +135,9 @@ int pf_pcp_find_peer(const char *iaddr, unsigned short iport,
                      const char *raddr, unsigned short rport, int proto,
                      unsigned short *eport, char *desc, int desclen,
                      unsigned int *timestamp);
+#define PCP_LEASE_SUPPORTED
 #define pcp_filter_get pf_pcp_filter_get
+#define pcp_lease_maps pf_pcp_lease_maps
 #define PCP_FIND_SUPPORTED
 #define pcp_find_map pf_pcp_find_map
 #define pcp_find_peer pf_pcp_find_peer

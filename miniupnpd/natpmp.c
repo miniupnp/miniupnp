@@ -20,6 +20,8 @@
 #include "rw_unaligned.h"
 #include "config.h"
 #include "natpmp.h"
+#include "pcp_filter.h"
+#include "pcp_lease.h"
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "upnpredirect.h"
@@ -426,6 +428,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						       eport, proto_itoa(proto), senderaddrstr, iport, desc);
 						resp[3] = 3;  /* Failure */
 					}
+#ifdef PCP_LEASE_SUPPORTED
+					else {
+						pcp_lease_note_map(1, proto, senderaddrstr, iport,
+						                   NULL, 0, NULL);
+					}
+#endif
 					break;
 				}
 			}
@@ -435,6 +443,10 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				eport = 0;
 				lifetime = 0;
 			}
+#ifdef PCP_LEASE_SUPPORTED
+			else
+				pcp_lease_save();	/* created, renewed or deleted */
+#endif
 			WRITENU16(resp+8, iport);	/* private port */
 			WRITENU16(resp+10, eport);	/* public port */
 			WRITENU32(resp+12, lifetime);	/* Port Mapping lifetime */

@@ -49,7 +49,7 @@ LDFLAGS += -m64
 
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
-          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o pcp_filter.o peer_lease.o \
+          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o pcp_lease.o pcp_filter.o peer_lease.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
           upnppinhole.o asyncsendto.o portinuse.o

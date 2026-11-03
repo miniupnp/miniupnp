@@ -581,6 +581,49 @@ pf_pcp_filter_delete(const struct in6_addr * address, unsigned short port,
 }
 
 
+/* ---- for pcp_lease.c ---- */
+struct state_maps_ctx {
+	pcp_lease_map_cb cb;
+	void * arg;
+};
+
+static int
+state_maps_cb(int index, const char * ifname, unsigned short eport,
+              const char * iaddr, unsigned short iport, int proto,
+              const char * desc, in_addr_t saddr, unsigned int prefix,
+              unsigned short sport, unsigned int timestamp, void * arg)
+{
+	struct state_maps_ctx * c = arg;
+	struct pcp_lease_map m;
+	UNUSED(index); UNUSED(saddr); UNUSED(prefix); UNUSED(sport);
+	memset(&m, 0, sizeof(m));
+	m.proto = proto;
+	m.eport = eport;
+	m.iport = iport;
+	strlcpy(m.iaddr, iaddr, sizeof(m.iaddr));
+	strlcpy(m.ifname, ifname, sizeof(m.ifname));
+	strlcpy(m.desc, desc, sizeof(m.desc));
+	m.timestamp = timestamp;
+	c->cb(&m, c->arg);
+	return 0;
+}
+
+/* a mapping with FILTER peers has a rdr rule per peer, and is reported
+ * once per rule */
+int
+pf_pcp_lease_maps(pcp_lease_map_cb cb, void * arg)
+{
+	struct state_maps_ctx c;
+	int r;
+	c.cb = cb;
+	c.arg = arg;
+	r = get_redirect_rules_foreach(state_maps_cb, &c);
+#ifdef ENABLE_UPNPPINHOLE
+	pf_pinhole_state_maps(cb, arg);	/* the IPv6 mappings */
+#endif
+	return r;
+}
+
 /* the IPv4 mapping to an internal endpoint (iport 0 : any port), in one pass
  * over the rdr rules. returns 0 if found */
 struct find_map_ctx {

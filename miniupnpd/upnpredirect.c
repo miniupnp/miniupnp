@@ -26,6 +26,7 @@
 #include "upnpevents.h"
 #include "portinuse.h"
 #include "upnputils.h"
+#include "pcp_lease.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
 #ifdef USE_NFTABLES
@@ -67,6 +68,8 @@ lease_file_add(const char * rhost,
 	FILE * fd;
 
 	if (lease_file == NULL) return 0;
+	/* the mappings of PCP and NAT-PMP are in the PCP lease file */
+	if (PCP_LEASE_OWNS(desc, eport, proto)) return 0;
 
 	fd = fopen( lease_file, "a");
 	if (fd==NULL) {

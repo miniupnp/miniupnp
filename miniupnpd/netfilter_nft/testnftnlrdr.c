@@ -42,6 +42,16 @@ addnatrule(int proto, unsigned short eport,
 	return add_redirect_rule2(NULL/* ifname */, rhost, eport, iaddr, iport, proto, NULL/* desc */, 0/* timestamp */);
 }
 
+#ifdef ENABLE_UPNPPINHOLE
+/* the listing of the pinholes is in nftpinhole.c, which this test does not link */
+int
+nft_pinhole_state_maps(pcp_lease_map_cb cb, void * ctx)
+{
+	(void)cb; (void)ctx;
+	return 0;
+}
+#endif
+
 int
 main(int argc, char ** argv)
 {

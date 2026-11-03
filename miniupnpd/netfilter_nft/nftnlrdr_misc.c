@@ -1971,7 +1971,7 @@ nft_pcp_filter_finish(struct pcp_filter_update *update, int commit)
 	return result;
 }
 
-/* the FILTER peers of a mapping, IPv4 or IPv6 */
+/* the FILTER peers of a mapping, IPv4 or IPv6 (for pcp_lease.c) */
 unsigned int
 nft_pcp_filter_get(const struct in6_addr *address, unsigned short port,
                    unsigned char protocol, struct pcp_filter *filters,

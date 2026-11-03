@@ -964,4 +964,41 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 	return n;	/* number of rules removed */
 }
 
+/* ---- for pcp_lease.c ---- */
+struct state_maps_ctx {
+	pcp_lease_map_cb cb;
+	void * arg;
+};
+
+static int
+state_maps_visit(const struct pinhole_rec * rec, void * arg)
+{
+	struct state_maps_ctx * c = arg;
+	struct pcp_lease_map m;
+	memset(&m, 0, sizeof(m));
+	if(inet_ntop(AF_INET6, &rec->dst, m.iaddr, sizeof(m.iaddr)) == NULL)
+		return 0;
+	m.proto = rec->proto;
+	m.iport = rec->dport;
+	m.eport = rec->dport;	/* a pinhole has no translation */
+	strlcpy(m.ifname, rec->ifname, sizeof(m.ifname));
+	strlcpy(m.desc, rec->desc, sizeof(m.desc));
+	m.timestamp = rec->ts;
+	if(!IN6_IS_ADDR_UNSPECIFIED(&rec->src))
+		inet_ntop(AF_INET6, &rec->src, m.raddr, sizeof(m.raddr));
+	m.rport = rec->sport;
+	c->cb(&m, c->arg);
+	return 0;
+}
+
+/* call cb for each pinhole : a mapping with FILTER peers has a pinhole per peer */
+int
+pf_pinhole_state_maps(pcp_lease_map_cb cb, void * arg)
+{
+	struct state_maps_ctx c;
+	c.cb = cb;
+	c.arg = arg;
+	return pinhole_foreach(state_maps_visit, &c);
+}
+
 #endif /* ENABLE_UPNPPINHOLE */

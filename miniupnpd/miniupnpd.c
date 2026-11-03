@@ -89,6 +89,8 @@
 #include "natpmp.h"
 #ifdef ENABLE_PCP
 #include "pcpserver.h"
+#include "pcp_filter.h"
+#include "pcp_lease.h"
 #else
 #define PCP_MAX_LEN 32
 #endif
@@ -2255,6 +2257,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	/*remove(lease_file);*/
 	syslog(LOG_INFO, "Reloading rules from lease file");
 	reload_from_lease_file();
+#ifdef PCP_LEASE_SUPPORTED
+	/* FILTER peers and PEER mappings are kept in a file next to the lease file */
+	pcp_lease_load();
+#endif
 #ifdef ENABLE_UPNPPINHOLE
 	reload_from_lease_file6();
 #endif
@@ -2878,6 +2884,10 @@ main(int argc, char * * argv)
 		{
 			syslog(LOG_DEBUG, "cleaning expired Port Mappings");
 			get_upnp_rules_state_list(0);
+#ifdef PCP_LEASE_SUPPORTED
+			/* the PCP lease file is not to keep what expired */
+			pcp_lease_save();
+#endif
 		}
 		if(nextruletoclean_timestamp
 		  && ((unsigned int)timeout.tv_sec >= (nextruletoclean_timestamp - timeofday.tv_sec)))
@@ -2890,7 +2900,12 @@ main(int argc, char * * argv)
 #ifdef ENABLE_UPNPPINHOLE
 		/* Clean up expired IPv6 PinHoles */
 		next_pinhole_ts = 0;
-		upnp_clean_expired_pinholes(&next_pinhole_ts);
+		if(upnp_clean_expired_pinholes(&next_pinhole_ts) > 0)
+		{
+#ifdef PCP_LEASE_SUPPORTED
+			pcp_lease_save();
+#endif
+		}
 		if(next_pinhole_ts &&
 		   timeout.tv_sec >= (int)(next_pinhole_ts - timeofday.tv_sec)) {
 			timeout.tv_sec = next_pinhole_ts - timeofday.tv_sec;

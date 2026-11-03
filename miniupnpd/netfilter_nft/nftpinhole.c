@@ -514,4 +514,43 @@ clean_pinhole_list(unsigned int * next_timestamp)
 	return n;	/* number of rules removed */
 }
 
+/*
+ * nft_pinhole_state_maps()
+ * call cb for each pinhole (for pcp_lease.c) : a mapping with FILTER peers has
+ * a pinhole per peer
+ */
+int
+nft_pinhole_state_maps(pcp_lease_map_cb cb, void * ctx)
+{
+	rule_t *p;
+
+	refresh_nft_cache_filter();
+	LIST_FOREACH(p, &head_filter, entry) {
+		struct pcp_lease_map m;
+		unsigned int ts;
+		int uid;
+		const char * pd;
+
+		if (p->type != RULE_FILTER || p->desc_len == 0)
+			continue;
+		if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
+			continue;	/* not a pinhole */
+		memset(&m, 0, sizeof(m));
+		if (inet_ntop(AF_INET6, &p->daddr6, m.iaddr, sizeof(m.iaddr)) == NULL)
+			continue;
+		m.proto = p->proto;
+		m.iport = p->dport;
+		m.eport = p->dport;	/* a pinhole has no translation */
+		m.timestamp = ts;
+		if (!IN6_IS_ADDR_UNSPECIFIED(&p->saddr6))
+			inet_ntop(AF_INET6, &p->saddr6, m.raddr, sizeof(m.raddr));
+		m.rport = p->sport;
+		pd = strchr(p->desc, ':');
+		if (pd != NULL)
+			strncpy(m.desc, pd + 2, sizeof(m.desc) - 1);
+		cb(&m, ctx);
+	}
+	return 0;
+}
+
 #endif /* ENABLE_UPNPPINHOLE */

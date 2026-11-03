@@ -85,6 +85,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "portinuse.h"
 #include "pcp_msg_struct.h"
 #include "pcp_filter.h"
+#include "pcp_lease.h"
 #ifdef ENABLE_UPNPPINHOLE
 #include "upnppinhole.h"
 #endif /* ENABLE_UPNPPINHOLE */
@@ -1067,6 +1068,18 @@ static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 		       pcp_msg_info->existed ? "Renew" : "Add", fam, ep,
 		       pcp_msg_info->ext_port, peerip_s,
 		       pcp_msg_info->peer_port, pcp_msg_info->lifetime);
+#ifdef PCP_LEASE_SUPPORTED
+		{
+			char eaddr_s[INET6_ADDRSTRLEN] = "";
+			if (!pcp_msg_info->is_fw && pcp_msg_info->ext_ip != NULL)
+				inet_n46top(pcp_msg_info->ext_ip, eaddr_s, sizeof(eaddr_s));
+			pcp_lease_note_peer(pcp_msg_info->protocol, pcp_msg_info->mapped_str,
+			                    pcp_msg_info->int_port, peerip_s,
+			                    pcp_msg_info->peer_port, eaddr_s,
+			                    pcp_msg_info->nonce,
+			                    pcp_msg_info->pfailure_present, NULL);
+		}
+#endif
 	}
 }
 
@@ -1522,6 +1535,11 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 			snprintf(flt, sizeof(flt), " filters %u", pcp_msg_info->filter_count);
 		syslog(LOG_INFO, "%s %s port map %s ext port %hu lifetime %u%s via PCP",
 		       verb, fam, ep, pcp_msg_info->ext_port, pcp_msg_info->lifetime, flt);
+#ifdef PCP_LEASE_SUPPORTED
+		pcp_lease_note_map(0, pcp_msg_info->protocol, pcp_msg_info->mapped_str,
+		                   pcp_msg_info->int_port, pcp_msg_info->nonce,
+		                   pcp_msg_info->pfailure_present, NULL);
+#endif
 	}
 }
 
@@ -2064,6 +2082,11 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 
 		if (pcp_msg_info.result_code != PCP_SUCCESS)
 			logPCPReject(&pcp_msg_info, addr_str);
+#if defined(PCP_LEASE_SUPPORTED) && defined(ENABLE_LEASEFILE)
+		else if (pcp_msg_info.opcode == PCP_OPCODE_MAP ||
+		         pcp_msg_info.opcode == PCP_OPCODE_PEER)
+			pcp_lease_save();
+#endif
 		createPCPResponse(buff, &pcp_msg_info);
 
 		/* ANNOUNCE has no opcode payload or response options.  Keep
