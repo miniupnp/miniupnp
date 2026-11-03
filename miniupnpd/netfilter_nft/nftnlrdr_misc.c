@@ -533,11 +533,22 @@ rule_expr_cb(struct nftnl_expr *e, rule_t *r)
 	return MNL_CB_OK;
 }
 
+static void
+rule_free(rule_t *r)
+{
+	free(r->desc);
+	free(r->table);
+	free(r->chain);
+	free(r);
+}
+
 struct table_cb_data {
 	const char * table;
 	const char * chain;
 	enum rule_type type;
 	int alloc_failed;
+	rule_t * captured;	/* capture : the parsed rule, not put in a list */
+	int capture;
 };
 
 /* callback.
@@ -622,6 +633,16 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					nftnl_expr_iter_destroy(itr);
 				}
 
+				if (CB_DATA(capture)) {
+					/* the echo of a rule we sent : nft_send_rule() files it */
+					if (CB_DATA(captured) == NULL) {
+						CB_DATA(captured) = r;
+						r = NULL;
+					} else {
+						rule_free(r);
+						r = NULL;
+					}
+				} else
 				switch (r->type) {
 				case RULE_NAT:
 					switch (r->nat_type) {
@@ -651,7 +672,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 				syslog(LOG_WARNING, "unknown chain '%s'", chain);
 			}
 			if (r != NULL) {
-				free(r);
+				rule_free(r);
 			}
 		}
 	}
@@ -754,10 +775,10 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		return -1;
 	}
 
+	memset(&data, 0, sizeof(data));	/* not capture : file the rules */
 	data.table = table;
 	data.chain = chain;
 	data.type = type;
-	data.alloc_failed = 0;
 	do {
 		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
 		if (n < 0) {
@@ -1328,6 +1349,26 @@ nft_mnl_batch_put(char *buf, uint16_t type, uint32_t seq)
 	nfg->res_id = NFNL_SUBSYS_NFTABLES;
 }
 
+static int send_batch_cb(struct mnl_nlmsg_batch *batch, mnl_cb_t cb, void *cb_data);
+
+/* the messages the kernel sends back for a rule sent with NLM_F_ECHO : the
+ * rule, and the generation (NFT_MSG_NEWGEN), which is not a rule (libnftnl
+ * aborts on parsing it as one) */
+static int
+rule_echo_cb(const struct nlmsghdr *nlh, void *data)
+{
+	if (NFNL_MSG_TYPE(nlh->nlmsg_type) != NFT_MSG_NEWRULE)
+		return MNL_CB_OK;
+	return table_cb(nlh, data);
+}
+
+/* Send a rule change and keep the cache of its chain valid when it can :
+ * a new rule is sent with NLM_F_ECHO and the kernel's copy of it (with its
+ * handle) goes into the cache, so the next lookup does not dump the chain
+ * again (a dump per request made N requests cost O(N^2)). A replaced rule is
+ * updated in place in the cache. A deleted rule (callers delete while they
+ * walk the list, so its entry can not be freed here), an error or a missing
+ * echo invalidate the cache as before. */
 int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
 {
@@ -1336,27 +1377,46 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 	struct nlmsghdr *nlh;
 	struct mnl_nlmsg_batch *batch;
 	char buf[MNL_SOCKET_BUFFER_SIZE*2];
+	struct table_cb_data echo;
+	struct rule_list *head;
+	uint32_t *validate;
+	uint64_t old_handle = 0;
+	int replace = 0;
 
+	switch (chain_type) {
+	case RULE_CHAIN_FILTER:
+		head = &head_filter;
+		validate = &rule_list_filter_validate;
+		break;
+	case RULE_CHAIN_PEER:
+		head = &head_peer;
+		validate = &rule_list_peer_validate;
+		break;
+	default:
+		head = &head_redirect;
+		validate = &rule_list_redirect_validate;
+		break;
+	}
 	/* PEER SNAT must run before a gateway's catch-all masquerade rule. */
 	if (chain_type != RULE_CHAIN_PEER)
 		flags |= NLM_F_APPEND;
-	if (cmd == NFT_MSG_NEWRULE && nftnl_rule_is_set(rule, NFTNL_RULE_HANDLE))
+	if (cmd == NFT_MSG_NEWRULE && nftnl_rule_is_set(rule, NFTNL_RULE_HANDLE)) {
 		flags = NLM_F_REPLACE | NLM_F_ACK;
+		replace = 1;
+		old_handle = nftnl_rule_get_u64(rule, NFTNL_RULE_HANDLE);
+	}
+	if (cmd == NFT_MSG_NEWRULE)
+		flags |= NLM_F_ECHO;
+
+	memset(&echo, 0, sizeof(echo));
+	echo.table = "";
+	echo.chain = "";
+	echo.type = chain_type == RULE_CHAIN_FILTER ? RULE_FILTER : RULE_NAT;
+	echo.capture = 1;
 
 	batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE);
 	if (batch != NULL)
 	{
-		switch (chain_type) {
-			case RULE_CHAIN_FILTER:
-				rule_list_filter_validate = RULE_CACHE_INVALID;
-				break;
-			case RULE_CHAIN_PEER:
-				rule_list_peer_validate = RULE_CACHE_INVALID;
-				break;
-			case RULE_CHAIN_REDIRECT:
-				rule_list_redirect_validate = RULE_CACHE_INVALID;
-				break;
-		}
 		nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
 		                                 cmd,
 		                                 nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
@@ -1366,13 +1426,45 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		nftnl_rule_nlmsg_build_payload(nlh, rule);
 		nftnl_rule_free(rule);
 
-		result = send_batch(batch);
+		result = send_batch_cb(batch, cmd == NFT_MSG_NEWRULE ? rule_echo_cb : NULL, &echo);
 		if (result < 0) {
 			syslog(LOG_ERR, "%s(%p, %d, %d) send_batch failed %d",
 			       "nft_send_rule", rule, (int)cmd, (int)chain_type, result);
 		}
+	} else {
+		nftnl_rule_free(rule);
 	}
 
+	if (result < 0 || cmd != NFT_MSG_NEWRULE || echo.captured == NULL ||
+	    echo.alloc_failed || *validate != RULE_CACHE_VALID) {
+		*validate = RULE_CACHE_INVALID;	/* dumped again at the next lookup */
+		if (echo.captured != NULL)
+			rule_free(echo.captured);
+	} else if (replace) {
+		rule_t *p;
+		LIST_FOREACH(p, head, entry) {
+			if (p->handle == old_handle)
+				break;
+		}
+		if (p == NULL) {
+			*validate = RULE_CACHE_INVALID;
+			rule_free(echo.captured);
+		} else {
+			/* the entry stays where it is in the list */
+			rule_t *n = echo.captured;
+			free(p->desc);
+			free(p->table);
+			free(p->chain);
+			n->entry = p->entry;
+			*p = *n;
+			free(n);
+		}
+	} else {
+		/* a dump lists the chain backwards (LIST_INSERT_HEAD), so a rule
+		 * appended to the chain goes first in the list. The PEER rules go
+		 * first in their chain: they are only looked up by their key. */
+		LIST_INSERT_HEAD(head, echo.captured, entry);
+	}
 	return result;
 }
 
@@ -1520,6 +1612,14 @@ start_batch(char *buf, size_t buf_size)
 int
 send_batch(struct mnl_nlmsg_batch *batch)
 {
+	return send_batch_cb(batch, NULL, NULL);
+}
+
+/* send_batch() : cb is called for the messages the kernel sends back before
+ * the acknowledgement (the echo of a rule sent with NLM_F_ECHO) */
+static int
+send_batch_cb(struct mnl_nlmsg_batch *batch, mnl_cb_t cb, void *cb_data)
+{
 	int ret;
 	ssize_t n;
 	char buf[MNL_SOCKET_BUFFER_SIZE];
@@ -1552,10 +1652,16 @@ send_batch(struct mnl_nlmsg_batch *batch)
 		}
 		/* https://git.netfilter.org/libmnl/tree/src/callback.c#n48 */
 		errno = 0;
-		ret = mnl_cb_run(buf, n, 0, mnl_portid, NULL, NULL);
+		ret = mnl_cb_run(buf, n, 0, mnl_portid, cb, cb_data);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
 			syslog(LOG_ERR, "%s: mnl_cb_run returned %d: %m",
 			       "send_batch", ret);
+			/* read what the kernel still sends for this batch (the other
+			 * acknowledgements), so the next request on the socket does
+			 * not get it as its own answer */
+			while (recv(mnl_socket_get_fd(mnl_sock), buf, sizeof(buf),
+			            MSG_DONTWAIT) > 0)
+				;
 			return -4;
 		}
 	} while (ret >= 1 /*== MNL_CB_OK*/);
