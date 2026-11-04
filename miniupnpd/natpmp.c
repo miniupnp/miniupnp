@@ -336,7 +336,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
 				int index, proto_old;
-				unsigned short eport_old;
+				unsigned short eport_old, eport_own = 0;
 				/* RFC 6886 section 3.3: a retry is identified by its
 				 * internal tuple, regardless of the suggested port. */
 				for (index = 0;
@@ -353,6 +353,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							break;
 						}
 						eport = eport_old;
+						eport_own = eport_old;
 						break;
 					}
 				}
@@ -388,6 +389,16 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 #endif
+					/* RFC 6886 section 3.3: an external port another
+					 * client maps, on either protocol, is reserved for it
+					 * (the companion port); this client gets the next port.
+					 * A port the client already holds is kept on renewal. */
+					if(eport != eport_own &&
+					   upnp_eport_used_by_other(eport, senderaddrstr)) {
+						eport++;
+						if(eport == 0) eport++; /* skip port zero */
+						continue;
+					}
 					r = get_redirect_rule(ext_if_name, eport, proto,
 					                      iaddr_old, sizeof(iaddr_old),
 					                      &iport_old, desc, sizeof(desc), 0, 0,
