@@ -322,6 +322,7 @@ set pcp-filter-filtered4 { type ipv4_addr . inet_proto . inet_service; }
 - The kernel refuses an element whose start or end falls inside another element. A peer contained in another peer of the same mapping (a narrower prefix with the same or any port) adds nothing, so it is not installed; the daemon keeps the whole list in memory for the lease file and for the merge of later requests.
 - After a restart the daemon reads the elements back once (`pcp_filter_recover()`); the PCP lease file then gives the whole list again.
 - At startup all the FILTER peers of the PCP lease file go to the kernel in one transaction, before any rule of a mapping exists, so a mapping is never there without its filter. The kernel sets are read first, so a mapping only they know keeps its filter. If the transaction fails, the restore goes mapping by mapping.
+- The rules of the mappings are then restored in transactions of up to 128 rules, without the echo of a normal add, and the rule cache is dumped again once at the end. If the kernel refuses one, each of its rules is sent alone.
 - Host peers are in hash sets, `... . saddr . sport` (`pcp-filter-peer4`, `-peer6`) and `... . saddr` for any port (`pcp-filter-host4`, `-host6`). The range set (`pcp-filter-allow4`, `-allow6`) holds real prefixes only. 2,500 flows with 40 peers each, Docker: create 23.5 s before and 2.5 s after, recovery after a restart 27.9 s before and 8.8 s after. The base chain tries the hash sets first and has four rules.
 
 Not adopted:

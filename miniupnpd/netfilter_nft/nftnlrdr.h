@@ -87,6 +87,9 @@ nft_redirect_cache_invalidate(void);
 void
 nft_delete_batch_begin(void);
 
+void
+nft_restore_batch_begin(void);
+
 int
 nft_delete_batch_end(void);
 

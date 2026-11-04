@@ -1209,6 +1209,7 @@ pcp_lease_load(void)
 	filter_index_build(&fx, lines, n);
 #ifdef USE_NFTABLES
 	restore_filters(lines, n, &fx);
+	nft_restore_batch_begin();
 #endif
 	for(i = 1; i < n; i++)
 	{
@@ -1276,6 +1277,10 @@ pcp_lease_load(void)
 		}
 #endif
 	}
+#ifdef USE_NFTABLES
+	if(nft_delete_batch_end() < 0)
+		syslog(LOG_WARNING, "some rules of %s could not be restored", path);
+#endif
 	syslog(LOG_INFO, "Restored %u PCP and NAT-PMP mappings, %u filter peers and %u peer mappings from %s",
 	       nm, nf, np, path);
 end:

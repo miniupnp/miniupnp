@@ -1421,10 +1421,14 @@ rule_cache_invalidate_all(void)
 	rule_list_peer_validate = RULE_CACHE_INVALID;
 }
 
-#define NFT_DELETE_BATCH_BUF	(64 * 1024)
+#define NFT_DELETE_BATCH_BUF	(128 * 1024)
+/* a new rule is much larger than a deletion */
+#define NFT_ADD_BATCH_MAX	128
 
 struct delete_item {
 	struct nftnl_rule *rule;
+	uint16_t cmd;		/* NFT_MSG_DELRULE, or NFT_MSG_NEWRULE in a restore */
+	uint16_t flags;		/* of a new rule */
 	enum rule_chain_type chain;
 	int done;		/* the rule is gone from the kernel */
 	int is_peer;		/* drop this PEER lease once the rule is gone */
@@ -1446,6 +1450,7 @@ struct delete_policy {
 };
 
 static int delete_batch_active;
+static int delete_batch_adds;		/* new rules are queued too (a restore) */
 static int delete_batch_failed;		/* since nft_delete_batch_begin() */
 static int delete_batch_group_failed;	/* of the mapping being queued */
 static struct delete_item delete_batch_items[NFT_DELETE_BATCH_MAX];
@@ -1518,17 +1523,26 @@ nft_delete_batch_flush(void)
 	    (batch = start_batch(buf, NFT_DELETE_BATCH_BUF)) != NULL) {
 		for (i = 0; i < delete_batch_count; i++) {
 			struct nftnl_rule *rule = delete_batch_items[i].rule;
-			if (i > 0)
-				mnl_nlmsg_batch_next(batch);
+			if (i > 0 && !mnl_nlmsg_batch_next(batch)) {
+				/* it does not fit : the last message, with the
+				 * ACK, would not be sent, and nothing would ever
+				 * answer. Send the rules alone. */
+				nlh = NULL;
+				break;
+			}
 			nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
-			                                 NFT_MSG_DELRULE,
+			                                 delete_batch_items[i].cmd,
 			                                 nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
-			                                 0, mnl_seq++);
+			                                 delete_batch_items[i].flags, mnl_seq++);
 			nftnl_rule_nlmsg_build_payload(nlh, rule);
 		}
-		/* one acknowledgement, after the complete transaction */
-		nlh->nlmsg_flags |= NLM_F_ACK;
-		result = send_batch(batch);
+		if (nlh != NULL) {
+			/* one acknowledgement, after the complete transaction */
+			nlh->nlmsg_flags |= NLM_F_ACK;
+			result = send_batch(batch);
+		} else {
+			mnl_nlmsg_batch_stop(batch);
+		}
 	}
 	for (i = 0; i < delete_batch_count; i++) {
 		struct delete_item *d = &delete_batch_items[i];
@@ -1536,8 +1550,9 @@ nft_delete_batch_flush(void)
 			nftnl_rule_free(d->rule);
 			d->done = 1;
 		} else {
-			d->done = nft_send_rule(d->rule, NFT_MSG_DELRULE, d->chain) >= 0 ||
-			          errno == ENOENT;
+			uint16_t cmd = d->cmd;
+			d->done = nft_send_rule(d->rule, cmd, d->chain) >= 0 ||
+			          (cmd == NFT_MSG_DELRULE && errno == ENOENT);
 		}
 		if (!d->done)
 			delete_batch_failed = 1;
@@ -1573,7 +1588,22 @@ nft_delete_batch_end(void)
 {
 	nft_delete_batch_flush();
 	delete_batch_active = 0;
+	/* the new rules were sent without an echo : they are not in the cache */
+	if (delete_batch_adds)
+		rule_cache_invalidate_all();
+	delete_batch_adds = 0;
 	return delete_batch_failed ? -1 : 0;
+}
+
+/* The restore of the PCP lease file : new rules are queued too, and go to the
+ * kernel a batch at a time. nft_delete_batch_end() ends it. The cache does not
+ * have them until then : each restored mapping has a key of its own, so the
+ * lookups of the restore do not need them, and a dump per batch would be slow. */
+void
+nft_restore_batch_begin(void)
+{
+	nft_delete_batch_begin();
+	delete_batch_adds = 1;
 }
 
 /* Send a rule change and keep the cache of its chain valid when it can :
@@ -1624,6 +1654,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 				nft_delete_batch_flush();	/* a failure is kept for nft_delete_batch_end() */
 			memset(&delete_batch_items[delete_batch_count], 0,
 			       sizeof(delete_batch_items[0]));
+			delete_batch_items[delete_batch_count].cmd = NFT_MSG_DELRULE;
 			delete_batch_items[delete_batch_count].rule = rule;
 			delete_batch_items[delete_batch_count++].chain = chain_type;
 			if (*validate == RULE_CACHE_VALID &&
@@ -1639,6 +1670,17 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		flags = NLM_F_REPLACE | NLM_F_ACK;
 		replace = 1;
 		old_handle = nftnl_rule_get_u64(rule, NFTNL_RULE_HANDLE);
+	}
+	if (cmd == NFT_MSG_NEWRULE && delete_batch_active && delete_batch_adds && !replace) {
+		if (delete_batch_count >= NFT_ADD_BATCH_MAX)
+			nft_delete_batch_flush();
+		memset(&delete_batch_items[delete_batch_count], 0,
+		       sizeof(delete_batch_items[0]));
+		delete_batch_items[delete_batch_count].cmd = NFT_MSG_NEWRULE;
+		delete_batch_items[delete_batch_count].flags = flags & ~NLM_F_ACK;
+		delete_batch_items[delete_batch_count].rule = rule;
+		delete_batch_items[delete_batch_count++].chain = chain_type;
+		return 0;
 	}
 	if (cmd == NFT_MSG_NEWRULE)
 		flags |= NLM_F_ECHO;
