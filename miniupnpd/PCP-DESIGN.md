@@ -225,9 +225,10 @@ kind|proto|eport|family|iaddr|iport|ifname|nonce|prefer_failure|since|expiry|ead
 | 12 | eaddr | External address when the line was written: the external interface address (or `use_ext_ip_addr`) for IPv4, the internal address for an IPv6 pinhole (no translation). For the user to read, not used to restore. | `NA` | IPv4: translated address, `NA` if unknown (the address of the external interface is used). IPv6: the internal address (a pinhole, no translation). |
 | 13 | raddr | `NA` | Allowed source as `addr/prefix` (IPv4 prefix 0-32, IPv6 prefix 1-128) | Remote peer address |
 | 14 | rport | `NA` | Allowed source port, `0` for any | Remote peer port |
-| 15 | label | DESCRIPTION option (RFC 7220), `NA` if none. Always the last field. | `NA` | same as MAP |
+| 15 | label | DESCRIPTION option (RFC 7220), `NA` if none. Always the last field. | `peer`, `host` or `range`, `NA` on pf | same as MAP |
 
 - A `PCP-F` line is one FILTER peer of the filtered MAP that has the same nonce. A filtered MAP is never created without its `PCP-F` lines.
+- The last field of a `PCP-F` line names the kernel set which holds the peer on nftables: `peer` (one host and port), `host` (one host, any port) or `range` (a prefix). It is `NA` on pf. It is for the reader: the restore finds the set from the prefix and the port.
 - The label is escaped: `\\`, `\|`, `\n`, `\r`, `\xHH` for other control characters. A label that is really `NA` is written `\x4EA`, so it is not taken for none.
 
 Example (values illustrative):
@@ -235,7 +236,7 @@ Example (values illustrative):
 ```
 PCP-LEASE 1
 PCP-M|TCP|40001|IPv4|192.168.1.10|22|eth1|00112233445566778899aabb|0|1730600000|1730603600|198.51.100.1|NA|NA|ssh
-PCP-F|TCP|40001|IPv4|192.168.1.10|22|NA|00112233445566778899aabb|NA|NA|NA|NA|203.0.113.0/24|0|NA
+PCP-F|TCP|40001|IPv4|192.168.1.10|22|NA|00112233445566778899aabb|NA|NA|NA|NA|203.0.113.0/24|0|range
 NAT-PMP|UDP|40002|IPv4|192.168.1.11|5060|eth1|NA|0|1730600100|1730601900|198.51.100.1|NA|NA|NA
 ```
 
@@ -320,6 +321,7 @@ set pcp-filter-filtered4 { type ipv4_addr . inet_proto . inet_service; }
 - `ct direction original` leaves the replies of outbound flows alone (RFC 6887 section 16.1: the outbound PEER and implicit mappings come first). The interface is the external one (`ext_ifname`, `ext_ifname6`).
 - The kernel refuses an element whose start or end falls inside another element. A peer contained in another peer of the same mapping (a narrower prefix with the same or any port) adds nothing, so it is not installed; the daemon keeps the whole list in memory for the lease file and for the merge of later requests.
 - After a restart the daemon reads the elements back once (`pcp_filter_recover()`); the PCP lease file then gives the whole list again.
+- At startup all the FILTER peers of the PCP lease file go to the kernel in one transaction, before any rule of a mapping exists, so a mapping is never there without its filter. The kernel sets are read first, so a mapping only they know keeps its filter. If the transaction fails, the restore goes mapping by mapping.
 - Host peers are in hash sets, `... . saddr . sport` (`pcp-filter-peer4`, `-peer6`) and `... . saddr` for any port (`pcp-filter-host4`, `-host6`). The range set (`pcp-filter-allow4`, `-allow6`) holds real prefixes only. 2,500 flows with 40 peers each, Docker: create 23.5 s before and 2.5 s after, recovery after a restart 27.9 s before and 8.8 s after. The base chain tries the hash sets first and has four rules.
 
 Not adopted:

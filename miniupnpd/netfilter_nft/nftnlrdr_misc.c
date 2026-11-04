@@ -2030,6 +2030,12 @@ enum pcp_filter_kind {
 static int pcp_filter_dispatch_ready[2];	/* [v4] */
 static char pcp_filter_dispatch_ifname[2][IFNAMSIZ];
 
+/* the bulk load of the policies (nft_pcp_filter_bulk_begin()) : one transaction
+ * which pcp_filter_install() adds to instead of sending its own */
+static struct mnl_nlmsg_batch *pcp_filter_bulk;
+static char *pcp_filter_bulk_buf;
+static int pcp_filter_bulk_pending;
+
 /* the next message of a batch : the previous one is ended first. The last
  * one is ended by send_batch() */
 static void *
@@ -2409,13 +2415,13 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 	               strcmp(pcp_filter_dispatch_ifname[v4], to->ifname) != 0);
 	/* an element is less than 200 octets of netlink messages */
 	const size_t batch_size = 16384 + (to->count + from_count) * 256;
-	char *buf = malloc(2 * batch_size);	/* libmnl wants twice the limit */
+	char *buf = pcp_filter_bulk ? NULL : malloc(2 * batch_size);	/* libmnl wants twice the limit */
 
 	for (k = 0; k < PCP_SET_PEER_KINDS; k++) {
 		add[k] = pcp_filter_set(v4, (enum pcp_filter_kind)k);
 		del[k] = pcp_filter_set(v4, (enum pcp_filter_kind)k);
 	}
-	if (!fset || !buf)
+	if (!fset || (!buf && !pcp_filter_bulk))
 		goto out;
 	for (k = 0; k < PCP_SET_PEER_KINDS; k++)
 		if (!add[k] || !del[k])
@@ -2453,7 +2459,12 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 		result = 0;	/* nothing changes in the kernel */
 		goto out;
 	}
-	batch = start_batch(buf, batch_size);
+	if (pcp_filter_bulk) {
+		batch = pcp_filter_bulk;
+		pending = pcp_filter_bulk_pending;
+	} else {
+		batch = start_batch(buf, batch_size);
+	}
 	if (!batch)
 		goto out;
 	if (dispatch && pcp_filter_dispatch_msgs(batch, &pending, v4, to->ifname) < 0)
@@ -2470,6 +2481,16 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 		pcp_filter_elems_msg(batch, &pending, fset, 1, 1, v4);
 	msgs = pending;
 	if (!msgs) {
+		result = 0;
+		goto out;
+	}
+	if (pcp_filter_bulk) {
+		/* sent by nft_pcp_filter_bulk_end() */
+		pcp_filter_bulk_pending = pending;
+		if (dispatch) {
+			pcp_filter_dispatch_ready[v4] = 1;
+			snprintf(pcp_filter_dispatch_ifname[v4], IFNAMSIZ, "%s", to->ifname);
+		}
 		result = 0;
 		goto out;
 	}
@@ -2720,6 +2741,77 @@ pcp_filter_recover(const struct in6_addr *address, unsigned short port,
 	}
 	p = *pcp_filter_find(address, port, protocol);
 	return (p && p->recovery_error) ? -1 : 0;
+}
+
+/* Between these two, pcp_filter_install() queues its changes in one transaction
+ * of at most size octets : the restore of the PCP lease file sends all the
+ * peers at once, before any rule of a mapping exists, instead of a transaction
+ * per mapping. The policies are still read from the kernel first, so a mapping
+ * which is only there keeps its filter.
+ * returns <0 if out of memory or the policies could not be read */
+int
+nft_pcp_filter_bulk_begin(size_t size)
+{
+	struct in6_addr any = IN6ADDR_ANY_INIT;
+	if (pcp_filter_recover(&any, 0, 0) < 0)
+		return -1;
+	pcp_filter_bulk_buf = malloc(2 * size);
+	if (!pcp_filter_bulk_buf)
+		return -1;
+	pcp_filter_bulk = start_batch(pcp_filter_bulk_buf, size);
+	pcp_filter_bulk_pending = 0;
+	if (!pcp_filter_bulk) {
+		free(pcp_filter_bulk_buf);
+		pcp_filter_bulk_buf = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+/* returns <0 if the transaction failed : nothing is in the kernel, the
+ * policies are read from it again, and the caller sends them one by one */
+int
+nft_pcp_filter_bulk_end(void)
+{
+	struct mnl_nlmsg_batch *batch = pcp_filter_bulk;
+	int result = 0;
+	if (!batch)
+		return 0;
+	pcp_filter_bulk = NULL;
+	if (pcp_filter_bulk_pending) {
+		int size = (int)mnl_nlmsg_batch_size(batch) + MNL_SOCKET_BUFFER_SIZE;
+		((struct nlmsghdr *)mnl_nlmsg_batch_current(batch))->nlmsg_flags |= NLM_F_ACK;
+		/* larger than the default send buffer. Without the privilege the
+		 * send can fail, which is handled as any other failure */
+		(void)setsockopt(mnl_socket_get_fd(mnl_sock), SOL_SOCKET, SO_SNDBUFFORCE,
+		                 &size, sizeof(size));
+		result = send_batch(batch);
+	} else {
+		mnl_nlmsg_batch_stop(batch);
+	}
+	free(pcp_filter_bulk_buf);
+	pcp_filter_bulk_buf = NULL;
+	if (result < 0) {
+		syslog(LOG_WARNING, "%s: the bulk load of the PCP FILTER peers failed", "nft_pcp_filter_bulk_end");
+		pcp_filter_dispatch_ready[0] = pcp_filter_dispatch_ready[1] = 0;
+		pcp_filter_free_all();
+		pcp_filter_recovered = 0;
+	}
+	return result;
+}
+
+/* the name of the set which holds a peer, for the PCP lease file */
+const char *
+nft_pcp_filter_set_label(const struct pcp_filter *f)
+{
+	switch (pcp_filter_peer_kind(f)) {
+	case PCP_SET_PEER:
+		return "peer";
+	case PCP_SET_HOST:
+		return "host";
+	default:
+		return "range";
+	}
 }
 
 int

@@ -66,8 +66,11 @@
  *       \x4EA.
  *   PCP-F : a peer of the filtered MAP having this nonce. raddr is
  *       addr/prefix (IPv4 : prefix 0-32, IPv6 : prefix 1-128), rport is the
- *       source port (0 : any). ifname, prefer_failure, since, expiry, eaddr
- *       and label are NA
+ *       source port (0 : any). The last field is the set of the kernel which
+ *       holds the peer on nftables (peer : one host and port, host : one
+ *       host, any port, range : a prefix ; NA on pf), for the reader : the
+ *       restore finds it from the prefix and the port. ifname, prefer_failure,
+ *       since, expiry and eaddr are NA
  *   PCP-P : a PEER mapping : IPv4 (eaddr is the translated address, NA if
  *       unknown, the address of the external interface is used then) or IPv6 (a
  *       pinhole to the remote endpoint, eaddr is iaddr, eport is iport).
@@ -710,10 +713,16 @@ pcp_lease_write(void)
 				inet_ntop(AF_INET, filters[k].address.s6_addr + 12, a, sizeof(a));
 			else
 				inet_ntop(AF_INET6, &filters[k].address, a, sizeof(a));
-			fprintf(f, "PCP-F|%s|%hu|%s|%s|%hu|NA|%s|NA|NA|NA|NA|%s/%u|%hu|NA\n",
+			fprintf(f, "PCP-F|%s|%hu|%s|%s|%hu|NA|%s|NA|NA|NA|NA|%s/%u|%hu|%s\n",
 			        proto_itoa(m->proto), m->eport, family_of(m->iaddr), m->iaddr,
 			        m->iport, nonce, a,
-			        v4 ? filters[k].prefix - 96u : filters[k].prefix, filters[k].port);
+			        v4 ? filters[k].prefix - 96u : filters[k].prefix, filters[k].port,
+#ifdef USE_NFTABLES
+			        nft_pcp_filter_set_label(&filters[k])
+#else
+			        LEASE_NA
+#endif
+			        );
 		}
 	}
 #ifdef PCP_PEER
@@ -1058,6 +1067,74 @@ restore_map(char ** fl, const struct filter_index * fx)
 	return nfilters;
 }
 
+#ifdef USE_NFTABLES
+/* the FILTER peers of the file in one transaction, before any rule of a
+ * mapping exists : a mapping is never there without its filter, and restore_map()
+ * then finds its policy unchanged. If this fails restore_map() does it mapping by
+ * mapping. */
+static void
+restore_filters(char ** lines, unsigned int n, const struct filter_index * fx)
+{
+	/* a peer needs less than 256 octets, a mapping some messages more */
+	struct pcp_filter * filters = malloc(PCP_FILTER_PEER_MAX * sizeof(*filters));
+	unsigned int i;
+
+	if(filters == NULL || nft_pcp_filter_bulk_begin(65536 + (size_t)n * 1024) < 0)
+	{
+		free(filters);
+		return;
+	}
+	for(i = 1; i < n; i++)
+	{
+		char tmp[LEASE_LINE_MAX], * fl[LEASE_FIELDS], desc[64];
+		struct pcp_filter_update * update = NULL;
+		struct in6_addr address;
+		const char * ifname = ext_if_name;
+		unsigned int expiry, nfilters;
+		int v4;
+		strlcpy(tmp, lines[i], sizeof(tmp));
+		if(strncmp(tmp, "PCP-M|", 6) != 0 || split_fields(tmp, fl, LEASE_FIELDS) != 0)
+			continue;
+		expiry = (unsigned int)strtoul(fl[F_EXPIRY], NULL, 10);
+		if(expiry != 0 && (long)expiry <= (long)time(NULL))
+			continue;
+		v4 = strcmp(fl[F_FAMILY], "IPv6") != 0;
+		unna_fields(fl);
+		desc_of_nonce("PCP MAP", fl[F_NONCE], desc, sizeof(desc));
+		if(!pcp_lease_owns(desc, (unsigned short)atoi(fl[F_EPORT]), proto_atoi(fl[F_PROTO])))
+			continue;
+		memset(&address, 0, sizeof(address));
+		if(v4)
+		{
+			struct in_addr ia;
+			if(inet_pton(AF_INET, fl[F_IADDR], &ia) != 1)
+				continue;
+			address.s6_addr[10] = address.s6_addr[11] = 0xff;
+			memcpy(address.s6_addr + 12, &ia, 4);
+		}
+		else
+		{
+			if(inet_pton(AF_INET6, fl[F_IADDR], &address) != 1)
+				continue;
+#ifdef ENABLE_IPV6
+			if(ext_if_name6 != NULL && ext_if_name6[0] != '\0')
+				ifname = ext_if_name6;
+#endif
+		}
+		if(fl[F_IFNAME][0] != '\0')
+			ifname = fl[F_IFNAME];
+		nfilters = read_filters(fx, fl, v4, filters);
+		if(nfilters > 0 &&
+		   pcp_filter_begin(&address, (unsigned short)atoi(fl[F_IPORT]),
+		                    proto_atoi(fl[F_PROTO]), ifname, filters, nfilters,
+		                    &update) == 0)
+			pcp_filter_finish(update, 1);
+	}
+	free(filters);
+	nft_pcp_filter_bulk_end();
+}
+#endif /* USE_NFTABLES */
+
 #ifdef PCP_PEER
 /* create again the pinhole of a PCP PEER (IPv6) : a pinhole to the remote
  * endpoint. lifetime : the time left, 0 for none. */
@@ -1130,6 +1207,9 @@ pcp_lease_load(void)
 		goto end;
 	}
 	filter_index_build(&fx, lines, n);
+#ifdef USE_NFTABLES
+	restore_filters(lines, n, &fx);
+#endif
 	for(i = 1; i < n; i++)
 	{
 		char tmp[LEASE_LINE_MAX];

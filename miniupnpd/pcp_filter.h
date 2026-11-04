@@ -90,6 +90,9 @@ int nft_pcp_filter_finish(struct pcp_filter_update *update, int commit);
 int nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
                          unsigned char protocol);
 /* for pcp_lease.c */
+int nft_pcp_filter_bulk_begin(size_t size);
+int nft_pcp_filter_bulk_end(void);
+const char *nft_pcp_filter_set_label(const struct pcp_filter *f);
 unsigned int nft_pcp_filter_get(const struct in6_addr *address, unsigned short port,
                                 unsigned char protocol, struct pcp_filter *filters,
                                 unsigned int max);
