@@ -68,6 +68,9 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 		      char * rhost, int rhostlen,
 		      unsigned int * timestamp,
 		      u_int64_t * packets, u_int64_t * bytes);
+void
+nft_rule_cache_invalidate(void);
+
 int
 get_redirect_rule_by_index(int index,
 			   char * ifname, unsigned short * eport,

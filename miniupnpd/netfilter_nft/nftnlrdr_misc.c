@@ -41,6 +41,7 @@
 #include <libnftnl/expr.h>
 
 #include "../commonrdr.h"
+#include "nftnlrdr.h"
 #include "nftnlrdr_misc.h"
 #include "../macros.h"
 #include "../pcp_filter.h"
@@ -97,6 +98,10 @@ struct rule_list head_peer = LIST_HEAD_INITIALIZER(head_peer);
 static uint32_t rule_list_filter_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_redirect_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_peer_validate = RULE_CACHE_INVALID;
+/* the entry of the last rule deleted from each list, see rule_cache_remove() */
+static rule_t *rule_deleted_filter;
+static rule_t *rule_deleted_redirect;
+static rule_t *rule_deleted_peer;
 
 
 /*
@@ -747,6 +752,7 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *nlh;
 	struct table_cb_data data;
+	rule_t **deleted;
 	struct nftnl_rule *rule;
 	int ret;
 	ssize_t n;
@@ -756,6 +762,12 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		return -1;
 	}
 	flush_nft_cache(head);
+	deleted = head == &head_filter ? &rule_deleted_filter :
+	          head == &head_peer ? &rule_deleted_peer : &rule_deleted_redirect;
+	if (*deleted != NULL) {
+		rule_free(*deleted);
+		*deleted = NULL;
+	}
 
 	rule = nftnl_rule_alloc();
 	if (rule == NULL) {
@@ -1363,13 +1375,34 @@ rule_echo_cb(const struct nlmsghdr *nlh, void *data)
 	return table_cb(nlh, data);
 }
 
+/* Take a deleted rule out of the cache. Its callers may still read the entry
+ * and follow its next pointer (LIST_REMOVE leaves that pointer as it is), so
+ * the entry is kept until the next deletion from the same list. Returns 0 if
+ * the rule is not in the list. */
+static int
+rule_cache_remove(struct rule_list *head, rule_t **deleted, uint64_t handle)
+{
+	rule_t *p;
+
+	LIST_FOREACH(p, head, entry) {
+		if (p->handle == handle) {
+			LIST_REMOVE(p, entry);
+			if (*deleted != NULL)
+				rule_free(*deleted);
+			*deleted = p;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /* Send a rule change and keep the cache of its chain valid when it can :
  * a new rule is sent with NLM_F_ECHO and the kernel's copy of it (with its
  * handle) goes into the cache, so the next lookup does not dump the chain
  * again (a dump per request made N requests cost O(N^2)). A replaced rule is
- * updated in place in the cache. A deleted rule (callers delete while they
- * walk the list, so its entry can not be freed here), an error or a missing
- * echo invalidate the cache as before. */
+ * updated in place in the cache. A deleted rule leaves the cache, see
+ * rule_cache_remove(). An error or a missing echo invalidate the cache as
+ * before. */
 int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
 {
@@ -1381,23 +1414,30 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 	struct table_cb_data echo;
 	struct rule_list *head;
 	uint32_t *validate;
+	rule_t **deleted;
 	uint64_t old_handle = 0;
+	uint64_t del_handle = 0;
 	int replace = 0;
 
 	switch (chain_type) {
 	case RULE_CHAIN_FILTER:
 		head = &head_filter;
 		validate = &rule_list_filter_validate;
+		deleted = &rule_deleted_filter;
 		break;
 	case RULE_CHAIN_PEER:
 		head = &head_peer;
 		validate = &rule_list_peer_validate;
+		deleted = &rule_deleted_peer;
 		break;
 	default:
 		head = &head_redirect;
 		validate = &rule_list_redirect_validate;
+		deleted = &rule_deleted_redirect;
 		break;
 	}
+	if (cmd == NFT_MSG_DELRULE)
+		del_handle = nftnl_rule_get_u64(rule, NFTNL_RULE_HANDLE);
 	/* PEER SNAT must run before a gateway's catch-all masquerade rule. */
 	if (chain_type != RULE_CHAIN_PEER)
 		flags |= NLM_F_APPEND;
@@ -1436,7 +1476,10 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		nftnl_rule_free(rule);
 	}
 
-	if (result < 0 || cmd != NFT_MSG_NEWRULE || echo.captured == NULL ||
+	if (result >= 0 && cmd == NFT_MSG_DELRULE && *validate == RULE_CACHE_VALID) {
+		if (!rule_cache_remove(head, deleted, del_handle))
+			*validate = RULE_CACHE_INVALID;
+	} else if (result < 0 || cmd != NFT_MSG_NEWRULE || echo.captured == NULL ||
 	    echo.alloc_failed || *validate != RULE_CACHE_VALID) {
 		*validate = RULE_CACHE_INVALID;	/* dumped again at the next lookup */
 		if (echo.captured != NULL)
@@ -1467,6 +1510,15 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		LIST_INSERT_HEAD(head, echo.captured, entry);
 	}
 	return result;
+}
+
+/* the next lookup reads the rules (and their counters) from the kernel */
+void
+nft_rule_cache_invalidate(void)
+{
+	rule_list_filter_validate = RULE_CACHE_INVALID;
+	rule_list_redirect_validate = RULE_CACHE_INVALID;
+	rule_list_peer_validate = RULE_CACHE_INVALID;
 }
 
 int

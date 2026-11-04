@@ -620,6 +620,10 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	int i = 0;
 	time_t current_time;
 
+#ifdef USE_NFTABLES
+	/* the counters of the rules are compared by remove_unused_rules() */
+	nft_rule_cache_invalidate();
+#endif
 	/*ifname[0] = '\0';*/
 	tmp = malloc(sizeof(struct rule_state));
 	if(!tmp)
@@ -721,6 +725,9 @@ remove_unused_rules(struct rule_state * list)
 	unsigned int timestamp;
 	int n = 0;
 
+#ifdef USE_NFTABLES
+	nft_rule_cache_invalidate();
+#endif
 	while(list)
 	{
 		/* remove the rule if no traffic has used it */
