@@ -968,7 +968,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	char iaddr_old[INET6_ADDRSTRLEN];
 	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
-	unsigned short eport_old;
+	unsigned short eport_old, eport_own = 0;
 	unsigned int timestamp_old;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
@@ -992,6 +992,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				return PCP_ERR_NOT_AUTHORIZED;
 			}
 			pcp_msg_info->ext_port = eport_old;
+			eport_own = eport_old;
 			break;
 		}
 	}
@@ -1051,6 +1052,22 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			continue;
 		}
 #endif
+		/* A NAT mapping shares the external address: as for NAT-PMP
+		 * (RFC 6886 section 3.3), an external port another client maps,
+		 * on either protocol, is reserved for that client.  A port the
+		 * client already holds is kept on renewal. */
+		if (pcp_msg_info->ext_port != eport_own &&
+		    upnp_eport_used_by_other(pcp_msg_info->ext_port,
+					     pcp_msg_info->mapped_str)) {
+			if (pcp_msg_info->pfailure_present) {
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			}
+			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
+			continue;
+		}
 		r = get_redirect_rule(ext_if_name,
 				      pcp_msg_info->ext_port,
 				      pcp_msg_info->protocol,
