@@ -911,6 +911,27 @@ read_filters(const struct filter_index * x, char ** fl, int v4,
 	return n;
 }
 
+/* the rules of a restored mapping have to be seen by the expiry */
+static void
+schedule_expiry(unsigned int timestamp)
+{
+	if(timestamp != 0 && (nextruletoclean_timestamp == 0 ||
+	                      timestamp < nextruletoclean_timestamp))
+		nextruletoclean_timestamp = timestamp;
+}
+
+/* is the IPv4 redirect of this mapping still in the firewall ? */
+static int
+redirect_survived(unsigned short eport, int proto,
+                  const char * iaddr, unsigned short iport)
+{
+	char iaddr_old[INET_ADDRSTRLEN];
+	unsigned short iport_old;
+	return get_redirect_rule(ext_if_name, eport, proto, iaddr_old, sizeof(iaddr_old),
+	                         &iport_old, NULL, 0, NULL, 0, NULL, NULL, NULL) == 0 &&
+	       iport_old == iport && strcmp(iaddr_old, iaddr) == 0;
+}
+
 /* create again a PCP-M or NAT-PMP mapping, with its FILTER peers :
  * (the fields are in the order of the file, see the top of this file) */
 static int
@@ -933,14 +954,22 @@ restore_map(char ** fl, const struct filter_index * fx)
 	int r = -1;
 
 	unna_fields(fl);
-	if(expiry != 0 && left <= 0)
-		return -1;	/* expired */
 	if(pmp)
 		snprintf(desc, sizeof(desc), "NAT-PMP %hu %s", eport, proto_itoa(proto));
 	else
 		desc_of_nonce("PCP MAP", fl[7], desc, sizeof(desc));
 	if(!pcp_lease_owns(desc, eport, proto))
 		return -1;
+	if(expiry != 0 && left <= 0)
+	{
+		/* expired. Rules which survived the restart have lost their
+		 * timestamp, the next expiry pass is to remove them. */
+		if(v4 && redirect_survived(eport, proto, fl[4], iport) &&
+		   update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc,
+		                                     (unsigned int)upnp_time()) == 0)
+			schedule_expiry((unsigned int)upnp_time());
+		return -1;
+	}
 	memset(&address, 0, sizeof(address));
 	if(v4)
 	{
@@ -984,15 +1013,19 @@ restore_map(char ** fl, const struct filter_index * fx)
 	}
 	if(v4)
 	{
-		char iaddr_old[INET_ADDRSTRLEN];
-		unsigned short iport_old;
-		if(get_redirect_rule(ext_if_name, eport, proto, iaddr_old, sizeof(iaddr_old),
-		                     &iport_old, NULL, 0, NULL, 0, NULL, NULL, NULL) == 0 &&
-		   iport_old == iport && strcmp(iaddr_old, fl[4]) == 0)
-			r = 0;	/* the rules are still there */
+		unsigned int timestamp = expiry ? upnp_time() + (unsigned int)left : 0;
+		if(redirect_survived(eport, proto, fl[4], iport))
+		{
+			/* the rules are still there, their timestamp is not : it
+			 * was in the memory of the previous process */
+			r = update_portmapping_desc_timestamp(ext_if_name, eport, proto,
+			                                      desc, timestamp);
+			if(r == 0)
+				schedule_expiry(timestamp);
+		}
 		else
 			r = upnp_redirect_internal(NULL, eport, fl[4], iport, proto, desc,
-			                           expiry ? upnp_time() + (unsigned int)left : 0);
+			                           timestamp);
 	}
 #ifdef ENABLE_UPNPPINHOLE
 	else
@@ -1119,9 +1152,19 @@ pcp_lease_load(void)
 			long left = expiry ? (long)expiry - (long)time(NULL) : 0;
 			struct state_entry * e;
 			char pdesc[64];
+			unsigned int timestamp;
 			unna_fields(fl);
 			if(expiry != 0 && left <= 0)
-				continue;	/* expired */
+			{
+				/* expired : remove the rule if it survived the restart */
+#if defined(USE_NFTABLES) || defined(USE_PF)
+				if(strcmp(fl[F_FAMILY], "IPv6") != 0)
+					delete_peer_rule(fl[4], (unsigned short)atoi(fl[5]),
+					                 fl[12], (unsigned short)atoi(fl[13]),
+					                 proto_atoi(fl[1]));
+#endif
+				continue;
+			}
 			desc_of_nonce("PCP PEER", fl[7], pdesc, sizeof(pdesc));
 			if(strcmp(fl[F_FAMILY], "IPv6") == 0)
 			{
@@ -1129,14 +1172,17 @@ pcp_lease_load(void)
 					np++;
 				continue;
 			}
+			timestamp = expiry ? upnp_time() + (unsigned int)left : 0;
 			if(add_peer_redirect_rule2(fl[6][0] ? fl[6] : ext_if_name,
 			                           fl[12], (unsigned short)atoi(fl[13]),
 			                           fl[11][0] ? fl[11] : NULL, /* else the address of the interface */
 			                           (unsigned short)atoi(fl[2]),
 			                           fl[4], (unsigned short)atoi(fl[5]),
-			                           proto_atoi(fl[1]), pdesc,
-			                           expiry ? upnp_time() + (unsigned int)left : 0) == 0)
+			                           proto_atoi(fl[1]), pdesc, timestamp) == 0)
+			{
 				np++;
+				schedule_expiry(timestamp);
+			}
 			e = state_get(1, proto_atoi(fl[1]), fl[4], (unsigned short)atoi(fl[5]),
 			              fl[12], (unsigned short)atoi(fl[13]), fl[7],
 			              (time_t)strtoul(fl[9], NULL, 10));
