@@ -1985,15 +1985,18 @@ pcp_filter_find(const struct in6_addr *address, unsigned short port,
 
 /* The FILTER policies on the packet path (RFC 6887 section 13.3), see
  * PCP-DESIGN.md section 6c. Per IP version one base chain on the forward
- * hook, before the forward chain of miniupnpd, holds two rules :
- *   ct direction original iifname <ext>
- *     daddr . l4proto . dport . saddr . sport @pcp-filter-allow<v> accept
- *   ct direction original iifname <ext>
- *     daddr . l4proto . dport @pcp-filter-filtered<v> drop
- * The allow set has an element per peer (the prefix and the port, or any
- * port, as ranges), the filtered set one per filtered mapping. The elements
- * carry no verdict, so a change never makes the kernel validate the table
- * again, and a packet costs two lookups whatever the number of mappings.
+ * hook, before the forward chain of miniupnpd, holds four rules, each with
+ * ct direction original iifname <ext> :
+ *   daddr . l4proto . dport . saddr . sport @pcp-filter-peer<v> accept
+ *   daddr . l4proto . dport . saddr @pcp-filter-host<v> accept
+ *   daddr . l4proto . dport . saddr . sport @pcp-filter-allow<v> accept
+ *   daddr . l4proto . dport @pcp-filter-filtered<v> drop
+ * A peer which is one host goes into one of the two hash sets, with its port
+ * or for any port. The allow set holds the real prefixes as ranges : a large
+ * range set is much slower to change than a hash set. The filtered set has
+ * an element per filtered mapping. The elements carry no verdict, so a change
+ * never makes the kernel validate the table again, and a packet costs at most
+ * four lookups whatever the number of mappings.
  * An accept only ends this base chain : the packet still has to pass the
  * ordinary firewall. */
 #define PCP_FILTER_BASE4	"pcp-filter-v4"
@@ -2002,10 +2005,24 @@ pcp_filter_find(const struct in6_addr *address, unsigned short port,
 #define PCP_FILTER_ALLOW6	"pcp-filter-allow6"
 #define PCP_FILTER_FILTERED4	"pcp-filter-filtered4"
 #define PCP_FILTER_FILTERED6	"pcp-filter-filtered6"
+#define PCP_FILTER_PEER4	"pcp-filter-peer4"
+#define PCP_FILTER_PEER6	"pcp-filter-peer6"
+#define PCP_FILTER_HOST4	"pcp-filter-host4"
+#define PCP_FILTER_HOST6	"pcp-filter-host6"
+/* the sets of a family, in the order of the rules of the base chain */
+enum pcp_filter_kind {
+	PCP_SET_PEER,		/* one host, one port */
+	PCP_SET_HOST,		/* one host, any port */
+	PCP_SET_RANGE,		/* a prefix, one port or any port */
+	PCP_SET_FILTERED,	/* the filtered mappings */
+	PCP_SET_COUNT
+};
+#define PCP_SET_PEER_KINDS	PCP_SET_FILTERED	/* the sets which hold peers */
 /* the types of the keys, for nft list : ipv4_addr (7) or ipv6_addr (8),
  * inet_proto (12), inet_service (13) */
 #define T_ADDR(v4)		((v4) ? 7u : 8u)
 #define PCP_FILTER_ALLOW_TYPE(v4)	((((((T_ADDR(v4) << 6) | 12u) << 6 | 13u) << 6 | T_ADDR(v4)) << 6) | 13u)
+#define PCP_FILTER_HOST_TYPE(v4)	((((((T_ADDR(v4) << 6) | 12u) << 6) | 13u) << 6) | T_ADDR(v4))
 #define PCP_FILTER_FILTERED_TYPE(v4)	((((T_ADDR(v4) << 6) | 12u) << 6) | 13u)
 #define PCP_FILTER_KEY_MAX	44	/* 16 + 4 + 4 + 16 + 4 */
 /* the base chain and the sets of a family are set up by the first install of
@@ -2077,6 +2094,56 @@ pcp_filter_key_peer(const struct pcp_filter_policy *policy,
 	return off + alen + 4;
 }
 
+/* the set which holds the peer f */
+static enum pcp_filter_kind
+pcp_filter_peer_kind(const struct pcp_filter *f)
+{
+	if (f->prefix != 128)
+		return PCP_SET_RANGE;
+	return f->port ? PCP_SET_PEER : PCP_SET_HOST;
+}
+
+/* the name of a set */
+static const char *
+pcp_filter_set_name(int v4, enum pcp_filter_kind kind)
+{
+	switch (kind) {
+	case PCP_SET_PEER:
+		return v4 ? PCP_FILTER_PEER4 : PCP_FILTER_PEER6;
+	case PCP_SET_HOST:
+		return v4 ? PCP_FILTER_HOST4 : PCP_FILTER_HOST6;
+	case PCP_SET_RANGE:
+		return v4 ? PCP_FILTER_ALLOW4 : PCP_FILTER_ALLOW6;
+	default:
+		return v4 ? PCP_FILTER_FILTERED4 : PCP_FILTER_FILTERED6;
+	}
+}
+
+static uint32_t
+pcp_filter_set_id(int v4, enum pcp_filter_kind kind)
+{
+	return (v4 ? 1 : 1 + PCP_SET_COUNT) + (uint32_t)kind;
+}
+
+/* add the peer f of policy to the set of its kind (a range has an end, the
+ * key of a peer for any port has no port). returns <0 if out of memory */
+static int pcp_filter_add_elem(struct nftnl_set *set, const unsigned char *key,
+                               const unsigned char *end, uint32_t len);
+
+static int
+pcp_filter_add_peer(struct nftnl_set *set, const struct pcp_filter_policy *policy,
+                    const struct pcp_filter *f)
+{
+	unsigned char key[PCP_FILTER_KEY_MAX], end[PCP_FILTER_KEY_MAX];
+	enum pcp_filter_kind kind = pcp_filter_peer_kind(f);
+	uint32_t len = pcp_filter_key_peer(policy, f, 0, key);
+	if (kind == PCP_SET_RANGE) {
+		pcp_filter_key_peer(policy, f, 1, end);
+		return pcp_filter_add_elem(set, key, end, len);
+	}
+	return pcp_filter_add_elem(set, key, NULL, kind == PCP_SET_HOST ? len - 4 : len);
+}
+
 /* is the peer a inside the peer b (a narrower or equal prefix of it, with
  * the same port or b any port) ? */
 static int
@@ -2110,21 +2177,19 @@ pcp_filter_installed(const struct pcp_filter_policy *policy, unsigned char *in)
 }
 
 static struct nftnl_set *
-pcp_filter_set(int v4, int allow)
+pcp_filter_set(int v4, enum pcp_filter_kind kind)
 {
 	struct nftnl_set *set = nftnl_set_alloc();
 	if (!set)
 		return NULL;
 	nftnl_set_set_str(set, NFTNL_SET_TABLE, nft_table);
-	nftnl_set_set_str(set, NFTNL_SET_NAME,
-	                  allow ? (v4 ? PCP_FILTER_ALLOW4 : PCP_FILTER_ALLOW6)
-	                        : (v4 ? PCP_FILTER_FILTERED4 : PCP_FILTER_FILTERED6));
+	nftnl_set_set_str(set, NFTNL_SET_NAME, pcp_filter_set_name(v4, kind));
 	nftnl_set_set_u32(set, NFTNL_SET_FAMILY, v4 ? nft_ipv4_family : nft_ipv6_family);
-	nftnl_set_set_u32(set, NFTNL_SET_ID, (v4 ? 1 : 3) + (allow ? 0 : 1));
+	nftnl_set_set_u32(set, NFTNL_SET_ID, pcp_filter_set_id(v4, kind));
 	return set;
 }
 
-/* the conditions of both rules of a base chain : the original direction,
+/* the conditions of the rules of a base chain : the original direction,
  * the external interface */
 static void
 pcp_filter_rule_head(struct nftnl_rule *r, int v4, const char *ifname)
@@ -2145,10 +2210,10 @@ pcp_filter_rule_head(struct nftnl_rule *r, int v4, const char *ifname)
 	expr_add_cmp(r, NFT_REG_1, NFT_CMP_EQ, ifname, strlen(ifname) + 1);
 }
 
-/* a rule of a base chain : a lookup of daddr . l4proto . dport (and
- * . saddr . sport for the allow set), then accept or drop */
+/* a rule of a base chain : a lookup of daddr . l4proto . dport and, for the
+ * peers, . saddr and . sport, then accept or drop */
 static struct nftnl_rule *
-pcp_filter_dispatch_rule(int v4, int allow, const char *ifname)
+pcp_filter_dispatch_rule(int v4, enum pcp_filter_kind kind, const char *ifname)
 {
 	uint16_t family = v4 ? nft_ipv4_family : nft_ipv6_family;
 	uint32_t alen = pcp_filter_alen(v4), reg = NFT_REG32_00;
@@ -2167,11 +2232,12 @@ pcp_filter_dispatch_rule(int v4, int allow, const char *ifname)
 	reg += alen / 4;
 	expr_add_meta(r, NFT_META_L4PROTO, reg++);
 	expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, reg++, 2, 2);
-	if (allow) {
+	if (kind != PCP_SET_FILTERED) {
 		expr_add_payload(r, NFT_PAYLOAD_NETWORK_HEADER, reg,
 		                 v4 ? offsetof(struct iphdr, saddr) : offsetof(struct ipv6hdr, saddr), alen);
 		reg += alen / 4;
-		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, reg, 0, 2);
+		if (kind != PCP_SET_HOST)
+			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, reg, 0, 2);
 	}
 	lookup = nftnl_expr_alloc("lookup");
 	if (!lookup) {
@@ -2179,12 +2245,10 @@ pcp_filter_dispatch_rule(int v4, int allow, const char *ifname)
 		return NULL;
 	}
 	nftnl_expr_set_u32(lookup, NFTNL_EXPR_LOOKUP_SREG, NFT_REG32_00);
-	nftnl_expr_set_str(lookup, NFTNL_EXPR_LOOKUP_SET,
-	                   allow ? (v4 ? PCP_FILTER_ALLOW4 : PCP_FILTER_ALLOW6)
-	                         : (v4 ? PCP_FILTER_FILTERED4 : PCP_FILTER_FILTERED6));
-	nftnl_expr_set_u32(lookup, NFTNL_EXPR_LOOKUP_SET_ID, (v4 ? 1 : 3) + (allow ? 0 : 1));
+	nftnl_expr_set_str(lookup, NFTNL_EXPR_LOOKUP_SET, pcp_filter_set_name(v4, kind));
+	nftnl_expr_set_u32(lookup, NFTNL_EXPR_LOOKUP_SET_ID, pcp_filter_set_id(v4, kind));
 	nftnl_rule_add_expr(r, lookup);
-	expr_set_reg_verdict(r, allow ? NF_ACCEPT : NF_DROP);
+	expr_set_reg_verdict(r, kind == PCP_SET_FILTERED ? NF_DROP : NF_ACCEPT);
 	if (expr_alloc_failed) {
 		nftnl_rule_free(r);
 		return NULL;
@@ -2193,7 +2257,7 @@ pcp_filter_dispatch_rule(int v4, int allow, const char *ifname)
 }
 
 /* the messages which create the base chain and the sets of a family (or
- * keep them) and replace the two rules. returns <0 if out of memory */
+ * keep them) and replace its rules. returns <0 if out of memory */
 static int
 pcp_filter_dispatch_msgs(struct mnl_nlmsg_batch *batch, int *pending, int v4,
                          const char *ifname)
@@ -2203,16 +2267,21 @@ pcp_filter_dispatch_msgs(struct mnl_nlmsg_batch *batch, int *pending, int v4,
 	uint32_t alen = pcp_filter_alen(v4);
 	uint8_t fields[5];
 	struct nftnl_chain *chain = nftnl_chain_alloc();
-	struct nftnl_set *allow = pcp_filter_set(v4, 1), *filtered = pcp_filter_set(v4, 0);
+	struct nftnl_set *sets[PCP_SET_COUNT] = {NULL};
 	struct nftnl_rule *flush = nftnl_rule_alloc();
-	struct nftnl_rule *rules[2] = {NULL, NULL};
+	struct nftnl_rule *rules[PCP_SET_COUNT] = {NULL};
 	struct nlmsghdr *nlh;
 	int i, result = -1;
 
-	rules[0] = pcp_filter_dispatch_rule(v4, 1, ifname);
-	rules[1] = pcp_filter_dispatch_rule(v4, 0, ifname);
-	if (!chain || !allow || !filtered || !flush || !rules[0] || !rules[1])
+	for (i = 0; i < PCP_SET_COUNT; i++) {
+		sets[i] = pcp_filter_set(v4, (enum pcp_filter_kind)i);
+		rules[i] = pcp_filter_dispatch_rule(v4, (enum pcp_filter_kind)i, ifname);
+	}
+	if (!chain || !flush)
 		goto out;
+	for (i = 0; i < PCP_SET_COUNT; i++)
+		if (!sets[i] || !rules[i])
+			goto out;
 	nftnl_chain_set_u32(chain, NFTNL_CHAIN_FAMILY, family);
 	nftnl_chain_set_str(chain, NFTNL_CHAIN_TABLE, nft_table);
 	nftnl_chain_set_str(chain, NFTNL_CHAIN_NAME, base);
@@ -2223,31 +2292,34 @@ pcp_filter_dispatch_msgs(struct mnl_nlmsg_batch *batch, int *pending, int v4,
 	                                 NFT_MSG_NEWCHAIN, family, NLM_F_CREATE, mnl_seq++);
 	nftnl_chain_nlmsg_build_payload(nlh, chain);
 
-	/* the peers : a set of concatenated ranges */
+	/* the hosts and the filtered mappings : hash sets */
+	nftnl_set_set_u32(sets[PCP_SET_PEER], NFTNL_SET_KEY_TYPE, PCP_FILTER_ALLOW_TYPE(v4));
+	nftnl_set_set_u32(sets[PCP_SET_PEER], NFTNL_SET_KEY_LEN, 2 * alen + 12);
+	nftnl_set_set_u32(sets[PCP_SET_HOST], NFTNL_SET_KEY_TYPE, PCP_FILTER_HOST_TYPE(v4));
+	nftnl_set_set_u32(sets[PCP_SET_HOST], NFTNL_SET_KEY_LEN, 2 * alen + 8);
+	nftnl_set_set_u32(sets[PCP_SET_FILTERED], NFTNL_SET_KEY_TYPE, PCP_FILTER_FILTERED_TYPE(v4));
+	nftnl_set_set_u32(sets[PCP_SET_FILTERED], NFTNL_SET_KEY_LEN, alen + 8);
+	/* the prefixes : a set of concatenated ranges */
 	fields[0] = (uint8_t)alen; fields[1] = 1; fields[2] = 2;
 	fields[3] = (uint8_t)alen; fields[4] = 2;
-	nftnl_set_set_u32(allow, NFTNL_SET_FLAGS, NFT_SET_INTERVAL | NFT_SET_CONCAT);
-	nftnl_set_set_u32(allow, NFTNL_SET_KEY_TYPE, PCP_FILTER_ALLOW_TYPE(v4));
-	nftnl_set_set_u32(allow, NFTNL_SET_KEY_LEN, 2 * alen + 12);
-	nftnl_set_set_data(allow, NFTNL_SET_DESC_CONCAT, fields, sizeof(fields));
-	nlh = nftnl_set_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
-	                               NFT_MSG_NEWSET, family, NLM_F_CREATE, mnl_seq++);
-	nftnl_set_nlmsg_build_payload(nlh, allow);
-	/* the filtered mappings : a hash set */
-	nftnl_set_set_u32(filtered, NFTNL_SET_KEY_TYPE, PCP_FILTER_FILTERED_TYPE(v4));
-	nftnl_set_set_u32(filtered, NFTNL_SET_KEY_LEN, alen + 8);
-	nlh = nftnl_set_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
-	                               NFT_MSG_NEWSET, family, NLM_F_CREATE, mnl_seq++);
-	nftnl_set_nlmsg_build_payload(nlh, filtered);
+	nftnl_set_set_u32(sets[PCP_SET_RANGE], NFTNL_SET_FLAGS, NFT_SET_INTERVAL | NFT_SET_CONCAT);
+	nftnl_set_set_u32(sets[PCP_SET_RANGE], NFTNL_SET_KEY_TYPE, PCP_FILTER_ALLOW_TYPE(v4));
+	nftnl_set_set_u32(sets[PCP_SET_RANGE], NFTNL_SET_KEY_LEN, 2 * alen + 12);
+	nftnl_set_set_data(sets[PCP_SET_RANGE], NFTNL_SET_DESC_CONCAT, fields, sizeof(fields));
+	for (i = 0; i < PCP_SET_COUNT; i++) {
+		nlh = nftnl_set_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
+		                               NFT_MSG_NEWSET, family, NLM_F_CREATE, mnl_seq++);
+		nftnl_set_nlmsg_build_payload(nlh, sets[i]);
+	}
 
-	/* the base chain holds only the two rules : flush it, add them */
+	/* the base chain holds only these rules : flush it, add them */
 	nftnl_rule_set_u32(flush, NFTNL_RULE_FAMILY, family);
 	nftnl_rule_set_str(flush, NFTNL_RULE_TABLE, nft_table);
 	nftnl_rule_set_str(flush, NFTNL_RULE_CHAIN, base);
 	nlh = nftnl_rule_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
 	                                NFT_MSG_DELRULE, family, 0, mnl_seq++);
 	nftnl_rule_nlmsg_build_payload(nlh, flush);
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < PCP_SET_COUNT; i++) {
 		nlh = nftnl_rule_nlmsg_build_hdr(pcp_filter_batch_msg(batch, pending),
 		                                NFT_MSG_NEWRULE, family,
 		                                NLM_F_CREATE | NLM_F_APPEND, mnl_seq++);
@@ -2255,15 +2327,14 @@ pcp_filter_dispatch_msgs(struct mnl_nlmsg_batch *batch, int *pending, int v4,
 	}
 	result = 0;
 out:
-	for (i = 0; i < 2; i++)
+	for (i = 0; i < PCP_SET_COUNT; i++) {
 		if (rules[i])
 			nftnl_rule_free(rules[i]);
+		if (sets[i])
+			nftnl_set_free(sets[i]);
+	}
 	if (flush)
 		nftnl_rule_free(flush);
-	if (allow)
-		nftnl_set_free(allow);
-	if (filtered)
-		nftnl_set_free(filtered);
 	if (chain)
 		nftnl_chain_free(chain);
 	return result;
@@ -2325,11 +2396,13 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 {
 	int v4 = IN6_IS_ADDR_V4MAPPED(&to->address);
 	unsigned char in_to[PCP_FILTER_PEER_MAX], in_from[PCP_FILTER_PEER_MAX];
-	unsigned char key[PCP_FILTER_KEY_MAX], end[PCP_FILTER_KEY_MAX];
-	struct nftnl_set *add = pcp_filter_set(v4, 1), *del = pcp_filter_set(v4, 1);
-	struct nftnl_set *fset = pcp_filter_set(v4, 0);
+	unsigned char key[PCP_FILTER_KEY_MAX];
+	struct nftnl_set *add[PCP_SET_PEER_KINDS] = {NULL}, *del[PCP_SET_PEER_KINDS] = {NULL};
+	struct nftnl_set *fset = pcp_filter_set(v4, PCP_SET_FILTERED);
 	struct mnl_nlmsg_batch *batch;
-	unsigned int i, nadd = 0, ndel = 0, from_count = from ? from->count : 0;
+	int nadd[PCP_SET_PEER_KINDS] = {0}, ndel[PCP_SET_PEER_KINDS] = {0};
+	int k, any = 0;
+	unsigned int i, from_count = from ? from->count : 0;
 	uint32_t len;
 	int pending = 0, result = -1, msgs = 0;
 	int dispatch = to->count && (!pcp_filter_dispatch_ready[v4] ||
@@ -2338,8 +2411,15 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 	const size_t batch_size = 16384 + (to->count + from_count) * 256;
 	char *buf = malloc(2 * batch_size);	/* libmnl wants twice the limit */
 
-	if (!add || !del || !fset || !buf)
+	for (k = 0; k < PCP_SET_PEER_KINDS; k++) {
+		add[k] = pcp_filter_set(v4, (enum pcp_filter_kind)k);
+		del[k] = pcp_filter_set(v4, (enum pcp_filter_kind)k);
+	}
+	if (!fset || !buf)
 		goto out;
+	for (k = 0; k < PCP_SET_PEER_KINDS; k++)
+		if (!add[k] || !del[k])
+			goto out;
 	memset(in_to, 0, sizeof(in_to));
 	memset(in_from, 0, sizeof(in_from));
 	pcp_filter_installed(to, in_to);
@@ -2348,20 +2428,20 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 	for (i = 0; i < from_count; i++) {
 		if (!in_from[i] || pcp_filter_has(to, in_to, &from->filters[i]))
 			continue;
-		len = pcp_filter_key_peer(from, &from->filters[i], 0, key);
-		pcp_filter_key_peer(from, &from->filters[i], 1, end);
-		if (pcp_filter_add_elem(del, key, end, len) < 0)
+		k = pcp_filter_peer_kind(&from->filters[i]);
+		if (pcp_filter_add_peer(del[k], from, &from->filters[i]) < 0)
 			goto out;
-		ndel++;
+		ndel[k]++;
+		any = 1;
 	}
 	for (i = 0; i < to->count; i++) {
 		if (!in_to[i] || pcp_filter_has(from, in_from, &to->filters[i]))
 			continue;
-		len = pcp_filter_key_peer(to, &to->filters[i], 0, key);
-		pcp_filter_key_peer(to, &to->filters[i], 1, end);
-		if (pcp_filter_add_elem(add, key, end, len) < 0)
+		k = pcp_filter_peer_kind(&to->filters[i]);
+		if (pcp_filter_add_peer(add[k], to, &to->filters[i]) < 0)
 			goto out;
-		nadd++;
+		nadd[k]++;
+		any = 1;
 	}
 	if ((to->count != 0) != (from_count != 0)) {
 		/* the mapping becomes filtered, or no longer is */
@@ -2369,7 +2449,7 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 		if (pcp_filter_add_elem(fset, key, NULL, len) < 0)
 			goto out;
 	}
-	if (!dispatch && !nadd && !ndel && (to->count != 0) == (from_count != 0)) {
+	if (!dispatch && !any && (to->count != 0) == (from_count != 0)) {
 		result = 0;	/* nothing changes in the kernel */
 		goto out;
 	}
@@ -2380,16 +2460,14 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 		goto out;
 	/* a mapping which becomes filtered gets its peers first ; one which no
 	 * longer is loses its drop first : never a moment without its peers */
-	if (to->count && !from_count) {
-		pcp_filter_elems_msg(batch, &pending, add, nadd, 1, v4);
-		pcp_filter_elems_msg(batch, &pending, fset, 1, 1, v4);
-	} else if (!to->count && from_count) {
+	if (!to->count && from_count)
 		pcp_filter_elems_msg(batch, &pending, fset, 1, 0, v4);
-		pcp_filter_elems_msg(batch, &pending, del, ndel, 0, v4);
-	} else {
-		pcp_filter_elems_msg(batch, &pending, del, ndel, 0, v4);
-		pcp_filter_elems_msg(batch, &pending, add, nadd, 1, v4);
-	}
+	for (k = 0; k < PCP_SET_PEER_KINDS; k++)
+		pcp_filter_elems_msg(batch, &pending, del[k], ndel[k], 0, v4);
+	for (k = 0; k < PCP_SET_PEER_KINDS; k++)
+		pcp_filter_elems_msg(batch, &pending, add[k], nadd[k], 1, v4);
+	if (to->count && !from_count)
+		pcp_filter_elems_msg(batch, &pending, fset, 1, 1, v4);
 	msgs = pending;
 	if (!msgs) {
 		result = 0;
@@ -2405,10 +2483,12 @@ pcp_filter_install(const struct pcp_filter_policy *to,
 			snprintf(pcp_filter_dispatch_ifname[v4], IFNAMSIZ, "%s", to->ifname);
 	}
 out:
-	if (add)
-		nftnl_set_free(add);
-	if (del)
-		nftnl_set_free(del);
+	for (k = 0; k < PCP_SET_PEER_KINDS; k++) {
+		if (add[k])
+			nftnl_set_free(add[k]);
+		if (del[k])
+			nftnl_set_free(del[k]);
+	}
 	if (fset)
 		nftnl_set_free(fset);
 	free(buf);
@@ -2419,7 +2499,7 @@ out:
 
 struct pcp_filter_recover_ctx {
 	int v4;
-	int allow;	/* the allow set, else the filtered set */
+	enum pcp_filter_kind kind;	/* the set being read */
 	int error;	/* out of memory */
 };
 
@@ -2514,22 +2594,31 @@ pcp_filter_recover_cb(const struct nlmsghdr *nlh, void *data)
 			ctx->error = 1;
 			continue;
 		}
-		if (!ctx->allow) {
+		if (ctx->kind == PCP_SET_FILTERED) {
 			p->seen_filtered = 1;
 			continue;
 		}
 		{
 			struct pcp_filter *f;
-			int prefix;
-			unsigned short plow, phigh;
-			if (!end || klen != 2 * alen + 12 || elen != klen ||
-			    p->count == PCP_FILTER_PEER_MAX ||
-			    (prefix = pcp_filter_range_prefix(key + alen + 8, end + alen + 8, alen)) < 0) {
+			int prefix = (int)alen * 8;
+			unsigned short plow = 0, phigh = 0xffff;
+			if (p->count == PCP_FILTER_PEER_MAX ||
+			    klen != 2 * alen + (ctx->kind == PCP_SET_HOST ? 8 : 12)) {
 				p->recovery_error |= 1;
 				continue;
 			}
-			plow = (unsigned short)((key[2 * alen + 8] << 8) | key[2 * alen + 9]);
-			phigh = (unsigned short)((end[2 * alen + 8] << 8) | end[2 * alen + 9]);
+			if (ctx->kind != PCP_SET_HOST) {
+				plow = (unsigned short)((key[2 * alen + 8] << 8) | key[2 * alen + 9]);
+				phigh = plow;
+			}
+			if (ctx->kind == PCP_SET_RANGE) {
+				if (!end || elen != klen ||
+				    (prefix = pcp_filter_range_prefix(key + alen + 8, end + alen + 8, alen)) < 0) {
+					p->recovery_error |= 1;
+					continue;
+				}
+				phigh = (unsigned short)((end[2 * alen + 8] << 8) | end[2 * alen + 9]);
+			}
 			if (!(plow == phigh || (plow == 0 && phigh == 0xffff))) {
 				p->recovery_error |= 1;
 				continue;
@@ -2555,10 +2644,10 @@ pcp_filter_recover_cb(const struct nlmsghdr *nlh, void *data)
 
 /* dump the elements of a set into the policies. returns <0 on error */
 static int
-pcp_filter_recover_set(int v4, int allow, struct pcp_filter_recover_ctx *ctx)
+pcp_filter_recover_set(int v4, enum pcp_filter_kind kind, struct pcp_filter_recover_ctx *ctx)
 {
 	uint16_t family = v4 ? nft_ipv4_family : nft_ipv6_family;
-	struct nftnl_set *set = pcp_filter_set(v4, allow);
+	struct nftnl_set *set = pcp_filter_set(v4, kind);
 	struct nlmsghdr *nlh;
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	ssize_t n;
@@ -2566,7 +2655,7 @@ pcp_filter_recover_set(int v4, int allow, struct pcp_filter_recover_ctx *ctx)
 	if (!set)
 		return -1;
 	ctx->v4 = v4;
-	ctx->allow = allow;
+	ctx->kind = kind;
 	mnl_seq = time(NULL);
 	nlh = nftnl_set_elem_nlmsg_build_hdr(buf, NFT_MSG_GETSETELEM, family,
 	                                    NLM_F_DUMP, mnl_seq);
@@ -2606,8 +2695,12 @@ pcp_filter_recover(const struct in6_addr *address, unsigned short port,
 		memset(&ctx, 0, sizeof(ctx));
 		/* the peers first, then the filtered mappings */
 		for (v4 = 1; v4 >= 0; v4--) {
-			if (pcp_filter_recover_set(v4, 1, &ctx) < 0 ||
-			    pcp_filter_recover_set(v4, 0, &ctx) < 0 || ctx.error) {
+			int k;
+			for (k = 0; k < PCP_SET_COUNT; k++) {
+				if (pcp_filter_recover_set(v4, (enum pcp_filter_kind)k, &ctx) < 0)
+					ctx.error = 1;
+			}
+			if (ctx.error) {
 				syslog(LOG_ERR, "%s: could not read the PCP FILTER sets", "pcp_filter_recover");
 				pcp_filter_free_all();
 				return -1;	/* tried again next time */

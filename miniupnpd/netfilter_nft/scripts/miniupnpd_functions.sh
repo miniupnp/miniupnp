@@ -98,7 +98,9 @@ remove_pcp_filter_chains() {
 			$NFT delete chain "$pcp_filter_family" "$TABLE" "$pcp_filter_chain" 2>/dev/null
 		done
 		for pcp_filter_set in pcp-filter-allow4 pcp-filter-allow6 \
-		                      pcp-filter-filtered4 pcp-filter-filtered6; do
+		                      pcp-filter-filtered4 pcp-filter-filtered6 \
+		                      pcp-filter-peer4 pcp-filter-peer6 \
+		                      pcp-filter-host4 pcp-filter-host6; do
 			$NFT delete set "$pcp_filter_family" "$TABLE" "$pcp_filter_set" 2>/dev/null
 		done
 	done
