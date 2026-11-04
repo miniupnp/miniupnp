@@ -623,7 +623,7 @@ pcp_lease_save(void)
 {
 	int r;
 #ifdef USE_PF
-	/* a save reads each ruleset once */
+	/* a save looks up the peers of each mapping */
 	pf_pcp_save_begin();
 #endif
 	r = pcp_lease_write();
@@ -1060,6 +1060,12 @@ restore_map(char ** fl, const struct filter_index * fx)
 #endif
 	if(!pmp && nfilters > 0)
 		pcp_filter_finish(update, r >= 0);
+#ifdef USE_NFTABLES
+	/* restore_filters() sent the peers of a mapping which could not be made */
+	if(!pmp && nfilters > 0 && r < 0 &&
+	   !(v4 && redirect_survived(eport, proto, fl[4], iport)))
+		pcp_filter_delete(&address, iport, proto);
+#endif
 	free(filters);
 	if(r < 0)
 		return -1;
