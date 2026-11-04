@@ -449,6 +449,30 @@ pf_pinhole_group_get(const struct in6_addr * dst, unsigned short port, int proto
 	return c.count;
 }
 
+static int
+group_index_cb(const struct pinhole_rec * rec, void * arg)
+{
+	struct pcp_filter f;
+	UNUSED(arg);
+	/* as group_get_cb() */
+	if(strncmp(rec->desc, "PCP MAP ", 8) != 0 || rec->prefix == 0)
+		return 0;
+	memset(&f, 0, sizeof(f));
+	f.address = rec->src;
+	f.prefix = rec->prefix;
+	f.port = rec->sport;
+	pf_pcp_filter_index_add(&rec->dst, rec->dport, (unsigned char)rec->proto, &f);
+	return 0;
+}
+
+/* add the peers of all the mappings to the index of a save.
+ * returns <0 on error */
+int
+pf_pinhole_group_index(void)
+{
+	return pinhole_foreach(group_index_cb, NULL);
+}
+
 /* add a pinhole for a peer (NULL : any source) to a mapping */
 int
 pf_pinhole_group_add(const char * ifname, const struct in6_addr * dst,

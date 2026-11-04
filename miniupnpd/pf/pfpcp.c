@@ -675,6 +675,134 @@ pf_pcp_find_map(const char * iaddr, unsigned short iport, int proto,
 	return c.found ? 0 : -1;
 }
 
+/* A save of the PCP lease file asks for the peers of every mapping. One walk
+ * per mapping would be N x N, so for the time of a save the peers are read once
+ * into a hash table on the mapping. */
+#define FILTER_INDEX_SIZE 4096
+struct filter_index_entry {
+	struct filter_index_entry * next;
+	struct in6_addr address;
+	unsigned short port;
+	unsigned char protocol;
+	struct pcp_filter filter;
+};
+static struct filter_index_entry * filter_index[FILTER_INDEX_SIZE];
+static int filter_index_active, filter_index_built, filter_index_failed;
+
+static unsigned int
+filter_index_bucket(const struct in6_addr * address, unsigned short port,
+                    unsigned char protocol)
+{
+	unsigned int h = 2166136261u, i;
+	for(i = 0; i < sizeof(address->s6_addr); i++)
+		h = (h ^ address->s6_addr[i]) * 16777619u;
+	h = (h ^ port) * 16777619u;
+	h = (h ^ protocol) * 16777619u;
+	return h % FILTER_INDEX_SIZE;
+}
+
+/* add a peer of a mapping to the index */
+void
+pf_pcp_filter_index_add(const struct in6_addr * address, unsigned short port,
+                        unsigned char protocol, const struct pcp_filter * f)
+{
+	struct filter_index_entry * e = malloc(sizeof(*e));
+	unsigned int b = filter_index_bucket(address, port, protocol);
+	if(e == NULL)
+	{
+		filter_index_failed = 1;
+		return;
+	}
+	e->address = *address;
+	e->port = port;
+	e->protocol = protocol;
+	e->filter = *f;
+	e->next = filter_index[b];
+	filter_index[b] = e;
+}
+
+static int
+filter_index_cb(int index, const char * ifname, unsigned short eport,
+                const char * iaddr, unsigned short iport, int proto,
+                const char * desc, in_addr_t saddr, unsigned int prefix,
+                unsigned short sport, unsigned int timestamp, void * arg)
+{
+	struct in6_addr address;
+	struct in_addr ia;
+	struct pcp_filter f;
+	UNUSED(index); UNUSED(ifname); UNUSED(eport); UNUSED(desc);
+	UNUSED(timestamp); UNUSED(arg);
+	/* as read_group_cb() */
+	if((prefix == 0 && sport == 0) || inet_pton(AF_INET, iaddr, &ia) != 1)
+		return 0;
+	memset(&address, 0, sizeof(address));
+	address.s6_addr[10] = address.s6_addr[11] = 0xff;
+	memcpy(address.s6_addr + 12, &ia, 4);
+	memset(&f, 0, sizeof(f));
+	f.address = address;
+	memcpy(f.address.s6_addr + 12, &saddr, 4);
+	f.prefix = prefix + 96;
+	f.port = sport;
+	pf_pcp_filter_index_add(&address, iport, (unsigned char)proto, &f);
+	return 0;
+}
+
+static void
+filter_index_free(void)
+{
+	unsigned int b;
+	for(b = 0; b < FILTER_INDEX_SIZE; b++)
+	{
+		while(filter_index[b] != NULL)
+		{
+			struct filter_index_entry * e = filter_index[b];
+			filter_index[b] = e->next;
+			free(e);
+		}
+	}
+}
+
+/* the peers of a mapping from the index, in the order of the rules */
+static unsigned int
+filter_index_get(const struct in6_addr * address, unsigned short port,
+                 unsigned char protocol, struct pcp_filter * filters,
+                 unsigned int max)
+{
+	const struct filter_index_entry * e;
+	unsigned int n = 0, i;
+	for(e = filter_index[filter_index_bucket(address, port, protocol)];
+	    e != NULL && n < max; e = e->next)
+	{
+		if(e->port == port && e->protocol == protocol &&
+		   memcmp(&e->address, address, sizeof(*address)) == 0)
+			filters[n++] = e->filter;
+	}
+	for(i = 0; i < n / 2; i++)
+	{
+		struct pcp_filter f = filters[i];
+		filters[i] = filters[n - 1 - i];
+		filters[n - 1 - i] = f;
+	}
+	return n;
+}
+
+void
+pf_pcp_save_begin(void)
+{
+	pf_rule_snapshot_begin();
+	filter_index_active = 1;
+	filter_index_built = 0;
+	filter_index_failed = 0;
+}
+
+void
+pf_pcp_save_end(void)
+{
+	filter_index_active = 0;
+	filter_index_free();
+	pf_rule_snapshot_end();
+}
+
 /* the FILTER peers of a mapping, IPv4 or IPv6 */
 unsigned int
 pf_pcp_filter_get(const struct in6_addr * address, unsigned short port,
@@ -684,6 +812,18 @@ pf_pcp_filter_get(const struct in6_addr * address, unsigned short port,
 	struct pf_pcp_policy policy;
 	struct pf_group_template tpl;
 	unsigned int n;
+	if(filter_index_active && !filter_index_built)
+	{
+		filter_index_built = 1;
+		if(get_redirect_rules_foreach(filter_index_cb, NULL) < 0)
+			filter_index_failed = 1;
+#ifdef ENABLE_UPNPPINHOLE
+		if(pf_pinhole_group_index() < 0)
+			filter_index_failed = 1;
+#endif
+	}
+	if(filter_index_active && !filter_index_failed)
+		return filter_index_get(address, port, protocol, filters, max);
 	if(!IN6_IS_ADDR_V4MAPPED(address))
 	{
 #ifdef ENABLE_UPNPPINHOLE

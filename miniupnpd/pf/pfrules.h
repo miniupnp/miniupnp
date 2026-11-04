@@ -36,6 +36,11 @@ typedef int (*pf_rule_cb)(int index, const pf_walk_rule_t * rule,
  * rules, -1 on error */
 int pf_rule_foreach(int action, pf_rule_cb cb, void * ctx);
 
+/* between these two pf_rule_foreach() reads the rules of an action once. The
+ * rules must not be changed meanwhile. */
+void pf_rule_snapshot_begin(void);
+void pf_rule_snapshot_end(void);
+
 /* call cb for the rule at this index of the miniupnpd anchor.
  * returns -1 if the rule could not be read (or the index is out of range),
  * else the value returned by cb */

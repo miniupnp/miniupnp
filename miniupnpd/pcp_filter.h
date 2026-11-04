@@ -122,6 +122,15 @@ int nft_pinhole_state_maps(pcp_lease_map_cb cb, void *ctx);
 #ifdef USE_PF
 struct pcp_filter_update;
 
+/* the index of the peers during a save */
+void pf_pcp_filter_index_add(const struct in6_addr *address, unsigned short port,
+                             unsigned char protocol, const struct pcp_filter *f);
+int pf_pinhole_group_index(void);
+
+/* for pcp_lease.c : around a save of the PCP lease file */
+void pf_pcp_save_begin(void);
+void pf_pcp_save_end(void);
+
 /* the policy is stored in the rules of the mapping */
 int pf_pcp_filter_begin(const struct in6_addr *address, unsigned short port,
                         unsigned char protocol, const char *ifname,

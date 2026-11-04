@@ -621,7 +621,15 @@ pcp_lease_flush(int force, struct timeval * timeout)
 int
 pcp_lease_save(void)
 {
-	int r = pcp_lease_write();
+	int r;
+#ifdef USE_PF
+	/* a save reads each ruleset once */
+	pf_pcp_save_begin();
+#endif
+	r = pcp_lease_write();
+#ifdef USE_PF
+	pf_pcp_save_end();
+#endif
 	lease_last_save = upnp_time();
 	lease_pending = r < 0;	/* tried again PCP_LEASE_SAVE_DELAY later */
 	return r;

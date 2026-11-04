@@ -39,8 +39,101 @@
 /* /dev/pf when opened */
 extern int dev;
 
+/* A snapshot of the rules for the time of one save of the PCP lease file : it
+ * looks up the peers of each mapping in the rules, and a walk per mapping would
+ * be N x N ioctls. Not kept any longer : the counters in the rules would go
+ * stale. */
+#define PF_SNAPSHOT_ACTIONS 4
+struct pf_snapshot {
+	int used;
+	int action;
+	int n, size;
+	pf_walk_rule_t * rules;
+	struct pf_walk walk;
+};
+static struct pf_snapshot pf_snapshots[PF_SNAPSHOT_ACTIONS];
+static int pf_snapshot_active;
+
+void
+pf_rule_snapshot_begin(void)
+{
+#ifndef PF_RELEASETICKETS
+	/* a callback can read more with the ticket of the walk, which has to
+	 * stay valid */
+	pf_snapshot_active = 1;
+#endif
+}
+
+void
+pf_rule_snapshot_end(void)
+{
+	int i;
+	pf_snapshot_active = 0;
+	for(i = 0; i < PF_SNAPSHOT_ACTIONS; i++)
+	{
+		free(pf_snapshots[i].rules);
+		memset(&pf_snapshots[i], 0, sizeof(pf_snapshots[i]));
+	}
+}
+
+static int
+pf_snapshot_cb(int index, const pf_walk_rule_t * rule,
+               const struct pf_walk * walk, void * ctx)
+{
+	struct pf_snapshot * s = ctx;
+	(void)index;
+	if(s->n == s->size)
+	{
+		int size = s->size ? s->size * 2 : 256;
+		pf_walk_rule_t * r = realloc(s->rules, size * sizeof(*r));
+		if(r == NULL)
+			return 1;	/* the walk is incomplete */
+		s->rules = r;
+		s->size = size;
+	}
+	s->rules[s->n++] = *rule;
+	s->walk = *walk;
+	return 0;
+}
+
+static int pf_rule_walk(int action, pf_rule_cb cb, void * ctx);
+
 int
 pf_rule_foreach(int action, pf_rule_cb cb, void * ctx)
+{
+	struct pf_snapshot * s = NULL;
+	int i;
+	if(!pf_snapshot_active)
+		return pf_rule_walk(action, cb, ctx);
+	for(i = 0; i < PF_SNAPSHOT_ACTIONS && s == NULL; i++)
+	{
+		if(!pf_snapshots[i].used || pf_snapshots[i].action == action)
+			s = &pf_snapshots[i];
+	}
+	if(s == NULL)
+		return pf_rule_walk(action, cb, ctx);
+	if(!s->used)
+	{
+		s->action = action;
+		if(pf_rule_walk(action, pf_snapshot_cb, s) != 0)
+		{
+			/* out of memory or an error : no snapshot */
+			free(s->rules);
+			memset(s, 0, sizeof(*s));
+			return pf_rule_walk(action, cb, ctx);
+		}
+		s->used = 1;
+	}
+	for(i = 0; i < s->n; i++)
+	{
+		if(cb(i, &s->rules[i], &s->walk, ctx))
+			return 1;
+	}
+	return 0;
+}
+
+static int
+pf_rule_walk(int action, pf_rule_cb cb, void * ctx)
 {
 	int i, n, r = 0;
 	struct pf_walk walk;
