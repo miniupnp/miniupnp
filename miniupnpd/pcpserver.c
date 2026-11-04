@@ -1272,6 +1272,10 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
 			return PCP_ERR_NOT_AUTHORIZED;
 		}
+		/* RFC 6887 section 13.2: no other port than the suggested one */
+		if (pcp_msg_info->pfailure_present && pcp_msg_info->ext_port != 0 &&
+		    pcp_msg_info->ext_port != eport_old)
+			return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 		pcp_msg_info->ext_port = eport_old;
 		pcp_msg_info->existed = 1;
 		/* Preserve the existing redirect and its filters on renewal. */
