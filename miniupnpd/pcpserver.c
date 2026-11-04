@@ -1580,12 +1580,16 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 
 	if (response[1] == 0x81) { /* MAP response */
 		if (response[0] == 1) {	/* version */
+			/* 24 reserved bits, MUST be sent as 0 */
+			memset(response + PCP_COMMON_RESPONSE_SIZE + 1, 0, 3);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
 			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 8,
 			                    pcp_msg_info->ext_ip);
 		}
 		else if (response[0] == 2) {
+			/* 24 reserved bits, MUST be sent as 0 */
+			memset(response + PCP_COMMON_RESPONSE_SIZE + 13, 0, 3);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 16, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 18, pcp_msg_info->ext_port);
 			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 20,
