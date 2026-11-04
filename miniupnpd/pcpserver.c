@@ -1599,16 +1599,20 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 #ifdef PCP_PEER
 	else if (response[1] == 0x82) { /* PEER response */
 		if (response[0] == 1) {
+			memset(response + PCP_COMMON_RESPONSE_SIZE + 1, 0, 3);	/* reserved : 0 */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 6, pcp_msg_info->ext_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 24, pcp_msg_info->peer_port);
+			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 26, 0);	/* reserved */
 			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 8,
 			                    pcp_msg_info->ext_ip);
 		}
 		else if (response[0] == 2) {
+			memset(response + PCP_COMMON_RESPONSE_SIZE + 13, 0, 3);	/* reserved : 0 */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 16, pcp_msg_info->int_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 18, pcp_msg_info->ext_port);
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 36, pcp_msg_info->peer_port);
+			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 38, 0);	/* reserved */
 			copyIPv6IfDifferent(response + PCP_COMMON_RESPONSE_SIZE + 20,
 			                    pcp_msg_info->ext_ip);
 		}
