@@ -91,6 +91,12 @@ int
 nft_delete_batch_end(void);
 
 int
+nft_delete_batch_redirect(unsigned short eport, int proto);
+
+void
+nft_redirect_removed(unsigned short eport, int proto);
+
+int
 nft_delete_batch_peer(in_addr_t iaddr, unsigned short iport,
                       in_addr_t raddr, unsigned short rport, int proto);
 

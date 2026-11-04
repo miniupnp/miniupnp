@@ -148,7 +148,8 @@ get_timestamp(unsigned short eport, int proto)
 	return 0;
 }
 
-static void
+/* returns 0 if there was no entry */
+static int
 remove_timestamp_entry(unsigned short eport, int proto)
 {
 	struct timestamp_entry * e;
@@ -161,12 +162,19 @@ remove_timestamp_entry(unsigned short eport, int proto)
 			/* remove the entry */
 			*p = e->next;
 			free(e);
-			return;
+			return 1;
 		}
 		p = &(e->next);
 		e = *p;
 	}
-	syslog(LOG_WARNING, "remove_timestamp_entry(%hu, %d) no entry found", eport, proto);
+	return 0;
+}
+
+/* a port mapping is gone. A mapping without a lifetime has no entry */
+void
+nft_redirect_removed(unsigned short eport, int proto)
+{
+	remove_timestamp_entry(eport, proto);
 }
 
 static void
@@ -383,6 +391,10 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 			/* Todo: send bulk request */
 			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
 				return -1;
+			/* queued : what is not removed keeps its timestamp, to be
+			 * expired again */
+			if (!nft_delete_batch_redirect(eport, proto))
+				nft_redirect_removed(eport, proto);
 			break;
 		}
 	}
@@ -1013,7 +1025,8 @@ update_portmapping_desc_timestamp(const char * ifname,
 {
 	UNUSED(ifname);
 	UNUSED(desc);
-	remove_timestamp_entry(eport, proto);
+	if (!remove_timestamp_entry(eport, proto))
+		syslog(LOG_WARNING, "remove_timestamp_entry(%hu, %d) no entry found", eport, proto);
 	add_timestamp_entry(eport, proto, timestamp);
 	return 0;
 }

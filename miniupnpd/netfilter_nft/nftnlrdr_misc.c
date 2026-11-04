@@ -1428,8 +1428,10 @@ struct delete_item {
 	enum rule_chain_type chain;
 	int done;		/* the rule is gone from the kernel */
 	int is_peer;		/* drop this PEER lease once the rule is gone */
+	int is_redirect;	/* drop this timestamp once the rule is gone */
 	in_addr_t iaddr, raddr;
 	unsigned short iport, rport;
+	unsigned short eport;
 	int proto;
 };
 
@@ -1457,6 +1459,22 @@ nft_delete_batch_begin(void)
 	delete_batch_active = 1;
 	delete_batch_failed = 0;
 	delete_batch_group_failed = 0;
+}
+
+/* a queued redirect rule : its timestamp goes when the rule is gone.
+ * returns 0 if there is no batch (the caller removes the timestamp) */
+int
+nft_delete_batch_redirect(unsigned short eport, int proto)
+{
+	struct delete_item *d;
+
+	if (!delete_batch_active)
+		return 0;
+	d = &delete_batch_items[delete_batch_count - 1];
+	d->is_redirect = 1;
+	d->eport = eport;
+	d->proto = proto;
+	return 1;
 }
 
 /* a queued PEER rule : its lease goes when the rule is gone.
@@ -1525,6 +1543,8 @@ nft_delete_batch_flush(void)
 			delete_batch_failed = 1;
 		else if (d->is_peer)
 			peer_lease_remove(d->iaddr, d->iport, d->raddr, d->rport, d->proto);
+		else if (d->is_redirect)
+			nft_redirect_removed(d->eport, d->proto);
 	}
 	/* the cache has lost rules which may still be there */
 	if (result < 0)
