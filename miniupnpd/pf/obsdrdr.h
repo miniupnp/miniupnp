@@ -111,6 +111,9 @@ int
 clear_nat_rules(void);
 #endif
 
+/* the next walks read the rules again, with fresh counters */
+void pf_rule_cache_invalidate(void);
+
 #endif
 
 

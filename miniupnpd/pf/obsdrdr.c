@@ -1584,6 +1584,11 @@ rdr_rule_info(int index, const pf_walk_rule_t * rule, const struct pf_walk * wal
 		*bytes = rule->bytes;
 #endif
 #ifndef PF_NEWSTYLE
+	if(walk->pool_addr != NULL && *walk->pool_addr != 0)
+	{
+		inet_ntop(AF_INET, walk->pool_addr, iaddr, iaddrlen);
+		goto addr_done;
+	}
 	memset(&pp, 0, sizeof(pp));
 	strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
 	pp.r_action = walk->action;
@@ -1608,10 +1613,15 @@ rdr_rule_info(int index, const pf_walk_rule_t * rule, const struct pf_walk * wal
 #ifdef PFVAR_NEW_STYLE
 	inet_ntop(AF_INET, &pp.addr.addr.v.a.addr.v4addr.s_addr,
 	          iaddr, iaddrlen);
+	if(walk->pool_addr != NULL)
+		*walk->pool_addr = pp.addr.addr.v.a.addr.v4addr.s_addr;
 #else
 	inet_ntop(AF_INET, &pp.addr.addr.v.a.addr.v4.s_addr,
 	          iaddr, iaddrlen);
+	if(walk->pool_addr != NULL)
+		*walk->pool_addr = pp.addr.addr.v.a.addr.v4.s_addr;
 #endif
+addr_done:
 #else
 	inet_ntop(AF_INET, &rule->rdr.addr.v.a.addr.v4.s_addr,
 	          iaddr, iaddrlen);

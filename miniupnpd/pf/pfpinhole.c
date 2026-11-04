@@ -1011,7 +1011,10 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 	 * change the index of the rules before it */
 	for(i = c.count; i-- > 0; ) {
 		const struct clean_entry * e = &c.entries[i];
-		if(e->ts <= (unsigned int)current_time) {
+		if(e->ts <= (unsigned int)current_time && n >= 64) {
+			/* the next pass goes on, after the requests */
+			min_ts = (unsigned int)current_time;
+		} else if(e->ts <= (unsigned int)current_time) {
 			syslog(LOG_INFO, "removing expired pinhole '%s'", e->label);
 			if(pf_rule_remove(PF_PASS, e->index) < 0) {
 				free(c.entries);

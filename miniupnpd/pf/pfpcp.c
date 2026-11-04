@@ -789,7 +789,6 @@ filter_index_get(const struct in6_addr * address, unsigned short port,
 void
 pf_pcp_save_begin(void)
 {
-	pf_rule_snapshot_begin();
 	filter_index_active = 1;
 	filter_index_built = 0;
 	filter_index_failed = 0;
@@ -800,7 +799,6 @@ pf_pcp_save_end(void)
 {
 	filter_index_active = 0;
 	filter_index_free();
-	pf_rule_snapshot_end();
 }
 
 /* the FILTER peers of a mapping, IPv4 or IPv6 */

@@ -642,6 +642,10 @@ expire_nft_rules(void)
 }
 #endif /* USE_NFTABLES */
 
+/* expired mappings handled by a pass of the main loop, so that a large expiry
+ * does not stop the daemon from answering. nftables has its own path. */
+#define EXPIRE_PF_MAX	64
+
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
 {
@@ -652,12 +656,15 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	struct rule_state * tmp;
 	struct rule_state * list = 0;
 	struct rule_state * * p;
-	int i = 0;
+	int i = 0, removed = 0;
 	time_t current_time;
 
 #ifdef USE_NFTABLES
 	/* the counters of the rules are compared by remove_unused_rules() */
 	nft_redirect_cache_invalidate();
+#elif defined(USE_PF)
+	if(max_rules_number_target != 0)
+		pf_rule_cache_invalidate();
 #endif
 	/*ifname[0] = '\0';*/
 	tmp = malloc(sizeof(struct rule_state));
@@ -725,8 +732,15 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	/* remove the redirections that need to be removed */
 	for(p = &list, tmp = list; tmp; tmp = *p)
 	{
-		if(tmp->to_remove)
+		if(tmp->to_remove && max_rules_number_target == 0 && removed >= EXPIRE_PF_MAX)
 		{
+			/* the next pass goes on, after the requests */
+			nextruletoclean_timestamp = (unsigned int)current_time;
+			p = &(tmp->next);
+		}
+		else if(tmp->to_remove)
+		{
+			removed++;
 			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
 			       tmp->eport, proto_itoa(tmp->proto));
 			_upnp_delete_redir(tmp->eport, tmp->proto);
@@ -777,6 +791,8 @@ remove_unused_rules(struct rule_state * list)
 
 #ifdef USE_NFTABLES
 	nft_redirect_cache_invalidate();
+#elif defined(USE_PF)
+	pf_rule_cache_invalidate();
 #endif
 	while(list)
 	{

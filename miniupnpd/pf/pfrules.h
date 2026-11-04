@@ -24,6 +24,10 @@ typedef struct pf_rule pf_walk_rule_t;
 struct pf_walk {
 	int action;		/* PF_PASS, PF_RDR, PF_NAT, ... */
 	unsigned int ticket;
+	/* a walk over the copy of the rules : the place to keep the address of
+	 * the pool of this rule, which is a pair of ioctls to read. 0 : not known
+	 * yet. NULL in a walk over the kernel's rules */
+	in_addr_t * pool_addr;
 };
 
 /* called for each rule, index is the position in the ruleset.
@@ -36,10 +40,8 @@ typedef int (*pf_rule_cb)(int index, const pf_walk_rule_t * rule,
  * rules, -1 on error */
 int pf_rule_foreach(int action, pf_rule_cb cb, void * ctx);
 
-/* between these two pf_rule_foreach() reads the rules of an action once. The
- * rules must not be changed meanwhile. */
-void pf_rule_snapshot_begin(void);
-void pf_rule_snapshot_end(void);
+/* the next walks read the rules again, with fresh counters */
+void pf_rule_cache_invalidate(void);
 
 /* call cb for the rule at this index of the miniupnpd anchor.
  * returns -1 if the rule could not be read (or the index is out of range),
