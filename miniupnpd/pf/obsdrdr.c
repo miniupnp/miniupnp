@@ -872,7 +872,7 @@ pf_pcp_lease_peers(pcp_lease_peer_cb cb, void * arg)
 unsigned int
 expire_peer_rules(unsigned int now)
 {
-	return peer_lease_expire(now, delete_peer_rule);
+	return peer_lease_expire(now, delete_peer_rule, 0);
 }
 
 int

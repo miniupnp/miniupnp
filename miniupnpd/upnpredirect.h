@@ -100,6 +100,10 @@ upnp_get_portmapping_number_of_entries(void);
 
 /* remove_unused_rules() :
  * also free the list */
+/* remove the mappings which expired, see nextruletoclean_timestamp */
+void
+expire_upnp_rules(void);
+
 void
 remove_unused_rules(struct rule_state * list);
 

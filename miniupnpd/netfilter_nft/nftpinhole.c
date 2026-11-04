@@ -458,12 +458,14 @@ clean_pinhole_list(unsigned int * next_timestamp)
 	unsigned int min_ts = UINT_MAX;
 	int min_uid = INT_MAX, max_uid = -1;
 	int n = 0;
+	int uid_scan_done = 1;
 
 	current_time = upnp_time();
 
 	d_printf(("clean_pinhole_list()\n"));
 	refresh_nft_cache_filter();
 
+	nft_delete_batch_begin();
 	LIST_FOREACH(p, &head_filter, entry) {
 		// Only forward entries
 		if (p->type != RULE_FILTER)
@@ -482,6 +484,12 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		}
 
 		if (ts <= (unsigned int)current_time) {
+			if (n >= EXPIRE_MAX_PER_PASS) {
+				/* the next pass goes on, after the requests */
+				min_ts = (unsigned int)current_time;
+				uid_scan_done = 0;
+				break;
+			}
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
 			r = rule_del_handle(p);
 			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0 ||
@@ -501,11 +509,14 @@ clean_pinhole_list(unsigned int * next_timestamp)
 				min_ts = ts;
 		}
 	}
+	if (nft_delete_batch_end() < 0)
+		min_ts = (unsigned int)current_time + 1;
 
 	if (next_timestamp && (min_ts != UINT_MAX))
 		*next_timestamp = min_ts;
 
-	if (max_uid > 0) {
+	/* an incomplete walk does not know the highest uid */
+	if (uid_scan_done && max_uid > 0) {
 		if (((min_uid - 32000) <= next_uid) && (next_uid <= max_uid)) {
 			next_uid = max_uid + 1;
 		}

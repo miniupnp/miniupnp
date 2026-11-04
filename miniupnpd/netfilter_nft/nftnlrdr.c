@@ -444,7 +444,7 @@ delete_peer_rule(const char *iaddr, unsigned short iport,
 unsigned int
 expire_peer_rules(unsigned int now)
 {
-	return peer_lease_expire(now, delete_peer_rule);
+	return peer_lease_expire(now, delete_peer_rule, EXPIRE_MAX_PER_PASS);
 }
 
 /*
@@ -800,6 +800,40 @@ timestamp_index_get(const struct timestamp_index * x, unsigned short eport, int 
 			return x->tab[i]->timestamp;
 	}
 	return 0;
+}
+
+/* Up to max port mappings which expired at 'now'. *next is the next expiry (0
+ * if none, 'now' if more mappings have expired than fit in max).
+ * returns their number, <0 if out of memory */
+int
+get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
+                           int max, unsigned int * next)
+{
+	rule_t *r;
+	struct timestamp_index tx;
+	int n = 0;
+
+	*next = 0;
+	if (timestamp_index_build(&tx) < 0)
+		return -1;
+	refresh_nft_cache_redirect();
+	LIST_FOREACH(r, &head_redirect, entry) {
+		unsigned int ts = timestamp_index_get(&tx, r->dport, r->proto);
+		if (ts == 0)
+			continue;
+		if (ts > now) {
+			if (*next == 0 || ts < *next)
+				*next = ts;
+		} else if (n == max) {
+			*next = now;
+			break;
+		} else {
+			expired[n].eport = r->dport;
+			expired[n++].proto = r->proto;
+		}
+	}
+	free(tx.tab);
+	return n;
 }
 
 /*

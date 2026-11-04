@@ -128,10 +128,10 @@ peer_lease_free_all(void)
 }
 
 unsigned int
-peer_lease_expire(unsigned int now, peer_lease_delete_cb delete)
+peer_lease_expire(unsigned int now, peer_lease_delete_cb delete, unsigned int max)
 {
 	struct peer_lease * lease;
-	unsigned int next = 0, b;
+	unsigned int next = 0, b, removed = 0;
 	for(b = 0; b < PEER_LEASE_HASH_SIZE; b++)
 	for(lease = peer_leases[b]; lease != NULL; )
 	{
@@ -142,6 +142,9 @@ peer_lease_expire(unsigned int now, peer_lease_delete_cb delete)
 			/* delete() frees the lease */
 			unsigned short iport = lease->iport, rport = lease->rport;
 			int proto = lease->proto;
+			if(max != 0 && removed >= max)
+				return now;	/* the next pass goes on */
+			removed++;
 			inet_ntop(AF_INET, &lease->iaddr, iaddr, sizeof(iaddr));
 			inet_ntop(AF_INET, &lease->raddr, raddr, sizeof(raddr));
 			if(delete(iaddr, iport, raddr, rport, proto) < 0)

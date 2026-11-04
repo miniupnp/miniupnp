@@ -607,6 +607,41 @@ upnp_get_portmapping_number_of_entries(void)
 
 /* functions used to remove unused rules
  * As a side effect, delete expired rules (based on LeaseDuration) */
+#ifdef USE_NFTABLES
+/* The expiry of a pass of the main loop : one walk over the rules, a limited
+ * number of mappings, their rules removed in one transaction. */
+static void
+expire_nft_rules(void)
+{
+	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int next, peer_next;
+	int n, i, failed = 0;
+
+	n = get_expired_redirect_rules(now, expired, EXPIRE_MAX_PER_PASS, &next);
+	if (n < 0) {
+		nextruletoclean_timestamp = now + 1;
+		return;
+	}
+	nft_delete_batch_begin();
+	for (i = 0; i < n; i++) {
+		syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
+		       expired[i].eport, proto_itoa(expired[i].proto));
+		if (_upnp_delete_redir(expired[i].eport, expired[i].proto) < 0)
+			failed = 1;
+	}
+	peer_next = expire_peer_rules(now);
+	if (nft_delete_batch_end() < 0)
+		failed = 1;
+	if (peer_next != 0 && (next == 0 || peer_next < next))
+		next = peer_next;
+	/* what could not be removed still has its timestamp */
+	if (failed && (next == 0 || now + 60 < next))
+		next = now + 60;
+	nextruletoclean_timestamp = next;
+}
+#endif /* USE_NFTABLES */
+
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
 {
@@ -712,6 +747,16 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		}
 	/* return list */
 	return list;
+}
+
+void
+expire_upnp_rules(void)
+{
+#ifdef USE_NFTABLES
+	expire_nft_rules();
+#else
+	get_upnp_rules_state_list(0);
+#endif
 }
 
 void

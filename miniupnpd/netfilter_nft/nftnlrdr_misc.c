@@ -687,6 +687,8 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 }
 #undef CB_DATA
 
+static int nft_delete_batch_flush(void);
+
 int
 refresh_nft_cache_filter(void)
 {
@@ -761,6 +763,8 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 		log_error("netlink not connected");
 		return -1;
 	}
+	/* the dump must not bring back rules which are waiting to be deleted */
+	nft_delete_batch_flush();
 	flush_nft_cache(head);
 	deleted = head == &head_filter ? &rule_deleted_filter :
 	          head == &head_peer ? &rule_deleted_peer : &rule_deleted_redirect;
@@ -1396,6 +1400,98 @@ rule_cache_remove(struct rule_list *head, rule_t **deleted, uint64_t handle)
 	return 0;
 }
 
+/* Deletions between nft_delete_batch_begin() and nft_delete_batch_end() go to
+ * the kernel in one transaction : a commit copies the rule pointers of the
+ * chain it changes, and with one commit per rule that was most of the time of
+ * an expiry. The FILTER policies of these rules are removed after the commit,
+ * as a mapping stays filtered until its rules are gone. */
+#define NFT_DELETE_BATCH_MAX	256
+#define NFT_DELETE_BATCH_BUF	(64 * 1024)
+
+struct delete_policy {
+	struct in6_addr address;
+	unsigned short port;
+	unsigned char protocol;
+};
+
+static int delete_batch_active;
+static struct nftnl_rule *delete_batch_rules[NFT_DELETE_BATCH_MAX];
+static enum rule_chain_type delete_batch_chains[NFT_DELETE_BATCH_MAX];
+static unsigned int delete_batch_count;
+static struct delete_policy delete_batch_policies[NFT_DELETE_BATCH_MAX];
+static unsigned int delete_batch_policy_count;
+
+void
+nft_delete_batch_begin(void)
+{
+	delete_batch_active = 1;
+}
+
+/* Send what is queued. If the kernel refuses the transaction nothing of it was
+ * done : each rule is sent alone, so one rule which is gone already does not
+ * keep the others. */
+static int
+nft_delete_batch_flush(void)
+{
+	static char buf[NFT_DELETE_BATCH_BUF * 2];
+	struct mnl_nlmsg_batch *batch;
+	struct nlmsghdr *nlh = NULL;
+	unsigned int i;
+	int active = delete_batch_active;
+	int result = -1, failed = 0;
+
+	if (delete_batch_count == 0 && delete_batch_policy_count == 0)
+		return 0;
+	delete_batch_active = 0;	/* the calls below are not queued */
+	if (delete_batch_count > 0 &&
+	    (batch = start_batch(buf, NFT_DELETE_BATCH_BUF)) != NULL) {
+		for (i = 0; i < delete_batch_count; i++) {
+			struct nftnl_rule *r = delete_batch_rules[i];
+			if (i > 0)
+				mnl_nlmsg_batch_next(batch);
+			nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+			                                 NFT_MSG_DELRULE,
+			                                 nftnl_rule_get_u32(r, NFTNL_RULE_FAMILY),
+			                                 0, mnl_seq++);
+			nftnl_rule_nlmsg_build_payload(nlh, r);
+		}
+		/* one acknowledgement, after the complete transaction */
+		nlh->nlmsg_flags |= NLM_F_ACK;
+		result = send_batch(batch);
+	}
+	for (i = 0; i < delete_batch_count; i++) {
+		if (result < 0) {
+			if (nft_send_rule(delete_batch_rules[i], NFT_MSG_DELRULE,
+			                  delete_batch_chains[i]) < 0 && errno != ENOENT)
+				failed = 1;
+		} else {
+			nftnl_rule_free(delete_batch_rules[i]);
+		}
+	}
+	if (result < 0) {
+		/* the cache has lost rules which may still be there */
+		nft_rule_cache_invalidate();
+	}
+	delete_batch_count = 0;
+	/* a mapping stays filtered if a rule of the transaction is left */
+	for (i = 0; !failed && i < delete_batch_policy_count; i++) {
+		const struct delete_policy *p = &delete_batch_policies[i];
+		if (nft_pcp_filter_delete(&p->address, p->port, p->protocol) < 0)
+			failed = 1;
+	}
+	delete_batch_policy_count = 0;
+	delete_batch_active = active;
+	return failed ? -1 : 0;
+}
+
+int
+nft_delete_batch_end(void)
+{
+	int result = nft_delete_batch_flush();
+	delete_batch_active = 0;
+	return result;
+}
+
 /* Send a rule change and keep the cache of its chain valid when it can :
  * a new rule is sent with NLM_F_ECHO and the kernel's copy of it (with its
  * handle) goes into the cache, so the next lookup does not dump the chain
@@ -1417,6 +1513,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 	rule_t **deleted;
 	uint64_t old_handle = 0;
 	uint64_t del_handle = 0;
+	int saved_errno;
 	int replace = 0;
 
 	switch (chain_type) {
@@ -1436,8 +1533,19 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		deleted = &rule_deleted_redirect;
 		break;
 	}
-	if (cmd == NFT_MSG_DELRULE)
+	if (cmd == NFT_MSG_DELRULE) {
 		del_handle = nftnl_rule_get_u64(rule, NFTNL_RULE_HANDLE);
+		if (delete_batch_active) {
+			if (delete_batch_count == NFT_DELETE_BATCH_MAX)
+				nft_delete_batch_flush();
+			delete_batch_rules[delete_batch_count] = rule;
+			delete_batch_chains[delete_batch_count++] = chain_type;
+			if (*validate == RULE_CACHE_VALID &&
+			    !rule_cache_remove(head, deleted, del_handle))
+				*validate = RULE_CACHE_INVALID;
+			return 0;
+		}
+	}
 	/* PEER SNAT must run before a gateway's catch-all masquerade rule. */
 	if (chain_type != RULE_CHAIN_PEER)
 		flags |= NLM_F_APPEND;
@@ -1476,6 +1584,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		nftnl_rule_free(rule);
 	}
 
+	saved_errno = errno;
 	if (result >= 0 && cmd == NFT_MSG_DELRULE && *validate == RULE_CACHE_VALID) {
 		if (!rule_cache_remove(head, deleted, del_handle))
 			*validate = RULE_CACHE_INVALID;
@@ -1509,6 +1618,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		 * first in their chain: they are only looked up by their key. */
 		LIST_INSERT_HEAD(head, echo.captured, entry);
 	}
+	errno = saved_errno;
 	return result;
 }
 
@@ -2557,6 +2667,17 @@ nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
 	struct pcp_filter_policy **p, *old;
 	struct pcp_filter_policy empty;
 	int result;
+	if (delete_batch_active) {
+		struct delete_policy *d;
+		if (delete_batch_policy_count == NFT_DELETE_BATCH_MAX &&
+		    nft_delete_batch_flush() < 0)
+			return -1;
+		d = &delete_batch_policies[delete_batch_policy_count++];
+		d->address = *address;
+		d->port = port;
+		d->protocol = protocol;
+		return 0;
+	}
 	if (pcp_filter_recover(address, port, protocol) < 0)
 		return -1;
 	p = pcp_filter_find(address, port, protocol);

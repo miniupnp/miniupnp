@@ -28,11 +28,12 @@ void peer_lease_free_all(void);
 
 /* remove the PEER mappings which expired at 'now' with delete() (the
  * delete_peer_rule() of the backend, it also removes the lease). A mapping
- * which could not be removed is tried again later.
- * returns the time of the next expiry (0 if none) */
+ * which could not be removed is tried again later. At most max mappings are
+ * removed (0 : no limit).
+ * returns the time of the next expiry (0 if none, 'now' if max was reached) */
 typedef int (*peer_lease_delete_cb)(const char * iaddr, unsigned short iport,
                                     const char * raddr, unsigned short rport,
                                     int proto);
-unsigned int peer_lease_expire(unsigned int now, peer_lease_delete_cb delete);
+unsigned int peer_lease_expire(unsigned int now, peer_lease_delete_cb delete, unsigned int max);
 
 #endif

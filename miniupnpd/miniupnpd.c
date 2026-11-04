@@ -2889,7 +2889,7 @@ main(int argc, char * * argv)
 		  && ((unsigned int)timeofday.tv_sec >= nextruletoclean_timestamp))
 		{
 			syslog(LOG_DEBUG, "cleaning expired Port Mappings");
-			get_upnp_rules_state_list(0);
+			expire_upnp_rules();
 #ifdef PCP_LEASE_SUPPORTED
 			/* the PCP lease file is not to keep what expired */
 			pcp_lease_changed();
