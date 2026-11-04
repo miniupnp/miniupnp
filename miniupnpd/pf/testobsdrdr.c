@@ -12,10 +12,15 @@
 #include <netinet/in.h>
 #include <syslog.h>
 
+#include "config.h"
 #include "obsdrdr.h"
+#include "../miniupnpdtypes.h"
 
 /*int logpackets = 1;*/
 int runtime_flags = 0;
+/* used by upnputils.c, which pfpinhole.o needs */
+time_t startup_time = 0;
+struct lan_addr_list lan_addrs;
 const char * tag = 0;
 const char * anchor_name = "miniupnpd";
 const char * queue = NULL;

@@ -41,6 +41,7 @@
 #include "../upnpglobalvars.h"
 
 #include "nftnlrdr_misc.h"
+#include "../pcp_filter.h"
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -54,6 +55,15 @@ static int next_uid = 1;
 
 #define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
 #define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
+
+/* MAP FILTER policy belongs to the wildcard inbound MAP pinhole.  PEER
+ * endpoints may share its local tuple and must not remove its policy. */
+static int
+pinhole_owns_pcp_filter(const rule_t *rule)
+{
+	const char *desc = strchr(rule->desc, ':');
+	return desc != NULL && strncmp(desc + 1, " PCP MAP ", 9) == 0;
+}
 
 void init_iptpinhole(void)
 {
@@ -214,7 +224,10 @@ delete_pinhole(unsigned short uid)
 		/* compare the uid value */
 		if (0 == strcmp(tmp_label, label_start)) {
 			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0)
+				return -1;
+			if (pinhole_owns_pcp_filter(p))
+				return nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto);
 			return 0;
 		}
 	}
@@ -309,14 +322,8 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	if (proto == -1)
 		return -2;
 
-	// Delete rule
-	r = rule_del_handle(p);
-	res = nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
-
-	if (res < 0)
-		return -1;
-
-	// readd rule with new timestamp
+	/* Replace the rule atomically so an allocation or netlink error cannot
+	 * remove the working pinhole during a failed PCP renewal. */
 	snprintf(comment, NFT_DESCR_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
 
@@ -326,7 +333,9 @@ update_pinhole(unsigned short uid, unsigned int timestamp)
 	r = rule_set_filter6(nft_ipv6_family, ifname, proto,
 			    rhost_addr_p, &ihost_addr,
 				0, iport, rport, comment, 0);
-
+	if (!r)
+		return -1;
+	nftnl_rule_set_u64(r, NFTNL_RULE_HANDLE, p->handle);
 	res = nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_FILTER);
 
 	if (res < 0)
@@ -449,12 +458,14 @@ clean_pinhole_list(unsigned int * next_timestamp)
 	unsigned int min_ts = UINT_MAX;
 	int min_uid = INT_MAX, max_uid = -1;
 	int n = 0;
+	int uid_scan_done = 1;
 
 	current_time = upnp_time();
 
 	d_printf(("clean_pinhole_list()\n"));
 	refresh_nft_cache_filter();
 
+	nft_delete_batch_begin();
 	LIST_FOREACH(p, &head_filter, entry) {
 		// Only forward entries
 		if (p->type != RULE_FILTER)
@@ -463,15 +474,31 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		if (p->desc_len == 0)
 			continue;
 
+		/* this runs at each pass of the main loop : the forward rules of
+		 * the port mappings are skipped without a log line each */
+		if (strncmp(p->desc, "pinhole-", 8) != 0)
+			continue;
 		if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
 			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
 			continue;
 		}
 
 		if (ts <= (unsigned int)current_time) {
+			if (n >= EXPIRE_MAX_PER_PASS) {
+				/* the next pass goes on, after the requests */
+				min_ts = (unsigned int)current_time;
+				uid_scan_done = 0;
+				break;
+			}
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
 			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0 ||
+			    (pinhole_owns_pcp_filter(p) &&
+			     nft_pcp_filter_delete(&p->daddr6, p->dport, p->proto) < 0)) {
+				/* Retry cleanup soon, including when all pinholes expired. */
+				min_ts = (unsigned int)current_time + 1;
+				continue;
+			}
 			n++;
 		} else {
 			if (uid > max_uid)
@@ -482,11 +509,14 @@ clean_pinhole_list(unsigned int * next_timestamp)
 				min_ts = ts;
 		}
 	}
+	if (nft_delete_batch_end() < 0)
+		min_ts = (unsigned int)current_time + 1;
 
 	if (next_timestamp && (min_ts != UINT_MAX))
 		*next_timestamp = min_ts;
 
-	if (max_uid > 0) {
+	/* an incomplete walk does not know the highest uid */
+	if (uid_scan_done && max_uid > 0) {
 		if (((min_uid - 32000) <= next_uid) && (next_uid <= max_uid)) {
 			next_uid = max_uid + 1;
 		}
@@ -497,6 +527,45 @@ clean_pinhole_list(unsigned int * next_timestamp)
 	}
 
 	return n;	/* number of rules removed */
+}
+
+/*
+ * nft_pinhole_state_maps()
+ * call cb for each pinhole (for pcp_lease.c) : a mapping with FILTER peers has
+ * a pinhole per peer
+ */
+int
+nft_pinhole_state_maps(pcp_lease_map_cb cb, void * ctx)
+{
+	rule_t *p;
+
+	refresh_nft_cache_filter();
+	LIST_FOREACH(p, &head_filter, entry) {
+		struct pcp_lease_map m;
+		unsigned int ts;
+		int uid;
+		const char * pd;
+
+		if (p->type != RULE_FILTER || p->desc_len == 0)
+			continue;
+		if (sscanf(p->desc, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2)
+			continue;	/* not a pinhole */
+		memset(&m, 0, sizeof(m));
+		if (inet_ntop(AF_INET6, &p->daddr6, m.iaddr, sizeof(m.iaddr)) == NULL)
+			continue;
+		m.proto = p->proto;
+		m.iport = p->dport;
+		m.eport = p->dport;	/* a pinhole has no translation */
+		m.timestamp = ts;
+		if (!IN6_IS_ADDR_UNSPECIFIED(&p->saddr6))
+			inet_ntop(AF_INET6, &p->saddr6, m.raddr, sizeof(m.raddr));
+		m.rport = p->sport;
+		pd = strchr(p->desc, ':');
+		if (pd != NULL)
+			strncpy(m.desc, pd + 2, sizeof(m.desc) - 1);
+		cb(&m, ctx);
+	}
+	return 0;
 }
 
 #endif /* ENABLE_UPNPPINHOLE */

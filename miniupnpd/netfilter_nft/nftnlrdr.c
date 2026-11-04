@@ -43,9 +43,12 @@
 #include "config.h"
 #include "../macros.h"
 #include "../commonrdr.h"
+#include "../getifaddr.h"
+#include "../peer_lease.h"
 #include "nftnlrdr.h"
 
 #include "nftnlrdr_misc.h"
+#include "../pcp_filter.h"
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -81,6 +84,7 @@ init_redirect(void)
 void
 shutdown_redirect(void)
 {
+	peer_lease_free_all();
 	nft_mnl_disconnect();
 }
 
@@ -144,7 +148,8 @@ get_timestamp(unsigned short eport, int proto)
 	return 0;
 }
 
-static void
+/* returns 0 if there was no entry */
+static int
 remove_timestamp_entry(unsigned short eport, int proto)
 {
 	struct timestamp_entry * e;
@@ -157,12 +162,19 @@ remove_timestamp_entry(unsigned short eport, int proto)
 			/* remove the entry */
 			*p = e->next;
 			free(e);
-			return;
+			return 1;
 		}
 		p = &(e->next);
 		e = *p;
 	}
-	syslog(LOG_WARNING, "remove_timestamp_entry(%hu, %d) no entry found", eport, proto);
+	return 0;
+}
+
+/* a port mapping is gone. A mapping without a lifetime has no entry */
+void
+nft_redirect_removed(unsigned short eport, int proto)
+{
+	remove_timestamp_entry(eport, proto);
 }
 
 static void
@@ -227,16 +239,60 @@ add_peer_redirect_rule2(const char * ifname,
 			const char * desc, unsigned int timestamp)
 {
 	struct nftnl_rule *r;
-	UNUSED(ifname); UNUSED(timestamp);
+	rule_t *old;
+	struct in_addr ia, ra, ea;
+	char extip[INET_ADDRSTRLEN];
+	unsigned int old_timestamp;
+	int had_lease;
+	int ret;
 
 	d_printf(("add peer redirect rule2()!\n"));
 
-	r = rule_set_snat(nft_nat_family, proto,
-	                  inet_addr(rhost), rport,
-	                  inet_addr(eaddr), eport,
-	                  inet_addr(iaddr), iport, desc, NULL);
+	if (inet_pton(AF_INET, iaddr, &ia) != 1 || inet_pton(AF_INET, rhost, &ra) != 1)
+		return -1;
+	if (eaddr != NULL && eaddr[0] != '\0') {
+		if (inet_pton(AF_INET, eaddr, &ea) != 1)
+			return -1;
+	} else if (getifaddr(ifname, extip, sizeof(extip), &ea, NULL) < 0) {
+		return -1;	/* no address on the external interface */
+	}
 
-	return nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_PEER);
+	had_lease = peer_lease_exists(ia.s_addr, iport, ra.s_addr, rport, proto);
+	old_timestamp = peer_lease_get(ia.s_addr, iport, ra.s_addr, rport, proto);
+	if (peer_lease_set(ia.s_addr, iport, ra.s_addr, rport, proto, timestamp) < 0)
+		return -1;
+
+	r = rule_set_snat(nft_nat_family, proto,
+	                  ra.s_addr, rport,
+	                  ea.s_addr, eport,
+	                  ia.s_addr, iport, desc, NULL);
+
+	if (r == NULL) {
+		if (had_lease)
+			peer_lease_set(ia.s_addr, iport, ra.s_addr, rport, proto, old_timestamp);
+		else
+			peer_lease_remove(ia.s_addr, iport, ra.s_addr, rport, proto);
+		return -1;
+	}
+	/* Refresh an existing endpoint without accumulating duplicate SNAT rules. */
+	refresh_nft_cache_peer();
+	LIST_FOREACH(old, &head_peer, entry) {
+		if (old->saddr == ia.s_addr && old->sport == iport &&
+		    old->daddr == ra.s_addr && old->dport == rport &&
+		    old->proto == proto) {
+			nftnl_rule_set_u64(r, NFTNL_RULE_HANDLE, old->handle);
+			break;
+		}
+	}
+	ret = nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_PEER);
+	if (ret < 0) {
+		/* back to the lease we had */
+		if (had_lease)
+			peer_lease_set(ia.s_addr, iport, ra.s_addr, rport, proto, old_timestamp);
+		else
+			peer_lease_remove(ia.s_addr, iport, ra.s_addr, rport, proto);
+	}
+	return ret;
 }
 
 /*
@@ -333,7 +389,12 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
+				return -1;
+			/* queued : what is not removed keeps its timestamp, to be
+			 * expired again */
+			if (!nft_delete_batch_redirect(eport, proto))
+				nft_redirect_removed(eport, proto);
 			break;
 		}
 	}
@@ -350,49 +411,56 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				syslog(LOG_DEBUG, "%s: found forward/filter rule %08x:%hu proto %d",
 				       "delete_redirect_and_filter_rules", iaddr, iport, p->proto);
 				r = rule_del_handle(p);
-				/* Todo: send bulk request */
-				nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+				/* Keep FILTER enforcement if deleting the base rule fails. */
+				if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0)
+					return -1;
 				break;
 			}
+		}
+		{
+			struct in6_addr address = IN6ADDR_ANY_INIT;
+			address.s6_addr[10] = address.s6_addr[11] = 0xff;
+			memcpy(address.s6_addr + 12, &iaddr, sizeof(iaddr));
+			if (nft_pcp_filter_delete(&address, iport, proto) < 0)
+				return -1;
 		}
 	} else {
 		syslog(LOG_WARNING, "%s: redirect rule with eport=%hu proto %d NOT FOUND",
 		       "delete_redirect_and_filter_rules", eport, proto);
 	}
 
-	iaddr = 0;
-	iport = 0;
+	return 0;
+}
 
+/* Delete only this PEER endpoint, even when other mappings share its NAT port. */
+int
+delete_peer_rule(const char *iaddr, unsigned short iport,
+                 const char *raddr, unsigned short rport, int proto)
+{
+	rule_t *r;
 	refresh_nft_cache_peer();
-	// Delete Peer Rule
-	LIST_FOREACH(p, &head_peer, entry) {
-		if (p->nat_port == eport && p->proto == proto &&
-		    (p->type == RULE_NAT && p->nat_type == NFT_NAT_SNAT)) {
-			iaddr = p->daddr;
-			iport = p->dport;
-
-			r = rule_del_handle(p);
-			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_PEER);
+	LIST_FOREACH(r, &head_peer, entry) {
+		if (r->saddr == inet_addr(iaddr) && r->sport == iport &&
+		    r->daddr == inet_addr(raddr) && r->dport == rport && r->proto == proto) {
+			int ret = nft_send_rule(rule_del_handle(r), NFT_MSG_DELRULE, RULE_CHAIN_PEER);
+			if (ret < 0)
+				return ret;
+			/* queued : the lease goes when the rule is gone */
+			if (nft_delete_batch_peer(inet_addr(iaddr), iport,
+			                          inet_addr(raddr), rport, proto))
+				return 0;
 			break;
 		}
 	}
-
-	if (iaddr != 0 && iport != 0) {
-		refresh_nft_cache_filter();
-		// Delete Forward Rule
-		LIST_FOREACH(p, &head_filter, entry) {
-			if (p->dport == iport &&
-				p->daddr == iaddr && p->type == RULE_FILTER) {
-				r = rule_del_handle(p);
-				/* Todo: send bulk request */
-				nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
-				break;
-			}
-		}
-	}
-
+	/* Also discard stale lease state if a rule was removed outside miniupnpd. */
+	peer_lease_remove(inet_addr(iaddr), iport, inet_addr(raddr), rport, proto);
 	return 0;
+}
+
+unsigned int
+expire_peer_rules(unsigned int now)
+{
+	return peer_lease_expire(now, delete_peer_rule, EXPIRE_MAX_PER_PASS);
 }
 
 /*
@@ -425,14 +493,14 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (iaddr != NULL) {
-				if (inet_ntop(AF_INET, &r->daddr, iaddr, iaddrlen) == NULL) {
+				if (inet_ntop(AF_INET, &r->saddr, iaddr, iaddrlen) == NULL) {
 					syslog(LOG_ERR, "%s: inet_ntop: %m",
 					       "get_peer_rule_by_index");
 				}
 			}
 
 			if (iport != NULL) {
-				*iport = r->dport;
+				*iport = r->sport;
 			}
 
 			if (proto != NULL) {
@@ -440,8 +508,8 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (rhost != NULL) {
-				if (r->saddr) {
-					if (inet_ntop(AF_INET, &r->saddr, rhost, rhostlen) == NULL) {
+				if (r->daddr) {
+					if (inet_ntop(AF_INET, &r->daddr, rhost, rhostlen) == NULL) {
 						syslog(LOG_ERR, "%s: inet_ntop: %m",
 						       "get_peer_rule_by_index");
 					}
@@ -451,7 +519,7 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (rport != NULL) {
-				*rport = r->sport;
+				*rport = r->dport;
 			}
 
 			if (desc != NULL) {
@@ -466,7 +534,8 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (timestamp) {
-				*timestamp = get_timestamp(r->dport, r->proto);
+				*timestamp = peer_lease_get(r->saddr, r->sport,
+				                            r->daddr, r->dport, r->proto);
 			}
 
 			return 0;
@@ -475,6 +544,47 @@ get_peer_rule_by_index(int index,
 
 	return -1;
 }
+
+#ifdef PCP_PEER
+/*
+ * nft_pcp_lease_peers()
+ * call cb for each PEER rule, in one pass (for pcp_lease.c)
+ */
+int
+nft_pcp_lease_peers(pcp_lease_peer_cb cb, void * ctx)
+{
+	rule_t *r;
+	uint32_t last_ifidx = 0;
+	char last_ifname[IFNAMSIZ] = "";
+
+	refresh_nft_cache_peer();
+	LIST_FOREACH(r, &head_peer, entry) {
+		struct pcp_lease_peer p;
+
+		memset(&p, 0, sizeof(p));
+		if (inet_ntop(AF_INET, &r->saddr, p.iaddr, sizeof(p.iaddr)) == NULL ||
+		    inet_ntop(AF_INET, &r->daddr, p.raddr, sizeof(p.raddr)) == NULL)
+			continue;
+		/* one name lookup per interface, not per rule */
+		if (r->ingress_ifidx && r->ingress_ifidx != last_ifidx) {
+			if (if_indextoname(r->ingress_ifidx, last_ifname) == NULL)
+				last_ifname[0] = '\0';
+			last_ifidx = r->ingress_ifidx;
+		}
+		if (r->ingress_ifidx)
+			strncpy(p.ifname, last_ifname, sizeof(p.ifname) - 1);
+		p.proto = r->proto;
+		p.eport = r->nat_port;
+		p.iport = r->sport;
+		p.rport = r->dport;
+		if (r->desc)
+			strncpy(p.desc, r->desc, sizeof(p.desc) - 1);
+		p.timestamp = peer_lease_get(r->saddr, r->sport, r->daddr, r->dport, r->proto);
+		cb(&p, ctx);
+	}
+	return 0;
+}
+#endif /* PCP_PEER */
 
 /*
  * get_redirect_rule()
@@ -585,6 +695,207 @@ get_redirect_rule_by_index(int index,
 	}
 
 	return -1;
+}
+
+/*
+ * nft_pcp_find_map() : the IPv4 mapping to an internal endpoint
+ * (iport 0 : any port). returns 0 if found
+ */
+int
+nft_pcp_find_map(const char * iaddr, unsigned short iport, int proto,
+                 unsigned short * eport, char * desc, int desclen,
+                 unsigned int * timestamp)
+{
+	rule_t *r;
+	struct in_addr ia;
+
+	if (inet_pton(AF_INET, iaddr, &ia) != 1)
+		return -1;
+	refresh_nft_cache_redirect();
+	LIST_FOREACH(r, &head_redirect, entry) {
+		if (r->nat_addr == ia.s_addr && r->proto == proto &&
+		    (iport == 0 || r->nat_port == iport)) {
+			*eport = r->dport;
+			if (desc != NULL && desclen > 0) {
+				desc[0] = '\0';
+				if (r->desc)
+					strncpy(desc, r->desc, desclen - 1);
+				desc[desclen - 1] = '\0';
+			}
+			if (timestamp != NULL)
+				*timestamp = get_timestamp(r->dport, proto);
+			return 0;
+		}
+	}
+	return -1;
+}
+
+/*
+ * nft_pcp_find_peer() : a PEER mapping by its two endpoints.
+ * returns 0 if found
+ */
+int
+nft_pcp_find_peer(const char * iaddr, unsigned short iport,
+                  const char * raddr, unsigned short rport, int proto,
+                  unsigned short * eport, char * desc, int desclen,
+                  unsigned int * timestamp)
+{
+	rule_t *r;
+	struct in_addr ia, ra;
+
+	if (inet_pton(AF_INET, iaddr, &ia) != 1 ||
+	    inet_pton(AF_INET, raddr, &ra) != 1)
+		return -1;
+	refresh_nft_cache_peer();
+	LIST_FOREACH(r, &head_peer, entry) {
+		if (r->saddr == ia.s_addr && r->sport == iport &&
+		    r->daddr == ra.s_addr && r->dport == rport && r->proto == proto) {
+			*eport = r->nat_port;
+			if (desc != NULL && desclen > 0) {
+				desc[0] = '\0';
+				if (r->desc)
+					strncpy(desc, r->desc, desclen - 1);
+				desc[desclen - 1] = '\0';
+			}
+			if (timestamp != NULL)
+				*timestamp = peer_lease_get(r->saddr, r->sport,
+				                            r->daddr, r->dport, r->proto);
+			return 0;
+		}
+	}
+	return -1;
+}
+
+/* the timestamps of timestamp_list in a hash set on (eport, proto), for a
+ * walk over all the rules : get_timestamp() scans the list (and logs) for
+ * each rule */
+struct timestamp_index {
+	const struct timestamp_entry ** tab;	/* NULL : free */
+	unsigned int size;			/* a power of 2 */
+};
+
+static unsigned int
+timestamp_slot(unsigned short eport, int proto, unsigned int size)
+{
+	return ((eport * 2654435761u) ^ (unsigned int)proto) & (size - 1);
+}
+
+/* returns <0 if out of memory */
+static int
+timestamp_index_build(struct timestamp_index * x)
+{
+	const struct timestamp_entry * e;
+	unsigned int n = 0, i;
+	for (e = timestamp_list; e; e = e->next)
+		n++;
+	x->size = 64;
+	while (x->size < 2 * n)
+		x->size *= 2;
+	x->tab = calloc(x->size, sizeof(*x->tab));
+	if (x->tab == NULL)
+		return -1;
+	for (e = timestamp_list; e; e = e->next) {
+		for (i = timestamp_slot(e->eport, e->protocol, x->size); x->tab[i];
+		     i = (i + 1) & (x->size - 1)) {
+			if (x->tab[i]->eport == e->eport && x->tab[i]->protocol == e->protocol)
+				break;	/* the first one in the list wins, as in get_timestamp() */
+		}
+		if (!x->tab[i])
+			x->tab[i] = e;
+	}
+	return 0;
+}
+
+static unsigned int
+timestamp_index_get(const struct timestamp_index * x, unsigned short eport, int proto)
+{
+	unsigned int i;
+	for (i = timestamp_slot(eport, proto, x->size); x->tab[i];
+	     i = (i + 1) & (x->size - 1)) {
+		if (x->tab[i]->eport == eport && x->tab[i]->protocol == (short)proto)
+			return x->tab[i]->timestamp;
+	}
+	return 0;
+}
+
+/* Up to max port mappings which expired at 'now'. *next is the next expiry (0
+ * if none, 'now' if more mappings have expired than fit in max).
+ * returns their number, <0 on error (out of memory, no rules from the kernel) */
+int
+get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
+                           int max, unsigned int * next)
+{
+	rule_t *r;
+	struct timestamp_index tx;
+	int n = 0;
+
+	*next = 0;
+	if (timestamp_index_build(&tx) < 0)
+		return -1;
+	if (refresh_nft_cache_redirect() < 0) {
+		free(tx.tab);
+		return -1;
+	}
+	LIST_FOREACH(r, &head_redirect, entry) {
+		unsigned int ts = timestamp_index_get(&tx, r->dport, r->proto);
+		if (ts == 0)
+			continue;
+		if (ts > now) {
+			if (*next == 0 || ts < *next)
+				*next = ts;
+		} else if (n == max) {
+			*next = now;
+			break;
+		} else {
+			expired[n].eport = r->dport;
+			expired[n++].proto = r->proto;
+		}
+	}
+	free(tx.tab);
+	return n;
+}
+
+/*
+ * nft_pcp_lease_maps()
+ * call cb for each redirect rule (for pcp_lease.c)
+ */
+int
+nft_pcp_lease_maps(pcp_lease_map_cb cb, void * ctx)
+{
+	rule_t *r;
+	struct timestamp_index tx;
+	uint32_t last_ifidx = 0;
+	char last_ifname[IFNAMSIZ] = "";
+
+	if (timestamp_index_build(&tx) < 0)
+		return -1;
+	refresh_nft_cache_redirect();
+	LIST_FOREACH(r, &head_redirect, entry) {
+		struct pcp_lease_map m;
+
+		memset(&m, 0, sizeof(m));
+		if (inet_ntop(AF_INET, &r->nat_addr, m.iaddr, sizeof(m.iaddr)) == NULL)
+			continue;
+		m.proto = r->proto;
+		m.eport = r->dport;
+		m.iport = r->nat_port;
+		if (r->ingress_ifidx && r->ingress_ifidx != last_ifidx) {
+			if (if_indextoname(r->ingress_ifidx, last_ifname) == NULL)
+				last_ifname[0] = '\0';
+			last_ifidx = r->ingress_ifidx;
+		}
+		if (r->ingress_ifidx)
+			strncpy(m.ifname, last_ifname, sizeof(m.ifname) - 1);
+		if (r->desc)
+			strncpy(m.desc, r->desc, sizeof(m.desc) - 1);
+		m.timestamp = timestamp_index_get(&tx, m.eport, m.proto);
+		cb(&m, ctx);
+	}
+	free(tx.tab);
+#ifdef ENABLE_UPNPPINHOLE
+	nft_pinhole_state_maps(cb, ctx);
+#endif
+	return 0;
 }
 
 /*
@@ -714,7 +1025,8 @@ update_portmapping_desc_timestamp(const char * ifname,
 {
 	UNUSED(ifname);
 	UNUSED(desc);
-	remove_timestamp_entry(eport, proto);
+	if (!remove_timestamp_entry(eport, proto))
+		syslog(LOG_WARNING, "remove_timestamp_entry(%hu, %d) no entry found", eport, proto);
 	add_timestamp_entry(eport, proto, timestamp);
 	return 0;
 }

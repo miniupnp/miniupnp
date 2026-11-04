@@ -61,6 +61,7 @@ enum upnpconfigoptions {
 	UPNPPCPMINLIFETIME,		/*!< minimum lifetime for PCP mapping */
 	UPNPPCPMAXLIFETIME,		/*!< maximum lifetime for PCP mapping */
 	UPNPPCPALLOWTHIRDPARTY,		/*!< allow third-party requests */
+	UPNPPCPMINLIFETIMEOVERRIDE,	/*!< minimum lifetime, also under 120 s */
 #ifdef USE_NETFILTER
 	UPNPTABLENAME,
 	UPNPNATTABLENAME,

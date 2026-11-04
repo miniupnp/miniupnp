@@ -89,6 +89,8 @@
 #include "natpmp.h"
 #ifdef ENABLE_PCP
 #include "pcpserver.h"
+#include "pcp_filter.h"
+#include "pcp_lease.h"
 #else
 #define PCP_MAX_LEN 32
 #endif
@@ -1372,6 +1374,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	int systemd_flag = 0;
 #endif
 	int verbosity_level = 0;	/* for determining setlogmask() */
+#ifdef ENABLE_PCP
+	unsigned long min_lifetime_override = 0;	/* 0 : not set */
+#endif
 	int openlog_option;
 	struct in_addr addr;
 	struct sigaction sa;
@@ -1633,6 +1638,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 						min_lifetime = 120;
 					}
 				break;
+			case UPNPPCPMINLIFETIMEOVERRIDE:
+				min_lifetime_override = strtoul(ary_options[i].value, NULL, 10);
+				if (min_lifetime_override == 0)
+					INIT_PRINT_ERR("pcp_min_lifetime_override must be at least 1, ignored\n");
+				break;
 			case UPNPPCPMAXLIFETIME:
 					max_lifetime = atoi(ary_options[i].value);
 					/* maximum is 24 hours */
@@ -1688,6 +1698,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			}
 		}
 #ifdef ENABLE_PCP
+		/* pcp_min_lifetime_override sets the minimum lifetime as it is, also
+		 * under the 120 seconds of RFC 6887 section 15 (for tests) */
+		if (min_lifetime_override > 0)
+			min_lifetime = min_lifetime_override;
 		/* if lifetimes are inverse */
 		if (min_lifetime >= max_lifetime) {
 			INIT_PRINT_ERR("Minimum lifetime (%lu) is greater than or equal to maximum lifetime (%lu).\n", min_lifetime, max_lifetime);
@@ -2243,6 +2257,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	/*remove(lease_file);*/
 	syslog(LOG_INFO, "Reloading rules from lease file");
 	reload_from_lease_file();
+	/* the PCP lease file is loaded in main(), once the PCP sockets are open */
 #ifdef ENABLE_UPNPPINHOLE
 	reload_from_lease_file6();
 #endif
@@ -2641,6 +2656,15 @@ main(int argc, char * * argv)
 	}
 #endif
 
+#if defined(ENABLE_LEASEFILE) && defined(PCP_LEASE_SUPPORTED)
+	/* Create again the PCP and NAT-PMP mappings, their FILTER peers and the
+	 * PEER mappings of the PCP lease file. The sockets are open : a request
+	 * which comes during the restore waits in the socket and is answered
+	 * after it, instead of being refused (a client then takes the server for
+	 * down, libpcpnatpmp for 5 minutes). */
+	pcp_lease_load();
+#endif
+
 	/* for miniupnpdctl */
 #ifdef USE_MINIUPNPDCTL
 	sctl = OpenAndConfCtlUnixSocket("/var/run/miniupnpd.ctl");
@@ -2865,7 +2889,11 @@ main(int argc, char * * argv)
 		  && ((unsigned int)timeofday.tv_sec >= nextruletoclean_timestamp))
 		{
 			syslog(LOG_DEBUG, "cleaning expired Port Mappings");
-			get_upnp_rules_state_list(0);
+			expire_upnp_rules();
+#ifdef PCP_LEASE_SUPPORTED
+			/* the PCP lease file is not to keep what expired */
+			pcp_lease_changed();
+#endif
 		}
 		if(nextruletoclean_timestamp
 		  && ((unsigned int)timeout.tv_sec >= (nextruletoclean_timestamp - timeofday.tv_sec)))
@@ -2878,13 +2906,34 @@ main(int argc, char * * argv)
 #ifdef ENABLE_UPNPPINHOLE
 		/* Clean up expired IPv6 PinHoles */
 		next_pinhole_ts = 0;
-		upnp_clean_expired_pinholes(&next_pinhole_ts);
+		if(upnp_clean_expired_pinholes(&next_pinhole_ts) > 0)
+		{
+#ifdef PCP_LEASE_SUPPORTED
+			pcp_lease_changed();
+#endif
+		}
 		if(next_pinhole_ts &&
 		   timeout.tv_sec >= (int)(next_pinhole_ts - timeofday.tv_sec)) {
 			timeout.tv_sec = next_pinhole_ts - timeofday.tv_sec;
 			timeout.tv_usec = 0;
 		}
 #endif /* ENABLE_UPNPPINHOLE */
+#ifdef PCP_LEASE_SUPPORTED
+		/* write the PCP lease file if a save is pending and due, else wake
+		 * up when it is */
+		pcp_lease_flush(0, &timeout);
+#endif
+
+#ifdef ENABLE_PCP
+		if(GETFLAG(ENABLENATPMPMASK))
+		{
+#ifdef ENABLE_IPV6
+			PCPAnnounceRetransmit(snatpmp, addr_count, spcp_v6, &timeout);
+#else /* IPv4 only */
+			PCPAnnounceRetransmit(snatpmp, addr_count, &timeout);
+#endif
+		}
+#endif /* ENABLE_PCP */
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
 		FD_ZERO(&readset);
@@ -3351,6 +3400,9 @@ shutdown:
 #if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 	lease_file_rewrite();
 #endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#ifdef PCP_LEASE_SUPPORTED
+	pcp_lease_flush(1, NULL);	/* the changes not written yet */
+#endif
 	/* close out open sockets */
 	while(upnphttphead.lh_first != NULL)
 	{

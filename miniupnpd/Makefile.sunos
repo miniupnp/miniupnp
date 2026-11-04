@@ -49,14 +49,14 @@ LDFLAGS += -m64
 
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
-          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
+          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o pcp_lease.o pcp_filter.o peer_lease.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
           upnppinhole.o asyncsendto.o portinuse.o
 BSDOBJS = bsd/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
 SUNOSOBJS = solaris/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
 MACOBJS = mac/getifstats.o bsd/ifacewatcher.o bsd/getroute.o
-PFOBJS = pf/obsdrdr.o pf/pfpinhole.o
+PFOBJS = pf/obsdrdr.o pf/pfpinhole.o pf/pfpcp.o pf/pfrules.o
 IPFOBJS = ipf/ipfrdr.o
 IPFWOBJS = ipfw/ipfwrdr.o ipfw/ipfwaux.o
 MISCOBJS = upnpreplyparse.o minixml.o

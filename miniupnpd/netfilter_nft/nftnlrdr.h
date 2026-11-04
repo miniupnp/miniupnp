@@ -48,6 +48,10 @@ add_peer_dscp_rule2(const char * ifname,
 		    const char * iaddr, unsigned short iport, int proto,
 		    const char * desc, unsigned int timestamp);
 
+int delete_peer_rule(const char *iaddr, unsigned short iport,
+                     const char *raddr, unsigned short rport, int proto);
+unsigned int expire_peer_rules(unsigned int now);
+
 int
 get_peer_rule_by_index(int index,
 		       char * ifname, unsigned short * eport,
@@ -64,6 +68,41 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 		      char * rhost, int rhostlen,
 		      unsigned int * timestamp,
 		      u_int64_t * packets, u_int64_t * bytes);
+/* expired mappings handled by a pass of the main loop, so that a large expiry
+ * does not stop the daemon from answering */
+#define EXPIRE_MAX_PER_PASS	64
+
+struct expired_redirect {
+	unsigned short eport;
+	short proto;
+};
+
+int
+get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
+                           int max, unsigned int * next);
+
+void
+nft_redirect_cache_invalidate(void);
+
+void
+nft_delete_batch_begin(void);
+
+void
+nft_restore_batch_begin(void);
+
+int
+nft_delete_batch_end(void);
+
+int
+nft_delete_batch_redirect(unsigned short eport, int proto);
+
+void
+nft_redirect_removed(unsigned short eport, int proto);
+
+int
+nft_delete_batch_peer(in_addr_t iaddr, unsigned short iport,
+                      in_addr_t raddr, unsigned short rport, int proto);
+
 int
 get_redirect_rule_by_index(int index,
 			   char * ifname, unsigned short * eport,

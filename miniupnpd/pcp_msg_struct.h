@@ -146,7 +146,14 @@ typedef enum pcp_options  {
 	PCP_OPTION_SESSION_LIFETIME = 10,
 	PCP_OPTION_RECEIVED_PAK = 11,
 	PCP_OPTION_ID_INDICATOR = 12,
+	PCP_OPTION_DESCRIPTION = 128,	/* RFC 7220 */
 } pcp_options_t;
+
+/* RFC 7220 section 2 : the DESCRIPTION text is at most 1016 octets on the
+ * wire. Section 3 : a server SHOULD store at least 128 bytes and truncates
+ * the rest. */
+#define PCP_DESCRIPTION_OPTION_MAX (1016)
+#define PCP_DESCRIPTION_STORE_MAX (128)
 
 
 /* PCP common request header*/

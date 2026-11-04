@@ -30,10 +30,10 @@ STD_OBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           options.o upnppermissions.o minissdp.o natpmp.o \
           upnpevents.o getconnstatus.o upnputils.o \
           upnpstun.o getosversion.o \
-          upnppinhole.o asyncsendto.o portinuse.o pcpserver.o
+          upnppinhole.o asyncsendto.o portinuse.o pcpserver.o pcp_lease.o pcp_filter.o peer_lease.o
 MAC_OBJS = getifstats.o ifacewatcher.o getroute.o
 IPFW_OBJS = ipfwrdr.o ipfwaux.o
-PF_OBJS = obsdrdr.o
+PF_OBJS = obsdrdr.o pfpcp.o pfrules.o
 # pf/pfpinhole.o # SHOULD be used, but doesn't compile on e.g. OS X 10.9.
 MISC_OBJS = upnpreplyparse.o minixml.o
 
