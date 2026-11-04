@@ -347,27 +347,34 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
-				int index, proto_old;
-				unsigned short eport_old;
+				int index, proto_old, foreign = 0;
+				unsigned short eport_old, eport_own = 0;
 				/* RFC 6886 section 3.3: a retry is identified by its
-				 * internal tuple, regardless of the suggested port. */
-				for (index = 0;
+				 * internal tuple, regardless of the suggested port.
+				 * The client's own mapping wins over another owner's
+				 * rule for the same tuple, wherever it is listed. Some
+				 * backends fill desc only with a timestamp (ipf), or
+				 * leave it as it was for a rule without one (nft). */
+				for (index = 0, desc[0] = '\0';
 				     get_redirect_rule_by_index(index, NULL, &eport_old,
 				                                iaddr_old, sizeof(iaddr_old),
 				                                &iport_old, &proto_old,
 				                                desc, sizeof(desc), NULL, 0,
-				                                NULL, NULL, NULL) >= 0;
-				     index++) {
-					if (proto_old == proto && iport_old == iport &&
-					    strcmp(senderaddrstr, iaddr_old) == 0) {
-						if (strncmp(desc, "NAT-PMP ", 8) != 0) {
-							resp[3] = 2; /* Not Authorized/Refused */
-							break;
-						}
-						eport = eport_old;
-						break;
+				                                &timestamp, NULL, NULL) >= 0;
+				     index++, desc[0] = '\0') {
+					if (proto_old != proto || iport_old != iport ||
+					    strcmp(senderaddrstr, iaddr_old) != 0)
+						continue;
+					if (strncmp(desc, "NAT-PMP ", 8) != 0) {
+						foreign = 1;
+						continue;
 					}
+					eport = eport_old;
+					eport_own = eport_old;
+					break;
 				}
+				if (eport_own == 0 && foreign)
+					resp[3] = 2; /* Not Authorized/Refused */
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {
@@ -400,6 +407,16 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 #endif
+					/* RFC 6886 section 3.3: an external port another
+					 * client maps, on either protocol, is reserved for it
+					 * (the companion port); this client gets the next port.
+					 * A port the client already holds is kept on renewal. */
+					if(eport != eport_own &&
+					   upnp_eport_used_by_other(eport, proto, senderaddrstr)) {
+						eport++;
+						if(eport == 0) eport++; /* skip port zero */
+						continue;
+					}
 					r = get_redirect_rule(ext_if_name, eport, proto,
 					                      iaddr_old, sizeof(iaddr_old),
 					                      &iport_old, desc, sizeof(desc), 0, 0,
