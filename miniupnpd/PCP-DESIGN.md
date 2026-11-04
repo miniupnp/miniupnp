@@ -288,6 +288,7 @@ Notes:
 - The expiry handles at most 64 mappings, 64 PEER mappings and 64 pinholes per pass of the main loop, found in one walk, and deletes their rules in one transaction. The FILTER policies go after the commit, and a lease or a timestamp only when its rule is gone. If the kernel refuses the transaction, each rule is sent alone.
 - After a failed netlink transaction `send_batch()` reads the rest of the kernel's answers, so the next request on the shared socket does not take them for its own.
 - A save of the lease file is one pass over the rules (`pcp_lease_maps()`, `pcp_lease_peers()`), with the external address looked up once, and at most one save every 2 seconds.
+- pf: a save of the PCP lease file reads each ruleset once and looks the FILTER peers up in a hash table built for that save (`pf_pcp_save_begin()`). The tables are not kept: the counters in the rules would go stale.
 - pf: the rules of a filtered mapping are deleted, and a pinhole group renewed or deleted, in one walk, the rules being removed from the last index.
 - Measured on Linux (nft, Docker), 500 flows with 40 FILTER peers each: 0.7 s to create them, 0.7 s to restore 6,680 peers at startup, 1 to 6 s for the clients to be answered again after a restart. Before: 1,209 of 2,000 flows in 900 s.
 
@@ -373,4 +374,4 @@ The `tests/` directories are local to the development checkout and not in the re
 - Reject-reason logging is not yet in the same format as the UPnP / NAT-PMP logs.
 - `get_pinhole_uid_by_index` is a stub on nft and absent on pf.
 - The iptables backend has no FILTER and no PCP lease file.
-- FreeBSD 15.x pf ignores anchored NAT, so PCP PEER NAT fails there. The NAT66 PEER case fails on 14.5 too.
+- FreeBSD 15.1 pf: a NAT rule matched in an anchor does not end the evaluation, so a generic NAT rule after the anchor overrides a PCP PEER rule and the flow leaves from a random port (fixed by b5219c068f in stable/15). The workaround is `tag=` in `miniupnpd.conf` and `! tagged <tag>` on the generic rule.

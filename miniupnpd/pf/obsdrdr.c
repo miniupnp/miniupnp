@@ -656,20 +656,12 @@ delete_nat_rule(const char * ifname, unsigned short eport, unsigned short iport,
  * stored in the anchor.  Replies are handled by the state it creates.
  * Rules are told apart from port triggering rules by their remote port.
  *
- * KNOWN LIMITATION (FreeBSD 15.1, low priority): IPv4 PEER NAT is affected
- * (NAT66 fails the same way): the translation is not
- * applied when the main ruleset has any other NAT rule, such as the usual
- * "nat on ext_if from lan -> (ext_if)".  The generic rule is used instead and
- * the flow leaves from a random port (50001+), not eport.  The rule is loaded
- * correctly in the anchor (0 packets, see pfctl -a miniupnpd -vsn), and a rule
- * loaded by pfctl with the same tuple behaves the same, so this is not the
- * rule construction.  It works when the anchor holds the only NAT rule, or when
- * the rule is placed in the main ruleset.  Filter-anchor "nat-to" rules were
- * overridden too.  The PCP e2e cases that check the translated WAN port fail
- * for this reason: peer-create-before-first-packet-{udp,tcp},
- * peer-recreates-remembered-tcp-mapping,
- * peer-rejects-mismatched-port-on-renewal and ipv6-nat66-pcp-peer-reachability.
- * Flows that already have a state (peer-adopts-existing-*) are not affected. */
+ * FreeBSD 15.1 : a NAT rule matched in an anchor does not end the evaluation
+ * (pf_match_translation_rule(), fixed by b5219c068f in stable/15), so a later
+ * rule of the main ruleset such as "nat on ext_if from lan -> (ext_if)"
+ * overrides it and the flow leaves from a random port, not eport. Keep such a
+ * rule from matching : set tag in miniupnpd.conf and add "! tagged <tag>" to
+ * it. */
 #ifdef __APPLE__
 #define RULE_SPORT(r)	((r).src.xport.range.port[0])
 #define RULE_DPORT(r)	((r).dst.xport.range.port[0])
