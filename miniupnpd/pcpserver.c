@@ -973,32 +973,52 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	char iaddr_old[INET6_ADDRSTRLEN];
 	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
-	unsigned short eport_old;
-	unsigned int timestamp_old;
+	unsigned short eport_old, eport_own = 0;
+	unsigned int timestamp_old, timestamp_foreign = 0;
+	int foreign = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
-	 * address, protocol and port, not the suggested external port. */
-	for (index = 0;
+	 * address, protocol and port, not the suggested external port.
+	 * Check ownership before changing any state, even when the client
+	 * suggests a different external port. The client's own mapping wins
+	 * over another owner's rule for the same key, wherever it is listed.
+	 * Some backends leave desc as it was for a rule without one (nft).
+	 * iptables keeps one description per external port and protocol,
+	 * shared with a PEER rule on the same port: a PEER description says
+	 * nothing about the owner of this rule. */
+	for (index = 0, desc_old[0] = '\0', timestamp_old = 0;
 	     get_redirect_rule_by_index(index, NULL, &eport_old,
 	                               iaddr_old, sizeof(iaddr_old), &iport_old,
 	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
 	                               &timestamp_old, NULL, NULL) >= 0;
-	     index++) {
-		if (proto_old == pcp_msg_info->protocol &&
-		    iport_old == pcp_msg_info->int_port &&
-		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
-			/* Check ownership before changing any state, even when the
-			 * client suggests a different external port. */
-			if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
-				if (timestamp_old > upnp_time())
-					pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
-				return PCP_ERR_NOT_AUTHORIZED;
-			}
-			pcp_msg_info->ext_port = eport_old;
-			break;
+	     index++, desc_old[0] = '\0', timestamp_old = 0) {
+		if (proto_old != pcp_msg_info->protocol ||
+		    iport_old != pcp_msg_info->int_port ||
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) != 0)
+			continue;
+		if (strncmp(desc_old, "PCP PEER ", 9) != 0 &&
+		    strcmp(desc_old, pcp_msg_info->desc) != 0) {
+			if (!foreign)
+				timestamp_foreign = timestamp_old;
+			foreign = 1;
+			continue;
 		}
+		/* RFC 6887 section 11.3 item 1: no other port than the
+		 * suggested one */
+		if (pcp_msg_info->pfailure_present &&
+		    pcp_msg_info->ext_port != 0 &&
+		    pcp_msg_info->ext_port != eport_old)
+			return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+		pcp_msg_info->ext_port = eport_old;
+		eport_own = eport_old;
+		break;
+	}
+	if (eport_own == 0 && foreign) {
+		if (timestamp_foreign > upnp_time())
+			pcp_msg_info->error_lifetime = timestamp_foreign - upnp_time();
+		return PCP_ERR_NOT_AUTHORIZED;
 	}
 
 	if (pcp_msg_info->ext_port == 0) {
@@ -1056,6 +1076,23 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			continue;
 		}
 #endif
+		/* A NAT mapping shares the external address: as for NAT-PMP
+		 * (RFC 6886 section 3.3), an external port another client maps,
+		 * on either protocol, is reserved for that client.  A port the
+		 * client already holds is kept on renewal. */
+		if (pcp_msg_info->ext_port != eport_own &&
+		    upnp_eport_used_by_other(pcp_msg_info->ext_port,
+					     pcp_msg_info->protocol,
+					     pcp_msg_info->mapped_str)) {
+			if (pcp_msg_info->pfailure_present) {
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			}
+			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
+			continue;
+		}
 		r = get_redirect_rule(ext_if_name,
 				      pcp_msg_info->ext_port,
 				      pcp_msg_info->protocol,
