@@ -433,6 +433,10 @@ delete_peer_rule(const char *iaddr, unsigned short iport,
 			int ret = nft_send_rule(rule_del_handle(r), NFT_MSG_DELRULE, RULE_CHAIN_PEER);
 			if (ret < 0)
 				return ret;
+			/* queued : the lease goes when the rule is gone */
+			if (nft_delete_batch_peer(inet_addr(iaddr), iport,
+			                          inet_addr(raddr), rport, proto))
+				return 0;
 			break;
 		}
 	}
@@ -804,7 +808,7 @@ timestamp_index_get(const struct timestamp_index * x, unsigned short eport, int 
 
 /* Up to max port mappings which expired at 'now'. *next is the next expiry (0
  * if none, 'now' if more mappings have expired than fit in max).
- * returns their number, <0 if out of memory */
+ * returns their number, <0 on error (out of memory, no rules from the kernel) */
 int
 get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
                            int max, unsigned int * next)
@@ -816,7 +820,10 @@ get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
 	*next = 0;
 	if (timestamp_index_build(&tx) < 0)
 		return -1;
-	refresh_nft_cache_redirect();
+	if (refresh_nft_cache_redirect() < 0) {
+		free(tx.tab);
+		return -1;
+	}
 	LIST_FOREACH(r, &head_redirect, entry) {
 		unsigned int ts = timestamp_index_get(&tx, r->dport, r->proto);
 		if (ts == 0)

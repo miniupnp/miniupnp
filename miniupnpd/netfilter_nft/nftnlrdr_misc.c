@@ -43,6 +43,7 @@
 #include "../commonrdr.h"
 #include "nftnlrdr.h"
 #include "nftnlrdr_misc.h"
+#include "../peer_lease.h"
 #include "../macros.h"
 #include "../pcp_filter.h"
 
@@ -102,6 +103,13 @@ static uint32_t rule_list_peer_validate = RULE_CACHE_INVALID;
 static rule_t *rule_deleted_filter;
 static rule_t *rule_deleted_redirect;
 static rule_t *rule_deleted_peer;
+
+static rule_t **
+deleted_slot(const struct rule_list *head)
+{
+	return head == &head_filter ? &rule_deleted_filter :
+	       head == &head_peer ? &rule_deleted_peer : &rule_deleted_redirect;
+}
 
 
 /*
@@ -687,7 +695,7 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 }
 #undef CB_DATA
 
-static int nft_delete_batch_flush(void);
+static void nft_delete_batch_flush(void);
 
 int
 refresh_nft_cache_filter(void)
@@ -754,7 +762,7 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *nlh;
 	struct table_cb_data data;
-	rule_t **deleted;
+	rule_t **deleted = deleted_slot(head);
 	struct nftnl_rule *rule;
 	int ret;
 	ssize_t n;
@@ -766,8 +774,6 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	/* the dump must not bring back rules which are waiting to be deleted */
 	nft_delete_batch_flush();
 	flush_nft_cache(head);
-	deleted = head == &head_filter ? &rule_deleted_filter :
-	          head == &head_peer ? &rule_deleted_peer : &rule_deleted_redirect;
 	if (*deleted != NULL) {
 		rule_free(*deleted);
 		*deleted = NULL;
@@ -1406,17 +1412,41 @@ rule_cache_remove(struct rule_list *head, rule_t **deleted, uint64_t handle)
  * an expiry. The FILTER policies of these rules are removed after the commit,
  * as a mapping stays filtered until its rules are gone. */
 #define NFT_DELETE_BATCH_MAX	256
+
+static void
+rule_cache_invalidate_all(void)
+{
+	rule_list_filter_validate = RULE_CACHE_INVALID;
+	rule_list_redirect_validate = RULE_CACHE_INVALID;
+	rule_list_peer_validate = RULE_CACHE_INVALID;
+}
+
 #define NFT_DELETE_BATCH_BUF	(64 * 1024)
 
+struct delete_item {
+	struct nftnl_rule *rule;
+	enum rule_chain_type chain;
+	int done;		/* the rule is gone from the kernel */
+	int is_peer;		/* drop this PEER lease once the rule is gone */
+	in_addr_t iaddr, raddr;
+	unsigned short iport, rport;
+	int proto;
+};
+
+/* The rules of a mapping, then its policy : the items from the end of the
+ * previous policy to rule_end are the rules of this one. */
 struct delete_policy {
 	struct in6_addr address;
 	unsigned short port;
 	unsigned char protocol;
+	unsigned int rule_end;
+	int rule_failed;	/* a rule of it failed in an earlier flush */
 };
 
 static int delete_batch_active;
-static struct nftnl_rule *delete_batch_rules[NFT_DELETE_BATCH_MAX];
-static enum rule_chain_type delete_batch_chains[NFT_DELETE_BATCH_MAX];
+static int delete_batch_failed;		/* since nft_delete_batch_begin() */
+static int delete_batch_group_failed;	/* of the mapping being queued */
+static struct delete_item delete_batch_items[NFT_DELETE_BATCH_MAX];
 static unsigned int delete_batch_count;
 static struct delete_policy delete_batch_policies[NFT_DELETE_BATCH_MAX];
 static unsigned int delete_batch_policy_count;
@@ -1425,71 +1455,105 @@ void
 nft_delete_batch_begin(void)
 {
 	delete_batch_active = 1;
+	delete_batch_failed = 0;
+	delete_batch_group_failed = 0;
+}
+
+/* a queued PEER rule : its lease goes when the rule is gone.
+ * returns 0 if there is no batch (the caller removes the lease) */
+int
+nft_delete_batch_peer(in_addr_t iaddr, unsigned short iport,
+                      in_addr_t raddr, unsigned short rport, int proto)
+{
+	struct delete_item *d;
+
+	if (!delete_batch_active)
+		return 0;
+	d = &delete_batch_items[delete_batch_count - 1];
+	d->is_peer = 1;
+	d->iaddr = iaddr;
+	d->iport = iport;
+	d->raddr = raddr;
+	d->rport = rport;
+	d->proto = proto;
+	return 1;
 }
 
 /* Send what is queued. If the kernel refuses the transaction nothing of it was
- * done : each rule is sent alone, so one rule which is gone already does not
- * keep the others. */
-static int
+ * done : each rule is then sent alone, so one rule which is gone already does
+ * not keep the others, and only what is gone completes (a lease, a policy).
+ * What is left is tried again by the next expiry. */
+static void
 nft_delete_batch_flush(void)
 {
 	static char buf[NFT_DELETE_BATCH_BUF * 2];
 	struct mnl_nlmsg_batch *batch;
 	struct nlmsghdr *nlh = NULL;
-	unsigned int i;
+	unsigned int i, r = 0;
 	int active = delete_batch_active;
-	int result = -1, failed = 0;
+	int result = -1;
 
 	if (delete_batch_count == 0 && delete_batch_policy_count == 0)
-		return 0;
+		return;
 	delete_batch_active = 0;	/* the calls below are not queued */
 	if (delete_batch_count > 0 &&
 	    (batch = start_batch(buf, NFT_DELETE_BATCH_BUF)) != NULL) {
 		for (i = 0; i < delete_batch_count; i++) {
-			struct nftnl_rule *r = delete_batch_rules[i];
+			struct nftnl_rule *rule = delete_batch_items[i].rule;
 			if (i > 0)
 				mnl_nlmsg_batch_next(batch);
 			nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
 			                                 NFT_MSG_DELRULE,
-			                                 nftnl_rule_get_u32(r, NFTNL_RULE_FAMILY),
+			                                 nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY),
 			                                 0, mnl_seq++);
-			nftnl_rule_nlmsg_build_payload(nlh, r);
+			nftnl_rule_nlmsg_build_payload(nlh, rule);
 		}
 		/* one acknowledgement, after the complete transaction */
 		nlh->nlmsg_flags |= NLM_F_ACK;
 		result = send_batch(batch);
 	}
 	for (i = 0; i < delete_batch_count; i++) {
-		if (result < 0) {
-			if (nft_send_rule(delete_batch_rules[i], NFT_MSG_DELRULE,
-			                  delete_batch_chains[i]) < 0 && errno != ENOENT)
-				failed = 1;
+		struct delete_item *d = &delete_batch_items[i];
+		if (result >= 0) {
+			nftnl_rule_free(d->rule);
+			d->done = 1;
 		} else {
-			nftnl_rule_free(delete_batch_rules[i]);
+			d->done = nft_send_rule(d->rule, NFT_MSG_DELRULE, d->chain) >= 0 ||
+			          errno == ENOENT;
 		}
+		if (!d->done)
+			delete_batch_failed = 1;
+		else if (d->is_peer)
+			peer_lease_remove(d->iaddr, d->iport, d->raddr, d->rport, d->proto);
 	}
-	if (result < 0) {
-		/* the cache has lost rules which may still be there */
-		nft_rule_cache_invalidate();
+	/* the cache has lost rules which may still be there */
+	if (result < 0)
+		rule_cache_invalidate_all();
+	/* a mapping stays filtered if one of its rules is left */
+	for (i = 0; i < delete_batch_policy_count; i++) {
+		const struct delete_policy *p = &delete_batch_policies[i];
+		int complete = !p->rule_failed;
+		for (; r < p->rule_end; r++)
+			complete = complete && delete_batch_items[r].done;
+		if (complete && nft_pcp_filter_delete(&p->address, p->port, p->protocol) < 0)
+			delete_batch_failed = 1;
+	}
+	/* rules of a mapping whose policy is not queued yet */
+	for (; r < delete_batch_count; r++) {
+		if (!delete_batch_items[r].done && !delete_batch_items[r].is_peer)
+			delete_batch_group_failed = 1;
 	}
 	delete_batch_count = 0;
-	/* a mapping stays filtered if a rule of the transaction is left */
-	for (i = 0; !failed && i < delete_batch_policy_count; i++) {
-		const struct delete_policy *p = &delete_batch_policies[i];
-		if (nft_pcp_filter_delete(&p->address, p->port, p->protocol) < 0)
-			failed = 1;
-	}
 	delete_batch_policy_count = 0;
 	delete_batch_active = active;
-	return failed ? -1 : 0;
 }
 
 int
 nft_delete_batch_end(void)
 {
-	int result = nft_delete_batch_flush();
+	nft_delete_batch_flush();
 	delete_batch_active = 0;
-	return result;
+	return delete_batch_failed ? -1 : 0;
 }
 
 /* Send a rule change and keep the cache of its chain valid when it can :
@@ -1513,33 +1577,35 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 	rule_t **deleted;
 	uint64_t old_handle = 0;
 	uint64_t del_handle = 0;
-	int saved_errno;
+	int saved_errno = 0;
 	int replace = 0;
 
 	switch (chain_type) {
 	case RULE_CHAIN_FILTER:
 		head = &head_filter;
 		validate = &rule_list_filter_validate;
-		deleted = &rule_deleted_filter;
 		break;
 	case RULE_CHAIN_PEER:
 		head = &head_peer;
 		validate = &rule_list_peer_validate;
-		deleted = &rule_deleted_peer;
 		break;
 	default:
 		head = &head_redirect;
 		validate = &rule_list_redirect_validate;
-		deleted = &rule_deleted_redirect;
 		break;
 	}
+	deleted = deleted_slot(head);
+	if (rule == NULL)
+		return -1;
 	if (cmd == NFT_MSG_DELRULE) {
 		del_handle = nftnl_rule_get_u64(rule, NFTNL_RULE_HANDLE);
 		if (delete_batch_active) {
 			if (delete_batch_count == NFT_DELETE_BATCH_MAX)
-				nft_delete_batch_flush();
-			delete_batch_rules[delete_batch_count] = rule;
-			delete_batch_chains[delete_batch_count++] = chain_type;
+				nft_delete_batch_flush();	/* a failure is kept for nft_delete_batch_end() */
+			memset(&delete_batch_items[delete_batch_count], 0,
+			       sizeof(delete_batch_items[0]));
+			delete_batch_items[delete_batch_count].rule = rule;
+			delete_batch_items[delete_batch_count++].chain = chain_type;
 			if (*validate == RULE_CACHE_VALID &&
 			    !rule_cache_remove(head, deleted, del_handle))
 				*validate = RULE_CACHE_INVALID;
@@ -1576,6 +1642,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		nftnl_rule_free(rule);
 
 		result = send_batch_cb(batch, cmd == NFT_MSG_NEWRULE ? rule_echo_cb : NULL, &echo);
+		saved_errno = errno;
 		if (result < 0) {
 			syslog(LOG_ERR, "%s(%p, %d, %d) send_batch failed %d",
 			       "nft_send_rule", rule, (int)cmd, (int)chain_type, result);
@@ -1584,7 +1651,6 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		nftnl_rule_free(rule);
 	}
 
-	saved_errno = errno;
 	if (result >= 0 && cmd == NFT_MSG_DELRULE && *validate == RULE_CACHE_VALID) {
 		if (!rule_cache_remove(head, deleted, del_handle))
 			*validate = RULE_CACHE_INVALID;
@@ -1622,13 +1688,11 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 	return result;
 }
 
-/* the next lookup reads the rules (and their counters) from the kernel */
+/* the next lookup reads the redirect rules and their counters from the kernel */
 void
-nft_rule_cache_invalidate(void)
+nft_redirect_cache_invalidate(void)
 {
-	rule_list_filter_validate = RULE_CACHE_INVALID;
 	rule_list_redirect_validate = RULE_CACHE_INVALID;
-	rule_list_peer_validate = RULE_CACHE_INVALID;
 }
 
 int
@@ -1817,6 +1881,7 @@ send_batch_cb(struct mnl_nlmsg_batch *batch, mnl_cb_t cb, void *cb_data)
 		errno = 0;
 		ret = mnl_cb_run(buf, n, 0, mnl_portid, cb, cb_data);
 		if (ret <= -1 /*== MNL_CB_ERROR*/) {
+			int saved_errno = errno;
 			syslog(LOG_ERR, "%s: mnl_cb_run returned %d: %m",
 			       "send_batch", ret);
 			/* read what the kernel still sends for this batch (the other
@@ -1825,6 +1890,7 @@ send_batch_cb(struct mnl_nlmsg_batch *batch, mnl_cb_t cb, void *cb_data)
 			while (recv(mnl_socket_get_fd(mnl_sock), buf, sizeof(buf),
 			            MSG_DONTWAIT) > 0)
 				;
+			errno = saved_errno;	/* the callers look at the kernel's error */
 			return -4;
 		}
 	} while (ret >= 1 /*== MNL_CB_OK*/);
@@ -2669,13 +2735,15 @@ nft_pcp_filter_delete(const struct in6_addr *address, unsigned short port,
 	int result;
 	if (delete_batch_active) {
 		struct delete_policy *d;
-		if (delete_batch_policy_count == NFT_DELETE_BATCH_MAX &&
-		    nft_delete_batch_flush() < 0)
-			return -1;
+		if (delete_batch_policy_count == NFT_DELETE_BATCH_MAX)
+			nft_delete_batch_flush();
 		d = &delete_batch_policies[delete_batch_policy_count++];
 		d->address = *address;
 		d->port = port;
 		d->protocol = protocol;
+		d->rule_end = delete_batch_count;
+		d->rule_failed = delete_batch_group_failed;
+		delete_batch_group_failed = 0;
 		return 0;
 	}
 	if (pcp_filter_recover(address, port, protocol) < 0)

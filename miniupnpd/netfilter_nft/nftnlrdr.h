@@ -82,13 +82,17 @@ get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
                            int max, unsigned int * next);
 
 void
-nft_rule_cache_invalidate(void);
+nft_redirect_cache_invalidate(void);
 
 void
 nft_delete_batch_begin(void);
 
 int
 nft_delete_batch_end(void);
+
+int
+nft_delete_batch_peer(in_addr_t iaddr, unsigned short iport,
+                      in_addr_t raddr, unsigned short rport, int proto);
 
 int
 get_redirect_rule_by_index(int index,

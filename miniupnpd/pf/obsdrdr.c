@@ -869,10 +869,13 @@ pf_pcp_lease_peers(pcp_lease_peer_cb cb, void * arg)
 	return pf_rule_foreach(NAT_RULE_ACTION, peer_nat_cb, &c) < 0 ? -1 : 0;
 }
 
+#define PEER_EXPIRE_MAX_PER_PASS	64
+
 unsigned int
 expire_peer_rules(unsigned int now)
 {
-	return peer_lease_expire(now, delete_peer_rule, 0);
+	/* each delete walks the rules : the next pass goes on */
+	return peer_lease_expire(now, delete_peer_rule, PEER_EXPIRE_MAX_PER_PASS);
 }
 
 int

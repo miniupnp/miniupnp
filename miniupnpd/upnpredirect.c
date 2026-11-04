@@ -657,7 +657,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 
 #ifdef USE_NFTABLES
 	/* the counters of the rules are compared by remove_unused_rules() */
-	nft_rule_cache_invalidate();
+	nft_redirect_cache_invalidate();
 #endif
 	/*ifname[0] = '\0';*/
 	tmp = malloc(sizeof(struct rule_state));
@@ -755,7 +755,12 @@ expire_upnp_rules(void)
 #ifdef USE_NFTABLES
 	expire_nft_rules();
 #else
-	get_upnp_rules_state_list(0);
+	struct rule_state * list = get_upnp_rules_state_list(0);
+	while(list) {
+		struct rule_state * tmp = list;
+		list = tmp->next;
+		free(tmp);
+	}
 #endif
 }
 
@@ -771,7 +776,7 @@ remove_unused_rules(struct rule_state * list)
 	int n = 0;
 
 #ifdef USE_NFTABLES
-	nft_rule_cache_invalidate();
+	nft_redirect_cache_invalidate();
 #endif
 	while(list)
 	{
