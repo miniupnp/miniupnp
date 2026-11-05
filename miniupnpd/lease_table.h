@@ -45,6 +45,8 @@ struct lease_entry {
 	struct lease_entry * ext_next;	/* the next row in its external bucket */
 	struct lease_entry * int_next;	/* the next row in its internal bucket */
 	struct lease_entry * uid_next;	/* the next row in its UID bucket */
+	struct lease_entry * port_next;	/* the port list, oldest first. IPv4 only */
+	struct lease_entry * port_prev;
 	unsigned char kind;		/* enum lease_kind */
 	unsigned char family;	/* AF_INET, AF_INET6 */
 	unsigned char proto;	/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
@@ -131,6 +133,14 @@ lease_table_next_internal(const struct lease_entry * prev, int proto, int family
 /* The UPnP pinhole with this UniqueID, or NULL. A PCP row has no uid, and
  * uid 0 finds nothing. */
 struct lease_entry * lease_table_find_uid(unsigned short uid);
+
+/* The IPv4 port mappings, oldest first, as UPnP lists them.
+ * lease_table_port_at() is one step from the index asked for before it, so a
+ * client reading index 0, 1, 2... costs one step for each. */
+struct lease_entry * lease_table_port_at(unsigned int index);
+unsigned int lease_table_port_count(void);
+/* first with prev NULL, then the next */
+struct lease_entry * lease_table_next_port(const struct lease_entry * prev);
 
 /* Call cb for every row, in no set order. This visits all the rows, so it is
  * not for use on each request. cb may not add or remove a row: collect the

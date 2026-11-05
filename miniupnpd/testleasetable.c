@@ -44,7 +44,7 @@ main(void)
 	static const char * h1 = "::ffff:192.0.2.10", * h2 = "::ffff:192.0.2.11";
 	struct in6_addr remote = addr("::ffff:203.0.113.5");
 	struct in6_addr second = addr("::ffff:198.51.100.2");
-	struct lease_entry e, * m, * p, * x, * pin;
+	struct lease_entry e, * m, * p, * x, * pin, * u;
 	unsigned int i, n = 0;
 
 	/* the key : proto, eaddr, eport */
@@ -144,7 +144,46 @@ main(void)
 		n = 0;
 	}
 
-	/* growth keeps every row */
+	/* the port mappings : oldest first, without a pinhole */
+	lease_table_clear();
+	assert(lease_table_port_count() == 0 && lease_table_port_at(0) == NULL);
+	e = row(LEASE_UPNP, 17, 40001, h1, 8080, 0);
+	m = lease_table_add(&e, NULL, 0);
+	e = row(LEASE_UPNP, 6, 41000, "2001:db8::10", 41000, 0);
+	e.family = AF_INET6;
+	pin = lease_table_add(&e, NULL, 0);
+	e = row(LEASE_NATPMP, 17, 40002, h1, 8081, 0);
+	u = lease_table_add(&e, NULL, 0);
+	e = row(LEASE_PCP_MAP, 6, 40003, h1, 8082, 2);
+	x = lease_table_add(&e, NULL, 0);
+	assert(lease_table_port_count() == 3 && lease_table_count() == 4);
+	assert(lease_table_port_at(0) == m && lease_table_port_at(1) == u);
+	assert(lease_table_port_at(2) == x && lease_table_port_at(3) == NULL);
+	assert(lease_table_next_port(NULL) == m && lease_table_next_port(m) == u);
+	assert(lease_table_next_port(x) == NULL);
+	/* backwards, and an add while a client reads */
+	assert(lease_table_port_at(0) == m);
+	assert(lease_table_port_at(1) == u);
+	e = row(LEASE_UPNP, 17, 40004, h2, 9000, 0);
+	assert(lease_table_add(&e, NULL, 0) != NULL);
+	assert(lease_table_port_at(2) == x);
+	assert(lease_table_port_at(3) != NULL && lease_table_port_at(3)->eport == 40004);
+	/* a remove : the row under the cursor, the first and the last. A pinhole
+	 * does not count */
+	assert(lease_table_port_at(1) == u);
+	lease_table_remove(u);
+	assert(lease_table_port_count() == 3);
+	assert(lease_table_port_at(1) == x);
+	lease_table_remove(pin);
+	assert(lease_table_port_count() == 3 && lease_table_port_at(1) == x);
+	lease_table_remove(m);
+	assert(lease_table_port_at(0) == x);
+	lease_table_remove(lease_table_port_at(1));
+	assert(lease_table_port_count() == 1 && lease_table_next_port(x) == NULL);
+	lease_table_remove(x);
+	assert(lease_table_next_port(NULL) == NULL && lease_table_port_at(0) == NULL);
+
+	/* growth keeps every row, and their order */
 	lease_table_clear();
 	assert(lease_table_count() == 0);
 	assert(lease_table_find_mapping(17, AF_INET, NULL, 40001) == NULL);
@@ -154,6 +193,9 @@ main(void)
 	}
 	lease_table_foreach(counter, &n);
 	assert(n == 20000 && lease_table_count() == 20000);
+	assert(lease_table_port_count() == 20000);
+	for(i = 0; i < 20000; i++)
+		assert(lease_table_port_at(i)->eport == i + 1);
 	for(i = 1; i <= 20000; i++)
 		assert(lease_table_find_external(17, AF_INET, NULL, (unsigned short)i, NULL, 0) != NULL);
 	n = 0;
