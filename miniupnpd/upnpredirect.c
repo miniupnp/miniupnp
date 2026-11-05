@@ -29,6 +29,9 @@
 #include "memmap.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
+#ifdef USE_NFTABLES
+#include "netfilter_nft/nftnlrdr.h"
+#endif
 #endif
 #if defined(USE_PF)
 #include "pf/obsdrdr.h"
@@ -668,6 +671,29 @@ upnp_get_portmapping_number_of_entries(void)
 
 /* functions used to remove unused rules
  * As a side effect, delete expired rules (based on LeaseDuration) */
+#ifdef USE_NFTABLES
+static void
+expire_nft_rules(void)
+{
+	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int next;
+	int n, i, failed = 0;
+
+	n = get_expired_redirect_rules(now, expired, EXPIRE_MAX_PER_PASS, &next);
+	for (i = 0; i < n; i++) {
+		syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
+		       expired[i].eport, proto_itoa(expired[i].proto));
+		if (_upnp_delete_redir(expired[i].eport, expired[i].proto) < 0)
+			failed = 1;
+	}
+	/* what could not be removed still has its row */
+	if (failed && (next == 0 || now + 60 < next))
+		next = now + 60;
+	nextruletoclean_timestamp = next;
+}
+#endif /* USE_NFTABLES */
+
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
 {
@@ -762,6 +788,21 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		}
 	/* return list */
 	return list;
+}
+
+void
+expire_upnp_rules(void)
+{
+#ifdef USE_NFTABLES
+	expire_nft_rules();
+#else
+	struct rule_state * list = get_upnp_rules_state_list(0);
+	while(list) {
+		struct rule_state * tmp = list;
+		list = tmp->next;
+		free(tmp);
+	}
+#endif
 }
 
 void

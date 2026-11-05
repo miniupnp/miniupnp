@@ -157,6 +157,12 @@ get_upnp_rules_state_list(int max_rules_number_target);
 int
 upnp_get_portmapping_number_of_entries(void);
 
+/* expire_upnp_rules()
+ * remove port mappings past their lifetime, and set
+ * nextruletoclean_timestamp */
+void
+expire_upnp_rules(void);
+
 /* remove_unused_rules() :
  * also free the list */
 void
