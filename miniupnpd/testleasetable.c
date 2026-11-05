@@ -122,6 +122,28 @@ main(void)
 	lease_table_remove(x);
 	n = 0;
 
+	/* many rows on an internal port */
+	{
+		struct in6_addr a2 = addr(h2);
+		lease_table_clear();
+		e = row(LEASE_UPNP, 17, 40002, h2, 9000, 0);
+		assert(lease_table_add(&e, NULL, 0) != NULL);
+		e.eport = 40003;
+		x = lease_table_add(&e, NULL, 0);
+		assert(x != NULL);
+		e.proto = 6;
+		e.eport = 40004;
+		assert(lease_table_add(&e, NULL, 0) != NULL);
+		n = 0;
+		for(p = lease_table_next_internal(NULL, 17, AF_INET, &a2, 9000); p != NULL;
+		    p = lease_table_next_internal(p, 17, AF_INET, &a2, 9000))
+			n++;
+		assert(n == 2);
+		lease_table_remove(x);
+		assert(lease_table_next_internal(NULL, 17, AF_INET, &a2, 9000)->eport == 40002);
+		n = 0;
+	}
+
 	/* growth keeps every row */
 	lease_table_clear();
 	assert(lease_table_count() == 0);
@@ -134,6 +156,14 @@ main(void)
 	assert(n == 20000 && lease_table_count() == 20000);
 	for(i = 1; i <= 20000; i++)
 		assert(lease_table_find_external(17, AF_INET, NULL, (unsigned short)i, NULL, 0) != NULL);
+	n = 0;
+	{
+		struct in6_addr a1 = addr(h1);
+		for(p = lease_table_next_internal(NULL, 17, AF_INET, &a1, 1); p != NULL;
+		    p = lease_table_next_internal(p, 17, AF_INET, &a1, 1))
+			n++;
+	}
+	assert(n == 2857);
 	lease_table_clear();
 
 	printf("testleasetable: OK\n");

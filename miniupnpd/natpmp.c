@@ -25,6 +25,7 @@
 #include "upnpredirect.h"
 #include "commonrdr.h"
 #include "upnputils.h"
+#include "memmap.h"
 #include "portinuse.h"
 #include "asyncsendto.h"
 
@@ -359,34 +360,19 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
-				int index, proto_old, foreign = 0;
 				unsigned short eport_old, eport_own = 0;
 				/* RFC 6886 section 3.3: a retry is identified by its
-				 * internal tuple, regardless of the suggested port.
-				 * The client's own mapping wins over another owner's
-				 * rule for the same tuple, wherever it is listed. Some
-				 * backends fill desc only with a timestamp (ipf), or
-				 * leave it as it was for a rule without one (nft). */
-				for (index = 0, desc[0] = '\0';
-				     get_redirect_rule_by_index(index, NULL, &eport_old,
-				                                iaddr_old, sizeof(iaddr_old),
-				                                &iport_old, &proto_old,
-				                                desc, sizeof(desc), NULL, 0,
-				                                &timestamp, NULL, NULL) >= 0;
-				     index++, desc[0] = '\0') {
-					if (proto_old != proto || iport_old != iport ||
-					    strcmp(senderaddrstr, iaddr_old) != 0)
-						continue;
-					if (strncmp(desc, "NAT-PMP ", 8) != 0) {
-						foreign = 1;
-						continue;
-					}
+				 * internal tuple, regardless of the suggested port. A
+				 * tuple which another owner maps is refused, whatever
+				 * the order of the rows. */
+				if (memmap_find(AF_INET, &sender6, iport, proto, &owner,
+				                &eport_old, NULL, 0, NULL) == 0) {
 					eport = eport_old;
 					eport_own = eport_old;
-					break;
-				}
-				if (eport_own == 0 && foreign)
+				} else if (memmap_find(AF_INET, &sender6, iport, proto, NULL,
+				                       &eport_old, NULL, 0, NULL) == 0) {
 					resp[3] = 2; /* Not Authorized/Refused */
+				}
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {

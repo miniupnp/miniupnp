@@ -967,45 +967,39 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 }
 #endif /* PCP_PEER */
 
+/* The owner of a PCP request: its nonce, as on the wire */
+static void pcp_owner(const pcp_info_t *pcp_msg_info, struct memmap_owner *owner)
+{
+	memmap_owner_init(owner, LEASE_PCP_MAP, pcp_msg_info->nonce);
+}
+
+/* The family of the internal address of a PCP request, as the table keeps it */
+static int pcp_family(const pcp_info_t *pcp_msg_info)
+{
+	return IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) ? AF_INET : AF_INET6;
+}
+
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
-	int index, proto_old;
-	char iaddr_old[INET6_ADDRSTRLEN];
+	struct in6_addr iaddr_old;
 	char desc_old[64];
+	struct memmap_owner owner;
 	uint16_t iport_old, eport_first = 0;
 	unsigned short eport_old, eport_own = 0;
-	unsigned int timestamp_old, timestamp_foreign = 0;
-	int foreign = 0;
+	unsigned int timestamp_old;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
 	 * address, protocol and port, not the suggested external port.
-	 * Check ownership before changing any state, even when the client
-	 * suggests a different external port. The client's own mapping wins
-	 * over another owner's rule for the same key, wherever it is listed.
-	 * Some backends leave desc as it was for a rule without one (nft).
-	 * iptables keeps one description per external port and protocol,
-	 * shared with a PEER rule on the same port: a PEER description says
-	 * nothing about the owner of this rule. */
-	for (index = 0, desc_old[0] = '\0', timestamp_old = 0;
-	     get_redirect_rule_by_index(index, NULL, &eport_old,
-	                               iaddr_old, sizeof(iaddr_old), &iport_old,
-	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
-	                               &timestamp_old, NULL, NULL) >= 0;
-	     index++, desc_old[0] = '\0', timestamp_old = 0) {
-		if (proto_old != pcp_msg_info->protocol ||
-		    iport_old != pcp_msg_info->int_port ||
-		    strcmp(iaddr_old, pcp_msg_info->mapped_str) != 0)
-			continue;
-		if (strncmp(desc_old, "PCP PEER ", 9) != 0 &&
-		    strcmp(desc_old, pcp_msg_info->desc) != 0) {
-			if (!foreign)
-				timestamp_foreign = timestamp_old;
-			foreign = 1;
-			continue;
-		}
+	 * The client's own row is looked up first, so a mapping of the same
+	 * tuple by another owner does not hide it. */
+	pcp_owner(pcp_msg_info, &owner);
+	if (memmap_find(pcp_family(pcp_msg_info), pcp_msg_info->mapped_ip,
+	                pcp_msg_info->int_port, pcp_msg_info->protocol, &owner,
+	                &eport_old, desc_old, sizeof(desc_old), NULL) == 0 &&
+	    strcmp(desc_old, pcp_msg_info->desc) == 0) {
 		/* RFC 6887 section 11.3 item 1: no other port than the
 		 * suggested one */
 		if (pcp_msg_info->pfailure_present &&
@@ -1014,11 +1008,13 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 		pcp_msg_info->ext_port = eport_old;
 		eport_own = eport_old;
-		break;
-	}
-	if (eport_own == 0 && foreign) {
-		if (timestamp_foreign > upnp_time())
-			pcp_msg_info->error_lifetime = timestamp_foreign - upnp_time();
+	} else if (memmap_find(pcp_family(pcp_msg_info), pcp_msg_info->mapped_ip,
+	                       pcp_msg_info->int_port, pcp_msg_info->protocol, NULL,
+	                       &eport_old, NULL, 0, &timestamp_old) == 0) {
+		/* Another owner maps the tuple: refuse before changing any
+		 * state, even when the client suggests another external port. */
+		if (timestamp_old > upnp_time())
+			pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
 		return PCP_ERR_NOT_AUTHORIZED;
 	}
 
