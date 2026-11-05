@@ -72,6 +72,20 @@ set_owner(struct lease_entry * e, const char * desc, unsigned short eport, int p
 	}
 }
 
+/* the kind of row which mapping_owner_of() gives for owner */
+static unsigned char
+owner_kind(int owner)
+{
+	switch(owner) {
+	case MAPPING_PCP:
+		return LEASE_PCP_MAP;
+	case MAPPING_NATPMP:
+		return LEASE_NATPMP;
+	default:
+		return LEASE_UPNP;
+	}
+}
+
 /* Add the row of an IPv4 port mapping, with its remote peer if remote is set,
  * or renew it. */
 static void
@@ -110,6 +124,29 @@ memmap_map_gone(unsigned short eport, int proto)
 	struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
 	if(row != NULL)
 		lease_table_remove(row);
+}
+
+int
+memmap_find_map(const char * iaddr, unsigned short iport, int proto,
+                int owner, unsigned short * eport, char * desc, int desclen,
+                unsigned int * timestamp)
+{
+	struct in6_addr a;
+	const struct lease_entry * row;
+	if(v4_mapped(iaddr, &a) < 0)
+		return -1;
+	for(row = lease_table_next_internal(NULL, proto, AF_INET, &a, iport); row != NULL;
+	    row = lease_table_next_internal(row, proto, AF_INET, &a, iport)) {
+		if(owner >= 0 && row->kind != owner_kind(owner))
+			continue;
+		*eport = row->eport;
+		if(desc != NULL && desclen > 0)
+			snprintf(desc, desclen, "%s", row->label ? row->label : "");
+		if(timestamp != NULL)
+			*timestamp = (unsigned int)row->expiry;
+		return 0;
+	}
+	return -1;
 }
 
 unsigned int
