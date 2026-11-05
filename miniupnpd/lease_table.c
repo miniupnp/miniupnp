@@ -21,6 +21,13 @@ struct index {
 static struct index ext_index, int_index, uid_index;
 static unsigned int count = 0;	/* the number of rows */
 
+static struct lease_entry * port_head, * port_tail;
+static unsigned int port_count = 0;
+/* the row of index port_cursor_index. An add goes at the end and does not
+ * move it. A remove clears it */
+static struct lease_entry * port_cursor;
+static unsigned int port_cursor_index;
+
 /* ::, the eaddr of an IPv4 row */
 static const struct in6_addr any_addr;
 
@@ -231,6 +238,71 @@ lease_table_find_uid(unsigned short uid)
 	return NULL;
 }
 
+static int
+is_port_mapping(const struct lease_entry * e)
+{
+	return e->family == AF_INET;
+}
+
+static void
+port_list_add(struct lease_entry * e)
+{
+	e->port_next = NULL;
+	e->port_prev = port_tail;
+	if(port_tail != NULL)
+		port_tail->port_next = e;
+	else
+		port_head = e;
+	port_tail = e;
+	port_count++;
+}
+
+static void
+port_list_remove(struct lease_entry * e)
+{
+	if(e->port_prev != NULL)
+		e->port_prev->port_next = e->port_next;
+	else
+		port_head = e->port_next;
+	if(e->port_next != NULL)
+		e->port_next->port_prev = e->port_prev;
+	else
+		port_tail = e->port_prev;
+	port_count--;
+	port_cursor = NULL;
+}
+
+struct lease_entry *
+lease_table_port_at(unsigned int index)
+{
+	struct lease_entry * e = port_head;
+	unsigned int i = 0;
+
+	if(index >= port_count)
+		return NULL;
+	if(port_cursor != NULL && port_cursor_index <= index) {
+		e = port_cursor;
+		i = port_cursor_index;
+	}
+	for(; i < index; i++)
+		e = e->port_next;
+	port_cursor = e;
+	port_cursor_index = index;
+	return e;
+}
+
+unsigned int
+lease_table_port_count(void)
+{
+	return port_count;
+}
+
+struct lease_entry *
+lease_table_next_port(const struct lease_entry * prev)
+{
+	return prev != NULL ? prev->port_next : port_head;
+}
+
 /* A copy of src with its own label and remote, in no index yet. NULL if there
  * is no memory */
 static struct lease_entry *
@@ -277,6 +349,8 @@ link_row(struct lease_entry * e)
 		e->uid_next = uid_index.buckets[b];
 		uid_index.buckets[b] = e;
 	}
+	if(is_port_mapping(e))
+		port_list_add(e);
 	count++;
 }
 
@@ -337,6 +411,8 @@ lease_table_remove(struct lease_entry * e)
 			p = &(*p)->uid_next;
 		*p = e->uid_next;
 	}
+	if(is_port_mapping(e))
+		port_list_remove(e);
 	free(e->remote);
 	free(e->label);
 	free(e);
