@@ -45,8 +45,10 @@ void memmap_remote_peer_gone(unsigned short uid);
  * the table. */
 void memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned short rport,
                                 const char * iaddr, unsigned short iport, int proto);
-/* The firewall removed the pinholes which expired: remove their rows, the
- * rows with an expiry at or before now. */
-void memmap_remote_peers_expired(unsigned int now);
+/* The firewall ended a pass over the pinholes, removing "removed" rules (<0 :
+ * error). The rows which expired go, unless the pass was partial. */
+void memmap_remote_peers_expired(unsigned int now, int removed);
+/* this pass leaves expired rules in the firewall : a failed delete */
+void memmap_remote_peers_partial(void);
 
 #endif

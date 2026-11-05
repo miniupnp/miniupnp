@@ -1106,8 +1106,7 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	ret = clean_pinhole_list(next_timestamp);
-	if(ret > 0)
-		memmap_remote_peers_expired((unsigned int)upnp_time());
+	memmap_remote_peers_expired((unsigned int)upnp_time(), ret);
 #else
 	UNUSED(next_timestamp);
 #endif

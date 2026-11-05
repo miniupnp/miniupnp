@@ -253,12 +253,25 @@ pinhole_expiry_row(struct lease_entry * e, void * arg)
 		c->rows[c->n++] = e;
 }
 
+static int pinholes_partial;
+
+void
+memmap_remote_peers_partial(void)
+{
+	pinholes_partial = 1;
+}
+
 /* the firewall removed expired pinholes : they go by their lifetime here */
 void
-memmap_remote_peers_expired(unsigned int now)
+memmap_remote_peers_expired(unsigned int now, int removed)
 {
 	static struct pinhole_expiry c;
 	unsigned int i;
+	int partial = pinholes_partial;
+
+	pinholes_partial = 0;
+	if(removed <= 0 || partial)
+		return;
 	do {
 		c.now = now;
 		c.n = 0;

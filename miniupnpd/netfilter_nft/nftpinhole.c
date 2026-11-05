@@ -41,6 +41,7 @@
 #include "../upnpglobalvars.h"
 
 #include "nftnlrdr_misc.h"
+#include "../memmap.h"
 
 #ifdef DEBUG
 #define d_printf(x) do { printf x; } while (0)
@@ -471,7 +472,12 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		if (ts <= (unsigned int)current_time) {
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
 			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0) {
+				/* the rule stays : retry soon */
+				min_ts = (unsigned int)current_time + 1;
+				memmap_remote_peers_partial();
+				continue;
+			}
 			n++;
 		} else {
 			if (uid > max_uid)
