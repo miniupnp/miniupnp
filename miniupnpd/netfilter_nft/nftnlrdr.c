@@ -245,6 +245,7 @@ delete_filter_rule(const char * ifname, unsigned short port, int proto)
 
 /*
  * Clear all rules corresponding eport/proto
+ * return -1 if the redirect rule is still there, else 0 (also when not found)
  */
 int
 delete_redirect_and_filter_rules(unsigned short eport, int proto)
@@ -253,9 +254,13 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	struct nftnl_rule *r = NULL;
 	in_addr_t iaddr = 0;
 	uint16_t iport = 0;
+	int ret = 0;
 
 	d_printf(("delete_redirect_and_filter_rules(%d %d)\n", eport, proto));
-	refresh_nft_cache_redirect();
+	/* a chain which cannot be read is not one without the rule: the caller
+	 * keeps its row and tries again */
+	if (refresh_nft_cache_redirect() < 0)
+		return -1;
 
 	// Delete Redirect Rule  eport => iaddr:iport
 	LIST_FOREACH(p, &head_redirect, entry) {
@@ -271,7 +276,10 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT);
+			/* the rule stays : the caller keeps its row and tries again.
+			 * A rule which is not found is gone, and that is a success. */
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
+				ret = -1;
 			break;
 		}
 	}
@@ -330,7 +338,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		}
 	}
 
-	return 0;
+	return ret;
 }
 
 /*

@@ -21,6 +21,9 @@
 #include "upnputils.h"
 #include "lease_table.h"
 #include "memmap.h"
+#ifdef USE_NFTABLES
+#include "netfilter_nft/nftnlrdr.h"
+#endif
 
 /* The table keeps every address in 16 bytes: a.b.c.d as ::ffff:a.b.c.d. */
 int
@@ -357,3 +360,42 @@ memmap_remote_peers_expired(unsigned int now, memmap_map6_lookup lookup)
 	c.lookup = lookup;
 	lease_table_foreach(map6_expiry_row, &c);
 }
+
+#ifdef USE_NFTABLES
+struct expiry_ctx {
+	unsigned int now;
+	struct expired_redirect * expired;
+	int max;
+	int n;
+	unsigned int next;
+};
+
+static void
+expiry_row(struct lease_entry * e, void * arg)
+{
+	struct expiry_ctx * c = arg;
+	unsigned int ts = (unsigned int)e->expiry;
+	if(e->family != AF_INET || ts == 0)
+		return;
+	if(ts > c->now) {
+		if(c->next == 0 || ts < c->next)
+			c->next = ts;
+	} else if(c->n == c->max) {
+		c->next = c->now;	/* the next pass goes on */
+	} else {
+		c->expired[c->n].eport = e->eport;
+		c->expired[c->n++].proto = e->proto;
+	}
+}
+
+/* without reading the firewall */
+int
+get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
+                           int max, unsigned int * next)
+{
+	struct expiry_ctx c = { now, expired, max, 0, 0 };
+	lease_table_foreach(expiry_row, &c);
+	*next = c.next;
+	return c.n;
+}
+#endif /* USE_NFTABLES */
