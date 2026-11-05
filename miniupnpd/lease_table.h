@@ -11,10 +11,13 @@
  *   eaddr equals iaddr and eport equals iport.
  * A row limited to one remote host also has a struct lease_remote.
  *
- * Two hash indexes find a row:
+ * Three hash indexes find a row:
  * - The external index, by protocol, family, eaddr, eport and remote.
+ * - The internal index, by protocol, family, iaddr and iport. Several rows
+ *   can share an internal endpoint.
  * - The UID index, by the UniqueID of a UPnP pinhole.
- * The indexes hold no data. They link the rows through ext_next and uid_next.
+ * The indexes hold no data. They link the rows through ext_next, int_next and
+ * uid_next.
  *
  * This file knows nothing of the protocols or the firewall. memmap.c fills
  * the rows from them. The daemon has one thread, so there are no locks. */
@@ -40,6 +43,7 @@ struct lease_remote {
 /* One port mapping or pinhole. lease_table_add() makes a row. */
 struct lease_entry {
 	struct lease_entry * ext_next;	/* the next row in its external bucket */
+	struct lease_entry * int_next;	/* the next row in its internal bucket */
 	struct lease_entry * uid_next;	/* the next row in its UID bucket */
 	unsigned char kind;		/* enum lease_kind */
 	unsigned char family;	/* AF_INET, AF_INET6 */
@@ -116,6 +120,13 @@ lease_table_find_external(int proto, int family, const struct in6_addr * eaddr,
 struct lease_entry *
 lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
                          unsigned short eport);
+
+/* Walk the rows of an internal endpoint: call with prev NULL for the first row,
+ * then with the row it returned, until NULL. A port mapping can have several
+ * rows, one per external port, so this is a walk and not a find. */
+struct lease_entry *
+lease_table_next_internal(const struct lease_entry * prev, int proto, int family,
+                          const struct in6_addr * iaddr, unsigned short iport);
 
 /* The UPnP pinhole with this UniqueID, or NULL. A PCP row has no uid, and
  * uid 0 finds nothing. */

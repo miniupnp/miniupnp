@@ -15,10 +15,10 @@ struct index {
 	unsigned int size;	/* a power of 2, so hash & (size - 1) is the bucket */
 };
 
-/* Both indexes are empty until the first row: see ready(). The external index
- * grows with the rows, and the UID index keeps its size: a UniqueID is 16 bits,
- * so its chains stay short. */
-static struct index ext_index, uid_index;
+/* The indexes are empty until the first row: see ready(). The external and
+ * internal indexes grow with the rows. The UID index keeps its size: a UniqueID
+ * is 16 bits, so its chains stay short. */
+static struct index ext_index, int_index, uid_index;
 static unsigned int count = 0;	/* the number of rows */
 
 /* ::, the eaddr of an IPv4 row */
@@ -48,10 +48,30 @@ ext_hash_key(int family, const struct in6_addr * eaddr, unsigned short eport)
 	return hash_bytes(h, &eport, sizeof(eport));
 }
 
+/* the hash of the internal index: all the rows of one internal endpoint */
+static unsigned int
+int_hash_key(int proto, int family, const struct in6_addr * iaddr,
+             unsigned short iport)
+{
+	unsigned char head[2];
+	unsigned int h;
+	head[0] = (unsigned char)proto;
+	head[1] = (unsigned char)family;
+	h = hash_bytes(HASH_INIT, head, sizeof(head));
+	h = hash_bytes(h, iaddr, sizeof(*iaddr));
+	return hash_bytes(h, &iport, sizeof(iport));
+}
+
 static unsigned int
 ext_hash(const struct lease_entry * e)
 {
 	return ext_hash_key(e->family, &e->eaddr, e->eport);
+}
+
+static unsigned int
+int_hash(const struct lease_entry * e)
+{
+	return int_hash_key(e->proto, e->family, &e->iaddr, e->iport);
 }
 
 static unsigned int
@@ -71,15 +91,19 @@ index_init(struct index * x, unsigned int size)
 	return 0;
 }
 
-/* Double the external index and move the rows over, which keeps its chains
- * short. On failure the old one stays: only the chains get longer. */
+/* Double the external and internal indexes and move the rows over, which keeps
+ * their chains short. On failure the old ones stay: only the chains get longer. */
 static void
 grow(void)
 {
-	struct index ext2;
+	struct index ext2, int2;
 	unsigned int size = ext_index.size * 2, i;
 	if(index_init(&ext2, size) < 0)
 		return;
+	if(index_init(&int2, size) < 0) {
+		free(ext2.buckets);
+		return;
+	}
 	for(i = 0; i < ext_index.size; i++) {
 		struct lease_entry * e = ext_index.buckets[i], * next;
 		for(; e != NULL; e = next) {
@@ -89,8 +113,19 @@ grow(void)
 			ext2.buckets[b] = e;
 		}
 	}
+	for(i = 0; i < int_index.size; i++) {
+		struct lease_entry * e = int_index.buckets[i], * next;
+		for(; e != NULL; e = next) {
+			unsigned int b = int_hash(e) & (size - 1);
+			next = e->int_next;
+			e->int_next = int2.buckets[b];
+			int2.buckets[b] = e;
+		}
+	}
 	free(ext_index.buckets);
+	free(int_index.buckets);
 	ext_index = ext2;
+	int_index = int2;
 }
 
 /* Set up the indexes at the first row. A daemon with no mappings then pays
@@ -102,9 +137,12 @@ ready(void)
 		return 0;
 	if(index_init(&ext_index, MIN_BUCKETS) < 0)
 		return -1;
-	if(index_init(&uid_index, MIN_BUCKETS) < 0) {
+	if(index_init(&int_index, MIN_BUCKETS) < 0 ||
+	   index_init(&uid_index, MIN_BUCKETS) < 0) {
 		free(ext_index.buckets);
+		free(int_index.buckets);
 		memset(&ext_index, 0, sizeof(ext_index));
+		memset(&int_index, 0, sizeof(int_index));
 		return -1;
 	}
 	return 0;
@@ -162,6 +200,24 @@ lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
 }
 
 struct lease_entry *
+lease_table_next_internal(const struct lease_entry * prev, int proto, int family,
+                          const struct in6_addr * iaddr, unsigned short iport)
+{
+	struct lease_entry * e;
+	if(int_index.buckets == NULL)
+		return NULL;
+	e = prev ? prev->int_next
+	         : int_index.buckets[int_hash_key(proto, family, iaddr, iport) &
+	                             (int_index.size - 1)];
+	for(; e != NULL; e = e->int_next) {
+		if(e->proto == proto && e->family == family && e->iport == iport &&
+		   memcmp(&e->iaddr, iaddr, sizeof(*iaddr)) == 0)
+			return e;
+	}
+	return NULL;
+}
+
+struct lease_entry *
 lease_table_find_uid(unsigned short uid)
 {
 	struct lease_entry * e;
@@ -185,7 +241,7 @@ new_row(const struct lease_entry * src, const struct in6_addr * raddr,
 	if(e == NULL)
 		return NULL;
 	*e = *src;
-	e->ext_next = e->uid_next = NULL;
+	e->ext_next = e->int_next = e->uid_next = NULL;
 	e->label = NULL;
 	e->remote = NULL;
 	if(src->label != NULL && (e->label = strdup(src->label)) == NULL)
@@ -213,6 +269,9 @@ link_row(struct lease_entry * e)
 	b = ext_hash(e) & (ext_index.size - 1);
 	e->ext_next = ext_index.buckets[b];
 	ext_index.buckets[b] = e;
+	b = int_hash(e) & (int_index.size - 1);
+	e->int_next = int_index.buckets[b];
+	int_index.buckets[b] = e;
 	if(lease_uid(e) != 0) {
 		b = uid_hash(lease_uid(e)) & (uid_index.size - 1);
 		e->uid_next = uid_index.buckets[b];
@@ -268,6 +327,10 @@ lease_table_remove(struct lease_entry * e)
 	while(*p != e)
 		p = &(*p)->ext_next;
 	*p = e->ext_next;
+	p = &int_index.buckets[int_hash(e) & (int_index.size - 1)];
+	while(*p != e)
+		p = &(*p)->int_next;
+	*p = e->int_next;
 	if(lease_uid(e) != 0) {
 		p = &uid_index.buckets[uid_hash(lease_uid(e)) & (uid_index.size - 1)];
 		while(*p != e)
@@ -306,7 +369,9 @@ lease_table_clear(void)
 			lease_table_remove(ext_index.buckets[i]);
 	}
 	free(ext_index.buckets);
+	free(int_index.buckets);
 	free(uid_index.buckets);
 	memset(&ext_index, 0, sizeof(ext_index));
+	memset(&int_index, 0, sizeof(int_index));
 	memset(&uid_index, 0, sizeof(uid_index));
 }

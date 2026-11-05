@@ -24,6 +24,11 @@ void memmap_map(unsigned short uid, unsigned short eport, const char * iaddr,
                 unsigned int timestamp);
 /* The firewall removed an IPv4 mapping: remove its row, if it has one. */
 void memmap_map_gone(unsigned short eport, int proto);
+/* the IPv4 mapping of an internal endpoint. 0 if found. desc may be NULL.
+ * owner (enum mapping_owner) takes the row of that protocol, -1 any row */
+int memmap_find_map(const char * iaddr, unsigned short iport, int proto,
+                    int owner, unsigned short * eport, char * desc, int desclen,
+                    unsigned int * timestamp);
 /* the expiry of an IPv4 mapping (0 : none or unknown), by its external port */
 unsigned int memmap_map_expiry(unsigned short eport, int proto);
 

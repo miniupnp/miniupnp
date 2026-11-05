@@ -965,7 +965,6 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
-	int index, proto_old;
 	char iaddr_old[INET6_ADDRSTRLEN];
 	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
@@ -975,27 +974,23 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
-	 * address, protocol and port, not the suggested external port. */
-	for (index = 0;
-	     get_redirect_rule_by_index(index, NULL, &eport_old,
-	                               iaddr_old, sizeof(iaddr_old), &iport_old,
-	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
-	                               &timestamp_old, NULL, NULL) >= 0;
-	     index++) {
-		if (proto_old == pcp_msg_info->protocol &&
-		    iport_old == pcp_msg_info->int_port &&
-		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
-			/* Check ownership before changing any state, even when the
-			 * client suggests a different external port. */
-			if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
-				if (timestamp_old > upnp_time())
-					pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
-				return PCP_ERR_NOT_AUTHORIZED;
-			}
-			pcp_msg_info->ext_port = eport_old;
-			eport_own = eport_old;
-			break;
-		}
+	 * address, protocol and port, not the suggested external port.
+	 * The client's own row is looked up first, so a mapping of the same
+	 * tuple by another owner does not hide it. */
+	if (memmap_find_map(pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+	                    pcp_msg_info->protocol, MAPPING_PCP, &eport_old,
+	                    desc_old, sizeof(desc_old), NULL) == 0 &&
+	    strcmp(desc_old, pcp_msg_info->desc) == 0) {
+		pcp_msg_info->ext_port = eport_old;
+		eport_own = eport_old;
+	} else if (memmap_find_map(pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+	                           pcp_msg_info->protocol, -1, &eport_old, NULL, 0,
+	                           &timestamp_old) == 0) {
+		/* Another owner maps the tuple: refuse before changing any
+		 * state, even when the client suggests another external port. */
+		if (timestamp_old > upnp_time())
+			pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
+		return PCP_ERR_NOT_AUTHORIZED;
 	}
 
 	if (pcp_msg_info->ext_port == 0) {
