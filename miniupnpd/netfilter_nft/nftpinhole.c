@@ -51,9 +51,42 @@
 #ifdef ENABLE_UPNPPINHOLE
 
 static int next_uid = 1;
+/* A bit per uid in use : next_uid wraps at 65535, and a pinhole can live
+ * through the wrap. Rules of an earlier run are set by clean_pinhole_list(). */
+static unsigned char uid_used[65536 / 8];
 
 #define PINEHOLE_LABEL_FORMAT "pinhole-%d ts-%u: %s"
 #define PINEHOLE_LABEL_FORMAT_SKIPDESC "pinhole-%d ts-%u: %*s"
+
+/* a uid parsed from a rule label can be any integer */
+static void
+pinhole_uid_set(int uid)
+{
+	if (uid > 0 && uid < 65536)
+		uid_used[uid >> 3] |= (unsigned char)(1 << (uid & 7));
+}
+
+static void
+pinhole_uid_clear(int uid)
+{
+	if (uid > 0 && uid < 65536)
+		uid_used[uid >> 3] &= (unsigned char)~(1 << (uid & 7));
+}
+
+/* make next_uid a uid which no pinhole has. returns <0 if none is free */
+static int
+pinhole_alloc_uid(void)
+{
+	int tries;
+
+	for (tries = 0; tries < 65534; tries++) {
+		if (!(uid_used[next_uid >> 3] & (1 << (next_uid & 7))))
+			return next_uid;
+		if (++next_uid >= 65535)
+			next_uid = 1;
+	}
+	return -1;
+}
 
 void init_iptpinhole(void)
 {
@@ -80,7 +113,11 @@ int add_pinhole(const char * ifname,
 	struct in6_addr rhost_addr, ihost_addr;
 	struct in6_addr *rhost_addr_p;
 
-	uid = next_uid;
+	uid = pinhole_alloc_uid();
+	if (uid < 0) {
+		syslog(LOG_ERR, "add_pinhole: no free uid");
+		return -1;
+	}
 
 	d_printf(("add_pinhole(%s, %s, %hu, %s, %hu, %d, %s, %u)\n",
 	          ifname, rem_host, rem_port, int_client, int_port, proto, desc, timestamp));
@@ -110,6 +147,7 @@ int add_pinhole(const char * ifname,
 	if (res < 0)
 		return -1;
 
+	pinhole_uid_set(uid);
 	if (++next_uid >= 65535) {
 		next_uid = 1;
 	}
@@ -214,7 +252,9 @@ delete_pinhole(unsigned short uid)
 		/* compare the uid value */
 		if (0 == strcmp(tmp_label, label_start)) {
 			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0)
+				return -1;
+			pinhole_uid_clear(uid);
 			return 0;
 		}
 	}
@@ -471,9 +511,15 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		if (ts <= (unsigned int)current_time) {
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
 			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0) {
+				/* the rule keeps its uid : retry soon */
+				min_ts = (unsigned int)current_time + 1;
+				continue;
+			}
+			pinhole_uid_clear(uid);
 			n++;
 		} else {
+			pinhole_uid_set(uid);
 			if (uid > max_uid)
 				max_uid = uid;
 			else if (uid < min_uid)

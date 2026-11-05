@@ -61,6 +61,40 @@ static int next_uid = 1;
 
 #define RULE (pr.rule)
 
+/* A bit per uid in use : next_uid wraps at 65535, and a pinhole can live
+ * through the wrap. Rules of an earlier run are set by clean_pinhole_list(). */
+static unsigned char uid_used[65536 / 8];
+
+/* a uid parsed from a rule label can be any integer */
+static void
+pinhole_uid_set(int uid)
+{
+	if(uid > 0 && uid < 65536)
+		uid_used[uid >> 3] |= (unsigned char)(1 << (uid & 7));
+}
+
+static void
+pinhole_uid_clear(int uid)
+{
+	if(uid > 0 && uid < 65536)
+		uid_used[uid >> 3] &= (unsigned char)~(1 << (uid & 7));
+}
+
+/* make next_uid a uid which no pinhole has. returns <0 if none is free */
+static int
+pinhole_alloc_uid(void)
+{
+	int tries;
+
+	for(tries = 0; tries < 65534; tries++) {
+		if(!(uid_used[next_uid >> 3] & (1 << (next_uid & 7))))
+			return next_uid;
+		if(++next_uid >= 65535)
+			next_uid = 1;
+	}
+	return -1;
+}
+
 int add_pinhole(const char * ifname,
                 const char * rem_host, unsigned short rem_port,
                 const char * int_client, unsigned short int_port,
@@ -74,6 +108,11 @@ int add_pinhole(const char * ifname,
 
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
+		return -1;
+	}
+	uid = pinhole_alloc_uid();
+	if(uid < 0) {
+		syslog(LOG_ERR, "add_pinhole: no free uid");
 		return -1;
 	}
 	memset(&pr, 0, sizeof(pr));
@@ -116,7 +155,6 @@ int add_pinhole(const char * ifname,
 		RULE.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		RULE.keep_state = 1;
-		uid = next_uid;
 		snprintf(RULE.label, PF_RULE_LABEL_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
 		if(queue)
@@ -160,6 +198,7 @@ int add_pinhole(const char * ifname,
 		}
 	}
 
+	pinhole_uid_set(uid);
 	if(++next_uid >= 65535) {
 		next_uid = 1;
 	}
@@ -364,6 +403,7 @@ int delete_pinhole(unsigned short uid)
 				release_ticket(dev, tnum);
 				return -1;
 			}
+			pinhole_uid_clear(uid);
 			release_ticket(dev, tnum);
 			return 0;
 		}
@@ -606,6 +646,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 				release_ticket(dev, tnum);
 				return -1;
 			}
+			pinhole_uid_clear(uid);
 			n++;
 #ifdef USE_LIBPFCTL
 			if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
@@ -630,6 +671,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 #endif
 #endif /* USE_LIBPFCTL */
 		} else {
+			pinhole_uid_set(uid);
 			if(uid > max_uid)
 				max_uid = uid;
 			else if(uid < min_uid)
