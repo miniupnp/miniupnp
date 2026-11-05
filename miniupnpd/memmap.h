@@ -77,17 +77,10 @@ void memmap_remote_peer_gone(unsigned short uid);
  * the table. */
 void memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned short rport,
                                 const char * iaddr, unsigned short iport, int proto);
-/* Find the rule of a pinhole in the firewall. raddr is NULL for a rule with no
- * remote host. 0 and the expiry of the rule in timestamp if it is there, -1 if
- * it is not, 1 if the firewall cannot be read. */
-typedef int (*memmap_map6_lookup)(const char * raddr, unsigned short rport,
-                                     const char * iaddr, unsigned short iport,
-                                     int proto, unsigned int * timestamp);
-
-/* The firewall removed the pinholes which expired. A row with an expiry at or
- * before now goes if lookup does not find its rule. A rule which is still
- * there keeps its row, with the expiry of the rule, and so does a row whose
- * rule cannot be read. */
-void memmap_remote_peers_expired(unsigned int now, memmap_map6_lookup lookup);
+/* The firewall ended a pass over the pinholes, removing "removed" rules (<0 :
+ * error). The rows which expired go, unless the pass was partial. */
+void memmap_remote_peers_expired(unsigned int now, int removed);
+/* this pass leaves expired rules in the firewall : a failed delete */
+void memmap_remote_peers_partial(void);
 
 #endif

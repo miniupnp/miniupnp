@@ -310,55 +310,53 @@ memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned shor
 		lease_table_remove(row);
 }
 
-/* Ask the firewall about the rule of an expired row. The row goes if it has
- * no rule. A rule which is still there keeps its row, with the expiry of the
- * rule: its removal failed, or it was renewed later than the row. */
-static void
-map6_expiry_check(struct lease_entry * e, memmap_map6_lookup lookup)
-{
-	char iaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN];
-	unsigned int timestamp = 0;
-	int remote_addr = e->remote != NULL && !IN6_IS_ADDR_UNSPECIFIED(&e->remote->raddr);
-	int r;
+/* A row cannot go during lease_table_foreach(), so a walk collects up to this
+ * many rows, removes them, and walks again until it found fewer. */
+#define MAP6_EXPIRE_MAX	256
 
-	if(inet_ntop(AF_INET6, &e->iaddr, iaddr, sizeof(iaddr)) == NULL)
-		return;
-	if(remote_addr &&
-	   inet_ntop(AF_INET6, &e->remote->raddr, raddr, sizeof(raddr)) == NULL)
-		return;
-	/* a remote port with any remote host is :: and the port */
-	r = lookup(remote_addr ? raddr : NULL, e->remote ? e->remote->rport : 0,
-	           iaddr, e->iport, e->proto, &timestamp);
-	if(r == 0)
-		e->expiry = timestamp;
-	else if(r < 0)
-		lease_table_remove(e);
-	/* else the firewall could not be read: the row stays, for the next pass */
-}
-
-/* what a walk over the rows gives map6_expiry_row() */
+/* what a walk over the rows gives pinhole_expiry_row() and gets back */
 struct map6_expiry {
 	time_t now;
-	memmap_map6_lookup lookup;
+	unsigned int n;
+	struct lease_entry * rows[MAP6_EXPIRE_MAX];
 };
 
-/* check the row if it is a pinhole past its expiry */
+/* collect the row if it is a pinhole past its expiry */
 static void
 map6_expiry_row(struct lease_entry * e, void * arg)
 {
-	const struct map6_expiry * c = arg;
-	if(e->family == AF_INET6 && e->expiry != 0 && e->expiry <= c->now)
-		map6_expiry_check(e, c->lookup);
+	struct map6_expiry * c = arg;
+	if(e->family == AF_INET6 && e->expiry != 0 && e->expiry <= c->now &&
+	   c->n < MAP6_EXPIRE_MAX)
+		c->rows[c->n++] = e;
 }
 
-void
-memmap_remote_peers_expired(unsigned int now, memmap_map6_lookup lookup)
-{
-	struct map6_expiry c;
+static int map6_partial;
 
-	c.now = now;
-	c.lookup = lookup;
-	lease_table_foreach(map6_expiry_row, &c);
+void
+memmap_remote_peers_partial(void)
+{
+	map6_partial = 1;
+}
+
+/* the firewall removed expired pinholes : they go by their lifetime here */
+void
+memmap_remote_peers_expired(unsigned int now, int removed)
+{
+	static struct map6_expiry c;
+	unsigned int i;
+	int partial = map6_partial;
+
+	map6_partial = 0;
+	if(removed <= 0 || partial)
+		return;
+	do {
+		c.now = now;
+		c.n = 0;
+		lease_table_foreach(map6_expiry_row, &c);
+		for(i = 0; i < c.n; i++)
+			lease_table_remove(c.rows[i]);
+	} while(c.n == MAP6_EXPIRE_MAX);
 }
 
 #ifdef USE_NFTABLES

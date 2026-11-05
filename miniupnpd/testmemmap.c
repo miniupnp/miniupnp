@@ -230,42 +230,6 @@ test_ipv6(void)
 	assert(lease_table_count() == 0);
 }
 
-/* the rules which are still in the firewall, for the lookup of the expiry */
-static struct {
-	const char * iaddr;
-	unsigned short iport;
-	const char * raddr;
-	unsigned short rport;
-	unsigned int timestamp;
-} fw_rules[4];
-static unsigned int fw_n, fw_lookups;
-static int fw_error;	/* the firewall cannot be read */
-
-static int
-fw_lookup(const char * raddr, unsigned short rport, const char * iaddr,
-          unsigned short iport, int proto, unsigned int * timestamp)
-{
-	unsigned int i;
-	(void)proto;
-	fw_lookups++;
-	if(fw_error)
-		return 1;
-	/* as find_pinhole(): the remote port is compared, also with no remote
-	 * host */
-	for(i = 0; i < fw_n; i++) {
-		if(strcmp(fw_rules[i].iaddr, iaddr) != 0 || fw_rules[i].iport != iport ||
-		   fw_rules[i].rport != rport)
-			continue;
-		if((fw_rules[i].raddr == NULL) != (raddr == NULL))
-			continue;
-		if(raddr != NULL && strcmp(fw_rules[i].raddr, raddr) != 0)
-			continue;
-		*timestamp = fw_rules[i].timestamp;
-		return 0;
-	}
-	return -1;
-}
-
 static void
 test_expiry(void)
 {
@@ -273,8 +237,7 @@ test_expiry(void)
 	unsigned int i;
 
 	lease_table_clear();
-	fw_n = 0;
-	/* more expired pinholes than the old walk of 256 took */
+	/* more expired pinholes than one walk takes */
 	for(i = 0; i < 600; i++) {
 		snprintf(iaddr, sizeof(iaddr), "2001:db8::%x", i + 1);
 		memmap_map((unsigned short)(i + 1), 0, iaddr, 8080, IPPROTO_UDP, "upnp", 100);
@@ -285,62 +248,24 @@ test_expiry(void)
 	memmap_map(0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web", 50);
 	assert(lease_table_count() == 603);
 
-	fw_lookups = 0;
-	memmap_remote_peers_expired(99, fw_lookup);
-	assert(lease_table_count() == 603 && fw_lookups == 0);
-	memmap_remote_peers_expired(100, fw_lookup);
-	assert(lease_table_count() == 3 && fw_lookups == 600);
+	memmap_remote_peers_expired(99, 600);
+	assert(lease_table_count() == 603);
+	memmap_remote_peers_expired(100, 600);
+	assert(lease_table_count() == 3);
 	assert(lease_table_find_uid(1) == NULL && lease_table_find_uid(600) == NULL);
 	assert(lease_table_find_uid(1000) != NULL);
-	memmap_remote_peers_expired(101, fw_lookup);
+	memmap_remote_peers_expired(101, 1);
 	assert(lease_table_find_uid(1000) == NULL);
 	/* 0 : no expiry */
-	memmap_remote_peers_expired(0xffffffffu, fw_lookup);
+	memmap_remote_peers_expired(0xffffffffu, 1);
 	assert(lease_table_find_uid(1001) != NULL);
 	assert(lease_table_find_mapping(IPPROTO_TCP, AF_INET, NULL, 40001) != NULL);
 	assert(lease_table_count() == 2);
 	lease_table_clear();
 }
 
-/* A row goes only if the firewall removed its rule. */
-static void
-test_expiry_rule_kept(void)
-{
-	static const char * h = "2001:db8::10", * peer = "2001:db8:1::5";
-	struct lease_entry * row;
-
-	lease_table_clear();
-	memmap_map(1, 0, h, 8080, IPPROTO_UDP, "upnp", 100);
-	memmap_map(2, 0, h, 8081, IPPROTO_UDP, "upnp", 100);
-	memmap_remote_peer(0, peer, 5000, 0, h, 9090, IPPROTO_UDP, PCP_DESC, 100);
-	memmap_remote_peer(0, peer, 5001, 0, h, 9090, IPPROTO_UDP, PCP_DESC, 100);
-	assert(lease_table_count() == 4);
-
-	/* the removal of uid 1 failed : the rule is still there, expired */
-	fw_rules[0].iaddr = h; fw_rules[0].iport = 8080;
-	fw_rules[0].raddr = NULL; fw_rules[0].timestamp = 100;
-	/* the PEER rule was renewed one second later than its row */
-	fw_rules[1].iaddr = h; fw_rules[1].iport = 9090;
-	fw_rules[1].raddr = peer; fw_rules[1].rport = 5000;
-	fw_rules[1].timestamp = 101;
-	fw_n = 2;
-	memmap_remote_peers_expired(100, fw_lookup);
-	assert(lease_table_count() == 2);
-	row = lease_table_find_uid(1);
-	assert(row != NULL && row->expiry == 100);
-	assert(lease_table_find_uid(2) == NULL);
-	row = map6(h, 9090, peer, 5000);
-	assert(row != NULL && row->expiry == 101);
-	assert(map6(h, 9090, peer, 5001) == NULL);
-
-	/* the next pass, after the firewall removed both */
-	fw_n = 0;
-	memmap_remote_peers_expired(101, fw_lookup);
-	assert(lease_table_count() == 0);
-}
-
-/* A remote port with any remote host, a row found by its key with another
- * uid, and a firewall which cannot be read */
+/* A remote port with any remote host, and a row found by its key with
+ * another uid */
 static void
 test_map6_keys(void)
 {
@@ -348,7 +273,6 @@ test_map6_keys(void)
 	struct lease_entry * a, * b;
 
 	lease_table_clear();
-	fw_n = 0;
 	/* two pinholes which differ only by the remote port : two rows */
 	memmap_remote_peer(1, "", 1000, 0, h, 8080, IPPROTO_UDP, "IGD2 pinhole", 100);
 	memmap_remote_peer(2, "*", 2000, 0, h, 8080, IPPROTO_UDP, "IGD2 pinhole", 100);
@@ -363,35 +287,19 @@ test_map6_keys(void)
 	assert(map6(h, 8080, NULL, 0) == lease_table_find_uid(3));
 	assert(lease_table_count() == 3);
 
-	/* the expiry asks for the remote port: the rule of uid 1 is still
-	 * there, those of 2 and 3 are gone */
-	fw_rules[0].iaddr = h; fw_rules[0].iport = 8080;
-	fw_rules[0].raddr = NULL; fw_rules[0].rport = 1000; fw_rules[0].timestamp = 150;
-	fw_n = 1;
-	memmap_remote_peers_expired(100, fw_lookup);
-	assert(lease_table_find_uid(1) == a && a->expiry == 150);
-	assert(lease_table_find_uid(2) == NULL && lease_table_find_uid(3) == NULL);
-
 	/* the delete fallback by the rule, with the port */
 	memmap_remote_peer_gone_at(99, "::", 1000, h, 8080, IPPROTO_UDP);
-	assert(lease_table_count() == 0);
-	fw_rules[0].rport = 0;
-	fw_n = 0;
+	assert(lease_table_find_uid(1) == NULL && lease_table_find_uid(2) == b);
+	assert(lease_table_count() == 2);
 
 	/* a row on the key with another uid : the new uid replaces it */
+	lease_table_clear();
 	memmap_map(5, 0, h, 7070, IPPROTO_UDP, "upnp", 100);
 	memmap_map(6, 0, h, 7070, IPPROTO_UDP, "upnp", 200);
 	a = lease_table_find_uid(6);
 	assert(a != NULL && lease_uid(a) == 6 && a->expiry == 200);
 	assert(lease_table_find_uid(5) == NULL && lease_table_count() == 1);
-
-	/* the firewall cannot be read : the expired row stays */
-	fw_error = 1;
-	memmap_remote_peers_expired(300, fw_lookup);
-	assert(lease_table_find_uid(6) == a && a->expiry == 200);
-	fw_error = 0;
-	memmap_remote_peers_expired(300, fw_lookup);
-	assert(lease_table_count() == 0);
+	lease_table_clear();
 }
 
 int
@@ -400,7 +308,6 @@ main(void)
 	test_ipv4();
 	test_ipv6();
 	test_expiry();
-	test_expiry_rule_kept();
 	test_map6_keys();
 	printf("testmemmap: all tests passed\n");
 	return 0;

@@ -1100,32 +1100,13 @@ upnp_check_pinhole_working(const char * uid,
 }
 #endif
 
-#if defined(USE_PF) || defined(USE_NETFILTER)
-/* memmap_map6_lookup : is the rule of a pinhole still in the firewall.
- * find_pinhole() gives -2 for no such rule, and -1 if it cannot read the
- * firewall */
-static int
-pinhole_in_firewall(const char * raddr, unsigned short rport,
-                    const char * iaddr, unsigned short iport,
-                    int proto, unsigned int * timestamp)
-{
-	int r = find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
-	                     NULL, 0, timestamp);
-	if(r >= 0)
-		return 0;
-	return r == -2 ? -1 : 1;
-}
-#endif
-
 int
 upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	ret = clean_pinhole_list(next_timestamp);
-	/* the rows go by the rules the firewall really removed. Also after an
-	 * error: pf can fail after it removed some */
-	memmap_remote_peers_expired((unsigned int)upnp_time(), pinhole_in_firewall);
+	memmap_remote_peers_expired((unsigned int)upnp_time(), ret);
 #else
 	UNUSED(next_timestamp);
 #endif
