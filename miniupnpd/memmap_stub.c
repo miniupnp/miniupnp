@@ -7,3 +7,8 @@ memmap_map_expiry(unsigned short eport, int proto)
 	(void)eport; (void)proto;
 	return 0;
 }
+
+void
+memmap_remote_peers_partial(void)
+{
+}
