@@ -31,14 +31,21 @@ row(int kind, int proto, unsigned short eport, const char * iaddr,
 	return e;
 }
 
+static void
+counter(struct lease_entry * e, void * arg)
+{
+	(void)e;
+	(*(unsigned int *)arg)++;
+}
+
 int
 main(void)
 {
 	static const char * h1 = "::ffff:192.0.2.10", * h2 = "::ffff:192.0.2.11";
 	struct in6_addr remote = addr("::ffff:203.0.113.5");
 	struct in6_addr second = addr("::ffff:198.51.100.2");
-	struct lease_entry e, * m, * p, * x;
-	unsigned int i;
+	struct lease_entry e, * m, * p, * x, * pin;
+	unsigned int i, n = 0;
 
 	/* the key : proto, eaddr, eport */
 	e = row(LEASE_PCP_MAP, 17, 40001, h1, 8080, 1);
@@ -70,6 +77,21 @@ main(void)
 	assert(lease_table_find_external(6, AF_INET, NULL, 40003, NULL, 0) == NULL);
 	assert(lease_table_find_mapping(6, AF_INET, NULL, 40003) == p);
 
+	/* a pinhole, by its UniqueID. A PCP nonce is not one */
+	e = row(LEASE_UPNP, 6, 41000, "2001:db8::10", 41000, 0);
+	e.family = AF_INET6;
+	lease_set_uid(&e, 7);
+	e.eaddr = e.iaddr;
+	pin = lease_table_add(&e, NULL, 0);
+	assert(lease_table_find_uid(7) == pin && lease_table_find_uid(8) == NULL);
+	e.kind = LEASE_PCP_MAP;
+	e.eport = e.iport = 41001;
+	x = lease_table_add(&e, NULL, 0);
+	assert(x != NULL && lease_uid(x) == 0 && lease_table_find_uid(7) == pin);
+	lease_table_remove(x);
+	lease_table_remove(pin);
+	assert(lease_table_find_uid(7) == NULL);
+
 	/* growth keeps every row */
 	lease_table_clear();
 	assert(lease_table_count() == 0);
@@ -78,7 +100,8 @@ main(void)
 		e = row(LEASE_UPNP, 17, (unsigned short)i, h1, (unsigned short)(i % 7 + 1), 0);
 		assert(lease_table_add(&e, NULL, 0) != NULL);
 	}
-	assert(lease_table_count() == 20000);
+	lease_table_foreach(counter, &n);
+	assert(n == 20000 && lease_table_count() == 20000);
 	for(i = 1; i <= 20000; i++)
 		assert(lease_table_find_external(17, AF_INET, NULL, (unsigned short)i, NULL, 0) != NULL);
 	lease_table_clear();

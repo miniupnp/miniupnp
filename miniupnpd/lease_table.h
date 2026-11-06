@@ -1,5 +1,6 @@
 /* The mappings of all the protocols, in memory.
- * One row per mapping, found by its external key. */
+ * One row per mapping or pinhole, found by its external key, or by its
+ * UniqueID for a UPnP pinhole. */
 #ifndef LEASE_TABLE_H_INCLUDED
 #define LEASE_TABLE_H_INCLUDED
 
@@ -18,6 +19,7 @@ struct lease_remote {
 
 struct lease_entry {
 	struct lease_entry * ext_next;
+	struct lease_entry * uid_next;
 	unsigned char kind;
 	unsigned char family;	/* AF_INET, AF_INET6 */
 	unsigned char proto;
@@ -25,7 +27,7 @@ struct lease_entry {
 	unsigned short iport;
 	struct in6_addr iaddr;	/* IPv4 as ::ffff:a.b.c.d */
 	struct in6_addr eaddr;	/* :: : the default address of the interface */
-	unsigned char nonce[LEASE_NONCE_LEN];	/* PCP, else 0 */
+	unsigned char nonce[LEASE_NONCE_LEN];	/* UPnP : the UniqueID in the first two */
 	time_t expiry;
 	char * label;		/* the rule description */
 	struct lease_remote * remote;
@@ -41,14 +43,28 @@ struct lease_entry {
 	 * with USE_NFTABLES, lease_table.c must then include config.h */
 };
 
+/* the UniqueID of a UPnP pinhole, else 0. PCP has only its nonce */
+static inline unsigned short
+lease_uid(const struct lease_entry * e)
+{
+	return e->kind == LEASE_UPNP ? (unsigned short)(e->nonce[0] << 8 | e->nonce[1]) : 0;
+}
+
+static inline void
+lease_set_uid(struct lease_entry * e, unsigned short uid)
+{
+	e->nonce[0] = (unsigned char)(uid >> 8);
+	e->nonce[1] = (unsigned char)uid;
+}
+
 /* the key fields of e (kind, family, proto, ports, addresses, nonce) are
- * copied, the row is added to the index. raddr != NULL adds its remote.
+ * copied, the row is added to the indexes. raddr != NULL adds its remote.
  * NULL if there is no memory or the external key is in use */
 struct lease_entry *
 lease_table_add(const struct lease_entry * e, const struct in6_addr * raddr,
                 unsigned short rport);
 
-/* removes the row from the index and frees it and its remote */
+/* removes the row from the indexes and frees it and its remote */
 void lease_table_remove(struct lease_entry * e);
 
 /* raddr NULL : the row without a remote */
@@ -61,6 +77,11 @@ lease_table_find_external(int proto, int family, const struct in6_addr * eaddr,
 struct lease_entry *
 lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
                          unsigned short eport);
+
+struct lease_entry * lease_table_find_uid(unsigned short uid);
+
+/* calls cb for every row. cb may not change the table */
+void lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg);
 
 unsigned int lease_table_count(void);
 void lease_table_clear(void);
