@@ -510,10 +510,8 @@ upnp_get_redirection_infos(unsigned short eport, const char * protocol,
 		desc[0] = '\0';
 	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
-	r = get_redirect_rule(ext_if_name, eport, proto_atoi(protocol),
-	                      iaddr, iaddrlen, iport, desc, desclen,
-	                      rhost, rhostlen, &timestamp,
-	                      0, 0);
+	r = memmap_get_map(eport, proto_atoi(protocol), iport, iaddr, iaddrlen,
+	                        desc, desclen, rhost, rhostlen, &timestamp);
 	if(r == 0 &&
 	   timestamp > 0 &&
 	   timestamp > (unsigned int)(current_time = upnp_time())) {

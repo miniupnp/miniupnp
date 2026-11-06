@@ -65,5 +65,9 @@ void memmap_remote_peers_partial(void);
 
 /* 1 if the IPv4 mapping has a row */
 int memmap_map_known(unsigned short eport, int proto);
+/* a port mapping by its external port. -1 if there is none */
+int memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
+                   char * iaddr, int iaddrlen, char * desc, int desclen,
+                   char * rhost, int rhostlen, unsigned int * timestamp);
 
 #endif
