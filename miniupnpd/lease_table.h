@@ -7,17 +7,19 @@
  *
  * A row is a struct lease_entry, and it is one of these:
  * - An IPv4 port mapping: packets to eport go to iaddr:iport.
- * - An IPv6 pinhole: packets to iaddr:iport pass without translation, so
- *   eaddr equals iaddr and eport equals iport.
+ * - An IPv6 pinhole: packets to iaddr:iport pass without translation, so eaddr equals iaddr and eport equals iport.
  * A row limited to one remote host also has a struct lease_remote.
  *
  * Three hash indexes find a row:
  * - The external index, by protocol, family, eaddr, eport and remote.
- * - The internal index, by protocol, family, iaddr and iport. Several rows
- *   can share an internal endpoint.
+ * - The internal index, by protocol, family, iaddr and iport. Several rows can share an internal endpoint.
  * - The UID index, by the UniqueID of a UPnP pinhole.
  * The indexes hold no data. They link the rows through ext_next, int_next and
  * uid_next.
+ *
+ * The IPv4 port mappings are also on a list, oldest first, because UPnP lists
+ * them by a position which must stay the same between its calls. A hash has no
+ * such order.
  *
  * This file knows nothing of the protocols or the firewall. memmap.c fills
  * the rows from them. The daemon has one thread, so there are no locks. */
@@ -45,20 +47,22 @@ struct lease_entry {
 	struct lease_entry * ext_next;	/* the next row in its external bucket */
 	struct lease_entry * int_next;	/* the next row in its internal bucket */
 	struct lease_entry * uid_next;	/* the next row in its UID bucket */
-	struct lease_entry * port_next;	/* the port list, oldest first. IPv4 only */
+	/* The port list: the rows UPnP reads by position, which are the IPv4 port
+	 * mappings, oldest first. The key finds a row, and this gives it a place. A
+	 * pinhole is not on the list, and has NULL in both. */
+	struct lease_entry * port_next;
 	struct lease_entry * port_prev;
-	unsigned char kind;		/* enum lease_kind */
+	unsigned char kind;		/* enum lease_kind PCP, PMP-NAT  */
 	unsigned char family;	/* AF_INET, AF_INET6 */
 	unsigned char proto;	/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
-	unsigned short eport;	/* host order. A pinhole: equals iport */
+	unsigned short eport;	/* host order.  for NON NAT equals iport */
 	unsigned short iport;	/* host order */
-	struct in6_addr iaddr;	/* IPv4 as ::ffff:a.b.c.d */
-	/* The external address. An IPv4 row has :: as the address is not stored yet:
-	 * a daemon can have several, so :: does not name one. A pinhole has iaddr. */
-	struct in6_addr eaddr;
-	unsigned char nonce[LEASE_NONCE_LEN];	/* UPnP : the UniqueID in the first two */
+	struct in6_addr iaddr;	/* IPv4 as ::ffff:a.b.c.d   Always populated. */
+	/* The external address. Always populated. for NON NAT equals iaddr */
+	struct in6_addr eaddr; /* IPv4 as ::ffff:a.b.c.d */
+	unsigned char nonce[LEASE_NONCE_LEN];	/* PCP nonce, or for UPnP the UniqueID in the first two */
 	time_t expiry;		/* on the clock of upnp_time(). 0 : no expiry */
-	char * label;		/* the rule description, owned by the row */
+	char * label;		/* RFC 7220 DESCRIPTION option, or Upnp DESCRIPTION, defined by owned of the  row PCP */
 	struct lease_remote * remote;	/* NULL : any remote host. Owned by the row */
 	/* Fields a row gets later:
 	 * time_t since;			first created, a renewal keeps it
@@ -66,13 +70,13 @@ struct lease_entry {
 	 * unsigned char prefer_failure;	from the PCP request
 	 * struct lease_filter * filters;	the FILTER peers of a PCP MAP
 	 * #ifdef USE_NFTABLES
-	 * unsigned long long rule_handle;	of the rule, 0 : unknown
-	 * unsigned long long filter_handle;	of its forward rule, 0 : unknown
+	 * unsigned long long rule_handle;	of the rule, null : unknown
+	 * unsigned long long filter_handle;	of its forward rule, null : unknown
 	 * #endif
 	 * with USE_NFTABLES, lease_table.c must then include config.h */
 };
 
-/* the UniqueID of a UPnP pinhole, else 0. PCP has only its nonce */
+/* the UniqueID of a UPnP pinhole, else null. */
 static inline unsigned short
 lease_uid(const struct lease_entry * e)
 {
@@ -123,7 +127,8 @@ struct lease_entry *
 lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
                          unsigned short eport);
 
-/* a mapping of the external port for another host, on any protocol */
+/* A row on this external port for another internal address, on any protocol,
+ * or NULL. An IPv4 external port goes to one host. eaddr NULL means ::. */
 struct lease_entry *
 lease_table_port_used_by_other(int family, const struct in6_addr * eaddr,
                                unsigned short eport, const struct in6_addr * iaddr);
@@ -139,12 +144,17 @@ lease_table_next_internal(const struct lease_entry * prev, int proto, int family
  * uid 0 finds nothing. */
 struct lease_entry * lease_table_find_uid(unsigned short uid);
 
-/* The IPv4 port mappings, oldest first, as UPnP lists them.
- * lease_table_port_at() is one step from the index asked for before it, so a
- * client reading index 0, 1, 2... costs one step for each. */
+/* The IPv4 port mapping at this place in the list, or NULL past the end.
+ * A client reads the list at index 0, 1, 2..., so this remembers where it
+ * stopped and goes on from there: each read costs one step, and not a walk from
+ * the start. A remove forgets the place. */
 struct lease_entry * lease_table_port_at(unsigned int index);
+
+/* the number of IPv4 port mappings */
 unsigned int lease_table_port_count(void);
-/* first with prev NULL, then the next */
+
+/* Walk the list, oldest first: call with prev NULL for the first row, then with
+ * the row it returned, until NULL. */
 struct lease_entry * lease_table_next_port(const struct lease_entry * prev);
 
 /* Call cb for every row, in no set order. This visits all the rows, so it is
@@ -152,10 +162,13 @@ struct lease_entry * lease_table_next_port(const struct lease_entry * prev);
  * rows and remove them after the walk. */
 void lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg);
 
-/* 0, or -1 if there is no memory. NULL clears */
+/* Replace the label of a row, which is how a renewal changes the description
+ * and keeps the place of the row on the list. NULL clears it. 0, or -1 if there
+ * is no memory, and then the old label stays. */
 int lease_table_set_label(struct lease_entry * e, const char * label);
 
-/* the owner of a row is its kind and nonce : 1 if they are the same */
+/* 1 if two rows have one owner, the same kind and nonce. For UPnP the nonce
+ * bytes hold a UniqueID, so the kind is enough. */
 int lease_table_same_owner(const struct lease_entry * a,
                            const struct lease_entry * b);
 

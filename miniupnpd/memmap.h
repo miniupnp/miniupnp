@@ -17,8 +17,10 @@
 #define MEMMAP_H_INCLUDED
 
 /* The firewall added or changed a mapping with no remote peer: write its row.
- * A row on the same external port is replaced. uid is the UniqueID of a UPnP
- * pinhole, else 0. timestamp is the expiry, 0 for none. */
+ * A renewal, the same owner and rule, keeps the row and its place on the port
+ * list, and gets the new expiry and description. Any other row on the port is
+ * replaced. uid is the UniqueID of a UPnP pinhole, else 0. timestamp is the
+ * expiry, 0 for none. */
 void memmap_map(unsigned short uid, unsigned short eport, const char * iaddr,
                 unsigned short iport, int proto, const char * desc,
                 unsigned int timestamp);
@@ -38,7 +40,8 @@ unsigned int memmap_map_expiry(unsigned short eport, int proto);
 
 /* The same for a mapping limited to a remote peer, a PEER or a UPnP mapping with
  * a remote host. Its row has a struct lease_remote, and the remote is part of
- * the key of the row: rows with and without a remote can share a port. */
+ * the key of the row: rows with and without a remote can share a port. An
+ * IPv4 row is on the port list like any other port mapping. */
 void memmap_remote_peer(unsigned short uid, const char * raddr, unsigned short rport,
                         unsigned short eport, const char * iaddr, unsigned short iport,
                         int proto, const char * desc, unsigned int timestamp);
@@ -63,26 +66,33 @@ void memmap_remote_peers_expired(unsigned int now, int removed);
  * the firewall, because a delete failed. */
 void memmap_remote_peers_partial(void);
 
-/* 1 if the IPv4 mapping has a row */
+/* 1 if the IPv4 mapping has a row. Rules of an earlier run are found at startup,
+ * and this tells which of them still need a row. */
 int memmap_map_known(unsigned short eport, int proto);
-/* a port mapping by its external port. -1 if there is none */
+/* The IPv4 mapping of an external port, with no read of the firewall. Fills the
+ * strings given, and takes NULL for what is not wanted. 0, or -1 if there is
+ * none. */
 int memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
                    char * iaddr, int iaddrlen, char * desc, int desclen,
                    char * rhost, int rhostlen, unsigned int * timestamp);
 
-/* a port mapping by its place in the list, oldest first. -1 past the end */
+/* The same by its place in the list, oldest first, for the UPnP calls which
+ * list mappings by index. 0, or -1 past the end. */
 int memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
                       unsigned short * iport, char * iaddr, int iaddrlen,
                       char * desc, int desclen, char * rhost, int rhostlen,
                       unsigned int * timestamp);
 
+/* the number of IPv4 port mappings */
 int memmap_map_count(void);
 
-/* a malloc'ed array of the external ports of proto in the range, oldest first */
+/* The external ports of proto in the range, oldest first, in a malloc'ed array
+ * which the caller frees. *number is their count. NULL if there is no memory. */
 unsigned short * memmap_ports_in_range(unsigned short startport, unsigned short endport,
                                        int proto, unsigned int * number);
 
-/* 1 if another host maps the external port, on any protocol */
+/* 1 if another internal address maps the external port, on any protocol. It
+ * logs who. */
 int memmap_eport_used_by_other(unsigned short eport, const char * iaddr);
 
 #endif

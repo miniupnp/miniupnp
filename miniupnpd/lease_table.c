@@ -21,8 +21,9 @@ struct index {
 static struct index ext_index, int_index, uid_index;
 static unsigned int count = 0;	/* the number of rows */
 
+/* the list of the port mappings: see lease_table.h */
 static struct lease_entry * port_head, * port_tail;
-static unsigned int port_count = 0;
+static unsigned int port_count = 0;	/* the rows on the list */
 /* the row of index port_cursor_index. An add goes at the end and does not
  * move it. A remove clears it */
 static struct lease_entry * port_cursor;
@@ -71,18 +72,21 @@ int_hash_key(int proto, int family, const struct in6_addr * iaddr,
 	return hash_bytes(h, &iport, sizeof(iport));
 }
 
+/* The external hash of a row. */
 static unsigned int
 ext_hash(const struct lease_entry * e)
 {
 	return ext_hash_key(e->family, &e->eaddr, e->eport);
 }
 
+/* The internal hash of a row. */
 static unsigned int
 int_hash(const struct lease_entry * e)
 {
 	return int_hash_key(e->proto, e->family, &e->iaddr, e->iport);
 }
 
+/* The hash of the UID index. */
 static unsigned int
 uid_hash(unsigned short uid)
 {
@@ -168,6 +172,7 @@ remote_matches(const struct lease_entry * e, const struct in6_addr * raddr,
 	       memcmp(&e->remote->raddr, raddr, sizeof(*raddr)) == 0;
 }
 
+/* Find the row with this exact external key and remote. */
 struct lease_entry *
 lease_table_find_external(int proto, int family, const struct in6_addr * eaddr,
                           unsigned short eport, const struct in6_addr * raddr,
@@ -189,6 +194,7 @@ lease_table_find_external(int proto, int family, const struct in6_addr * eaddr,
 	return NULL;
 }
 
+/* Find a row on this external port, whatever its remote. */
 struct lease_entry *
 lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
                          unsigned short eport)
@@ -208,6 +214,7 @@ lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
 	return NULL;
 }
 
+/* Find a row on this external port for another internal address. */
 struct lease_entry *
 lease_table_port_used_by_other(int family, const struct in6_addr * eaddr,
                                unsigned short eport, const struct in6_addr * iaddr)
@@ -227,6 +234,7 @@ lease_table_port_used_by_other(int family, const struct in6_addr * eaddr,
 	return NULL;
 }
 
+/* Step to the next row of an internal endpoint. */
 struct lease_entry *
 lease_table_next_internal(const struct lease_entry * prev, int proto, int family,
                           const struct in6_addr * iaddr, unsigned short iport)
@@ -245,6 +253,7 @@ lease_table_next_internal(const struct lease_entry * prev, int proto, int family
 	return NULL;
 }
 
+/* Find the UPnP pinhole with this UniqueID. */
 struct lease_entry *
 lease_table_find_uid(unsigned short uid)
 {
@@ -259,12 +268,14 @@ lease_table_find_uid(unsigned short uid)
 	return NULL;
 }
 
+/* 1 if the row belongs on the port list */
 static int
 is_port_mapping(const struct lease_entry * e)
 {
 	return e->family == AF_INET;
 }
 
+/* a new row goes at the end: the list is in the order of the adds */
 static void
 port_list_add(struct lease_entry * e)
 {
@@ -278,6 +289,7 @@ port_list_add(struct lease_entry * e)
 	port_count++;
 }
 
+/* The rows after e move up one place, so the remembered place is cleared. */
 static void
 port_list_remove(struct lease_entry * e)
 {
@@ -293,6 +305,7 @@ port_list_remove(struct lease_entry * e)
 	port_cursor = NULL;
 }
 
+/* Find the port mapping at this place on the port list. */
 struct lease_entry *
 lease_table_port_at(unsigned int index)
 {
@@ -312,12 +325,14 @@ lease_table_port_at(unsigned int index)
 	return e;
 }
 
+/* Return the number of rows on the port list. */
 unsigned int
 lease_table_port_count(void)
 {
 	return port_count;
 }
 
+/* Step to the next row of the port list. */
 struct lease_entry *
 lease_table_next_port(const struct lease_entry * prev)
 {
@@ -375,6 +390,7 @@ link_row(struct lease_entry * e)
 	count++;
 }
 
+/* Add a copy of a row to the indexes and the port list. */
 struct lease_entry *
 lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
                 unsigned short rport)
@@ -413,6 +429,7 @@ lease_table_replace(struct lease_entry * old, const struct lease_entry * src,
 	return e;
 }
 
+/* Take a row out of the indexes and the port list, and free it. */
 void
 lease_table_remove(struct lease_entry * e)
 {
@@ -440,6 +457,7 @@ lease_table_remove(struct lease_entry * e)
 	count--;
 }
 
+/* Replace the label of a row. */
 int
 lease_table_set_label(struct lease_entry * e, const char * label)
 {
@@ -451,6 +469,7 @@ lease_table_set_label(struct lease_entry * e, const char * label)
 	return 0;
 }
 
+/* Tell if two rows have one owner. */
 int
 lease_table_same_owner(const struct lease_entry * a, const struct lease_entry * b)
 {
@@ -461,6 +480,7 @@ lease_table_same_owner(const struct lease_entry * a, const struct lease_entry * 
 	return memcmp(a->nonce, b->nonce, LEASE_NONCE_LEN) == 0;
 }
 
+/* Call cb for every row, by walking the external index. */
 void
 lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg)
 {
@@ -472,12 +492,14 @@ lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg)
 	}
 }
 
+/* Return the number of rows. */
 unsigned int
 lease_table_count(void)
 {
 	return count;
 }
 
+/* Remove all the rows and free the indexes. */
 void
 lease_table_clear(void)
 {
