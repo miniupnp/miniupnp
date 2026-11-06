@@ -38,9 +38,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/param.h>
-#if defined(sun)
-#include <kstat.h>
-#elif !defined(__linux__)
+#if !defined(__linux__)
 /* for BSD's sysctl */
 #include <sys/sysctl.h>
 #endif
@@ -870,25 +868,6 @@ set_startup_time(void)
 			}
 			fclose(f);
 			startup_time -= uptime;
-		}
-#elif defined(SOLARIS_KSTATS)
-		kstat_ctl_t *kc;
-		kc = kstat_open();
-		if(kc != NULL)
-		{
-			kstat_t *ksp;
-			ksp = kstat_lookup(kc, "unix", 0, "system_misc");
-			if(ksp && (kstat_read(kc, ksp, NULL) != -1))
-			{
-				void *ptr = kstat_data_lookup(ksp, "boot_time");
-				if(ptr)
-					memcpy(&startup_time, ptr, sizeof(startup_time));
-				else
-					syslog(LOG_ERR, "cannot find boot_time kstat");
-			}
-			else
-				syslog(LOG_ERR, "cannot open kstats for unix/0/system_misc: %m");
-			kstat_close(kc);
 		}
 #else
 		struct timeval boottime;

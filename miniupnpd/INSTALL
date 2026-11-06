@@ -45,14 +45,11 @@ To Build and Install :
   # PREFIX=/usr/local make install
 - run as root : The daemon needs rights to modify pf rules.
 
-=========================== *BSD,*Solaris/ipf =============================
+=============================== *BSD/ipf ==================================
 
 configure tries to detect whether ipf or pf should be
 used. If it fails, you can use ./configure --firewall=ipf
 Installation steps are almost the same as with pf.
-
-*Solaris users would be interested in reading informations from :
-https://web.archive.org/web/20110506013706/http://blogs.sun.com/avalon/category/IPFilter
 
 ============================= Mac OS X/ipfw ===============================
 

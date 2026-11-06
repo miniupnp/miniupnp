@@ -11,11 +11,6 @@
 
 #include "getifstats.h"
 
-#if defined(__sun)
-/* solaris 10 does not define LOG_PERROR */
-#define LOG_PERROR 0
-#endif
-
 int
 main(int argc, char **argv)
 {

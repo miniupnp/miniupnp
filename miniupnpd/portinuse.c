@@ -386,7 +386,7 @@ static struct nlist list[] = {
 	}
 /* #elif __NetBSD__ */
 #else
-/* TODO : NetBSD / Darwin (OS X) / Solaris code */
+/* TODO : NetBSD / Darwin (OS X) code */
 #error "No port_in_use() implementation available for this OS"
 #endif
 

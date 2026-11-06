@@ -71,7 +71,7 @@ Thanks to :
 
 # Foreword
 The MiniUPnP project offers software which supports the UPnP Internet Gateway Device (IGD) specifications. NAT-PMP and PCP support was added to MiniUPnPd. For client side NAT-PMP support, use libnatpmp.
-The MiniUPnP daemon (MiniUPnPd) supports OpenBSD, FreeBSD, NetBSD, DragonFly BSD, Solaris and Mac OS X in combination with pf or ipfw (ipfirewall) or ipf and Linux with netfilter or nftables.
+The MiniUPnP daemon (MiniUPnPd) supports OpenBSD, FreeBSD, NetBSD, DragonFly BSD and Mac OS X in combination with pf or ipfw (ipfirewall) or ipf and Linux with netfilter or nftables.
 The MiniUPnP client (MiniUPnPc) and MiniSSDPd are portable and should work on any POSIX system. MiniUPnPc also works under MS Windows and AmigaOS (version 3 and 4).
 UPnP IGD client lightweight library and UPnP IGD daemon
 The UPnP protocol is supported by most home adsl/cable routers and Microsoft Windows 2K/XP. The aim of the MiniUPnP project is to bring a free software solution to support the "Internet Gateway Device" part of the protocol. The MediaServer/MediaRenderer UPnP protocol (DLNA) is also becoming very popular but here we are talking about IGD. ReadyMedia (formely known as MiniDLNA) is a UPnP Media Server using some UPnP code from MiniUPnPd.
@@ -83,12 +83,12 @@ The miniUPnP daemon is much smaller than any other IGD daemon and is ideal for u
 The project is divided in two main parts :
 
 MiniUPnPc, the client library, enabling applications to access the services provided by an UPnP "Internet Gateway Device" present on the network. In UPnP terminology, MiniUPnPc is a UPnP Control Point.
-MiniUPnPd, a daemon providing these services to your network from a linux or BSD (or even Solaris) box being the gateway. Following UPnP terminology, MiniUPnPd is a UPnP Device.
+MiniUPnPd, a daemon providing these services to your network from a linux or BSD box being the gateway. Following UPnP terminology, MiniUPnPd is a UPnP Device.
 MiniSSDPd was developped to work together with MiniUPnPc, MiniUPnPd and other cooperative softwares : MiniSSDPd listen to SSDP traffic on the network so MiniUPnPc or other UPnP Control Points does not need to perform the discovery process and can work faster to set up a redirection. MiniSSDPd is also able to reply to M-SEARCH SSDP requests on behalf on MiniUPnPd or other UPnP server software. That is useful in order to host several UPnP services on the same machine, such as MiniDLNA (now ReadyMedia) and MiniUPnPd. MiniUPnPd natively uses MiniSSDPd if run on the same machine, but other UPnP software may require to be patched : read MiniSSDPd patch for MiniDLNA (not needeed for MiniDLNA 1.0.22 and up) and MiniSSDPd patch for MediaTomb.
 MiniUPnPd was first developped on OpenBSD 3.0+ with pf. You can see some of the work I have done to integrate with pf on this page (obsolete).
 As pf is also available under FreeBSD, guys at the pfSense project have ported miniupnpd to this system. Now it must be possible to compile and run on every platform where pf is available.
 The daemon is now also available for linux 2.4.x and 2.6.x using netfilter. It is possible to make it run on router devices running OpenWRT.
-Darren Reed worked on an IP Filter (ipf) implementation. I'm afraid it is not maintained... Darren also added support for Solaris/OpenSolaris. The ipfw port is available for MacOS X. It should be possible to make it work on FreeBSD too, but I haven't received any feedback about that.
+Darren Reed worked on an IP Filter (ipf) implementation. I'm afraid it is not maintained... The ipfw port is available for MacOS X. It should be possible to make it work on FreeBSD too, but I haven't received any feedback about that.
 
 For some reasons, it may be not the good solution for you to use the code from the MiniUPnP project directly.
 As the code is small and simple to understand, it is a good base to take inspiration for your own UPnP implementation. The KTorrent UPnP plugin in C++ is a good example.
