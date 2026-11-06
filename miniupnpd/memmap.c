@@ -1,4 +1,14 @@
-/* See memmap.h */
+/* The layer between the protocols and the mapping table. See memmap.h.
+ *
+ * Functions this file gets later:
+ * memmap_add_filter()	the third add: a FILTER peer on the row of a PCP MAP.
+ * memmap_sync()	send the rows of a request to the firewall as one
+ *			transaction. A request succeeds or fails as a whole. Its
+ *			rows are built in full and are not linked into the table:
+ *			a success links them, and a failure frees them, so a
+ *			lookup never finds a row the firewall refused. The startup
+ *			restore, a firewall reload and rules lost from the
+ *			firewall use the same send. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,18 +22,55 @@
 #include "lease_table.h"
 #include "memmap.h"
 
+/* The table keeps every address in 16 bytes: a.b.c.d as ::ffff:a.b.c.d. */
+int
+memmap_pton(const char * s, int * family, struct in6_addr * a)
+{
+	struct in_addr v4;
+
+	if(s == NULL)
+		return -1;
+	if(inet_pton(AF_INET, s, &v4) == 1) {
+		memset(a, 0, sizeof(*a));
+		a->s6_addr[10] = a->s6_addr[11] = 0xff;
+		memcpy(a->s6_addr + 12, &v4, sizeof(v4));
+		*family = AF_INET;
+		return 0;
+	}
+	if(inet_pton(AF_INET6, s, a) == 1) {
+		*family = AF_INET6;
+		return 0;
+	}
+	return -1;
+}
+
+/* Print an address of the table. */
+const char *
+memmap_ntop(int family, const struct in6_addr * a, char * buf, size_t len)
+{
+	if(family == AF_INET)
+		return inet_ntop(AF_INET, a->s6_addr + 12, buf, len);
+	return inet_ntop(AF_INET6, a, buf, len);
+}
+
+/* The table form of an IPv4 address. 0, or -1 if s is not an IPv4 address */
 static int
 v4_mapped(const char * s, struct in6_addr * a)
 {
-	struct in_addr v4;
-	if(inet_pton(AF_INET, s, &v4) != 1)
-		return -1;
-	memset(a, 0, sizeof(*a));
-	a->s6_addr[10] = a->s6_addr[11] = 0xff;
-	memcpy(a->s6_addr + 12, &v4, sizeof(v4));
-	return 0;
+	int family;
+	return memmap_pton(s, &family, a) == 0 && family == AF_INET ? 0 : -1;
 }
 
+void
+memmap_owner_init(struct memmap_owner * o, int kind, const void * nonce)
+{
+	memset(o, 0, sizeof(*o));
+	o->kind = (unsigned char)kind;
+	if(nonce != NULL)
+		memcpy(o->nonce, nonce, sizeof(o->nonce));
+}
+
+/* the value of a hex digit. mapping_owner_of() has checked the digits */
 static int
 hex_value(int c)
 {
@@ -32,16 +79,32 @@ hex_value(int c)
 	return c - 'A' + 10;
 }
 
-/* kind and nonce of a mapping, from its description */
-static void
-set_owner(struct lease_entry * e, const char * desc, unsigned short eport, int proto)
+/* the kind of row which mapping_owner_of() gives for owner */
+static unsigned char
+owner_kind(int owner)
 {
+	switch(owner) {
+	case MAPPING_PCP:
+		return LEASE_PCP_MAP;
+	case MAPPING_NATPMP:
+		return LEASE_NATPMP;
+	default:
+		return LEASE_UPNP;
+	}
+}
+
+/* The owner a description names: a PCP description ends in the 24 hex
+ * digits of the nonce. See mapping_owner_of(). */
+void
+memmap_owner_from_desc(const char * desc, unsigned short eport, int proto,
+                       struct memmap_owner * o)
+{
+	int owner = mapping_owner_of(desc != NULL ? desc : "", eport, proto);
 	uint32_t w;
 	int i, j;
-	memset(e->nonce, 0, sizeof(e->nonce));
-	switch(mapping_owner_of(desc, eport, proto)) {
-	case MAPPING_PCP:
-		e->kind = LEASE_PCP_MAP;
+
+	memmap_owner_init(o, owner_kind(owner), NULL);
+	if(owner == MAPPING_PCP) {
 		desc += strlen(desc) - 24;
 		/* pcpserver.c copies the nonce off the wire into three uint32_t
 		 * and prints each with %08x: a group of 8 digits is a word in
