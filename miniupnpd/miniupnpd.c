@@ -2310,9 +2310,6 @@ main(int argc, char * * argv)
 #ifdef USE_PF
 			puts("using pf backend");
 #endif
-#ifdef USE_IPFW
-			puts("using ipfw backend");
-#endif
 #ifdef USE_IPTABLES
 			puts("using netfilter(iptables) backend");
 #endif

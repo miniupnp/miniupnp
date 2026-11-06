@@ -53,7 +53,6 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnppinhole.o asyncsendto.o portinuse.o
 OS_OBJS = getifstats.o ifacewatcher.o getroute.o
 PFOBJS = obsdrdr.o pfpinhole.o
-IPFWOBJS = ipfwrdr.o ipfwaux.o
 MISCOBJS = upnpreplyparse.o minixml.o
 
 ALLOBJS = $(STDOBJS) $(MISCOBJS)
@@ -74,9 +73,6 @@ ALLSRCS += $(SRCDIR)/bsd/ifacewatcher.c $(SRCDIR)/bsd/getroute.c
 .if $(FWNAME) == "pf"
 FWOBJS = $(PFOBJS)
 FWSRCS = $(PFOBJS:S/^/$(SRCDIR)\/pf\//:S/.o$/.c/)
-.elif $(FWNAME) == "ipfw"
-FWOBJS = $(IPFWOBJS)
-FWSRCS = $(IPFWOBJS:S/^/$(SRCDIR)\/ipfw\//:S/.o$/.c/)
 .endif
 ALLOBJS += $(FWOBJS)
 ALLSRCS += $(FWSRCS)
@@ -225,7 +221,6 @@ config.h:	$(SRCDIR)/configure $(SRCDIR)/VERSION $(SRCDIR)/Makefile.bsd
 
 $(STDOBJS) $(MISCOBJS):	$(SRCDIR)/$(@:.o=.c)
 $(PFOBJS):	$(SRCDIR)/pf/$(@:.o=.c)
-$(IPFWOBJS):	$(SRCDIR)/ipfw/$(@:.o=.c)
 
 .if $(OSNAME) == "Darwin"
 getifstats.o:	$(SRCDIR)/mac/getifstats.c

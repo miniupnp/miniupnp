@@ -391,7 +391,7 @@ static struct nlist list[] = {
 #endif
 
 	/* Phase 2 : check existing mappings
-	 * TODO : implement for pf/ipfw/etc. */
+	 * TODO : implement for pf/etc. */
 #if defined(USE_NETFILTER)
 	if (!found) {
 		char iaddr_old[16];

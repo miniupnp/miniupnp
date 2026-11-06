@@ -91,7 +91,7 @@ case "$argv" in
 		echo " --https-key=/path     Path to the HTTPS private key (default to ${HTTPS_KEYFILE})"
 		echo " --uda-version=x.x     Set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn     Disable WANPPPConnection"
-		echo " --firewall=<name>     Force firewall type (nftables, iptables, pf, ipfw)"
+		echo " --firewall=<name>     Force firewall type (nftables, iptables, pf)"
 		echo " --libpfctl            Use libpfctl"
 		echo " --iptablespath=/path  Use a specific version of iptables"
 		echo " --disable-fork        Do not go to background and do not write pid file"
@@ -353,31 +353,8 @@ case $OS_NAME in
 			fi
 		fi
 		HAVE_IP_MREQN=1
-		# see which firewall is enabled
-		# see https://miniupnp.tuxfamily.org/forum/viewtopic.php?p=957
-		if [ "$CROSSBUILD" != "1" ] && [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/defaults/rc.conf ] ; then
-			# source file with handy subroutines like checkyesno
-			. /etc/rc.subr
-			# source config file so we can probe vars
-			. /etc/defaults/rc.conf
-			if [ -f /etc/rc.conf ] ; then
-				. /etc/rc.conf
-			fi
-			if checkyesno pf_enable; then
-				echo "Using pf"
-				FW=pf
-			elif checkyesno firewall_enable; then
-				echo "Using ifpw"
-				FW=ipfw
-			fi
-		fi
 		if [ -z $FW ] ; then
-			echo "Could not detect usage of pf, ipfw. Compiling for pf by default"
 			FW=pf
-		fi
-		if [ "$FW" = "ipfw" ] ; then
-			echo "!!! ipfw is known to not work with FreeBSD, please contribute !!!"
-			echo "!!! see https://github.com/miniupnp/miniupnp/issues/596       !!!"
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
 		OS_URL=https://www.freebsd.org/
@@ -541,13 +518,13 @@ case $OS_NAME in
         # do not daemon() under macOS
 	    NO_BACKGROUND_NO_PIDFILE=1
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
-		# OS X switched to pf since 10.7 Lion (Darwin 11.0)
-		if [ $MAJORVER -ge 11 ] ; then
-			FW=pf
-			echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
-		else
-			FW=ipfw
+		# OS X has pf since 10.7 Lion (Darwin 11.0)
+		if [ $MAJORVER -lt 11 ] ; then
+			echo "Mac OS X before 10.7 has no pf"
+			exit 1
 		fi
+		FW=pf
+		echo "#define PFRULE_INOUT_COUNTS" >> ${CONFIGFILE}
 		OS_URL=https://developer.apple.com/macos/
 		;;
 	*)
@@ -586,9 +563,6 @@ case $FW in
 			echo "#define USE_LIBPFCTL 1" >> ${CONFIGFILE}
 		fi
         MINIUPNPD_DESC_SIZE=64
-		;;
-	ipfw)
-		echo "#define USE_IPFW 1" >> ${CONFIGFILE}
 		;;
 	iptables)
 		if ! [ "$OS_FAMILY" = "Linux" ] ; then
@@ -806,7 +780,7 @@ echo "#define MINIUPNPD_DESC_SIZE ${MINIUPNPD_DESC_SIZE}" >> ${CONFIGFILE}
 
 # define SUPPORT_REMOTEHOST if the FW related code really supports setting
 # a RemoteHost
-if [ \( "$FW" = "nftables" \) -o \( "$FW" = "iptables" \) -o \( "$FW" = "pf" \) -o \( "$FW" = "ipfw" \) ] ; then
+if [ \( "$FW" = "nftables" \) -o \( "$FW" = "iptables" \) -o \( "$FW" = "pf" \) ] ; then
 	echo "#define SUPPORT_REMOTEHOST" >> ${CONFIGFILE}
 fi
 
