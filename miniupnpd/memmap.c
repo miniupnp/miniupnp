@@ -382,3 +382,36 @@ memmap_map_known(unsigned short eport, int proto)
 {
 	return lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL;
 }
+
+/* the strings of the row of a port mapping. NULL for what is not wanted */
+static void
+port_info(const struct lease_entry * row, unsigned short * iport,
+          char * iaddr, int iaddrlen, char * desc, int desclen,
+          char * rhost, int rhostlen, unsigned int * timestamp)
+{
+	if(iport != NULL)
+		*iport = row->iport;
+	if(iaddr != NULL && iaddrlen > 0)
+		inet_ntop(AF_INET, row->iaddr.s6_addr + 12, iaddr, iaddrlen);
+	if(desc != NULL && desclen > 0)
+		snprintf(desc, desclen, "%s", row->label ? row->label : "");
+	if(rhost != NULL && rhostlen > 0) {
+		rhost[0] = '\0';
+		if(row->remote != NULL)
+			inet_ntop(AF_INET, row->remote->raddr.s6_addr + 12, rhost, rhostlen);
+	}
+	if(timestamp != NULL)
+		*timestamp = (unsigned int)row->expiry;
+}
+
+int
+memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
+               char * iaddr, int iaddrlen, char * desc, int desclen,
+               char * rhost, int rhostlen, unsigned int * timestamp)
+{
+	const struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	if(row == NULL)
+		return -1;
+	port_info(row, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen, timestamp);
+	return 0;
+}
