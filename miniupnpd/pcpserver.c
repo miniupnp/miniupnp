@@ -82,6 +82,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "getifaddr.h"
 #include "asyncsendto.h"
 #include "upnputils.h"
+#include "memmap.h"
 #include "portinuse.h"
 #include "pcp_msg_struct.h"
 #ifdef ENABLE_UPNPPINHOLE
@@ -1144,6 +1145,10 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
+		memmap_map((unsigned short)uid, pcp_msg_info->int_port,
+		           pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		           pcp_msg_info->protocol, pcp_msg_info->desc,
+		           upnp_time() + pcp_msg_info->lifetime);
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
 		return PCP_SUCCESS;
 	} else {
