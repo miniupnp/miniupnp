@@ -415,3 +415,18 @@ memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
 	port_info(row, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen, timestamp);
 	return 0;
 }
+
+int
+memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
+                  unsigned short * iport, char * iaddr, int iaddrlen,
+                  char * desc, int desclen, char * rhost, int rhostlen,
+                  unsigned int * timestamp)
+{
+	const struct lease_entry * row = lease_table_port_at(index);
+	if(row == NULL)
+		return -1;
+	*eport = row->eport;
+	*proto = row->proto;
+	port_info(row, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen, timestamp);
+	return 0;
+}

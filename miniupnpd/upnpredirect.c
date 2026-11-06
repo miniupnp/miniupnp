@@ -540,10 +540,9 @@ upnp_get_redirection_infos_by_index(int index,
 		desc[0] = '\0';
 	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
-	if(get_redirect_rule_by_index(index, 0/*ifname*/, eport, iaddr, iaddrlen,
-	                              iport, &proto, desc, desclen,
-	                              rhost, rhostlen, &timestamp,
-	                              0, 0) < 0)
+	if(index < 0 ||
+	   memmap_get_map_at((unsigned int)index, eport, &proto, iport, iaddr, iaddrlen,
+	                          desc, desclen, rhost, rhostlen, &timestamp) < 0)
 		return -1;
 	else
 	{
