@@ -451,6 +451,25 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	}
 }
 
+/* a redirect rule whose filter rule failed. A rule which cannot be deleted
+ * gets a row which has expired, so the expiry tries again */
+static void
+remove_half_added(const char * rhost, unsigned short eport, const char * iaddr,
+                  unsigned short iport, int proto, const char * desc)
+{
+#if defined(__linux__)
+	int r = delete_redirect_and_filter_rules(eport, proto);
+#else
+	int r = delete_redirect_rule(ext_if_name, eport, proto);
+#endif
+	if(r < 0) {
+		unsigned int now = (unsigned int)upnp_time();
+		syslog(LOG_WARNING, "could not remove the half added rule of port %hu", eport);
+		record_map(rhost, eport, iaddr, iport, proto, desc, now);
+		nextruletoclean_timestamp = now;
+	}
+}
+
 int
 upnp_redirect_internal(const char * rhost, unsigned short eport,
                        const char * iaddr, unsigned short iport,
@@ -466,19 +485,16 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 		return -1;
 	}
 
-#ifdef ENABLE_LEASEFILE
-	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
-#endif
 /*	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %s for: %s",
 		iaddr, iport, protocol, desc);*/
 	if(add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc) < 0) {
-		/* clean up the redirect rule */
-#if !defined(__linux__)
-		delete_redirect_rule(ext_if_name, eport, proto);
-#endif
+		remove_half_added(rhost, eport, iaddr, iport, proto, desc);
 		return -1;
 	}
 	record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
+#ifdef ENABLE_LEASEFILE
+	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
+#endif
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;
