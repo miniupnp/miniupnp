@@ -17,7 +17,7 @@ support IGD v2 : http://upnp.org/specs/gw/igd2/
  - WANIPv6FirewallControl
    - pf : updatepinhole to do
    - netfilter : ok ?
-   - ipfw/ipf : TODO
+   - ipfw : TODO
 
 implement port_in_use() for NetBSD
 

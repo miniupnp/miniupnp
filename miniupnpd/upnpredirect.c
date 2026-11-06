@@ -32,9 +32,6 @@
 #if defined(USE_PF)
 #include "pf/obsdrdr.h"
 #endif
-#if defined(USE_IPF)
-#include "ipf/ipfrdr.h"
-#endif
 #if defined(USE_IPFW)
 #include "ipfw/ipfwrdr.h"
 #endif

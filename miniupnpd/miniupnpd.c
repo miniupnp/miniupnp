@@ -1243,7 +1243,7 @@ void print_usage(FILE * out, const char * argv0) {
 			" [-H https_port]"
 #endif
 			" [-p port] [-d] [-v]"
-#if defined(USE_PF) || defined(USE_IPF)
+#ifdef USE_PF
 			" [-L]"
 #endif
 			" [-U] [-S0]"
@@ -1286,8 +1286,8 @@ void print_usage(FILE * out, const char * argv0) {
 #ifdef ENABLE_IPV6
 			"\t-4 disable IPv6\n"
 #endif
-#if defined(USE_PF) || defined(USE_IPF)
-			"\t-L sets packet log in pf and ipf on.\n"
+#ifdef USE_PF
+			"\t-L sets packet log in pf on.\n"
 #endif
 			"\t-S0 disable \"secure\" mode so clients can add mappings to other ips\n"
 			"\t-U causes miniupnpd to report system uptime instead "
@@ -1558,12 +1558,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(SYSUPTIMEMASK);	/*sysuptime = 1;*/
 				break;
-#if defined(USE_PF) || defined(USE_IPF)
+#ifdef USE_PF
 			case UPNPPACKET_LOG:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(LOGPACKETSMASK);	/*logpackets = 1;*/
 				break;
-#endif	/* defined(USE_PF) || defined(USE_IPF) */
+#endif	/* USE_PF */
 			case UPNPUUID:
 				strncpy(uuidvalue_igd+5, ary_options[i].value,
 				        strlen(uuidvalue_igd+5) + 1);
@@ -1802,12 +1802,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		/*case 'l':
 			logfilename = argv[++i];
 			break;*/
-#if defined(USE_PF) || defined(USE_IPF)
+#ifdef USE_PF
 		case 'L':
 			/*logpackets = 1;*/
 			SETFLAG(LOGPACKETSMASK);
 			break;
-#endif	/* defined(USE_PF) || defined(USE_IPF) */
+#endif	/* USE_PF */
 		case 'S':
 			/* -S0 to disable secure mode, for backward compatibility
 			 * -S is ignored */
@@ -2309,9 +2309,6 @@ main(int argc, char * * argv)
 			     " " __DATE__ );
 #ifdef USE_PF
 			puts("using pf backend");
-#endif
-#ifdef USE_IPF
-			puts("using ipf backend");
 #endif
 #ifdef USE_IPFW
 			puts("using ipfw backend");

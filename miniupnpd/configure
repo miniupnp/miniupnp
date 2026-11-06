@@ -91,7 +91,7 @@ case "$argv" in
 		echo " --https-key=/path     Path to the HTTPS private key (default to ${HTTPS_KEYFILE})"
 		echo " --uda-version=x.x     Set advertised UPnP version (default to ${UPNP_VERSION_MAJOR}.${UPNP_VERSION_MINOR})"
 		echo " --disable-pppconn     Disable WANPPPConnection"
-		echo " --firewall=<name>     Force firewall type (nftables, iptables, pf, ipf, ipfw)"
+		echo " --firewall=<name>     Force firewall type (nftables, iptables, pf, ipfw)"
 		echo " --libpfctl            Use libpfctl"
 		echo " --iptablespath=/path  Use a specific version of iptables"
 		echo " --disable-fork        Do not go to background and do not write pid file"
@@ -353,7 +353,7 @@ case $OS_NAME in
 			fi
 		fi
 		HAVE_IP_MREQN=1
-		# new way to see which one to use PF or IPF.
+		# see which firewall is enabled
 		# see https://miniupnp.tuxfamily.org/forum/viewtopic.php?p=957
 		if [ "$CROSSBUILD" != "1" ] && [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/defaults/rc.conf ] ; then
 			# source file with handy subroutines like checkyesno
@@ -363,10 +363,7 @@ case $OS_NAME in
 			if [ -f /etc/rc.conf ] ; then
 				. /etc/rc.conf
 			fi
-			if checkyesno ipfilter_enable; then
-				echo "Using ipf"
-				FW=ipf
-			elif checkyesno pf_enable; then
+			if checkyesno pf_enable; then
 				echo "Using pf"
 				FW=pf
 			elif checkyesno firewall_enable; then
@@ -375,7 +372,7 @@ case $OS_NAME in
 			fi
 		fi
 		if [ -z $FW ] ; then
-			echo "Could not detect usage of ipf, pf, ipfw. Compiling for pf by default"
+			echo "Could not detect usage of pf, ipfw. Compiling for pf by default"
 			FW=pf
 		fi
 		if [ "$FW" = "ipfw" ] ; then
@@ -401,19 +398,7 @@ case $OS_NAME in
 		;;
 	NetBSD)
 		MAKEFILE=Makefile.bsd
-		if [ "$CROSSBUILD" != "1" ] && [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
-			# source file with handy subroutines like checkyesno
-			. /etc/rc.subr
-			# source config file so we can probe vars
-			. /etc/rc.conf
-			if checkyesno pf; then
-				FW=pf
-			elif checkyesno ipfilter; then
-				FW=ipf
-			fi
-		fi
 		if [ -z $FW ] ; then
-			echo "Could not detect ipf nor pf, defaulting to pf."
 			FW=pf
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
@@ -422,19 +407,7 @@ case $OS_NAME in
 	DragonFly)
 		OS_FAMILY=DragonFlyBSD
 		MAKEFILE=Makefile.bsd
-		if [ "$CROSSBUILD" != "1" ] && [ -z $FW ] && [ -f /etc/rc.subr ] && [ -f /etc/rc.conf ] ; then
-			# source file with handy subroutines like checkyesno
-			. /etc/rc.subr
-			# source config file so we can probe vars
-			. /etc/rc.conf
-			if checkyesno pf; then
-				FW=pf
-			elif checkyesno ipfilter; then
-				FW=ipf
-			fi
-		fi
 		if [ -z $FW ] ; then
-			echo "Could not detect ipf nor pf, defaulting to pf."
 			FW=pf
 		fi
 		echo "#define USE_IFACEWATCHER 1" >> ${CONFIGFILE}
@@ -613,9 +586,6 @@ case $FW in
 			echo "#define USE_LIBPFCTL 1" >> ${CONFIGFILE}
 		fi
         MINIUPNPD_DESC_SIZE=64
-		;;
-	ipf)
-		echo "#define USE_IPF 1" >> ${CONFIGFILE}
 		;;
 	ipfw)
 		echo "#define USE_IPFW 1" >> ${CONFIGFILE}
@@ -1025,7 +995,7 @@ echo " * It can be disabled to save a few bytes. */" >> ${CONFIGFILE}
 echo "#define ENABLE_EVENTS" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 
-echo "/* include interface name in pf, ipf and nftables rules */" >> ${CONFIGFILE}
+echo "/* include interface name in pf and nftables rules */" >> ${CONFIGFILE}
 echo "#define USE_IFNAME_IN_RULES" >> ${CONFIGFILE}
 echo "" >> ${CONFIGFILE}
 

@@ -45,12 +45,6 @@ To Build and Install :
   # PREFIX=/usr/local make install
 - run as root : The daemon needs rights to modify pf rules.
 
-=============================== *BSD/ipf ==================================
-
-configure tries to detect whether ipf or pf should be
-used. If it fails, you can use ./configure --firewall=ipf
-Installation steps are almost the same as with pf.
-
 ============================= Mac OS X/ipfw ===============================
 
 - To enable non standard compilation options,
