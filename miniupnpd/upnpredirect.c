@@ -640,25 +640,13 @@ _upnp_delete_redir(unsigned short eport, int proto)
 int
 upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr)
 {
-	static const int protos[] = { IPPROTO_TCP, IPPROTO_UDP };
-	char iaddr_old[INET6_ADDRSTRLEN];
-	unsigned short iport_old;
-	size_t i;
+	struct in6_addr a;
+	int family;
 
-	for(i = 0; i < sizeof(protos)/sizeof(protos[0]); i++) {
-		if(protos[i] == proto)
-			continue;	/* the caller looks it up */
-		if(get_redirect_rule(ext_if_name, eport, protos[i],
-		                     iaddr_old, sizeof(iaddr_old), &iport_old,
-		                     0, 0, 0, 0, NULL, 0, 0) != 0)
-			continue;
-		if(strcmp(iaddr, iaddr_old) == 0)
-			continue;	/* the client's own mapping */
-		syslog(LOG_INFO, "external port %hu is used by %s (%s)",
-		       eport, iaddr_old, proto_itoa(protos[i]));
-		return 1;
-	}
-	return 0;
+	(void)proto;	/* the table answers for both protocols at once */
+	if(memmap_pton(iaddr, &family, &a) < 0)
+		return 0;
+	return memmap_eport_used_by_other(family, NULL, eport, &a);
 }
 
 int
