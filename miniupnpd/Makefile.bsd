@@ -108,7 +108,7 @@ TESTMINISSDPOBJS = testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
 TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o \
                        getroute.o
 TESTSTUNOBJS = teststun.o upnpstun.o upnputils.o getroute.o $(FWOBJS) \
-               getifaddr.o
+               memmap_stub.o getifaddr.o
 TESTUPNPHTTPOBJS = testupnphttp.o upnphttp.o upnputils.o getosversion.o \
                    getroute.o
 TESTLEASETABLEOBJS = testleasetable.o lease_table.o

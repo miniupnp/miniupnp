@@ -16,16 +16,19 @@ all:	$(EXECUTABLES)
 clean:
 	rm -f *.o $(EXECUTABLES)
 
-testobsdrdr:	testobsdrdr.o obsdrdr.o getifaddr.o
+testobsdrdr:	testobsdrdr.o obsdrdr.o memmap_stub.o getifaddr.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@ $>
 
 testpfpinhole:	testpfpinhole.o obsdrdr.o pfpinhole.o \
-	getifaddr.o upnputils.o getroute.o
+	getifaddr.o upnputils.o getroute.o memmap_stub.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@ $>
 
 obsdrdr.o:	obsdrdr.c obsdrdr.h
 
 pfpinhole.o:	pfpinhole.c pfpinhole.h
+
+memmap_stub.o:	../memmap_stub.c ../memmap.h
+	$(CC) $(CFLAGS) -c -o $@ ../memmap_stub.c
 
 testobsdrdr.o:	testobsdrdr.c obsdrdr.h
 

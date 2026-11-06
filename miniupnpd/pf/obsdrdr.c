@@ -77,72 +77,18 @@
 #include "obsdrdr.h"
 #include "../upnpglobalvars.h"
 #include "../getifaddr.h"
+#include "../memmap.h"
 #include "rtickets.h"
 
 #ifndef USE_PF
 #error "USE_PF macro is undefined, check consistency between config.h and Makefile"
 #else
 
-/* list to keep timestamps for port mappings having a lease duration */
-struct timestamp_entry {
-	struct timestamp_entry * next;
-	unsigned int timestamp;
-	unsigned short eport;
-	short protocol;
-};
-
-static struct timestamp_entry * timestamp_list = NULL;
 
 static unsigned int
 get_timestamp(unsigned short eport, int proto)
 {
-	struct timestamp_entry * e;
-	e = timestamp_list;
-	while(e) {
-		if(e->eport == eport && e->protocol == (short)proto)
-			return e->timestamp;
-		e = e->next;
-	}
-	return 0;
-}
-
-static void
-remove_timestamp_entry(unsigned short eport, int proto)
-{
-	struct timestamp_entry * e;
-	struct timestamp_entry * * p;
-	p = &timestamp_list;
-	e = *p;
-	while(e) {
-		if(e->eport == eport && e->protocol == (short)proto) {
-			/* remove the entry */
-			*p = e->next;
-			free(e);
-			return;
-		}
-		p = &(e->next);
-		e = *p;
-	}
-}
-
-static void
-add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
-{
-	struct timestamp_entry * tmp;
-	tmp = malloc(sizeof(struct timestamp_entry));
-	if(tmp)
-	{
-		tmp->next = timestamp_list;
-		tmp->timestamp = timestamp;
-		tmp->eport = eport;
-		tmp->protocol = (short)proto;
-		timestamp_list = tmp;
-	}
-	else
-	{
-		syslog(LOG_ERR, "add_timestamp_entry() malloc(%lu) error",
-		       sizeof(struct timestamp_entry));
-	}
+	return memmap_map_expiry(eport, proto);
 }
 
 /* /dev/pf when opened */
@@ -648,6 +594,7 @@ add_redirect_rule2(const char * ifname,
 	struct pf_pooladdr *a;
 #endif
 
+	UNUSED(timestamp);	/* the lifetime is in the table */
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -794,8 +741,6 @@ add_redirect_rule2(const char * ifname,
 		free(a);
 #endif
 	}
-	if(r == 0 && timestamp > 0)
-		add_timestamp_entry(eport, proto, timestamp);
 #ifdef ENABLE_PORT_TRIGGERING
 	if(r == 0 && proto == IPPROTO_UDP)
 	{
@@ -1310,7 +1255,6 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 				r = -1;
 				break;
 			}
-			remove_timestamp_entry(eport, proto);
 			r = 0;
 			break;
 		}
@@ -1775,9 +1719,7 @@ update_portmapping_desc_timestamp(const char * ifname,
 	if(r < 0)
 		return -1;
 	if(r == 1) {
-		/* only change timestamp */
-		remove_timestamp_entry(eport, proto);
-		add_timestamp_entry(eport, proto, timestamp);
+		/* only the timestamp changes, and that is in the table */
 		return 0;
 	}
 	if (priv_delete_filter_rule(ifname, iport, proto, iaddr) < 0)

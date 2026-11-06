@@ -15,4 +15,4 @@ OTHEROBJS = miniupnpdctl.o testupnpdescgen.o testgetifstats.o \
             testupnppermissions.o testgetifaddr.o testgetroute.o \
             testssdppktgen.o testasyncsendto.o testportinuse.o testminissdp.o \
             testifacewatcher.o teststun.o testupnphttp.o \
-            testleasetable.o testmemmap.o
+            testleasetable.o testmemmap.o memmap_stub.o
