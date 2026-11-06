@@ -70,4 +70,10 @@ int memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
                    char * iaddr, int iaddrlen, char * desc, int desclen,
                    char * rhost, int rhostlen, unsigned int * timestamp);
 
+/* a port mapping by its place in the list, oldest first. -1 past the end */
+int memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
+                      unsigned short * iport, char * iaddr, int iaddrlen,
+                      char * desc, int desclen, char * rhost, int rhostlen,
+                      unsigned int * timestamp);
+
 #endif
