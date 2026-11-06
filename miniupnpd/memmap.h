@@ -82,4 +82,7 @@ int memmap_map_count(void);
 unsigned short * memmap_ports_in_range(unsigned short startport, unsigned short endport,
                                        int proto, unsigned int * number);
 
+/* 1 if another host maps the external port, on any protocol */
+int memmap_eport_used_by_other(unsigned short eport, const char * iaddr);
+
 #endif

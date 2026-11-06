@@ -461,3 +461,19 @@ memmap_ports_in_range(unsigned short startport, unsigned short endport,
 	}
 	return ports;
 }
+
+int
+memmap_eport_used_by_other(unsigned short eport, const char * iaddr)
+{
+	struct in6_addr a;
+	struct lease_entry * row;
+	char other[INET_ADDRSTRLEN];
+	if(v4_mapped(iaddr, &a) < 0)
+		return 0;
+	row = lease_table_port_used_by_other(AF_INET, NULL, eport, &a);
+	if(row == NULL)
+		return 0;
+	if(inet_ntop(AF_INET, row->iaddr.s6_addr + 12, other, sizeof(other)) != NULL)
+		syslog(LOG_INFO, "external port %hu is used by %s", eport, other);
+	return 1;
+}

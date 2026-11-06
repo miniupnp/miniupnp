@@ -123,6 +123,11 @@ struct lease_entry *
 lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
                          unsigned short eport);
 
+/* a mapping of the external port for another host, on any protocol */
+struct lease_entry *
+lease_table_port_used_by_other(int family, const struct in6_addr * eaddr,
+                               unsigned short eport, const struct in6_addr * iaddr);
+
 /* Walk the rows of an internal endpoint: call with prev NULL for the first row,
  * then with the row it returned, until NULL. A port mapping can have several
  * rows, one per external port, so this is a walk and not a find. */
