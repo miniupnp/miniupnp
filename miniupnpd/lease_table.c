@@ -1,0 +1,209 @@
+/* See lease_table.h */
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+
+#include "lease_table.h"
+
+#define MIN_BUCKETS	1024u
+
+struct index {
+	struct lease_entry ** buckets;
+	unsigned int size;	/* a power of 2 */
+};
+
+static struct index ext_index;
+static unsigned int count = 0;
+
+static const struct in6_addr any_addr;
+
+/* FNV-1a */
+static unsigned int
+hash_bytes(unsigned int h, const void * data, size_t len)
+{
+	const unsigned char * p = data;
+	while(len-- > 0)
+		h = (h ^ *p++) * 16777619u;
+	return h;
+}
+
+#define HASH_INIT	2166136261u
+
+static unsigned int
+ext_hash_key(int family, const struct in6_addr * eaddr, unsigned short eport)
+{
+	unsigned char head = (unsigned char)family;
+	unsigned int h = hash_bytes(HASH_INIT, &head, sizeof(head));
+	h = hash_bytes(h, eaddr, sizeof(*eaddr));
+	return hash_bytes(h, &eport, sizeof(eport));
+}
+
+static unsigned int
+ext_hash(const struct lease_entry * e)
+{
+	return ext_hash_key(e->family, &e->eaddr, e->eport);
+}
+
+static int
+index_init(struct index * x, unsigned int size)
+{
+	x->buckets = calloc(size, sizeof(*x->buckets));
+	if(x->buckets == NULL)
+		return -1;
+	x->size = size;
+	return 0;
+}
+
+/* a bigger table of buckets. On failure the old one stays: only the chains
+ * get longer */
+static void
+grow(void)
+{
+	struct index ext2;
+	unsigned int size = ext_index.size * 2, i;
+	if(index_init(&ext2, size) < 0)
+		return;
+	for(i = 0; i < ext_index.size; i++) {
+		struct lease_entry * e = ext_index.buckets[i], * next;
+		for(; e != NULL; e = next) {
+			unsigned int b = ext_hash(e) & (size - 1);
+			next = e->ext_next;
+			e->ext_next = ext2.buckets[b];
+			ext2.buckets[b] = e;
+		}
+	}
+	free(ext_index.buckets);
+	ext_index = ext2;
+}
+
+static int
+ready(void)
+{
+	if(ext_index.buckets != NULL)
+		return 0;
+	return index_init(&ext_index, MIN_BUCKETS);
+}
+
+static int
+remote_matches(const struct lease_entry * e, const struct in6_addr * raddr,
+               unsigned short rport)
+{
+	if(e->remote == NULL)
+		return raddr == NULL;
+	return raddr != NULL && e->remote->rport == rport &&
+	       memcmp(&e->remote->raddr, raddr, sizeof(*raddr)) == 0;
+}
+
+struct lease_entry *
+lease_table_find_external(int proto, int family, const struct in6_addr * eaddr,
+                          unsigned short eport, const struct in6_addr * raddr,
+                          unsigned short rport)
+{
+	struct lease_entry * e;
+	if(ext_index.buckets == NULL)
+		return NULL;
+	if(eaddr == NULL)
+		eaddr = &any_addr;
+	e = ext_index.buckets[ext_hash_key(family, eaddr, eport) &
+	                      (ext_index.size - 1)];
+	for(; e != NULL; e = e->ext_next) {
+		if(e->proto == proto && e->family == family && e->eport == eport &&
+		   memcmp(&e->eaddr, eaddr, sizeof(*eaddr)) == 0 &&
+		   remote_matches(e, raddr, rport))
+			return e;
+	}
+	return NULL;
+}
+
+struct lease_entry *
+lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
+                         unsigned short eport)
+{
+	struct lease_entry * e;
+	if(ext_index.buckets == NULL)
+		return NULL;
+	if(eaddr == NULL)
+		eaddr = &any_addr;
+	e = ext_index.buckets[ext_hash_key(family, eaddr, eport) &
+	                      (ext_index.size - 1)];
+	for(; e != NULL; e = e->ext_next) {
+		if(e->proto == proto && e->family == family && e->eport == eport &&
+		   memcmp(&e->eaddr, eaddr, sizeof(*eaddr)) == 0)
+			return e;
+	}
+	return NULL;
+}
+
+struct lease_entry *
+lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
+                unsigned short rport)
+{
+	struct lease_entry * e;
+	unsigned int b;
+
+	if(ready() < 0)
+		return NULL;
+	if(lease_table_find_external(src->proto, src->family, &src->eaddr,
+	                             src->eport, raddr, rport) != NULL)
+		return NULL;
+	if(count >= ext_index.size)
+		grow();
+	e = malloc(sizeof(*e));
+	if(e == NULL)
+		return NULL;
+	*e = *src;
+	e->ext_next = NULL;
+	e->label = NULL;
+	e->remote = NULL;
+	if(src->label != NULL && (e->label = strdup(src->label)) == NULL)
+		goto fail;
+	if(raddr != NULL) {
+		e->remote = malloc(sizeof(*e->remote));
+		if(e->remote == NULL)
+			goto fail;
+		e->remote->raddr = *raddr;
+		e->remote->rport = rport;
+	}
+	b = ext_hash(e) & (ext_index.size - 1);
+	e->ext_next = ext_index.buckets[b];
+	ext_index.buckets[b] = e;
+	count++;
+	return e;
+fail:
+	free(e->label);
+	free(e);
+	return NULL;
+}
+
+void
+lease_table_remove(struct lease_entry * e)
+{
+	struct lease_entry ** p;
+
+	p = &ext_index.buckets[ext_hash(e) & (ext_index.size - 1)];
+	while(*p != e)
+		p = &(*p)->ext_next;
+	*p = e->ext_next;
+	free(e->remote);
+	free(e->label);
+	free(e);
+	count--;
+}
+
+unsigned int
+lease_table_count(void)
+{
+	return count;
+}
+
+void
+lease_table_clear(void)
+{
+	unsigned int i;
+	for(i = 0; i < ext_index.size; i++) {
+		while(ext_index.buckets[i] != NULL)
+			lease_table_remove(ext_index.buckets[i]);
+	}
+	free(ext_index.buckets);
+	memset(&ext_index, 0, sizeof(ext_index));
+}
