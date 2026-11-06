@@ -26,6 +26,7 @@
 #include "upnpevents.h"
 #include "portinuse.h"
 #include "upnputils.h"
+#include "memmap.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
 #endif
@@ -405,6 +406,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			} else {
 				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
 			}
+			if(r == 0)
+				memmap_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
@@ -459,6 +462,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #endif
 		return -1;
 	}
+	memmap_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;
@@ -558,6 +562,8 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	r = delete_redirect_rule(ext_if_name, eport, proto);
 	delete_filter_rule(ext_if_name, eport, proto);
 #endif
+	if(r >= 0)
+		memmap_map_gone(eport, proto);
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
