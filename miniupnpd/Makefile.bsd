@@ -55,7 +55,7 @@ CPPFLAGS += -DMINIUPNPD_GIT_REF=\"$(GITREF)\"
 
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
-          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o lease_table.o \
+          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o lease_table.o memmap.o \
           pcplearndscp.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
