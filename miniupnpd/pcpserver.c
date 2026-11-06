@@ -1064,12 +1064,9 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			}
 			continue;
 		}
-		r = get_redirect_rule(ext_if_name,
-				      pcp_msg_info->ext_port,
-				      pcp_msg_info->protocol,
-				      iaddr_old, sizeof(iaddr_old),
-				      &iport_old, 0, 0, 0, 0,
-				      NULL/*&timestamp*/, 0, 0);
+		r = memmap_get_map(pcp_msg_info->ext_port, pcp_msg_info->protocol,
+				   &iport_old, iaddr_old, sizeof(iaddr_old),
+				   NULL, 0, NULL, 0, NULL);
 
 		if(r==0) {
 			if((strcmp(pcp_msg_info->mapped_str, iaddr_old)!=0)

@@ -391,10 +391,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						if(eport == 0) eport++; /* skip port zero */
 						continue;
 					}
-					r = get_redirect_rule(ext_if_name, eport, proto,
-					                      iaddr_old, sizeof(iaddr_old),
-					                      &iport_old, desc, sizeof(desc), 0, 0,
-					                      &timestamp, 0, 0);
+					r = memmap_get_map(eport, proto, &iport_old,
+					                   iaddr_old, sizeof(iaddr_old),
+					                   desc, sizeof(desc), NULL, 0, &timestamp);
 					if(r==0) {
 						if(strcmp(senderaddrstr, iaddr_old)==0
 						    && iport==iport_old) {
