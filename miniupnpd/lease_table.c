@@ -1,23 +1,30 @@
-/* See lease_table.h */
+/* The rows and hash indexes of the mapping table. See lease_table.h. */
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 
 #include "lease_table.h"
 
+/* the size of an index at the first row */
 #define MIN_BUCKETS	1024u
 
+/* A hash table with chains: a bucket is the first row of its chain, and the
+ * rows link to the next one. */
 struct index {
 	struct lease_entry ** buckets;
-	unsigned int size;	/* a power of 2 */
+	unsigned int size;	/* a power of 2, so hash & (size - 1) is the bucket */
 };
 
+/* Both indexes are empty until the first row: see ready(). The external index
+ * grows with the rows, and the UID index keeps its size: a UniqueID is 16 bits,
+ * so its chains stay short. */
 static struct index ext_index, uid_index;
-static unsigned int count = 0;
+static unsigned int count = 0;	/* the number of rows */
 
+/* ::, the eaddr of an IPv4 row */
 static const struct in6_addr any_addr;
 
-/* FNV-1a */
+/* FNV-1a: add len bytes to the hash h */
 static unsigned int
 hash_bytes(unsigned int h, const void * data, size_t len)
 {
@@ -29,6 +36,9 @@ hash_bytes(unsigned int h, const void * data, size_t len)
 
 #define HASH_INIT	2166136261u
 
+/* The hash of the external index. The protocol and the remote are left out, so
+ * all the rows of one external port are in one chain: a lookup by port alone
+ * can see them all. The chain walk compares the rest of the key. */
 static unsigned int
 ext_hash_key(int family, const struct in6_addr * eaddr, unsigned short eport)
 {
@@ -50,6 +60,7 @@ uid_hash(unsigned short uid)
 	return hash_bytes(HASH_INIT, &uid, sizeof(uid));
 }
 
+/* an empty index of size buckets. 0, or -1 if there is no memory */
 static int
 index_init(struct index * x, unsigned int size)
 {
@@ -60,8 +71,8 @@ index_init(struct index * x, unsigned int size)
 	return 0;
 }
 
-/* a bigger table of buckets. On failure the old one stays: only the chains
- * get longer */
+/* Double the external index and move the rows over, which keeps its chains
+ * short. On failure the old one stays: only the chains get longer. */
 static void
 grow(void)
 {
@@ -82,6 +93,8 @@ grow(void)
 	ext_index = ext2;
 }
 
+/* Set up the indexes at the first row. A daemon with no mappings then pays
+ * nothing for them. 0, or -1 if there is no memory */
 static int
 ready(void)
 {
@@ -97,6 +110,7 @@ ready(void)
 	return 0;
 }
 
+/* 1 if the row has this exact remote. raddr NULL means a row with no remote */
 static int
 remote_matches(const struct lease_entry * e, const struct in6_addr * raddr,
                unsigned short rport)
