@@ -862,7 +862,7 @@ upnp_get_portmappings_in_range(unsigned short startport,
 	proto = proto_atoi(protocol);
 	if(!number)
 		return NULL;
-	return get_portmappings_in_range(startport, endport, proto, number);
+	return memmap_ports_in_range(startport, endport, proto, number);
 }
 
 /* stuff for miniupnpdctl */
