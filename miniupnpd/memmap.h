@@ -24,6 +24,8 @@ void memmap_map(unsigned short uid, unsigned short eport, const char * iaddr,
                 unsigned int timestamp);
 /* The firewall removed an IPv4 mapping: remove its row, if it has one. */
 void memmap_map_gone(unsigned short eport, int proto);
+/* the expiry of an IPv4 mapping (0 : none or unknown), by its external port */
+unsigned int memmap_map_expiry(unsigned short eport, int proto);
 
 /* The same for a mapping limited to a remote peer, a PEER or a UPnP mapping with
  * a remote host. Its row has a struct lease_remote, and the remote is part of

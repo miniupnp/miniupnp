@@ -109,6 +109,13 @@ memmap_map_gone(unsigned short eport, int proto)
 		lease_table_remove(row);
 }
 
+unsigned int
+memmap_map_expiry(unsigned short eport, int proto)
+{
+	struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	return row != NULL ? (unsigned int)row->expiry : 0;
+}
+
 /* Add the row of an IPv6 pinhole, with its remote peer if raddr is set, or renew
  * it. */
 static void
