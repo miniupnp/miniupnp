@@ -436,3 +436,28 @@ memmap_map_count(void)
 {
 	return (int)lease_table_port_count();
 }
+
+unsigned short *
+memmap_ports_in_range(unsigned short startport, unsigned short endport,
+                      int proto, unsigned int * number)
+{
+	const struct lease_entry * row;
+	unsigned short * ports;
+	unsigned int n = 0;
+
+	for(row = lease_table_next_port(NULL); row != NULL; row = lease_table_next_port(row)) {
+		if(row->proto == proto && startport <= row->eport && row->eport <= endport)
+			n++;
+	}
+	*number = 0;
+	ports = calloc(n > 0 ? n : 1, sizeof(*ports));
+	if(ports == NULL) {
+		syslog(LOG_ERR, "memmap_ports_in_range: no memory for %u ports", n);
+		return NULL;
+	}
+	for(row = lease_table_next_port(NULL); row != NULL; row = lease_table_next_port(row)) {
+		if(row->proto == proto && startport <= row->eport && row->eport <= endport)
+			ports[(*number)++] = row->eport;
+	}
+	return ports;
+}

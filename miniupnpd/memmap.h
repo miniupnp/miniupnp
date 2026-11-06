@@ -78,4 +78,8 @@ int memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
 
 int memmap_map_count(void);
 
+/* a malloc'ed array of the external ports of proto in the range, oldest first */
+unsigned short * memmap_ports_in_range(unsigned short startport, unsigned short endport,
+                                       int proto, unsigned int * number);
+
 #endif
