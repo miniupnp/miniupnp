@@ -68,6 +68,7 @@
 #include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #ifdef USE_LIBPFCTL
 #include <libpfctl.h>
 #endif
@@ -522,7 +523,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 		return -1;
 	}
 #ifdef USE_LIBPFCTL
-	if(pfctl_get_rules_info(dev, &ri, NAT_RULE_ACTION, anchor_name) < 0)
+	if((errno = pfctl_get_rules_info(dev, &ri, NAT_RULE_ACTION, anchor_name)) != 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
 		return -1;
@@ -554,7 +555,7 @@ delete_nat_rule(const char * ifname, unsigned short iport, int proto, in_addr_t 
 	for(i=0; i<n; i++)
 	{
 #ifdef USE_LIBPFCTL
-		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, NAT_RULE_ACTION, &rule, anchor_call) < 0)
+		if((errno = pfctl_get_rule(dev, i, ri.ticket, anchor_name, NAT_RULE_ACTION, &rule, anchor_call)) != 0)
 		{
 			syslog(LOG_ERR, "pfctl_get_rule(): %m");
 			r = -1;
@@ -921,7 +922,7 @@ get_redirect_rule_count(const char * ifname)
 		return -1;
 	}
 #ifdef USE_LIBPFCTL
-	if (pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	if ((errno = pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name)) != 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
 		return -1;
@@ -977,7 +978,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 		return -1;
 	}
 #ifdef USE_LIBPFCTL
-	if(pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	if((errno = pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name)) != 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
 		return -1;
@@ -1006,7 +1007,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	for(i=0; i<n; i++)
 	{
 #ifdef USE_LIBPFCTL
-		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call) < 0)
+		if((errno = pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call)) != 0)
 		{
 			syslog(LOG_ERR, "pfctl_get_rule: %m");
 			r = -1;
@@ -1163,7 +1164,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 	pr.rule.action = PF_RDR;	/* used with USE_LIBPFCTL for the DIOCCHANGERULE calls */
 #endif
 #ifdef USE_LIBPFCTL
-	if (pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	if ((errno = pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name)) != 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
 		return -1;
@@ -1185,7 +1186,7 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 	for(i=0; i<n; i++)
 	{
 #ifdef USE_LIBPFCTL
-		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call) < 0)
+		if((errno = pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call)) != 0)
 #else /* USE_LIBPFCTL */
 		pr.nr = i;
 		if(ioctl(dev, DIOCGETRULE, &pr) < 0)
@@ -1457,7 +1458,7 @@ get_redirect_rule_by_index(int index,
 		return -1;
 	}
 #ifdef USE_LIBPFCTL
-	if(pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	if((errno = pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name)) != 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
 		return -1;
@@ -1483,7 +1484,7 @@ get_redirect_rule_by_index(int index,
 	if(index >= n)
 		goto error;
 #ifdef USE_LIBPFCTL
-	if(pfctl_get_rule(dev, index, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call) < 0)
+	if((errno = pfctl_get_rule(dev, index, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call)) != 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rule: %m");
 		goto error;
@@ -1640,7 +1641,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 		return NULL;
 	}
 #ifdef USE_LIBPFCTL
-	if (pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	if ((errno = pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name)) != 0)
 	{
 		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
 		free(array);
@@ -1667,7 +1668,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	for(i=0; i<n; i++)
 	{
 #ifdef USE_LIBPFCTL
-		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call) < 0)
+		if((errno = pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call)) != 0)
 		{
 			syslog(LOG_ERR, "pfctl_get_rule: %m");
 			continue;
@@ -1814,7 +1815,7 @@ list_rules(void)
 	}
 
 #ifdef USE_LIBPFCTL
-	if (pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name) < 0)
+	if ((errno = pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name)) != 0)
 		perror("pfctl_get_rules_info");
 	printf("ticket = %d, nr = %d\n", ri.ticket, ri.nr);
 	n = ri.nr;
@@ -1831,7 +1832,7 @@ list_rules(void)
 	{
 		printf("-- rule %d --\n", i);
 #ifdef USE_LIBPFCTL
-		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call) < 0)
+		if((errno = pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_RDR, &rule, anchor_call)) != 0)
 			perror("pfctl_get_rule");
 #else /* USE_LIBPFCTL */
 		pr.nr = i;
