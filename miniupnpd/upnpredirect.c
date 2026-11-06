@@ -841,6 +841,34 @@ remove_unused_rules(struct rule_state * list)
 		syslog(LOG_NOTICE, "removed %d unused rules", n);
 }
 
+/* Give a row to each rule of an earlier run which has none, so the rule can be
+ * listed and deleted. The row has the lifetime the firewall reports, or 0 for
+ * none: then it does not expire. A rule with a row is skipped, so a repeated
+ * call is safe. */
+void
+upnp_adopt_rules(void)
+{
+	int index = 0, proto;
+	unsigned short eport, iport;
+	char iaddr[32], desc[64], rhost[40];
+	unsigned int timestamp;
+
+	for(;;) {
+		desc[0] = '\0';
+		rhost[0] = '\0';
+		timestamp = 0;
+		if(get_redirect_rule_by_index(index++, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
+		                              &iport, &proto, desc, sizeof(desc),
+		                              rhost, sizeof(rhost), &timestamp, 0, 0) < 0)
+			break;
+		if(memmap_map_known(eport, proto))
+			continue;
+		syslog(LOG_NOTICE, "adopting rule %hu %s to %s:%hu", eport,
+		       proto_itoa(proto), iaddr, iport);
+		record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
+	}
+}
+
 /* upnp_get_portmappings_in_range()
  * return a list of all "external" ports for which a port
  * mapping exists */

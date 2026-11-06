@@ -376,3 +376,9 @@ get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
 	return c.n;
 }
 #endif /* USE_NFTABLES */
+
+int
+memmap_map_known(unsigned short eport, int proto)
+{
+	return lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL;
+}

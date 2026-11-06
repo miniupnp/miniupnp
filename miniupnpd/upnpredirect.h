@@ -168,6 +168,10 @@ expire_upnp_rules(void);
 void
 remove_unused_rules(struct rule_state * list);
 
+/*! \brief give a row to each rule which has none */
+void
+upnp_adopt_rules(void);
+
 /*! \brief returns a list of all "external" ports for which a port
  * mapping exists
  * \param[in] startport lowest port in the interval

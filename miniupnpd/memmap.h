@@ -63,4 +63,7 @@ void memmap_remote_peers_expired(unsigned int now, int removed);
  * the firewall, because a delete failed. */
 void memmap_remote_peers_partial(void);
 
+/* 1 if the IPv4 mapping has a row */
+int memmap_map_known(unsigned short eport, int proto);
+
 #endif
