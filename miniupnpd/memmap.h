@@ -24,12 +24,16 @@ void memmap_map(unsigned short uid, unsigned short eport, const char * iaddr,
                 unsigned int timestamp);
 /* The firewall removed an IPv4 mapping: remove its row, if it has one. */
 void memmap_map_gone(unsigned short eport, int proto);
-/* the IPv4 mapping of an internal endpoint. 0 if found. desc may be NULL.
- * owner (enum mapping_owner) takes the row of that protocol, -1 any row */
+/* The IPv4 mapping of an internal endpoint, with no read of the firewall. PCP
+ * and NAT-PMP ask this to see if a client already has a mapping. Several
+ * protocols can map one endpoint: owner (enum mapping_owner) takes the row of
+ * that protocol, and -1 the first row of any. Returns 0 if found, else -1. desc
+ * and timestamp may be NULL. */
 int memmap_find_map(const char * iaddr, unsigned short iport, int proto,
                     int owner, unsigned short * eport, char * desc, int desclen,
                     unsigned int * timestamp);
-/* the expiry of an IPv4 mapping (0 : none or unknown), by its external port */
+/* The expiry of an IPv4 mapping by its external port, for a firewall backend
+ * whose rule does not hold it. 0 : no expiry, or no such row. */
 unsigned int memmap_map_expiry(unsigned short eport, int proto);
 
 /* The same for a mapping limited to a remote peer, a PEER or a UPnP mapping with
@@ -50,10 +54,13 @@ void memmap_remote_peer_gone(unsigned short uid);
  * the table. */
 void memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned short rport,
                                 const char * iaddr, unsigned short iport, int proto);
-/* The firewall ended a pass over the pinholes, removing "removed" rules (<0 :
- * error). The rows which expired go, unless the pass was partial. */
+/* The firewall ended a pass over the pinholes, and removed "removed" rules
+ * (<0 : error). The rows which expired go, as their rules went. If the pass
+ * removed nothing, failed or was partial, the rows stay for the next pass: a row
+ * must not go while its rule may still be there. */
 void memmap_remote_peers_expired(unsigned int now, int removed);
-/* this pass leaves expired rules in the firewall : a failed delete */
+/* Tell the next memmap_remote_peers_expired() that this pass leaves expired rules in
+ * the firewall, because a delete failed. */
 void memmap_remote_peers_partial(void);
 
 #endif

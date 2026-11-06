@@ -290,6 +290,7 @@ pinhole_expiry_row(struct lease_entry * e, void * arg)
 		c->rows[c->n++] = e;
 }
 
+/* set by memmap_remote_peers_partial(), read and cleared by memmap_remote_peers_expired() */
 static int pinholes_partial;
 
 void
@@ -319,6 +320,7 @@ memmap_remote_peers_expired(unsigned int now, int removed)
 }
 
 #ifdef USE_NFTABLES
+/* what a walk over the rows gives expiry_row() and gets back */
 struct expiry_ctx {
 	unsigned int now;
 	struct expired_redirect * expired;
@@ -327,6 +329,8 @@ struct expiry_ctx {
 	unsigned int next;
 };
 
+/* Collect an IPv4 row past its expiry. Else keep the soonest expiry, so the main
+ * loop knows when to come back. When expired[] is full, the next pass is now. */
 static void
 expiry_row(struct lease_entry * e, void * arg)
 {
@@ -345,7 +349,9 @@ expiry_row(struct lease_entry * e, void * arg)
 	}
 }
 
-/* without reading the firewall */
+/* The nftables backend asks this which port mappings expired, with no read of
+ * the firewall. Fills expired[] with at most max mappings, and returns how many.
+ * *next is the time of the next expiry, 0 if there is none. */
 int
 get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
                            int max, unsigned int * next)
