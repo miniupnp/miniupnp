@@ -632,23 +632,7 @@ mapping_owner_of(const char * desc, unsigned short eport, int proto)
 int
 upnp_eport_used_by_other(unsigned short eport, const char * iaddr)
 {
-	static const int protos[] = { IPPROTO_TCP, IPPROTO_UDP };
-	char iaddr_old[INET6_ADDRSTRLEN];
-	unsigned short iport_old;
-	size_t i;
-
-	for(i = 0; i < sizeof(protos)/sizeof(protos[0]); i++) {
-		if(get_redirect_rule(ext_if_name, eport, protos[i],
-		                     iaddr_old, sizeof(iaddr_old), &iport_old,
-		                     0, 0, 0, 0, NULL, 0, 0) != 0)
-			continue;
-		if(strcmp(iaddr, iaddr_old) == 0)
-			continue;	/* the client's own mapping */
-		syslog(LOG_INFO, "external port %hu is used by %s (%s)",
-		       eport, iaddr_old, proto_itoa(protos[i]));
-		return 1;
-	}
-	return 0;
+	return memmap_eport_used_by_other(eport, iaddr);
 }
 
 int

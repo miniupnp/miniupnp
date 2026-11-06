@@ -69,6 +69,14 @@ main(void)
 	assert(lease_table_find_mapping(17, AF_INET, &second, 40001) == NULL);
 	assert(lease_table_count() == 1);
 
+	/* the companion port : any protocol, another host only */
+	{
+		struct in6_addr a1 = addr(h1), a2 = addr(h2);
+		assert(lease_table_port_used_by_other(AF_INET, NULL, 40001, &a2) == m);
+		assert(lease_table_port_used_by_other(AF_INET, NULL, 40001, &a1) == NULL);
+		assert(lease_table_port_used_by_other(AF_INET, NULL, 40009, &a2) == NULL);
+	}
+
 	/* a mapping limited to a remote host */
 	e = row(LEASE_UPNP, 6, 40003, h2, 9000, 0);
 	p = lease_table_add(&e, &remote, 0);

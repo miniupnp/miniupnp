@@ -49,6 +49,8 @@ hash_bytes(unsigned int h, const void * data, size_t len)
 static unsigned int
 ext_hash_key(int family, const struct in6_addr * eaddr, unsigned short eport)
 {
+	/* not the protocol : TCP and UDP of a port are in one bucket, for
+	 * lease_table_port_used_by_other() */
 	unsigned char head = (unsigned char)family;
 	unsigned int h = hash_bytes(HASH_INIT, &head, sizeof(head));
 	h = hash_bytes(h, eaddr, sizeof(*eaddr));
@@ -201,6 +203,25 @@ lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
 	for(; e != NULL; e = e->ext_next) {
 		if(e->proto == proto && e->family == family && e->eport == eport &&
 		   memcmp(&e->eaddr, eaddr, sizeof(*eaddr)) == 0)
+			return e;
+	}
+	return NULL;
+}
+
+struct lease_entry *
+lease_table_port_used_by_other(int family, const struct in6_addr * eaddr,
+                               unsigned short eport, const struct in6_addr * iaddr)
+{
+	struct lease_entry * e;
+	if(ext_index.buckets == NULL)
+		return NULL;
+	if(eaddr == NULL)
+		eaddr = &any_addr;
+	e = ext_index.buckets[ext_hash_key(family, eaddr, eport) & (ext_index.size - 1)];
+	for(; e != NULL; e = e->ext_next) {
+		if(e->family == family && e->eport == eport &&
+		   memcmp(&e->eaddr, eaddr, sizeof(*eaddr)) == 0 &&
+		   memcmp(&e->iaddr, iaddr, sizeof(*iaddr)) != 0)
 			return e;
 	}
 	return NULL;
