@@ -324,18 +324,19 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				 * on sending, and MUST be ignored by the gateway on reception. */
 				int index = 0;
 				unsigned short eport2, iport2;
-				char iaddr2[16];
+				struct in6_addr iaddr2;
+				char iaddr2str[INET6_ADDRSTRLEN];
 				int proto2;
 				char desc[64];
 				eport = 0; /* to indicate correct removing of port mapping */
-				while(get_redirect_rule_by_index(index, 0,
-				          &eport2, iaddr2, sizeof(iaddr2),
-						  &iport2, &proto2,
-						  desc, sizeof(desc),
-				          0, 0, &timestamp, 0, 0) >= 0) {
+				while(memmap_get_at(index, &eport2, &proto2, &iport2,
+				          &iaddr2, desc, sizeof(desc),
+				          NULL, &timestamp) >= 0) {
 					syslog(LOG_DEBUG, "%d %d %hu->'%s':%hu '%s'",
-					       index, proto2, eport2, iaddr2, iport2, desc);
-					if(0 == strcmp(iaddr2, senderaddrstr)
+					       index, proto2, eport2,
+					       memmap_ntop(AF_INET, &iaddr2, iaddr2str, sizeof(iaddr2str)) ? iaddr2str : "?",
+					       iport2, desc);
+					if(0 == memcmp(&iaddr2, &sender6, sizeof(iaddr2))
 					  && 0 == memcmp(desc, "NAT-PMP", 7)) {
 						/* (iport == 0) => remove all the mappings for this client
 						 * using the requested protocol (RFC 6886 section 3.4) */

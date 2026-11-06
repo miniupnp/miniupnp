@@ -1259,14 +1259,14 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 		int index;
 		/* iterate through all rules and delete the requested ones */
 		for (index = 0;
-		     get_redirect_rule_by_index(index, 0,
-					 &eport2, iaddr2, sizeof(iaddr2),
-					 &iport2, &proto2,
-					 desc, sizeof(desc),
-					 0, 0, &timestamp, 0, 0) >= 0;
+		     memmap_get_at(index, &eport2, &proto2, &iport2,
+				   &iaddr2, desc, sizeof(desc),
+				   NULL, &timestamp) >= 0;
 		     index++) {
-			syslog(LOG_DEBUG, "%d: %s %hu %d", index, iaddr2, iport2, proto2);
-			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
+			syslog(LOG_DEBUG, "%d: %s %hu %d", index,
+			       memmap_ntop(AF_INET, &iaddr2, iaddr2str, sizeof(iaddr2str)) ? iaddr2str : "?",
+			       iport2, proto2);
+			if(0 == memcmp(&iaddr2, pcp_msg_info->mapped_ip, sizeof(iaddr2))
 			   && (proto2==proto)
 			   && ((iport2==iport) || (iport==0))) {
 				found = 1;
