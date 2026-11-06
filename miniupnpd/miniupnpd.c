@@ -203,6 +203,8 @@ tomato_load(void)
 
 	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
 	{
+		/* upnp_redirect() must see the rules which survived */
+		upnp_adopt_rules();
 		current_time = time(NULL);
 		s[sizeof(s) - 1] = 0;
 		while (fgets(s, sizeof(s) - 1, f)) {

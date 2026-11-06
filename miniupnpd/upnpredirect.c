@@ -206,6 +206,8 @@ int reload_from_lease_file(void)
 	if(unlink(lease_file) < 0) {
 		syslog(LOG_WARNING, "could not unlink file %s : %m", lease_file);
 	}
+	/* upnp_redirect() must see the rules which survived, not add them again */
+	upnp_adopt_rules();
 
 	current_time = upnp_time();
 #ifndef LEASEFILE_USE_REMAINING_TIME
@@ -405,10 +407,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	 *     =         =           =           =         Success (overwrite)
 	 */
 	rhost_old[0] = '\0';
-	r = get_redirect_rule(ext_if_name, eport, proto,
-	                      iaddr_old, sizeof(iaddr_old), &iport_old, 0, 0,
-	                      rhost_old, sizeof(rhost_old),
-	                      &timestamp, 0, 0);
+	r = memmap_get_map(eport, proto, &iport_old, iaddr_old, sizeof(iaddr_old),
+	                        NULL, 0, rhost_old, sizeof(rhost_old), NULL);
 	if(r == 0) {
 		if(strcmp(iaddr, iaddr_old)==0 &&
 		   ((rhost == NULL && rhost_old[0]=='\0') ||
