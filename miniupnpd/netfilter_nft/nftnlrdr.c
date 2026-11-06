@@ -439,22 +439,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	                             timestamp, packets, bytes);
 }
 
-/* get_redirect_rule_count()
- * return value : -1 for error or the number of redirection rules */
-int
-get_redirect_rule_count(const char * ifname)
-{
-	rule_t *r;
-	int n = 0;
-	UNUSED(ifname);
-
-	refresh_nft_cache_redirect();
-	LIST_FOREACH(r, &head_redirect, entry) {
-		n++;
-	}
-	return n;
-}
-
 /*
  * get_redirect_rule_by_index()
  * return -1 when the rule was not found

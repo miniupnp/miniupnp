@@ -862,45 +862,6 @@ add_filter_rule2(const char * ifname,
 #endif
 }
 
-/* get_redirect_rule_count()
- * return value : -1 for error or the number of rdr rules */
-int
-get_redirect_rule_count(const char * ifname)
-{
-#ifdef USE_LIBPFCTL
-	struct pfctl_rules_info ri;
-#else
-	struct pfioc_rule pr;
-#endif
-	UNUSED(ifname);
-
-	if(dev<0) {
-		syslog(LOG_ERR, "pf device is not open");
-		return -1;
-	}
-#ifdef USE_LIBPFCTL
-	if ((errno = pfctl_get_rules_info(dev, &ri, PF_RDR, anchor_name)) != 0)
-	{
-		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
-		return -1;
-	}
-	return ri.nr;
-#else
-	memset(&pr, 0, sizeof(pr));
-	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-#ifndef PF_NEWSTYLE
-	RULE.action = PF_RDR;
-#endif
-	if(ioctl(dev, DIOCGETRULES, &pr) < 0)
-	{
-		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
-		return -1;
-	}
-	release_ticket(dev, pr.ticket);
-	return pr.nr;
-#endif
-}
-
 /* get_redirect_rule()
  * return value : 0 success (found)
  * -1 = error

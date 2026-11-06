@@ -76,4 +76,6 @@ int memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
                       char * desc, int desclen, char * rhost, int rhostlen,
                       unsigned int * timestamp);
 
+int memmap_map_count(void);
+
 #endif

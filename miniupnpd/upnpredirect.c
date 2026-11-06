@@ -646,24 +646,7 @@ upnp_delete_redirection(unsigned short eport, const char * protocol)
 int
 upnp_get_portmapping_number_of_entries(void)
 {
-#if defined(USE_PF) || defined(USE_NFTABLES)
-	return get_redirect_rule_count(ext_if_name);
-#else
-	int n = 0, r = 0;
-	unsigned short eport, iport;
-	char protocol[8], iaddr[32], desc[64], rhost[32];
-	unsigned int leaseduration;
-	do {
-		protocol[0] = '\0'; iaddr[0] = '\0'; desc[0] = '\0';
-		r = upnp_get_redirection_infos_by_index(n, &eport, protocol, &iport,
-		                                        iaddr, sizeof(iaddr),
-		                                        desc, sizeof(desc),
-		                                        rhost, sizeof(rhost),
-		                                        &leaseduration);
-		n++;
-	} while(r==0);
-	return (n-1);
-#endif
+	return memmap_map_count();
 }
 
 /* functions used to remove unused rules

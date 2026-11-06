@@ -430,3 +430,9 @@ memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
 	port_info(row, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen, timestamp);
 	return 0;
 }
+
+int
+memmap_map_count(void)
+{
+	return (int)lease_table_port_count();
+}
