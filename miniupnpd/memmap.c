@@ -1,4 +1,14 @@
-/* See memmap.h */
+/* The layer between the protocols and the mapping table. See memmap.h.
+ *
+ * Functions this file gets later:
+ * memmap_add_filter()	the third add: a FILTER peer on the row of a PCP MAP.
+ * memmap_sync()	send the rows of a request to the firewall as one
+ *			transaction. A request succeeds or fails as a whole. Its
+ *			rows are built in full and are not linked into the table:
+ *			a success links them, and a failure frees them, so a
+ *			lookup never finds a row the firewall refused. The startup
+ *			restore, a firewall reload and rules lost from the
+ *			firewall use the same send. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +22,8 @@
 #include "lease_table.h"
 #include "memmap.h"
 
+/* The table keeps every address in 16 bytes: turn a.b.c.d into ::ffff:a.b.c.d.
+ * 0, or -1 if s is not an IPv4 address */
 static int
 v4_mapped(const char * s, struct in6_addr * a)
 {
@@ -24,6 +36,7 @@ v4_mapped(const char * s, struct in6_addr * a)
 	return 0;
 }
 
+/* the value of a hex digit. mapping_owner_of() has checked the digits */
 static int
 hex_value(int c)
 {
@@ -32,7 +45,9 @@ hex_value(int c)
 	return c - 'A' + 10;
 }
 
-/* kind and nonce of a mapping, from its description */
+/* Set the owner of a row, its kind and nonce, from the description of its rule.
+ * A PCP description ends in the 24 hex digits of the nonce. See
+ * mapping_owner_of(). */
 static void
 set_owner(struct lease_entry * e, const char * desc, unsigned short eport, int proto)
 {
@@ -201,14 +216,18 @@ memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned shor
 		lease_table_remove(row);
 }
 
+/* A row cannot go during lease_table_foreach(), so a walk collects up to this
+ * many rows, removes them, and walks again until it found fewer. */
 #define PINHOLE_EXPIRE_MAX	256
 
+/* what a walk over the rows gives pinhole_expiry_row() and gets back */
 struct pinhole_expiry {
 	time_t now;
 	unsigned int n;
 	struct lease_entry * rows[PINHOLE_EXPIRE_MAX];
 };
 
+/* collect the row if it is a pinhole past its expiry */
 static void
 pinhole_expiry_row(struct lease_entry * e, void * arg)
 {
