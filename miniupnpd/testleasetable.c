@@ -144,6 +144,24 @@ main(void)
 		n = 0;
 	}
 
+	/* a label can change, and an owner is its kind and nonce */
+	lease_table_clear();
+	e = row(LEASE_UPNP, 17, 40001, h1, 8080, 0);
+	m = lease_table_add(&e, NULL, 0);
+	e.eport = 40002;
+	u = lease_table_add(&e, NULL, 0);
+	assert(lease_table_same_owner(m, u));
+	assert(lease_table_set_label(m, "ssh") == 0 && strcmp(m->label, "ssh") == 0);
+	assert(lease_table_set_label(m, NULL) == 0 && m->label == NULL);
+	e = row(LEASE_PCP_MAP, 17, 40003, h1, 8080, 0);
+	p = lease_table_add(&e, NULL, 0);
+	assert(!lease_table_same_owner(p, u));	/* a zero nonce is not UPnP */
+	e = row(LEASE_PCP_MAP, 17, 40004, h1, 8080, 7);
+	x = lease_table_add(&e, NULL, 0);
+	assert(!lease_table_same_owner(p, x));
+	e = row(LEASE_NATPMP, 17, 40005, h1, 8080, 0);
+	assert(!lease_table_same_owner(lease_table_add(&e, NULL, 0), u));
+
 	/* the port mappings : oldest first, without a pinhole */
 	lease_table_clear();
 	assert(lease_table_port_count() == 0 && lease_table_port_at(0) == NULL);
