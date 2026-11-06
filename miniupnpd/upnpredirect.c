@@ -568,6 +568,31 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	return r;
 }
 
+static int
+desc_has_pcp_nonce(const char * desc, const char * prefix)
+{
+	size_t n = strlen(prefix);
+	return strncmp(desc, prefix, n) == 0 && strlen(desc) == n + 24 &&
+	       strspn(desc + n, "0123456789abcdefABCDEF") == 24;
+}
+
+enum mapping_owner
+mapping_owner_of(const char * desc, unsigned short eport, int proto)
+{
+	if(desc == NULL)
+		return MAPPING_UPNP;
+	if(desc_has_pcp_nonce(desc, "PCP MAP "))
+		return MAPPING_PCP;
+	if(strncmp(desc, "NAT-PMP ", 8) == 0) {
+		char expected[64];
+		snprintf(expected, sizeof(expected), "NAT-PMP %hu %s",
+		         eport, proto_itoa(proto));
+		if(strcmp(desc, expected) == 0)
+			return MAPPING_NATPMP;
+	}
+	return MAPPING_UPNP;
+}
+
 /* called from natpmp.c and pcpserver.c */
 int
 upnp_eport_used_by_other(unsigned short eport, const char * iaddr)
