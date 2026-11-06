@@ -30,7 +30,7 @@ STD_OBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           options.o upnppermissions.o minissdp.o natpmp.o \
           upnpevents.o getconnstatus.o upnputils.o \
           upnpstun.o getosversion.o \
-          upnppinhole.o asyncsendto.o portinuse.o pcpserver.o
+          upnppinhole.o asyncsendto.o portinuse.o pcpserver.o lease_table.o
 MAC_OBJS = getifstats.o ifacewatcher.o getroute.o
 IPFW_OBJS = ipfwrdr.o ipfwaux.o
 PF_OBJS = obsdrdr.o

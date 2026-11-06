@@ -12,6 +12,8 @@ testupnppermissions
 testgetroute
 testasyncsendto
 testportinuse
+testleasetable
+validateleasetable
 netfilter/testiptcrdr
 netfilter/testiptcrdr_dscp
 netfilter/testiptcrdr_peer
