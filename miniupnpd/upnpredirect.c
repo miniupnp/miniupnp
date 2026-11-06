@@ -407,7 +407,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
 			}
 			if(r == 0)
-				memmap_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
+				memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
@@ -462,7 +462,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #endif
 		return -1;
 	}
-	memmap_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
+	memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;

@@ -73,6 +73,11 @@ upnp_get_pinhole_uid_by_index(int index);
 int
 upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime);
 
+/* the same, to the expiry timestamp, upnp_time() + leasetime. For a caller
+ * which writes the same expiry elsewhere */
+int
+upnp_update_inboundpinhole_until(unsigned short uid, unsigned int timestamp);
+
 /* remove the inbound pinhole */
 int
 upnp_delete_inboundpinhole(unsigned short uid);
