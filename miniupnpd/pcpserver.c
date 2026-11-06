@@ -1231,11 +1231,9 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 		int index;
 		/* iterate through all rules and delete the requested ones */
 		for (index = 0;
-		     get_redirect_rule_by_index(index, 0,
-					 &eport2, iaddr2, sizeof(iaddr2),
-					 &iport2, &proto2,
-					 desc, sizeof(desc),
-					 0, 0, &timestamp, 0, 0) >= 0;
+		     memmap_get_map_at(index, &eport2, &proto2, &iport2,
+				       iaddr2, sizeof(iaddr2), desc, sizeof(desc),
+				       NULL, 0, &timestamp) >= 0;
 		     index++) {
 			syslog(LOG_DEBUG, "%d: %s %hu %d", index, iaddr2, iport2, proto2);
 			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)

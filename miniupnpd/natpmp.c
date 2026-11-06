@@ -304,11 +304,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				int proto2;
 				char desc[64];
 				eport = 0; /* to indicate correct removing of port mapping */
-				while(get_redirect_rule_by_index(index, 0,
-				          &eport2, iaddr2, sizeof(iaddr2),
-						  &iport2, &proto2,
-						  desc, sizeof(desc),
-				          0, 0, &timestamp, 0, 0) >= 0) {
+				while(memmap_get_map_at(index, &eport2, &proto2, &iport2,
+				          iaddr2, sizeof(iaddr2), desc, sizeof(desc),
+				          NULL, 0, &timestamp) >= 0) {
 					syslog(LOG_DEBUG, "%d %d %hu->'%s':%hu '%s'",
 					       index, proto2, eport2, iaddr2, iport2, desc);
 					if(0 == strcmp(iaddr2, senderaddrstr)
