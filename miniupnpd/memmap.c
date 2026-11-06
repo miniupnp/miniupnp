@@ -164,8 +164,12 @@ ipv4_row(const char * remote, unsigned short rport, unsigned short eport,
 		old->expiry = timestamp;
 		if(lease_table_set_label(old, desc) < 0)
 			syslog(LOG_WARNING, "lease table: no memory for the label of %hu", eport);
+		syslog(LOG_DEBUG, "memmap: renew %s port %hu, expiry %u", proto_itoa(proto), eport,
+		       timestamp);
 		return;
 	}
+	if(old != NULL)
+		syslog(LOG_DEBUG, "memmap: replace the row of %s port %hu", proto_itoa(proto), eport);
 	e.family = AF_INET;
 	e.proto = (unsigned char)proto;
 	e.eport = eport;
@@ -180,6 +184,10 @@ ipv4_row(const char * remote, unsigned short rport, unsigned short eport,
 		row = lease_table_add(&e, has_remote ? &raddr : NULL, rport);
 	if(row == NULL)
 		syslog(LOG_WARNING, "lease table: could not add %hu %d", eport, proto);
+	else
+		syslog(LOG_INFO, "memmap: add %s port %hu to %s:%hu, remote %s, expiry %u",
+		       proto_itoa(proto), eport, iaddr, iport, has_remote ? remote : "any",
+		       timestamp);
 }
 
 /* Remove the row of an IPv4 mapping: the one row of its port. */
@@ -187,31 +195,48 @@ void
 memmap_map_gone(unsigned short eport, int proto)
 {
 	struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
-	if(row != NULL)
+	if(row != NULL) {
 		lease_table_remove(row);
+		syslog(LOG_INFO, "memmap: remove %s port %hu", proto_itoa(proto), eport);
+	}
 }
 
-/* Find the first IPv4 mapping of an internal endpoint. */
-int
-memmap_find_map(const char * iaddr, unsigned short iport, int proto,
-                int owner, unsigned short * eport, char * desc, int desclen,
-                unsigned int * timestamp)
+/* 1 if owner is the owner of the row. A UPnP row keeps its uid in the nonce
+ * bytes, and a UPnP or NAT-PMP owner has no nonce: the kind is enough. */
+static int
+owned_by(const struct lease_entry * row, const struct memmap_owner * owner)
 {
-	struct in6_addr a;
+	if(row->kind != owner->kind)
+		return 0;
+	if(row->kind != LEASE_PCP_MAP)
+		return 1;
+	return memcmp(row->nonce, owner->nonce, LEASE_NONCE_LEN) == 0;
+}
+
+/* Find the first mapping of an internal endpoint. */
+int
+memmap_find(int family, const struct in6_addr * iaddr, unsigned short iport,
+            int proto, const struct memmap_owner * owner, unsigned short * eport,
+            char * desc, int desclen, unsigned int * timestamp)
+{
 	const struct lease_entry * row;
-	if(v4_mapped(iaddr, &a) < 0)
-		return -1;
-	for(row = lease_table_next_internal(NULL, proto, AF_INET, &a, iport); row != NULL;
-	    row = lease_table_next_internal(row, proto, AF_INET, &a, iport)) {
-		if(owner >= 0 && row->kind != owner_kind(owner))
+	char s[INET6_ADDRSTRLEN];
+
+	for(row = lease_table_next_internal(NULL, proto, family, iaddr, iport); row != NULL;
+	    row = lease_table_next_internal(row, proto, family, iaddr, iport)) {
+		if(owner != NULL && !owned_by(row, owner))
 			continue;
 		*eport = row->eport;
 		if(desc != NULL && desclen > 0)
 			snprintf(desc, desclen, "%s", row->label ? row->label : "");
 		if(timestamp != NULL)
 			*timestamp = (unsigned int)row->expiry;
+		syslog(LOG_DEBUG, "memmap: %s %s:%hu has external port %hu", proto_itoa(proto),
+		       memmap_ntop(family, iaddr, s, sizeof(s)) ? s : "?", iport, row->eport);
 		return 0;
 	}
+	syslog(LOG_DEBUG, "memmap: no mapping of %s %s:%hu", proto_itoa(proto),
+	       memmap_ntop(family, iaddr, s, sizeof(s)) ? s : "?", iport);
 	return -1;
 }
 
@@ -266,8 +291,12 @@ ipv6_row(unsigned short uid, const char * raddr, unsigned short rport,
 		   row->iport == iport && memcmp(&row->iaddr, &i, sizeof(i)) == 0 &&
 		   (row->kind != LEASE_UPNP || lease_uid(row) == uid)) {
 			row->expiry = timestamp;
+			syslog(LOG_DEBUG, "memmap: renew pinhole %s [%s]:%hu, expiry %u",
+			       proto_itoa(proto), iaddr, iport, timestamp);
 			return;
 		}
+		syslog(LOG_DEBUG, "memmap: replace the row of pinhole %s [%s]:%hu",
+		       proto_itoa(proto), iaddr, iport);
 	}
 	memset(&e, 0, sizeof(e));
 	e.iaddr = e.eaddr = i;
@@ -286,7 +315,11 @@ ipv6_row(unsigned short uid, const char * raddr, unsigned short rport,
 	else
 		row = lease_table_add(&e, has_remote ? &r : NULL, rport);
 	if(row == NULL)
-		syslog(LOG_WARNING, "lease table: could not add Remote peer %hu", uid);
+		syslog(LOG_WARNING, "lease table: could not add the row of pinhole %hu", uid);
+	else
+		syslog(LOG_INFO, "memmap: add pinhole %s [%s]:%hu, uid %hu, remote %s port %hu, expiry %u",
+		       proto_itoa(proto), iaddr, iport, uid, has_remote ? raddr : "any", rport,
+		       timestamp);
 }
 
 /* Add the row of a mapping with no remote peer, or renew it. */
@@ -318,8 +351,10 @@ void
 memmap_renew_uid(unsigned short uid, unsigned int timestamp)
 {
 	struct lease_entry * row = lease_table_find_uid(uid);
-	if(row != NULL)
+	if(row != NULL) {
 		row->expiry = timestamp;
+		syslog(LOG_DEBUG, "memmap: renew pinhole uid %hu, expiry %u", uid, timestamp);
+	}
 }
 
 /* Remove the row of a pinhole by its uid. */
@@ -327,8 +362,10 @@ void
 memmap_remote_peer_gone(unsigned short uid)
 {
 	struct lease_entry * row = lease_table_find_uid(uid);
-	if(row != NULL)
+	if(row != NULL) {
 		lease_table_remove(row);
+		syslog(LOG_INFO, "memmap: remove pinhole uid %hu", uid);
+	}
 }
 
 /* Remove the row of a pinhole by its uid, or else by its rule. */
@@ -342,14 +379,17 @@ memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned shor
 	int has_remote = map6_remote(raddr, rport, &r);
 	if(row != NULL) {
 		lease_table_remove(row);
+		syslog(LOG_INFO, "memmap: remove pinhole uid %hu", uid);
 		return;
 	}
 	if(inet_pton(AF_INET6, iaddr, &a) != 1)
 		return;
 	row = lease_table_find_external(proto, AF_INET6, &a, iport,
 	                                has_remote ? &r : NULL, rport);
-	if(row != NULL)
+	if(row != NULL) {
 		lease_table_remove(row);
+		syslog(LOG_INFO, "memmap: remove pinhole %s [%s]:%hu", proto_itoa(proto), iaddr, iport);
+	}
 }
 
 /* A row cannot go during lease_table_foreach(), so a walk collects up to this
@@ -381,6 +421,7 @@ void
 memmap_remote_peers_partial(void)
 {
 	map6_partial = 1;
+	syslog(LOG_DEBUG, "memmap: expired pinhole rules are left in the firewall");
 }
 
 /* the firewall removed expired pinholes : they go by their lifetime here */
@@ -388,19 +429,25 @@ void
 memmap_remote_peers_expired(unsigned int now, int removed)
 {
 	static struct map6_expiry c;
-	unsigned int i;
+	unsigned int i, total = 0;
 	int partial = map6_partial;
 
 	map6_partial = 0;
-	if(removed <= 0 || partial)
+	if(removed <= 0 || partial) {
+		if(removed != 0 || partial)
+			syslog(LOG_DEBUG, "memmap: keep the expired pinhole rows, removed %d, partial %d",
+			       removed, partial);
 		return;
+	}
 	do {
 		c.now = now;
 		c.n = 0;
 		lease_table_foreach(map6_expiry_row, &c);
 		for(i = 0; i < c.n; i++)
 			lease_table_remove(c.rows[i]);
+		total += c.n;
 	} while(c.n == MAP6_EXPIRE_MAX);
+	syslog(LOG_INFO, "memmap: %u expired pinhole rows removed", total);
 }
 
 #ifdef USE_NFTABLES
@@ -443,6 +490,8 @@ get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
 	struct expiry_ctx c = { now, expired, max, 0, 0 };
 	lease_table_foreach(expiry_row, &c);
 	*next = c.next;
+	if(c.n > 0)
+		syslog(LOG_DEBUG, "memmap: %d port mappings expired, next at %u", c.n, c.next);
 	return c.n;
 }
 #endif /* USE_NFTABLES */
@@ -454,54 +503,62 @@ memmap_map_known(unsigned short eport, int proto)
 	return lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL;
 }
 
-/* Copy a row of a port mapping out as strings, for memmap_get_map() and
- * memmap_get_map_at(). NULL for what is not wanted. */
+/* Copy a row of a mapping out, for memmap_get() and memmap_get_at(). NULL for
+ * what is not wanted. */
 static void
 port_info(const struct lease_entry * row, unsigned short * iport,
-          char * iaddr, int iaddrlen, char * desc, int desclen,
-          char * rhost, int rhostlen, unsigned int * timestamp)
+          struct in6_addr * iaddr, char * desc, int desclen,
+          struct memmap_remote * remote, unsigned int * timestamp)
 {
 	if(iport != NULL)
 		*iport = row->iport;
-	if(iaddr != NULL && iaddrlen > 0)
-		inet_ntop(AF_INET, row->iaddr.s6_addr + 12, iaddr, iaddrlen);
+	if(iaddr != NULL)
+		*iaddr = row->iaddr;
 	if(desc != NULL && desclen > 0)
 		snprintf(desc, desclen, "%s", row->label ? row->label : "");
-	if(rhost != NULL && rhostlen > 0) {
-		rhost[0] = '\0';
-		if(row->remote != NULL)
-			inet_ntop(AF_INET, row->remote->raddr.s6_addr + 12, rhost, rhostlen);
+	if(remote != NULL) {
+		memset(remote, 0, sizeof(*remote));
+		if(row->remote != NULL) {
+			remote->raddr = row->remote->raddr;
+			remote->rport = row->remote->rport;
+		}
 	}
 	if(timestamp != NULL)
 		*timestamp = (unsigned int)row->expiry;
 }
 
-/* Read an IPv4 mapping by its external port. */
+/* Read a mapping by its external port. */
 int
-memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
-               char * iaddr, int iaddrlen, char * desc, int desclen,
-               char * rhost, int rhostlen, unsigned int * timestamp)
+memmap_get(int family, const struct in6_addr * eaddr, unsigned short eport,
+           int proto, unsigned short * iport, struct in6_addr * iaddr,
+           char * desc, int desclen, struct memmap_remote * remote,
+           unsigned int * timestamp)
 {
-	const struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
-	if(row == NULL)
+	const struct lease_entry * row = lease_table_find_mapping(proto, family, eaddr, eport);
+	if(row == NULL) {
+		syslog(LOG_DEBUG, "memmap: no mapping of %s port %hu", proto_itoa(proto), eport);
 		return -1;
-	port_info(row, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen, timestamp);
+	}
+	port_info(row, iport, iaddr, desc, desclen, remote, timestamp);
+	syslog(LOG_DEBUG, "memmap: read %s port %hu", proto_itoa(proto), eport);
 	return 0;
 }
 
 /* Read an IPv4 mapping by its place on the port list. */
 int
-memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
-                  unsigned short * iport, char * iaddr, int iaddrlen,
-                  char * desc, int desclen, char * rhost, int rhostlen,
-                  unsigned int * timestamp)
+memmap_get_at(unsigned int index, unsigned short * eport, int * proto,
+              unsigned short * iport, struct in6_addr * iaddr,
+              char * desc, int desclen, struct memmap_remote * remote,
+              unsigned int * timestamp)
 {
 	const struct lease_entry * row = lease_table_port_at(index);
-	if(row == NULL)
+	if(row == NULL) {
+		syslog(LOG_DEBUG, "memmap: no mapping at index %u", index);
 		return -1;
+	}
 	*eport = row->eport;
 	*proto = row->proto;
-	port_info(row, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen, timestamp);
+	port_info(row, iport, iaddr, desc, desclen, remote, timestamp);
 	return 0;
 }
 
@@ -535,6 +592,8 @@ memmap_ports_in_range(unsigned short startport, unsigned short endport,
 		if(row->proto == proto && startport <= row->eport && row->eport <= endport)
 			ports[(*number)++] = row->eport;
 	}
+	syslog(LOG_DEBUG, "memmap: %u %s ports in %hu-%hu", *number, proto_itoa(proto),
+	       startport, endport);
 	return ports;
 }
 
