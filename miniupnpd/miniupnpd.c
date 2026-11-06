@@ -2641,6 +2641,8 @@ main(int argc, char * * argv)
 	}
 #endif
 
+	upnp_adopt_rules();
+
 	/* for miniupnpdctl */
 #ifdef USE_MINIUPNPDCTL
 	sctl = OpenAndConfCtlUnixSocket("/var/run/miniupnpd.ctl");
