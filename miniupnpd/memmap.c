@@ -182,6 +182,7 @@ ipv4_row(const char * remote, unsigned short rport, unsigned short eport,
 		syslog(LOG_WARNING, "lease table: could not add %hu %d", eport, proto);
 }
 
+/* Remove the row of an IPv4 mapping: the one row of its port. */
 void
 memmap_map_gone(unsigned short eport, int proto)
 {
@@ -190,6 +191,7 @@ memmap_map_gone(unsigned short eport, int proto)
 		lease_table_remove(row);
 }
 
+/* Find the first IPv4 mapping of an internal endpoint. */
 int
 memmap_find_map(const char * iaddr, unsigned short iport, int proto,
                 int owner, unsigned short * eport, char * desc, int desclen,
@@ -213,6 +215,7 @@ memmap_find_map(const char * iaddr, unsigned short iport, int proto,
 	return -1;
 }
 
+/* Return the expiry of an IPv4 mapping. */
 unsigned int
 memmap_map_expiry(unsigned short eport, int proto)
 {
@@ -283,7 +286,7 @@ ipv6_row(unsigned short uid, const char * raddr, unsigned short rport,
 	else
 		row = lease_table_add(&e, has_remote ? &r : NULL, rport);
 	if(row == NULL)
-		syslog(LOG_WARNING, "lease table: could not add pinhole %hu", uid);
+		syslog(LOG_WARNING, "lease table: could not add Remote peer %hu", uid);
 }
 
 /* Add the row of a mapping with no remote peer, or renew it. */
@@ -319,6 +322,7 @@ memmap_renew_uid(unsigned short uid, unsigned int timestamp)
 		row->expiry = timestamp;
 }
 
+/* Remove the row of a pinhole by its uid. */
 void
 memmap_remote_peer_gone(unsigned short uid)
 {
@@ -327,6 +331,7 @@ memmap_remote_peer_gone(unsigned short uid)
 		lease_table_remove(row);
 }
 
+/* Remove the row of a pinhole by its uid, or else by its rule. */
 void
 memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned short rport,
                            const char * iaddr, unsigned short iport, int proto)
@@ -371,6 +376,7 @@ map6_expiry_row(struct lease_entry * e, void * arg)
 /* set by memmap_remote_peers_partial(), read and cleared by memmap_remote_peers_expired() */
 static int map6_partial;
 
+/* Keep the rows of the next pass over the pinholes. */
 void
 memmap_remote_peers_partial(void)
 {
@@ -441,13 +447,15 @@ get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
 }
 #endif /* USE_NFTABLES */
 
+/* Tell if an IPv4 mapping has a row. */
 int
 memmap_map_known(unsigned short eport, int proto)
 {
 	return lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL;
 }
 
-/* the strings of the row of a port mapping. NULL for what is not wanted */
+/* Copy a row of a port mapping out as strings, for memmap_get_map() and
+ * memmap_get_map_at(). NULL for what is not wanted. */
 static void
 port_info(const struct lease_entry * row, unsigned short * iport,
           char * iaddr, int iaddrlen, char * desc, int desclen,
@@ -468,6 +476,7 @@ port_info(const struct lease_entry * row, unsigned short * iport,
 		*timestamp = (unsigned int)row->expiry;
 }
 
+/* Read an IPv4 mapping by its external port. */
 int
 memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
                char * iaddr, int iaddrlen, char * desc, int desclen,
@@ -480,6 +489,7 @@ memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
 	return 0;
 }
 
+/* Read an IPv4 mapping by its place on the port list. */
 int
 memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
                   unsigned short * iport, char * iaddr, int iaddrlen,
@@ -495,12 +505,14 @@ memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
 	return 0;
 }
 
+/* Return the number of IPv4 port mappings. */
 int
 memmap_map_count(void)
 {
 	return (int)lease_table_port_count();
 }
 
+/* List the external ports of a protocol in a range. */
 unsigned short *
 memmap_ports_in_range(unsigned short startport, unsigned short endport,
                       int proto, unsigned int * number)
@@ -526,18 +538,18 @@ memmap_ports_in_range(unsigned short startport, unsigned short endport,
 	return ports;
 }
 
+/* Tell if another internal address maps this external port. */
 int
-memmap_eport_used_by_other(unsigned short eport, const char * iaddr)
+memmap_eport_used_by_other(int family, const struct in6_addr * eaddr,
+                           unsigned short eport, const struct in6_addr * iaddr)
 {
-	struct in6_addr a;
 	struct lease_entry * row;
-	char other[INET_ADDRSTRLEN];
-	if(v4_mapped(iaddr, &a) < 0)
-		return 0;
-	row = lease_table_port_used_by_other(AF_INET, NULL, eport, &a);
+	char other[INET6_ADDRSTRLEN];
+
+	row = lease_table_port_used_by_other(family, eaddr, eport, iaddr);
 	if(row == NULL)
 		return 0;
-	if(inet_ntop(AF_INET, row->iaddr.s6_addr + 12, other, sizeof(other)) != NULL)
+	if(memmap_ntop(row->family, &row->iaddr, other, sizeof(other)) != NULL)
 		syslog(LOG_INFO, "external port %hu is used by %s", eport, other);
 	return 1;
 }
