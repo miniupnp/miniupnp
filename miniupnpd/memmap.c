@@ -173,6 +173,13 @@ memmap_map_gone(unsigned short eport, int proto)
 		lease_table_remove(row);
 }
 
+unsigned int
+memmap_map_expiry(unsigned short eport, int proto)
+{
+	struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	return row != NULL ? (unsigned int)row->expiry : 0;
+}
+
 /* The remote of a pinhole as the key of its row: an address, or :: with a
  * port for a remote port with any remote host. 1 and *r, or 0 for none. NULL,
  * empty, "*" and :: are any remote host. */
