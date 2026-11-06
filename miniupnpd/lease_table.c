@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <syslog.h>
 
 #include "lease_table.h"
 
@@ -111,10 +112,13 @@ grow(void)
 {
 	struct index ext2, int2;
 	unsigned int size = ext_index.size * 2, i;
-	if(index_init(&ext2, size) < 0)
+	if(index_init(&ext2, size) < 0) {
+		syslog(LOG_INFO, "lease table: no memory to grow to %u buckets", size);
 		return;
+	}
 	if(index_init(&int2, size) < 0) {
 		free(ext2.buckets);
+		syslog(LOG_INFO, "lease table: no memory to grow to %u buckets", size);
 		return;
 	}
 	for(i = 0; i < ext_index.size; i++) {
@@ -139,6 +143,7 @@ grow(void)
 	free(int_index.buckets);
 	ext_index = ext2;
 	int_index = int2;
+	syslog(LOG_INFO, "lease table: %u buckets for %u rows", size, count);
 }
 
 /* Set up the indexes at the first row. A daemon with no mappings then pays
@@ -346,8 +351,10 @@ new_row(const struct lease_entry * src, const struct in6_addr * raddr,
         unsigned short rport)
 {
 	struct lease_entry * e = malloc(sizeof(*e));
-	if(e == NULL)
+	if(e == NULL) {
+		syslog(LOG_INFO, "lease table: no memory for the row of port %hu", src->eport);
 		return NULL;
+	}
 	*e = *src;
 	e->ext_next = e->int_next = e->uid_next = NULL;
 	e->label = NULL;
@@ -363,6 +370,7 @@ new_row(const struct lease_entry * src, const struct in6_addr * raddr,
 	}
 	return e;
 fail:
+	syslog(LOG_INFO, "lease table: no memory for the row of port %hu", src->eport);
 	free(e->label);
 	free(e);
 	return NULL;
@@ -400,8 +408,10 @@ lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
 	if(ready() < 0)
 		return NULL;
 	if(lease_table_find_external(src->proto, src->family, &src->eaddr,
-	                             src->eport, raddr, rport) != NULL)
+	                             src->eport, raddr, rport) != NULL) {
+		syslog(LOG_DEBUG, "lease table: port %hu is in use, no row added", src->eport);
 		return NULL;
+	}
 	if(count >= ext_index.size)
 		grow();
 	e = new_row(src, raddr, rport);
@@ -504,6 +514,8 @@ void
 lease_table_clear(void)
 {
 	unsigned int i;
+
+	syslog(LOG_DEBUG, "lease table: clear %u rows", count);
 	for(i = 0; i < ext_index.size; i++) {
 		while(ext_index.buckets[i] != NULL)
 			lease_table_remove(ext_index.buckets[i]);
