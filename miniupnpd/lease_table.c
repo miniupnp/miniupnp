@@ -12,7 +12,7 @@ struct index {
 	unsigned int size;	/* a power of 2 */
 };
 
-static struct index ext_index;
+static struct index ext_index, uid_index;
 static unsigned int count = 0;
 
 static const struct in6_addr any_addr;
@@ -42,6 +42,12 @@ static unsigned int
 ext_hash(const struct lease_entry * e)
 {
 	return ext_hash_key(e->family, &e->eaddr, e->eport);
+}
+
+static unsigned int
+uid_hash(unsigned short uid)
+{
+	return hash_bytes(HASH_INIT, &uid, sizeof(uid));
 }
 
 static int
@@ -81,7 +87,14 @@ ready(void)
 {
 	if(ext_index.buckets != NULL)
 		return 0;
-	return index_init(&ext_index, MIN_BUCKETS);
+	if(index_init(&ext_index, MIN_BUCKETS) < 0)
+		return -1;
+	if(index_init(&uid_index, MIN_BUCKETS) < 0) {
+		free(ext_index.buckets);
+		memset(&ext_index, 0, sizeof(ext_index));
+		return -1;
+	}
+	return 0;
 }
 
 static int
@@ -135,6 +148,20 @@ lease_table_find_mapping(int proto, int family, const struct in6_addr * eaddr,
 }
 
 struct lease_entry *
+lease_table_find_uid(unsigned short uid)
+{
+	struct lease_entry * e;
+	if(uid_index.buckets == NULL || uid == 0)
+		return NULL;
+	for(e = uid_index.buckets[uid_hash(uid) & (uid_index.size - 1)];
+	    e != NULL; e = e->uid_next) {
+		if(lease_uid(e) == uid)
+			return e;
+	}
+	return NULL;
+}
+
+struct lease_entry *
 lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
                 unsigned short rport)
 {
@@ -152,7 +179,7 @@ lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
 	if(e == NULL)
 		return NULL;
 	*e = *src;
-	e->ext_next = NULL;
+	e->ext_next = e->uid_next = NULL;
 	e->label = NULL;
 	e->remote = NULL;
 	if(src->label != NULL && (e->label = strdup(src->label)) == NULL)
@@ -167,6 +194,11 @@ lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
 	b = ext_hash(e) & (ext_index.size - 1);
 	e->ext_next = ext_index.buckets[b];
 	ext_index.buckets[b] = e;
+	if(lease_uid(e) != 0) {
+		b = uid_hash(lease_uid(e)) & (uid_index.size - 1);
+		e->uid_next = uid_index.buckets[b];
+		uid_index.buckets[b] = e;
+	}
 	count++;
 	return e;
 fail:
@@ -184,10 +216,27 @@ lease_table_remove(struct lease_entry * e)
 	while(*p != e)
 		p = &(*p)->ext_next;
 	*p = e->ext_next;
+	if(lease_uid(e) != 0) {
+		p = &uid_index.buckets[uid_hash(lease_uid(e)) & (uid_index.size - 1)];
+		while(*p != e)
+			p = &(*p)->uid_next;
+		*p = e->uid_next;
+	}
 	free(e->remote);
 	free(e->label);
 	free(e);
 	count--;
+}
+
+void
+lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg)
+{
+	unsigned int i;
+	struct lease_entry * e;
+	for(i = 0; i < ext_index.size; i++) {
+		for(e = ext_index.buckets[i]; e != NULL; e = e->ext_next)
+			cb(e, arg);
+	}
 }
 
 unsigned int
@@ -205,5 +254,7 @@ lease_table_clear(void)
 			lease_table_remove(ext_index.buckets[i]);
 	}
 	free(ext_index.buckets);
+	free(uid_index.buckets);
 	memset(&ext_index, 0, sizeof(ext_index));
+	memset(&uid_index, 0, sizeof(uid_index));
 }
