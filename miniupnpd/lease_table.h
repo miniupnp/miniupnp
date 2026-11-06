@@ -147,6 +147,13 @@ struct lease_entry * lease_table_next_port(const struct lease_entry * prev);
  * rows and remove them after the walk. */
 void lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg);
 
+/* 0, or -1 if there is no memory. NULL clears */
+int lease_table_set_label(struct lease_entry * e, const char * label);
+
+/* the owner of a row is its kind and nonce : 1 if they are the same */
+int lease_table_same_owner(const struct lease_entry * a,
+                           const struct lease_entry * b);
+
 /* the number of rows */
 unsigned int lease_table_count(void);
 

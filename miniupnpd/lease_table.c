@@ -419,6 +419,27 @@ lease_table_remove(struct lease_entry * e)
 	count--;
 }
 
+int
+lease_table_set_label(struct lease_entry * e, const char * label)
+{
+	char * copy = NULL;
+	if(label != NULL && (copy = strdup(label)) == NULL)
+		return -1;
+	free(e->label);
+	e->label = copy;
+	return 0;
+}
+
+int
+lease_table_same_owner(const struct lease_entry * a, const struct lease_entry * b)
+{
+	if(a->kind != b->kind)
+		return 0;
+	if(a->kind == LEASE_UPNP)
+		return 1;	/* UPnP + 0 : the bytes are its UniqueID */
+	return memcmp(a->nonce, b->nonce, LEASE_NONCE_LEN) == 0;
+}
+
 void
 lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg)
 {

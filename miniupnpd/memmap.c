@@ -100,16 +100,30 @@ ipv4_row(const char * remote, unsigned short rport, unsigned short eport,
 	memset(&e, 0, sizeof(e));
 	if(v4_mapped(iaddr, &e.iaddr) < 0)
 		return;
+	set_owner(&e, desc ? desc : "", eport, proto);
+	/* An IPv4 port has one row, whatever its remote: UPnP maps an external
+	 * port once, and a PCP PEER has no row. A row with another remote is
+	 * replaced. */
+	old = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	if(old != NULL && old->iport == iport && lease_table_same_owner(old, &e) &&
+	   memcmp(&old->iaddr, &e.iaddr, sizeof(e.iaddr)) == 0 &&
+	   (old->remote == NULL ? !has_remote
+	                        : has_remote && old->remote->rport == rport &&
+	                          memcmp(&old->remote->raddr, &raddr, sizeof(raddr)) == 0)) {
+		/* a renewal : the row stays, and keeps its place in the list */
+		old->expiry = timestamp;
+		if(lease_table_set_label(old, desc) < 0)
+			syslog(LOG_WARNING, "lease table: no memory for the label of %hu", eport);
+		return;
+	}
 	e.family = AF_INET;
 	e.proto = (unsigned char)proto;
 	e.eport = eport;
 	e.iport = iport;
 	e.expiry = timestamp;
 	e.label = (char *)desc;	/* copied */
-	set_owner(&e, desc ? desc : "", eport, proto);
-	/* a row on the port is replaced. If that fails, it stays: the port is
-	 * still mapped */
-	old = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	/* another row on the port is replaced. If that fails, it stays: the port
+	 * is still mapped */
 	if(old != NULL)
 		row = lease_table_replace(old, &e, has_remote ? &raddr : NULL, rport);
 	else
