@@ -1,0 +1,100 @@
+# The Docker fixture of the end-to-end suites, whose drivers set every variable: SLOT and the addresses
+# come from reserve_slot and e2e_address_plan (e2e_lib.sh), e2e_compose runs it. The traffic agents
+# have the profile "agents". The runner of each case is not here: e2e_start_runner joins it to the LAN.
+name: pcp-e2e-${SLOT:?}
+
+x-agent: &agent
+  image: ${IMAGE:?}
+  profiles: [agents]
+  init: true
+  cap_add: [NET_ADMIN]
+  volumes: ["${ROOT:?}/miniupnpd/tests:/pcp-tests:ro"]
+  entrypoint: ["python3", "/pcp-tests/common/traffic_agent.py"]
+  depends_on: [router]
+
+networks:
+  lan:
+    name: pcp-e2e-lan-${SLOT}
+    enable_ipv6: true
+    ipam:
+      config:
+        - { subnet: "${LAN4:?}.0/24", gateway: "${LAN4}.254" }
+        - { subnet: "${LAN6:?}/64", gateway: "${LAN6}ffff" }
+  wan:
+    name: pcp-e2e-wan-${SLOT}
+    enable_ipv6: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv6: routed
+    ipam:
+      config:
+        - { subnet: "${WAN4:?}.0/24", gateway: "${WAN4}.254" }
+        - { subnet: "${WAN6:?}/64", gateway: "${WAN6}ffff" }
+
+services:
+  router:
+    container_name: pcp-e2e-router-${SLOT}
+    image: ${IMAGE}
+    cap_add: [NET_ADMIN, NET_RAW]
+    volumes: ["${RUN_DIR:?}:/pcp-e2e-artifacts", "${DAEMON_DIR:?}:/opt/miniupnpd:ro"]
+    environment:
+      PCP_TEST_REAL_WAN: "1"
+      PCP_TEST_ENABLE_UPNP: ${PCP_TEST_ENABLE_UPNP:-no}
+      PCP_TEST_UPNP_UUID: ${PCP_TEST_UPNP_UUID:-}
+      PCP_TEST_EXTRA_CONF: ${PCP_TEST_EXTRA_CONF:-}
+      PCP_TEST_WAN4: ${WAN4}
+      PCP_TEST_CONF_REPLACE: ${PCP_TEST_CONF_REPLACE:-0}
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.forwarding: "1"
+    networks:
+      # entrypoint.sh expects eth0/eth1 and renames the WAN link to wan0 before daemon start
+      lan: { ipv4_address: "${LAN4}.1", ipv6_address: "${LAN6}1", interface_name: eth0, gw_priority: 1 }
+      wan: { ipv4_address: "${WAN4}.1", ipv6_address: "${WAN6}1", interface_name: eth1 }
+
+  allow:
+    <<: *agent
+    container_name: pcp-e2e-allow-${SLOT}
+    command:
+      - --host=0.0.0.0
+      - --source4=${WAN4}.2
+      - --source6=${WAN6}2
+      - --route6=${LAN6}/64
+      - --gateway6=${WAN6}1
+      - --route6=fd42:1::/64
+      - --gateway6=${WAN6}1
+      - --peer-port=42100
+    networks:
+      lan: { ipv4_address: "${LAN4}.12", ipv6_address: "${LAN6}12", interface_name: eth0, gw_priority: 1 }
+      wan: { ipv4_address: "${WAN4}.2", ipv6_address: "${WAN6}2", interface_name: eth1 }
+
+  deny:
+    <<: *agent
+    container_name: pcp-e2e-deny-${SLOT}
+    command:
+      - --host=0.0.0.0
+      - --source4=${WAN4}.130
+      - --source6=${WAN6}130
+      - --route6=${LAN6}/64
+      - --gateway6=${WAN6}1
+      - --route6=fd42:1::/64
+      - --gateway6=${WAN6}1
+      - --peer-port=42100
+    networks:
+      lan: { ipv4_address: "${LAN4}.13", ipv6_address: "${LAN6}13", interface_name: eth0, gw_priority: 1 }
+      wan: { ipv4_address: "${WAN4}.130", ipv6_address: "${WAN6}130", interface_name: eth1 }
+
+  third:
+    <<: *agent
+    container_name: pcp-e2e-third-${SLOT}
+    command:
+      - --host=0.0.0.0
+      - --source4=${WAN4}.200
+      - --source6=${WAN6}200
+      - --route6=${LAN6}/64
+      - --gateway6=${WAN6}1
+      - --route6=fd42:1::/64
+      - --gateway6=${WAN6}1
+      - --peer-port=42100
+    networks:
+      lan: { ipv4_address: "${LAN4}.14", ipv6_address: "${LAN6}14", interface_name: eth0, gw_priority: 1 }
+      wan: { ipv4_address: "${WAN4}.200", ipv6_address: "${WAN6}200", interface_name: eth1 }
