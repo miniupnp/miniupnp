@@ -1,0 +1,339 @@
+
+
+
+
+
+
+Internet Engineering Task Force (IETF)                      M. Boucadair
+Request for Comments: 7220                                France Telecom
+Category: Standards Track                                       R. Penno
+ISSN: 2070-1721                                                  D. Wing
+                                                                   Cisco
+                                                                May 2014
+
+
+         Description Option for the Port Control Protocol (PCP)
+
+Abstract
+
+   This document extends the Port Control Protocol (PCP) with the
+   ability to associate a description with a PCP-instantiated mapping.
+   It does this by defining a new DESCRIPTION option.
+
+Status of This Memo
+
+   This is an Internet Standards Track document.
+
+   This document is a product of the Internet Engineering Task Force
+   (IETF).  It represents the consensus of the IETF community.  It has
+   received public review and has been approved for publication by the
+   Internet Engineering Steering Group (IESG).  Further information on
+   Internet Standards is available in Section 2 of RFC 5741.
+
+   Information about the current status of this document, any errata,
+   and how to provide feedback on it may be obtained at
+   http://www.rfc-editor.org/info/rfc7220.
+
+Copyright Notice
+
+   Copyright (c) 2014 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (http://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.  Code Components extracted from this document must
+   include Simplified BSD License text as described in Section 4.e of
+   the Trust Legal Provisions and are provided without warranty as
+   described in the Simplified BSD License.
+
+
+
+
+
+
+
+Boucadair, et al.            Standards Track                    [Page 1]
+
+RFC 7220                 PCP Description Option                 May 2014
+
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   2
+   2.  Format  . . . . . . . . . . . . . . . . . . . . . . . . . . .   3
+   3.  Behavior  . . . . . . . . . . . . . . . . . . . . . . . . . .   4
+   4.  Security Considerations . . . . . . . . . . . . . . . . . . .   5
+   5.  IANA Considerations . . . . . . . . . . . . . . . . . . . . .   5
+   6.  References  . . . . . . . . . . . . . . . . . . . . . . . . .   5
+     6.1.  Normative References  . . . . . . . . . . . . . . . . . .   5
+     6.2.  Informative References  . . . . . . . . . . . . . . . . .   6
+
+1.  Introduction
+
+   This document extends the base PCP [RFC6887] with the ability to
+   associate a human-readable description with a PCP-instantiated
+   mapping.  It does this by defining a new DESCRIPTION option.
+
+   This PCP option can be used in simple scenarios with a PCP client and
+   PCP server, as well as in more complex scenarios where an
+   interworking function is used to proxy between a UPnP IGD Control
+   Point and a PCP server [RFC6970].
+
+   Querying the PCP server to get the description text of an existing
+   mapping is out of scope.
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
+   document are to be interpreted as described in RFC 2119 [RFC2119].
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Boucadair, et al.            Standards Track                    [Page 2]
+
+RFC 7220                 PCP Description Option                 May 2014
+
+
+2.  Format
+
+   The format of the DESCRIPTION option is shown in Figure 1.
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |Option Code=128|  Reserved     |           Length              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                           Description                         |
+      :                                                               :
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        This Option:
+
+         Option Name: DESCRIPTION
+         Number: 128
+         Purpose: Used to associate a text description with a mapping
+         Valid for Opcodes: MAP, PEER
+         Length: Variable,  maximum 1016 octets.
+         May appear in: request. May appear in response only if it
+                        appeared in the associated request.
+         Maximum occurrences: 1
+
+                       Figure 1: DESCRIPTION Option
+
+   The 'Reserved' field is initialized as specified in Section 7.3 of
+   [RFC6887].
+
+   The Description field MUST carry UTF-8 encoded [RFC3629] description
+   text.  The description text MUST NOT be null terminated.  The length
+   of the description text is indicated by the Length field.  In
+   particular, the description text is not null terminated, and when a
+   client or server receives a DESCRIPTION option, it MUST NOT rely on
+   the presence of a NUL character in the wire format data to identify
+   the end of the text.
+
+   This option can be used by a user (or an application) to indicate a
+   description associated with a given mapping, such as "FTP server",
+   "My remote access to my CP router", "Camera", "Network attached
+   storage serve", etc.
+
+
+
+
+
+
+
+
+
+
+Boucadair, et al.            Standards Track                    [Page 3]
+
+RFC 7220                 PCP Description Option                 May 2014
+
+
+   How the content of the DESCRIPTION option is used is deployment-
+   specific.  For example, the description text can be used by the
+   entity managing the PCP server for many purposes, such as the
+   following:
+
+   o  The description text can be used as a hint when cleaning a mapping
+      table by an administrator.
+
+   o  In some deployments making use of a portal to instruct PCP
+      mappings (e.g., Section 5.2 of [PCP-DEPLOY]), the description text
+      can be used to store a subscriber identifier.
+
+3.  Behavior
+
+   Support for the DESCRIPTION option by PCP servers and PCP clients is
+   optional.  This option (Code 128; see Figure 1) MAY be included in a
+   PCP MAP/PEER request to associate a description with the requested
+   mapping.
+
+   A PCP server MAY ignore the DESCRIPTION option sent to it by a PCP
+   client (e.g., if it does not support the option or if it is
+   configured to ignore it).  To signal that it has not accepted the
+   option, a PCP server simply does not include the DESCRIPTION option
+   in the response.  If the PCP client does not receive a DESCRIPTION
+   option in a response to a request enclosing a DESCRIPTION option,
+   this means the PCP server does not support the option or it is
+   configured to ignore it.
+
+   If the DESCRIPTION option is not included in the PCP client request,
+   the PCP server MUST NOT include the DESCRIPTION option in the
+   associated response.
+
+   A PCP server SHOULD be able to store at least 128 bytes for a
+   description.  When the PCP server receives a DESCRIPTION option, it
+   first stores the value of the received Description field, truncating
+   it if it cannot store the entire value.  The server MUST then send
+   the stored value back to the PCP client in the DESCRIPTION option in
+   the response.
+
+   If the PCP client request contains invalid DESCRIPTION options (e.g.,
+   the content is not a legal UTF-8 string), the PCP server MUST ignore
+   the request (i.e., MUST NOT return a DESCRIPTION option in the
+   response).
+
+   To update the description text of a mapping maintained by a PCP
+   server, the PCP client generates a PCP MAP/PEER renewal request that
+   includes a DESCRIPTION option carrying the new description text.
+   Upon receipt of the PCP request, the PCP server proceeds to the same
+
+
+
+Boucadair, et al.            Standards Track                    [Page 4]
+
+RFC 7220                 PCP Description Option                 May 2014
+
+
+   operations to validate a MAP/PEER request refreshing an existing
+   mapping.  If validation checks are successfully passed, the PCP
+   server replaces the old description text with the new one included in
+   the DESCRIPTION option, and the PCP server returns the updated
+   description text in the response, truncated (if necessary) as
+   described above.
+
+   The PCP client uses an empty DESCRIPTION option (i.e., Length set to
+   0) to erase the description text associated with a mapping.  To
+   indicate that the PCP server has successfully cleared the description
+   text associated with a mapping, the PCP server returns the empty
+   DESCRIPTION option in the response.
+
+4.  Security Considerations
+
+   PCP-related security considerations are discussed in [RFC6887].  In
+   addition, administrators of PCP servers SHOULD configure a maximum
+   description length that does not lead to exhausting storage resources
+   in the PCP server.
+
+   If the PCP client and the PCP server are not under the same
+   administrative entity, the DESCRIPTION option has the potential to
+   leak privacy-related information.  PCP clients should not use the
+   DESCRIPTION option for such leakage.  For example, the option should
+   not be used to include user identifiers, locations, or names.  Refer
+   to Section 3.2 of [RFC6462] for a discussion on information leakage.
+
+5.  IANA Considerations
+
+   IANA has allocated the following value in the "PCP Options" registry
+   (http://www.iana.org/assignments/pcp-parameters) from the optional-
+   to-process range (see Section 19.4 of [RFC6887]):
+
+      DESCRIPTION set to 128 (see Section 2)
+
+6.  References
+
+6.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC3629]  Yergeau, F., "UTF-8, a transformation format of ISO
+              10646", STD 63, RFC 3629, November 2003.
+   [RFC6887]  Wing, D., Ed., Cheshire, S., Boucadair, M., Penno, R., and
+              P. Selkirk, "Port Control Protocol (PCP)", RFC 6887, April
+              2013.
+
+
+
+
+Boucadair, et al.            Standards Track                    [Page 5]
+
+RFC 7220                 PCP Description Option                 May 2014
+
+
+6.2.  Informative References
+
+   [PCP-DEPLOY]
+              Boucadair, M., "Port Control Protocol (PCP) Deployment
+              Models", Work in Progress, April 2014.
+
+   [RFC6462]  Cooper, A., "Report from the Internet Privacy Workshop",
+              RFC 6462, January 2012.
+
+   [RFC6970]  Boucadair, M., Penno, R., and D. Wing, "Universal Plug and
+              Play (UPnP) Internet Gateway Device - Port Control
+              Protocol Interworking Function (IGD-PCP IWF)", RFC 6970,
+              July 2013.
+
+Authors' Addresses
+
+   Mohamed Boucadair
+   France Telecom
+   Rennes  35000
+   France
+
+   EMail: mohamed.boucadair@orange.com
+
+
+   Reinaldo Penno
+   Cisco
+   USA
+
+   EMail: repenno@cisco.com
+
+
+   Dan Wing
+   Cisco Systems, Inc.
+   170 West Tasman Drive
+   San Jose, California  95134
+   USA
+
+   EMail: dwing@cisco.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+Boucadair, et al.            Standards Track                    [Page 6]
+
