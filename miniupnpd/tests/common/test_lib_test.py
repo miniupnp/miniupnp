@@ -452,6 +452,94 @@ class LeaseRecordTests(unittest.TestCase):
                          [lib_test.lease_record(LEASE_MAP4)])
 
 
+class OptionStepReplyTests(unittest.TestCase):
+    """A short or wrong reply of the daemon fails the step: it must not stop the run."""
+
+    address = ("192.0.2.1", 5351)
+
+    def step(self, step, reply):
+        case = {"request": {"steps": [step]}}
+        with patch.object(lib_test, "exchange", return_value=reply), \
+                patch.object(lib_test, "client_address", return_value="192.0.2.2"):
+            lib_test.run_option_steps(None, self.address, case, None)
+
+    def test_short_replies_fail_the_step(self):
+        for step in ({"natpmp_address": {}}, {"natpmp_map": {"port": 1000}}, {"pcp_map": {"port": 1000}}):
+            for reply in (b"", b"\x00", b"\x00\x81\x00"):
+                with self.assertRaisesRegex(AssertionError, "step 1: "):
+                    self.step(step, reply)
+
+    def test_a_reply_of_another_opcode_fails_the_map_step(self):
+        with self.assertRaisesRegex(AssertionError, "bad NAT-PMP map response"):
+            self.step({"natpmp_map": {"port": 1000}}, bytes((0, 130)) + bytes(14))
+
+    def test_the_fields_of_good_replies(self):
+        address = bytes((0, 128, 0, 0)) + struct.pack("!I", 7) + bytes((203, 0, 113, 9))
+        self.step({"natpmp_address": {"equals": "203.0.113.9", "epoch_below": 8}}, address)
+        with self.assertRaisesRegex(AssertionError, "epoch 7"):
+            self.step({"natpmp_address": {"epoch_below": 7}}, address)
+        self.step({"natpmp_map": {"port": 1000, "result": 2}}, bytes((0, 129, 0, 2)) + bytes(12))
+        external = bytes(10) + b"\xff\xff" + bytes((203, 0, 113, 9))
+        pcp = bytes((2, 129, 0, 0)) + bytes(40) + external
+        self.step({"pcp_map": {"port": 1000, "external": "203.0.113.9"}}, pcp)
+        with self.assertRaisesRegex(AssertionError, "PCP result 8"):
+            self.step({"pcp_map": {"port": 1000}}, bytes((2, 129, 0, 8)) + bytes(56))
+
+
+class SoapSaveTests(unittest.TestCase):
+    """What a soap step saves is for the later steps of its own case only."""
+
+    address = ("192.0.2.1", 5351)
+    save = {"soap": {"path": "/ctl/IPConn", "service": "s", "action": "Add", "save": {"id": "NewUniqueID"}}}
+    use = {"soap": {"path": "/ctl/IPConn", "service": "s", "action": "Delete", "args": {"NewUniqueID": "$id"}}}
+
+    def run_case(self, *steps):
+        calls = []
+
+        def soap_call(_url, _service, action, args):
+            calls.append((action, args))
+            return 200, {"NewUniqueID": "7"}
+        with patch.object(lib_test, "soap_call", side_effect=soap_call), \
+                patch.object(lib_test, "client_address", return_value="192.0.2.2"):
+            lib_test.run_option_steps(None, self.address, {"request": {"steps": list(steps)}}, None)
+        return calls
+
+    def test_a_later_step_reads_the_saved_value(self):
+        self.assertEqual(self.run_case(self.save, self.use)[1], ("Delete", [("NewUniqueID", "7")]))
+
+    def test_the_next_case_does_not_see_it(self):
+        self.run_case(self.save)
+        with self.assertRaisesRegex(AssertionError, "step 1: KeyError"):
+            self.run_case(self.use)
+
+
+class UpnpCaseCleanupTests(unittest.TestCase):
+    """The cleanup DeletePortMapping of a UPnP case runs, and its failure does not hide the result."""
+
+    address = ("192.0.2.1", 5351)
+    request = {"kind": "upnp", "action": "AddPortMapping", "protocol": "tcp", "external_port": 1000,
+               "internal_port": 1000}
+
+    def run_case(self, expected, cleanup):
+        case = {"request": self.request, "expect": {"kind": "upnp", "result": expected}}
+        with patch.object(lib_test, "upnp_outcome", return_value="SUCCESS"), \
+                patch.object(lib_test, "upnp_request", side_effect=cleanup) as request, \
+                patch.object(lib_test, "client_address", return_value="192.0.2.2"):
+            try:
+                lib_test.run_upnp_case(None, self.address, case)
+            finally:
+                self.assertEqual(request.call_args[0][2]["action"], "DeletePortMapping")
+
+    def test_a_wrong_result_is_reported_over_a_failed_cleanup(self):
+        with self.assertRaisesRegex(AssertionError, "expected UPNP_718, got SUCCESS"):
+            self.run_case(["UPNP_718"], ConnectionResetError())
+
+    def test_a_failed_cleanup_fails_a_passing_case(self):
+        with self.assertRaisesRegex(AssertionError, "cleanup DeletePortMapping failed"):
+            self.run_case(["SUCCESS"], ConnectionResetError())
+        self.run_case(["SUCCESS"], None)
+
+
 class LeaseFileStepTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -2214,6 +2302,232 @@ class WanExposureTests(unittest.TestCase):
             self.assertEqual(probe.call_args.args[1:5], ("tcp", "198.51.100.1", 5000, b"GET / HTTP/1.0\r\n\r\n".hex()))
         with patch.object(lib_test.traffic_agent, "request_probe", return_value={"delivered": False, "error": "timed out"}):
             lib_test.check_wan_exposure("http://agent", "udp", "2001:db8:9000::1", 1900, "M-SEARCH")
+
+
+# the daemon_options suite: configurations of cases, UPnP outcomes
+
+
+def option_case(name, config, protocol="natpmp", side=None, **fields):
+    case = {"name": name, "protocol": protocol, "families": ["ipv4"], "config": list(config),
+            "request": {"kind": "raw", "hex": "0000"}, "expect": {"kind": "silence"}}
+    if side:
+        case["from"] = side
+    case.update(fields)
+    return case
+
+
+def upnp_case(name, config=("enable_upnp=yes", "http_port=5000"), result=("SUCCESS",), **request):
+    spec = {"kind": "upnp", "action": "AddPortMapping", "protocol": "tcp", "external_port": 45001,
+            "internal_port": 45001}
+    spec.update(request)
+    return option_case(name, config, protocol="upnp", request=spec,
+                       expect={"kind": "upnp", "result": list(result)})
+
+
+class FakeUpnpServer:
+    """A TCP listener on loopback: mode "ok" answers HTTP 200, "close" closes without a response."""
+
+    def __init__(self, mode):
+        self.mode = mode
+        self.requests = []
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(4)
+        self.sock.settimeout(5)
+        self.port = self.sock.getsockname()[1]
+        self.thread = threading.Thread(target=self.serve, daemon=True)
+        self.thread.start()
+
+    def serve(self):
+        while True:
+            try:
+                connection, _ = self.sock.accept()
+            except OSError:
+                return
+            with connection:
+                connection.settimeout(2)
+                data = b""
+                while b"</s:Envelope>" not in data:
+                    block = connection.recv(4096)
+                    if not block:
+                        break
+                    data += block
+                self.requests.append(data)
+                if self.mode == "ok":
+                    connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+
+    def close(self):
+        self.sock.close()
+        self.thread.join(timeout=2)
+
+
+class DaemonOptionTests(unittest.TestCase):
+    def test_option_names_of_options_c(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "options.c")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write('#ifdef ENABLE_NATPMP\n\t{ UPNPENABLENATPMP, "enable_natpmp"},\n#endif\n'
+                             '\t{ UPNPEXT_IP,\t"ext_ip" },\n\t{ UPNPUUID, "uuid"},\n/* "port" in a comment */\n')
+            self.assertEqual(lib_test.daemon_option_names(path), {"enable_natpmp", "ext_ip", "uuid"})
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("int x;\n")
+            with self.assertRaises(CorpusError):
+                lib_test.daemon_option_names(path)
+        real = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, "options.c")
+        if os.path.exists(real):
+            names = lib_test.daemon_option_names(real)
+            self.assertTrue({"enable_natpmp", "enable_pcp_pmp", "enable_upnp", "http_port", "secure_mode"} <= names)
+
+    def test_config_lines_are_checked(self):
+        names = {"enable_upnp", "http_port"}
+        lib_test.check_case_config(option_case("a", ["enable_upnp=yes"]), names)
+        lib_test.check_case_config(option_case("a", []), names)
+        for bad in (option_case("a", ["enable_upnp = yes"]), option_case("a", ["enable_upnp"]),
+                    option_case("a", ["unknown_option=1"]), option_case("a", ["x=1"], side="dmz"),
+                    dict(option_case("a", []), config="enable_upnp=yes")):
+            with self.subTest(case=bad), self.assertRaises(CorpusError):
+                lib_test.check_case_config(bad, names)
+        lib_test.check_case_config(option_case("a", ["unknown_option=1"]))     # no names: not checked
+
+    def test_upnp_cases_are_checked(self):
+        lib_test.check_upnp_case(upnp_case("a"))
+        lib_test.check_upnp_case(upnp_case("a", config=["enable_upnp=no", "port=5000"], result=["NO_LISTENER"]))
+        lib_test.check_upnp_case(upnp_case("a", result=["UPNP_718", "NO_REPLY"]))
+        neighbour = upnp_case("a")
+        neighbour["request"]["internal_client"] = "neighbour"
+        lib_test.check_upnp_case(neighbour)
+        neighbour["request"]["internal_client"] = "192.0.2.1"
+        with self.assertRaises(CorpusError):
+            lib_test.check_upnp_case(neighbour)
+        self.assertEqual(lib_test.lan_neighbour("172.28.41.2"), "172.28.41.3")
+        for bad in (upnp_case("a", config=["enable_upnp=yes"]), upnp_case("a", result=["MAYBE"]),
+                    upnp_case("a", result=[]), upnp_case("a", action="GetStatusInfo"),
+                    upnp_case("a", protocol="sctp"), dict(upnp_case("a"), families=["ipv4", "ipv6"])):
+            with self.subTest(case=bad), self.assertRaises(CorpusError):
+                lib_test.check_upnp_case(bad)
+
+    def test_permission_lines_in_config(self):
+        line = "allow 46000-46100 0.0.0.0/0 46000-46100"
+        lib_test.check_case_config({"name": "a", "config": ["http_port=5000", line]})
+        self.assertEqual(lib_test.config_options(("http_port=5000", line)), {"http_port": "5000"})
+        self.assertEqual(lib_test.config_line(lib_test.config_word(line)), line)
+        self.assertNotIn(" ", lib_test.config_word(line))
+        for bad in ("allow everything", "allow 1-2 0.0.0.0/0", "a=b+c"):
+            with self.subTest(line=bad), self.assertRaises(CorpusError):
+                lib_test.check_case_config({"name": "a", "config": [bad]})
+
+    def test_option_steps(self):
+        lib_test.check_step("a", {"sleep": 1})
+        for bad in ({}, {"sleep": 1, "router": {}}, {"nothing": 1}, "sleep"):
+            with self.subTest(step=bad), self.assertRaises(CorpusError):
+                lib_test.check_step("a", bad)
+        lib_test.check_text("a", "one two", {"contains": ["one"], "absent": ["three"]})
+        with self.assertRaises(AssertionError):
+            lib_test.check_text("a", "one", {"contains": ["two"]})
+        with self.assertRaises(AssertionError):
+            lib_test.check_text("a", "one", {"absent": ["one"]})
+
+    def test_router_call(self):
+        with tempfile.TemporaryDirectory() as directory:
+            def driver():
+                while True:
+                    requests = [name for name in os.listdir(directory) if name.endswith(".req")]
+                    if requests:
+                        name = os.path.join(directory, requests[0])
+                        with open(name, encoding="utf-8") as request:
+                            command = request.read()
+                        os.unlink(name)
+                        with open(name[:-4] + ".resp", "w", encoding="utf-8") as response:
+                            response.write(command.upper())
+                        return
+            thread = threading.Thread(target=driver)
+            thread.start()
+            self.assertEqual(lib_test.router_call(directory, "log"), "LOG")
+            thread.join()
+        with self.assertRaises(AssertionError):
+            lib_test.router_call(None, "log")
+
+    def test_validate_option_cases(self):
+        cases = [option_case("a", ["enable_upnp=yes"]), upnp_case("b")]
+        earlier = lib_test.validate_option_cases(cases, {"baseline": {}}, {"enable_upnp", "http_port"})
+        self.assertEqual(set(earlier), {"natpmp/a", "upnp/b"})
+        with self.assertRaises(CorpusError):
+            lib_test.validate_option_cases(cases + [upnp_case("b")], {"baseline": {}})
+        with self.assertRaises(CorpusError):     # the PCP / NAT-PMP cases go through validate_cases
+            lib_test.validate_option_cases([option_case("a", [], request={"kind": "bogus"})], {"baseline": {}})
+
+    def test_runs_and_their_cases(self):
+        cases = [option_case("a", ["x=1"]), option_case("b", ["x=2"], side="wan"),
+                 dict(option_case("c", ["x=1"], side="wan"), families=["ipv4", "ipv6"]),
+                 option_case("d", ["x=1"]), option_case("e", [])]
+        self.assertEqual(lib_test.config_runs(cases), [
+            (("x=1",), "lan", "ipv4"), (("x=1",), "wan", "ipv4"), (("x=1",), "wan", "ipv6"),
+            (("x=2",), "wan", "ipv4"), ((), "lan", "ipv4")])
+        self.assertEqual([case["name"] for case in lib_test.cases_of_run(cases, ["x=1"], "lan")], ["a", "d"])
+        self.assertEqual([case["name"] for case in lib_test.cases_of_run(cases, [], "lan")], ["e"])
+        sections = lib_test.option_status_sections([{"title": "T", "description": "", "cases": [
+            dict(cases[1], description="why")]}])
+        self.assertEqual(sections[0]["cases"][0]["description"], "[x=2; from wan] why")
+        self.assertEqual(lib_test.config_label(()), "fixture defaults")
+
+    def test_upnp_outcomes(self):
+        spec = {"action": "AddPortMapping", "protocol": "tcp", "external_port": 45001, "internal_port": 45001}
+        closed = free_port(socket.SOCK_STREAM)
+        with patch.object(lib_test, "UPNP_HTTP_PORT", closed):
+            self.assertEqual(lib_test.upnp_outcome("127.0.0.1", "127.0.0.1", spec), "NO_LISTENER")
+        for mode, outcome in (("ok", "SUCCESS"), ("close", "NO_REPLY")):
+            server = FakeUpnpServer(mode)
+            try:
+                with patch.object(lib_test, "UPNP_HTTP_PORT", server.port):
+                    self.assertEqual(lib_test.upnp_outcome("127.0.0.1", "127.0.0.1", spec), outcome)
+            finally:
+                server.close()
+
+    def test_upnp_case_deletes_its_mapping(self):
+        server = FakeUpnpServer("ok")
+        try:
+            with patch.object(lib_test, "UPNP_HTTP_PORT", server.port), \
+                    socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                lib_test.run_option_case(sock, ("127.0.0.1", 5351), upnp_case("a"))
+                with self.assertRaises(AssertionError):
+                    lib_test.run_option_case(sock, ("127.0.0.1", 5351), upnp_case("b", result=["NO_LISTENER"]))
+        finally:
+            server.close()
+        actions = [b"DeletePortMapping" in request for request in server.requests]
+        self.assertEqual(actions, [False, True, False, True])     # a failed case cleans up too
+
+    def test_pcp_case_goes_to_run_case(self):
+        with patch.object(lib_test, "run_case") as run_case:
+            lib_test.run_option_case("sock", ("192.0.2.1", 5351), option_case("a", []))
+        run_case.assert_called_once()
+        self.assertTrue(run_case.call_args.kwargs["mutating"])
+
+
+class OptionCoverageTests(unittest.TestCase):
+    def test_permission_lines_of_options_c(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "options.c")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write('if(0 == memcmp(name, "allow", 5) || 0 == memcmp(name, "deny", 4))\n')
+            self.assertEqual(lib_test.permission_line_kinds(path), ["allow", "deny"])
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write('{ UPNPUUID, "uuid"},\n')
+            self.assertEqual(lib_test.permission_line_kinds(path), [])
+        real = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, "options.c")
+        if os.path.exists(real):
+            self.assertEqual(lib_test.permission_line_kinds(real), ["allow", "deny"])
+
+    def test_coverage_of_case_configs(self):
+        cases = [option_case("a", ["enable_upnp=no", "http_port=5000"]), option_case("b", ["enable_upnp=yes"]),
+                 option_case("c", ["not_an_option=1"]), option_case("d", ["allow 1-2 0.0.0.0/0 1-2"])]
+        names = {"enable_upnp", "http_port", "uuid", "secure_mode"}
+        self.assertEqual(lib_test.option_coverage(cases, names),
+                         (["enable_upnp", "http_port"], ["secure_mode", "uuid"]))
+        line = lib_test.option_coverage_line(cases, names, ["allow", "deny"])
+        self.assertEqual(line, "INFO options: 2 of 4 varied by a case (enable_upnp, http_port); "
+                               "untested: secure_mode, uuid; permission lines (allow/deny): varied by 1 case(s)")
+        self.assertEqual(lib_test.option_coverage_line([], {"uuid"}),
+                         "INFO options: 0 of 1 varied by a case (none); untested: uuid")
 
 
 if __name__ == "__main__":
