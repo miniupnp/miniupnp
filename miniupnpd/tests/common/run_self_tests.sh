@@ -37,6 +37,7 @@ check "pcp_wire runner" pcp_wire python3 run_pcp_wire_cases.py --self-test
 check "common tools" common/tools python3 -m unittest discover -p 'test_*.py'
 check "pcp_wire tools" pcp_wire/tools python3 -m unittest discover -p 'test_*.py'
 check "pcp_e2e runner" pcp_e2e python3 run_pcp_e2e_cases.py --self-test
+check "daemon_options runner" daemon_options python3 run_daemon_options_cases.py --self-test
 # the compare.py of each suite (common/tools/compare_daemon_branches.py)
 for test in $(cd "$TESTS" && ls -- */test_compare.py 2>/dev/null); do
   check "${test%%/*} compare" "${test%%/*}" python3 -m unittest test_compare
