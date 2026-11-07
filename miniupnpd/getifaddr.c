@@ -17,9 +17,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
-#if defined(sun)
-#include <sys/sockio.h>
-#endif
 
 #include "config.h"
 #include "getifaddr.h"
