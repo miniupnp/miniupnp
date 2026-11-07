@@ -328,7 +328,7 @@ sync_tree() {
 build_router() {
   # --rebuild: configure again, which also cleans
   if [ "$REBUILD" = 1 ]; then vm rm -f miniupnpd/.e2e-configure.stamp; fi
-  vm sh $ROUTER_SCRIPT build
+  vm sh $ROUTER_SCRIPT build "'${E2E_CONFIGURE_OPTIONS:-}'"
   $SSH "$PRIV cat /tmp/pcp-e2e/build.log" >"$RUN_DIR/daemon-build.log" 2>&1 || true
 }
 
@@ -338,7 +338,8 @@ start_router() {
   if ! vm sh $ROUTER_SCRIPT has-net "$LAN4" 2>/dev/null; then
     vm sh $ROUTER_SCRIPT net "$LAN4" "$LAN6" "$WAN4" "$WAN6"
   fi
-  vm sh $ROUTER_SCRIPT start
+  vm sh $ROUTER_SCRIPT host allowed-peer.e2e.test "$WAN4.2" "${WAN6}2"
+  vm sh $ROUTER_SCRIPT start "'${E2E_EXTRA_CONF:-}'"
 }
 
 # ---- Wait for the peers --------------------------------------------------
@@ -631,6 +632,12 @@ run_restart_check() {
     STATUS=1
   fi
 }
+
+# Another suite on this fixture (upnp_e2e/run-freebsd.sh): a file that replaces the functions above.
+if [ -n "${PCP_E2E_SUITE_HOOKS:-}" ]; then
+  # shellcheck disable=SC1090
+  . "$PCP_E2E_SUITE_HOOKS"
+fi
 
 # PCP_E2E_PF_MAKE=1 : build the development test programs of miniupnpd/pf in the VM
 if [ "${PCP_E2E_PF_MAKE:-0}" = 1 ]; then

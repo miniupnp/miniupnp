@@ -3,7 +3,7 @@
 # driver (../run-freebsd.sh) does to the pf router.
 #
 #   pf-router.sh setup         build + net + start, from a clean work directory
-#   pf-router.sh build         configure and make miniupnpd
+#   pf-router.sh build [OPTIONS]  configure (extra OPTIONS, default --igd2 --pcp-peer) and make miniupnpd
 #   pf-router.sh net [LAN4 LAN6 WAN4 WAN6]  configure vtnet1 (LAN) / vtnet2 (WAN) and the main pf ruleset;
 #                              the address plan of the fixture slot (run-freebsd.sh --slot), as
 #                              e2e_address_plan sets it (172.28.1 2001:db8:1:1:: 6.18.1 2001:db8:9000:1::)
@@ -60,6 +60,14 @@ flush_anchor() {
 		pfctl -a "$child" -F all >/dev/null 2>&1 || true
 	done
 	pfctl -a miniupnpd -F all >/dev/null 2>&1 || true
+}
+
+# A host name of a WAN peer, which the daemon resolves with the system resolver.
+cmd_host() {
+	sed -i.bak "/ ${1:?name}\$/d" /etc/hosts
+	for address in "$2" "$3"; do
+		echo "$address $1" >>/etc/hosts
+	done
 }
 
 cmd_lose_rules() {
@@ -150,7 +158,7 @@ cmd_build() {
 	set -e
 	mkdir -p "$WORK"
 	pfctl_dir=$(dirname "$(ls /usr/lib/private/libpfctl.* 2>/dev/null | head -n 1)")   # part of the stamp
-	options="--firewall=pf --igd2 --ipv6 $(freebsd_peer_option) --leasefile --disable-tests"
+	options="--firewall=pf --ipv6 --leasefile --disable-tests ${1:---igd2 $(freebsd_peer_option)}"
 	stamp=$( { echo "$options $pfctl_dir $(uname -r)"
 		cat miniupnpd/configure miniupnpd/VERSION miniupnpd/Makefile.bsd; } | cksum)
 	: >"$WORK/build.log"
@@ -237,6 +245,8 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+	# extra configuration lines, separated by commas (a suite on this fixture)
+	printf '%s\n' "${1:-}" | tr ',' '\n' >>"$WORK/miniupnpd.conf"
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >"$WORK/miniupnpd.log" 2>&1 &
 	echo $! >"$WORK/miniupnpd.pid"
 	# the daemon answers on its PCP port once it is ready
@@ -258,14 +268,15 @@ command=${1:-}
 [ "$#" -eq 0 ] || shift
 case "$command" in
 setup) cmd_setup ;;
-build) cmd_build ;;
+build) cmd_build "$@" ;;
 net) cmd_net "$@" ;;
 has-net) cmd_has_net "$@" ;;
-start) cmd_start ;;
+start) cmd_start "$@" ;;
 stop) cmd_stop ;;
 nat66) write_pf "${1:-off}" ;;
 restart) cmd_restart ;;
 lose-rules) cmd_lose_rules ;;
+host) cmd_host "$@" ;;
 rules) cmd_rules "$@" ;;
 restored) cmd_restored ;;
 snapshot) cmd_snapshot ;;

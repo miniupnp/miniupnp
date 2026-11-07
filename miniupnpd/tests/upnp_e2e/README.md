@@ -25,6 +25,16 @@ The results go into [status.md](status.md), one column per platform and build (`
 `linux-igd2`); the raw results and the logs (runner, daemon, ruleset and lease file after each request)
 into `.tmp/tests/upnp_e2e/` of the repository.
 
+## On FreeBSD
+
+    sh miniupnpd/tests/upnp_e2e/run-freebsd.sh [--slot N] [--case NAME]...
+
+`run-freebsd.sh` runs the suite on the FreeBSD pf router of `pcp_e2e/run-freebsd.sh` (its QEMU VM, slots,
+`--reuse`, `up`, `down`), with a daemon built with `--igd2`, and fills the `freebsd-igd2` column of
+[status.md](status.md). That driver sources `freebsd-hooks.sh` (`PCP_E2E_SUITE_HOOKS`), whose functions
+replace its PCP ones; it defines only the settings of this suite and `restart_daemon`, the restart of
+the daemon in the VM.
+
 The request and traffic keys of the corpus are those of the pcp_e2e corpus (`lib_test.CaseRun`), with the
 UPnP request kinds listed at the top of the corpus. A case with `requires: [restart]` asks the driver
 for a restart of the daemon after its first request (`router_call restart`, answered by the driver's

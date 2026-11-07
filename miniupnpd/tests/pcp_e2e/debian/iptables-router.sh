@@ -3,7 +3,7 @@
 # (../run-debian-iptables.sh) does to the iptables router. The commands are those of
 # ../freebsd/pf-router.sh.
 #
-#   iptables-router.sh build         configure and make miniupnpd
+#   iptables-router.sh build [OPTIONS]  configure (extra OPTIONS, default --igd2 --pcp-peer) and make miniupnpd
 #   iptables-router.sh net LAN4 LAN6 WAN4 WAN6   name the LAN and WAN interfaces, give them the
 #                                    addresses of the fixture slot and start the firewall
 #   iptables-router.sh has-net LAN4  has the VM got the addresses of this slot?
@@ -30,6 +30,14 @@ flush_chains() {
 	iptables -w -t mangle -F MINIUPNPD 2>/dev/null || true
 	iptables -w -t filter -F MINIUPNPD 2>/dev/null || true
 	ip6tables -w -t filter -F MINIUPNPD 2>/dev/null || true
+}
+
+# A host name of a WAN peer, which the daemon resolves with the system resolver.
+cmd_host() {
+	sed -i.bak "/ ${1:?name}\$/d" /etc/hosts
+	for address in "$2" "$3"; do
+		echo "$address $1" >>/etc/hosts
+	done
 }
 
 cmd_lose_rules() {
@@ -91,7 +99,7 @@ cmd_net() {
 cmd_build() {
 	set -e
 	mkdir -p "$WORK"
-	options="--firewall=iptables --igd2 --ipv6 --pcp-peer --leasefile --disable-tests"
+	options="--firewall=iptables --ipv6 --leasefile --disable-tests ${1:---igd2 --pcp-peer}"
 	stamp=$( { echo "$options $(uname -r)"
 		cat miniupnpd/configure miniupnpd/VERSION miniupnpd/Makefile.linux; } | cksum)
 	: >"$WORK/build.log"
@@ -197,6 +205,8 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+	# extra configuration lines, separated by commas (a suite on this fixture)
+	printf '%s\n' "${1:-}" | tr ',' '\n' >>"$WORK/miniupnpd.conf"
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >"$WORK/miniupnpd.log" 2>&1 &
 	echo $! >"$WORK/miniupnpd.pid"
 	# the daemon answers on its PCP port once it is ready
@@ -209,14 +219,15 @@ CONF
 command=${1:-}
 [ "$#" -eq 0 ] || shift
 case "$command" in
-build) cmd_build ;;
+build) cmd_build "$@" ;;
 net) cmd_net "$@" ;;
 has-net) cmd_has_net "$@" ;;
-start) cmd_start ;;
+start) cmd_start "$@" ;;
 stop) cmd_stop ;;
 nat66) cmd_nat66 "$@" ;;
 restart) cmd_restart ;;
 lose-rules) cmd_lose_rules ;;
+host) cmd_host "$@" ;;
 rules) cmd_rules "$@" ;;
 restored) cmd_restored ;;
 snapshot) cmd_snapshot ;;

@@ -39,6 +39,16 @@ The runner can also be pointed at another daemon: `--router`, `--client-address`
 `--interface` (the IPv6 multicast scope). Without `--router-call-dir` / `--lease-file` the cases that need
 them are skipped.
 
+## On FreeBSD
+
+    sh miniupnpd/tests/upnp_wire/run-freebsd.sh [--slot N] [--case NAME]...
+
+`run-freebsd.sh` runs the suite on the FreeBSD pf router of `pcp_e2e/run-freebsd.sh` (its QEMU VM, slots,
+`--reuse`, `up`, `down`), with a daemon built with `--igd2`, and fills the `freebsd-igd2` column of
+[status.md](status.md). That driver sources `freebsd-hooks.sh` (`PCP_E2E_SUITE_HOOKS`), whose functions
+replace its PCP ones: this suite's settings, `restart_daemon` in the VM, and `run_family`, which runs
+`e2e_run_family` as the Docker driver does. The cases of the lease file SKIP, as the file is in the VM.
+
 ## The corpus
 
 A case has `name`, `ref`, `description`, optionally `builds` and `families` (default: all), `requires`
