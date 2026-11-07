@@ -1,0 +1,7 @@
+# Linux side of the FreeBSD end-to-end fixture: LAN client, WAN traffic agents
+# and the L2 relay. The repository is mounted at run time, not copied in.
+FROM debian:trixie-slim
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      iproute2 python3 python3-yaml tcpdump ca-certificates \
+ && rm -rf /var/lib/apt/lists/*

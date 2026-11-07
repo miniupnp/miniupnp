@@ -1,0 +1,1286 @@
+---
+# End-to-end PCP cases grouped by operation. Each logical case runs for both IPv4 and IPv6.
+version: 1
+description: End-to-end checks for PCP mappings installed by miniupnpd. A passing case requires observing
+  the expected packet delivery behavior through the daemon's forwarding path.
+sections:
+  - name: MAP
+    description: PCP MAP mapping lifecycle and protocol scenarios.
+    cases:
+      - name: map-single-udp-only
+        families:
+          - ipv4
+          - ipv6
+        description: A UDP mapping forwards UDP traffic and does not create a TCP mapping.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41010
+          suggested_external_port: 41010
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: allowed-peer
+              protocol: tcp
+              expect: blocked
+      - name: map-single-tcp-only
+        families:
+          - ipv4
+          - ipv6
+        description: A TCP mapping forwards TCP traffic and does not create a UDP mapping.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: tcp
+          internal_port: 41011
+          suggested_external_port: 41011
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: tcp
+              expect: delivered
+            - from: allowed-peer
+              protocol: udp
+              expect: blocked
+      - name: map-udp-and-tcp-same-port
+        families:
+          - ipv4
+          - ipv6
+        description: UDP and TCP mappings can coexist on the same external and internal port.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41012
+            suggested_external_port: 41012
+          - pcp: MAP
+            lifetime: 120
+            protocol: tcp
+            internal_port: 41012
+            suggested_external_port: 41012
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: allowed-peer
+              protocol: tcp
+              expect: delivered
+      - name: map-same-protocol-and-port-conflicts
+        families:
+          - ipv4
+          - ipv6
+        description: A second mapping cannot steal an occupied external protocol and port tuple.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41013
+            suggested_external_port: 41013
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41014
+            suggested_external_port: 41013
+            options:
+              - PREFER_FAILURE
+        expect:
+          results:
+            - SUCCESS
+            - CANNOT_PROVIDE_EXTERNAL
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+              external_port: 41013
+              service_port: 41013
+      - name: map-ipv6-prefer-failure-preserves-mapping
+        families: [ipv6]
+        description: Reject a refresh requiring port translation without removing the firewall rule of the existing mapping.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41018
+            suggested_external_port: 41018
+          - pcp: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41018
+            suggested_external_port: 43018
+            options:
+              - PREFER_FAILURE
+        expect:
+          results: [SUCCESS, CANNOT_PROVIDE_EXTERNAL]
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              external_port: 41018
+              service_port: 41018
+              expect: delivered
+            - from: allowed-peer
+              protocol: udp
+              external_port: 43018
+              service_port: 41018
+              expect: blocked
+      - name: map-renewal-keeps-forwarding
+        families:
+          - ipv4
+          - ipv6
+        description: Renewing a mapping keeps its forwarding behavior active.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41015
+            suggested_external_port: 41015
+          - pcp: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41015
+            suggested_external_port: 41015
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+      - name: map-renewal-adds-lost-rule
+        families: [ipv4, ipv6]
+        description: The firewall lost the rules of a mapping, and a renewal makes the mapping pass traffic again.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: tcp, internal_port: 41230, suggested_external_port: 41230}
+          - {pcp: MAP, lifetime: 240, protocol: tcp, internal_port: 41230, suggested_external_port: 41230}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              lose_rules: true
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 41230, external_port: 41230, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41230, external_port: 41230, expect: delivered}
+      - name: map-delete-stops-forwarding
+        families:
+          - ipv4
+          - ipv6
+        description: Deleting a mapping removes the forwarding path for new flows.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: tcp
+            internal_port: 41016
+            suggested_external_port: 41016
+          - pcp: MAP
+            lifetime: 0
+            protocol: tcp
+            internal_port: 41016
+            suggested_external_port: 41016
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: tcp
+              expect: blocked
+              use_fresh_source_port: true
+      - name: map-unfiltered-allows-independent-peers
+        families:
+          - ipv4
+          - ipv6
+        description: An unrestricted PCP MAP accepts traffic from either WAN peer.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41001
+          suggested_external_port: 41001
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: delivered
+      # github #868, #188: renewals added a duplicate rule each time, and one delete left the others forwarding.
+      - name: map-repeated-renewals-then-delete-stops-forwarding
+        families: [ipv4, ipv6]
+        description: Create a mapping, renew it three times, delete it once, and check that no rule is left to forward.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41250, suggested_external_port: 41250}
+          - {pcp: MAP, lifetime: 240, protocol: udp, internal_port: 41250, suggested_external_port: 41250}
+          - {pcp: MAP, lifetime: 180, protocol: udp, internal_port: 41250, suggested_external_port: 41250}
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41250, suggested_external_port: 41250}
+          - {pcp: MAP, lifetime: 0, protocol: udp, internal_port: 41250, suggested_external_port: 41250}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 4
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41250, external_port: 41250, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41250, external_port: 41250, expect: blocked,
+               use_fresh_source_port: true}
+      - name: map-tcp-repeated-renewals-then-delete-stops-forwarding
+        families: [ipv4, ipv6]
+        description: The TCP form of the repeated-renewal case.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: tcp, internal_port: 41251, suggested_external_port: 41251}
+          - {pcp: MAP, lifetime: 240, protocol: tcp, internal_port: 41251, suggested_external_port: 41251}
+          - {pcp: MAP, lifetime: 180, protocol: tcp, internal_port: 41251, suggested_external_port: 41251}
+          - {pcp: MAP, lifetime: 0, protocol: tcp, internal_port: 41251, suggested_external_port: 41251}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 3
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 41251, external_port: 41251, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41251, external_port: 41251, expect: blocked,
+               use_fresh_source_port: true}
+  - name: FILTER
+    description: PCP MAP FILTER peer and source-port policy scenarios.
+    cases:
+      - name: map-filter-exact-peer-and-port
+        families:
+          - ipv4
+          - ipv6
+        description: An exact peer and port filter uses /32 for IPv4 and /128 for IPv6.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41002
+          suggested_external_port: 41002
+          options:
+            - FILTER: {remote_peer: allowed-peer, remote_port: 42000}
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+              source_port: 42000
+            - from: denied-peer
+              protocol: udp
+              expect: blocked
+              source_port: 42000
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+              source_port: 42000
+      - name: map-filter-restricts-remote-port
+        families:
+          - ipv4
+          - ipv6
+        description: A matching peer address with a different source port is blocked.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: tcp
+          internal_port: 41003
+          suggested_external_port: 41003
+          options:
+            - FILTER: {remote_peer: allowed-peer, remote_port: 42000}
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: tcp
+              expect: delivered
+              source_port: 42000
+            - from: allowed-peer
+              protocol: tcp
+              expect: blocked
+              source_port: 42001
+            - from: denied-peer
+              protocol: tcp
+              expect: blocked
+              source_port: 42000
+      - name: map-filter-prefix-allows-subnet
+        families:
+          - ipv4
+          - ipv6
+        description: A /24 IPv4 or /64 IPv6 prefix permits peers in the same subnet.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41004
+          suggested_external_port: 41004
+          options:
+            - FILTER: {remote_peer: allowed-peer, prefix_length: {ipv4: 24, ipv6: 64}}
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: delivered
+      - name: map-filter-narrow-prefix-rejects-outside-subnet
+        families:
+          - ipv4
+          - ipv6
+        description: A narrow prefix permits the allowed peer and blocks the peer outside it.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41005
+          suggested_external_port: 41005
+          options:
+            - FILTER: {remote_peer: allowed-peer, prefix_length: {ipv4: 25, ipv6: 127}}
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-multiple-options-add-peers
+        families:
+          - ipv4
+          - ipv6
+        description: Repeated FILTER options in one request allow traffic from either peer.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41006
+          suggested_external_port: 41006
+          options:
+            - FILTER: allowed-peer
+            - FILTER: denied-peer
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-options-at-message-limit
+        families:
+          - ipv4
+          - ipv6
+        description: >-
+          Process 43 FILTER options, PREFER_FAILURE, and an unknown optional
+          option in a 1100-octet request.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41017
+          suggested_external_port: 41017
+          options:
+            - FILTER: {remote_peer: allowed-peer, repeat: 43}
+            - PREFER_FAILURE
+            - UNKNOWN_OPTIONAL: 1
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: blocked
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-refresh-adds-peer
+        families:
+          - ipv4
+          - ipv6
+        description: A refresh with a FILTER adds that peer to the existing mapping's allowed set.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41007
+            suggested_external_port: 41007
+            options:
+              - FILTER: allowed-peer
+          - pcp: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41007
+            suggested_external_port: 41007
+            options:
+              - FILTER: denied-peer
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-refresh-replaces-peer-set
+        families:
+          - ipv4
+          - ipv6
+        description: Prefix zero clears previous filters before the replacement peer is installed.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41008
+            suggested_external_port: 41008
+            options:
+              - FILTER: allowed-peer
+          - pcp: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41008
+            suggested_external_port: 41008
+            options:
+              - FILTER: {remote_peer: '::', prefix_length: 0}
+              - FILTER: denied-peer
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: allowed-peer
+              protocol: udp
+              expect: blocked
+            - from: third-peer
+              protocol: udp
+              expect: blocked
+      - name: map-filter-prefix-zero-removes-all
+        families:
+          - ipv4
+          - ipv6
+        description: A prefix-zero FILTER clears all filters and permits both peers on the mapping.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41009
+            suggested_external_port: 41009
+            options:
+              - FILTER: allowed-peer
+          - pcp: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41009
+            suggested_external_port: 41009
+            options:
+              - FILTER: {remote_peer: '::', prefix_length: 0}
+        expect:
+          results:
+            - SUCCESS
+            - SUCCESS
+          traffic:
+            - from: allowed-peer
+              protocol: udp
+              expect: delivered
+            - from: denied-peer
+              protocol: udp
+              expect: delivered
+            - from: third-peer
+              protocol: udp
+              expect: delivered
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - from: allowed-peer
+                  protocol: udp
+                  expect: delivered
+                - from: denied-peer
+                  protocol: udp
+                  expect: blocked
+                - from: third-peer
+                  protocol: udp
+                  expect: blocked
+      - name: map-filter-refresh-without-options-preserves-policy
+        families: [ipv4, ipv6]
+        description: Renewing a filtered mapping without FILTER options retains its permitted peer set.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41019
+            suggested_external_port: 41019
+            options:
+              - FILTER: allowed-peer
+          - pcp: MAP
+            lifetime: 240
+            protocol: udp
+            internal_port: 41019
+            suggested_external_port: 41019
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, expect: delivered}
+            - {from: denied-peer, protocol: udp, expect: blocked}
+            - {from: third-peer, protocol: udp, expect: blocked}
+      - name: map-filter-delete-and-recreate-clears-policy
+        families: [ipv4, ipv6]
+        description: Deleting a filtered mapping removes its rules and recreating the tuple without FILTER allows all peers.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41022
+            suggested_external_port: 41022
+            options:
+              - FILTER: allowed-peer
+          - pcp: MAP
+            lifetime: 0
+            protocol: udp
+            internal_port: 41022
+            suggested_external_port: 41022
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41022
+            suggested_external_port: 41022
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, source_port: 42010, expect: delivered}
+                - {from: denied-peer, protocol: udp, source_port: 42010, expect: blocked}
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, source_port: 42011, expect: blocked}
+                - {from: denied-peer, protocol: udp, source_port: 42011, expect: blocked}
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42012, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42012, expect: delivered}
+            - {from: third-peer, protocol: udp, source_port: 42012, expect: delivered}
+  - name: PEER
+    description: PCP PEER mappings restricted to a remote endpoint.
+    cases:
+      - name: peer-create-before-first-packet-udp
+        families:
+          - ipv4
+          - ipv6
+        description: Create a UDP outbound mapping before the client sends its first packet.
+        request:
+          pcp: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41020
+          suggested_external_port: {ipv4: 43020, ipv6: 41020}
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              mode: peer
+              protocol: udp
+              expect: delivered
+      - name: peer-create-before-first-packet-tcp
+        families:
+          - ipv4
+          - ipv6
+        description: Create a TCP outbound mapping before the client sends its first packet.
+        request:
+          pcp: PEER
+          lifetime: 120
+          protocol: tcp
+          internal_port: 41021
+          suggested_external_port: {ipv4: 43021, ipv6: 41021}
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              mode: peer
+              protocol: tcp
+              expect: delivered
+      - name: peer-processes-options-at-message-limit
+        families:
+          - ipv4
+          - ipv6
+        description: >-
+          Process 255 unknown optional options in a 1100-octet PEER request.
+        request:
+          pcp: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41041
+          suggested_external_port: {ipv4: 43041, ipv6: 41041}
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+          options:
+            - UNKNOWN_OPTIONAL: 255
+        expect:
+          result: SUCCESS
+      - name: peer-adopts-existing-udp-mapping
+        families:
+          - ipv4
+          - ipv6
+        description: PEER learns and extends an existing implicit UDP outbound mapping.
+        request:
+          pcp: PEER
+          lifetime: 240
+          protocol: udp
+          internal_port: 41030
+          suggested_external_port: 0
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        before_traffic:
+          - from: allowed-peer
+            mode: peer-implicit
+            protocol: udp
+            expect: delivered
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              mode: peer-existing
+              protocol: udp
+              expect: delivered
+      - name: peer-adopts-existing-tcp-mapping
+        families:
+          - ipv4
+          - ipv6
+        description: PEER learns and extends an existing implicit TCP outbound mapping.
+        request:
+          pcp: PEER
+          lifetime: 240
+          protocol: tcp
+          internal_port: 41031
+          suggested_external_port: 0
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        before_traffic:
+          - from: allowed-peer
+            mode: peer-implicit
+            protocol: tcp
+            expect: delivered
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              mode: peer-existing
+              protocol: tcp
+              expect: delivered
+      - name: peer-recreates-remembered-tcp-mapping
+        families:
+          - ipv4
+          - ipv6
+        description: In a clean fixture, recreate a lost TCP mapping using its remembered external tuple.
+        request:
+          pcp: PEER
+          lifetime: 240
+          protocol: tcp
+          internal_port: 41040
+          suggested_external_port: {ipv4: 43040, ipv6: 41040}
+          suggested_external_address: {ipv4: router-wan, ipv6: client}
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: SUCCESS
+          traffic:
+            - from: allowed-peer
+              mode: peer
+              protocol: tcp
+              expect: delivered
+
+      - name: peer-rejects-unavailable-external-address
+        families: [ipv4]
+        description: IPv4 PEER with an external address the gateway does not own returns CANNOT_PROVIDE_EXTERNAL and creates nothing.
+        request:
+          pcp: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41048
+          suggested_external_port: 41048
+          suggested_external_address: unowned-wan
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: CANNOT_PROVIDE_EXTERNAL
+      - name: peer-rejects-mismatched-port-on-renewal
+        families: [ipv4, ipv6]
+        description: Renewing a PEER mapping while suggesting a different external port returns CANNOT_PROVIDE_EXTERNAL and keeps the mapping.
+        requests:
+          - pcp: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41049
+            suggested_external_port: {ipv4: 43049, ipv6: 41049}
+            remote_peer: allowed-peer
+            remote_peer_port: 42100
+          - pcp: PEER
+            lifetime: 240
+            protocol: udp
+            internal_port: 41049
+            suggested_external_port: {ipv4: 43050, ipv6: 43050}
+            remote_peer: allowed-peer
+            remote_peer_port: 42100
+        expect:
+          results: [SUCCESS, CANNOT_PROVIDE_EXTERNAL]
+          traffic:
+            - {from: allowed-peer, mode: peer, protocol: udp, expect: delivered}
+      - name: peer-rejects-prefer-failure
+        families: [ipv4, ipv6]
+        description: RFC 6887 section 12.1 forbids PREFER_FAILURE on PEER; the request is malformed and creates nothing.
+        request:
+          pcp: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41047
+          suggested_external_port: 41047
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+          options:
+            - PREFER_FAILURE
+        expect:
+          result: MALFORMED_REQUEST
+          traffic:
+            - {from: denied-peer, protocol: udp, source_port: 42100, service_port: 41047, external_port: 41047, expect: blocked}
+      - name: peer-ipv6-udp-restricts-remote-endpoint
+        families: [ipv6]
+        description: A UDP PEER mapping permits its remote address and port before outbound traffic and after renewal.
+        requests:
+          - pcp: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41042
+            suggested_external_port: 41042
+            remote_peer: allowed-peer
+            remote_peer_port: 42050
+          - pcp: PEER
+            lifetime: 240
+            protocol: udp
+            internal_port: 41042
+            suggested_external_port: 41042
+            remote_peer: allowed-peer
+            remote_peer_port: 42050
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, source_port: 42050, expect: delivered}
+                - {from: allowed-peer, protocol: udp, source_port: 42051, expect: blocked}
+                - {from: denied-peer, protocol: udp, source_port: 42050, expect: blocked}
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42050, expect: delivered}
+            - {from: allowed-peer, protocol: udp, source_port: 42052, expect: blocked}
+            - {from: third-peer, protocol: udp, source_port: 42050, expect: blocked}
+      - name: peer-ipv6-tcp-restricts-remote-endpoint
+        families: [ipv6]
+        description: A TCP PEER mapping permits only its specified remote address and port before outbound traffic.
+        request:
+          pcp: PEER
+          lifetime: 120
+          protocol: tcp
+          internal_port: 41043
+          suggested_external_port: 41043
+          remote_peer: allowed-peer
+          remote_peer_port: 42053
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: tcp, source_port: 42053, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, source_port: 42054, expect: blocked}
+            - {from: denied-peer, protocol: tcp, source_port: 42053, expect: blocked}
+            - {from: third-peer, protocol: tcp, source_port: 42053, expect: blocked}
+
+      - name: peer-ipv6-rejects-unavailable-external-port
+        families: [ipv6]
+        description: Reject an untranslatable external port without reserving the endpoint or preventing a valid retry with a fresh nonce.
+        requests:
+          - pcp: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41044
+            suggested_external_port: 43044
+            remote_peer: allowed-peer
+            remote_peer_port: 42055
+          - pcp: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41044
+            suggested_external_port: 41044
+            remote_peer: allowed-peer
+            remote_peer_port: 42055
+        expect:
+          results: [CANNOT_PROVIDE_EXTERNAL, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42055, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42055, expect: blocked}
+      - name: peer-ipv6-rejects-unavailable-external-address
+        families: [ipv6]
+        description: Reject an unavailable external address without reserving the endpoint or preventing a valid retry with a fresh nonce.
+        requests:
+          - pcp: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41045
+            suggested_external_port: 41045
+            suggested_external_address: router-wan
+            remote_peer: allowed-peer
+            remote_peer_port: 42056
+          - pcp: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41045
+            suggested_external_port: 41045
+            remote_peer: allowed-peer
+            remote_peer_port: 42056
+        expect:
+          results: [CANNOT_PROVIDE_EXTERNAL, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42056, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42056, expect: blocked}
+      - name: peer-ipv6-coexists-with-filtered-map
+        families: [ipv6]
+        description: A filtered MAP still blocks unsolicited traffic while PEER permits replies from a different remote on the same internal port.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41046
+            suggested_external_port: 41046
+            options:
+              - FILTER: {remote_peer: allowed-peer, prefix_length: 128}
+          - pcp: PEER
+            lifetime: 120
+            protocol: udp
+            internal_port: 41046
+            suggested_external_port: 41046
+            remote_peer: denied-peer
+            remote_peer_port: 42100
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: denied-peer, mode: peer, protocol: udp, expect: delivered}
+            - {from: allowed-peer, protocol: udp, source_port: 42060, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42060, expect: blocked}
+            - {from: third-peer, protocol: udp, source_port: 42060, expect: blocked}
+
+  - name: NAT
+    description: NAT-PMP IPv4 address discovery and IPv6 PCP mapping with NAT66.
+    nat66: true
+    cases:
+      - name: natpmp-public-address
+        families: [ipv4]
+        description: Request and verify the gateway's external IPv4 address.
+        request:
+          natpmp: PUBLIC_ADDRESS
+        expect:
+          result: SUCCESS
+      - name: ipv6-pcp-map-reachability
+        families: [ipv6]
+        description: With the client using the NAT66-only ULA, PCP MAP preserves that address and opens its firewall rule.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41103
+          suggested_external_port: 41103
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41103, external_port: 41103, expect: delivered}
+      - name: ipv6-nat66-pcp-peer-reachability
+        families: [ipv6]
+        description: With a NAT66-only ULA client, a PEER request succeeds and its outbound flow is masqueraded to the WAN address.
+        request:
+          pcp: PEER
+          lifetime: 120
+          protocol: udp
+          internal_port: 41104
+          suggested_external_port: 41104
+          remote_peer: allowed-peer
+          remote_peer_port: 42100
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, mode: peer, protocol: udp, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42100, expect: blocked}
+      - name: ipv6-nat66-pcp-map-filter
+        families: [ipv6]
+        description: With a NAT66-only ULA client, a MAP FILTER admits only the allowed peer.
+        request:
+          pcp: MAP
+          lifetime: 120
+          protocol: udp
+          internal_port: 41105
+          suggested_external_port: 41105
+          options:
+            - FILTER: {remote_peer: allowed-peer, prefix_length: 128}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, source_port: 42105, service_port: 41105, external_port: 41105, expect: delivered}
+            - {from: denied-peer, protocol: udp, source_port: 42105, service_port: 41105, external_port: 41105, expect: blocked}
+
+  - name: PMP
+    description: NAT-PMP UDP and TCP mapping creation, renewal, and deletion.
+    cases:
+      - name: natpmp-single-udp-lifecycle
+        families: [ipv4]
+        description: Create, renew, and delete a UDP mapping, checking forwarding before deletion and blocking after.
+        requests:
+          - natpmp: UDP
+            private_port: 41100
+            public_port: 41100
+            lifetime: 120
+          - natpmp: UDP
+            private_port: 41100
+            public_port: 41100
+            lifetime: 240
+          - natpmp: UDP
+            private_port: 41100
+            public_port: 0
+            lifetime: 0
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41100, external_port: 41100, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41100, external_port: 41100, expect: blocked}
+      - name: natpmp-single-tcp-lifecycle
+        families: [ipv4]
+        description: Create and delete a TCP mapping and verify its forwarding path is removed.
+        requests:
+          - natpmp: TCP
+            private_port: 41101
+            public_port: 41101
+            lifetime: 120
+          - natpmp: TCP
+            private_port: 41101
+            public_port: 0
+            lifetime: 0
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 41101, external_port: 41101, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41101, external_port: 41101, expect: blocked}
+      - name: natpmp-udp-and-tcp-same-port
+        families: [ipv4]
+        description: UDP and TCP NAT-PMP mappings can share the same private and public port numbers.
+        requests:
+          - natpmp: UDP
+            private_port: 41102
+            public_port: 41102
+            lifetime: 120
+          - natpmp: TCP
+            private_port: 41102
+            public_port: 41102
+            lifetime: 120
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41102, external_port: 41102, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, service_port: 41102, external_port: 41102, expect: delivered}
+
+      - name: natpmp-renewal-adds-lost-rule
+        families: [ipv4]
+        description: The firewall lost the rules of a mapping, and a renewal makes the mapping pass traffic again.
+        requests:
+          - {natpmp: TCP, private_port: 41231, public_port: 41231, lifetime: 120}
+          - {natpmp: TCP, private_port: 41231, public_port: 41231, lifetime: 240}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              lose_rules: true
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 41231, external_port: 41231, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41231, external_port: 41231, expect: delivered}
+
+      # github #868: renewals must not pile up rules that outlive the delete.
+      - name: natpmp-repeated-renewals-then-delete-stops-forwarding
+        families: [ipv4]
+        description: Create a UDP mapping, renew it three times, delete it once, and check forwarding stops.
+        requests:
+          - {natpmp: UDP, private_port: 41252, public_port: 41252, lifetime: 120}
+          - {natpmp: UDP, private_port: 41252, public_port: 41252, lifetime: 240}
+          - {natpmp: UDP, private_port: 41252, public_port: 41252, lifetime: 180}
+          - {natpmp: UDP, private_port: 41252, public_port: 41252, lifetime: 120}
+          - {natpmp: UDP, private_port: 41252, public_port: 0, lifetime: 0}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 4
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41252, external_port: 41252, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41252, external_port: 41252, expect: blocked,
+               use_fresh_source_port: true}
+      # github #97: a delete (public port 0) used the private port as the public port, so it missed its
+      # own mapping and could hit the mapping whose public port equals that private port.
+      - name: natpmp-delete-finds-mapping-by-private-port
+        families: [ipv4]
+        description: Two crossed mappings (41253->41254 and 41254->41253); deleting the first leaves the second.
+        requests:
+          - {natpmp: UDP, private_port: 41253, public_port: 41254, lifetime: 120}
+          - {natpmp: UDP, private_port: 41254, public_port: 41253, lifetime: 120}
+          - {natpmp: UDP, private_port: 41253, public_port: 0, lifetime: 0}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41253, external_port: 41254, expect: delivered}
+                - {from: allowed-peer, protocol: udp, service_port: 41254, external_port: 41253, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41253, external_port: 41254, expect: blocked,
+               use_fresh_source_port: true}
+            - {from: allowed-peer, protocol: udp, service_port: 41254, external_port: 41253, expect: delivered}
+  - name: UPnP
+    description: UPnP IGD port mappings (SOAP AddPortMapping / DeletePortMapping), which share the firewall
+      rule code with PCP. Needs a daemon with enable_upnp=yes, so the section only runs with --enable-upnp.
+    requires: upnp
+    cases:
+      - name: upnp-udp-lifecycle
+        families: [ipv4]
+        description: Add a permanent UDP mapping, check forwarding, delete it, and check forwarding stops.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41200, external_port: 41200, lease_duration: 0}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41200, external_port: 41200}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41200, external_port: 41200, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41200, external_port: 41200, expect: blocked}
+      - name: upnp-tcp-lifecycle
+        families: [ipv4]
+        description: Add a permanent TCP mapping, check forwarding, delete it, and check forwarding stops.
+        requests:
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 41201, external_port: 41201, lease_duration: 0}
+          - {upnp: DeletePortMapping, protocol: tcp, internal_port: 41201, external_port: 41201}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 41201, external_port: 41201, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41201, external_port: 41201, expect: blocked}
+      - name: upnp-renewal-adds-lost-rule
+        families: [ipv4]
+        description: The firewall lost the rules of a mapping, and a renewal makes the mapping pass traffic again.
+        requests:
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 41232, external_port: 41232, lease_duration: 120}
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 41232, external_port: 41232, lease_duration: 240}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              lose_rules: true
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 41232, external_port: 41232, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41232, external_port: 41232, expect: delivered}
+      - name: upnp-udp-lease-expiry
+        families: [ipv4]
+        description: A mapping with a short lease forwards traffic and is removed by the daemon when the lease ends.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41202, external_port: 41202, lease_duration: 4, wait_after: 10}
+        expect:
+          result: SUCCESS
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41202, external_port: 41202, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41202, external_port: 41202, expect: blocked}
+      - name: upnp-udp-and-tcp-same-port
+        families: [ipv4]
+        description: UDP and TCP mappings share a port number, and deleting the UDP one leaves the TCP one in place.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41203, external_port: 41203, lease_duration: 0}
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 41203, external_port: 41203, lease_duration: 0}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41203, external_port: 41203}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41203, external_port: 41203, expect: delivered}
+                - {from: allowed-peer, protocol: tcp, service_port: 41203, external_port: 41203, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41203, external_port: 41203, expect: blocked}
+            - {from: allowed-peer, protocol: tcp, service_port: 41203, external_port: 41203, expect: delivered}
+      - name: upnp-delete-unknown-mapping
+        families: [ipv4]
+        description: Deleting a mapping that does not exist is refused with NoSuchEntryInArray (714).
+        request: {upnp: DeletePortMapping, protocol: udp, internal_port: 41204, external_port: 41204}
+        expect:
+          result: UPNP_714
+
+      # github #919: an update of a mapping (new internal port) re-adds its rules; the old ones must go.
+      - name: upnp-update-internal-port-then-delete
+        families: [ipv4]
+        description: Move a UDP mapping to another internal port, check it forwards, delete it, and check that no
+          rule of the old or the new internal port still forwards the external port.
+        # A probe counts any echo through the external port as delivered, so the case cannot tell which
+        # internal port got it while the mapping exists; after the delete, any echo is a leaked rule.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41255, external_port: 41255, lease_duration: 0}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41256, external_port: 41255, lease_duration: 0}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41256, external_port: 41255}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41256, external_port: 41255, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41256, external_port: 41255, expect: blocked,
+               use_fresh_source_port: true}
+            - {from: allowed-peer, protocol: udp, service_port: 41255, external_port: 41255, expect: blocked,
+               use_fresh_source_port: true}
+      # github #868, #919: lease renewals of one UDP mapping, then one delete.
+      - name: upnp-repeated-renewals-then-delete-stops-forwarding
+        families: [ipv4]
+        description: Add a UDP mapping, renew its lease three times, delete it once, and check forwarding stops.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41257, external_port: 41257, lease_duration: 120}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41257, external_port: 41257, lease_duration: 240}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41257, external_port: 41257, lease_duration: 180}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41257, external_port: 41257, lease_duration: 120}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41257, external_port: 41257}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 4
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41257, external_port: 41257, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41257, external_port: 41257, expect: blocked,
+               use_fresh_source_port: true}
+      # Ownership between protocols: the owner is protocol + nonce (PCP-DESIGN.md section 5c)
+      - name: owner-upnp-second-eport-on-pcp-filter-refused
+        families: [ipv4]
+        description: UPnP may not add a second external port to the internal port of a filtered PCP MAP.
+        requests:
+          - pcp: MAP
+            lifetime: 120
+            protocol: udp
+            internal_port: 41210
+            suggested_external_port: 41210
+            options:
+              - FILTER: {remote_peer: allowed-peer}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41210, external_port: 41211, lease_duration: 0}
+        expect:
+          results: [SUCCESS, UPNP_729]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41210, external_port: 41210, expect: delivered}
+            - {from: denied-peer, protocol: udp, service_port: 41210, external_port: 41210, expect: blocked}
+            - {from: denied-peer, protocol: udp, service_port: 41210, external_port: 41211, expect: blocked}
+      - name: owner-upnp-same-eport-other-iport-refused
+        families: [ipv4]
+        description: UPnP may not move the external port of a PCP MAP to another internal port.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41212, suggested_external_port: 41212}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41213, external_port: 41212, lease_duration: 0}
+        expect:
+          results: [SUCCESS, UPNP_729]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41212, external_port: 41212, expect: delivered}
+      - name: owner-upnp-same-tuple-refused
+        families: [ipv4]
+        description: UPnP may not renew a PCP MAP, whatever the lease.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41214, suggested_external_port: 41214}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41214, external_port: 41214, lease_duration: 0}
+        expect:
+          results: [SUCCESS, UPNP_729]
+      - name: owner-upnp-delete-of-pcp-refused
+        families: [ipv4]
+        description: UPnP may not delete a PCP MAP, and the mapping keeps working.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41215, suggested_external_port: 41215}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41215, external_port: 41215}
+        expect:
+          results: [SUCCESS, UPNP_606]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41215, external_port: 41215, expect: delivered}
+      - name: owner-upnp-two-eports-allowed
+        families: [ipv4]
+        description: One owner keeps several external ports to one internal port.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41216, external_port: 41216, lease_duration: 0}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41216, external_port: 41217, lease_duration: 0}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41216, external_port: 41217}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41216, external_port: 41216}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS, SUCCESS]
+      - name: owner-pcp-on-upnp-internal-refused
+        families: [ipv4]
+        description: PCP may not map an internal port which a UPnP mapping uses.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41218, external_port: 41218, lease_duration: 0}
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41218, suggested_external_port: 41219}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 41218, external_port: 41218}
+        expect:
+          results: [SUCCESS, NOT_AUTHORIZED, SUCCESS]
+      - name: owner-upnp-on-natpmp-internal-refused
+        families: [ipv4]
+        description: UPnP and NAT-PMP are different owners, so UPnP may not use an internal port of NAT-PMP.
+        requests:
+          - {natpmp: UDP, private_port: 41220, public_port: 41220, lifetime: 120}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41220, external_port: 41221, lease_duration: 0}
+          - {natpmp: UDP, private_port: 41220, public_port: 0, lifetime: 0}
+        expect:
+          results: [SUCCESS, UPNP_729, SUCCESS]
+      - name: owner-peer-on-eport-of-other-internal-port-refused
+        families: [ipv4]
+        description: A PEER may not use the external port of a MAP of another internal port.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41222, suggested_external_port: 41222}
+          - {pcp: PEER, lifetime: 120, protocol: udp, internal_port: 41223, suggested_external_port: 41222, remote_peer: allowed-peer, remote_peer_port: 42001}
+        expect:
+          results: [SUCCESS, CANNOT_PROVIDE_EXTERNAL]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41222, external_port: 41222, expect: delivered}
