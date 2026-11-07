@@ -26,6 +26,7 @@
 #include "upnpevents.h"
 #include "portinuse.h"
 #include "upnputils.h"
+#include "memmap.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
 #endif
@@ -327,6 +328,19 @@ void lease_file_rewrite(void)
  *          -3 permission check failed
  *          -4 already redirected (other mechanism)
  */
+/* Write the row of a port mapping: a mapping, or a mapping with its remote peer.
+ * rhost NULL, empty or "*" means any remote. */
+static void
+record_map(const char * rhost, unsigned short eport, const char * iaddr,
+           unsigned short iport, int proto, const char * desc,
+           unsigned int timestamp)
+{
+	if(rhost != NULL && rhost[0] != '\0' && strcmp(rhost, "*") != 0)
+		memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
+	else
+		memmap_map(0, eport, iaddr, iport, proto, desc, timestamp);
+}
+
 int
 upnp_redirect(const char * rhost, unsigned short eport,
               const char * iaddr, unsigned short iport,
@@ -405,6 +419,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			} else {
 				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
 			}
+			if(r == 0)
+				record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
@@ -459,6 +475,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #endif
 		return -1;
 	}
+	record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;
@@ -558,6 +575,8 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	r = delete_redirect_rule(ext_if_name, eport, proto);
 	delete_filter_rule(ext_if_name, eport, proto);
 #endif
+	if(r >= 0)
+		memmap_map_gone(eport, proto);
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
@@ -566,6 +585,54 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	upnp_event_var_change_notify(EWanIPC);
 #endif
 	return r;
+}
+
+static int
+desc_has_pcp_nonce(const char * desc, const char * prefix)
+{
+	size_t n = strlen(prefix);
+	return strncmp(desc, prefix, n) == 0 && strlen(desc) == n + 24 &&
+	       strspn(desc + n, "0123456789abcdefABCDEF") == 24;
+}
+
+enum mapping_owner
+mapping_owner_of(const char * desc, unsigned short eport, int proto)
+{
+	if(desc == NULL)
+		return MAPPING_UPNP;
+	if(desc_has_pcp_nonce(desc, "PCP MAP "))
+		return MAPPING_PCP;
+	if(strncmp(desc, "NAT-PMP ", 8) == 0) {
+		char expected[64];
+		snprintf(expected, sizeof(expected), "NAT-PMP %hu %s",
+		         eport, proto_itoa(proto));
+		if(strcmp(desc, expected) == 0)
+			return MAPPING_NATPMP;
+	}
+	return MAPPING_UPNP;
+}
+
+/* called from natpmp.c and pcpserver.c */
+int
+upnp_eport_used_by_other(unsigned short eport, const char * iaddr)
+{
+	static const int protos[] = { IPPROTO_TCP, IPPROTO_UDP };
+	char iaddr_old[INET6_ADDRSTRLEN];
+	unsigned short iport_old;
+	size_t i;
+
+	for(i = 0; i < sizeof(protos)/sizeof(protos[0]); i++) {
+		if(get_redirect_rule(ext_if_name, eport, protos[i],
+		                     iaddr_old, sizeof(iaddr_old), &iport_old,
+		                     0, 0, 0, 0, NULL, 0, 0) != 0)
+			continue;
+		if(strcmp(iaddr, iaddr_old) == 0)
+			continue;	/* the client's own mapping */
+		syslog(LOG_INFO, "external port %hu is used by %s (%s)",
+		       eport, iaddr_old, proto_itoa(protos[i]));
+		return 1;
+	}
+	return 0;
 }
 
 int

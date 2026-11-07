@@ -2636,7 +2636,7 @@ main(int argc, char * * argv)
 #endif
 
 #if defined(ENABLE_IPV6) && defined(ENABLE_PCP)
-	if(!GETFLAG(IPV6DISABLEDMASK)) {
+	if(GETFLAG(ENABLENATPMPMASK) && !GETFLAG(IPV6DISABLEDMASK)) {
 		spcp_v6 = OpenAndConfPCPv6Socket();
 	}
 #endif
@@ -2885,6 +2885,17 @@ main(int argc, char * * argv)
 			timeout.tv_usec = 0;
 		}
 #endif /* ENABLE_UPNPPINHOLE */
+
+#ifdef ENABLE_PCP
+		if(GETFLAG(ENABLENATPMPMASK))
+		{
+#ifdef ENABLE_IPV6
+			PCPAnnounceRetransmit(snatpmp, addr_count, spcp_v6, &timeout);
+#else /* IPv4 only */
+			PCPAnnounceRetransmit(snatpmp, addr_count, &timeout);
+#endif
+		}
+#endif /* ENABLE_PCP */
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
 		FD_ZERO(&readset);
