@@ -9,15 +9,21 @@ daemons that run with different `miniupnpd.conf` lines.
 | `daemon-options-cases.yaml` | the cases; each declares its daemon configuration (`config:`) |
 | `run_daemon_options_cases.py` | the runner: one run of one configuration, side and address family |
 | `run-docker.sh` | the Linux (Docker) driver: a fresh daemon per configuration |
-| `status.md` | the results (`lib_test.write_status`, a `linux` column) |
+| `run-freebsd.sh` | the FreeBSD driver: the suite in a throwaway VM (`freebsd/run-suite.sh`) |
+| `status.md` | the results (`lib_test.write_status`, a `linux` and a `freebsd` column) |
 
 ## Running
 
 ```sh
 miniupnpd/tests/daemon_options/run-docker.sh                 # every case
 miniupnpd/tests/daemon_options/run-docker.sh --case NAME     # some cases (repeatable)
+miniupnpd/tests/daemon_options/run-freebsd.sh               # the same in a FreeBSD VM (pf)
 python3 miniupnpd/tests/daemon_options/run_daemon_options_cases.py --self-test
 ```
+
+`run-freebsd.sh` boots a throwaway VM, runs `freebsd/run-suite.sh` there (epair and vnet jails) and
+copies the results out. The `platform: linux` cases stay out. It builds the daemon of the tree with
+pf as pcp_e2e does: PCP PEER only where pf supports it, and no `PF_ENABLE_FILTER_RULES`.
 
 The driver runs `common/run_self_tests.sh` first (`PCP_TEST_SELF_TEST=0` skips it), compiles the
 daemon in the tools image (`e2e_tools_image`, with OpenSSL; `e2e_build_daemon`) and writes:
@@ -61,8 +67,11 @@ engine: `run_case`), plus:
 
 - request kind `option_steps`: a list of steps (`natpmp_address`, `natpmp_map`, `pcp_map`,
   `upnp_add`, `upnp_get`, `http_get`, `soap`, `router`, `sleep`, `ssdp`), with `expect: {kind: steps}`.
-  A `router` step asks the driver for `ruleset`, `log`, `cat:PATH`, `restart`, `firewall-flush` or
-  `wan-probe:PORT`. `firewall-flush` removes the rules behind the daemon's back, as a reload does.
+  A `router` step asks the driver for `ruleset`, `log`, `cat:PATH`, `restart`, `firewall-flush`,
+  `wan-probe:PORT` or `wan-reserved`; on FreeBSD also `ruleset:ANCHOR`, the rules of one pf anchor. `firewall-flush` removes the rules behind the daemon's back, as
+  a reload does. `wan-reserved` gives the WAN a reserved address and sends the daemon SIGUSR1 (the
+  FreeBSD fixture's WAN is reserved already). `wan-probe:PORT` fetches `http://WAN:PORT/` from the
+  WAN host.
   With `expect: {kind: daemon_exits}` the daemon must refuse to start; a `router` log step checks why.
 - `@WAN4@`, `@LAN4@`, `@LAN6@` in a config line are the addresses of the slot; `key=@OFF@` leaves the
   default line of that option out.
@@ -110,6 +119,4 @@ before.
 
 Not covered yet:
 
-- FreeBSD runs need a tree with the `feat/pcp-peer-filter` daemon. `run-freebsd.sh` runs the suite
-  inside a throwaway VM (`freebsd/run-suite.sh`, epair and vnet jails) and copies the results out.
 - Forwarding-only / no-NAT mode: miniupnpd has no such option (`options.c`).
