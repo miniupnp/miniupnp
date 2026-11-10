@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/11/10:
+  libpfctl: fix error return checks
+
 2026/11/02:
   netfilter: support DNAT rules rev 2 (iptables 1.8.8+)
   PCP/NAT-PMP: various fixes
