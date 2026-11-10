@@ -67,8 +67,8 @@ jobs:
             matrix: linux
             emoji: 🐧
             runs-on:
-              arm: [ubuntu-latest]
-              intel: [ubuntu-latest]
+              arm: [ubuntu-24.04]
+              intel: [ubuntu-24.04]
             cibw-archs:
               arm: aarch64
               intel: x86_64
