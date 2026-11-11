@@ -526,8 +526,9 @@ class PacketCaptureTests(unittest.TestCase):
 
     def test_start_and_stop_write_the_log(self):
         with tempfile.TemporaryDirectory() as directory:
-            tcpdump = self.fake_tcpdump(directory, "echo 'listening on lo' >&2\n"
-                                                   "trap 'echo stopped >&2; exit 0' INT\nwhile :; do sleep 0.1; done\n")
+            tcpdump = self.fake_tcpdump(directory, "trap 'echo stopped >&2; exit 0' INT\n"
+                                                   "echo 'listening on lo' >&2\n"
+                                                   "while :; do sleep 0.1; done\n")
             capture = lib_test.PacketCapture.start(tcpdump, "lo", "udp", directory, "case", 2)
             capture.stop()
             with open(os.path.join(directory, "case.tcpdump.log"), encoding="utf-8") as log:
