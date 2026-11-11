@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/11/11:
+  open the IPv6 PCP socket only when NAT-PMP/PCP is enabled
+
 2026/11/10:
   libpfctl: fix error return checks
 
