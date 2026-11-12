@@ -77,7 +77,8 @@ on pf. Those are daemon results to triage, not harness faults.
 In CI, the `end2end-freebsd` job of `.github/workflows/regression-testing.yml` runs this driver on
 a GitHub Ubuntu runner (KVM, FreeBSD 14.5 and 15.1; the downloaded and prepared images are
 cached), with master's daemon and the pull request's, at the same time as `end2end-linux`, which
-does the same with `run-docker.sh`.
+does the same with `run-docker.sh`. Both run `../common/tools/compare_daemon_branches.py
+--suite end2end`; [`compare.py`](compare.py) tells it how to run this suite and read its results.
 
 ### Keeping the VM between runs
 

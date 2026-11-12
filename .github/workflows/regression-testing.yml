@@ -109,7 +109,7 @@ jobs:
           if [ -n "$CASE_NAME" ]; then
             args+=(--case "$CASE_NAME")
           fi
-          python3 candidate/miniupnpd/tests/pcp_wire/tools/compare_daemon_branches.py \
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
             --suite end2end --platform linux \
             --master-source master \
             --candidate-source candidate \
@@ -192,7 +192,7 @@ jobs:
           if [ -n "$CASE_NAME" ]; then
             args+=(--case "$CASE_NAME")
           fi
-          python3 candidate/miniupnpd/tests/pcp_wire/tools/compare_daemon_branches.py \
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
             --suite end2end --platform freebsd \
             --master-source master \
             --candidate-source candidate \
@@ -251,7 +251,8 @@ jobs:
           if [ "$PCP_WAN_PEER" = true ]; then
             args+=(--wan-peer)
           fi
-          python3 candidate/miniupnpd/tests/pcp_wire/tools/compare_daemon_branches.py \
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite wire \
             --master-source master \
             --candidate-source candidate \
             --profile "$PCP_PROFILE" \
@@ -323,8 +324,8 @@ jobs:
 
       - name: Compare master with pull request on FreeBSD ${{ matrix.release }}
         run: |
-          python3 candidate/miniupnpd/tests/pcp_wire/tools/compare_daemon_branches.py \
-            --platform freebsd \
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite wire --platform freebsd \
             --results freebsd-results/master freebsd-results/candidate \
             --master-source master \
             --candidate-source candidate \
