@@ -18,13 +18,41 @@
 #include <arpa/inet.h>
 
 #include "config.h"
+#include "macros.h"
 #include "upnpredirect.h"
+#include "upnpglobalvars.h"
 #include "upnputils.h"
 #include "lease_table.h"
 #include "memmap.h"
+#if defined(USE_NETFILTER)
+#include "netfilter/iptcrdr.h"
 #ifdef USE_NFTABLES
 #include "netfilter_nft/nftnlrdr.h"
 #endif
+#endif
+#if defined(USE_PF)
+#include "pf/obsdrdr.h"
+#endif
+#if defined(USE_IPF)
+#include "ipf/ipfrdr.h"
+#endif
+#if defined(USE_IPFW)
+#include "ipfw/ipfwrdr.h"
+#endif
+
+/* The firewalls which have pinholes. The PF API of Apple differs from what
+ * pf/pfpinhole.c expects. */
+#ifdef ENABLE_UPNPPINHOLE
+#if defined(USE_NETFILTER) || (defined(USE_PF) && !defined(__APPLE__))
+#define MEMMAP_PINHOLES
+#if defined(USE_NETFILTER)
+#include "netfilter/iptpinhole.h"
+#else
+#include "pf/pfpinhole.h"
+#endif
+#endif
+#endif
+
 
 /* The table keeps every address in 16 bytes: turn a.b.c.d into ::ffff:a.b.c.d.
  * 0, or -1 if s is not an IPv4 address */
@@ -349,8 +377,11 @@ memmap_remote_peers_partial(void)
 	syslog(LOG_DEBUG, "memmap: expired pinhole rules are left in the firewall");
 }
 
-/* the firewall removed expired pinholes : they go by their lifetime here */
-void
+/* The firewall ended a pass over the pinholes, and removed "removed" rules
+ * (<0 : error). The rows which expired go, as their rules went. If the pass
+ * removed nothing, failed or was partial, the rows stay for the next pass: a row
+ * must not go while its rule may still be there. */
+static void
 memmap_remote_peers_expired(unsigned int now, int removed)
 {
 	static struct pinhole_expiry c;
@@ -405,12 +436,10 @@ expiry_row(struct lease_entry * e, void * arg)
 	}
 }
 
-/* The nftables backend asks this which port mappings expired, with no read of
- * the firewall. Fills expired[] with at most max mappings, and returns how many.
- * *next is the time of the next expiry, 0 if there is none. */
+/* The port mappings which expired, with no read of the firewall. */
 int
-get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
-                           int max, unsigned int * next)
+memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
+                    int max, unsigned int * next)
 {
 	struct expiry_ctx c = { now, expired, max, 0, 0 };
 	lease_table_foreach(expiry_row, &c);
@@ -421,8 +450,8 @@ get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
 }
 #endif /* USE_NFTABLES */
 
-/* Tell if an IPv4 mapping has a row. */
-int
+/* 1 if the IPv4 mapping has a row */
+static int
 memmap_map_known(unsigned short eport, int proto)
 {
 	return lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL;
@@ -535,3 +564,128 @@ memmap_eport_used_by_other(unsigned short eport, const char * iaddr)
 		syslog(LOG_INFO, "external port %hu is used by %s", eport, other);
 	return 1;
 }
+
+/* Read the counters of an IPv4 port mapping from the firewall. */
+int
+memmap_map_counters(unsigned short eport, int proto,
+                    u_int64_t * packets, u_int64_t * bytes)
+{
+	unsigned short iport;
+	unsigned int timestamp;
+	return get_redirect_rule(ext_if_name, eport, proto, NULL, 0, &iport, NULL, 0,
+	                         NULL, 0, &timestamp, packets, bytes) >= 0 ? 0 : -1;
+}
+
+/* Give a row to each rule of an earlier run which has none. The row has the
+ * lifetime the firewall reports, or 0 for none: then it does not expire. A rule
+ * with a row is skipped, so a repeated call is safe. */
+void
+memmap_adopt_rules(void)
+{
+	int index = 0, proto;
+	unsigned short eport, iport;
+	char iaddr[32], desc[64], rhost[40];
+	unsigned int timestamp;
+
+	for(;;) {
+		desc[0] = '\0';
+		rhost[0] = '\0';
+		timestamp = 0;
+		if(get_redirect_rule_by_index(index++, NULL, &eport, iaddr, sizeof(iaddr),
+		                              &iport, &proto, desc, sizeof(desc),
+		                              rhost, sizeof(rhost), &timestamp, NULL, NULL) < 0)
+			break;
+		if(memmap_map_known(eport, proto))
+			continue;
+		syslog(LOG_NOTICE, "adopting rule %hu %s to %s:%hu", eport,
+		       proto_itoa(proto), iaddr, iport);
+		if(rhost[0] != '\0' && strcmp(rhost, "*") != 0)
+			memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
+		else
+			memmap_map(0, eport, iaddr, iport, proto, desc, timestamp);
+	}
+}
+
+#ifdef ENABLE_UPNPPINHOLE
+/* Find a pinhole by its rule, in the firewall. */
+int
+memmap_find_pinhole(const char * raddr, unsigned short rport,
+                    const char * iaddr, unsigned short iport, int proto,
+                    char * desc, int desclen, unsigned int * timestamp)
+{
+#ifdef MEMMAP_PINHOLES
+	return find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
+	                    desc, desclen, timestamp);
+#else
+	UNUSED(raddr); UNUSED(rport); UNUSED(iaddr); UNUSED(iport); UNUSED(proto);
+	UNUSED(desc); UNUSED(desclen); UNUSED(timestamp);
+	return -42;
+#endif
+}
+
+/* Read the rule of a pinhole from the firewall. */
+int
+memmap_get_pinhole(unsigned short uid, char * raddr, int raddrlen,
+                   unsigned short * rport, char * iaddr, int iaddrlen,
+                   unsigned short * iport, int * proto, char * desc, int desclen,
+                   unsigned int * timestamp, u_int64_t * packets)
+{
+#ifdef MEMMAP_PINHOLES
+	return get_pinhole_info(uid, raddr, raddrlen, rport, iaddr, iaddrlen, iport,
+	                        proto, desc, desclen, timestamp, packets, NULL);
+#else
+	UNUSED(uid); UNUSED(raddr); UNUSED(raddrlen); UNUSED(rport);
+	UNUSED(iaddr); UNUSED(iaddrlen); UNUSED(iport); UNUSED(proto);
+	UNUSED(desc); UNUSED(desclen); UNUSED(timestamp); UNUSED(packets);
+	return -42;
+#endif
+}
+
+/* The uid of a pinhole by its place in the firewall. */
+int
+memmap_pinhole_uid_at(int index)
+{
+#if defined(USE_NETFILTER) && defined(MEMMAP_PINHOLES)
+	return get_pinhole_uid_by_index(index);
+#else
+	UNUSED(index);
+	return -42;
+#endif
+}
+
+/* The firewall removes the expired pinholes: it holds their expiry. */
+int
+memmap_expire_pinholes(unsigned int * next)
+{
+#ifdef MEMMAP_PINHOLES
+	int removed = clean_pinhole_list(next);
+	memmap_remote_peers_expired((unsigned int)upnp_time(), removed);
+	return removed;
+#else
+	UNUSED(next);
+	return 0;
+#endif
+}
+#endif /* ENABLE_UPNPPINHOLE */
+
+#ifdef PCP_PEER
+/* Read a PEER rule from the firewall. */
+int
+memmap_get_peer_at(int index, unsigned short * eport, char * iaddr, int iaddrlen,
+                   unsigned short * iport, int * proto, char * desc, int desclen,
+                   char * rhost, int rhostlen, unsigned short * rport,
+                   unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	return get_peer_rule_by_index(index, NULL, eport, iaddr, iaddrlen, iport, proto,
+	                              desc, desclen, rhost, rhostlen, rport, timestamp,
+	                              packets, bytes) >= 0 ? 0 : -1;
+}
+
+/* Find the external address of a connection in the kernel. */
+int
+memmap_peer_nat_addr(struct sockaddr * intaddr, struct sockaddr * peer,
+                     unsigned char proto, struct sockaddr * ext)
+{
+	return get_nat_ext_addr(intaddr, peer, proto, ext);
+}
+#endif /* PCP_PEER */
