@@ -11,6 +11,7 @@ daemons that run with different `miniupnpd.conf` lines.
 | `run-docker.sh` | the Linux (Docker) driver: a fresh daemon per configuration |
 | `run-freebsd.sh` | the FreeBSD driver: the suite in a throwaway VM (`freebsd/run-suite.sh`) |
 | `status.md` | the results (`lib_test.write_status`, a `linux` and a `freebsd` column) |
+| `compare.py` | the suite in `common/tools/compare_daemon_branches.py` (`test_compare.py` tests it) |
 
 ## Running
 
@@ -24,6 +25,11 @@ python3 miniupnpd/tests/daemon_options/run_daemon_options_cases.py --self-test
 `run-freebsd.sh` boots a throwaway VM, runs `freebsd/run-suite.sh` there (epair and vnet jails) and
 copies the results out. The `platform: linux` cases stay out. It builds the daemon of the tree with
 pf as pcp_e2e does: PCP PEER only where pf supports it, and no `PF_ENABLE_FILTER_RULES`.
+
+In CI, the `options-linux` and `options-freebsd` jobs of `.github/workflows/regression-testing.yml`
+run both drivers with master's daemon and the pull request's
+(`common/tools/compare_daemon_branches.py --suite daemon_options`, FreeBSD 14.5 and 15.1). A case
+that passes with master's daemon and fails with the pull request's fails the job.
 
 The driver runs `common/run_self_tests.sh` first (`PCP_TEST_SELF_TEST=0` skips it), compiles the
 daemon in the tools image (`e2e_tools_image`, with OpenSSL; `e2e_build_daemon`) and writes:

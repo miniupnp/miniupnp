@@ -10,6 +10,9 @@ name: 'miniupnpd: Regression testing'
 #                   master's daemon against the pull request's
 #   end2end-linux   the end-to-end suite on Docker (run-docker.sh), master's daemon against the pull request's
 #   end2end-freebsd the same with a FreeBSD pf router in QEMU (run-freebsd.sh), 14.5 and 15.1
+#   options-linux   the daemon_options suite (one daemon per miniupnpd.conf) on Docker, master's
+#                   daemon against the pull request's
+#   options-freebsd the same in a FreeBSD QEMU VM (pf), 14.5 and 15.1
 # The comparisons build both daemons with the pull request's harness; a case that passed
 # with master's daemon and fails with the pull request's fails the job. On a push to
 # master, "master" is the commit before the push.
@@ -33,6 +36,10 @@ name: 'miniupnpd: Regression testing'
         type: string
       wire_case:
         description: 'Optional single wire case (pcp-wire-cases.yaml; empty runs all)'
+        required: false
+        type: string
+      options_case:
+        description: 'Optional single daemon_options case (daemon-options-cases.yaml; empty runs all; both platforms)'
         required: false
         type: string
       profile:
@@ -353,5 +360,140 @@ jobs:
         with:
           name: wire-freebsd-${{ matrix.release }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: freebsd-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  options-linux:
+    # daemon_options/run-docker.sh with master's daemon and with the pull request's (both with
+    # the pull request's harness); a case that passed on master and fails now fails the job
+    name: options-linux (Docker, master against the pull request)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Check out master baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || 'master' }}
+          path: master
+          persist-credentials: false
+
+      - name: Install YAML parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+
+      - name: Compare master with pull request on linux
+        env:
+          CASE_NAME: ${{ inputs.options_case }}
+        run: |
+          args=()
+          if [ -n "$CASE_NAME" ]; then
+            args+=(--case "$CASE_NAME")
+          fi
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite daemon_options --platform linux \
+            --master-source master \
+            --candidate-source candidate \
+            --output options-linux "${args[@]}"
+
+      - name: Publish comparison summary
+        if: always()
+        run: |
+          if [ -f options-linux/summary.md ]; then
+            cat options-linux/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results and daemon logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: options-linux-${{ github.run_id }}-${{ github.run_attempt }}
+          path: options-linux/
+          if-no-files-found: warn
+          retention-days: 14
+
+  options-freebsd:
+    # The whole suite runs in a FreeBSD QEMU VM with pf (vnet jails for the LAN and WAN hosts).
+    # Master's daemon and the pull request's, as in options-linux.
+    name: options-freebsd ${{ matrix.release }} (pf in QEMU, master against the pull request)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['14.5', '15.1']
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Check out master baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || 'master' }}
+          path: master
+          persist-credentials: false
+
+      - name: Install QEMU, the seed ISO tool and the YAML parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso python3-yaml
+
+      - name: Let the job use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' |
+            sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Cache the FreeBSD images (downloaded and prepared)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/miniupnpd-pcp-test/FreeBSD-*.qcow2
+            ~/.cache/miniupnpd-pcp-test/prepared-*.qcow2
+            ~/.cache/miniupnpd-pcp-test/id_ed25519*
+          # the same images and key as end2end-freebsd
+          key: >-
+            end2end-freebsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/freebsd/prepare.sh') }}
+
+      - name: Compare master with pull request on freebsd
+        env:
+          CASE_NAME: ${{ inputs.options_case }}
+          PCP_TEST_FREEBSD_VERSION: ${{ matrix.release }}
+        run: |
+          args=()
+          if [ -n "$CASE_NAME" ]; then
+            args+=(--case "$CASE_NAME")
+          fi
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite daemon_options --platform freebsd \
+            --master-source master \
+            --candidate-source candidate \
+            --output options-freebsd "${args[@]}"
+
+      - name: Publish comparison summary
+        if: always()
+        run: |
+          if [ -f options-freebsd/summary.md ]; then
+            cat options-freebsd/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results and daemon logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: options-freebsd-${{ matrix.release }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: options-freebsd/
           if-no-files-found: warn
           retention-days: 14
