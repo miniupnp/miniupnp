@@ -254,6 +254,88 @@ sections:
           traffic:
             - {from: allowed-peer, protocol: tcp, service_port: 41251, external_port: 41251, expect: blocked,
                use_fresh_source_port: true}
+      - name: static-map-match-gets-static-port
+        families: [ipv4]
+        description: >-
+          RFC 6887 11.3 (MUST): a MAP whose internal address, protocol and port match a static mapping
+          gets SUCCESS with the external port of the static mapping, whatever port it suggests.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41300, internal_port: 41300}
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: tcp, internal_port: 41300, suggested_external_port: 41309, static_mapping: true}
+        expect:
+          results: [SUCCESS]
+          external_ports: [41300]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41300, external_port: 41300, expect: delivered}
+      - name: static-map-match-prefer-failure-other-port-refused
+        families: [ipv4]
+        description: >-
+          RFC 6887 11.3 (MUST): a MAP with PREFER_FAILURE which matches a static mapping but suggests
+          another external port gets CANNOT_PROVIDE_EXTERNAL.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41301, internal_port: 41301}
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: tcp, internal_port: 41301, suggested_external_port: 41308, options: [PREFER_FAILURE]}
+        expect:
+          results: [CANNOT_PROVIDE_EXTERNAL]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41301, external_port: 41301, expect: delivered}
+      - name: static-map-delete-refused
+        families: [ipv4]
+        description: >-
+          RFC 6887 15 (MUST): a MAP with lifetime 0 for a static mapping gets NOT_AUTHORIZED, and the
+          static mapping still forwards.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41302, internal_port: 41302}
+        requests:
+          - {pcp: MAP, lifetime: 0, protocol: tcp, internal_port: 41302, suggested_external_port: 41302}
+        expect:
+          results: [NOT_AUTHORIZED]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41302, external_port: 41302, expect: delivered}
+      - name: static-map-other-client-port-gets-other-port
+        families: [ipv4]
+        description: >-
+          A MAP which suggests the external port of a static mapping to another internal port gets
+          another external port, and both forward (RFC 6887 11.3: the suggested port is a hint).
+        admin_forwards:
+          - {protocol: tcp, external_port: 41303, internal_port: 41313}
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: tcp, internal_port: 41303, suggested_external_port: 41303}
+        expect:
+          results: [SUCCESS]
+          external_ports: [{not: 41303}]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41313, external_port: 41303, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, service_port: 41303, expect: delivered}
+      - name: static-map-other-client-port-prefer-failure-refused
+        families: [ipv4]
+        description: >-
+          RFC 6887 11.3 (MUST): a MAP with PREFER_FAILURE which suggests the external port of a static
+          mapping to another internal port gets CANNOT_PROVIDE_EXTERNAL.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41304, internal_port: 41314}
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: tcp, internal_port: 41304, suggested_external_port: 41304, options: [PREFER_FAILURE]}
+        expect:
+          results: [CANNOT_PROVIDE_EXTERNAL]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41314, external_port: 41304, expect: delivered}
+      - name: static-map-kept-after-other-mapping-deleted
+        families: [ipv4]
+        description: >-
+          A static mapping keeps forwarding after the daemon adds and deletes a mapping of another port.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41305, internal_port: 41305}
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: tcp, internal_port: 41306, suggested_external_port: 41306}
+          - {pcp: MAP, lifetime: 0, protocol: tcp, internal_port: 41306, suggested_external_port: 41306}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41305, external_port: 41305, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, service_port: 41306, external_port: 41306, expect: blocked}
   - name: FILTER
     description: PCP MAP FILTER peer and source-port policy scenarios.
     cases:
@@ -1073,6 +1155,48 @@ sections:
             - {from: allowed-peer, protocol: udp, service_port: 41253, external_port: 41254, expect: blocked,
                use_fresh_source_port: true}
             - {from: allowed-peer, protocol: udp, service_port: 41254, external_port: 41253, expect: delivered}
+      - name: natpmp-static-match-gets-static-port
+        families: [ipv4]
+        description: >-
+          A NAT-PMP request whose internal port matches a static mapping gets SUCCESS with the external
+          port of the static mapping (as RFC 6887 11.3 for PCP; RFC 6886 has no rule of its own).
+        admin_forwards:
+          - {protocol: tcp, external_port: 41307, internal_port: 41307}
+        requests:
+          - {natpmp: TCP, private_port: 41307, public_port: 41317, lifetime: 120, static_mapping: true}
+        expect:
+          results: [SUCCESS]
+          external_ports: [41307]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41307, external_port: 41307, expect: delivered}
+      - name: natpmp-static-delete-refused
+        families: [ipv4]
+        description: >-
+          RFC 6886 3.4 (MUST): a delete of a mapping the administrator configured gets Not Authorized
+          (result 2), and the static mapping still forwards.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41310, internal_port: 41310}
+        requests:
+          - {natpmp: TCP, private_port: 41310, public_port: 0, lifetime: 0}
+        expect:
+          results: [NOT_AUTHORIZED]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41310, external_port: 41310, expect: delivered}
+      - name: natpmp-static-other-client-port-gets-other-port
+        families: [ipv4]
+        description: >-
+          A NAT-PMP request for the public port of a static mapping to another internal port gets
+          another public port (RFC 6886 3.3: the requested port is a hint), and both forward.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41311, internal_port: 41319}
+        requests:
+          - {natpmp: TCP, private_port: 41311, public_port: 41311, lifetime: 120}
+        expect:
+          results: [SUCCESS]
+          external_ports: [{not: 41311}]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41319, external_port: 41311, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, service_port: 41311, expect: delivered}
   - name: UPnP
     description: UPnP IGD port mappings (SOAP AddPortMapping / DeletePortMapping), which share the firewall
       rule code with PCP. Needs a daemon with enable_upnp=yes, so the section only runs with --enable-upnp.
@@ -1284,3 +1408,29 @@ sections:
           results: [SUCCESS, CANNOT_PROVIDE_EXTERNAL]
           traffic:
             - {from: allowed-peer, protocol: udp, service_port: 41222, external_port: 41222, expect: delivered}
+      - name: upnp-static-match-succeeds
+        families: [ipv4]
+        description: >-
+          AddPortMapping which matches a static mapping (same external port, internal client and port)
+          succeeds, and the static mapping still forwards.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41312, internal_port: 41312}
+        requests:
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 41312, external_port: 41312, lease_duration: 0, static_mapping: true}
+        expect:
+          results: [SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41312, external_port: 41312, expect: delivered}
+      - name: upnp-static-other-client-port-conflict
+        families: [ipv4]
+        description: >-
+          AddPortMapping for the external port of a static mapping to another internal port fails with
+          718 ConflictInMappingEntry (WANIPConnection 2.4.16), and the static mapping still forwards.
+        admin_forwards:
+          - {protocol: tcp, external_port: 41315, internal_port: 41316}
+        requests:
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 41315, external_port: 41315, lease_duration: 0}
+        expect:
+          results: [UPNP_718]
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 41316, external_port: 41315, expect: delivered}

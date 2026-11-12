@@ -289,6 +289,9 @@ e2e_start_runner() {
 # lose-rules needs lose_rules, which removes the rules of the daemon and prints their number before and after.
 # restart needs restart_daemon, which restarts the daemon with its state (the lease file) and returns once
 # it answers again.
+# admin-forward:FAMILY:PROTO:EXTERNAL:INTERNAL needs admin_forward, which adds a static mapping (a port
+# forward of the administrator, outside the rules of the daemon) and prints "ok"; admin-clear needs
+# admin_clear, which removes them.
 router_call() {
   case $1 in
     snapshot:*) snapshot_daemon_state "$case_dir/daemon-expect-${1#snapshot:}.txt" ;;
@@ -296,6 +299,8 @@ router_call() {
     restart)
       echo "restarting the daemon for the runner" >&2
       restart_daemon >/dev/null && echo restarted ;;
+    admin-forward:*) admin_forward "${1#admin-forward:}" ;;
+    admin-clear) admin_clear ;;
     *) echo "unknown router command: $1" ;;
   esac
 }

@@ -2270,6 +2270,14 @@ def validate_corpus(corpus):
                 kind = request.get("protocol_family", "PCP")
                 validator = REQUEST_VALIDATORS.get(kind) if isinstance(kind, str) else None
                 (validator or validate_pcp_request)(where, request, family)
+            for forward in resolved.get("admin_forwards", []):
+                if forward.get("protocol") not in ("tcp", "udp"):
+                    raise ValueError(f"{where}: invalid admin forward protocol")
+                check_port(where, forward, "external_port")
+                check_port(where, forward, "internal_port")
+            ports = resolved.get("expect", {}).get("external_ports")
+            if ports is not None and len(ports) != len(requests):
+                raise ValueError(f"{where}: external_ports must have one entry per request")
             for probe_spec in case_traffic(resolved):
                 if probe_spec.get("protocol") not in ("tcp", "udp") or probe_spec.get("expect") not in (
                         "delivered", "blocked"):
@@ -2486,6 +2494,27 @@ def lose_firewall_rules(directory):
         raise AssertionError(f"lose-rules answered {answer!r}")
     if int(counts[0]) == 0 or int(counts[1]) != 0:
         raise AssertionError(f"lose-rules: {counts[0]} rules before, {counts[1]} after")
+
+
+def add_admin_forward(directory, family, forward):
+    """A static mapping: a port forward of the administrator on the router, outside the rules of the
+    daemon, from external_port to internal_port of the client."""
+    answer = router_call(directory, "admin-forward:{}:{}:{}:{}".format(
+        family, forward["protocol"], forward["external_port"], forward["internal_port"]))
+    if answer.strip() != "ok":
+        raise AssertionError(f"admin-forward answered {answer!r}")
+
+
+def check_external_port(wanted, port):
+    """An entry of `external_ports`: the port the answer must give, {not: port} for a port it must
+    not give, or null for no check."""
+    if wanted is None:
+        return
+    if isinstance(wanted, dict):
+        if port == wanted["not"]:
+            raise AssertionError(f"external port {port} is the port of a static mapping")
+    elif port != wanted:
+        raise AssertionError(f"external port expected {wanted}, got {port}")
 
 
 def wan_network(external_address):
@@ -2727,6 +2756,11 @@ class CaseRun:
             run_restart({"router_call_dir": self.args.router_call_dir})
         if result != wanted:
             raise AssertionError(f"{spec.get('protocol_family', 'PCP')} response expected {wanted}, got {result}")
+        ports = self.case["expect"].get("external_ports")
+        if result == "SUCCESS" and ports is not None:
+            check_external_port(ports[request_index - 1], port)
+        if spec.get("static_mapping"):
+            return      # the answer names a static mapping: there is nothing of the client to delete
         if (result == "SUCCESS" and spec.get("opcode") == "PUBLIC_ADDRESS"
                 and port != self.args.external_address):
             raise AssertionError(f"NAT-PMP public address expected {self.args.external_address}, got {port}")
@@ -2759,7 +2793,10 @@ class CaseRun:
         if len(self.requests) != len(self.expected):
             raise AssertionError("requests/results lengths differ")
         failed = True
+        forwards = self.case.get("admin_forwards", [])
         try:
+            for forward in forwards:
+                add_admin_forward(self.args.router_call_dir, self.args.family, forward)
             self.run_traffic(self.case.get("before_traffic", []))
             for request_index, (spec, wanted) in enumerate(zip(self.requests, self.expected), 1):
                 self.run_request(request_index, spec, wanted)
@@ -2772,6 +2809,9 @@ class CaseRun:
             except AssertionError:
                 if not failed:      # else it would replace the failure of the case
                     raise
+            finally:
+                if forwards:
+                    router_call(self.args.router_call_dir, "admin-clear")
 
 
 # The UPnP IGD client: SSDP, HTTP, the description and SCPD documents, SOAP control and GENA eventing
