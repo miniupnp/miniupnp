@@ -129,31 +129,24 @@ get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
 
 #ifdef TEST_PINHOLES
 int
-find_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
-             const char * int_client, unsigned short int_port, int proto,
-             char * desc, int desc_len, unsigned int * timestamp)
+get_pinhole_packets(const char * rem_host, unsigned short rem_port,
+                    const char * int_client, unsigned short int_port, int proto,
+                    u_int64_t * packets)
 {
-	UNUSED(ifname); UNUSED(rem_host); UNUSED(rem_port); UNUSED(int_client);
-	UNUSED(int_port); UNUSED(proto); UNUSED(desc); UNUSED(desc_len); UNUSED(timestamp);
-	return -2;
+	UNUSED(rem_host); UNUSED(rem_port); UNUSED(int_client); UNUSED(int_port);
+	UNUSED(proto);
+	*packets = 0;
+	return 0;
 }
 
 int
-get_pinhole_info(unsigned short uid, char * rem_host, int rem_hostlen,
-                 unsigned short * rem_port, char * int_client, int int_clientlen,
-                 unsigned short * int_port, int * proto, char * desc, int desclen,
-                 unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
+                    unsigned short * rem_port, char * int_client, int int_clientlen,
+                    unsigned short * int_port, int * proto, char * desc, int desclen)
 {
-	UNUSED(uid); UNUSED(rem_host); UNUSED(rem_hostlen); UNUSED(rem_port);
+	UNUSED(index); UNUSED(rem_host); UNUSED(rem_hostlen); UNUSED(rem_port);
 	UNUSED(int_client); UNUSED(int_clientlen); UNUSED(int_port); UNUSED(proto);
-	UNUSED(desc); UNUSED(desclen); UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
-	return -2;
-}
-
-int
-get_pinhole_uid_by_index(int index)
-{
-	UNUSED(index);
+	UNUSED(desc); UNUSED(desclen);
 	return -1;
 }
 
@@ -224,9 +217,7 @@ fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * by
 	return r >= 0 ? 0 : r == -2 ? -2 : -1;
 }
 
-/* The fake fw_sync(): it takes every change, and gives a new pinhole the uid
- * of fake_uid. */
-static int fake_uid;
+/* The fake fw_sync(): it takes every change. */
 unsigned int nextruletoclean_timestamp;
 
 int
@@ -234,25 +225,32 @@ fw_sync(struct fw_change * changes, int n)
 {
 	int i;
 	for(i = 0; i < n; i++) {
-		if(changes[i].op == FW_ADD && changes[i].row->family == AF_INET6)
-			changes[i].uid = (unsigned short)fake_uid;
 		changes[i].applied = FW_APPLIED;
 	}
 	return 0;
 }
 
-/* A request of one change, as the protocols send it. uid is the one the
- * firewall gives a new pinhole, or the pinhole to renew or delete. */
+/* The uid the map gave the pinhole of the last add, 0 for none. */
+static int last_uid;
+
+/* A request of one change, as the protocols send it. For an add, a uid other
+ * than 0 asks the map for one (UPnP), which last_uid then holds; else uid is
+ * the pinhole to renew or delete. */
 static int
 sync1(enum memmap_op op, int uid, const char * raddr, unsigned short rport,
       unsigned short eport, const char * iaddr, unsigned short iport, int proto,
       const char * desc, unsigned int timestamp)
 {
 	struct memmap_change c;
-	memmap_change_init(&c, op, uid, raddr, rport, eport, iaddr, iport, proto, desc,
-	                   timestamp);
-	fake_uid = uid;
-	return memmap_sync(&c, 1);
+	int r;
+	memmap_change_init(&c, op, op == MEMMAP_ADD ? 0 : uid, raddr, rport, eport, iaddr,
+	                   iport, proto, desc, timestamp);
+	if(op == MEMMAP_ADD)
+		c.give_uid = uid != 0;
+	r = memmap_sync(&c, 1);
+	if(op == MEMMAP_ADD)
+		last_uid = c.uid;
+	return r;
 }
 
 /* add a mapping with no remote peer */
@@ -418,47 +416,53 @@ test_ipv6(void)
 {
 	static const char * h = "2001:db8::10", * peer = "2001:db8:1::5";
 	struct lease_entry * row, * again;
+	int u, u2;
 
 	lease_table_clear();
 	/* a UPnP pinhole : found by its uid */
-	add_map(7, 0, h, 8080, IPPROTO_UDP, "upnp", 100);
-	row = lease_table_find_uid(7);
+	add_map(1, 0, h, 8080, IPPROTO_UDP, "upnp", 100);
+	u = last_uid;
+	assert(u > 0);
+	row = lease_table_find_uid((unsigned short)u);
 	assert(row != NULL && row == pinhole(h, 8080, NULL, 0));
 	assert(row->family == AF_INET6 && row->eport == 8080 && row->iport == 8080);
 	assert(same_addr(&row->eaddr, h) && same_addr(&row->iaddr, h));
-	assert(row->kind == LEASE_UPNP && lease_uid(row) == 7);
+	assert(row->kind == LEASE_UPNP && lease_uid(row) == u);
 
 	/* renew by uid, without a description */
-	renew_uid(7, 200);
-	assert(lease_table_find_uid(7) == row && row->expiry == 200);
-	renew_uid(7, 300);
+	renew_uid(u, 200);
+	assert(lease_table_find_uid((unsigned short)u) == row && row->expiry == 200);
+	renew_uid(u, 300);
 	assert(row->expiry == 300 && strcmp(row->label, "upnp") == 0);
-	renew_uid(8, 999);	/* no row : nothing */
+	renew_uid(u + 1, 999);	/* no row : nothing */
 	assert(lease_table_count() == 1);
 
 	/* renew with the same description : the row stays */
-	renew(7, NULL, 0, h, 8080, IPPROTO_UDP, "upnp", 400);
-	assert(lease_table_find_uid(7) == row && row->expiry == 400);
+	renew(u, NULL, 0, h, 8080, IPPROTO_UDP, "upnp", 400);
+	assert(lease_table_find_uid((unsigned short)u) == row && row->expiry == 400);
 
 	/* another description on the key : the row takes it */
-	renew(7, NULL, 0, h, 8080, IPPROTO_UDP, "other", 500);
-	again = lease_table_find_uid(7);
+	renew(u, NULL, 0, h, 8080, IPPROTO_UDP, "other", 500);
+	again = lease_table_find_uid((unsigned short)u);
 	assert(again != NULL && strcmp(again->label, "other") == 0);
 	assert(again->expiry == 500 && lease_table_count() == 1);
 
 	/* a pinhole with a remote : its own row next to the one without */
-	add_peer(9, peer, 5000, 0, h, 8080, IPPROTO_UDP, "upnp peer", 600);
+	add_peer(1, peer, 5000, 0, h, 8080, IPPROTO_UDP, "upnp peer", 600);
 	assert(lease_table_count() == 2);
-	row = lease_table_find_uid(9);
+	u2 = last_uid;
+	assert(u2 > 0 && u2 != u);
+	row = lease_table_find_uid((unsigned short)u2);
 	assert(row != NULL && row == pinhole(h, 8080, peer, 5000));
 	assert(row->remote != NULL && row->remote->rport == 5000);
-	drop_pinhole(9, NULL, 0, NULL, 0, 0);
-	assert(lease_table_find_uid(9) == NULL && lease_table_count() == 1);
-	drop_pinhole(9, NULL, 0, NULL, 0, 0);	/* no row : nothing */
+	drop_pinhole(u2, NULL, 0, NULL, 0, 0);
+	assert(lease_table_find_uid((unsigned short)u2) == NULL && lease_table_count() == 1);
+	drop_pinhole(u2, NULL, 0, NULL, 0, 0);	/* no row : nothing */
 	assert(lease_table_count() == 1);
 
 	/* PCP has no uid : the row is found by its key */
 	add_peer(0, peer, 5000, 0, h, 9090, IPPROTO_UDP, PCP_DESC, 700);
+	assert(last_uid == 0);
 	row = pinhole(h, 9090, peer, 5000);
 	assert(row != NULL && row->kind == LEASE_PCP_MAP && lease_uid(row) == 0);
 	assert(lease_table_count() == 2);
@@ -476,11 +480,11 @@ test_ipv6(void)
 	assert(pinhole(h, 9091, NULL, 0) == NULL && lease_table_count() == 1);
 
 	/* a delete with a uid takes the row of the uid */
-	drop_pinhole(7, NULL, 0, h, 1, IPPROTO_UDP);
-	assert(lease_table_find_uid(7) == NULL && lease_table_count() == 0);
+	drop_pinhole(u, NULL, 0, h, 1, IPPROTO_UDP);
+	assert(lease_table_find_uid((unsigned short)u) == NULL && lease_table_count() == 0);
 
 	/* a bad internal address : no row */
-	add_map(3, 0, "2001:db8::zz", 8080, IPPROTO_UDP, "upnp", 100);
+	add_map(1, 0, "2001:db8::zz", 8080, IPPROTO_UDP, "upnp", 100);
 	assert(lease_table_count() == 0);
 
 	/* A PCP pinhole renewed with the uid the firewall gave it, which a
@@ -621,7 +625,7 @@ test_expired_maps(void)
 	add_map(0, 40004, "192.0.2.10", 5003, IPPROTO_TCP, "d", 120);
 	add_map(0, 40005, "192.0.2.10", 5004, IPPROTO_TCP, "e", 0);	/* no expiry */
 	/* an IPv6 pinhole is not a port mapping */
-	add_map(7, 6000, "2001:db8::1", 6000, IPPROTO_TCP, "f", 50);
+	add_map(1, 6000, "2001:db8::1", 6000, IPPROTO_TCP, "f", 50);
 
 	n = memmap_expired_maps(100, expired, EXPIRE_MAX_PER_PASS, &next);
 	assert(n == 2);
@@ -672,7 +676,7 @@ test_each_map_counters(void)
 	lease_table_clear();
 	add_map(0, 40001, "192.0.2.10", 5000, IPPROTO_TCP, "a", 0);
 	add_map(0, 40002, "192.0.2.10", 5001, IPPROTO_UDP, "b", 0);	/* its rule is gone */
-	add_map(7, 6000, "2001:db8::1", 6000, IPPROTO_TCP, "c", 0);	/* not a port mapping */
+	add_map(1, 6000, "2001:db8::1", 6000, IPPROTO_TCP, "c", 0);	/* not a port mapping */
 	/* NAT-PMP and PCP: their lease ends them, not their counters */
 	add_map(0, 40004, "192.0.2.11", 5002, IPPROTO_TCP, "NAT-PMP 40004 tcp", 0);
 	add_map(0, 40005, "192.0.2.12", 5003, IPPROTO_TCP, PCP_DESC, 0);

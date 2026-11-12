@@ -81,7 +81,7 @@ enum memmap_op {
 	MEMMAP_UPDATE,		/* an IPv4 port mapping: new iport, description, expiry */
 	MEMMAP_RENEW,		/* a pinhole by uid: new expiry. With iaddr, its rule */
 	MEMMAP_DELETE,		/* an IPv4 port mapping, by eport */
-	MEMMAP_DELETE_PINHOLE	/* a pinhole by uid. With iaddr, its rule too */
+	MEMMAP_DELETE_PINHOLE	/* a pinhole by uid, or by its rule (iaddr) */
 };
 
 /* One change of a request. The strings stay the caller's. */
@@ -95,7 +95,9 @@ struct memmap_change {
 	int proto;
 	const char * desc;
 	unsigned int timestamp;	/* the expiry, 0 for none */
-	int uid;		/* a pinhole: set by MEMMAP_ADD, read by the others */
+	int uid;		/* a pinhole: set by MEMMAP_ADD, read by the others. 0 : none */
+	int give_uid;		/* MEMMAP_ADD of a pinhole: 1 gives it a uid, which UPnP
+				 * names it by. PCP finds a pinhole by its rule: 0 */
 };
 
 /* Fill a change, with every field it does not name zero. A pinhole has no
@@ -164,27 +166,33 @@ int memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
                         int max, unsigned int * next);
 
 #ifdef ENABLE_UPNPPINHOLE
-/* 1 if the pinhole uid has a row: then it needs no read of the firewall. */
-int memmap_pinhole_has_row(unsigned short uid);
+/* The pinholes, read from the table. Each one has a row: those of an earlier
+ * run get theirs from memmap_adopt_pinholes() at startup. A UPnP pinhole also
+ * has a uid, its UniqueID. A PCP pinhole has none (uid 0): PCP finds it by
+ * its rule. */
 
-/* The pinhole reads below go to the firewall: a pinhole of an earlier run has
- * no row, and the packet counter is only there. */
-
-/* The uid of the pinhole of this rule, or < 0. desc and timestamp may be NULL. */
+/* The uid of the pinhole of this rule, 0 if it has none, or -2 if there is
+ * no such pinhole. desc and timestamp may be NULL. */
 int memmap_find_pinhole(const char * raddr, unsigned short rport,
                         const char * iaddr, unsigned short iport, int proto,
                         char * desc, int desclen, unsigned int * timestamp);
-/* The rule of a pinhole. 0, -2 if there is no such pinhole, or < 0. */
+/* The rule of a pinhole, with its packet counter from the firewall. raddr is
+ * "" for none. 0, or -2 if there is no such pinhole. */
 int memmap_get_pinhole(unsigned short uid, char * raddr, int raddrlen,
                        unsigned short * rport, char * iaddr, int iaddrlen,
                        unsigned short * iport, int * proto, char * desc, int desclen,
                        unsigned int * timestamp, u_int64_t * packets);
-/* The uid of the pinhole at this place, or < 0 past the end. */
+/* The uid of the pinhole at this place in a walk of the pinholes which have a
+ * uid, or -1 past the end. The order is that of the table, and changes with
+ * it. */
 int memmap_pinhole_uid_at(int index);
 /* Remove the pinholes past their expiry, which the firewall holds, and their
  * rows. The rules are read only when a pinhole is due. *next is the time of the
  * next expiry. The number removed, or < 0. */
 int memmap_expire_pinholes(unsigned int * next);
+/* Give a row and a uid to each pinhole rule of an earlier run. This reads the
+ * firewall, once at startup. */
+void memmap_adopt_pinholes(void);
 #endif
 
 #ifdef PCP_PEER

@@ -78,19 +78,18 @@ WEAK int get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
   (void)packets; (void)bytes; return -1; }
 #endif
 #ifdef FW_PINHOLES
-WEAK int find_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
-                      const char * int_client, unsigned short int_port, int proto,
-                      char * desc, int desc_len, unsigned int * timestamp)
-{ (void)ifname; (void)rem_host; (void)rem_port; (void)int_client; (void)int_port;
-  (void)proto; (void)desc; (void)desc_len; (void)timestamp; return -1; }
-WEAK int get_pinhole_info(unsigned short uid, char * rem_host, int rem_hostlen,
-                          unsigned short * rem_port, char * int_client, int int_clientlen,
-                          unsigned short * int_port, int * proto, char * desc, int desclen,
-                          unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
-{ (void)uid; (void)rem_host; (void)rem_hostlen; (void)rem_port; (void)int_client;
+WEAK int get_pinhole_packets(const char * rem_host, unsigned short rem_port,
+                             const char * int_client, unsigned short int_port,
+                             int proto, u_int64_t * packets)
+{ (void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
+  (void)packets; return -1; }
+WEAK int get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
+                             unsigned short * rem_port, char * int_client, int int_clientlen,
+                             unsigned short * int_port, int * proto, char * desc, int desclen,
+                             unsigned int * timestamp)
+{ (void)index; (void)rem_host; (void)rem_hostlen; (void)rem_port; (void)int_client;
   (void)int_clientlen; (void)int_port; (void)proto; (void)desc; (void)desclen;
-  (void)timestamp; (void)packets; (void)bytes; return -1; }
-WEAK int get_pinhole_uid_by_index(int index) { (void)index; return -1; }
+  (void)timestamp; return -1; }
 WEAK int clean_pinhole_list(unsigned int * next_timestamp) { (void)next_timestamp; return 0; }
 #endif
 WEAK int get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
@@ -123,8 +122,6 @@ static int fail_at = -1;	/* the change which fails, -1 : none */
 static int fail_call;		/* only in this call (1 the first), 0 : in each */
 static enum fw_applied stays = FW_NOT_APPLIED;	/* what the changes before it are */
 static enum fw_applied failed_as = FW_NOT_APPLIED;	/* what the failed change is */
-static int uid_override;	/* the uid the backend gives the next pinhole */
-static int next_uid = 1;	/* else the backend counts */
 static struct fw_change last[8];
 /* what the rows of the last call held: they can be freed after it */
 static unsigned short last_old_iport, last_row_iport, last_old_eport;
@@ -137,8 +134,6 @@ fw_sync(struct fw_change * c, int n)
 	sent = n;
 	for(i = 0; i < n; i++) {
 		c[i].applied = FW_APPLIED;
-		if(c[i].op == FW_ADD && c[i].row->family == AF_INET6)
-			c[i].uid = (unsigned short)(uid_override ? uid_override : next_uid++);
 	}
 	if(n <= 8)
 		memcpy(last, c, n * sizeof(*c));
@@ -163,7 +158,6 @@ reset(void)
 	fail_at = -1;
 	fail_call = 0;
 	stays = failed_as = FW_NOT_APPLIED;
-	uid_override = 0;
 	nextruletoclean_timestamp = 0;
 }
 
@@ -482,9 +476,10 @@ pinhole(struct memmap_change * c, enum memmap_op op, int uid, const char * iaddr
         unsigned short iport, unsigned int ts)
 {
 	memmap_change_init(c, op, uid, NULL, 0, iport, iaddr, iport, IPPROTO_UDP, "pinhole", ts);
+	c->give_uid = 1;	/* UPnP; a PCP pinhole has none */
 }
 
-/* the backend gives the uid, and a failed add leaves no row */
+/* the map gives the uid, and takes it back when the add fails */
 static void
 test_pinhole_uid(void)
 {
@@ -494,7 +489,7 @@ test_pinhole_uid(void)
 	pinhole(&c, MEMMAP_ADD, 0, "2001:db8::10", 5000, 2000);
 	assert(memmap_sync(&c, 1) == 0);
 	uid = c.uid;
-	assert(uid > 0 && last[0].uid == uid);
+	assert(uid > 0);
 	assert(lease_table_find_uid((unsigned short)uid) != NULL);
 	fail_at = 0;
 	pinhole(&c, MEMMAP_ADD, 0, "2001:db8::11", 5001, 2000);
@@ -504,7 +499,7 @@ test_pinhole_uid(void)
 	/* renew by uid only: the row gets the new expiry */
 	pinhole(&c, MEMMAP_RENEW, uid, NULL, 0, 3000);
 	assert(memmap_sync(&c, 1) == 0);
-	assert(last[0].op == FW_UPDATE && last[0].uid == uid);
+	assert(last[0].op == FW_UPDATE);
 	assert(lease_table_find_uid((unsigned short)uid)->expiry == 3000);
 	pinhole(&c, MEMMAP_DELETE_PINHOLE, uid, NULL, 0, 0);
 	assert(memmap_sync(&c, 1) == 0);
@@ -512,17 +507,36 @@ test_pinhole_uid(void)
 	assert(lease_table_count() == 0);
 }
 
-/* the row takes the uid the backend gave */
+/* a pinhole is read from the table; the firewall finds its rule by key */
 static void
-test_pinhole_backend_uid(void)
+test_pinhole_key(void)
 {
 	struct memmap_change c;
+	char iaddr[64], desc[64];
+	unsigned short iport;
+	unsigned int ts;
+	int uid, calls_before;
 	reset();
-	uid_override = 777;
-	pinhole(&c, MEMMAP_ADD, 0, "2001:db8::10", 5000, 2000);
+	pinhole(&c, MEMMAP_ADD, 0, "2001:db8::20", 6000, 2000);
 	assert(memmap_sync(&c, 1) == 0);
-	assert(c.uid == 777);
-	assert(lease_table_find_uid(777) != NULL);
+	uid = memmap_find_pinhole(NULL, 0, "2001:db8::20", 6000, IPPROTO_UDP,
+	                          desc, sizeof(desc), &ts);
+	assert(uid == c.uid && strcmp(desc, "pinhole") == 0 && ts == 2000);
+	assert(memmap_find_pinhole(NULL, 0, "2001:db8::21", 6000, IPPROTO_UDP,
+	                           NULL, 0, NULL) == -2);
+	assert(memmap_get_pinhole((unsigned short)uid, NULL, 0, NULL, iaddr, sizeof(iaddr),
+	                          &iport, NULL, NULL, 0, NULL, NULL) == 0);
+	assert(strcmp(iaddr, "2001:db8::20") == 0 && iport == 6000);
+	assert(memmap_pinhole_uid_at(0) == uid && memmap_pinhole_uid_at(1) == -1);
+	/* a delete with neither row nor key sends nothing */
+	calls_before = calls;
+	pinhole(&c, MEMMAP_DELETE_PINHOLE, 999, NULL, 0, 0);
+	assert(memmap_sync(&c, 1) == -2 && calls == calls_before);
+	/* a delete with no row but a key goes to the firewall, by the key */
+	pinhole(&c, MEMMAP_DELETE_PINHOLE, 999, "2001:db8::30", 7000, 0);
+	assert(memmap_sync(&c, 1) == 0 && calls == calls_before + 1);
+	assert(last[0].op == FW_DELETE && last_old_iport == 7000);
+	assert(lease_table_count() == 1);
 }
 
 /* a request whose row cannot be built sends nothing */
@@ -577,7 +591,7 @@ main(void)
 	test_update_new_port();
 	test_delete();
 	test_pinhole_uid();
-	test_pinhole_backend_uid();
+	test_pinhole_key();
 	test_bad_address();
 	test_one_row_twice();
 	lease_table_clear();

@@ -20,17 +20,12 @@
 #include "lease_table.h"
 
 /* The firewalls which have pinholes, and their pinhole functions. The PF API
- * of Apple differs from what pf/pfpinhole.c expects. */
+ * of Apple differs from what pf/pfpinhole.c expects. A pinhole rule is found
+ * by its key: the uid is the map's alone. */
 #ifdef ENABLE_UPNPPINHOLE
 #if defined(USE_NETFILTER) || (defined(USE_PF) && !defined(__APPLE__))
 #define FW_PINHOLES
-#if defined(USE_NFTABLES)
-#include "netfilter_nft/nftpinhole.h"
-#elif defined(USE_NETFILTER)
-#include "netfilter/iptpinhole.h"
-#else
-#include "pf/pfpinhole.h"
-#endif
+#include "fwpinhole.h"
 #endif
 #endif
 
@@ -55,13 +50,12 @@ struct fw_change {
 	const struct lease_entry * old;	/* FW_UPDATE, FW_DELETE: the rule as it is */
 	int old_partial;		/* old holds the key only, as the rule has
 					 * no row: the change cannot be taken back */
-	unsigned short uid;		/* a pinhole: the uid of its rule */
 	enum fw_applied applied;	/* set by fw_sync() */
 };
 
 /* Send the changes of one request to the firewall. 0: all are applied. < 0:
  * the request failed, and each change says if it is applied all the same.
- * A pinhole add sets uid to the one the backend chose. */
+ * A pinhole rule is found by the key of its row, not by its uid. */
 int fw_sync(struct fw_change * changes, int n);
 
 /* The redirect rule of an IPv4 port mapping, and its counters: 0, -2 if the

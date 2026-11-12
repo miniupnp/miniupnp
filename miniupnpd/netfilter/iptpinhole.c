@@ -447,6 +447,7 @@ get_pinhole_info(unsigned short uid,
 		IP6TC_HANDLE h;
 		const struct ip6t_entry * e;
 		const struct ip6t_entry_match * match;
+		int found = 0;
 		h = ip6tc_init("filter");
 		if(!h) {
 			syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
@@ -466,11 +467,15 @@ get_pinhole_info(unsigned short uid,
 						*packets = e->counters.pcnt;
 					if(bytes)
 						*bytes = e->counters.bcnt;
+					found = 1;
 					break;
 				}
 			}
 		}
 		ip6tc_free(h);
+		/* the list has the pinhole, but the chain lost its rule */
+		if(!found)
+			return -2;
 	}
 	return 0;
 }
@@ -513,6 +518,84 @@ clean_pinhole_list(unsigned int * next_timestamp)
 	if(next_timestamp && (min_ts != UINT_MAX))
 		*next_timestamp = min_ts;
 	return n;
+}
+
+/* The key-based API of fwpinhole.h, on top of the list of pinholes, which
+ * keeps its own uids. */
+static int
+key_uid(const char * rem_host, unsigned short rem_port,
+        const char * int_client, unsigned short int_port, int proto)
+{
+	return find_pinhole(NULL, pinhole_any_remote(rem_host) ? NULL : rem_host, rem_port,
+	                    int_client, int_port, proto, NULL, 0, NULL);
+}
+
+int
+add_pinhole_rule(const char * ifname,
+                 const char * rem_host, unsigned short rem_port,
+                 const char * int_client, unsigned short int_port,
+                 int proto, const char * desc, unsigned int timestamp)
+{
+	return add_pinhole(ifname, pinhole_any_remote(rem_host) ? NULL : rem_host, rem_port,
+	                   int_client, int_port, proto, desc, timestamp) < 0 ? -1 : 0;
+}
+
+int
+update_pinhole_rule(const char * ifname,
+                    const char * rem_host, unsigned short rem_port,
+                    const char * int_client, unsigned short int_port,
+                    int proto, const char * desc, unsigned int timestamp)
+{
+	int uid = key_uid(rem_host, rem_port, int_client, int_port, proto);
+	UNUSED(ifname); UNUSED(desc);
+	return uid < 0 ? -2 : update_pinhole((unsigned short)uid, timestamp);
+}
+
+int
+delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
+                    const char * int_client, unsigned short int_port, int proto)
+{
+	int uid = key_uid(rem_host, rem_port, int_client, int_port, proto);
+	return uid < 0 ? -2 : delete_pinhole((unsigned short)uid);
+}
+
+int
+get_pinhole_packets(const char * rem_host, unsigned short rem_port,
+                    const char * int_client, unsigned short int_port,
+                    int proto, u_int64_t * packets)
+{
+	int uid = key_uid(rem_host, rem_port, int_client, int_port, proto);
+	int r;
+	if(uid < 0)
+		return -2;
+	/* -2 also when the chain lost the rule of the pinhole */
+	r = get_pinhole_info((unsigned short)uid, NULL, 0, NULL, NULL, 0, NULL,
+	                     NULL, NULL, 0, NULL, packets, NULL);
+	return r < 0 ? r : 0;
+}
+
+int
+get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
+                    unsigned short * rem_port,
+                    char * int_client, int int_clientlen,
+                    unsigned short * int_port, int * proto,
+                    char * desc, int desclen, unsigned int * timestamp)
+{
+	int uid = get_pinhole_uid_by_index(index);
+	if(uid < 0)
+		return -1;
+	/* get_pinhole_info() writes the remote only into a buffer which is not empty */
+	if(rem_host && rem_hostlen > 1) {
+		rem_host[0] = '?';
+		rem_host[1] = '\0';
+	}
+	if(get_pinhole_info((unsigned short)uid, rem_host, rem_hostlen, rem_port,
+	                    int_client, int_clientlen, int_port, proto, desc, desclen,
+	                    timestamp, NULL, NULL) < 0)
+		return -1;
+	if(rem_host && strcmp(rem_host, "::") == 0)
+		rem_host[0] = '\0';
+	return 0;
 }
 
 #endif /* ENABLE_UPNPPINHOLE */

@@ -29,35 +29,28 @@ const char * use_ext_ip_addr = "42.42.42.42";
 struct lan_addr_list lan_addrs;
 
 #ifdef ENABLE_IPV6
-static int print_pinhole(int uid)
+static void print_pinholes(void)
 {
-	int r;
+	int i;
 	char rem_host[64];
 	unsigned short rem_port;
 	char int_client[64];
 	unsigned short int_port;
 	int proto;
 	unsigned int timestamp;
-	u_int64_t packets, bytes;
+	u_int64_t packets;
 	char desc[64];
 
-	r = get_pinhole_info((unsigned short)uid,
-	                     rem_host, sizeof(rem_host), &rem_port,
-	                     int_client, sizeof(int_client), &int_port,
-	                     &proto,
-	                     desc, sizeof(desc),
-	                     &timestamp,
-	                     &packets, &bytes);
-	if(r < 0) {
-		fprintf(stderr, "get_pinhole(%d) returned %d\n", uid, r);
-	} else {
+	for(i = 0; get_pinhole_rule_at(i, rem_host, sizeof(rem_host), &rem_port,
+	                               int_client, sizeof(int_client), &int_port,
+	                               &proto, desc, sizeof(desc), &timestamp) == 0; i++) {
+		packets = 0;
+		get_pinhole_packets(rem_host, rem_port, int_client, int_port, proto, &packets);
 		printf("pinhole %d : [%s]:%hu => [%s]:%hu proto=%d ts=%u\n",
-		       uid, rem_host, rem_port, int_client, int_port,
-		       proto, timestamp);
+		       i, rem_host, rem_port, int_client, int_port, proto, timestamp);
 		printf("    desc='%s'\n", desc);
-		printf("    packets=%" PRIu64 " bytes=%" PRIu64 "\n", packets, bytes);
+		printf("    packets=%" PRIu64 "\n", packets);
 	}
-	return r;
 }
 #endif
 
@@ -67,10 +60,7 @@ int main(int argc, char * *argv)
 	fprintf(stderr,"nothing to test, ENABLE_IPV6 is not defined in config.h\n");
 	return 1;
 #else
-	int uid;
-	int uid2;
 	int ret;
-	unsigned int timestamp;
 	(void)argc; (void)argv;
 
 	openlog("testpfpinhole", LOG_PERROR, LOG_USER);
@@ -79,33 +69,18 @@ int main(int argc, char * *argv)
 		return 1;
 	}
 
-	uid = add_pinhole("ep0", "2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP, "description test 1", 424242);
-	if(uid < 0) {
-		fprintf(stderr, "add_pinhole() failed\n");
-	}
-	printf("add_pinhole() returned %d\n", uid);
-	uid = add_pinhole("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP, "description test 2", 4321000);
-	if(uid < 0) {
-		fprintf(stderr, "add_pinhole() failed\n");
-	}
-	printf("add_pinhole() returned %d\n", uid);
+	ret = add_pinhole_rule("ep0", "2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP, "description test 1", 424242);
+	printf("add_pinhole_rule() returned %d\n", ret);
+	ret = add_pinhole_rule("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP, "description test 2", 4321000);
+	printf("add_pinhole_rule() returned %d\n", ret);
 
-	uid2 = find_pinhole("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP, NULL, 0, &timestamp);
-	if(uid2 < 0) {
-		fprintf(stderr, "find_pinhole() failed\n");
-	} else {
-		printf("find_pinhole() uid=%d timestamp=%u\n", uid2, timestamp);
-	}
-
-	print_pinhole(1);
-	print_pinhole(2);
+	print_pinholes();
 	clean_pinhole_list(NULL);
 
-	ret = delete_pinhole(1);
-	printf("delete_pinhole() returned %d\n", ret);
-	ret = delete_pinhole(2);
-	printf("delete_pinhole() returned %d\n", ret);
+	ret = delete_pinhole_rule("2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP);
+	printf("delete_pinhole_rule() returned %d\n", ret);
+	ret = delete_pinhole_rule(NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP);
+	printf("delete_pinhole_rule() returned %d\n", ret);
 #endif
 	return 0;
 }
-

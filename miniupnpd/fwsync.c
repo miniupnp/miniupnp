@@ -28,6 +28,7 @@
 #include "ipfw/ipfwrdr.h"
 #endif
 
+
 /* a row as the arguments of the backend functions */
 struct fw_rule {
 	char iaddr[INET6_ADDRSTRLEN];
@@ -94,23 +95,30 @@ map_rule_present(const struct lease_entry * e)
 }
 
 /* Delete the rules of a row. The result of the backend, or 0 if the backend
- * failed on an IPv4 rule which it does not have and the table has its row
+ * failed on a rule which it does not have and the table has its row
  * (has_row): then the row can go. A firewall which cannot be read is not
  * taken for one without the rule: the row stays, and the next delete or
  * expiry tries again. A flush or another program can remove a
  * rule, and pf reports the missing rule as an error. Without a row, the port
- * is not mapped, and the error stays. An IPv6 row whose rule is gone goes at
- * its expiry. */
+ * is not mapped, and the error stays. For an IPv6 allow rule every backend
+ * answers -2 when it has no such rule. */
 static int
-delete_rules(const struct lease_entry * e, unsigned short uid, int has_row)
+delete_rules(const struct lease_entry * e, int has_row)
 {
 	int r;
 
 	if(e->family == AF_INET6) {
 #ifdef FW_PINHOLES
-		return delete_pinhole(uid);
+		struct fw_rule fr;
+		rule_of(e, &fr);
+		r = delete_pinhole_rule(fr.rhost, fr.rport, fr.iaddr, fr.iport, fr.proto);
+		if(r == -2 && has_row) {
+			syslog(LOG_INFO, "IPv6 %s port %hu has no rule in the firewall, its row goes",
+			       e->proto == IPPROTO_UDP ? "UDP" : "TCP", e->iport);
+			return 0;
+		}
+		return r;
 #else
-		UNUSED(uid);
 		return -1;
 #endif
 	}
@@ -133,7 +141,7 @@ delete_rules(const struct lease_entry * e, unsigned short uid, int has_row)
 /* Add the rules of a row. *half is set when the redirect rule of a port
  * mapping stays although its filter rule failed. The result of the backend. */
 static int
-add_rules(const struct lease_entry * e, unsigned short * uid, int * half)
+add_rules(const struct lease_entry * e, int * half)
 {
 	struct fw_rule r;
 	int ret;
@@ -141,12 +149,8 @@ add_rules(const struct lease_entry * e, unsigned short * uid, int * half)
 	rule_of(e, &r);
 	if(e->family == AF_INET6) {
 #if defined(FW_PINHOLES)
-		ret = add_pinhole(ext_if_name6, r.rhost, r.rport, r.iaddr, r.iport,
-		                  r.proto, r.desc, r.timestamp);
-		if(ret < 0)
-			return -1;
-		*uid = (unsigned short)ret;
-		return 0;
+		return add_pinhole_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, r.iport,
+		                        r.proto, r.desc, r.timestamp) < 0 ? -1 : 0;
 #else
 		return -1;
 #endif
@@ -172,20 +176,20 @@ add_rules(const struct lease_entry * e, unsigned short * uid, int * half)
 
 /* Change the rules of from into those of to. The result of the backend. */
 static int
-update_rules(const struct lease_entry * from, const struct lease_entry * to,
-             unsigned short uid)
+update_rules(const struct lease_entry * from, const struct lease_entry * to)
 {
 	struct fw_rule r;
+	rule_of(to, &r);
 	if(to->family == AF_INET6) {
 #ifdef FW_PINHOLES
 		UNUSED(from);
-		return update_pinhole(uid, (unsigned int)to->expiry);
+		return update_pinhole_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, r.iport,
+		                           r.proto, r.desc, r.timestamp);
 #else
-		UNUSED(from); UNUSED(uid);
+		UNUSED(from);
 		return -1;
 #endif
 	}
-	rule_of(to, &r);
 	if(from->iport != to->iport)
 		return update_portmapping(ext_if_name, r.eport, r.proto, r.iport, r.desc,
 		                          r.timestamp);
@@ -199,11 +203,11 @@ send_change(struct fw_change * c, int * half)
 {
 	switch(c->op) {
 	case FW_ADD:
-		return add_rules(c->row, &c->uid, half);
+		return add_rules(c->row, half);
 	case FW_UPDATE:
-		return update_rules(c->old, c->row, c->uid);
+		return update_rules(c->old, c->row);
 	case FW_DELETE:
-		return delete_rules(c->old, c->uid, !c->old_partial);
+		return delete_rules(c->old, !c->old_partial);
 	}
 	return -1;
 }
@@ -218,14 +222,11 @@ undo_change(struct fw_change * c)
 		return -1;
 	switch(c->op) {
 	case FW_ADD:
-		return delete_rules(c->row, c->uid, 1);
+		return delete_rules(c->row, 1);
 	case FW_UPDATE:
-		return update_rules(c->row, c->old, c->uid);
+		return update_rules(c->row, c->old);
 	case FW_DELETE:
-		/* the backend gives a pinhole a new uid, so it cannot come back as it was */
-		if(c->old->family == AF_INET6)
-			return -1;
-		return add_rules(c->old, &c->uid, &half);
+		return add_rules(c->old, &half);
 	}
 	return -1;
 }

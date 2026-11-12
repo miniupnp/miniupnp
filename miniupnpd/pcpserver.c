@@ -1171,13 +1171,14 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 		return PCP_SUCCESS;
 	} else {
 		/* create new */
+		/* no uid: PCP finds its pinhole by its rule */
 		r = upnp_add_inboundpinhole(NULL, 0,
 						pcp_msg_info->mapped_str,
 						pcp_msg_info->int_port,
 						pcp_msg_info->protocol,
 						pcp_msg_info->desc,
 						pcp_msg_info->lifetime,
-						&uid);
+						NULL);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -1317,13 +1318,13 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 		r = _upnp_delete_redir(eport2, proto);
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
-		int uid;
-		uid = upnp_find_inboundpinhole(NULL, 0,
+		int found;
+		found = upnp_find_inboundpinhole(NULL, 0,
 						pcp_msg_info->mapped_str, iport,
 						pcp_msg_info->protocol,
 						desc, sizeof(desc),
 						NULL /* lifetime */);
-		if (uid < 0) {
+		if (found < 0) {
 			syslog(LOG_ERR, "Failed to find mapping to %s:%hu, protocol %s",
 			       pcp_msg_info->mapped_str, iport, proto_itoa(pcp_msg_info->protocol));
 			return;
@@ -1335,7 +1336,9 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				       iport, proto_itoa(pcp_msg_info->protocol));
 				return;
 			} else {
-				r = upnp_delete_inboundpinhole(uid);
+				r = upnp_delete_inboundpinhole_key(NULL, 0,
+				                                   pcp_msg_info->mapped_str,
+				                                   iport, pcp_msg_info->protocol);
 			}
 		}
 #else

@@ -576,8 +576,9 @@ int reload_from_lease_file6(void)
 			leaseduration = 0;	/* default value */
 		}
 
+		/* a line with uid 0 is a PCP pinhole, which has none */
 		r = upnp_add_inboundpinhole(rem_client, rem_port, int_client, int_port, proto_atoi(proto),
-                        		desc, leaseduration, &uid);
+                        		desc, leaseduration, uid > 0 ? &uid : NULL);
 		if(r == -1) {
 			syslog(LOG_ERR, "Failed to add %s:%hu -> %s:%hu protocol %s",
 			       rem_client, rem_port, int_client, int_port, proto);
@@ -616,6 +617,8 @@ upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
 }
 
 /* upnp_add_inboundpinhole()
+ * uid NULL : the pinhole gets no uid, as for PCP, which finds it by its rule.
+ * Else *uid is set to the uid of the pinhole, for UPnP.
  * returns:  1 on success
  *          -1 Pinhole space exhausted
  *          -4 invalid arguments
@@ -632,7 +635,7 @@ upnp_add_inboundpinhole(const char * raddr,
                         unsigned int leasetime,
                         int * uid)
 {
-	int r;
+	int r, found;
 	time_t current;
 	unsigned int timestamp;
 	struct in6_addr address;
@@ -648,15 +651,18 @@ upnp_add_inboundpinhole(const char * raddr,
 	timestamp = current + leasetime;
 	r = 0;
 
-	*uid = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
-	if(*uid >= 0) {
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, *uid);
-		r = upnp_renew_inboundpinhole((unsigned short)*uid, raddr, rport, iaddr, iport,
+	found = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
+	if(found >= 0) {
+		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, found);
+		/* by its rule too, as a PCP pinhole has no uid */
+		r = upnp_renew_inboundpinhole((unsigned short)found, raddr, rport, iaddr, iport,
 		                              proto, desc, leasetime);
+		if (uid != NULL)
+			*uid = found;
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {
 			lease_file6_remove(iaddr, iport, proto, -1);
-			lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
+			lease_file6_add(raddr, rport, iaddr, iport, proto, found, desc, timestamp);
 		}
 #endif /* ENABLE_LEASEFILE */
 		return (r >= 0) ? 1 : r;
@@ -664,14 +670,17 @@ upnp_add_inboundpinhole(const char * raddr,
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	pinhole_change(&c, MEMMAP_ADD, 0, raddr, rport, iaddr, iport, proto, desc,
 	               timestamp);
-	*uid = memmap_sync(&c, 1) < 0 ? -1 : c.uid;
+	c.give_uid = uid != NULL;
+	r = memmap_sync(&c, 1) < 0 ? -1 : 1;
+	if (uid != NULL)
+		*uid = r < 0 ? -1 : c.uid;
 #ifdef ENABLE_LEASEFILE
-	if (*uid >= 0) {
+	if (r >= 0) {
 		lease_file6_remove(iaddr, iport, proto, -1);
-		lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
+		lease_file6_add(raddr, rport, iaddr, iport, proto, c.uid, desc, timestamp);
 	}
 #endif /* ENABLE_LEASEFILE */
-	return *uid >= 0 ? 1 : -1;
+	return r;
 #else
 	return -42;	/* not implemented */
 #endif
@@ -824,7 +833,7 @@ upnp_renew_inboundpinhole(unsigned short uid, const char * raddr, unsigned short
 	int proto_fw;
 
 	timestamp = upnp_time() + leasetime;
-	if (iaddr == NULL && !memmap_pinhole_has_row(uid) &&
+	if (iaddr == NULL &&
 	    memmap_get_pinhole(uid, raddr_fw, sizeof(raddr_fw), &rport_fw,
 	                       iaddr_fw, sizeof(iaddr_fw), &iport_fw, &proto_fw,
 	                       desc_fw, sizeof(desc_fw), NULL, NULL) >= 0) {
@@ -874,6 +883,29 @@ upnp_delete_inboundpinhole(unsigned short uid)
 	return ret;
 #else
 	UNUSED(uid);
+
+	return -1;
+#endif
+}
+
+int
+upnp_delete_inboundpinhole_key(const char * raddr, unsigned short rport,
+                                const char * iaddr, unsigned short iport, int proto)
+{
+#if defined(USE_PF) || defined(USE_NETFILTER)
+	int ret;
+	struct memmap_change c;
+	pinhole_change(&c, MEMMAP_DELETE_PINHOLE, 0, raddr, rport, iaddr, iport, proto,
+	               NULL, 0);
+	ret = memmap_sync(&c, 1);
+#ifdef ENABLE_LEASEFILE
+	if (ret == 0)
+		lease_file6_remove(iaddr, iport, proto, -1);
+#endif
+
+	return ret;
+#else
+	UNUSED(raddr); UNUSED(rport); UNUSED(iaddr); UNUSED(iport); UNUSED(proto);
 
 	return -1;
 #endif

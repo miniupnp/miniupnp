@@ -128,20 +128,26 @@ update_portmapping_desc_timestamp(const char * ifname, unsigned short eport, int
 /* the pinhole functions, which these tests do not reach */
 #define WEAK __attribute__((weak))
 #ifdef FW_PINHOLES
-/* the remote of the last pinhole added: "(any)" for NULL */
+/* the remote of the last IPv6 allow rule added: "(any)" for NULL */
 static char pinhole_rhost[64];
 static unsigned short pinhole_rport;
-WEAK int add_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
-                     const char * int_client, unsigned short int_port, int proto,
-                     const char * desc, unsigned int timestamp)
-{ (void)ifname; (void)int_client; (void)int_port;
-  (void)proto; (void)desc; (void)timestamp;
+WEAK int add_pinhole_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
+                          const char * int_client, unsigned short int_port, int proto,
+                          const char * desc, unsigned int timestamp)
+{ (void)ifname; (void)int_client; (void)int_port; (void)proto; (void)desc; (void)timestamp;
   snprintf(pinhole_rhost, sizeof(pinhole_rhost), "%s", rem_host ? rem_host : "(any)");
   pinhole_rport = rem_port;
-  return 5; }
-WEAK int delete_pinhole(unsigned short uid) { (void)uid; return -1; }
-WEAK int update_pinhole(unsigned short uid, unsigned int timestamp)
-{ (void)uid; (void)timestamp; return -1; }
+  return 0; }
+WEAK int update_pinhole_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
+                             const char * int_client, unsigned short int_port, int proto,
+                             const char * desc, unsigned int timestamp)
+{ (void)ifname; (void)rem_host; (void)rem_port; (void)int_client; (void)int_port;
+  (void)proto; (void)desc; (void)timestamp; return -1; }
+static int map6_delete_result = -1;	/* what delete_pinhole_rule() answers */
+WEAK int delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
+                             const char * int_client, unsigned short int_port, int proto)
+{ (void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
+  return map6_delete_result; }
 #endif
 
 static void
@@ -334,6 +340,35 @@ test_pinhole_remote_port(void)
 	assert(fw_sync(&c, 1) == 0);
 	assert(strcmp(pinhole_rhost, "2000::5") == 0 && pinhole_rport == 5000);
 }
+
+/* an IPv6 delete of a rule the firewall does not have (-2) lets the row go;
+ * any other failure, or no row, keeps the error */
+static void
+test_delete_lost_map6(void)
+{
+	struct lease_entry old;
+	struct fw_change c;
+	reset();
+	row(&old, 1000, 80);
+	old.family = AF_INET6;
+	memset(&old.iaddr, 0, sizeof(old.iaddr));
+	old.iaddr.s6_addr[0] = 0x20;
+	old.iaddr.s6_addr[1] = 0x01;
+	old.iaddr.s6_addr[15] = 1;
+	memset(&c, 0, sizeof(c));
+	c.op = FW_DELETE; c.old = &old;
+	map6_delete_result = -2;
+	assert(fw_sync(&c, 1) == 0);
+	assert(c.applied == FW_APPLIED);
+	map6_delete_result = -1;
+	assert(fw_sync(&c, 1) < 0);
+	assert(c.applied == FW_NOT_APPLIED);
+	map6_delete_result = -2;
+	c.old_partial = 1;
+	assert(fw_sync(&c, 1) < 0);
+	assert(c.applied == FW_NOT_APPLIED);
+	map6_delete_result = -1;
+}
 #endif
 
 int
@@ -347,6 +382,7 @@ main(void)
 	test_delete_lost_rule();
 #ifdef FW_PINHOLES
 	test_pinhole_remote_port();
+	test_delete_lost_map6();
 #endif
 	printf("testfwsync: all tests passed\n");
 	return 0;
