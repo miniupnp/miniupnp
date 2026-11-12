@@ -26,8 +26,8 @@ void memmap_map(unsigned short uid, unsigned short eport, const char * iaddr,
 void memmap_map_gone(unsigned short eport, int proto);
 
 /* The same for a mapping limited to a remote peer, a PEER or a UPnP mapping with
- * a remote host: one row in Mappings and its remote in Remotes, written together
- * because rows with and without a remote can share a key. */
+ * a remote host. Its row has a struct lease_remote, and the remote is part of
+ * the key of the row: rows with and without a remote can share a port. */
 void memmap_remote_peer(unsigned short uid, const char * raddr, unsigned short rport,
                         unsigned short eport, const char * iaddr, unsigned short iport,
                         int proto, const char * desc, unsigned int timestamp);
