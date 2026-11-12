@@ -653,13 +653,59 @@ memmap_pinhole_uid_at(int index)
 #endif
 }
 
-/* The firewall removes the expired pinholes: it holds their expiry. */
+#ifdef MEMMAP_PINHOLES
+/* keep the soonest expiry of a pinhole row */
+static void
+pinhole_next_row(struct lease_entry * e, void * arg)
+{
+	unsigned int * next = arg;
+	unsigned int ts = (unsigned int)e->expiry;
+	if(e->family == AF_INET6 && ts != 0 && (*next == 0 || ts < *next))
+		*next = ts;
+}
+
+/* the sooner of two expiries, where 0 is none */
+static unsigned int
+sooner(unsigned int a, unsigned int b)
+{
+	if(a == 0)
+		return b;
+	if(b == 0)
+		return a;
+	return a < b ? a : b;
+}
+#endif
+
+/* The firewall removes the expired pinholes: it holds their expiry. Reading
+ * the rules costs a dump of the filter chain, so it happens only when a
+ * pinhole is due: a row of the table, or a rule the last read found. A rule
+ * of an earlier run has no row, and only the read finds its expiry. The
+ * first call reads the rules. */
 int
 memmap_expire_pinholes(unsigned int * next)
 {
 #ifdef MEMMAP_PINHOLES
-	int removed = clean_pinhole_list(next);
-	memmap_remote_peers_expired((unsigned int)upnp_time(), removed);
+	static int rules_read;
+	static unsigned int rules_next;	/* soonest expiry in the rules, 0 : none */
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int rows_next = 0, fw_next = 0;
+	int removed;
+
+	lease_table_foreach(pinhole_next_row, &rows_next);
+	if(rules_read && (rows_next == 0 || rows_next > now) &&
+	   (rules_next == 0 || rules_next > now)) {
+		*next = sooner(rows_next, rules_next);
+		return 0;
+	}
+	removed = clean_pinhole_list(&fw_next);
+	memmap_remote_peers_expired(now, removed);
+	if(removed < 0) {
+		*next = now + 1;	/* read again soon */
+		return removed;
+	}
+	rules_read = 1;
+	rules_next = fw_next;
+	*next = fw_next;
 	return removed;
 #else
 	UNUSED(next);
