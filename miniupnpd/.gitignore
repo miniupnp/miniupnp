@@ -14,6 +14,8 @@ testasyncsendto
 testportinuse
 testleasetable
 validateleasetable
+testmemmap
+validatememmap
 netfilter/testiptcrdr
 netfilter/testiptcrdr_dscp
 netfilter/testiptcrdr_peer
