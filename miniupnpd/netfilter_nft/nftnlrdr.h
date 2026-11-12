@@ -11,21 +11,6 @@
 #ifndef NFTNLRDR_H_INCLUDED
 #define NFTNLRDR_H_INCLUDED
 
-/* the mappings removed by a pass of the main loop, so that a large expiry
- * does not stop the daemon from answering */
-#define EXPIRE_MAX_PER_PASS	64
-
-struct expired_redirect {
-	unsigned short eport;
-	int proto;
-};
-
-/* fills expired with at most max mappings past their lifetime, and next with
- * the next expiry (0 : none, now : more to do). returns the number filled */
-int
-get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
-                           int max, unsigned int * next);
-
 #include "../commonrdr.h"
 
 int init_redirect(void);

@@ -112,7 +112,7 @@ TESTSTUNOBJS = teststun.o upnpstun.o upnputils.o getroute.o $(FWOBJS) \
 TESTUPNPHTTPOBJS = testupnphttp.o upnphttp.o upnputils.o getosversion.o \
                    getroute.o
 TESTLEASETABLEOBJS = testleasetable.o lease_table.o
-TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o upnputils.o getroute.o
+TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \

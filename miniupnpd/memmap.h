@@ -18,7 +18,10 @@
 
 #include <sys/types.h>
 #include <netinet/in.h>
+#include "config.h"
 #include "lease_table.h"
+
+struct sockaddr;
 
 /* Turn the text of an address into the form of the table: IPv4 a.b.c.d as
  * ::ffff:a.b.c.d with *family AF_INET, IPv6 as it is with AF_INET6. 0, or -1 if
@@ -29,6 +32,25 @@ int memmap_pton(const char * s, int * family, struct in6_addr * a);
  * it does not fit. */
 const char * memmap_ntop(int family, const struct in6_addr * a, char * buf, size_t len);
 
+/* A mapping as a protocol names it, without a remote. An IPv6 pinhole has no
+ * translation: eaddr is iaddr and eport is iport. An IPv4 mapping has eaddr ::,
+ * the one external address. */
+struct memmap_key {
+	int family;		/* AF_INET, AF_INET6 */
+	int proto;
+	struct in6_addr eaddr;
+	unsigned short eport;
+	struct in6_addr iaddr;	/* IPv4 as ::ffff:a.b.c.d */
+	unsigned short iport;
+};
+
+/* The remote a mapping is limited to: a UPnP RemoteHost or a PCP PEER. It is a
+ * part of the external key, so each remote is a row of its own. */
+struct memmap_remote {
+	struct in6_addr raddr;	/* IPv4 as ::ffff:a.b.c.d. :: : any host */
+	unsigned short rport;	/* 0 : any */
+};
+
 /* The owner of a row: kind is an enum lease_kind. A PCP owner also has its
  * nonce, as on the wire. UPnP and NAT-PMP leave the nonce zero: any client of
  * the protocol may change their rows. */
@@ -36,6 +58,12 @@ struct memmap_owner {
 	unsigned char kind;
 	unsigned char nonce[LEASE_NONCE_LEN];
 };
+
+/* Fill a key. eaddr NULL : ::, the one external address of an IPv4 mapping.
+ * An IPv6 key takes iaddr and iport as its external side. */
+void memmap_key_init(struct memmap_key * k, int family, int proto,
+                     const struct in6_addr * eaddr, unsigned short eport,
+                     const struct in6_addr * iaddr, unsigned short iport);
 
 /* Fill an owner. nonce NULL : zero. */
 void memmap_owner_init(struct memmap_owner * o, int kind, const void * nonce);
@@ -89,31 +117,29 @@ void memmap_remote_peer_gone(unsigned short uid);
  * the table. */
 void memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned short rport,
                                 const char * iaddr, unsigned short iport, int proto);
-/* The firewall ended a pass over the pinholes, and removed "removed" rules
- * (<0 : error). The rows which expired go, as their rules went. If the pass
- * removed nothing, failed or was partial, the rows stay for the next pass: a row
- * must not go while its rule may still be there. */
-void memmap_remote_peers_expired(unsigned int now, int removed);
-/* Tell the next memmap_remote_peers_expired() that this pass leaves expired rules in
- * the firewall, because a delete failed. */
+/* For a firewall backend: tell memmap_expire_map6() that this pass leaves
+ * expired rules in the firewall, because a delete failed. The rows then stay. */
 void memmap_remote_peers_partial(void);
 
-/* 1 if the IPv4 mapping has a row. Rules of an earlier run are found at startup,
- * and this tells which of them still need a row. */
-int memmap_map_known(unsigned short eport, int proto);
-/* The IPv4 mapping of an external port, with no read of the firewall. Fills the
- * strings given, and takes NULL for what is not wanted. 0, or -1 if there is
- * none. */
-int memmap_get_map(unsigned short eport, int proto, unsigned short * iport,
-                   char * iaddr, int iaddrlen, char * desc, int desclen,
-                   char * rhost, int rhostlen, unsigned int * timestamp);
+/* The mapping of an external port, with no read of the firewall. family
+ * AF_INET with eaddr NULL is an IPv4 port mapping. Fills what is given, and
+ * takes NULL for what is not wanted. raddr gets :: for no remote. 0, or -1 if
+ * there is none. */
+int memmap_get(int family, const struct in6_addr * eaddr, unsigned short eport,
+               int proto, unsigned short * iport, struct in6_addr * iaddr,
+               char * desc, int desclen, struct memmap_remote * remote,
+               unsigned int * timestamp);
 
-/* The same by its place in the list, oldest first, for the UPnP calls which
- * list mappings by index. 0, or -1 past the end. */
-int memmap_get_map_at(unsigned int index, unsigned short * eport, int * proto,
-                      unsigned short * iport, char * iaddr, int iaddrlen,
-                      char * desc, int desclen, char * rhost, int rhostlen,
-                      unsigned int * timestamp);
+/* The IPv4 mapping at this place in the list, oldest first, for the UPnP calls
+ * which list mappings by index. 0, or -1 past the end. */
+int memmap_get_at(unsigned int index, unsigned short * eport, int * proto,
+                  unsigned short * iport, struct in6_addr * iaddr,
+                  char * desc, int desclen, struct memmap_remote * remote,
+                  unsigned int * timestamp);
+
+/* The kind of the row of an IPv4 port mapping, a LEASE_* value, or -1 if
+ * there is none. */
+int memmap_map_kind(unsigned short eport, int proto);
 
 /* the number of IPv4 port mappings */
 int memmap_map_count(void);
@@ -124,7 +150,81 @@ unsigned short * memmap_ports_in_range(unsigned short startport, unsigned short 
                                        int proto, unsigned int * number);
 
 /* 1 if another internal address maps the external port, on any protocol. It
- * logs who. */
-int memmap_eport_used_by_other(unsigned short eport, const char * iaddr);
+ * logs who. eaddr NULL : ::. */
+int memmap_eport_used_by_other(int family, const struct in6_addr * eaddr,
+                               unsigned short eport, const struct in6_addr * iaddr);
+
+/* 1 if the external port of key is redirected to another internal endpoint
+ * than that of key: by a mapping of ours, from the table, or with iptables by
+ * a port forward of another program, from the firewall. For port_in_use(). */
+int memmap_eport_redirected_elsewhere(const char * ifname, const struct memmap_key * key);
+
+/* The reads below are those only the firewall can answer. The protocols call
+ * them here, and never the firewall backend. */
+
+/* The packet and byte counters of an IPv4 port mapping, which only the kernel
+ * has. 0, or -1 if the firewall has no such rule. */
+int memmap_map_counters(unsigned short eport, int proto,
+                        u_int64_t * packets, u_int64_t * bytes);
+
+/* 1 if the firewall still has the rule of the IPv4 port mapping of key, which
+ * has a row. A flush or another program can remove a rule: then drop the row
+ * and return 0, so the caller adds the mapping again instead of renewing a
+ * closed port. */
+int memmap_in_firewall(const struct memmap_key * key);
+
+/* Give a row to each rule of an earlier run which has none, so the rule can be
+ * listed and deleted. This reads the firewall, once at startup. */
+void memmap_adopt_rules(void);
+
+#ifdef USE_NFTABLES
+/* the mappings removed by a pass of the main loop, so that a large expiry
+ * does not stop the daemon from answering */
+#define EXPIRE_MAX_PER_PASS	64
+
+struct expired_redirect {
+	unsigned short eport;
+	int proto;
+};
+
+/* Fills expired with at most max IPv4 mappings past their lifetime, and next
+ * with the next expiry (0 : none, now : more to do), with no read of the
+ * firewall. Returns the number filled. */
+int memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
+                        int max, unsigned int * next);
+#endif
+
+#ifdef ENABLE_UPNPPINHOLE
+/* The pinhole reads below go to the firewall: a pinhole of an earlier run has
+ * no row, and the packet counter is only there. */
+
+/* The uid of the pinhole of this rule, or < 0. desc and timestamp may be NULL. */
+int memmap_find_map6(const char * raddr, unsigned short rport,
+                        const char * iaddr, unsigned short iport, int proto,
+                        char * desc, int desclen, unsigned int * timestamp);
+/* The rule of a pinhole. 0, -2 if there is no such pinhole, or < 0. */
+int memmap_get_map6(unsigned short uid, char * raddr, int raddrlen,
+                       unsigned short * rport, char * iaddr, int iaddrlen,
+                       unsigned short * iport, int * proto, char * desc, int desclen,
+                       unsigned int * timestamp, u_int64_t * packets);
+/* The uid of the pinhole at this place, or < 0 past the end. */
+int memmap_map6_uid_at(int index);
+/* Remove the pinholes past their expiry, which the firewall holds, and their
+ * rows. *next is the time of the next expiry. The number removed, or < 0. */
+int memmap_expire_map6(unsigned int * next);
+#endif
+
+#ifdef PCP_PEER
+/* The PCP PEER rule at this place, from the firewall: a PEER has no row. 0, or
+ * -1 past the end. The arguments are those of get_peer_rule_by_index(). */
+int memmap_get_peer_at(int index, unsigned short * eport, char * iaddr, int iaddrlen,
+                       unsigned short * iport, int * proto, char * desc, int desclen,
+                       char * rhost, int rhostlen, unsigned short * rport,
+                       unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes);
+/* The external address and port of the connection of int to peer, from the
+ * kernel's connection table. 1 if found. */
+int memmap_peer_nat_addr(struct sockaddr * intaddr, struct sockaddr * peer,
+                         unsigned char proto, struct sockaddr * ext);
+#endif
 
 #endif

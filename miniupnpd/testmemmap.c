@@ -1,4 +1,5 @@
-/* unit test of memmap.c : the rows it writes for the firewall rules */
+/* unit test of memmap.c : the rows it writes for the firewall rules and the
+ * expiry of the pinholes. The firewall is a fake. */
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,15 +9,168 @@
 #include <sys/socket.h>
 
 #include "config.h"
+#include "macros.h"
+#include "upnpredirect.h"
 #include "upnputils.h"
-#include "upnpglobalvars.h"
+#include "commonrdr.h"
 #include "lease_table.h"
 #include "memmap.h"
+#if defined(USE_NETFILTER)
+#include "netfilter/iptcrdr.h"
+#ifdef USE_NFTABLES
+#include "netfilter_nft/nftnlrdr.h"
+#endif
+#endif
+#if defined(USE_PF)
+#include "pf/obsdrdr.h"
+#endif
+/* the firewalls on which memmap.c reads pinholes, as in memmap.c */
+#ifdef ENABLE_UPNPPINHOLE
+#if defined(USE_NETFILTER) || (defined(USE_PF) && !defined(__APPLE__))
+#define TEST_MAP6
+#if defined(USE_NETFILTER)
+#include "netfilter/iptpinhole.h"
+#else
+#include "pf/pfpinhole.h"
+#endif
+#endif
+#endif
 
-/* upnputils.o, for the real mapping_owner_of(), needs these */
-struct lan_addr_list lan_addrs;
-int runtime_flags = 0;
-time_t startup_time = 0;
+/* The fake firewall: memmap.c reads it, this test does not link a backend.
+ * It holds no rule. A pass over the pinholes removes fake_removed rules. */
+const char * ext_if_name = "wan";
+static time_t fake_now;
+static int fake_removed;
+static int fake_partial;	/* the next pass leaves expired rules */
+
+time_t
+upnp_time(void)
+{
+	return fake_now;
+}
+
+const char *
+proto_itoa(int proto)
+{
+	return proto == IPPROTO_TCP ? "TCP" : "UDP";
+}
+
+int
+get_redirect_rule(const char * ifname, unsigned short eport, int proto,
+                  char * iaddr, int iaddrlen, unsigned short * iport,
+                  char * desc, int desclen, char * rhost, int rhostlen,
+                  unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto); UNUSED(iaddr); UNUSED(iaddrlen);
+	UNUSED(iport); UNUSED(desc); UNUSED(desclen); UNUSED(rhost); UNUSED(rhostlen);
+	UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
+	return -1;
+}
+
+int
+get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
+                           char * iaddr, int iaddrlen, unsigned short * iport,
+                           int * proto, char * desc, int desclen,
+                           char * rhost, int rhostlen, unsigned int * timestamp,
+                           u_int64_t * packets, u_int64_t * bytes)
+{
+	UNUSED(index); UNUSED(ifname); UNUSED(eport); UNUSED(iaddr); UNUSED(iaddrlen);
+	UNUSED(iport); UNUSED(proto); UNUSED(desc); UNUSED(desclen); UNUSED(rhost);
+	UNUSED(rhostlen); UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
+	return -1;
+}
+
+#ifdef TEST_MAP6
+int
+find_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
+             const char * int_client, unsigned short int_port, int proto,
+             char * desc, int desc_len, unsigned int * timestamp)
+{
+	UNUSED(ifname); UNUSED(rem_host); UNUSED(rem_port); UNUSED(int_client);
+	UNUSED(int_port); UNUSED(proto); UNUSED(desc); UNUSED(desc_len); UNUSED(timestamp);
+	return -2;
+}
+
+int
+get_pinhole_info(unsigned short uid, char * rem_host, int rem_hostlen,
+                 unsigned short * rem_port, char * int_client, int int_clientlen,
+                 unsigned short * int_port, int * proto, char * desc, int desclen,
+                 unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	UNUSED(uid); UNUSED(rem_host); UNUSED(rem_hostlen); UNUSED(rem_port);
+	UNUSED(int_client); UNUSED(int_clientlen); UNUSED(int_port); UNUSED(proto);
+	UNUSED(desc); UNUSED(desclen); UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
+	return -2;
+}
+
+int
+get_pinhole_uid_by_index(int index)
+{
+	UNUSED(index);
+	return -1;
+}
+
+int
+clean_pinhole_list(unsigned int * next_timestamp)
+{
+	if(fake_partial) {
+		memmap_remote_peers_partial();
+		fake_partial = 0;
+	}
+	*next_timestamp = 1;	/* due : every pass reads the rules */
+	return fake_removed;
+}
+#endif /* TEST_PINHOLES */
+
+#ifdef PCP_PEER
+int
+get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
+                       char * iaddr, int iaddrlen, unsigned short * iport,
+                       int * proto, char * desc, int desclen,
+                       char * rhost, int rhostlen, unsigned short * rport,
+                       unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	UNUSED(index); UNUSED(ifname); UNUSED(eport); UNUSED(iaddr); UNUSED(iaddrlen);
+	UNUSED(iport); UNUSED(proto); UNUSED(desc); UNUSED(desclen); UNUSED(rhost);
+	UNUSED(rhostlen); UNUSED(rport); UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
+	return -1;
+}
+
+int
+get_nat_ext_addr(struct sockaddr * src, struct sockaddr * dst, uint8_t proto,
+                 struct sockaddr * ret_ext)
+{
+	UNUSED(src); UNUSED(dst); UNUSED(proto); UNUSED(ret_ext);
+	return -1;
+}
+#endif /* PCP_PEER */
+
+/* mapping_owner_of() of upnputils.c, which this test does not link: it would
+ * bring the real upnp_time() and proto_itoa() */
+static int
+desc_has_pcp_nonce(const char * desc, const char * prefix)
+{
+	size_t n = strlen(prefix);
+	return strncmp(desc, prefix, n) == 0 && strlen(desc) == n + 24 &&
+	       strspn(desc + n, "0123456789abcdefABCDEF") == 24;
+}
+
+enum mapping_owner
+mapping_owner_of(const char * desc, unsigned short eport, int proto)
+{
+	if(desc == NULL)
+		return MAPPING_UPNP;
+	if(desc_has_pcp_nonce(desc, "PCP MAP "))
+		return MAPPING_PCP;
+	if(strncmp(desc, "NAT-PMP ", 8) == 0) {
+		char expected[64];
+		snprintf(expected, sizeof(expected), "NAT-PMP %hu %s",
+		         eport, proto_itoa(proto));
+		if(strcmp(desc, expected) == 0)
+			return MAPPING_NATPMP;
+	}
+	return MAPPING_UPNP;
+}
 
 #define PCP_DESC	"PCP MAP 0102030405060708090a0b0c"
 
@@ -79,6 +233,8 @@ test_ipv4(void)
 	assert(same_addr(&row->iaddr, "::ffff:192.0.2.10") && row->iport == 8080);
 	assert(row->expiry == 100 && strcmp(row->label, "web") == 0);
 	assert(row->remote == NULL);
+	assert(memmap_map_kind(40001, IPPROTO_TCP) == LEASE_UPNP);
+	assert(memmap_map_kind(40001, IPPROTO_UDP) == -1);
 
 	/* renew : one row, with the new expiry and label */
 	memmap_map(0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web2", 200);
@@ -91,6 +247,7 @@ test_ipv4(void)
 	again = lease_table_find_mapping(IPPROTO_TCP, AF_INET, NULL, 40001);
 	assert(again != NULL && lease_table_count() == 1);
 	assert(again->kind == LEASE_NATPMP);
+	assert(memmap_map_kind(40001, IPPROTO_TCP) == LEASE_NATPMP);
 	assert(same_addr(&again->iaddr, "::ffff:192.0.2.11") && again->iport == 9090);
 	assert(again->expiry == 300 && strcmp(again->label, "NAT-PMP 40001 TCP") == 0);
 
@@ -230,34 +387,97 @@ test_ipv6(void)
 	assert(lease_table_count() == 0);
 }
 
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+/* the port forwards of other programs, which port_in_use() reads with iptables:
+ * there are none */
+int
+get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned short eport,
+                      int proto, char * iaddr, int iaddrlen, unsigned short * iport,
+                      char * desc, int desclen, char * rhost, int rhostlen,
+                      unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	UNUSED(nat_chain_name); UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(iaddr); UNUSED(iaddrlen); UNUSED(iport); UNUSED(desc); UNUSED(desclen);
+	UNUSED(rhost); UNUSED(rhostlen); UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
+	return -1;
+}
+#endif
+
+#ifdef TEST_MAP6
+/* One expiry pass over the pinholes at time now, in which the firewall removes
+ * "removed" rules (< 0 : it fails). */
 static void
-test_expiry(void)
+expire_map6(time_t now, int removed)
+{
+	unsigned int next;
+
+	fake_now = now;
+	fake_removed = removed;
+	(void)memmap_expire_map6(&next);
+}
+
+static void
+test_map6_expiry(void)
 {
 	char iaddr[64];
 	unsigned int i;
 
 	lease_table_clear();
-	/* more expired pinholes than one walk takes */
+	memmap_map(1, 6001, "2001:db8::1", 6001, IPPROTO_TCP, "a", 90);	/* expired */
+	memmap_map(2, 6002, "2001:db8::1", 6002, IPPROTO_TCP, "b", 150);
+	memmap_map(3, 6003, "2001:db8::1", 6003, IPPROTO_TCP, "c", 0);	/* no expiry */
+	assert(lease_table_count() == 3);
+
+	/* the firewall failed : the rows stay */
+	expire_map6(100, -1);
+	assert(lease_table_count() == 3);
+
+	/* a pass which leaves expired rules keeps the rows, once */
+	fake_partial = 1;
+	expire_map6(100, 1);
+	assert(fake_partial == 0);
+	assert(lease_table_count() == 3);
+
+	/* a full pass removes the expired row only */
+	expire_map6(100, 1);
+	assert(lease_table_count() == 2);
+	assert(lease_table_find_uid(1) == NULL);
+	assert(lease_table_find_uid(2) != NULL && lease_table_find_uid(3) != NULL);
+
+	/* a renewal by uid moves the expiry */
+	memmap_renew_uid(2, 300);
+	expire_map6(200, 1);
+	assert(lease_table_count() == 2);
+	expire_map6(300, 1);
+	assert(lease_table_count() == 1);
+
+	/* a pass which removed no rule keeps the rows */
+	memmap_map(4, 6004, "2001:db8::1", 6004, IPPROTO_TCP, "d", 350);
+	expire_map6(400, 0);
+	assert(lease_table_count() == 2);
+	lease_table_clear();
+
+	/* many expired pinholes, removed during one walk; an IPv4 mapping is not a
+	 * pinhole, whatever its expiry */
 	for(i = 0; i < 600; i++) {
 		snprintf(iaddr, sizeof(iaddr), "2001:db8::%x", i + 1);
 		memmap_map((unsigned short)(i + 1), 0, iaddr, 8080, IPPROTO_UDP, "upnp", 100);
 	}
 	memmap_map(1000, 0, "2001:db8:1::1", 8080, IPPROTO_UDP, "upnp", 101);
 	memmap_map(1001, 0, "2001:db8:1::2", 8080, IPPROTO_UDP, "upnp", 0);
-	/* an IPv4 mapping is not a pinhole, whatever its expiry */
 	memmap_map(0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web", 50);
 	assert(lease_table_count() == 603);
 
-	memmap_remote_peers_expired(99, 600);
+	expire_map6(99, 600);
 	assert(lease_table_count() == 603);
-	memmap_remote_peers_expired(100, 600);
+	expire_map6(100, 600);
 	assert(lease_table_count() == 3);
 	assert(lease_table_find_uid(1) == NULL && lease_table_find_uid(600) == NULL);
 	assert(lease_table_find_uid(1000) != NULL);
-	memmap_remote_peers_expired(101, 1);
+	expire_map6(101, 1);
 	assert(lease_table_find_uid(1000) == NULL);
 	/* 0 : no expiry */
-	memmap_remote_peers_expired(0xffffffffu, 1);
+	expire_map6(0x7fffffff, 1);
 	assert(lease_table_find_uid(1001) != NULL);
 	assert(lease_table_find_mapping(IPPROTO_TCP, AF_INET, NULL, 40001) != NULL);
 	assert(lease_table_count() == 2);
@@ -301,14 +521,17 @@ test_map6_keys(void)
 	assert(lease_table_find_uid(5) == NULL && lease_table_count() == 1);
 	lease_table_clear();
 }
+#endif /* TEST_PINHOLES */
 
 int
 main(void)
 {
 	test_ipv4();
 	test_ipv6();
-	test_expiry();
+#ifdef TEST_MAP6
+	test_map6_expiry();
 	test_map6_keys();
+#endif
 	printf("testmemmap: all tests passed\n");
 	return 0;
 }

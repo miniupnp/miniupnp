@@ -609,14 +609,8 @@ upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
                          const char * iaddr, unsigned short iport,
                          int proto, char * desc, int desc_len, unsigned int * leasetime)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	int uid;
-	uid = find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
-	                   desc, desc_len, leasetime);
-	return uid;
-#else
-	return -42;
-#endif
+	return memmap_find_map6(raddr, rport, iaddr, iport, proto,
+	                           desc, desc_len, leasetime);
 }
 
 /* upnp_add_inboundpinhole()
@@ -782,14 +776,12 @@ upnp_get_pinhole_info(unsigned short uid,
 	int r;
 	unsigned int timestamp;
 	u_int64_t packets_tmp;
-	/*u_int64_t bytes_tmp;*/
 
-	r = get_pinhole_info(uid, raddr, raddrlen, rport,
-	                     iaddr, iaddrlen, iport,
-	                     proto, desc, desclen,
-	                     leasetime ? &timestamp : NULL,
-	                     packets ? &packets_tmp : NULL,
-	                     NULL/*&bytes_tmp*/);
+	r = memmap_get_map6(uid, raddr, raddrlen, rport,
+	                       iaddr, iaddrlen, iport,
+	                       proto, desc, desclen,
+	                       leasetime ? &timestamp : NULL,
+	                       packets ? &packets_tmp : NULL);
 	if(r >= 0) {
 		if(leasetime) {
 			time_t current_time;
@@ -816,12 +808,7 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_get_pinhole_uid_by_index(int index)
 {
-#if defined (USE_NETFILTER)
-	return get_pinhole_uid_by_index(index);
-#else
-	UNUSED(index);
-	return -42;
-#endif /* defined (USE_NETFILTER) */
+	return memmap_map6_uid_at(index);
 }
 
 int
@@ -1105,8 +1092,7 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	ret = clean_pinhole_list(next_timestamp);
-	memmap_remote_peers_expired((unsigned int)upnp_time(), ret);
+	ret = memmap_expire_map6(next_timestamp);
 #else
 	UNUSED(next_timestamp);
 #endif

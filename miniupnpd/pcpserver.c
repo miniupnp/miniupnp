@@ -79,7 +79,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnpglobalvars.h"
 #include "pcplearndscp.h"
 #include "upnpredirect.h"
-#include "commonrdr.h"
 #include "getifaddr.h"
 #include "asyncsendto.h"
 #include "upnputils.h"
@@ -757,11 +756,11 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	 * a MAP rule on the same port: a MAP description says nothing about
 	 * the owner of this rule. */
 	for (index = 0, desc_old[0] = '\0';
-	     get_peer_rule_by_index(index, NULL, &eport_old,
-	                            iaddr_old, sizeof(iaddr_old), &iport_old,
-	                            &proto_old, desc_old, sizeof(desc_old),
-	                            rhost_old, sizeof(rhost_old), &rport_old,
-	                            NULL, NULL, NULL) >= 0;
+	     memmap_get_peer_at(index, &eport_old,
+	                        iaddr_old, sizeof(iaddr_old), &iport_old,
+	                        &proto_old, desc_old, sizeof(desc_old),
+	                        rhost_old, sizeof(rhost_old), &rport_old,
+	                        NULL, NULL, NULL) >= 0;
 	     index++, desc_old[0] = '\0') {
 		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
 		    rport_old == pcp_msg_info->peer_port &&
@@ -777,8 +776,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
-	if (get_nat_ext_addr( (struct sockaddr*)&intip, (struct sockaddr*)&peerip,
-			      proto, (struct sockaddr*)&ret_extip) == 1) {
+	if (memmap_peer_nat_addr((struct sockaddr*)&intip, (struct sockaddr*)&peerip,
+	                         proto, (struct sockaddr*)&ret_extip) == 1) {
 		if (ret_extip.ss_family == AF_INET) {
 			struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext4->sin_port);
@@ -921,12 +920,12 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 
 	for (index = 0 ;
 	     (!pcp_msg_info->is_fw &&
-	      get_peer_rule_by_index(index, 0,
-				     &eport2, iaddr2, sizeof(iaddr2),
-				     &iport2, &proto2,
-				     desc, sizeof(desc),
-				     rhost2, sizeof(rhost2), &rport2,
-				     &timestamp, 0, 0) >= 0)
+	      memmap_get_peer_at(index,
+				 &eport2, iaddr2, sizeof(iaddr2),
+				 &iport2, &proto2,
+				 desc, sizeof(desc),
+				 rhost2, sizeof(rhost2), &rport2,
+				 &timestamp, 0, 0) >= 0)
 #if 0
 		     /* Some day if outbound pinholes are supported.. */
 		     ||
@@ -1090,12 +1089,14 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			}
 			continue;
 		}
-		r = memmap_get_map(pcp_msg_info->ext_port, pcp_msg_info->protocol,
-				   &iport_old, iaddr_old, sizeof(iaddr_old),
-				   NULL, 0, NULL, 0, NULL);
+		r = memmap_get(AF_INET, NULL, pcp_msg_info->ext_port, pcp_msg_info->protocol,
+			       &iport_old, &iaddr_old, NULL, 0, NULL, NULL);
+		if (r == 0 && !upnp_map_in_firewall(pcp_msg_info->ext_port,
+						    pcp_msg_info->protocol))
+			r = -1;
 
 		if(r==0) {
-			if((strcmp(pcp_msg_info->mapped_str, iaddr_old)!=0)
+			if(memcmp(pcp_msg_info->mapped_ip, &iaddr_old, sizeof(iaddr_old)) != 0
 			   || (pcp_msg_info->int_port != iport_old)) {
 				/* redirection already existing */
 				if (pcp_msg_info->pfailure_present) {
@@ -1104,7 +1105,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			} else {
 				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
 				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
-				       iaddr_old, iport_old);
+				       pcp_msg_info->mapped_str, iport_old);
 				/* remove and then add again */
 				if (_upnp_delete_redir(pcp_msg_info->ext_port,
 						       pcp_msg_info->protocol)==0) {
@@ -1248,7 +1249,8 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	/* remove the mapping */
 	/* remove all the mappings for this client */
 	unsigned short eport2, iport2;
-	char iaddr2[INET6_ADDRSTRLEN];
+	struct in6_addr iaddr2;
+	char iaddr2str[INET6_ADDRSTRLEN];
 	int proto2;
 	char desc[64];
 	unsigned int timestamp;

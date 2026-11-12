@@ -23,7 +23,6 @@
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "upnpredirect.h"
-#include "commonrdr.h"
 #include "upnputils.h"
 #include "memmap.h"
 #include "portinuse.h"
@@ -298,22 +297,33 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			uint32_t lifetime; 		/* lifetime=0 => remove port mapping */
 			int r;
 			int proto;
-			char iaddr_old[16];
+			struct in6_addr iaddr_old;
 			unsigned short iport_old;
 			unsigned int timestamp;
 			char desc[64];
+			/* the client, as the table keeps it, and its owner */
+			struct in6_addr sender6;
+			int sender_family;
+			struct memmap_owner owner;
 
 			iport = READNU16(req+4);
 			eport = READNU16(req+6);
 			lifetime = READNU32(req+8);
 			proto = (req[1]==1)?IPPROTO_UDP:IPPROTO_TCP;
+			memmap_owner_init(&owner, LEASE_NATPMP, NULL);
+			if(memmap_pton(senderaddrstr, &sender_family, &sender6) < 0) {
+				syslog(LOG_ERR, "NAT-PMP: bad sender address %s", senderaddrstr);
+				resp[3] = 3;	/* Failure */
+			}
 			syslog(LOG_INFO, "NAT-PMP port mapping request : "
 			                 "%hu->%s:%hu %s lifetime=%us",
 			                 eport, senderaddrstr, iport,
 			                 (req[1]==1)?"udp":"tcp", lifetime);
 			/* TODO: accept port mapping if iport ok but eport not ok
 			 * (and set eport correctly) */
-			if(lifetime == 0) {
+			if(resp[3] != 0) {
+				/* the sender address did not parse: nothing to do */
+			} else if(lifetime == 0) {
 				/* remove the mapping */
 				/* RFC6886 :
 				 * A client MAY also send an explicit packet to request deletion of a
@@ -416,11 +426,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						if(eport == 0) eport++; /* skip port zero */
 						continue;
 					}
-					r = memmap_get_map(eport, proto, &iport_old,
-					                   iaddr_old, sizeof(iaddr_old),
-					                   desc, sizeof(desc), NULL, 0, &timestamp);
+					r = memmap_get(AF_INET, NULL, eport, proto, &iport_old,
+					               &iaddr_old, desc, sizeof(desc), NULL, &timestamp);
+					if(r == 0 && !upnp_map_in_firewall(eport, proto))
+						r = -1;
 					if(r==0) {
-						if(strcmp(senderaddrstr, iaddr_old)==0
+						if(memcmp(&sender6, &iaddr_old, sizeof(iaddr_old))==0
 						    && iport==iport_old) {
 							if(0 == strncmp(desc, "PCP ", 4)) {
 								/* Preserve PCP mapping ownership and nonce state. */
@@ -429,7 +440,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							}
 							/* redirection already existing */
 							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
-							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
+							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, iport_old);
 							/* remove and then add again */
 							if(_upnp_delete_redir(eport, proto) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");

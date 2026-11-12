@@ -18,43 +18,44 @@
 #include <arpa/inet.h>
 
 #include "config.h"
+#include "macros.h"
+#include "upnpredirect.h"
+#include "upnpglobalvars.h"
 #include "upnputils.h"
 #include "lease_table.h"
 #include "memmap.h"
+#if defined(USE_NETFILTER)
+#include "netfilter/iptcrdr.h"
 #ifdef USE_NFTABLES
 #include "netfilter_nft/nftnlrdr.h"
 #endif
+#endif
+#if defined(USE_PF)
+#include "pf/obsdrdr.h"
+#endif
+#if defined(USE_IPF)
+#include "ipf/ipfrdr.h"
+#endif
+#if defined(USE_IPFW)
+#include "ipfw/ipfwrdr.h"
+#endif
 
-/* The table keeps every address in 16 bytes: a.b.c.d as ::ffff:a.b.c.d. */
-int
-memmap_pton(const char * s, int * family, struct in6_addr * a)
-{
-	struct in_addr v4;
+/* The firewalls which have pinholes. The PF API of Apple differs from what
+ * pf/pfpinhole.c expects. */
+#ifdef ENABLE_UPNPPINHOLE
+#if defined(USE_NETFILTER) || (defined(USE_PF) && !defined(__APPLE__))
+#define MEMMAP_MAP6
+#if defined(USE_NETFILTER)
+#include "netfilter/iptpinhole.h"
+#else
+#include "pf/pfpinhole.h"
+#endif
+#endif
+#endif
 
-	if(s == NULL)
-		return -1;
-	if(inet_pton(AF_INET, s, &v4) == 1) {
-		memset(a, 0, sizeof(*a));
-		a->s6_addr[10] = a->s6_addr[11] = 0xff;
-		memcpy(a->s6_addr + 12, &v4, sizeof(v4));
-		*family = AF_INET;
-		return 0;
-	}
-	if(inet_pton(AF_INET6, s, a) == 1) {
-		*family = AF_INET6;
-		return 0;
-	}
-	return -1;
-}
 
-/* Print an address of the table. */
-const char *
-memmap_ntop(int family, const struct in6_addr * a, char * buf, size_t len)
-{
-	if(family == AF_INET)
-		return inet_ntop(AF_INET, a->s6_addr + 12, buf, len);
-	return inet_ntop(AF_INET6, a, buf, len);
-}
+/* memmap_pton(), memmap_ntop(), memmap_key_init(): shared with memmap_stub.c */
+#include "memmap_key.c"
 
 /* The table form of an IPv4 address. 0, or -1 if s is not an IPv4 address */
 static int
@@ -424,8 +425,11 @@ memmap_remote_peers_partial(void)
 	syslog(LOG_DEBUG, "memmap: expired pinhole rules are left in the firewall");
 }
 
-/* the firewall removed expired pinholes : they go by their lifetime here */
-void
+/* The firewall ended a pass over the pinholes, and removed "removed" rules
+ * (<0 : error). The rows which expired go, as their rules went. If the pass
+ * removed nothing, failed or was partial, the rows stay for the next pass: a row
+ * must not go while its rule may still be there. */
+static void
 memmap_remote_peers_expired(unsigned int now, int removed)
 {
 	static struct map6_expiry c;
@@ -480,12 +484,10 @@ expiry_row(struct lease_entry * e, void * arg)
 	}
 }
 
-/* The nftables backend asks this which port mappings expired, with no read of
- * the firewall. Fills expired[] with at most max mappings, and returns how many.
- * *next is the time of the next expiry, 0 if there is none. */
+/* The port mappings which expired, with no read of the firewall. */
 int
-get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
-                           int max, unsigned int * next)
+memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
+                    int max, unsigned int * next)
 {
 	struct expiry_ctx c = { now, expired, max, 0, 0 };
 	lease_table_foreach(expiry_row, &c);
@@ -496,8 +498,8 @@ get_expired_redirect_rules(unsigned int now, struct expired_redirect * expired,
 }
 #endif /* USE_NFTABLES */
 
-/* Tell if an IPv4 mapping has a row. */
-int
+/* 1 if the IPv4 mapping has a row */
+static int
 memmap_map_known(unsigned short eport, int proto)
 {
 	return lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL;
@@ -542,6 +544,14 @@ memmap_get(int family, const struct in6_addr * eaddr, unsigned short eport,
 	port_info(row, iport, iaddr, desc, desclen, remote, timestamp);
 	syslog(LOG_DEBUG, "memmap: read %s port %hu", proto_itoa(proto), eport);
 	return 0;
+}
+
+/* The kind of the row of an IPv4 port mapping. */
+int
+memmap_map_kind(unsigned short eport, int proto)
+{
+	const struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	return row != NULL ? row->kind : -1;
 }
 
 /* Read an IPv4 mapping by its place on the port list. */
@@ -611,4 +621,197 @@ memmap_eport_used_by_other(int family, const struct in6_addr * eaddr,
 	if(memmap_ntop(row->family, &row->iaddr, other, sizeof(other)) != NULL)
 		syslog(LOG_INFO, "external port %hu is used by %s", eport, other);
 	return 1;
+}
+
+/* Read the counters of an IPv4 port mapping from the firewall. */
+int
+memmap_map_counters(unsigned short eport, int proto,
+                    u_int64_t * packets, u_int64_t * bytes)
+{
+	unsigned short iport;
+	unsigned int timestamp;
+	return get_redirect_rule(ext_if_name, eport, proto, NULL, 0, &iport, NULL, 0,
+	                         NULL, 0, &timestamp, packets, bytes) >= 0 ? 0 : -1;
+}
+
+int
+memmap_in_firewall(const struct memmap_key * key)
+{
+	u_int64_t packets, bytes;
+
+	if(memmap_map_counters(key->eport, key->proto, &packets, &bytes) == 0)
+		return 1;
+	syslog(LOG_INFO, "port %hu %s has no rule in the firewall, adding it again",
+	       key->eport, proto_itoa(key->proto));
+	memmap_map_gone(key->eport, key->proto);
+	return 0;
+}
+
+/* Give a row to each rule of an earlier run which has none. The row has the
+ * lifetime the firewall reports, or 0 for none: then it does not expire. A rule
+ * with a row is skipped, so a repeated call is safe. */
+void
+memmap_adopt_rules(void)
+{
+	int index = 0, proto;
+	unsigned short eport, iport;
+	char iaddr[32], desc[64], rhost[40];
+	unsigned int timestamp;
+
+	for(;;) {
+		desc[0] = '\0';
+		rhost[0] = '\0';
+		timestamp = 0;
+		if(get_redirect_rule_by_index(index++, NULL, &eport, iaddr, sizeof(iaddr),
+		                              &iport, &proto, desc, sizeof(desc),
+		                              rhost, sizeof(rhost), &timestamp, NULL, NULL) < 0)
+			break;
+		/* a backend may fill a long description with no terminator */
+		desc[sizeof(desc) - 1] = '\0';
+		rhost[sizeof(rhost) - 1] = '\0';
+		if(memmap_map_known(eport, proto))
+			continue;
+		syslog(LOG_NOTICE, "adopting rule %hu %s to %s:%hu", eport,
+		       proto_itoa(proto), iaddr, iport);
+		if(rhost[0] != '\0' && strcmp(rhost, "*") != 0)
+			memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
+		else
+			memmap_map(0, eport, iaddr, iport, proto, desc, timestamp);
+	}
+}
+
+#ifdef ENABLE_UPNPPINHOLE
+/* Find a pinhole by its rule, in the firewall. */
+int
+memmap_find_map6(const char * raddr, unsigned short rport,
+                    const char * iaddr, unsigned short iport, int proto,
+                    char * desc, int desclen, unsigned int * timestamp)
+{
+#ifdef MEMMAP_MAP6
+	return find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
+	                    desc, desclen, timestamp);
+#else
+	UNUSED(raddr); UNUSED(rport); UNUSED(iaddr); UNUSED(iport); UNUSED(proto);
+	UNUSED(desc); UNUSED(desclen); UNUSED(timestamp);
+	return -42;
+#endif
+}
+
+/* Read the rule of a pinhole from the firewall. */
+int
+memmap_get_map6(unsigned short uid, char * raddr, int raddrlen,
+                   unsigned short * rport, char * iaddr, int iaddrlen,
+                   unsigned short * iport, int * proto, char * desc, int desclen,
+                   unsigned int * timestamp, u_int64_t * packets)
+{
+#ifdef MEMMAP_MAP6
+	return get_pinhole_info(uid, raddr, raddrlen, rport, iaddr, iaddrlen, iport,
+	                        proto, desc, desclen, timestamp, packets, NULL);
+#else
+	UNUSED(uid); UNUSED(raddr); UNUSED(raddrlen); UNUSED(rport);
+	UNUSED(iaddr); UNUSED(iaddrlen); UNUSED(iport); UNUSED(proto);
+	UNUSED(desc); UNUSED(desclen); UNUSED(timestamp); UNUSED(packets);
+	return -42;
+#endif
+}
+
+/* The uid of a pinhole by its place in the firewall. */
+int
+memmap_map6_uid_at(int index)
+{
+#if defined(USE_NETFILTER) && defined(MEMMAP_MAP6)
+	return get_pinhole_uid_by_index(index);
+#else
+	UNUSED(index);
+	return -42;
+#endif
+}
+
+/* The firewall removes the expired pinholes: it holds their expiry. */
+int
+memmap_expire_map6(unsigned int * next)
+{
+#ifdef MEMMAP_MAP6
+	int removed = clean_pinhole_list(next);
+	memmap_remote_peers_expired((unsigned int)upnp_time(), removed);
+	return removed;
+#else
+	UNUSED(next);
+	return 0;
+#endif
+}
+#endif /* ENABLE_UPNPPINHOLE */
+
+#ifdef PCP_PEER
+/* Read a PEER rule from the firewall. */
+int
+memmap_get_peer_at(int index, unsigned short * eport, char * iaddr, int iaddrlen,
+                   unsigned short * iport, int * proto, char * desc, int desclen,
+                   char * rhost, int rhostlen, unsigned short * rport,
+                   unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	return get_peer_rule_by_index(index, NULL, eport, iaddr, iaddrlen, iport, proto,
+	                              desc, desclen, rhost, rhostlen, rport, timestamp,
+	                              packets, bytes) >= 0 ? 0 : -1;
+}
+
+/* Find the external address of a connection in the kernel. */
+int
+memmap_peer_nat_addr(struct sockaddr * intaddr, struct sockaddr * peer,
+                     unsigned char proto, struct sockaddr * ext)
+{
+	return get_nat_ext_addr(intaddr, peer, proto, ext);
+}
+#endif /* PCP_PEER */
+
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+/* The chains of other programs, where a port forward of theirs can use a port. */
+#ifdef TOMATO
+static const char * const foreign_nat_chains[] = { "WANPREROUTING", NULL };
+#else
+static const char * const foreign_nat_chains[] = { "PREROUTING", NULL };
+#endif
+#endif
+
+int
+memmap_eport_redirected_elsewhere(const char * ifname, const struct memmap_key * key)
+{
+	struct lease_entry * row = lease_table_find_mapping(key->proto, key->family,
+	                                                    &key->eaddr, key->eport);
+	char old[INET6_ADDRSTRLEN];
+
+	/* ours: the table */
+	if(row != NULL &&
+	   (memcmp(&row->iaddr, &key->iaddr, sizeof(row->iaddr)) != 0 ||
+	    row->iport != key->iport)) {
+		syslog(LOG_DEBUG, "port %hu %s is mapped to %s port %hu", key->eport,
+		       proto_itoa(key->proto),
+		       memmap_ntop(row->family, &row->iaddr, old, sizeof(old)) ? old : "?",
+		       row->iport);
+		return 1;
+	}
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+	/* those of other programs: only the firewall has them */
+	{
+		char iaddr[INET6_ADDRSTRLEN];
+		unsigned short iport_old;
+		int i;
+		if(memmap_ntop(key->family, &key->iaddr, iaddr, sizeof(iaddr)) == NULL)
+			return 0;
+		for(i = 0; foreign_nat_chains[i] != NULL; i++) {
+			if(get_nat_redirect_rule(foreign_nat_chains[i], ifname, key->eport, key->proto,
+			                         old, sizeof(old), &iport_old,
+			                         NULL, 0, NULL, 0, NULL, NULL, NULL) == 0 &&
+			   (strcmp(iaddr, old) != 0 || key->iport != iport_old)) {
+				syslog(LOG_DEBUG, "port %hu %s is redirected to %s port %hu on chain %s",
+				       key->eport, proto_itoa(key->proto), old, iport_old,
+				       foreign_nat_chains[i]);
+				return 1;
+			}
+		}
+	}
+#else
+	UNUSED(ifname);
+#endif
+	return 0;
 }
