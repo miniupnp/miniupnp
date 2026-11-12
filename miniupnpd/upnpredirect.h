@@ -140,19 +140,6 @@ get_upnp_rules_state_list(int max_rules_number_target);
 int
 upnp_get_portmapping_number_of_entries(void);
 
-/* remove_unused_rules() :
- * also free the list */
-void
-remove_unused_rules(struct rule_state * list);
-
-/*! \brief returns a list of all "external" ports for which a port
- * mapping exists
- * \param[in] startport lowest port in the interval
- * \param[in] endport highest port in theinterval
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
- * \param[out] number number of ports in the returned array
- * \return a malloc'ed array of ports or NULL for error
- */
 unsigned short *
 upnp_get_portmappings_in_range(unsigned short startport,
                                unsigned short endport,
