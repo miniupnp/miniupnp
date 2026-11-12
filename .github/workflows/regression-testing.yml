@@ -181,7 +181,7 @@ jobs:
           # the key logs in to the prepared image, so the two are cached together. It opens
           # only the throwaway VM, on 127.0.0.1 of the runner.
           key: >-
-            end2end-freebsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/pcp_wire/freebsd/prepare.sh') }}
+            end2end-freebsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/freebsd/prepare.sh') }}
 
       - name: Compare master with pull request on freebsd
         env:
@@ -310,7 +310,7 @@ jobs:
             set -u
             harness=$PWD/candidate/miniupnpd/tests/pcp_wire
             # Packages (idempotent), PyYAML for this python, libpfctl on 15+.
-            PCP_TEST_PYTHON=1 sh "$harness/freebsd/prepare.sh"
+            PCP_TEST_PYTHON=1 sh "$PWD/candidate/miniupnpd/tests/common/freebsd/prepare.sh"
             # Both daemons with this pull request's harness. The next step compares
             # them: a failure here alone does not fail the job.
             sh "$harness/freebsd/ci.sh" "$PWD/master" "$PWD/freebsd-results/master" || true

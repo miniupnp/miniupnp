@@ -63,8 +63,9 @@ GSO super-packets.
 
 The pf ruleset blocks inbound WAN traffic except Neighbor Discovery and the
 miniupnpd anchor, passes LAN traffic with state, and NATs IPv4 (and IPv6 in
-`nat66` sections). The VM image cache is shared with
-`pcp_wire/run-freebsd.sh`. The result of each case fills the `freebsd`
+`nat66` sections). The VM steps are those of `../common/vm_lib.sh`, and the VM image cache is
+shared with the VM of `pcp_wire` and `daemon_options` (`../common/freebsd_vm.sh`). The release is
+`--freebsd-version` or `PCP_TEST_FREEBSD_VERSION`, by default the newest with a cloud image. The result of each case fills the `freebsd`
 column of `status.md` (the Docker run fills `linux`; override the report with
 `E2E_STATUS_FILE`), and the artifacts go to `.tmp/pcp-e2e/freebsd-<run>-slot<N>/`, in the
 same per-case layout as the Docker run, with pcaps taken on `vtnet1`/`vtnet2`
@@ -102,7 +103,7 @@ The daemon is stopped and started from a clean state on every run (anchor, pf st
 NAT66, lease files and logs), so cases do not see what an earlier run left. The fixture is
 in `$PCP_TEST_FREEBSD_CACHE/e2e-vm/$PCP_E2E_VM_NAME` (default name `slotN`) and uses SSH
 port `PCP_E2E_FREEBSD_SSH_PORT` (default 2230+N), so it does not clash with the VM of
-`pcp_wire/run-freebsd.sh` from 2401. One run at a time uses a fixture (`flock`).
+`../common/freebsd_vm.sh` from 2401. One run at a time uses a fixture (`flock`).
 
 ### Running FreeBSD fixtures side by side
 

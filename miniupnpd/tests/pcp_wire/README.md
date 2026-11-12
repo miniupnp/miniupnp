@@ -209,7 +209,8 @@ fills the `freebsd` column:
 ./miniupnpd/tests/pcp_wire/run-freebsd.sh
 ```
 
-It boots a throwaway FreeBSD VM under QEMU (KVM when available) and runs
+It boots a throwaway FreeBSD VM under QEMU (KVM when available, `../common/freebsd_vm.sh`, the
+newest release unless `--freebsd-version` or `PCP_TEST_FREEBSD_VERSION` names one) and runs
 `freebsd/ci.sh` inside it: build miniupnpd with pf on an `epair(4)` router
 topology (a WAN and two LANs, default route out of the WAN), run the whole YAML
 suite from a client jail on LAN1, then the cases that restart the daemon. The
@@ -217,7 +218,7 @@ client is a vnet jail because the daemon decides which LAN a request came from b
 routing to the sender; for the router's own address that route is `lo0`, so a
 runner on the router itself is ignored over IPv6. Requires `qemu-system-x86_64`,
 `qemu-img`, `xz`, `curl`, `ssh` and `xorriso`/`genisoimage`/`mkisofs` on the host;
-the header of the script lists its environment variables. The first run builds a
+the headers of the script and of `../common/freebsd_vm.sh` list the environment variables. The first run builds a
 cached VM image with the build tools, Python and PyYAML. Results, captures and
 logs go to `.tmp/ci/out/freebsd/announce/`, and the merged `status.md` is updated.
 
