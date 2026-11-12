@@ -76,6 +76,7 @@
 #include "options.h"
 #include "minissdp.h"
 #include "upnpredirect.h"
+#include "memmap.h"
 #include "upnppinhole.h"
 #include "upnpstun.h"
 #include "miniupnpdtypes.h"
@@ -204,7 +205,7 @@ tomato_load(void)
 	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
 	{
 		/* upnp_redirect() must see the rules which survived */
-		upnp_adopt_rules();
+		memmap_adopt_rules();
 		current_time = time(NULL);
 		s[sizeof(s) - 1] = 0;
 		while (fgets(s, sizeof(s) - 1, f)) {
@@ -2643,7 +2644,7 @@ main(int argc, char * * argv)
 	}
 #endif
 
-	upnp_adopt_rules();
+	memmap_adopt_rules();
 
 	/* for miniupnpdctl */
 #ifdef USE_MINIUPNPDCTL

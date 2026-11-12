@@ -23,7 +23,6 @@
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "upnpredirect.h"
-#include "commonrdr.h"
 #include "upnputils.h"
 #include "memmap.h"
 #include "portinuse.h"

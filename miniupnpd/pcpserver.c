@@ -78,7 +78,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnpglobalvars.h"
 #include "pcplearndscp.h"
 #include "upnpredirect.h"
-#include "commonrdr.h"
 #include "getifaddr.h"
 #include "asyncsendto.h"
 #include "upnputils.h"
@@ -753,11 +752,11 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	/* RFC 6887 sections 12.3 and 15.1: authenticate the full PEER
 	 * mapping key before refreshing it or adding any rules. */
 	for (index = 0;
-	     get_peer_rule_by_index(index, NULL, &eport_old,
-	                            iaddr_old, sizeof(iaddr_old), &iport_old,
-	                            &proto_old, desc_old, sizeof(desc_old),
-	                            rhost_old, sizeof(rhost_old), &rport_old,
-	                            NULL, NULL, NULL) >= 0;
+	     memmap_get_peer_at(index, &eport_old,
+	                        iaddr_old, sizeof(iaddr_old), &iport_old,
+	                        &proto_old, desc_old, sizeof(desc_old),
+	                        rhost_old, sizeof(rhost_old), &rport_old,
+	                        NULL, NULL, NULL) >= 0;
 	     index++) {
 		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
 		    rport_old == pcp_msg_info->peer_port &&
@@ -772,8 +771,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
-	if (get_nat_ext_addr( (struct sockaddr*)&intip, (struct sockaddr*)&peerip,
-			      proto, (struct sockaddr*)&ret_extip) == 1) {
+	if (memmap_peer_nat_addr((struct sockaddr*)&intip, (struct sockaddr*)&peerip,
+	                         proto, (struct sockaddr*)&ret_extip) == 1) {
 		if (ret_extip.ss_family == AF_INET) {
 			struct sockaddr_in* ret_ext4 = (struct sockaddr_in*)&ret_extip;
 			uint16_t ret_eport = ntohs(ret_ext4->sin_port);
@@ -916,12 +915,12 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 
 	for (index = 0 ;
 	     (!pcp_msg_info->is_fw &&
-	      get_peer_rule_by_index(index, 0,
-				     &eport2, iaddr2, sizeof(iaddr2),
-				     &iport2, &proto2,
-				     desc, sizeof(desc),
-				     rhost2, sizeof(rhost2), &rport2,
-				     &timestamp, 0, 0) >= 0)
+	      memmap_get_peer_at(index,
+				 &eport2, iaddr2, sizeof(iaddr2),
+				 &iport2, &proto2,
+				 desc, sizeof(desc),
+				 rhost2, sizeof(rhost2), &rport2,
+				 &timestamp, 0, 0) >= 0)
 #if 0
 		     /* Some day if outbound pinholes are supported.. */
 		     ||

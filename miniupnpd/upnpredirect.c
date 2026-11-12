@@ -207,7 +207,7 @@ int reload_from_lease_file(void)
 		syslog(LOG_WARNING, "could not unlink file %s : %m", lease_file);
 	}
 	/* upnp_redirect() must see the rules which survived, not add them again */
-	upnp_adopt_rules();
+	memmap_adopt_rules();
 
 	current_time = upnp_time();
 #ifndef LEASEFILE_USE_REMAINING_TIME
@@ -312,10 +312,9 @@ void lease_file_rewrite(void)
 	if (lease_file == NULL) return;
 	remove(lease_file);
 	for(index = 0; ; index++) {
-		if(get_redirect_rule_by_index(index, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
-		                              &iport, &proto, desc, sizeof(desc),
-		                              rhost, sizeof(rhost), &timestamp,
-		                              0, 0) < 0)
+		if(memmap_get_map_at((unsigned int)index, &eport, &proto, &iport,
+		                     iaddr, sizeof(iaddr), desc, sizeof(desc),
+		                     rhost, sizeof(rhost), &timestamp) < 0)
 			break;
 		if(lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp) < 0)
 			break;
@@ -660,7 +659,7 @@ expire_nft_rules(void)
 	unsigned int next;
 	int n, i, failed = 0;
 
-	n = get_expired_redirect_rules(now, expired, EXPIRE_MAX_PER_PASS, &next);
+	n = memmap_expired_maps(now, expired, EXPIRE_MAX_PER_PASS, &next);
 	for (i = 0; i < n; i++) {
 		syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
 		       expired[i].eport, proto_itoa(expired[i].proto));
@@ -693,10 +692,11 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		return 0;
 	current_time = upnp_time();
 	nextruletoclean_timestamp = 0;
-	while(get_redirect_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
-	                              &iport, &proto, 0, 0, 0,0, &timestamp,
-								  &tmp->packets, &tmp->bytes) >= 0)
+	while(memmap_get_map_at((unsigned int)i, &tmp->eport, &proto, &iport,
+	                        NULL, 0, NULL, 0, NULL, 0, &timestamp) >= 0)
 	{
+		if(memmap_map_counters(tmp->eport, proto, &tmp->packets, &tmp->bytes) < 0)
+			tmp->packets = tmp->bytes = 0;
 		tmp->to_remove = 0;
 		if(timestamp > 0) {
 			/* need to remove this port mapping ? */
@@ -718,9 +718,9 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	}
 #ifdef PCP_PEER
 	i=0;
-	while(get_peer_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
-		                              &iport, &proto, 0, 0, 0,0,0, &timestamp,
-									  &tmp->packets, &tmp->bytes) >= 0)
+	while(memmap_get_peer_at(i, &tmp->eport, NULL, 0, &iport, &proto, NULL, 0,
+	                         NULL, 0, NULL, &timestamp,
+	                         &tmp->packets, &tmp->bytes) >= 0)
 	{
 		tmp->to_remove = 0;
 		if(timestamp > 0) {
@@ -788,20 +788,15 @@ expire_upnp_rules(void)
 void
 remove_unused_rules(struct rule_state * list)
 {
-	char ifname[IFNAMSIZ];
-	unsigned short iport;
 	struct rule_state * tmp;
 	u_int64_t packets;
 	u_int64_t bytes;
-	unsigned int timestamp;
 	int n = 0;
 
 	while(list)
 	{
 		/* remove the rule if no traffic has used it */
-		if(get_redirect_rule(ifname, list->eport, list->proto,
-	                         0, 0, &iport, 0, 0, 0, 0, &timestamp,
-		                     &packets, &bytes) >= 0)
+		if(memmap_map_counters(list->eport, list->proto, &packets, &bytes) >= 0)
 		{
 			if(packets == list->packets && bytes == list->bytes)
 			{
@@ -819,34 +814,6 @@ remove_unused_rules(struct rule_state * list)
 	}
 	if(n>0)
 		syslog(LOG_NOTICE, "removed %d unused rules", n);
-}
-
-/* Give a row to each rule of an earlier run which has none, so the rule can be
- * listed and deleted. The row has the lifetime the firewall reports, or 0 for
- * none: then it does not expire. A rule with a row is skipped, so a repeated
- * call is safe. */
-void
-upnp_adopt_rules(void)
-{
-	int index = 0, proto;
-	unsigned short eport, iport;
-	char iaddr[32], desc[64], rhost[40];
-	unsigned int timestamp;
-
-	for(;;) {
-		desc[0] = '\0';
-		rhost[0] = '\0';
-		timestamp = 0;
-		if(get_redirect_rule_by_index(index++, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
-		                              &iport, &proto, desc, sizeof(desc),
-		                              rhost, sizeof(rhost), &timestamp, 0, 0) < 0)
-			break;
-		if(memmap_map_known(eport, proto))
-			continue;
-		syslog(LOG_NOTICE, "adopting rule %hu %s to %s:%hu", eport,
-		       proto_itoa(proto), iaddr, iport);
-		record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
-	}
 }
 
 /* upnp_get_portmappings_in_range()
@@ -883,12 +850,12 @@ write_ruleset_details(int s)
 	int n;
 
 	write(s, "Ruleset :\n", 10);
-	while(get_redirect_rule_by_index(i, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
-	                                 &iport, &proto, desc, sizeof(desc),
-	                                 rhost, sizeof(rhost),
-	                                 &timestamp,
-	                                 &packets, &bytes) >= 0)
+	while(memmap_get_map_at((unsigned int)i, &eport, &proto, &iport,
+	                        iaddr, sizeof(iaddr), desc, sizeof(desc),
+	                        rhost, sizeof(rhost), &timestamp) >= 0)
 	{
+		if(memmap_map_counters(eport, proto, &packets, &bytes) < 0)
+			packets = bytes = 0;
 		n = snprintf(buffer, sizeof(buffer),
 		             "%2d %s %s:%hu->%s:%hu "
 		             "'%s' %u %" PRIu64 " %" PRIu64 "\n",
