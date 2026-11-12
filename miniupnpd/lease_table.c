@@ -344,19 +344,22 @@ lease_table_next_port(const struct lease_entry * prev)
 	return prev != NULL ? prev->port_next : port_head;
 }
 
-/* A copy of src with its own label and remote, in no index yet. NULL if there
- * is no memory */
-static struct lease_entry *
-new_row(const struct lease_entry * src, const struct in6_addr * raddr,
-        unsigned short rport)
+struct lease_entry *
+lease_table_new(const struct lease_entry * src, const struct in6_addr * raddr,
+                unsigned short rport)
 {
-	struct lease_entry * e = malloc(sizeof(*e));
+	struct lease_entry * e;
+
+	if(ready() < 0)
+		return NULL;
+	e = malloc(sizeof(*e));
 	if(e == NULL) {
 		syslog(LOG_INFO, "lease table: no memory for the row of port %hu", src->eport);
 		return NULL;
 	}
 	*e = *src;
 	e->ext_next = e->int_next = e->uid_next = NULL;
+	e->port_next = e->port_prev = NULL;
 	e->label = NULL;
 	e->remote = NULL;
 	if(src->label != NULL && (e->label = strdup(src->label)) == NULL)
@@ -376,12 +379,23 @@ fail:
 	return NULL;
 }
 
-/* put a new row in all the indexes */
-static void
-link_row(struct lease_entry * e)
+void
+lease_table_free(struct lease_entry * e)
+{
+	if(e == NULL)
+		return;
+	free(e->remote);
+	free(e->label);
+	free(e);
+}
+
+void
+lease_table_link(struct lease_entry * e)
 {
 	unsigned int b;
 
+	if(count >= ext_index.size)
+		grow();
 	b = ext_hash(e) & (ext_index.size - 1);
 	e->ext_next = ext_index.buckets[b];
 	ext_index.buckets[b] = e;
@@ -398,25 +412,20 @@ link_row(struct lease_entry * e)
 	count++;
 }
 
-/* Add a copy of a row to the indexes and the port list. */
 struct lease_entry *
 lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
                 unsigned short rport)
 {
 	struct lease_entry * e;
 
-	if(ready() < 0)
-		return NULL;
 	if(lease_table_find_external(src->proto, src->family, &src->eaddr,
 	                             src->eport, raddr, rport) != NULL) {
 		syslog(LOG_DEBUG, "lease table: port %hu is in use, no row added", src->eport);
 		return NULL;
 	}
-	if(count >= ext_index.size)
-		grow();
-	e = new_row(src, raddr, rport);
+	e = lease_table_new(src, raddr, rport);
 	if(e != NULL)
-		link_row(e);
+		lease_table_link(e);
 	return e;
 }
 
@@ -431,11 +440,11 @@ lease_table_replace(struct lease_entry * old, const struct lease_entry * src,
 	if(other != NULL && other != old)
 		return NULL;
 	/* the memory first : if there is none, old stays */
-	e = new_row(src, raddr, rport);
+	e = lease_table_new(src, raddr, rport);
 	if(e == NULL)
 		return NULL;
 	lease_table_remove(old);
-	link_row(e);
+	lease_table_link(e);
 	return e;
 }
 
@@ -461,9 +470,7 @@ lease_table_remove(struct lease_entry * e)
 	}
 	if(is_port_mapping(e))
 		port_list_remove(e);
-	free(e->remote);
-	free(e->label);
-	free(e);
+	lease_table_free(e);
 	count--;
 }
 

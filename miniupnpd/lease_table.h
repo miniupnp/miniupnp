@@ -92,7 +92,23 @@ lease_set_uid(struct lease_entry * e, unsigned short uid)
 	e->nonce[1] = (unsigned char)uid;
 }
 
-/* Add a row: a copy of e, with its label copied too, in all the indexes.
+/* A new row: a copy of e, with its label and remote copied too, in no index.
+ * A lookup does not find it until lease_table_link(). NULL if there is no
+ * memory. memmap_sync() builds the rows of a request with this, before it
+ * sends the rules, so a failed request only frees rows nobody could see. */
+struct lease_entry *
+lease_table_new(const struct lease_entry * e, const struct in6_addr * raddr,
+                unsigned short rport);
+
+/* Free a row which lease_table_new() made and which is in no index. */
+void lease_table_free(struct lease_entry * e);
+
+/* Put a row of lease_table_new() in all the indexes, and on the port list if it
+ * is an IPv4 port mapping. This cannot fail: lease_table_new() set up the
+ * indexes. The caller makes sure no linked row has the same external key. */
+void lease_table_link(struct lease_entry * e);
+
+/* Add a row: lease_table_new() and lease_table_link() in one call.
  * raddr != NULL limits the row to that remote. The row must not change its key
  * afterwards. Returns the row, or NULL if there is no memory or the external
  * key is in use. A row is one rule: lease_table_replace() replaces one. */
