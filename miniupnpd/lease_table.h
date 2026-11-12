@@ -85,11 +85,17 @@ lease_set_uid(struct lease_entry * e, unsigned short uid)
 /* Add a row: a copy of e, with its label copied too, in all the indexes.
  * raddr != NULL limits the row to that remote. The row must not change its key
  * afterwards. Returns the row, or NULL if there is no memory or the external
- * key is in use. A row is one rule: the caller replaces a row by removing it
- * first. */
+ * key is in use. A row is one rule: lease_table_replace() replaces one. */
 struct lease_entry *
 lease_table_add(const struct lease_entry * e, const struct in6_addr * raddr,
                 unsigned short rport);
+
+/* Replace the row old by a copy of e, as lease_table_add() makes it. The key of
+ * e may be that of old. Returns the new row, or NULL if there is no memory or
+ * another row has the key of e: old then stays, and is still valid. */
+struct lease_entry *
+lease_table_replace(struct lease_entry * old, const struct lease_entry * e,
+                    const struct in6_addr * raddr, unsigned short rport);
 
 /* Take the row out of the indexes and free it, with its label and remote.
  * e is no longer valid afterwards. */

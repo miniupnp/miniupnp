@@ -175,21 +175,13 @@ lease_table_find_uid(unsigned short uid)
 	return NULL;
 }
 
-struct lease_entry *
-lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
-                unsigned short rport)
+/* A copy of src with its own label and remote, in no index yet. NULL if there
+ * is no memory */
+static struct lease_entry *
+new_row(const struct lease_entry * src, const struct in6_addr * raddr,
+        unsigned short rport)
 {
-	struct lease_entry * e;
-	unsigned int b;
-
-	if(ready() < 0)
-		return NULL;
-	if(lease_table_find_external(src->proto, src->family, &src->eaddr,
-	                             src->eport, raddr, rport) != NULL)
-		return NULL;
-	if(count >= ext_index.size)
-		grow();
-	e = malloc(sizeof(*e));
+	struct lease_entry * e = malloc(sizeof(*e));
 	if(e == NULL)
 		return NULL;
 	*e = *src;
@@ -205,6 +197,19 @@ lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
 		e->remote->raddr = *raddr;
 		e->remote->rport = rport;
 	}
+	return e;
+fail:
+	free(e->label);
+	free(e);
+	return NULL;
+}
+
+/* put a new row in all the indexes */
+static void
+link_row(struct lease_entry * e)
+{
+	unsigned int b;
+
 	b = ext_hash(e) & (ext_index.size - 1);
 	e->ext_next = ext_index.buckets[b];
 	ext_index.buckets[b] = e;
@@ -214,11 +219,44 @@ lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
 		uid_index.buckets[b] = e;
 	}
 	count++;
+}
+
+struct lease_entry *
+lease_table_add(const struct lease_entry * src, const struct in6_addr * raddr,
+                unsigned short rport)
+{
+	struct lease_entry * e;
+
+	if(ready() < 0)
+		return NULL;
+	if(lease_table_find_external(src->proto, src->family, &src->eaddr,
+	                             src->eport, raddr, rport) != NULL)
+		return NULL;
+	if(count >= ext_index.size)
+		grow();
+	e = new_row(src, raddr, rport);
+	if(e != NULL)
+		link_row(e);
 	return e;
-fail:
-	free(e->label);
-	free(e);
-	return NULL;
+}
+
+struct lease_entry *
+lease_table_replace(struct lease_entry * old, const struct lease_entry * src,
+                    const struct in6_addr * raddr, unsigned short rport)
+{
+	struct lease_entry * e, * other;
+
+	other = lease_table_find_external(src->proto, src->family, &src->eaddr,
+	                                  src->eport, raddr, rport);
+	if(other != NULL && other != old)
+		return NULL;
+	/* the memory first : if there is none, old stays */
+	e = new_row(src, raddr, rport);
+	if(e == NULL)
+		return NULL;
+	lease_table_remove(old);
+	link_row(e);
+	return e;
 }
 
 void
