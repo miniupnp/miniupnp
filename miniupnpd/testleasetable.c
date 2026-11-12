@@ -92,6 +92,36 @@ main(void)
 	lease_table_remove(pin);
 	assert(lease_table_find_uid(7) == NULL);
 
+	/* replace : on the same key, or on a new one */
+	n = lease_table_count();
+	e = row(LEASE_NATPMP, 6, 40003, h1, 9100, 0);
+	e.label = "NAT-PMP";
+	x = lease_table_replace(p, &e, &remote, 0);
+	assert(x != NULL && lease_table_count() == n);
+	assert(lease_table_find_external(6, AF_INET, NULL, 40003, &remote, 0) == x);
+	assert(x->kind == LEASE_NATPMP && x->iport == 9100 && strcmp(x->label, "NAT-PMP") == 0);
+	p = lease_table_replace(x, &e, NULL, 0);
+	assert(p != NULL && lease_table_count() == n);
+	assert(lease_table_find_external(6, AF_INET, NULL, 40003, &remote, 0) == NULL);
+	assert(lease_table_find_external(6, AF_INET, NULL, 40003, NULL, 0) == p);
+	/* not on the key of another row : both stay */
+	e = row(LEASE_UPNP, 17, 40001, h2, 9200, 0);
+	assert(lease_table_replace(p, &e, NULL, 0) == NULL);
+	assert(lease_table_find_external(6, AF_INET, NULL, 40003, NULL, 0) == p);
+	assert(lease_table_find_external(17, AF_INET, NULL, 40001, NULL, 0) == m);
+	assert(lease_table_count() == n);
+	/* a uid moves with its row */
+	e = row(LEASE_UPNP, 6, 41000, "2001:db8::10", 41000, 0);
+	e.family = AF_INET6;
+	e.eaddr = e.iaddr;
+	lease_set_uid(&e, 7);
+	pin = lease_table_add(&e, NULL, 0);
+	lease_set_uid(&e, 9);
+	x = lease_table_replace(pin, &e, NULL, 0);
+	assert(x != NULL && lease_table_find_uid(9) == x && lease_table_find_uid(7) == NULL);
+	lease_table_remove(x);
+	n = 0;
+
 	/* growth keeps every row */
 	lease_table_clear();
 	assert(lease_table_count() == 0);
