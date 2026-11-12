@@ -46,6 +46,7 @@ mapping_owner_of(const char * desc, unsigned short eport, int proto)
 /* the backend reads of memmap.c, which the tests do not reach */
 #define WEAK __attribute__((weak))
 static int rule_present;	/* 1: get_redirect_rule() finds the rule, 0: not, -1: an error */
+static int pinhole_gone;	/* get_pinhole_packets() finds no rule */
 WEAK int get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                            char * iaddr, int iaddrlen, unsigned short * iport,
                            char * desc, int desclen, char * rhost, int rhostlen,
@@ -82,7 +83,7 @@ WEAK int get_pinhole_packets(const char * rem_host, unsigned short rem_port,
                              const char * int_client, unsigned short int_port,
                              int proto, u_int64_t * packets)
 { (void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
-  (void)packets; return -1; }
+  (void)packets; return pinhole_gone ? -2 : 0; }
 WEAK int get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
                              unsigned short * rem_port, char * int_client, int int_clientlen,
                              unsigned short * int_port, int * proto, char * desc, int desclen)
@@ -493,11 +494,33 @@ test_pinhole_uid(void)
 	assert(memmap_sync(&c, 1) < 0);
 	assert(lease_table_find_uid((unsigned short)c.uid) == NULL);
 	fail_at = -1;
-	/* renew by uid only: the row gets the new expiry */
-	pinhole(&c, MEMMAP_RENEW, uid, NULL, 0, 3000);
-	assert(memmap_sync(&c, 1) == 0);
-	assert(last[0].op == FW_UPDATE);
+	/* a renewal changes the row, and sends nothing to the firewall */
+	calls = 0;
+	assert(memmap_renew_pinhole((unsigned short)uid, NULL, 3000) == 0);
+	assert(calls == 0);
 	assert(lease_table_find_uid((unsigned short)uid)->expiry == 3000);
+	assert(memmap_renew_pinhole((unsigned short)uid, "renamed", 4000) == 0);
+	assert(lease_table_find_uid((unsigned short)uid)->expiry == 4000);
+	assert(strcmp(lease_table_find_uid((unsigned short)uid)->label, "renamed") == 0);
+	assert(memmap_renew_pinhole((unsigned short)(uid + 1), NULL, 3000) == -1);
+	assert(calls == 0);
+	/* the firewall lost the rule: what is left goes, and the row is added */
+	pinhole_gone = 1;
+	assert(memmap_renew_pinhole((unsigned short)uid, NULL, 5000) == 0);
+	assert(calls == 2 && last[0].op == FW_ADD && last[0].row->iport == 5000);
+	assert(lease_table_find_uid((unsigned short)uid)->expiry == 5000);
+	/* the add fails: the renewal fails, the row stays as it was */
+	fail_at = 0;
+	assert(memmap_renew_pinhole((unsigned short)uid, NULL, 6000) == -3);
+	fail_at = -1;
+	assert(lease_table_find_uid((unsigned short)uid)->expiry == 5000);
+	/* trusted, the firewall is not asked */
+	firewall_trust = FW_TRUST_TRUST;
+	calls = 0;
+	assert(memmap_renew_pinhole((unsigned short)uid, NULL, 7000) == 0);
+	assert(calls == 0 && lease_table_find_uid((unsigned short)uid)->expiry == 7000);
+	firewall_trust = FW_TRUST_CHECK;
+	pinhole_gone = 0;
 	pinhole(&c, MEMMAP_DELETE_PINHOLE, uid, NULL, 0, 0);
 	assert(memmap_sync(&c, 1) == 0);
 	assert(lease_table_find_uid((unsigned short)uid) == NULL);
@@ -534,6 +557,58 @@ test_pinhole_key(void)
 	assert(memmap_sync(&c, 1) == 0 && calls == calls_before + 1);
 	assert(last[0].op == FW_DELETE && last_old_iport == 7000);
 	assert(lease_table_count() == 1);
+}
+
+/* a PCP pinhole has no uid: it is renewed, expired and deleted by its rule.
+ * A UPnP client which takes it over gets a uid. */
+static void
+test_pcp_pinhole(void)
+{
+	struct memmap_change c;
+	struct expired_pinhole expired[2];
+	unsigned int next;
+	const struct lease_entry * row;
+	unsigned short u;
+	int r;
+	reset();
+	pinhole(&c, MEMMAP_ADD, 0, "2001:db8::40", 8000, 500);
+	c.give_uid = 0;
+	assert(memmap_sync(&c, 1) == 0 && c.uid == 0);
+	assert(memmap_find_pinhole(NULL, 0, "2001:db8::40", 8000, IPPROTO_UDP,
+	                           NULL, 0, NULL) == 0);
+	assert(memmap_pinhole_uid_at(0) == -1);	/* no uid to list */
+	/* PCP rows leave the uids to UPnP */
+	u = lease_table_new_uid();
+	assert(u != 0 && lease_table_find_uid(u) == NULL);
+	/* a renewal by its rule */
+	calls = 0;
+	assert(memmap_renew_pinhole_at(NULL, 0, "2001:db8::40", 8000, IPPROTO_UDP,
+	                               "pcp", 600, 0) == 0);
+	assert(calls == 0);
+	assert(memmap_renew_pinhole_at(NULL, 0, "2001:db8::41", 8000, IPPROTO_UDP,
+	                               NULL, 600, 0) == -1);
+	/* the expiry pass deletes it by its rule */
+	assert(memmap_expired_pinholes((unsigned int)now, expired, 2, &next) == 1);
+	assert(expired[0].uid == 0 && expired[0].iport == 8000);
+	pinhole(&c, MEMMAP_DELETE_PINHOLE, 0, expired[0].iaddr, expired[0].iport, 0);
+	assert(memmap_sync(&c, 1) == 0 && lease_table_count() == 0);
+	/* a UPnP client takes over a PCP pinhole: a uid, in place */
+	pinhole(&c, MEMMAP_ADD, 0, "2001:db8::42", 8001, 2000);
+	c.give_uid = 0;
+	assert(memmap_sync(&c, 1) == 0 && c.uid == 0);
+	calls = 0;
+	r = memmap_renew_pinhole_at(NULL, 0, "2001:db8::42", 8001, IPPROTO_UDP,
+	                            "IGD2 pinhole", 3000, 1);
+	assert(r > 0 && calls == 0 && lease_table_count() == 1);
+	row = lease_table_find_uid((unsigned short)r);
+	assert(row != NULL && row->expiry == 3000 && row->iport == 8001);
+	assert(memmap_pinhole_uid_at(0) == r);
+	/* renewed again, it keeps its uid */
+	assert(memmap_renew_pinhole_at(NULL, 0, "2001:db8::42", 8001, IPPROTO_UDP,
+	                               NULL, 4000, 1) == r);
+	pinhole(&c, MEMMAP_DELETE_PINHOLE, r, NULL, 0, 0);
+	assert(memmap_sync(&c, 1) == 0 && lease_table_count() == 0);
+	assert(lease_table_find_uid((unsigned short)r) == NULL);
 }
 
 /* a request whose row cannot be built sends nothing */
@@ -628,6 +703,7 @@ main(void)
 	test_delete();
 	test_pinhole_uid();
 	test_pinhole_key();
+	test_pcp_pinhole();
 	test_bad_address();
 	test_one_row_twice();
 	test_pinhole_expiry();

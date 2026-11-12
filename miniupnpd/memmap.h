@@ -183,6 +183,18 @@ int memmap_get_pinhole(unsigned short uid, char * raddr, int raddrlen,
  * uid, or -1 past the end. The order is that of the table, and changes with
  * it. */
 int memmap_pinhole_uid_at(int index);
+/* Renew a pinhole: a new expiry, and a new description unless desc is NULL, in
+ * the table. The expiry is the table's, so the firewall changes only if it lost
+ * the rule, which is then added again; with firewall_trust FW_TRUST_TRUST it
+ * is not asked. 0, -1 if there is no such pinhole, -2 if
+ * there is no memory, -3 if the lost rule could not be added again. */
+int memmap_renew_pinhole(unsigned short uid, const char * desc, unsigned int expiry);
+/* The same, for the pinhole of this rule, which may have no uid (PCP). With
+ * give_uid, a pinhole with no uid gets one (UPnP). Its uid (0 : none), or < 0
+ * as for memmap_renew_pinhole(), and -4 if there is no free uid. */
+int memmap_renew_pinhole_at(const char * raddr, unsigned short rport,
+                            const char * iaddr, unsigned short iport, int proto,
+                            const char * desc, unsigned int expiry, int give_uid);
 /* the pinholes removed by a pass of the main loop */
 #define PINHOLE_EXPIRE_PER_PASS	64
 

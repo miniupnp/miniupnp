@@ -651,23 +651,23 @@ upnp_add_inboundpinhole(const char * raddr,
 	timestamp = current + leasetime;
 	r = 0;
 
+#if defined(USE_PF) || defined(USE_NETFILTER)
 	found = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
 	if(found >= 0) {
 		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, found);
-		/* by its rule too, as a PCP pinhole has no uid */
-		r = upnp_renew_inboundpinhole((unsigned short)found, raddr, rport, iaddr, iport,
-		                              proto, desc, leasetime);
+		/* by its rule, as a PCP pinhole has no uid; UPnP gets one */
+		r = memmap_renew_pinhole_at(raddr, rport, iaddr, iport, proto, desc,
+		                            timestamp, uid != NULL);
 		if (uid != NULL)
-			*uid = found;
+			*uid = r < 0 ? -1 : r;
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {
 			lease_file6_remove(iaddr, iport, proto, -1);
-			lease_file6_add(raddr, rport, iaddr, iport, proto, found, desc, timestamp);
+			lease_file6_add(raddr, rport, iaddr, iport, proto, r, desc, timestamp);
 		}
 #endif /* ENABLE_LEASEFILE */
 		return (r >= 0) ? 1 : r;
 	}
-#if defined(USE_PF) || defined(USE_NETFILTER)
 	pinhole_change(&c, MEMMAP_ADD, 0, raddr, rport, iaddr, iport, proto, desc,
 	               timestamp);
 	c.give_uid = uid != NULL;
@@ -816,46 +816,23 @@ upnp_get_pinhole_uid_by_index(int index)
 int
 upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
 {
-	return upnp_renew_inboundpinhole(uid, NULL, 0, NULL, 0, 0, NULL, leasetime);
+	return upnp_renew_inboundpinhole(uid, NULL, leasetime);
 }
 
 int
-upnp_renew_inboundpinhole(unsigned short uid, const char * raddr, unsigned short rport,
-                          const char * iaddr, unsigned short iport, int proto,
-                          const char * desc, unsigned int leasetime)
+upnp_renew_inboundpinhole(unsigned short uid, const char * desc, unsigned int leasetime)
 {
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	unsigned int timestamp;
-	int ret;
-	struct memmap_change c;
-	char raddr_fw[INET6_ADDRSTRLEN] = "", iaddr_fw[INET6_ADDRSTRLEN], desc_fw[64];
-	unsigned short rport_fw, iport_fw;
-	int proto_fw;
-
-	timestamp = upnp_time() + leasetime;
-	if (iaddr == NULL &&
-	    memmap_get_pinhole(uid, raddr_fw, sizeof(raddr_fw), &rport_fw,
-	                       iaddr_fw, sizeof(iaddr_fw), &iport_fw, &proto_fw,
-	                       desc_fw, sizeof(desc_fw), NULL, NULL) >= 0) {
-		/* the rule of the pinhole gives a row to one of an earlier run */
-		raddr = raddr_fw;
-		rport = rport_fw;
-		iaddr = iaddr_fw;
-		iport = iport_fw;
-		proto = proto_fw;
-		desc = desc_fw;
-	}
-	pinhole_change(&c, MEMMAP_RENEW, uid, raddr, rport, iaddr, iport, proto, desc,
-	               timestamp);
-	ret = memmap_sync(&c, 1);
+	unsigned int timestamp = upnp_time() + leasetime;
+	/* the expiry is the table's: the rule stays as it is */
+	int ret = memmap_renew_pinhole(uid, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
 		lease_file6_update(uid, timestamp);
 #endif
 	return ret;
 #else
-	UNUSED(uid); UNUSED(raddr); UNUSED(rport); UNUSED(iaddr); UNUSED(iport);
-	UNUSED(proto); UNUSED(desc); UNUSED(leasetime);
+	UNUSED(uid); UNUSED(desc); UNUSED(leasetime);
 
 	return -42; /* not implemented */
 #endif

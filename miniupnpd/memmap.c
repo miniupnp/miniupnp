@@ -446,9 +446,10 @@ memmap_each_map_counters(memmap_counters_fn fn, void * arg)
 }
 
 /* Add the rules of a row again, after the firewall lost them. The row stays,
- * and with it what the table knows of the mapping. What is left of the rules
- * goes first, as a delete and add did: the delete may find nothing. 0, -1 if
- * the add failed and left nothing, or -2 if a part of the rules stayed. */
+ * and with it what the table knows of the mapping: the uid a client renews
+ * a UPnP pinhole by, too. What is left of the rules goes first, as a delete
+ * and add did: the delete may find nothing. 0, -1 if the add failed and left
+ * nothing, or -2 if a part of the rules stayed. */
 static int
 restore_rules(const struct lease_entry * row)
 {
@@ -666,6 +667,68 @@ memmap_pinhole_uid_at(int index)
 	if(index >= 0)
 		lease_table_foreach(pinhole_at_row, &a);
 	return a.uid;
+}
+
+/* Renew the row of a pinhole in the table, and add its rule again if the
+ * firewall lost it. */
+static int
+renew_pinhole_row(struct lease_entry * row, const char * desc, unsigned int expiry)
+{
+#ifdef FW_PINHOLES
+	char r[INET6_ADDRSTRLEN] = "", i[INET6_ADDRSTRLEN];
+	u_int64_t packets;
+
+	/* unless the firewall is trusted, the rule is looked up by the key of
+	 * the row, and added again if the firewall lost it */
+	inet_ntop(AF_INET6, &row->iaddr, i, sizeof(i));
+	if(row->remote != NULL)
+		inet_ntop(AF_INET6, &row->remote->raddr, r, sizeof(r));
+	if(firewall_trust == FW_TRUST_CHECK &&
+	   get_pinhole_packets(r[0] ? r : NULL, row->remote ? row->remote->rport : 0,
+	                       i, row->iport, row->proto, &packets) == -2) {
+		syslog(LOG_NOTICE, "memmap: the rule of pinhole %s port %hu is gone, adding it again",
+		       proto_itoa(row->proto), row->iport);
+		if(restore_rules(row) < 0)
+			return -3;
+	}
+#endif
+	if(desc != NULL && lease_table_set_label(row, desc) < 0)
+		return -2;
+	row->expiry = expiry;
+	syslog(LOG_DEBUG, "memmap: renew pinhole %s port %hu, uid %hu, expiry %u",
+	       proto_itoa(row->proto), row->iport, lease_uid(row), expiry);
+	return 0;
+}
+
+/* Renew a pinhole in the table, by its uid. */
+int
+memmap_renew_pinhole(unsigned short uid, const char * desc, unsigned int expiry)
+{
+	struct lease_entry * row = lease_table_find_uid(uid);
+	if(row == NULL || row->family != AF_INET6)
+		return -1;
+	return renew_pinhole_row(row, desc, expiry);
+}
+
+/* Renew a pinhole in the table, by its rule. */
+int
+memmap_renew_pinhole_at(const char * raddr, unsigned short rport,
+                        const char * iaddr, unsigned short iport, int proto,
+                        const char * desc, unsigned int expiry, int give_uid)
+{
+	struct lease_entry * row = pinhole_row(raddr, rport, iaddr, iport, proto);
+	int r;
+	if(row == NULL)
+		return -1;
+	if(give_uid && lease_uid(row) == 0) {
+		/* a UPnP client takes over a pinhole with no uid */
+		int uid = new_uid();
+		if(uid < 0)
+			return -4;
+		lease_table_link_uid(row, (unsigned short)uid);
+	}
+	r = renew_pinhole_row(row, desc, expiry);
+	return r < 0 ? r : lease_uid(row);
 }
 
 /* Delete the pinhole rules of an earlier run which have no row. Their expiry is
