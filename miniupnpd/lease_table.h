@@ -35,7 +35,6 @@ enum lease_kind { LEASE_PCP_MAP, LEASE_NATPMP, LEASE_UPNP };
 struct lease_remote {
 	struct in6_addr raddr;	/* IPv4 as ::ffff:a.b.c.d */
 	unsigned short rport;	/* 0 : any */
-	/* later : struct lease_entry * map;	its row in Mappings */
 };
 
 /* One port mapping or pinhole. lease_table_add() makes a row. */
