@@ -13,7 +13,7 @@
  * Three hash indexes find a row:
  * - The external index, by protocol, family, eaddr, eport and remote.
  * - The internal index, by protocol, family, iaddr and iport. Several rows can share an internal endpoint.
- * - The UID index, by the UniqueID of a UPnP pinhole.
+ * - The UID index, by the uid of a UPnP pinhole.
  * The indexes hold no data. They link the rows through ext_next, int_next and
  * uid_next.
  *
@@ -59,10 +59,11 @@ struct lease_entry {
 					 * not renewed as it is, see memmap.c */
 	unsigned short eport;	/* host order.  for NON NAT equals iport */
 	unsigned short iport;	/* host order */
+	unsigned short uid;	/* a UPnP pinhole: its uid, given by the map. 0 : none */
 	struct in6_addr iaddr;	/* IPv4 as ::ffff:a.b.c.d   Always populated. */
 	/* The external address. Always populated. for NON NAT equals iaddr */
 	struct in6_addr eaddr; /* IPv4 as ::ffff:a.b.c.d */
-	unsigned char nonce[LEASE_NONCE_LEN];	/* PCP nonce, or for UPnP the UniqueID in the first two */
+	unsigned char nonce[LEASE_NONCE_LEN];	/* PCP nonce. 0 for UPnP and NAT-PMP */
 	time_t expiry;		/* on the clock of upnp_time(). 0 : no expiry */
 	char * label;		/* RFC 7220 DESCRIPTION option, or Upnp DESCRIPTION, defined by owned of the  row PCP */
 	struct lease_remote * remote;	/* NULL : any remote host. Owned by the row */
@@ -78,20 +79,19 @@ struct lease_entry {
 	 * with USE_NFTABLES, lease_table.c must then include config.h */
 };
 
-/* the UniqueID of a UPnP pinhole, else null. */
+/* the uid of a UPnP pinhole, else 0: a PCP pinhole has none. */
 static inline unsigned short
 lease_uid(const struct lease_entry * e)
 {
-	return e->kind == LEASE_UPNP ? (unsigned short)(e->nonce[0] << 8 | e->nonce[1]) : 0;
+	return e->uid;
 }
 
-/* stores uid in the nonce bytes, which a UPnP row does not use for a nonce.
- * Set it before lease_table_add(), which indexes the uid */
+/* Set the uid of a pinhole. Set it before lease_table_link(), which indexes
+ * the uid */
 static inline void
 lease_set_uid(struct lease_entry * e, unsigned short uid)
 {
-	e->nonce[0] = (unsigned char)(uid >> 8);
-	e->nonce[1] = (unsigned char)uid;
+	e->uid = uid;
 }
 
 /* A new row: a copy of e, with its label and remote copied too, in no index.
@@ -158,9 +158,17 @@ struct lease_entry *
 lease_table_next_internal(const struct lease_entry * prev, int proto, int family,
                           const struct in6_addr * iaddr, unsigned short iport);
 
-/* The UPnP pinhole with this UniqueID, or NULL. A PCP row has no uid, and
- * uid 0 finds nothing. */
+/* The pinhole with this uid, or NULL. uid 0 finds nothing. */
 struct lease_entry * lease_table_find_uid(unsigned short uid);
+
+/* A uid for a new UPnP pinhole: the next one after the last given which no
+ * row holds, so one uid never names two pinholes, also after the wrap at
+ * 65535. 0 if every uid is in use. Every row with a uid is in the UID index,
+ * so the index alone tells which are free. */
+unsigned short lease_table_new_uid(void);
+
+/* Give a linked row with no uid a uid, and put it in the UID index. */
+void lease_table_link_uid(struct lease_entry * e, unsigned short uid);
 
 /* The IPv4 port mapping at this place in the list, or NULL past the end.
  * A client reads the list at index 0, 1, 2..., so this remembers where it
@@ -185,8 +193,8 @@ void lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg);
  * is no memory, and then the old label stays. */
 int lease_table_set_label(struct lease_entry * e, const char * label);
 
-/* 1 if two rows have one owner, the same kind and nonce. For UPnP the nonce
- * bytes hold a UniqueID, so the kind is enough. */
+/* 1 if two rows have one owner, the same kind and nonce. UPnP has no nonce,
+ * so the kind is enough. */
 int lease_table_same_owner(const struct lease_entry * a,
                            const struct lease_entry * b);
 

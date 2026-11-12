@@ -38,6 +38,77 @@ counter(struct lease_entry * e, void * arg)
 	(*(unsigned int *)arg)++;
 }
 
+/* a new uid skips the uids rows hold, also over the wrap */
+static void
+test_new_uid(void)
+{
+	struct lease_entry e;
+	unsigned short u1, u2;
+	lease_table_clear();
+	u1 = lease_table_new_uid();
+	assert(u1 != 0);
+	memset(&e, 0, sizeof(e));
+	e.family = AF_INET6;
+	e.proto = IPPROTO_UDP;
+	e.eport = e.iport = 4000;
+	lease_set_uid(&e, (unsigned short)(u1 + 1));
+	assert(lease_table_add(&e, NULL, 0) != NULL);
+	u2 = lease_table_new_uid();
+	assert(u2 != 0 && u2 != u1 + 1);
+	lease_table_clear();
+}
+
+/* with every uid in use there is none to give, and a freed one comes back */
+static void
+test_uids_full(void)
+{
+	struct lease_entry e, * x = NULL;
+	char a[INET6_ADDRSTRLEN];
+	unsigned int i;
+	lease_table_clear();
+	memset(&e, 0, sizeof(e));
+	e.family = AF_INET6;
+	e.proto = IPPROTO_UDP;
+	e.eport = e.iport = 4000;
+	for(i = 1; i <= 65534; i++) {
+		snprintf(a, sizeof(a), "2001:db8::%x", i);
+		e.iaddr = e.eaddr = addr(a);
+		lease_set_uid(&e, (unsigned short)i);
+		x = lease_table_add(&e, NULL, 0);
+		assert(x != NULL);
+	}
+	assert(lease_table_new_uid() == 0);
+	lease_table_remove(x);
+	assert(lease_table_new_uid() == 65534);
+	lease_table_clear();
+	assert(lease_table_new_uid() != 0);
+}
+
+/* PCP pinholes take no uid, so there can be more of them than uids */
+static void
+test_pcp_no_uid(void)
+{
+	struct lease_entry e;
+	unsigned short u;
+	char a[INET6_ADDRSTRLEN];
+	int i;
+	lease_table_clear();
+	memset(&e, 0, sizeof(e));
+	e.kind = LEASE_PCP_MAP;
+	e.family = AF_INET6;
+	e.proto = IPPROTO_UDP;
+	e.eport = e.iport = 4000;
+	for(i = 0; i < 70000; i++) {
+		snprintf(a, sizeof(a), "2001:db8::%x:%x", i >> 16, i & 0xffff);
+		e.iaddr = e.eaddr = addr(a);
+		assert(lease_table_add(&e, NULL, 0) != NULL);
+	}
+	assert(lease_table_count() == 70000);
+	u = lease_table_new_uid();
+	assert(u != 0 && lease_table_find_uid(u) == NULL);
+	lease_table_clear();
+}
+
 int
 main(void)
 {
@@ -46,6 +117,10 @@ main(void)
 	struct in6_addr second = addr("::ffff:198.51.100.2");
 	struct lease_entry e, * m, * p, * x, * pin, * u;
 	unsigned int i, n = 0;
+
+	test_new_uid();
+	test_uids_full();
+	test_pcp_no_uid();
 
 	/* the key : proto, eaddr, eport */
 	e = row(LEASE_PCP_MAP, 17, 40001, h1, 8080, 1);
@@ -85,7 +160,7 @@ main(void)
 	assert(lease_table_find_external(6, AF_INET, NULL, 40003, NULL, 0) == NULL);
 	assert(lease_table_find_mapping(6, AF_INET, NULL, 40003) == p);
 
-	/* a pinhole, by its UniqueID. A PCP nonce is not one */
+	/* a UPnP pinhole, by its uid; a PCP pinhole has none */
 	e = row(LEASE_UPNP, 6, 41000, "2001:db8::10", 41000, 0);
 	e.family = AF_INET6;
 	lease_set_uid(&e, 7);
@@ -94,11 +169,19 @@ main(void)
 	assert(lease_table_find_uid(7) == pin && lease_table_find_uid(8) == NULL);
 	e.kind = LEASE_PCP_MAP;
 	e.eport = e.iport = 41001;
+	lease_set_uid(&e, 0);
 	x = lease_table_add(&e, NULL, 0);
-	assert(x != NULL && lease_uid(x) == 0 && lease_table_find_uid(7) == pin);
+	assert(x != NULL && lease_uid(x) == 0 && lease_table_find_uid(0) == NULL &&
+	       lease_table_find_uid(7) == pin);
+	/* a UPnP client takes the PCP pinhole over: it gets a uid in place */
+	lease_table_link_uid(x, 8);
+	assert(lease_uid(x) == 8 && lease_table_find_uid(8) == x &&
+	       lease_table_find_uid(7) == pin);
+	lease_table_link_uid(x, 9);	/* a row keeps the uid it has */
+	assert(lease_uid(x) == 8 && lease_table_find_uid(9) == NULL);
 	lease_table_remove(x);
 	lease_table_remove(pin);
-	assert(lease_table_find_uid(7) == NULL);
+	assert(lease_table_find_uid(7) == NULL && lease_table_find_uid(8) == NULL);
 
 	/* replace : on the same key, or on a new one */
 	n = lease_table_count();

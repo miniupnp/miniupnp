@@ -17,8 +17,8 @@ struct index {
 };
 
 /* The indexes are empty until the first row: see ready(). The external and
- * internal indexes grow with the rows. The UID index keeps its size: a UniqueID
- * is 16 bits, so its chains stay short. */
+ * internal indexes grow with the rows. The UID index keeps its size: a uid is
+ * 16 bits, so its chains stay short. */
 static struct index ext_index, int_index, uid_index;
 static unsigned int count = 0;	/* the number of rows */
 
@@ -258,7 +258,7 @@ lease_table_next_internal(const struct lease_entry * prev, int proto, int family
 	return NULL;
 }
 
-/* Find the UPnP pinhole with this UniqueID. */
+/* Find the pinhole with this uid. */
 struct lease_entry *
 lease_table_find_uid(unsigned short uid)
 {
@@ -271,6 +271,27 @@ lease_table_find_uid(unsigned short uid)
 			return e;
 	}
 	return NULL;
+}
+
+/* the uids 1 to UID_MAX, and how many rows hold one */
+#define UID_MAX	65534
+static unsigned int uid_count;
+
+/* Look for a free uid from the one after the last given. With every uid in
+ * use, there is no need to look. */
+unsigned short
+lease_table_new_uid(void)
+{
+	static unsigned short last = 0;
+	unsigned int n;
+	if(uid_count >= UID_MAX)
+		return 0;
+	for(n = 0; n < UID_MAX; n++) {
+		last = (unsigned short)(last >= UID_MAX ? 1 : last + 1);
+		if(lease_table_find_uid(last) == NULL)
+			return last;
+	}
+	return 0;
 }
 
 /* 1 if the row belongs on the port list */
@@ -406,6 +427,7 @@ lease_table_link(struct lease_entry * e)
 		b = uid_hash(lease_uid(e)) & (uid_index.size - 1);
 		e->uid_next = uid_index.buckets[b];
 		uid_index.buckets[b] = e;
+		uid_count++;
 	}
 	if(is_port_mapping(e))
 		port_list_add(e);
@@ -448,6 +470,20 @@ lease_table_replace(struct lease_entry * old, const struct lease_entry * src,
 	return e;
 }
 
+void
+lease_table_link_uid(struct lease_entry * e, unsigned short uid)
+{
+	unsigned int b;
+
+	if(lease_uid(e) != 0 || uid == 0)
+		return;
+	lease_set_uid(e, uid);
+	b = uid_hash(uid) & (uid_index.size - 1);
+	e->uid_next = uid_index.buckets[b];
+	uid_index.buckets[b] = e;
+	uid_count++;
+}
+
 /* Take a row out of the indexes and the port list, and free it. */
 void
 lease_table_remove(struct lease_entry * e)
@@ -467,6 +503,7 @@ lease_table_remove(struct lease_entry * e)
 		while(*p != e)
 			p = &(*p)->uid_next;
 		*p = e->uid_next;
+		uid_count--;
 	}
 	if(is_port_mapping(e))
 		port_list_remove(e);
@@ -493,7 +530,7 @@ lease_table_same_owner(const struct lease_entry * a, const struct lease_entry * 
 	if(a->kind != b->kind)
 		return 0;
 	if(a->kind == LEASE_UPNP)
-		return 1;	/* UPnP + 0 : the bytes are its UniqueID */
+		return 1;	/* UPnP has no nonce */
 	return memcmp(a->nonce, b->nonce, LEASE_NONCE_LEN) == 0;
 }
 
