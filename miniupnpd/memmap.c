@@ -76,16 +76,13 @@ ipv4_row(const char * remote, unsigned short rport, unsigned short eport,
          const char * iaddr, unsigned short iport, int proto,
          const char * desc, unsigned int timestamp)
 {
-	struct lease_entry e, * row;
+	struct lease_entry e, * row, * old;
 	struct in6_addr raddr;
 	int has_remote = remote != NULL && v4_mapped(remote, &raddr) == 0;
 
 	memset(&e, 0, sizeof(e));
 	if(v4_mapped(iaddr, &e.iaddr) < 0)
 		return;
-	row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
-	if(row != NULL)
-		lease_table_remove(row);
 	e.family = AF_INET;
 	e.proto = (unsigned char)proto;
 	e.eport = eport;
@@ -93,7 +90,13 @@ ipv4_row(const char * remote, unsigned short rport, unsigned short eport,
 	e.expiry = timestamp;
 	e.label = (char *)desc;	/* copied */
 	set_owner(&e, desc ? desc : "", eport, proto);
-	row = lease_table_add(&e, has_remote ? &raddr : NULL, rport);
+	/* a row on the port is replaced. If that fails, it stays: the port is
+	 * still mapped */
+	old = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	if(old != NULL)
+		row = lease_table_replace(old, &e, has_remote ? &raddr : NULL, rport);
+	else
+		row = lease_table_add(&e, has_remote ? &raddr : NULL, rport);
 	if(row == NULL)
 		syslog(LOG_WARNING, "lease table: could not add %hu %d", eport, proto);
 }
@@ -136,7 +139,6 @@ ipv6_row(unsigned short uid, const char * raddr, unsigned short rport,
 			row->expiry = timestamp;
 			return;
 		}
-		lease_table_remove(row);
 	}
 	memset(&e, 0, sizeof(e));
 	e.iaddr = e.eaddr = i;
@@ -148,7 +150,11 @@ ipv6_row(unsigned short uid, const char * raddr, unsigned short rport,
 	set_owner(&e, desc ? desc : "", iport, proto);
 	if(e.kind == LEASE_UPNP)
 		lease_set_uid(&e, uid);
-	row = lease_table_add(&e, has_remote ? &r : NULL, rport);
+	/* if the row cannot be replaced, it stays: the rule is still there */
+	if(row != NULL)
+		row = lease_table_replace(row, &e, has_remote ? &r : NULL, rport);
+	else
+		row = lease_table_add(&e, has_remote ? &r : NULL, rport);
 	if(row == NULL)
 		syslog(LOG_WARNING, "lease table: could not add pinhole %hu", uid);
 }
