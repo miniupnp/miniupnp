@@ -1398,6 +1398,30 @@ sections:
           - {natpmp: UDP, private_port: 41220, public_port: 0, lifetime: 0}
         expect:
           results: [SUCCESS, UPNP_729, SUCCESS]
+      # A NAT-PMP renewal deletes its rule and adds it again, so the rule moves behind any later rule.
+      # If UPnP could add a second rule for the same internal port, a lookup that stops at the first
+      # rule of the internal port would find the UPnP rule and refuse the client's own renewal.
+      - name: owner-natpmp-renewal-finds-own-mapping-first
+        families: [ipv4]
+        description: >-
+          A NAT-PMP mapping 41224 is renewed twice after UPnP asked for another external port to the
+          same internal port. UPnP is refused (729), and each renewal keeps external port 41224,
+          whatever the order of the rules.
+        requests:
+          - {natpmp: UDP, private_port: 41224, public_port: 41224, lifetime: 120}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 41224, external_port: 41225, lease_duration: 0}
+          - {natpmp: UDP, private_port: 41224, public_port: 41224, lifetime: 120}
+          - {natpmp: UDP, private_port: 41224, public_port: 41224, lifetime: 120}
+          - {natpmp: UDP, private_port: 41224, public_port: 0, lifetime: 0}
+        expect:
+          results: [SUCCESS, UPNP_729, SUCCESS, SUCCESS, SUCCESS]
+          external_ports: [41224, null, 41224, 41224, null]
+          traffic_stages:
+            - after_request: 4
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41224, external_port: 41224, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 41224, external_port: 41224, expect: blocked}
       - name: owner-peer-on-eport-of-other-internal-port-refused
         families: [ipv4]
         description: A PEER may not use the external port of a MAP of another internal port.
