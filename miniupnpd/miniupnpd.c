@@ -900,7 +900,7 @@ set_startup_time(void)
 		}
 		else
 		{
-			startup_time = boottime.tv_sec;
+			startup_time -= (time(NULL) - boottime.tv_sec); /* keep startup_time in the monotonic domain (epoch SSSOE) */
 		}
 #endif
 	}
