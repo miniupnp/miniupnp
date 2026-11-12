@@ -432,14 +432,17 @@ test_map6_expiry(void)
 	expire_map6(100, -1);
 	assert(lease_table_count() == 3);
 
-	/* a pass which leaves expired rules keeps the rows, once */
+	/* a pass which leaves expired rules keeps the rows, once. It comes a
+	 * second after the failed one, not on the next turn of the main loop */
 	fake_partial = 1;
 	expire_map6(100, 1);
+	assert(fake_partial == 1);	/* no read */
+	expire_map6(101, 1);
 	assert(fake_partial == 0);
 	assert(lease_table_count() == 3);
 
 	/* a full pass removes the expired row only */
-	expire_map6(100, 1);
+	expire_map6(102, 1);
 	assert(lease_table_count() == 2);
 	assert(lease_table_find_uid(1) == NULL);
 	assert(lease_table_find_uid(2) != NULL && lease_table_find_uid(3) != NULL);
@@ -451,10 +454,12 @@ test_map6_expiry(void)
 	expire_map6(300, 1);
 	assert(lease_table_count() == 1);
 
-	/* a pass which removed no rule keeps the rows */
+	/* a full pass which removed no rule : the rule of the expired row was
+	 * already gone, and the row goes too */
 	memmap_map(4, 6004, "2001:db8::1", 6004, IPPROTO_TCP, "d", 350);
 	expire_map6(400, 0);
-	assert(lease_table_count() == 2);
+	assert(lease_table_count() == 1);
+	assert(lease_table_find_uid(4) == NULL);
 	lease_table_clear();
 
 	/* many expired pinholes, removed during one walk; an IPv4 mapping is not a

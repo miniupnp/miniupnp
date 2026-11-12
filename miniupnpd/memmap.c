@@ -53,6 +53,22 @@
 #endif
 #endif
 
+#ifdef MEMMAP_MAP6
+/* The soonest expiry of a pinhole row, 0 : none. A row which gets an expiry
+ * makes it sooner. A row which goes or is renewed leaves it too early, which
+ * costs one walk over the rows when it comes. */
+static unsigned int map6_rows_next;
+
+static void
+map6_due(unsigned int ts)
+{
+	if(ts != 0 && (map6_rows_next == 0 || ts < map6_rows_next))
+		map6_rows_next = ts;
+}
+#else
+#define map6_due(ts)	((void)(ts))
+#endif
+
 
 /* memmap_pton(), memmap_ntop(), memmap_key_init(): shared with memmap_stub.c */
 #include "memmap_key.c"
@@ -274,6 +290,7 @@ ipv6_row(unsigned short uid, const char * raddr, unsigned short rport,
 	struct memmap_owner owner;
 	int has_remote;
 
+	map6_due(timestamp);
 	if(row != NULL && desc == NULL) {
 		row->expiry = timestamp;
 		return;
@@ -354,6 +371,7 @@ memmap_renew_uid(unsigned short uid, unsigned int timestamp)
 	struct lease_entry * row = lease_table_find_uid(uid);
 	if(row != NULL) {
 		row->expiry = timestamp;
+		map6_due(timestamp);
 		syslog(LOG_DEBUG, "memmap: renew pinhole uid %hu, expiry %u", uid, timestamp);
 	}
 }
@@ -393,25 +411,21 @@ memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned shor
 	}
 }
 
-/* A row cannot go during lease_table_foreach(), so a walk collects up to this
- * many rows, removes them, and walks again until it found fewer. */
-#define MAP6_EXPIRE_MAX	256
-
-/* what a walk over the rows gives pinhole_expiry_row() and gets back */
+/* what a walk over the rows gives map6_expiry_row() and gets back */
 struct map6_expiry {
 	time_t now;
-	unsigned int n;
-	struct lease_entry * rows[MAP6_EXPIRE_MAX];
+	unsigned int removed;
 };
 
-/* collect the row if it is a pinhole past its expiry */
+/* remove the row if it is a pinhole past its expiry */
 static void
 map6_expiry_row(struct lease_entry * e, void * arg)
 {
 	struct map6_expiry * c = arg;
-	if(e->family == AF_INET6 && e->expiry != 0 && e->expiry <= c->now &&
-	   c->n < MAP6_EXPIRE_MAX)
-		c->rows[c->n++] = e;
+	if(e->family == AF_INET6 && e->expiry != 0 && e->expiry <= c->now) {
+		lease_table_remove(e);
+		c->removed++;
+	}
 }
 
 /* set by memmap_remote_peers_partial(), read and cleared by memmap_remote_peers_expired() */
@@ -426,32 +440,27 @@ memmap_remote_peers_partial(void)
 }
 
 /* The firewall ended a pass over the pinholes, and removed "removed" rules
- * (<0 : error). The rows which expired go, as their rules went. If the pass
- * removed nothing, failed or was partial, the rows stay for the next pass: a row
- * must not go while its rule may still be there. */
-static void
+ * (<0 : error). The rows which expired go: a complete pass leaves no expired
+ * rule, also when it removed none because the rules were already gone. If the
+ * pass failed or was partial, the rows stay for the next pass: a row must not
+ * go while its rule may still be there. Returns 1 if the rows stay. */
+static int
 memmap_remote_peers_expired(unsigned int now, int removed)
 {
-	static struct map6_expiry c;
-	unsigned int i, total = 0;
+	struct map6_expiry c;
 	int partial = map6_partial;
 
 	map6_partial = 0;
-	if(removed <= 0 || partial) {
-		if(removed != 0 || partial)
-			syslog(LOG_DEBUG, "memmap: keep the expired pinhole rows, removed %d, partial %d",
-			       removed, partial);
-		return;
+	if(removed < 0 || partial) {
+		syslog(LOG_DEBUG, "memmap: keep the expired pinhole rows, removed %d, partial %d",
+		       removed, partial);
+		return 1;
 	}
-	do {
-		c.now = now;
-		c.n = 0;
-		lease_table_foreach(map6_expiry_row, &c);
-		for(i = 0; i < c.n; i++)
-			lease_table_remove(c.rows[i]);
-		total += c.n;
-	} while(c.n == MAP6_EXPIRE_MAX);
-	syslog(LOG_INFO, "memmap: %u expired pinhole rows removed", total);
+	c.now = now;
+	c.removed = 0;
+	lease_table_foreach(map6_expiry_row, &c);
+	syslog(LOG_INFO, "memmap: %u expired pinhole rows removed", c.removed);
+	return 0;
 }
 
 #ifdef USE_NFTABLES
@@ -727,13 +736,81 @@ memmap_map6_uid_at(int index)
 #endif
 }
 
-/* The firewall removes the expired pinholes: it holds their expiry. */
+#ifdef MEMMAP_MAP6
+/* keep the soonest expiry of a pinhole row */
+static void
+map6_next_row(struct lease_entry * e, void * arg)
+{
+	unsigned int * next = arg;
+	unsigned int ts = (unsigned int)e->expiry;
+	if(e->family == AF_INET6 && ts != 0 && (*next == 0 || ts < *next))
+		*next = ts;
+}
+
+/* the sooner of two expiries, where 0 is none */
+static unsigned int
+sooner(unsigned int a, unsigned int b)
+{
+	if(a == 0)
+		return b;
+	if(b == 0)
+		return a;
+	return a < b ? a : b;
+}
+
+/* 1 if an expiry (0 : none) has come */
+static int
+due(unsigned int ts, unsigned int now)
+{
+	return ts != 0 && ts <= now;
+}
+#endif
+
+/* The firewall removes the expired pinholes: it holds their expiry. Reading
+ * the rules costs a dump of the filter chain, so it happens only when a
+ * pinhole is due: a row of the table, or a rule the last read found. A rule
+ * of an earlier run has no row, and only the read finds its expiry. The
+ * first call reads the rules. A pass which leaves expired rules is tried
+ * again a second later, not on every turn of the main loop. */
 int
 memmap_expire_map6(unsigned int * next)
 {
 #ifdef MEMMAP_MAP6
-	int removed = clean_pinhole_list(next);
-	memmap_remote_peers_expired((unsigned int)upnp_time(), removed);
+	static int rules_read;
+	static unsigned int rules_next;	/* soonest expiry in the rules, 0 : none */
+	static unsigned int retry;	/* a pass left expired rules: read again then */
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int fw_next = 0;
+	int removed;
+
+	if(retry != 0) {
+		if(retry > now) {
+			*next = retry;
+			return 0;
+		}
+		retry = 0;
+	}
+	/* the kept expiry may be early: walk the rows only when it comes */
+	if(due(map6_rows_next, now)) {
+		map6_rows_next = 0;
+		lease_table_foreach(map6_next_row, &map6_rows_next);
+	}
+	if(rules_read && !due(map6_rows_next, now) && !due(rules_next, now)) {
+		*next = sooner(map6_rows_next, rules_next);
+		return 0;
+	}
+	removed = clean_pinhole_list(&fw_next);
+	if(memmap_remote_peers_expired(now, removed)) {
+		retry = now + 1;
+		*next = retry;
+		return removed;
+	}
+	/* the expired rows are gone */
+	map6_rows_next = 0;
+	lease_table_foreach(map6_next_row, &map6_rows_next);
+	rules_read = 1;
+	rules_next = fw_next;
+	*next = sooner(map6_rows_next, fw_next);
 	return removed;
 #else
 	UNUSED(next);

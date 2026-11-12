@@ -210,7 +210,8 @@ int memmap_get_map6(unsigned short uid, char * raddr, int raddrlen,
 /* The uid of the pinhole at this place, or < 0 past the end. */
 int memmap_map6_uid_at(int index);
 /* Remove the pinholes past their expiry, which the firewall holds, and their
- * rows. *next is the time of the next expiry. The number removed, or < 0. */
+ * rows. The rules are read only when a pinhole is due. *next is the time of the
+ * next expiry. The number removed, or < 0. */
 int memmap_expire_map6(unsigned int * next);
 #endif
 
