@@ -8,11 +8,6 @@ memmap_map_expiry(unsigned short eport, int proto)
 	return 0;
 }
 
-void
-memmap_remote_peers_partial(void)
-{
-}
-
 int
 memmap_eport_redirected_elsewhere(const char * ifname, unsigned short eport, int proto,
                                   const char * iaddr, unsigned short iport)

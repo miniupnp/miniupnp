@@ -16,6 +16,7 @@
 #define MEMMAP_H_INCLUDED
 
 #include <sys/types.h>
+#include <netinet/in.h>
 #include "config.h"
 
 struct sockaddr;
@@ -38,10 +39,6 @@ unsigned int memmap_map_expiry(unsigned short eport, int proto);
  * has no such mapping or no memory for the description. */
 int memmap_renew_map(unsigned short eport, int proto, const char * desc,
                      unsigned int expiry);
-
-/* For a firewall backend: tell memmap_expire_pinholes() that this pass leaves
- * expired rules in the firewall, because a delete failed. The rows then stay. */
-void memmap_remote_peers_partial(void);
 
 /* The IPv4 mapping of an external port, with no read of the firewall. Fills the
  * strings given, and takes NULL for what is not wanted. 0, or -1 if there is
@@ -166,10 +163,10 @@ int memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
                         int max, unsigned int * next);
 
 #ifdef ENABLE_UPNPPINHOLE
-/* The pinholes, read from the table. Each one has a row: those of an earlier
- * run get theirs from memmap_adopt_pinholes() at startup. A UPnP pinhole also
- * has a uid, its UniqueID. A PCP pinhole has none (uid 0): PCP finds it by
- * its rule. */
+/* The pinholes, read from the table. Each one has a row: the rules of an
+ * earlier run which have none are deleted at startup, by
+ * memmap_remove_old_pinholes(). A UPnP pinhole also has a uid, its UniqueID.
+ * A PCP pinhole has none (uid 0): PCP finds it by its rule. */
 
 /* The uid of the pinhole of this rule, 0 if it has none, or -2 if there is
  * no such pinhole. desc and timestamp may be NULL. */
@@ -186,13 +183,28 @@ int memmap_get_pinhole(unsigned short uid, char * raddr, int raddrlen,
  * uid, or -1 past the end. The order is that of the table, and changes with
  * it. */
 int memmap_pinhole_uid_at(int index);
-/* Remove the pinholes past their expiry, which the firewall holds, and their
- * rows. The rules are read only when a pinhole is due. *next is the time of the
- * next expiry. The number removed, or < 0. */
-int memmap_expire_pinholes(unsigned int * next);
-/* Give a row and a uid to each pinhole rule of an earlier run. This reads the
- * firewall, once at startup. */
-void memmap_adopt_pinholes(void);
+/* the pinholes removed by a pass of the main loop */
+#define PINHOLE_EXPIRE_PER_PASS	64
+
+/* a pinhole past its expiry, with its rule */
+struct expired_pinhole {
+	unsigned short uid;
+	int proto;
+	unsigned short iport;
+	unsigned short rport;
+	char iaddr[INET6_ADDRSTRLEN];
+	char raddr[INET6_ADDRSTRLEN];	/* "" : any remote */
+};
+
+/* Fills expired with at most max pinholes past their lifetime, and next with
+ * the next expiry (0 : none, now : more to do), from the table with no read of
+ * the firewall. Returns the number filled. */
+int memmap_expired_pinholes(unsigned int now, struct expired_pinhole * expired,
+                            int max, unsigned int * next);
+
+/* Delete the pinhole rules of an earlier run which have no row: their expiry
+ * is not known. This reads the firewall, once at startup. */
+void memmap_remove_old_pinholes(void);
 #endif
 
 #ifdef PCP_PEER

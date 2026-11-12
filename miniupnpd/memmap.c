@@ -160,65 +160,58 @@ memmap_renew_map(unsigned short eport, int proto, const char * desc,
 	return 0;
 }
 
-/* A row cannot go during lease_table_foreach(), so a walk collects up to this
- * many rows, removes them, and walks again until it found fewer. */
-#define PINHOLE_EXPIRE_MAX	256
 
 /* what a walk over the rows gives pinhole_expiry_row() and gets back */
 struct pinhole_expiry {
-	time_t now;
-	unsigned int n;
-	struct lease_entry * rows[PINHOLE_EXPIRE_MAX];
+	unsigned int now;
+	struct expired_pinhole * expired;
+	int max;
+	int n;
+	unsigned int next;
 };
 
-/* collect the row if it is a pinhole past its expiry */
+/* Collect a pinhole row past its expiry, with its rule. Else keep the soonest
+ * expiry. When expired[] is full, the next pass is now. */
 static void
 pinhole_expiry_row(struct lease_entry * e, void * arg)
 {
 	struct pinhole_expiry * c = arg;
-	if(e->family == AF_INET6 && e->expiry != 0 && e->expiry <= c->now &&
-	   c->n < PINHOLE_EXPIRE_MAX)
-		c->rows[c->n++] = e;
-}
-
-/* set by memmap_remote_peers_partial(), read and cleared by memmap_remote_peers_expired() */
-static int pinholes_partial;
-
-/* Keep the rows of the next pass over the pinholes. */
-void
-memmap_remote_peers_partial(void)
-{
-	pinholes_partial = 1;
-	syslog(LOG_DEBUG, "memmap: expired pinhole rules are left in the firewall");
-}
-
-/* The firewall ended a pass over the pinholes, and removed "removed" rules
- * (<0 : error). The rows which expired go: a complete pass leaves no expired
- * rule, also when it removed none because the rules were already gone. If the
- * pass failed or was partial, the rows stay for the next pass: a row must not
- * go while its rule may still be there. */
-static void
-memmap_remote_peers_expired(unsigned int now, int removed)
-{
-	static struct pinhole_expiry c;
-	unsigned int i, total = 0;
-	int partial = pinholes_partial;
-
-	pinholes_partial = 0;
-	if(removed < 0 || partial) {
-		syslog(LOG_DEBUG, "memmap: keep the expired pinhole rows, removed %d, partial %d",
-		       removed, partial);
+	unsigned int ts = (unsigned int)e->expiry;
+	struct expired_pinhole * x;
+	if(e->family != AF_INET6 || ts == 0)
+		return;
+	if(ts > c->now) {
+		if(c->next == 0 || ts < c->next)
+			c->next = ts;
 		return;
 	}
-	do {
-		c.now = now;
-		c.n = 0;
-		lease_table_foreach(pinhole_expiry_row, &c);
-		for(i = 0; i < c.n; i++)
-			lease_table_remove(c.rows[i]);
-		total += c.n;
-	} while(c.n == PINHOLE_EXPIRE_MAX);
-	syslog(LOG_INFO, "memmap: %u expired pinhole rows removed", total);
+	if(c->n == c->max) {
+		c->next = c->now;	/* the next pass goes on */
+		return;
+	}
+	x = &c->expired[c->n++];
+	memset(x, 0, sizeof(*x));
+	x->uid = lease_uid(e);
+	x->proto = e->proto;
+	x->iport = e->iport;
+	inet_ntop(AF_INET6, &e->iaddr, x->iaddr, sizeof(x->iaddr));
+	if(e->remote != NULL) {
+		inet_ntop(AF_INET6, &e->remote->raddr, x->raddr, sizeof(x->raddr));
+		x->rport = e->remote->rport;
+	}
+}
+
+/* The pinholes which expired, from the table, with no read of the firewall. */
+int
+memmap_expired_pinholes(unsigned int now, struct expired_pinhole * expired,
+                        int max, unsigned int * next)
+{
+	struct pinhole_expiry c = { now, expired, max, 0, 0 };
+	lease_table_foreach(pinhole_expiry_row, &c);
+	*next = c.next;
+	if(c.n > 0)
+		syslog(LOG_DEBUG, "memmap: %d pinholes expired, next at %u", c.n, c.next);
+	return c.n;
 }
 
 /* what a walk over the rows gives expiry_row() and gets back */
@@ -675,108 +668,72 @@ memmap_pinhole_uid_at(int index)
 	return a.uid;
 }
 
-/* Give a row to each pinhole rule of an earlier run which has none, with a
- * uid from the map. This reads the firewall, once at startup. */
+/* Delete the pinhole rules of an earlier run which have no row. Their expiry is
+ * not known: the firewall rule does not hold it, and until the lease file has
+ * the pinholes, a restart loses it. A client renews its pinhole as usual, and
+ * gets a new rule. This reads the firewall, once at startup. */
 void
-memmap_adopt_pinholes(void)
+memmap_remove_old_pinholes(void)
 {
 #ifdef FW_PINHOLES
-	int index, proto, uid;
-	unsigned short rport, iport;
-	char raddr[INET6_ADDRSTRLEN], iaddr[INET6_ADDRSTRLEN], desc[64];
-	unsigned int timestamp;
-	struct memmap_change c;
-	struct lease_entry * row;
+	struct old_pinhole {
+		char raddr[INET6_ADDRSTRLEN];
+		char iaddr[INET6_ADDRSTRLEN];
+		unsigned short rport, iport;
+		int proto;
+	} * old = NULL, * grown;
+	struct memmap_change * changes;
+	int index, n = 0, size = 0, i, removed = 0;
+	struct old_pinhole o;
 
 	for(index = 0;
-	    get_pinhole_rule_at(index, raddr, sizeof(raddr), &rport, iaddr, sizeof(iaddr),
-	                        &iport, &proto, desc, sizeof(desc), &timestamp) == 0;
+	    get_pinhole_rule_at(index, o.raddr, sizeof(o.raddr), &o.rport, o.iaddr, sizeof(o.iaddr),
+	                        &o.iport, &o.proto, NULL, 0) == 0;
 	    index++) {
-		if(pinhole_row(raddr, rport, iaddr, iport, proto) != NULL)
+		if(pinhole_row(o.raddr, o.rport, o.iaddr, o.iport, o.proto) != NULL)
 			continue;
-		uid = new_uid();
-		if(uid < 0)
-			break;
-		memset(&c, 0, sizeof(c));
-		c.raddr = raddr;
-		c.rport = rport;
-		c.iaddr = iaddr;
-		c.iport = iport;
-		c.eport = iport;
-		c.proto = proto;
-		c.desc = desc;
-		c.timestamp = timestamp;
-		c.uid = uid;
-		row = new_row(&c);
-		if(row == NULL) {
-			continue;
+		if(n == size) {
+			size = size ? 2 * size : 64;
+			grown = realloc(old, size * sizeof(*old));
+			if(grown == NULL)
+				break;
+			old = grown;
 		}
-		lease_table_link(row);
-		syslog(LOG_NOTICE, "adopting pinhole %s [%s]:%hu, uid %d", proto_itoa(proto),
-		       iaddr, iport, uid);
+		old[n++] = o;
 	}
+	if(n == 0) {
+		free(old);
+		return;
+	}
+	changes = calloc(n, sizeof(*changes));
+	if(changes == NULL) {
+		free(old);
+		return;
+	}
+	for(i = 0; i < n; i++) {
+		changes[i].op = MEMMAP_DELETE_PINHOLE;
+		changes[i].raddr = old[i].raddr;
+		changes[i].rport = old[i].rport;
+		changes[i].iaddr = old[i].iaddr;
+		changes[i].iport = old[i].iport;
+		changes[i].eport = old[i].iport;
+		changes[i].proto = old[i].proto;
+	}
+	/* one request for all; if it fails, one rule must not keep the others */
+	if(memmap_sync(changes, n) == 0) {
+		removed = n;
+	} else {
+		for(i = 0; i < n; i++)
+			if(memmap_sync(&changes[i], 1) == 0)
+				removed++;
+	}
+	syslog(LOG_NOTICE, "removed %d of %d pinholes of an earlier run, which have no known expiry",
+	       removed, n);
+	free(changes);
+	free(old);
 #endif
 }
 
-#ifdef FW_PINHOLES
-/* keep the soonest expiry of a pinhole row */
-static void
-pinhole_next_row(struct lease_entry * e, void * arg)
-{
-	unsigned int * next = arg;
-	unsigned int ts = (unsigned int)e->expiry;
-	if(e->family == AF_INET6 && ts != 0 && (*next == 0 || ts < *next))
-		*next = ts;
-}
-
-/* the sooner of two expiries, where 0 is none */
-static unsigned int
-sooner(unsigned int a, unsigned int b)
-{
-	if(a == 0)
-		return b;
-	if(b == 0)
-		return a;
-	return a < b ? a : b;
-}
-#endif
-
-/* The firewall removes the expired pinholes: it holds their expiry. Reading
- * the rules costs a dump of the filter chain, so it happens only when a
- * pinhole is due: a row of the table, or a rule the last read found. A rule
- * of an earlier run has no row, and only the read finds its expiry. The
- * first call reads the rules. */
-int
-memmap_expire_pinholes(unsigned int * next)
-{
-#ifdef FW_PINHOLES
-	static int rules_read;
-	static unsigned int rules_next;	/* soonest expiry in the rules, 0 : none */
-	unsigned int now = (unsigned int)upnp_time();
-	unsigned int rows_next = 0, fw_next = 0;
-	int removed;
-
-	lease_table_foreach(pinhole_next_row, &rows_next);
-	if(rules_read && (rows_next == 0 || rows_next > now) &&
-	   (rules_next == 0 || rules_next > now)) {
-		*next = sooner(rows_next, rules_next);
-		return 0;
-	}
-	removed = clean_pinhole_list(&fw_next);
-	memmap_remote_peers_expired(now, removed);
-	if(removed < 0) {
-		*next = now + 1;	/* read again soon */
-		return removed;
-	}
-	rules_read = 1;
-	rules_next = fw_next;
-	*next = fw_next;
-	return removed;
-#else
-	UNUSED(next);
-	return 0;
-#endif
-}
 #endif /* ENABLE_UPNPPINHOLE */
 
 #ifdef PCP_PEER

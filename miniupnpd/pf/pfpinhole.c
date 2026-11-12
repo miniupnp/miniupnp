@@ -40,15 +40,15 @@
 #include "../memmap.h"
 #include "rtickets.h"
 
-/* the pass rules created by add_pinhole() are as follow :
+/* the pass rules created by add_pinhole_rule() are as follow :
  *
  * pass in quick on ep0 inet6 proto udp
  *   from any to dead:beef::42:42 port = 8080
  *   flags S/SA keep state
- *   label "pinhole ts-4321000: description"
+ *   label "pinhole: description"
  *
- * with the label "pinhole ts-$timestamp: $description". A rule is found by its
- * addresses, ports and protocol: the label is not its key.
+ * A rule is found by its addresses, ports and protocol: the label is not its
+ * key, and holds no uid or expiry, which are the map's.
  */
 
 #ifdef ENABLE_UPNPPINHOLE
@@ -69,7 +69,7 @@ extern int dev;
 	 (iport) == ntohs(RULE.dst.port[0]) && \
 	 0 == memcmp(&(saddr), &RULE.src.addr.v.a.addr.v6, sizeof(struct in6_addr)) && \
 	 0 == memcmp(&(daddr), &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)) && \
-	 pinhole_label_parse(RULE_LABEL, &ts, NULL) == 0)
+	 pinhole_label_desc(RULE_LABEL) != NULL)
 
 /* the addresses of a key. 0, or -1 if one does not parse */
 static int
@@ -100,6 +100,7 @@ int add_pinhole_rule(const char * ifname,
 	struct pfioc_pooladdr pp;
 #endif
 
+	UNUSED(timestamp);	/* the map holds the expiry */
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -144,7 +145,7 @@ int add_pinhole_rule(const char * ifname,
 		RULE.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		RULE.keep_state = 1;
-		pinhole_label(RULE.label, PF_RULE_LABEL_SIZE, timestamp, desc);
+		pinhole_label(RULE.label, PF_RULE_LABEL_SIZE, desc);
 		if(queue)
 			strlcpy(RULE.qname, queue, PF_QNAME_SIZE);
 		if(tag)
@@ -193,7 +194,7 @@ int get_pinhole_packets(const char * rem_host, unsigned short rem_port,
                         const char * int_client, unsigned short int_port,
                         int proto, u_int64_t * packets)
 {
-	unsigned int ts, tnum;
+	unsigned int tnum;
 	int i, n;
 #undef RULE
 #ifdef USE_LIBPFCTL
@@ -276,7 +277,7 @@ int delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
                         int proto)
 {
 	int i, n;
-	unsigned int ts, tnum;
+	unsigned int tnum;
 	struct in6_addr saddr, daddr;
 #undef RULE
 #ifdef USE_LIBPFCTL
@@ -372,10 +373,10 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
                     unsigned short * int_port, int * proto,
-                    char * desc, int desclen, unsigned int * timestamp)
+                    char * desc, int desclen)
 {
 	int i, n;
-	unsigned int ts, tnum;
+	unsigned int tnum;
 	const char * d;
 	static const struct in6_addr any;
 #undef RULE
@@ -434,7 +435,7 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
 			return -1;
 		}
 #endif /* USE_LIBPFCTL */
-		if(pinhole_label_parse(RULE_LABEL, &ts, &d) < 0 || index-- > 0)
+		if((d = pinhole_label_desc(RULE_LABEL)) == NULL || index-- > 0)
 			continue;
 		if(rem_host && rem_hostlen > 0) {
 			rem_host[0] = '\0';
@@ -451,8 +452,6 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
 			*int_port = ntohs(RULE.dst.port[0]);
 		if(proto)
 			*proto = RULE.proto;
-		if(timestamp)
-			*timestamp = ts;
 		if(desc && desclen > 0)
 			strlcpy(desc, d, desclen);
 		release_ticket(dev, tnum);
@@ -475,140 +474,6 @@ int update_pinhole_rule(const char * ifname,
 		return r;
 	return add_pinhole_rule(ifname, rem_host, rem_port, int_client, int_port,
 	                        proto, desc, timestamp);
-}
-
-/* return the number of rules removed
- * or a negative integer in case of error */
-int clean_pinhole_list(unsigned int * next_timestamp)
-{
-	int i;
-#undef RULE
-#ifdef USE_LIBPFCTL
-	struct pfctl_rules_info ri;
-	struct pfctl_rule rule;
-#define RULE (rule)
-	char anchor_call[MAXPATHLEN] = "";
-#else /* USE_LIBPFCTL */
-	struct pfioc_rule pr;
-#define RULE (pr.rule)
-#endif /* USE_LIBPFCTL */
-	time_t current_time;
-	unsigned int ts, tnum;
-	unsigned int min_ts = UINT_MAX;
-	int n = 0;
-
-	if(dev<0) {
-		syslog(LOG_ERR, "pf device is not open");
-		return -1;
-	}
-	current_time = upnp_time();
-#ifdef USE_LIBPFCTL
-	if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
-	{
-		syslog(LOG_ERR, "pfctl_get_rules_info: %m");
-		return -1;
-	}
-	i = ri.nr - 1;
-#ifdef PF_RELEASETICKETS
-	tnum = ri.ticket;
-#endif /* PF_RELEASETICKETS */
-#else /* USE_LIBPFCTL */
-	memset(&pr, 0, sizeof(pr));
-	strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-#ifndef PF_NEWSTYLE
-	RULE.action = PF_PASS;
-#endif
-	if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
-		syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
-		return -1;
-	}
-	i = pr.nr - 1;
-#ifdef PF_RELEASETICKETS
-	tnum = pr.ticket;
-#endif
-#endif /* USE_LIBPFCTL */
-	for(; i >= 0; i--) {
-#ifdef USE_LIBPFCTL
-		if(pfctl_get_rule(dev, i, ri.ticket, anchor_name, PF_PASS, &rule, anchor_call) < 0)
-		{
-			syslog(LOG_ERR, "pfctl_get_rule: %m");
-			release_ticket(dev, tnum);
-			return -1;
-		}
-		if(pinhole_label_parse(RULE.label[0], &ts, NULL) < 0) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
-			continue;
-		}
-#else /* USE_LIBPFCTL */
-		pr.nr = i;
-		if(ioctl(dev, DIOCGETRULE, &pr) < 0) {
-			syslog(LOG_ERR, "ioctl(dev, DIOCGETRULE): %m");
-			release_ticket(dev, tnum);
-			return -1;
-		}
-		if(pinhole_label_parse(RULE.label, &ts, NULL) < 0) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
-			continue;
-		}
-#endif /* USE_LIBPFCTL */
-		if(ts <= (unsigned int)current_time) {
-#ifdef USE_LIBPFCTL
-			/* TODO: convert DIOCCHANGERULE to libpfctl */
-			struct pfioc_rule pr;
-			pr.action = PF_CHANGE_GET_TICKET;
-			memset(&pr, 0, sizeof(pr));
-			pr.ticket = ri.ticket;
-			pr.nr = i;
-			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label[0]);
-#else /* USE_LIBPFCTL */
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label);
-#endif /* USE_LIBPFCTL */
-			pr.action = PF_CHANGE_GET_TICKET;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_GET_TICKET: %m");
-				release_ticket(dev, tnum);
-				return -1;
-			}
-			pr.action = PF_CHANGE_REMOVE;
-			pr.nr = i;
-			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCCHANGERULE, ...) PF_CHANGE_REMOVE: %m");
-				release_ticket(dev, tnum);
-				return -1;
-			}
-			n++;
-#ifdef USE_LIBPFCTL
-			if(pfctl_get_rules_info(dev, &ri, PF_PASS, anchor_name) < 0)
-			{
-				syslog(LOG_ERR, "pfctl_get_rules_info: %m");
-				return -1;
-			}
-#ifdef PF_RELEASETICKETS
-			tnum = ri.ticket;
-#endif /* PF_RELEASETICKETS */
-#else /* USE_LIBPFCTL */
-#ifndef PF_NEWSTYLE
-			RULE.action = PF_PASS;
-#endif
-			release_ticket(dev, tnum);
-			if(ioctl(dev, DIOCGETRULES, &pr) < 0) {
-				syslog(LOG_ERR, "ioctl(dev, DIOCGETRULES, ...): %m");
-				return -1;
-			}
-#ifdef PF_RELEASETICKETS
-			tnum = pr.ticket;
-#endif
-#endif /* USE_LIBPFCTL */
-		} else {
-			if(ts < min_ts)
-				min_ts = ts;
-		}
-	}
-	if(next_timestamp && (min_ts != UINT_MAX))
-		*next_timestamp = min_ts;
-	release_ticket(dev, tnum);
-	return n;	/* number of rules removed */
 }
 
 #endif /* ENABLE_UPNPPINHOLE */

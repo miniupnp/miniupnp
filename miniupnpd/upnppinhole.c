@@ -1135,7 +1135,41 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	ret = memmap_expire_pinholes(next_timestamp);
+	struct expired_pinhole expired[PINHOLE_EXPIRE_PER_PASS];
+	struct memmap_change changes[PINHOLE_EXPIRE_PER_PASS];
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int next;
+	int n, i, failed = 0;
+
+	n = memmap_expired_pinholes(now, expired, PINHOLE_EXPIRE_PER_PASS, &next);
+	for (i = 0; i < n; i++) {
+		const char * raddr = expired[i].raddr[0] != '\0' ? expired[i].raddr : NULL;
+		syslog(LOG_INFO, "remove pinhole %hu [%s]:%hu %s because it has expired",
+		       expired[i].uid, expired[i].iaddr, expired[i].iport,
+		       proto_itoa(expired[i].proto));
+		pinhole_change(&changes[i], MEMMAP_DELETE_PINHOLE, expired[i].uid, raddr,
+		               expired[i].rport, expired[i].iaddr, expired[i].iport,
+		               expired[i].proto, NULL, 0);
+	}
+	/* one request for all, which the firewall applies whole or not at all */
+	if (n > 0 && memmap_sync(changes, n) == 0) {
+		ret = n;
+	} else {
+		/* one rule which cannot go must not keep the others */
+		for (i = 0; i < n; i++) {
+			if (memmap_sync(&changes[i], 1) == 0)
+				ret++;
+			else
+				failed = 1;
+		}
+	}
+	/* What could not be removed still has its row: try it again in a
+	 * minute. A full pass (next is now) which removed nothing would pick
+	 * the same rows at once, so it waits too. */
+	if (failed && (next == 0 || now + 60 < next || (next == now && ret == 0)))
+		next = now + 60;
+	if (next != 0)
+		*next_timestamp = next;
 #else
 	UNUSED(next_timestamp);
 #endif

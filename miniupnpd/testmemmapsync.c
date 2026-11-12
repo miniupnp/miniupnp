@@ -85,12 +85,9 @@ WEAK int get_pinhole_packets(const char * rem_host, unsigned short rem_port,
   (void)packets; return -1; }
 WEAK int get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
                              unsigned short * rem_port, char * int_client, int int_clientlen,
-                             unsigned short * int_port, int * proto, char * desc, int desclen,
-                             unsigned int * timestamp)
+                             unsigned short * int_port, int * proto, char * desc, int desclen)
 { (void)index; (void)rem_host; (void)rem_hostlen; (void)rem_port; (void)int_client;
-  (void)int_clientlen; (void)int_port; (void)proto; (void)desc; (void)desclen;
-  (void)timestamp; return -1; }
-WEAK int clean_pinhole_list(unsigned int * next_timestamp) { (void)next_timestamp; return 0; }
+  (void)int_clientlen; (void)int_port; (void)proto; (void)desc; (void)desclen; return -1; }
 #endif
 WEAK int get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
                                 char * iaddr, int iaddrlen, unsigned short * iport,
@@ -572,6 +569,45 @@ test_one_row_twice(void)
 	assert(calls == 1 && memmap_map_count() == 1);
 }
 
+/* the expiry pass finds the expired pinholes in the table, with their rules,
+ * and the next expiry; a full array makes the next pass run now */
+static void
+test_pinhole_expiry(void)
+{
+	struct memmap_change c;
+	struct expired_pinhole expired[2];
+	unsigned int next;
+	char iaddr[3][32];
+	int i, n;
+	reset();
+	for(i = 0; i < 3; i++) {
+		snprintf(iaddr[i], sizeof(iaddr[i]), "2001:db8::%d", 20 + i);
+		/* two expired (500, 600), one later (3000) */
+		pinhole(&c, MEMMAP_ADD, 0, iaddr[i], (unsigned short)(6000 + i),
+		        i < 2 ? (unsigned int)(500 + 100 * i) : 3000);
+		assert(memmap_sync(&c, 1) == 0);
+	}
+	n = memmap_expired_pinholes((unsigned int)now, expired, 2, &next);
+	assert(n == 2 && next == 3000);
+	assert(expired[0].uid != 0 && expired[1].uid != 0);
+	assert(expired[0].iport >= 6000 && expired[0].iport <= 6001);
+	assert(expired[0].raddr[0] == '\0');
+	n = memmap_expired_pinholes((unsigned int)now, expired, 1, &next);
+	assert(n == 1 && next == (unsigned int)now);
+	/* a delete of the expired ones, as the pass sends it */
+	for(i = 0; i < 2; i++) {
+		pinhole(&c, MEMMAP_DELETE_PINHOLE, expired[0].uid, NULL, 0, 0);
+		n = memmap_expired_pinholes((unsigned int)now, expired, 2, &next);
+		assert(n == 2 - i);
+		pinhole(&c, MEMMAP_DELETE_PINHOLE, expired[0].uid, expired[0].iaddr,
+		        expired[0].iport, 0);
+		assert(memmap_sync(&c, 1) == 0);
+	}
+	n = memmap_expired_pinholes((unsigned int)now, expired, 2, &next);
+	assert(n == 0 && next == 3000);
+	assert(lease_table_count() == 1);
+}
+
 int
 main(void)
 {
@@ -594,6 +630,7 @@ main(void)
 	test_pinhole_key();
 	test_bad_address();
 	test_one_row_twice();
+	test_pinhole_expiry();
 	lease_table_clear();
 	printf("testmemmapsync: all tests passed\n");
 	return 0;

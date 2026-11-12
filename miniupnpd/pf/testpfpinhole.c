@@ -43,7 +43,7 @@ static void print_pinholes(void)
 
 	for(i = 0; get_pinhole_rule_at(i, rem_host, sizeof(rem_host), &rem_port,
 	                               int_client, sizeof(int_client), &int_port,
-	                               &proto, desc, sizeof(desc), &timestamp) == 0; i++) {
+	                               &proto, desc, sizeof(desc)) == 0; i++) {
 		packets = 0;
 		get_pinhole_packets(rem_host, rem_port, int_client, int_port, proto, &packets);
 		printf("pinhole %d : [%s]:%hu => [%s]:%hu proto=%d ts=%u\n",
@@ -75,7 +75,6 @@ int main(int argc, char * *argv)
 	printf("add_pinhole_rule() returned %d\n", ret);
 
 	print_pinholes();
-	clean_pinhole_list(NULL);
 
 	ret = delete_pinhole_rule("2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP);
 	printf("delete_pinhole_rule() returned %d\n", ret);

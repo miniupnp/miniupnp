@@ -70,7 +70,6 @@ find_rule(const char * rem_host, unsigned short rem_port,
 {
 	rule_t *p;
 	struct in6_addr saddr, daddr;
-	unsigned int ts;
 
 	memset(&saddr, 0, sizeof(saddr));
 	if (!pinhole_any_remote(rem_host) && inet_pton(AF_INET6, rem_host, &saddr) < 1) {
@@ -89,7 +88,7 @@ find_rule(const char * rem_host, unsigned short rem_port,
 		if (proto == p->proto && rem_port == p->sport && int_port == p->dport &&
 		    0 == memcmp(&saddr, &p->saddr6, sizeof(saddr)) &&
 		    0 == memcmp(&daddr, &p->daddr6, sizeof(daddr)) &&
-		    pinhole_label_parse(p->desc, &ts, NULL) == 0)
+		    pinhole_label_desc(p->desc) != NULL)
 			return p;
 	}
 	return NULL;
@@ -109,6 +108,8 @@ add_pinhole_rule(const char * ifname,
 	struct in6_addr rhost_addr, ihost_addr;
 	struct in6_addr *rhost_addr_p = NULL;
 
+	UNUSED(timestamp);	/* the map holds the expiry */
+
 	d_printf(("add_pinhole_rule(%s, %s, %hu, %s, %hu, %d, %s, %u)\n",
 	          ifname, rem_host, rem_port, int_client, int_port, proto, desc, timestamp));
 
@@ -124,7 +125,7 @@ add_pinhole_rule(const char * ifname,
 		syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", int_client);
 		return -1;
 	}
-	pinhole_label(comment, sizeof(comment), timestamp, desc);
+	pinhole_label(comment, sizeof(comment), desc);
 	r = rule_set_filter6(nft_ipv6_family, ifname, proto,
 	                     rhost_addr_p, &ihost_addr,
 	                     0, int_port, rem_port, comment, 0);
@@ -187,17 +188,16 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
                     unsigned short * int_port, int * proto,
-                    char * desc, int desclen, unsigned int * timestamp)
+                    char * desc, int desclen)
 {
 	rule_t *p;
-	unsigned int ts;
 	const char * d;
 	static const struct in6_addr any;
 
 	refresh_nft_cache_filter();
 	LIST_FOREACH(p, &head_filter, entry) {
 		if (p->type != RULE_FILTER || p->desc_len == 0 ||
-		    pinhole_label_parse(p->desc, &ts, &d) < 0)
+		    (d = pinhole_label_desc(p->desc)) == NULL)
 			continue;
 		if (index-- > 0)
 			continue;
@@ -218,61 +218,10 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
 			strncpy(desc, d, desclen);
 			desc[desclen - 1] = '\0';
 		}
-		if (timestamp)
-			*timestamp = ts;
 		return 0;
 	}
 	return -1;
 }
 
-int
-clean_pinhole_list(unsigned int * next_timestamp)
-{
-	rule_t *p;
-	struct nftnl_rule *r;
-	time_t current_time;
-	unsigned int ts;
-	unsigned int min_ts = UINT_MAX;
-	int n = 0;
-
-	current_time = upnp_time();
-
-	d_printf(("clean_pinhole_list()\n"));
-	refresh_nft_cache_filter();
-
-	LIST_FOREACH(p, &head_filter, entry) {
-		// Only forward entries
-		if (p->type != RULE_FILTER)
-			continue;
-
-		if (p->desc_len == 0)
-			continue;
-
-		if (pinhole_label_parse(p->desc, &ts, NULL) < 0) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", p->desc);
-			continue;
-		}
-
-		if (ts <= (unsigned int)current_time) {
-			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
-			r = rule_del_handle(p);
-			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER) < 0) {
-				/* the rule stays : retry soon */
-				min_ts = (unsigned int)current_time + 1;
-				memmap_remote_peers_partial();
-				continue;
-			}
-			n++;
-		} else {
-			if (ts < min_ts)
-				min_ts = ts;
-		}
-	}
-
-	if (next_timestamp && (min_ts != UINT_MAX))
-		*next_timestamp = min_ts;
-
-	return n;	/* number of rules removed */
-}
 
 #endif /* ENABLE_UPNPPINHOLE */

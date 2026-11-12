@@ -40,12 +40,10 @@
 #endif
 
 /* The fake firewall: memmap.c reads it, this test does not link a backend.
- * It holds no rule. A pass over the pinholes removes fake_removed rules. */
+ * It holds no rule. */
 const char * ext_if_name = "wan";
 int firewall_trust = FW_TRUST_CHECK;
 static time_t fake_now;
-static int fake_removed;
-static int fake_partial;	/* the next pass leaves expired rules */
 
 time_t
 upnp_time(void)
@@ -148,17 +146,6 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
 	UNUSED(int_client); UNUSED(int_clientlen); UNUSED(int_port); UNUSED(proto);
 	UNUSED(desc); UNUSED(desclen);
 	return -1;
-}
-
-int
-clean_pinhole_list(unsigned int * next_timestamp)
-{
-	if(fake_partial) {
-		memmap_remote_peers_partial();
-		fake_partial = 0;
-	}
-	*next_timestamp = 1;	/* due : every pass reads the rules */
-	return fake_removed;
 }
 #endif /* TEST_PINHOLES */
 
@@ -712,89 +699,6 @@ test_each_map_counters(void)
 	lease_table_clear();
 }
 
-#ifdef TEST_PINHOLES
-/* One expiry pass over the pinholes at time now, in which the firewall removes
- * "removed" rules (< 0 : it fails). */
-static void
-expire_pinholes(time_t now, int removed)
-{
-	unsigned int next;
-
-	fake_now = now;
-	fake_removed = removed;
-	(void)memmap_expire_pinholes(&next);
-}
-
-static void
-test_pinhole_expiry(void)
-{
-	char iaddr[64];
-	unsigned int i;
-
-	lease_table_clear();
-	add_map(1, 6001, "2001:db8::1", 6001, IPPROTO_TCP, "a", 90);	/* expired */
-	add_map(2, 6002, "2001:db8::1", 6002, IPPROTO_TCP, "b", 150);
-	add_map(3, 6003, "2001:db8::1", 6003, IPPROTO_TCP, "c", 0);	/* no expiry */
-	assert(lease_table_count() == 3);
-
-	/* the firewall failed : the rows stay */
-	expire_pinholes(100, -1);
-	assert(lease_table_count() == 3);
-
-	/* a pass which leaves expired rules keeps the rows, once */
-	fake_partial = 1;
-	expire_pinholes(100, 1);
-	assert(lease_table_count() == 3);
-
-	/* a full pass removes the expired row only */
-	expire_pinholes(100, 1);
-	assert(lease_table_count() == 2);
-	assert(lease_table_find_uid(1) == NULL);
-	assert(lease_table_find_uid(2) != NULL && lease_table_find_uid(3) != NULL);
-
-	/* a renewal by uid moves the expiry */
-	renew_uid(2, 300);
-	expire_pinholes(200, 1);
-	assert(lease_table_count() == 2);
-	expire_pinholes(300, 1);
-	assert(lease_table_count() == 1);
-
-	/* a full pass which removed no rule : the rule of the expired row was
-	 * already gone, and the row goes too */
-	add_map(4, 6004, "2001:db8::1", 6004, IPPROTO_TCP, "d", 350);
-	expire_pinholes(400, 0);
-	assert(lease_table_count() == 1);
-	assert(lease_table_find_uid(4) == NULL);
-	lease_table_clear();
-
-	/* more expired pinholes than one walk takes; an IPv4 mapping is not a
-	 * pinhole, whatever its expiry */
-	for(i = 0; i < 600; i++) {
-		snprintf(iaddr, sizeof(iaddr), "2001:db8::%x", i + 1);
-		add_map((unsigned short)(i + 1), 0, iaddr, 8080, IPPROTO_UDP, "upnp", 100);
-	}
-	add_map(1000, 0, "2001:db8:1::1", 8080, IPPROTO_UDP, "upnp", 101);
-	add_map(1001, 0, "2001:db8:1::2", 8080, IPPROTO_UDP, "upnp", 0);
-	add_map(0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web", 50);
-	assert(lease_table_count() == 603);
-
-	expire_pinholes(99, 600);
-	assert(lease_table_count() == 603);
-	expire_pinholes(100, 600);
-	assert(lease_table_count() == 3);
-	assert(lease_table_find_uid(1) == NULL && lease_table_find_uid(600) == NULL);
-	assert(lease_table_find_uid(1000) != NULL);
-	expire_pinholes(101, 1);
-	assert(lease_table_find_uid(1000) == NULL);
-	/* 0 : no expiry */
-	expire_pinholes(0x7fffffff, 1);
-	assert(lease_table_find_uid(1001) != NULL);
-	assert(lease_table_find_mapping(IPPROTO_TCP, AF_INET, NULL, 40001) != NULL);
-	assert(lease_table_count() == 2);
-	lease_table_clear();
-}
-#endif /* TEST_PINHOLES */
-
 int
 main(void)
 {
@@ -804,9 +708,6 @@ main(void)
 	test_one_port_many_clients();
 	test_expired_maps();
 	test_each_map_counters();
-#ifdef TEST_PINHOLES
-	test_pinhole_expiry();
-#endif
 	printf("testmemmap: all tests passed\n");
 	return 0;
 }

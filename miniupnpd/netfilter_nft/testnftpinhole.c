@@ -32,7 +32,7 @@ static void print_infos(void)
 
 	for (i = 0; get_pinhole_rule_at(i, rem_host, sizeof(rem_host), &rem_port,
 	                                int_client, sizeof(int_client), &int_port,
-	                                &proto, desc, sizeof(desc), &timestamp) == 0; i++) {
+	                                &proto, desc, sizeof(desc)) == 0; i++) {
 		packets = 0;
 		get_pinhole_packets(rem_host, rem_port, int_client, int_port, proto, &packets);
 		syslog(LOG_INFO, "pinhole %d : [%s]:%hu => [%s]:%hu %s desc \"%s\" ts=%u packets=%llu",

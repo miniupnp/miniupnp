@@ -490,35 +490,6 @@ int get_pinhole_uid_by_index(int index)
 	return -1;
 }
 
-int
-clean_pinhole_list(unsigned int * next_timestamp)
-{
-	unsigned int min_ts = UINT_MAX;
-	struct pinhole_t * p;
-	time_t current_time;
-	int n = 0;
-
-	current_time = upnp_time();
-	p = pinhole_list.lh_first;
-	while(p != NULL) {
-		if(p->timestamp <= (unsigned int)current_time) {
-			unsigned short uid = p->uid;
-			syslog(LOG_INFO, "removing expired pinhole with uid=%hu", uid);
-			p = p->entries.le_next;
-			if(delete_pinhole(uid) == 0)
-				n++;
-			else
-				break;
-		} else {
-			if(p->timestamp < min_ts)
-				min_ts = p->timestamp;
-			p = p->entries.le_next;
-		}
-	}
-	if(next_timestamp && (min_ts != UINT_MAX))
-		*next_timestamp = min_ts;
-	return n;
-}
 
 /* The key-based API of fwpinhole.h, on top of the list of pinholes, which
  * keeps its own uids. */
@@ -579,7 +550,7 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
                     unsigned short * int_port, int * proto,
-                    char * desc, int desclen, unsigned int * timestamp)
+                    char * desc, int desclen)
 {
 	int uid = get_pinhole_uid_by_index(index);
 	if(uid < 0)
@@ -591,7 +562,7 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
 	}
 	if(get_pinhole_info((unsigned short)uid, rem_host, rem_hostlen, rem_port,
 	                    int_client, int_clientlen, int_port, proto, desc, desclen,
-	                    timestamp, NULL, NULL) < 0)
+	                    NULL, NULL, NULL) < 0)
 		return -1;
 	if(rem_host && strcmp(rem_host, "::") == 0)
 		rem_host[0] = '\0';
