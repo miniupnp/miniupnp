@@ -1305,12 +1305,12 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	}
 #endif
 
-	/* Destination Port */
+	/* Destination Port. UDP-Lite has its ports where UDP has them. */
 	dport = htons(iport);
 	if (proto == IPPROTO_TCP) {
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct tcphdr, dest), sizeof(uint16_t));
-	} else if (proto == IPPROTO_UDP) {
+	} else {
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
 	}
@@ -1322,7 +1322,7 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 		if (proto == IPPROTO_TCP) {
 			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 			                 offsetof(struct tcphdr, source), sizeof(uint16_t));
-		} else if (proto == IPPROTO_UDP) {
+		} else {
 			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 			                 offsetof(struct udphdr, source), sizeof(uint16_t));
 		}
