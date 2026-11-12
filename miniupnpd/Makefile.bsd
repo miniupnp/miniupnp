@@ -114,13 +114,14 @@ TESTUPNPHTTPOBJS = testupnphttp.o upnphttp.o upnputils.o getosversion.o \
 TESTLEASETABLEOBJS = testleasetable.o lease_table.o
 TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o
 TESTMEMMAPSYNCOBJS = testmemmapsync.o memmap.o lease_table.o
+TESTFWSYNCOBJS = testfwsync.o fwsync.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp \
               testifacewatcher teststun testupnphttp \
-              testleasetable testmemmap testmemmapsync
+              testleasetable testmemmap testmemmapsync testfwsync
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -159,6 +160,7 @@ clean:
 	$(RM) validateleasetable testleasetable.o
 	$(RM) validatememmap testmemmap.o
 	$(RM) validatememmapsync testmemmapsync.o
+	$(RM) validatefwsync testfwsync.o
 
 install:	miniupnpd
 	$(STRIP) miniupnpd
@@ -172,7 +174,7 @@ install:	miniupnpd
 
 check:  validateupnppermissions validategetifaddr validatessdppktgen \
         validateupnphttp validateleasetable validatememmap \
-        validatememmapsync
+        validatememmapsync validatefwsync
 
 validateupnppermissions: $(SRCDIR)/testupnppermissions.sh testupnppermissions
 	$(SRCDIR)/testupnppermissions.sh
@@ -200,6 +202,10 @@ validatememmap:	testmemmap
 
 validatememmapsync:	testmemmapsync
 	./testmemmapsync
+	touch $@
+
+validatefwsync:	testfwsync
+	./testfwsync
 	touch $@
 
 depend:	$(ALLSRCS)
@@ -261,6 +267,9 @@ testmemmap:	config.h $(TESTMEMMAPOBJS)
 
 testmemmapsync:	config.h $(TESTMEMMAPSYNCOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTMEMMAPSYNCOBJS)
+
+testfwsync:	config.h $(TESTFWSYNCOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTFWSYNCOBJS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^

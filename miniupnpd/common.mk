@@ -31,6 +31,8 @@ testmemmap:	testmemmap.o memmap.o lease_table.o
 
 testmemmapsync:	testmemmapsync.o memmap.o lease_table.o
 
+testfwsync:	testfwsync.o fwsync.o
+
 miniupnpdctl:	miniupnpdctl.o
 
 dox:	$(SRCDIR)/miniupnpd.doxyconf

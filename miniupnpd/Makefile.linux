@@ -87,7 +87,7 @@ EXECUTABLES += testupnpdescgen testgetifstats \
                testgetroute testasyncsendto testportinuse \
                testssdppktgen testminissdp testifacewatcher \
                teststun testupnphttp testleasetable \
-               testmemmap testmemmapsync
+               testmemmap testmemmapsync testfwsync
 endif
 
 .PHONY:	all clean install dox
@@ -99,7 +99,7 @@ clean:
 	$(RM) -r $(DEPDIR)
 	$(RM) $(EXECUTABLES)
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
-	$(RM) validateleasetable validatememmap validatememmapsync
+	$(RM) validateleasetable validatememmap validatememmapsync validatefwsync
 	$(RM) validateversion
 	$(RM) -r dox/
 
