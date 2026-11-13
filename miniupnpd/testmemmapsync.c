@@ -61,6 +61,13 @@ WEAK int get_redirect_rule_by_index(int index, char * ifname, unsigned short * e
 { (void)index; (void)ifname; (void)eport; (void)iaddr; (void)iaddrlen; (void)iport;
   (void)proto; (void)desc; (void)desclen; (void)rhost; (void)rhostlen; (void)timestamp;
   (void)packets; (void)bytes; return -1; }
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+WEAK int get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
+                                                u_int64_t packets, u_int64_t bytes,
+                                                void * arg),
+                                     void * arg)
+{ (void)fn; (void)arg; return -1; }
+#endif
 #ifdef FW_PINHOLES
 WEAK int find_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
                       const char * int_client, unsigned short int_port, int proto,

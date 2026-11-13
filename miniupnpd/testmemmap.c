@@ -59,15 +59,36 @@ proto_itoa(int proto)
 	return proto == IPPROTO_TCP ? "TCP" : "UDP";
 }
 
+/* the redirect rules of the fake firewall, with their counters, and the
+ * number of times it was read */
+struct fake_rule {
+	unsigned short eport;
+	int proto;
+	u_int64_t packets;
+	u_int64_t bytes;
+};
+static struct fake_rule fake_rules[4];
+static int fake_rule_count;
+static int fake_reads;
+
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,
                   char * desc, int desclen, char * rhost, int rhostlen,
                   unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
 {
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto); UNUSED(iaddr); UNUSED(iaddrlen);
+	int i;
+	UNUSED(ifname); UNUSED(iaddr); UNUSED(iaddrlen);
 	UNUSED(iport); UNUSED(desc); UNUSED(desclen); UNUSED(rhost); UNUSED(rhostlen);
-	UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
+	UNUSED(timestamp);
+	fake_reads++;
+	for(i = 0; i < fake_rule_count; i++) {
+		if(fake_rules[i].eport == eport && fake_rules[i].proto == proto) {
+			*packets = fake_rules[i].packets;
+			*bytes = fake_rules[i].bytes;
+			return 0;
+		}
+	}
 	return -1;
 }
 
@@ -78,11 +99,33 @@ get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
                            char * rhost, int rhostlen, unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes)
 {
-	UNUSED(index); UNUSED(ifname); UNUSED(eport); UNUSED(iaddr); UNUSED(iaddrlen);
-	UNUSED(iport); UNUSED(proto); UNUSED(desc); UNUSED(desclen); UNUSED(rhost);
-	UNUSED(rhostlen); UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
-	return -1;
+	UNUSED(ifname); UNUSED(iaddr); UNUSED(iaddrlen);
+	UNUSED(iport); UNUSED(desc); UNUSED(desclen); UNUSED(rhost);
+	UNUSED(rhostlen); UNUSED(timestamp);
+	fake_reads++;
+	if(index < 0 || index >= fake_rule_count)
+		return -1;
+	*eport = fake_rules[index].eport;
+	*proto = fake_rules[index].proto;
+	*packets = fake_rules[index].packets;
+	*bytes = fake_rules[index].bytes;
+	return 0;
 }
+
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+int
+get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
+                                       u_int64_t packets, u_int64_t bytes, void * arg),
+                            void * arg)
+{
+	int i;
+	fake_reads++;
+	for(i = 0; i < fake_rule_count; i++)
+		fn(fake_rules[i].eport, fake_rules[i].proto, fake_rules[i].packets,
+		   fake_rules[i].bytes, arg);
+	return 0;
+}
+#endif
 
 #ifdef TEST_PINHOLES
 int
@@ -570,6 +613,58 @@ test_expired_maps(void)
 	lease_table_clear();
 }
 
+/* what memmap_each_map_counters() reported */
+static struct fake_rule seen[4];
+static int seen_count;
+
+static void
+see_counters(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
+             void * arg)
+{
+	UNUSED(arg);
+	assert(seen_count < 4);
+	seen[seen_count].eport = eport;
+	seen[seen_count].proto = proto;
+	seen[seen_count].packets = packets;
+	seen[seen_count].bytes = bytes;
+	seen_count++;
+}
+
+static void
+test_each_map_counters(void)
+{
+	lease_table_clear();
+	add_map(0, 40001, "192.0.2.10", 5000, IPPROTO_TCP, "a", 0);
+	add_map(0, 40002, "192.0.2.10", 5001, IPPROTO_UDP, "b", 0);	/* its rule is gone */
+	add_map(7, 6000, "2001:db8::1", 6000, IPPROTO_TCP, "c", 0);	/* not a port mapping */
+	fake_rules[0].eport = 40001;
+	fake_rules[0].proto = IPPROTO_TCP;
+	fake_rules[0].packets = 5;
+	fake_rules[0].bytes = 500;
+	fake_rules[1].eport = 40003;	/* a rule with no row */
+	fake_rules[1].proto = IPPROTO_TCP;
+	fake_rules[1].packets = 9;
+	fake_rules[1].bytes = 900;
+	fake_rule_count = 2;
+	fake_reads = 0;
+	seen_count = 0;
+
+	assert(memmap_each_map_counters(see_counters, NULL) == 0);
+	assert(seen_count == 1);
+	assert(seen[0].eport == 40001 && seen[0].proto == IPPROTO_TCP);
+	assert(seen[0].packets == 5 && seen[0].bytes == 500);
+	/* a firewall which can list its rules is read once, not once a mapping */
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+	assert(fake_reads == 1);
+#elif defined(USE_PF)
+	assert(fake_reads == fake_rule_count + 1);
+#else
+	assert(fake_reads == 2);
+#endif
+	fake_rule_count = 0;
+	lease_table_clear();
+}
+
 #ifdef TEST_PINHOLES
 /* One expiry pass over the pinholes at time now, in which the firewall removes
  * "removed" rules (< 0 : it fails). */
@@ -661,6 +756,7 @@ main(void)
 	test_find_map();
 	test_one_port_many_clients();
 	test_expired_maps();
+	test_each_map_counters();
 #ifdef TEST_PINHOLES
 	test_pinhole_expiry();
 #endif

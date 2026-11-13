@@ -387,6 +387,62 @@ memmap_map_counters(unsigned short eport, int proto,
 	                         NULL, 0, &timestamp, packets, bytes) >= 0 ? 0 : -1;
 }
 
+/* the callback of memmap_each_map_counters(), and its argument */
+struct counters_of_rows {
+	memmap_counters_fn fn;
+	void * arg;
+};
+
+/* Pass on the counters of a rule which has a row. */
+static void
+counters_of_row(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
+                void * arg)
+{
+	struct counters_of_rows * c = arg;
+	if(lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL)
+		c->fn(eport, proto, packets, bytes, c->arg);
+}
+
+/* Read the counters of every port mapping, in as few reads as the firewall
+ * allows. */
+int
+memmap_each_map_counters(memmap_counters_fn fn, void * arg)
+{
+	struct counters_of_rows c;
+#if defined(USE_PF)
+	int index, proto;
+	unsigned short eport, iport;
+	unsigned int timestamp;
+	char iaddr[INET_ADDRSTRLEN];
+	u_int64_t packets, bytes;
+#elif !defined(USE_NETFILTER) || defined(USE_NFTABLES)
+	const struct lease_entry * row;
+	u_int64_t packets, bytes;
+#endif
+
+	c.fn = fn;
+	c.arg = arg;
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+	return get_redirect_rules_counters(counters_of_row, &c);
+#elif defined(USE_PF)
+	for(index = 0;
+	    get_redirect_rule_by_index(index, NULL, &eport, iaddr, sizeof(iaddr), &iport,
+	                               &proto, NULL, 0, NULL, 0, &timestamp,
+	                               &packets, &bytes) >= 0;
+	    index++)
+		counters_of_row(eport, proto, packets, bytes, &c);
+	return 0;
+#else
+	/* nftables reads its rules once into a cache */
+	for(row = lease_table_next_port(NULL); row != NULL; row = lease_table_next_port(row)) {
+		if(row->family == AF_INET &&
+		   memmap_map_counters(row->eport, row->proto, &packets, &bytes) == 0)
+			counters_of_row(row->eport, row->proto, packets, bytes, &c);
+	}
+	return 0;
+#endif
+}
+
 int
 memmap_map_in_firewall(unsigned short eport, int proto)
 {

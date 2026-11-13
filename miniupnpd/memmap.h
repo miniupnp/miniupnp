@@ -115,6 +115,14 @@ int memmap_sync(struct memmap_change * changes, int n);
 int memmap_map_counters(unsigned short eport, int proto,
                         u_int64_t * packets, u_int64_t * bytes);
 
+/* fn(eport, proto, packets, bytes, arg) for each IPv4 port mapping which has
+ * a row and a rule. iptables walks its chain once and pf reads its rules by
+ * index, once each; the other firewalls are read once per mapping. 0, or -1 if
+ * the firewall could not be read. */
+typedef void (*memmap_counters_fn)(unsigned short eport, int proto,
+                                   u_int64_t packets, u_int64_t bytes, void * arg);
+int memmap_each_map_counters(memmap_counters_fn fn, void * arg);
+
 /* 1 if the firewall still has the rule of an IPv4 port mapping with a row.
  * A flush or another program can remove a rule: then drop the row and return
  * 0, so the caller adds the mapping again instead of renewing a closed port.
