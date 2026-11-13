@@ -455,9 +455,7 @@ test_pinhole_expiry(void)
 	memmap_map(3, 6003, "2001:db8::1", 6003, IPPROTO_TCP, "c", 0);	/* no expiry */
 	assert(lease_table_count() == 3);
 
-	/* the firewall removed nothing, or failed : the rows stay */
-	expire_pinholes(100, 0);
-	assert(lease_table_count() == 3);
+	/* the firewall failed : the rows stay */
 	expire_pinholes(100, -1);
 	assert(lease_table_count() == 3);
 
@@ -478,6 +476,13 @@ test_pinhole_expiry(void)
 	assert(lease_table_count() == 2);
 	expire_pinholes(300, 1);
 	assert(lease_table_count() == 1);
+
+	/* a full pass which removed no rule : the rule of the expired row was
+	 * already gone, and the row goes too */
+	memmap_map(4, 6004, "2001:db8::1", 6004, IPPROTO_TCP, "d", 350);
+	expire_pinholes(400, 0);
+	assert(lease_table_count() == 1);
+	assert(lease_table_find_uid(4) == NULL);
 	lease_table_clear();
 
 	/* more expired pinholes than one walk takes; an IPv4 mapping is not a

@@ -378,9 +378,10 @@ memmap_remote_peers_partial(void)
 }
 
 /* The firewall ended a pass over the pinholes, and removed "removed" rules
- * (<0 : error). The rows which expired go, as their rules went. If the pass
- * removed nothing, failed or was partial, the rows stay for the next pass: a row
- * must not go while its rule may still be there. */
+ * (<0 : error). The rows which expired go: a complete pass leaves no expired
+ * rule, also when it removed none because the rules were already gone. If the
+ * pass failed or was partial, the rows stay for the next pass: a row must not
+ * go while its rule may still be there. */
 static void
 memmap_remote_peers_expired(unsigned int now, int removed)
 {
@@ -389,10 +390,9 @@ memmap_remote_peers_expired(unsigned int now, int removed)
 	int partial = pinholes_partial;
 
 	pinholes_partial = 0;
-	if(removed <= 0 || partial) {
-		if(removed != 0 || partial)
-			syslog(LOG_DEBUG, "memmap: keep the expired pinhole rows, removed %d, partial %d",
-			       removed, partial);
+	if(removed < 0 || partial) {
+		syslog(LOG_DEBUG, "memmap: keep the expired pinhole rows, removed %d, partial %d",
+		       removed, partial);
 		return;
 	}
 	do {
