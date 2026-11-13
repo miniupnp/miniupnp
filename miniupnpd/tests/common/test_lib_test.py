@@ -919,7 +919,8 @@ class ShellScriptTests(unittest.TestCase):
 
     def test_every_called_helper_is_defined(self):
         scripts = list(self.scripts())
-        defined = set()
+        # system commands with an underscore in their name
+        defined = {"pkg_add"}
         for _path, text in scripts:
             defined.update(re.findall(r"^\s*([a-z_][a-z0-9_]*)\(\)", text, re.M))
         call = re.compile(r"(?:^\s*|\$\(\s*|\|\s*|&&\s*|\bthen\s+|\belse\s+|!\s+)([a-z][a-z0-9]*_[a-z0-9_]+)(?=[\s)\"]|$)", re.M)
