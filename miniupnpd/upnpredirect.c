@@ -408,6 +408,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	rhost_old[0] = '\0';
 	r = memmap_get_map(eport, proto, &iport_old, iaddr_old, sizeof(iaddr_old),
 	                        NULL, 0, rhost_old, sizeof(rhost_old), NULL);
+	if(r == 0 && !memmap_map_in_firewall(eport, proto))
+		r = -1;
 	if(r == 0) {
 		if(strcmp(iaddr, iaddr_old)==0 &&
 		   ((rhost == NULL && rhost_old[0]=='\0') ||

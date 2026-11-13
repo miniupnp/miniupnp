@@ -1066,6 +1066,9 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		r = memmap_get_map(pcp_msg_info->ext_port, pcp_msg_info->protocol,
 				   &iport_old, iaddr_old, sizeof(iaddr_old),
 				   NULL, 0, NULL, 0, NULL);
+		if (r == 0 && !memmap_map_in_firewall(pcp_msg_info->ext_port,
+						      pcp_msg_info->protocol))
+			r = -1;
 
 		if(r==0) {
 			if((strcmp(pcp_msg_info->mapped_str, iaddr_old)!=0)

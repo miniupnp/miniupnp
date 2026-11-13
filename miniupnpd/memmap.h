@@ -100,6 +100,11 @@ int memmap_eport_used_by_other(unsigned short eport, const char * iaddr);
 int memmap_map_counters(unsigned short eport, int proto,
                         u_int64_t * packets, u_int64_t * bytes);
 
+/* 1 if the firewall still has the rule of an IPv4 port mapping with a row.
+ * A flush or another program can remove a rule: then drop the row and return
+ * 0, so the caller adds the mapping again instead of renewing a closed port. */
+int memmap_map_in_firewall(unsigned short eport, int proto);
+
 /* Give a row to each rule of an earlier run which has none, so the rule can be
  * listed and deleted. This reads the firewall, once at startup. */
 void memmap_adopt_rules(void);
