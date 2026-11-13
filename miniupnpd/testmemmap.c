@@ -1,5 +1,5 @@
-/* unit test of memmap.c : the rows it writes for the firewall rules and the
- * expiry of the pinholes. The firewall is a fake. */
+/* unit test of memmap.c : the rows it writes for the firewall rules, the
+ * lookups by internal endpoint and the expiry. The firewall is a fake. */
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -288,6 +288,12 @@ test_ipv4(void)
 	                   IPPROTO_TCP, "peer", 500);
 	again = lease_table_find_external(IPPROTO_TCP, AF_INET, NULL, 40001, &r, 5000);
 	assert(again != NULL && again->expiry == 500 && lease_table_count() == 1);
+	/* another remote port is not a renewal : the row takes it */
+	memmap_remote_peer(0, "203.0.113.5", 5001, 40001, "192.0.2.10", 8080,
+	                   IPPROTO_TCP, "peer", 550);
+	assert(lease_table_find_external(IPPROTO_TCP, AF_INET, NULL, 40001, &r, 5000) == NULL);
+	again = lease_table_find_external(IPPROTO_TCP, AF_INET, NULL, 40001, &r, 5001);
+	assert(again != NULL && again->expiry == 550 && lease_table_count() == 1);
 	/* and back to no remote */
 	memmap_map(0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web", 600);
 	assert(lease_table_count() == 1);
@@ -402,6 +408,121 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned
 	return -1;
 }
 #endif
+
+/* The cases below name addresses as text, as the protocols did before memmap
+ * took a family and a struct in6_addr. These turn the text into that API. */
+static inline void
+compat_owner(int mapping_owner, struct memmap_owner * o)
+{
+	if(mapping_owner == MAPPING_PCP)
+		memmap_owner_from_desc("PCP MAP 0102030405060708090a0b0c", 0, IPPROTO_UDP, o);
+	else
+		memmap_owner_init(o, mapping_owner == MAPPING_NATPMP ? LEASE_NATPMP : LEASE_UPNP, NULL);
+}
+
+static inline int
+find_s(const char * iaddr, unsigned short iport, int proto, int mapping_owner,
+       unsigned short * eport, char * desc, int desclen, unsigned int * ts)
+{
+	struct in6_addr a;
+	struct memmap_owner o;
+	int family;
+	if(memmap_pton(iaddr, &family, &a) < 0)
+		return -1;
+	compat_owner(mapping_owner, &o);
+	return memmap_find(family, &a, iport, proto, mapping_owner < 0 ? NULL : &o,
+	                   eport, desc, desclen, ts);
+}
+
+static void
+test_find_map(void)
+{
+	static const char * h1 = "192.0.2.10";
+	unsigned short eport = 0;
+	char desc[64];
+	unsigned int ts = 0;
+
+	lease_table_clear();
+	/* a UPnP row, then the NAT-PMP and PCP rows of the same internal endpoint */
+	memmap_map(0, 40001, h1, 5000, IPPROTO_UDP, "upnp app", 1000);
+	memmap_map(0, 40002, h1, 5000, IPPROTO_UDP, "NAT-PMP 40002 UDP", 2000);
+	memmap_map(0, 40003, h1, 5000, IPPROTO_UDP, PCP_DESC, 3000);
+
+	assert(find_s(h1, 5000, IPPROTO_UDP, MAPPING_NATPMP,
+	              &eport, desc, sizeof(desc), &ts) == 0);
+	assert(eport == 40002 && ts == 2000);
+	assert(strcmp(desc, "NAT-PMP 40002 UDP") == 0);
+	assert(find_s(h1, 5000, IPPROTO_UDP, MAPPING_UPNP,
+	              &eport, NULL, 0, NULL) == 0 && eport == 40001);
+	assert(find_s(h1, 5000, IPPROTO_UDP, MAPPING_PCP,
+	              &eport, NULL, 0, NULL) == 0 && eport == 40003);
+	/* any owner : one of the three rows */
+	assert(find_s(h1, 5000, IPPROTO_UDP, -1, &eport, NULL, 0, NULL) == 0);
+	assert(eport >= 40001 && eport <= 40003);
+
+	/* only the UPnP row left : no NAT-PMP row, whatever comes first */
+	memmap_map_gone(40002, IPPROTO_UDP);
+	memmap_map_gone(40003, IPPROTO_UDP);
+	assert(find_s(h1, 5000, IPPROTO_UDP, MAPPING_NATPMP,
+	              &eport, NULL, 0, NULL) == -1);
+
+	/* another port, protocol or address is another endpoint */
+	assert(find_s(h1, 5001, IPPROTO_UDP, -1, &eport, NULL, 0, NULL) == -1);
+	assert(find_s(h1, 5000, IPPROTO_TCP, -1, &eport, NULL, 0, NULL) == -1);
+	assert(find_s("192.0.2.11", 5000, IPPROTO_UDP, -1,
+	              &eport, NULL, 0, NULL) == -1);
+	assert(find_s("not an address", 5000, IPPROTO_UDP, -1,
+	              &eport, NULL, 0, NULL) == -1);
+	lease_table_clear();
+}
+
+#ifdef USE_NFTABLES
+static void
+test_expired_maps(void)
+{
+	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
+	unsigned int next = 1;
+	int i, n;
+
+	lease_table_clear();
+	/* nothing : no expiry to come back for */
+	assert(memmap_expired_maps(100, expired, EXPIRE_MAX_PER_PASS, &next) == 0);
+	assert(next == 0);
+
+	memmap_map(0, 40001, "192.0.2.10", 5000, IPPROTO_TCP, "a", 90);	/* expired */
+	memmap_map(0, 40002, "192.0.2.10", 5001, IPPROTO_UDP, "b", 100);	/* expires now */
+	memmap_map(0, 40003, "192.0.2.10", 5002, IPPROTO_TCP, "c", 150);
+	memmap_map(0, 40004, "192.0.2.10", 5003, IPPROTO_TCP, "d", 120);
+	memmap_map(0, 40005, "192.0.2.10", 5004, IPPROTO_TCP, "e", 0);	/* no expiry */
+	/* an IPv6 pinhole is not a port mapping */
+	memmap_map(7, 6000, "2001:db8::1", 6000, IPPROTO_TCP, "f", 50);
+
+	n = memmap_expired_maps(100, expired, EXPIRE_MAX_PER_PASS, &next);
+	assert(n == 2);
+	for(i = 0; i < n; i++)
+		assert((expired[i].eport == 40001 && expired[i].proto == IPPROTO_TCP) ||
+		       (expired[i].eport == 40002 && expired[i].proto == IPPROTO_UDP));
+	assert(next == 120);
+
+	/* the rows stay until the rules are gone */
+	assert(memmap_expired_maps(100, expired, EXPIRE_MAX_PER_PASS, &next) == 2);
+	memmap_map_gone(40001, IPPROTO_TCP);
+	memmap_map_gone(40002, IPPROTO_UDP);
+	assert(memmap_expired_maps(100, expired, EXPIRE_MAX_PER_PASS, &next) == 0);
+	assert(next == 120);
+	lease_table_clear();
+
+	/* more than a pass takes : the next pass is now */
+	for(i = 0; i < 3 * EXPIRE_MAX_PER_PASS; i++)
+		memmap_map(0, (unsigned short)(30000 + i), "192.0.2.20", (unsigned short)(1000 + i),
+		           IPPROTO_UDP, "x", 10);
+	n = memmap_expired_maps(100, expired, EXPIRE_MAX_PER_PASS, &next);
+	assert(n == EXPIRE_MAX_PER_PASS && next == 100);
+	/* a smaller max is kept */
+	assert(memmap_expired_maps(100, expired, 3, &next) == 3 && next == 100);
+	lease_table_clear();
+}
+#endif /* USE_NFTABLES */
 
 #ifdef TEST_MAP6
 /* One expiry pass over the pinholes at time now, in which the firewall removes
@@ -533,6 +654,10 @@ main(void)
 {
 	test_ipv4();
 	test_ipv6();
+	test_find_map();
+#ifdef USE_NFTABLES
+	test_expired_maps();
+#endif
 #ifdef TEST_MAP6
 	test_map6_expiry();
 	test_map6_keys();
