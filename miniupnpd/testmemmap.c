@@ -384,7 +384,6 @@ test_find_map(void)
 	lease_table_clear();
 }
 
-#ifdef USE_NFTABLES
 static void
 test_expired_maps(void)
 {
@@ -430,7 +429,6 @@ test_expired_maps(void)
 	assert(memmap_expired_maps(100, expired, 3, &next) == 3 && next == 100);
 	lease_table_clear();
 }
-#endif /* USE_NFTABLES */
 
 #ifdef TEST_PINHOLES
 /* One expiry pass over the pinholes at time now, in which the firewall removes
@@ -516,9 +514,7 @@ main(void)
 	test_ipv4();
 	test_ipv6();
 	test_find_map();
-#ifdef USE_NFTABLES
 	test_expired_maps();
-#endif
 #ifdef TEST_PINHOLES
 	test_pinhole_expiry();
 #endif
