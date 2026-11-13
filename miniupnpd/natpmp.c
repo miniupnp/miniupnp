@@ -391,7 +391,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					r = memmap_get_map(eport, proto, &iport_old,
 					                   iaddr_old, sizeof(iaddr_old),
 					                   desc, sizeof(desc), NULL, 0, &timestamp);
-					if(r == 0 && !memmap_map_in_firewall(eport, proto))
+					if(r == 0 && !upnp_map_in_firewall(eport, proto))
 						r = -1;
 					if(r==0) {
 						if(strcmp(senderaddrstr, iaddr_old)==0
