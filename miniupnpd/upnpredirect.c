@@ -670,8 +670,6 @@ upnp_get_portmapping_number_of_entries(void)
 	return memmap_map_count();
 }
 
-/* functions used to remove unused rules
- * As a side effect, delete expired rules (based on LeaseDuration) */
 /* Remove at most EXPIRE_MAX_PER_PASS port mappings past their lifetime, which
  * the table knows with no read of the firewall, and set when the next pass is
  * due. */
@@ -735,108 +733,47 @@ expire_peers(void)
 }
 #endif /* PCP_PEER */
 
+/* Put the counters of a mapping on the list arg points to. */
+static void
+add_rule_state(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
+               void * arg)
+{
+	struct rule_state ** list = arg;
+	struct rule_state * tmp = malloc(sizeof(*tmp));
+	if(tmp == NULL)
+		return;	/* the mapping is left out of this check */
+	tmp->packets = packets;
+	tmp->bytes = bytes;
+	tmp->eport = eport;
+	tmp->proto = (unsigned char)proto;
+	tmp->to_remove = 0;
+	tmp->next = *list;
+	*list = tmp;
+}
+
+static void
+free_rule_states(struct rule_state * list)
+{
+	struct rule_state * tmp;
+	while(list) {
+		tmp = list;
+		list = tmp->next;
+		free(tmp);
+	}
+}
+
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
 {
-	/*char ifname[IFNAMSIZ];*/
-	int proto;
-	unsigned short iport;
-	unsigned int timestamp;
-	struct rule_state * tmp;
-	struct rule_state * list = 0;
-	struct rule_state * * p;
-	int i = 0;
-	time_t current_time;
-	char desc[64];
+	struct rule_state * list = NULL;
 
-	/*ifname[0] = '\0';*/
-	tmp = malloc(sizeof(struct rule_state));
-	if(!tmp)
-		return 0;
-	current_time = upnp_time();
-	nextruletoclean_timestamp = 0;
-	while(memmap_get_map_at((unsigned int)i, &tmp->eport, &proto, &iport,
-	                        NULL, 0, desc, sizeof(desc), NULL, 0, &timestamp) >= 0)
-	{
-		if(memmap_map_counters(tmp->eport, proto, &tmp->packets, &tmp->bytes) < 0)
-			tmp->packets = tmp->bytes = 0;
-		tmp->to_remove = 0;
-		if(timestamp > 0) {
-			/* need to remove this port mapping ? */
-			if(timestamp <= (unsigned int)current_time)
-				tmp->to_remove = 1;
-			else if((nextruletoclean_timestamp <= (unsigned int)current_time)
-			       || (timestamp < nextruletoclean_timestamp))
-				nextruletoclean_timestamp = timestamp;
-		}
-		tmp->proto = (short)proto;
-		/* A PCP or NAT-PMP mapping lasts the lifetime its client asked
-		 * for: idle counters must not end it, only its expiry does. */
-		if(!tmp->to_remove &&
-		   mapping_owner_of(desc, tmp->eport, proto) != MAPPING_UPNP) {
-			i++;
-			continue;
-		}
-		/* add tmp to list */
-		tmp->next = list;
-		list = tmp;
-		/* prepare next iteration */
-		i++;
-		tmp = malloc(sizeof(struct rule_state));
-		if(!tmp)
-			break;
+	/* not enough mappings: the firewall is not read */
+	if(memmap_map_count() <= max_rules_number_target)
+		return NULL;
+	if(memmap_each_map_counters(add_rule_state, &list) < 0) {
+		free_rule_states(list);
+		return NULL;
 	}
-#ifdef PCP_PEER
-	i=0;
-	while(memmap_get_peer_at(i, &tmp->eport, NULL, 0, &iport, &proto, NULL, 0,
-	                         NULL, 0, NULL, &timestamp,
-	                         &tmp->packets, &tmp->bytes) >= 0)
-	{
-		tmp->to_remove = 0;
-		if(timestamp > 0) {
-			/* need to remove this port mapping ? */
-			if(timestamp <= (unsigned int)current_time)
-				tmp->to_remove = 1;
-			else if((nextruletoclean_timestamp <= (unsigned int)current_time)
-				   || (timestamp < nextruletoclean_timestamp))
-				nextruletoclean_timestamp = timestamp;
-		}
-		tmp->proto = (short)proto;
-		/* add tmp to list */
-		tmp->next = list;
-		list = tmp;
-		/* prepare next iteration */
-		i++;
-		tmp = malloc(sizeof(struct rule_state));
-		if(!tmp)
-			break;
-	}
-#endif
-	free(tmp);
-	/* remove the redirections that need to be removed */
-	for(p = &list, tmp = list; tmp; tmp = *p)
-	{
-		if(tmp->to_remove)
-		{
-			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
-			       tmp->eport, proto_itoa(tmp->proto));
-			_upnp_delete_redir(tmp->eport, tmp->proto);
-			*p = tmp->next;
-			free(tmp);
-			i--;
-		} else {
-			p = &(tmp->next);
-		}
-	}
-	/* return empty list if not enough redirections */
-	if(i<=max_rules_number_target)
-		while(list)
-		{
-			tmp = list;
-			list = tmp->next;
-			free(tmp);
-		}
-	/* return list */
 	return list;
 }
 
@@ -849,33 +786,72 @@ expire_upnp_rules(void)
 #endif
 }
 
+/* the list of get_upnp_rules_state_list(), sorted by protocol and port */
+struct rule_states {
+	struct rule_state ** v;
+	size_t n;
+};
+
+static int
+cmp_rule_state(const void * a, const void * b)
+{
+	const struct rule_state * x = *(const struct rule_state * const *)a;
+	const struct rule_state * y = *(const struct rule_state * const *)b;
+	if(x->proto != y->proto)
+		return x->proto < y->proto ? -1 : 1;
+	if(x->eport != y->eport)
+		return x->eport < y->eport ? -1 : 1;
+	return 0;
+}
+
+/* Mark a mapping whose counters have not moved since the list was made. */
+static void
+mark_unused_rule(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
+                 void * arg)
+{
+	struct rule_states * s = arg;
+	struct rule_state key;
+	struct rule_state * k = &key;
+	struct rule_state ** found;
+
+	key.eport = eport;
+	key.proto = (unsigned char)proto;
+	found = bsearch(&k, s->v, s->n, sizeof(*s->v), cmp_rule_state);
+	if(found != NULL && (*found)->packets == packets && (*found)->bytes == bytes)
+		(*found)->to_remove = 1;
+}
+
 void
 remove_unused_rules(struct rule_state * list)
 {
+	struct rule_states s;
 	struct rule_state * tmp;
-	u_int64_t packets;
-	u_int64_t bytes;
+	size_t i;
 	int n = 0;
 
-	while(list)
-	{
-		/* remove the rule if no traffic has used it */
-		if(memmap_map_counters(list->eport, list->proto, &packets, &bytes) >= 0)
-		{
-			if(packets == list->packets && bytes == list->bytes)
-			{
-				syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
-				       "%" PRIu64 "packets %" PRIu64 "bytes",
-				       list->eport, proto_itoa(list->proto),
-				       packets, bytes);
-				_upnp_delete_redir(list->eport, list->proto);
-				n++;
-			}
-		}
-		tmp = list;
-		list = tmp->next;
-		free(tmp);
+	s.n = 0;
+	for(tmp = list; tmp; tmp = tmp->next)
+		s.n++;
+	s.v = s.n > 0 ? malloc(s.n * sizeof(*s.v)) : NULL;
+	if(s.v != NULL) {
+		for(i = 0, tmp = list; tmp; tmp = tmp->next)
+			s.v[i++] = tmp;
+		qsort(s.v, s.n, sizeof(*s.v), cmp_rule_state);
+		/* one read of the counters of all mappings */
+		memmap_each_map_counters(mark_unused_rule, &s);
+		free(s.v);
 	}
+	for(tmp = list; tmp; tmp = tmp->next) {
+		/* remove the rule if no traffic has used it */
+		if(!tmp->to_remove)
+			continue;
+		syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
+		       "%" PRIu64 "packets %" PRIu64 "bytes",
+		       tmp->eport, proto_itoa(tmp->proto), tmp->packets, tmp->bytes);
+		_upnp_delete_redir(tmp->eport, tmp->proto);
+		n++;
+	}
+	free_rule_states(list);
 	if(n>0)
 		syslog(LOG_NOTICE, "removed %d unused rules", n);
 }

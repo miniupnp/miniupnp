@@ -185,9 +185,9 @@ struct rule_state
 	unsigned char to_remove;
 };
 
-/* return a linked list of all rules
- * or an empty list if there are not enough
- * As a "side effect", delete rules which are expired */
+/* return a linked list of the counters of all port mappings,
+ * or an empty list if there are not more than max_rules_number_target.
+ * Expiry is left to expire_upnp_rules(). */
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target);
 
