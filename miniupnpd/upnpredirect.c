@@ -545,6 +545,51 @@ upnp_get_redirection_infos_by_index(int index,
 	}
 }
 
+int
+upnp_get_redirection_infos_by_ituple(unsigned short iport,
+                                     const char * iaddr, int proto,
+                                     unsigned short * eport,
+                                     char * desc, int desclen,
+                                     char * rhost, int rhostlen,
+                                     unsigned int * leaseduration)
+{
+	/* that is a default implementation, iterating all rules */
+	int index;
+
+	for(index = 0; ; index++) {
+		unsigned short other_iport = 0;
+		int other_proto = 0;
+		char other_iaddr[16] = "";
+		unsigned int timestamp;
+
+		if(get_redirect_rule_by_index(index, 0/*ifname*/, eport,
+		                              other_iaddr, sizeof(other_iaddr),
+		                              &other_iport, &other_proto,
+		                              desc, desclen,
+		                              rhost, rhostlen, &timestamp,
+		                              0, 0) < 0)
+			break;
+		if(other_proto == proto && other_iport == iport &&
+		   strcmp(other_iaddr, iaddr) == 0) {
+			/* found it ! */
+			if(leaseduration) {
+				time_t current_time = upnp_time();
+				*leaseduration = (timestamp > (unsigned int)current_time)
+				                 ? (timestamp - current_time)
+				                 : 0;
+			}
+			return 0;
+		}
+	}
+	/* not found */
+	if(index > 0) {
+		/* clean the mess */
+		desc[0] = '\0';
+		rhost[0] = '\0';
+	}
+	return -1;
+}
+
 /* called from natpmp.c too */
 int
 _upnp_delete_redir(unsigned short eport, int proto)

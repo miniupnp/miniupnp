@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/11/13:
+  upnpredirect.c: add upnp_get_redirection_infos_by_ituple()
+
 2026/11/12:
   fix startup_time() with BSD and system_uptime=yes
 
