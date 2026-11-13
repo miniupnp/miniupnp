@@ -1,10 +1,10 @@
 #!/bin/sh
-# Runs inside the FreeBSD VM as root, from the repository root: everything the host
-# driver (../run-freebsd.sh) does to the pf router.
+# Runs inside the FreeBSD or OpenBSD VM as root, from the repository root: everything the
+# host driver (../run-freebsd.sh, ../run-openbsd.sh) does to the pf router.
 #
 #   pf-router.sh setup         build + net + start, from a clean work directory
 #   pf-router.sh build [OPTIONS]  configure (extra OPTIONS, default --igd2 --pcp-peer) and make miniupnpd
-#   pf-router.sh net [LAN4 LAN6 WAN4 WAN6]  configure vtnet1 (LAN) / vtnet2 (WAN) and the main pf ruleset;
+#   pf-router.sh net [LAN4 LAN6 WAN4 WAN6]  configure the LAN and WAN NICs and the main pf ruleset;
 #                              the address plan of the fixture slot (run-freebsd.sh --slot), as
 #                              e2e_address_plan sets it (172.28.1 2001:db8:1:1:: 6.18.1 2001:db8:9000:1::)
 #   pf-router.sh start         start the daemon from a clean state (anchor, states, NAT66, leases)
@@ -16,18 +16,26 @@
 #                              time and the pinhole number in their labels (ts-N, pinhole-N); what the restart check compares
 #   pf-router.sh restored      how many times the daemon logged the restore of its PCP lease file
 #   pf-router.sh snapshot      print the router state, for the per-case snapshots
-#   pf-router.sh capture start|stop   tcpdump on vtnet1 and vtnet2 into /tmp/pcp-e2e/cap-*.pcap
+#   pf-router.sh capture start|stop   tcpdump on the LAN and WAN NICs into /tmp/pcp-e2e/cap-*.pcap
 #   pf-router.sh pf-make       build the development test programs of miniupnpd/pf
 #
-# vtnet0 is QEMU's management NIC (ssh). vtnet1 and vtnet2 are relayed onto the
-# Linux Docker LAN and WAN bridges, where the client and the traffic agents live.
+# The first NIC is QEMU's management NIC (ssh): vtnet0 on FreeBSD, vio0 on OpenBSD. The
+# second (LAN) and third (WAN) are relayed onto the Linux Docker LAN and WAN bridges, where
+# the client and the traffic agents live.
+#
+# OpenBSD translates in the filter rules (rdr-to, nat-to, since 4.7): its main ruleset has
+# no rdr-anchor and no nat-anchor, and the daemon puts pass ... rdr-to rules in its anchor.
 set -u
+
+OS=$(uname)
+if [ "$OS" = OpenBSD ]; then LAN_IF=vio1; WAN_IF=vio2; else LAN_IF=vtnet1; WAN_IF=vtnet2; fi
 
 WORK=/tmp/pcp-e2e
 . "$(dirname -- "$0")/../../common/freebsd_lib.sh"
 PF=$WORK/pf.conf
 
 write_pf() {
+	if [ "$OS" = OpenBSD ]; then write_pf_openbsd "${1:-off}"; return; fi
 	{
 		# PCP PEER NAT rules live in the anchor and must be evaluated first
 		echo 'nat-anchor "miniupnpd"'
@@ -52,6 +60,35 @@ pass out all keep state
 PF
 	} >"$PF"
 	pfctl -f "$PF"
+}
+
+# NAT44 and NAT66 as on FreeBSD, with match ... nat-to; the anchor holds the pass ... rdr-to
+# rules of the mappings.
+write_pf_openbsd() {
+	{
+		echo "match out on $WAN_IF inet from !($WAN_IF) nat-to ($WAN_IF)"
+		if [ "${1:-off}" = on ]; then
+			wan6=$(ifconfig $WAN_IF inet6 | awk '$1 == "inet6" && $2 !~ /^fe80:/ { print $2; exit }')
+			echo "match out on $WAN_IF inet6 from !($WAN_IF) nat-to $wan6 static-port"
+		fi
+		cat <<PF
+block in on $WAN_IF all
+pass in quick on $WAN_IF inet6 proto icmp6 icmp6-type { neighbrsol, neighbradv }
+anchor "miniupnpd"
+pass in on $LAN_IF all keep state
+pass out all keep state
+PF
+	} >"$PF"
+	pfctl -f "$PF"
+}
+
+# is the daemon listening on its PCP port?
+pcp_listening() {
+	if [ "$OS" = OpenBSD ]; then
+		netstat -an -f inet -p udp | grep -q '\.5351 '
+	else
+		sockstat -4l | grep -q ':5351'
+	fi
 }
 
 # the rules are in child anchors of miniupnpd, and its own rules send packets there
@@ -118,8 +155,10 @@ cmd_capture() {
 	case "${1:-}" in
 	start)
 		rm -f "$WORK"/cap-*.pcap "$WORK/cap.pids"
-		for i in vtnet1 vtnet2; do
-			nohup tcpdump -U -n -i $i -s 0 -w "$WORK/cap-$i.pcap" >"$WORK/cap-$i.log" 2>&1 </dev/null &
+		# OpenBSD's tcpdump has no -U: the capture is whole once it is stopped
+		unbuffered=-U; [ "$OS" = OpenBSD ] && unbuffered=
+		for i in $LAN_IF $WAN_IF; do
+			nohup tcpdump $unbuffered -n -i $i -s 0 -w "$WORK/cap-$i.pcap" >"$WORK/cap-$i.log" 2>&1 </dev/null &
 			echo $! >>"$WORK/cap.pids"
 		done
 		sleep 1
@@ -159,6 +198,7 @@ cmd_build() {
 	mkdir -p "$WORK"
 	pfctl_dir=$(dirname "$(ls /usr/lib/private/libpfctl.* 2>/dev/null | head -n 1)")   # part of the stamp
 	options="--firewall=pf --ipv6 --leasefile --disable-tests ${1:---igd2 $(freebsd_peer_option)}"
+	link_pfctl=freebsd_link_pfctl; [ "$OS" = OpenBSD ] && link_pfctl=true
 	stamp=$( { echo "$options $pfctl_dir $(uname -r)"
 		cat miniupnpd/configure miniupnpd/VERSION miniupnpd/Makefile.bsd; } | cksum)
 	: >"$WORK/build.log"
@@ -166,7 +206,7 @@ cmd_build() {
 		[ ! -f miniupnpd/config.h ] || [ ! -f miniupnpd/bsdmake.inc ]; then
 		echo "configure: $options" >>"$WORK/build.log"
 		(cd miniupnpd && ./configure $options >/dev/null \
-			&& freebsd_link_pfctl \
+			&& $link_pfctl \
 			&& { make -f Makefile.bsd clean; make -f Makefile.bsd depend; } >>"$WORK/build.log" 2>&1) || {
 			tail -40 "$WORK/build.log" >&2
 			echo "FAIL: configure" >&2
@@ -181,22 +221,23 @@ cmd_build() {
 	}
 }
 
-# the addresses on vtnet1 / vtnet2 and the main ruleset of pf
+# the addresses on the LAN and WAN NICs and the main ruleset of pf
 cmd_net() {
 	set -e
 	lan4=${1:-172.28.41}; lan6=${2:-2001:db8:1::}; wan4=${3:-198.51.100}; wan6=${4:-2001:db8:9000::}
 	mkdir -p "$WORK"
-	sysctl net.inet.ip.forwarding=1 net.inet6.ip6.forwarding=1 >/dev/null
-	ifconfig vtnet1 up
-	ifconfig vtnet1 inet "$lan4.1/24"
-	ifconfig vtnet1 inet6 "${lan6}1/64"
-	ifconfig vtnet1 inet6 fd42:1::1/64
-	ifconfig vtnet2 up
-	ifconfig vtnet2 inet "$wan4.1/24"
-	ifconfig vtnet2 inet6 "${wan6}1/64"
+	sysctl net.inet.ip.forwarding=1 >/dev/null
+	sysctl net.inet6.ip6.forwarding=1 >/dev/null
+	ifconfig $LAN_IF up
+	ifconfig $LAN_IF inet "$lan4.1/24"
+	ifconfig $LAN_IF inet6 "${lan6}1/64" alias
+	ifconfig $LAN_IF inet6 fd42:1::1/64 alias
+	ifconfig $WAN_IF up
+	ifconfig $WAN_IF inet "$wan4.1/24"
+	ifconfig $WAN_IF inet6 "${wan6}1/64" alias
 	sleep 3 # let IPv6 DAD finish
 
-	kldload -n pf || true
+	[ "$OS" = OpenBSD ] || kldload -n pf || true
 	pfctl -F all >/dev/null 2>&1 || true
 	pfctl -e >/dev/null 2>&1 || true
 	write_pf off
@@ -205,7 +246,7 @@ cmd_net() {
 # Stop the daemon if it runs and wait until it is gone.
 # has the VM got the addresses of this slot?
 cmd_has_net() {
-	ifconfig vtnet1 | grep -q "inet $1.1 "
+	ifconfig $LAN_IF | grep -q "inet $1.1 "
 }
 
 cmd_stop() {
@@ -231,10 +272,10 @@ cmd_start() {
 	write_pf off
 	rm -f /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6 "$WORK"/cap-*
 	cat >"$WORK/miniupnpd.conf" <<'CONF'
-ext_ifname=vtnet2
+ext_ifname=WAN_IF
 tag=miniupnpd
 ext_allow_private_ipv4=yes
-listening_ip=vtnet1
+listening_ip=LAN_IF
 enable_upnp=yes
 http_port=5000
 enable_pcp_pmp=yes
@@ -245,14 +286,15 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+	sed -i.bak "s/=WAN_IF\$/=$WAN_IF/; s/=LAN_IF\$/=$LAN_IF/" "$WORK/miniupnpd.conf" && rm -f "$WORK/miniupnpd.conf.bak"
 	# extra configuration lines, separated by commas (a suite on this fixture)
 	printf '%s\n' "${1:-}" | tr ',' '\n' >>"$WORK/miniupnpd.conf"
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >"$WORK/miniupnpd.log" 2>&1 &
 	echo $! >"$WORK/miniupnpd.pid"
 	# the daemon answers on its PCP port once it is ready
 	i=0
-	until sockstat -4l | grep -q ':5351' || [ "$i" -ge 20 ]; do i=$((i + 1)); sleep 0.5; done
-	kill -0 "$(cat "$WORK/miniupnpd.pid")" && sockstat -4l | grep -q ':5351' || {
+	until pcp_listening || [ "$i" -ge 20 ]; do i=$((i + 1)); sleep 0.5; done
+	kill -0 "$(cat "$WORK/miniupnpd.pid")" && pcp_listening || {
 		cat "$WORK/miniupnpd.log" >&2; echo "FAIL: daemon" >&2; exit 1; }
 }
 
@@ -261,7 +303,7 @@ cmd_setup() {
 	cmd_build
 	cmd_net
 	cmd_start
-	echo "FreeBSD router ready"
+	echo "$OS router ready"
 }
 
 command=${1:-}

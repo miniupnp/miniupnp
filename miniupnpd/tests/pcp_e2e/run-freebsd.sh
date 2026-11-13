@@ -70,7 +70,7 @@ RUN_ID=$(date -u +%Y-%m-%dT%H-%M-%SZ)
 case "$ARTIFACTS" in /*) ;; *) ARTIFACTS=$ROOT/$ARTIFACTS ;; esac
 CACHE=${PCP_TEST_FREEBSD_CACHE:-"$HOME/.cache/miniupnpd-pcp-test"}
 MEMORY=${PCP_TEST_FREEBSD_MEMORY:-2048}
-# The router of the fixture. run-debian-iptables.sh sets debian-iptables.
+# The router of the fixture. run-debian-iptables.sh sets debian-iptables, run-openbsd.sh openbsd-pf.
 ROUTER=${PCP_E2E_ROUTER:-freebsd-pf}
 ROUTER_SCRIPT=miniupnpd/tests/pcp_e2e/freebsd/pf-router.sh
 VM_USER=freebsd
@@ -86,9 +86,21 @@ if [ "$ROUTER" = debian-iptables ]; then
   PREPARE=$DIR/debian/prepare.sh
   E2E_PLATFORM=debian-iptables
 fi
+if [ "$ROUTER" = openbsd-pf ]; then
+  # pf-router.sh serves both BSDs
+  VM_USER=openbsd
+  LAN_IF=vio1
+  WAN_IF=vio2
+  PREPARE=$COMMON/openbsd/prepare.sh
+  E2E_PLATFORM=openbsd
+fi
 # the name of the router in the report, once VERSION is known (the boot looks up the newest)
 set_router_name() {
-  if [ "$ROUTER" = debian-iptables ]; then ROUTER_NAME="Debian $VERSION iptables"; else ROUTER_NAME="FreeBSD $VERSION pf"; fi
+  case "$ROUTER" in
+    debian-iptables) ROUTER_NAME="Debian $VERSION iptables" ;;
+    openbsd-pf) ROUTER_NAME="OpenBSD $VERSION pf" ;;
+    *) ROUTER_NAME="FreeBSD $VERSION pf" ;;
+  esac
 }
 STATUS=0
 EXECUTED=0
@@ -138,7 +150,12 @@ while [ "$argc" -gt 0 ]; do
 done
 e2e_parse_args "$@"
 # --freebsd-version or PCP_TEST_FREEBSD_VERSION; empty: the newest (vmlib_freebsd_image)
-[ "$ROUTER" = debian-iptables ] || VERSION=${PCP_TEST_FREEBSD_VERSION:-}
+# PCP_TEST_OPENBSD_VERSION for OpenBSD (default: vmlib_openbsd_image's)
+case "$ROUTER" in
+  debian-iptables) ;;
+  openbsd-pf) VERSION=${PCP_TEST_OPENBSD_VERSION:-} ;;
+  *) VERSION=${PCP_TEST_FREEBSD_VERSION:-} ;;
+esac
 # shellcheck disable=SC1091
 . "$COMMON/vm_lib.sh"
 
@@ -185,7 +202,7 @@ fi
 
 vmlib_tools "$DOCKER" qemu-system-x86_64 qemu-img xz curl ssh ssh-keygen
 
-RUN_DIR=$ARTIFACTS/freebsd-$RUN_ID-slot$SLOT
+RUN_DIR=$ARTIFACTS/$E2E_PLATFORM-$RUN_ID-slot$SLOT
 mkdir -p "$RUN_DIR"
 if [ "$KEEP_MODE" = 1 ]; then WORK=$STATE; else WORK=$(mktemp -d); fi
 QEMU_PID=
@@ -279,6 +296,8 @@ vm_boot() {
       mv "$CACHE/$IMAGE_NAME.part" "$CACHE/$IMAGE_NAME"
     fi
     vmlib_unlock
+  elif [ "$ROUTER" = openbsd-pf ]; then
+    vmlib_openbsd_image
   else
     vmlib_freebsd_image
   fi
@@ -287,6 +306,8 @@ vm_boot() {
   # the FreeBSD image is the one of ../common/freebsd_vm.sh: one prepared image for both
   if [ "$ROUTER" = freebsd-pf ]; then
     vmlib_prepared "$PREPARE" "prepared-$VERSION"
+  elif [ "$ROUTER" = openbsd-pf ]; then
+    vmlib_prepared "$PREPARE" "prepared-openbsd-$VERSION"
   else
     vmlib_prepared "$PREPARE" "prepared-$ROUTER-$VERSION"
   fi
@@ -307,7 +328,7 @@ vm() { $SSH "cd /root/miniupnp && $PRIV $*"; }
 
 # ---- Copy the checkout into the VM ---------------------------------------
 set_vm_clock() {
-  [ "$ROUTER" = freebsd-pf ] || return 0
+  [ "$ROUTER" != debian-iptables ] || return 0
   $SSH "$PRIV date -u $(date -u +%Y%m%d%H%M.%S)" >/dev/null 2>&1 || true
 }
 
