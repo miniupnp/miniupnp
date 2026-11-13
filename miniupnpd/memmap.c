@@ -393,6 +393,8 @@ memmap_map_in_firewall(unsigned short eport, int proto)
 	u_int64_t packets, bytes;
 	struct lease_entry * row;
 
+	if(firewall_trust == FW_TRUST_TRUST)
+		return 1;
 	if(memmap_map_counters(eport, proto, &packets, &bytes) == 0)
 		return 1;
 	syslog(LOG_INFO, "port %hu %s has no rule in the firewall, adding it again",

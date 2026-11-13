@@ -17,11 +17,13 @@
 #include "lease_table.h"
 #include "memmap.h"
 #include "fwsync.h"
+#include "upnpglobalvars.h"
 
 /* globals of the daemon which memmap.c uses */
 const char * ext_if_name = "wan";
 const char * ext_if_name6 = "wan";
 unsigned int nextruletoclean_timestamp = 0;
+int firewall_trust = FW_TRUST_CHECK;
 static time_t now = 1000;
 
 time_t upnp_time(void) { return now; }
@@ -304,6 +306,14 @@ test_renew_lost_rule(void)
 	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 0);
 	assert(lease_table_count() == 0 && calls == 1);
 	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 3000) < 0);
+	/* trusted, the firewall is not asked: the row stays, and renews */
+	firewall_trust = FW_TRUST_TRUST;
+	map(&c, MEMMAP_ADD, 1000, "192.168.1.10", 80, "web", 2000);
+	assert(memmap_sync(&c, 1) == 0 && calls == 2);
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
+	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 5000) == 0);
+	assert(calls == 2 && lease_table_count() == 1);
+	firewall_trust = FW_TRUST_CHECK;
 }
 
 /* a renewal with the description of another protocol gives the row to it, as

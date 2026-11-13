@@ -25,6 +25,8 @@ const char * ext_if_name6 = 0;
 const char * ext_stun_host = 0;
 uint16_t ext_stun_port = 0;
 
+int firewall_trust = FW_TRUST_CHECK;
+
 /* file to store leases */
 #ifdef ENABLE_LEASEFILE
 const char* lease_file = 0;

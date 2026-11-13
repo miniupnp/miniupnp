@@ -16,6 +16,7 @@
 #include "commonrdr.h"
 #include "lease_table.h"
 #include "memmap.h"
+#include "upnpglobalvars.h"
 #include "fwsync.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
@@ -41,6 +42,7 @@
 /* The fake firewall: memmap.c reads it, this test does not link a backend.
  * It holds no rule. A pass over the pinholes removes fake_removed rules. */
 const char * ext_if_name = "wan";
+int firewall_trust = FW_TRUST_CHECK;
 static time_t fake_now;
 static int fake_removed;
 static int fake_partial;	/* the next pass leaves expired rules */

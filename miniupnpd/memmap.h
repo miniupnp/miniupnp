@@ -117,7 +117,8 @@ int memmap_map_counters(unsigned short eport, int proto,
 
 /* 1 if the firewall still has the rule of an IPv4 port mapping with a row.
  * A flush or another program can remove a rule: then drop the row and return
- * 0, so the caller adds the mapping again instead of renewing a closed port. */
+ * 0, so the caller adds the mapping again instead of renewing a closed port.
+ * With firewall_trust FW_TRUST_TRUST the firewall is not asked: 1. */
 int memmap_map_in_firewall(unsigned short eport, int proto);
 
 /* Give a row to each rule of an earlier run which has none, so the rule can be
