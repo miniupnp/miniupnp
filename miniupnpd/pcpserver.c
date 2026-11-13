@@ -1234,8 +1234,6 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	uint8_t  proto = pcp_msg_info->protocol;
 	int r=-1;
 	int found = 0;
-	/* remove the mapping */
-	/* remove all the mappings for this client */
 	unsigned short eport2, iport2;
 	char iaddr2[INET6_ADDRSTRLEN];
 	int proto2;
@@ -1245,33 +1243,43 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	syslog(LOG_DEBUG, "is_fw=%d addr=%s iport=%hu proto=%d",
 	       pcp_msg_info->is_fw,  pcp_msg_info->mapped_str, iport, (int)proto);
 	if (!pcp_msg_info->is_fw) {
-		int index;
-		/* iterate through all rules and delete the requested ones */
-		for (index = 0;
-		     memmap_get_map_at(index, &eport2, &proto2, &iport2,
-				       iaddr2, sizeof(iaddr2), desc, sizeof(desc),
-				       NULL, 0, &timestamp) >= 0;
-		     index++) {
-			syslog(LOG_DEBUG, "%d: %s %hu %d", index, iaddr2, iport2, proto2);
-			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
-			   && (proto2==proto)
-			   && ((iport2==iport) || (iport==0))) {
+		if (iport != 0) {
+			/* RFC 6887 section 11.3: the internal address, protocol and
+			 * port are the key of the mapping. As in CreatePCPMap(), the
+			 * client's own row comes first, and the row of another owner
+			 * is refused below. */
+			if (memmap_find_map(pcp_msg_info->mapped_str, iport, proto,
+			                    MAPPING_PCP, &eport2, desc, sizeof(desc), NULL) == 0 ||
+			    memmap_find_map(pcp_msg_info->mapped_str, iport, proto,
+			                    -1, &eport2, desc, sizeof(desc), NULL) == 0)
 				found = 1;
-				if(0 != strcmp(desc, pcp_msg_info->desc)) {
-					/* nonce does not match */
-					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-					syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
-					       iport, proto_itoa(pcp_msg_info->protocol));
-					return;
-				} else {
-					r = _upnp_delete_redir(eport2, proto2);
+		} else {
+			int index;
+			/* internal port 0 is all ports (RFC 6887 section 11.1),
+			 * which has no index: the first mapping of the client */
+			for (index = 0;
+			     memmap_get_map_at(index, &eport2, &proto2, &iport2,
+			                       iaddr2, sizeof(iaddr2), desc, sizeof(desc),
+			                       NULL, 0, &timestamp) >= 0;
+			     index++) {
+				if (proto2 == proto &&
+				    strcmp(iaddr2, pcp_msg_info->mapped_str) == 0) {
+					found = 1;
+					break;
 				}
-				break;
 			}
 		}
 		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */
 		if (!found)
 			return;
+		if (0 != strcmp(desc, pcp_msg_info->desc)) {
+			/* nonce does not match */
+			pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+			syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
+			       iport, proto_itoa(pcp_msg_info->protocol));
+			return;
+		}
+		r = _upnp_delete_redir(eport2, proto);
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
