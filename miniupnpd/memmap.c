@@ -574,6 +574,19 @@ memmap_map_counters(unsigned short eport, int proto,
 	                         NULL, 0, &timestamp, packets, bytes) >= 0 ? 0 : -1;
 }
 
+int
+memmap_map_in_firewall(unsigned short eport, int proto)
+{
+	u_int64_t packets, bytes;
+
+	if(memmap_map_counters(eport, proto, &packets, &bytes) == 0)
+		return 1;
+	syslog(LOG_INFO, "port %hu %s has no rule in the firewall, adding it again",
+	       eport, proto_itoa(proto));
+	memmap_map_gone(eport, proto);
+	return 0;
+}
+
 /* Give a row to each rule of an earlier run which has none. The row has the
  * lifetime the firewall reports, or 0 for none: then it does not expire. A rule
  * with a row is skipped, so a repeated call is safe. */
