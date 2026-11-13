@@ -406,7 +406,6 @@ memmap_remote_peers_expired(unsigned int now, int removed)
 	syslog(LOG_INFO, "memmap: %u expired pinhole rows removed", total);
 }
 
-#ifdef USE_NFTABLES
 /* what a walk over the rows gives expiry_row() and gets back */
 struct expiry_ctx {
 	unsigned int now;
@@ -448,7 +447,6 @@ memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
 		syslog(LOG_DEBUG, "memmap: %d port mappings expired, next at %u", c.n, c.next);
 	return c.n;
 }
-#endif /* USE_NFTABLES */
 
 /* 1 if the IPv4 mapping has a row */
 static int

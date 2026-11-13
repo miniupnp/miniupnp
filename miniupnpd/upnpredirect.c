@@ -650,9 +650,11 @@ upnp_get_portmapping_number_of_entries(void)
 
 /* functions used to remove unused rules
  * As a side effect, delete expired rules (based on LeaseDuration) */
-#ifdef USE_NFTABLES
+/* Remove at most EXPIRE_MAX_PER_PASS port mappings past their lifetime, which
+ * the table knows with no read of the firewall, and set when the next pass is
+ * due. */
 static void
-expire_nft_rules(void)
+expire_maps(void)
 {
 	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
 	unsigned int now = (unsigned int)upnp_time();
@@ -671,7 +673,45 @@ expire_nft_rules(void)
 		next = now + 60;
 	nextruletoclean_timestamp = next;
 }
-#endif /* USE_NFTABLES */
+
+#ifdef PCP_PEER
+/* Remove at most EXPIRE_MAX_PER_PASS PEER rules past their lifetime. They have
+ * no row, so they are read from the firewall, by index. The next pass comes no
+ * later than the soonest expiry of the rest. */
+static void
+expire_peers(void)
+{
+	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int timestamp;
+	unsigned short iport;
+	u_int64_t packets, bytes;
+	int index, n = 0, proto, i;
+
+	for (index = 0;
+	     memmap_get_peer_at(index, &expired[n].eport, NULL, 0, &iport, &proto,
+	                        NULL, 0, NULL, 0, NULL, &timestamp,
+	                        &packets, &bytes) >= 0;
+	     index++) {
+		if (timestamp == 0)
+			continue;
+		if (timestamp > now) {
+			if (nextruletoclean_timestamp == 0 || timestamp < nextruletoclean_timestamp)
+				nextruletoclean_timestamp = timestamp;
+		} else if (n == EXPIRE_MAX_PER_PASS - 1) {
+			nextruletoclean_timestamp = now;	/* the next pass goes on */
+			break;
+		} else {
+			expired[n++].proto = proto;
+		}
+	}
+	for (i = 0; i < n; i++) {
+		syslog(LOG_NOTICE, "remove peer mapping %hu %s because it has expired",
+		       expired[i].eport, proto_itoa(expired[i].proto));
+		_upnp_delete_redir(expired[i].eport, expired[i].proto);
+	}
+}
+#endif /* PCP_PEER */
 
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
@@ -773,15 +813,9 @@ get_upnp_rules_state_list(int max_rules_number_target)
 void
 expire_upnp_rules(void)
 {
-#ifdef USE_NFTABLES
-	expire_nft_rules();
-#else
-	struct rule_state * list = get_upnp_rules_state_list(0);
-	while(list) {
-		struct rule_state * tmp = list;
-		list = tmp->next;
-		free(tmp);
-	}
+	expire_maps();
+#ifdef PCP_PEER
+	expire_peers();
 #endif
 }
 
