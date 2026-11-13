@@ -54,6 +54,13 @@ upnp_redirect(const char * rhost, unsigned short eport,
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */
+/* 1 if the firewall still has the rule of the IPv4 port mapping of eport,
+ * else 0. A rule which a flush or another program removed takes the row of
+ * its mapping and its line of the lease file with it, so the caller adds the
+ * mapping again, and a restart does not bring back the old one. */
+int
+upnp_map_in_firewall(unsigned short eport, int proto);
+
 int
 upnp_redirect_internal(const char * rhost, unsigned short eport,
                        const char * iaddr, unsigned short iport,

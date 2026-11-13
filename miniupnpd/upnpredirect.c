@@ -323,6 +323,17 @@ void lease_file_rewrite(void)
 #endif
 #endif
 
+int
+upnp_map_in_firewall(unsigned short eport, int proto)
+{
+	if(memmap_map_in_firewall(eport, proto))
+		return 1;
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(eport, proto);
+#endif
+	return 0;
+}
+
 /* upnp_redirect()
  * calls OS/fw dependent implementation of the redirection.
  * protocol should be the string "TCP" or "UDP"
@@ -408,7 +419,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	rhost_old[0] = '\0';
 	r = memmap_get_map(eport, proto, &iport_old, iaddr_old, sizeof(iaddr_old),
 	                        NULL, 0, rhost_old, sizeof(rhost_old), NULL);
-	if(r == 0 && !memmap_map_in_firewall(eport, proto))
+	if(r == 0 && !upnp_map_in_firewall(eport, proto))
 		r = -1;
 	if(r == 0) {
 		if(strcmp(iaddr, iaddr_old)==0 &&
