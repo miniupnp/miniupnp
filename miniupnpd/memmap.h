@@ -177,7 +177,6 @@ int memmap_in_firewall(const struct memmap_key * key);
  * listed and deleted. This reads the firewall, once at startup. */
 void memmap_adopt_rules(void);
 
-#ifdef USE_NFTABLES
 /* the mappings removed by a pass of the main loop, so that a large expiry
  * does not stop the daemon from answering */
 #define EXPIRE_MAX_PER_PASS	64
@@ -192,7 +191,6 @@ struct expired_redirect {
  * firewall. Returns the number filled. */
 int memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
                         int max, unsigned int * next);
-#endif
 
 #ifdef ENABLE_UPNPPINHOLE
 /* The pinhole reads below go to the firewall: a pinhole of an earlier run has

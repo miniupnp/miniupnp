@@ -434,6 +434,63 @@ find_s(const char * iaddr, unsigned short iport, int proto, int mapping_owner,
 	                   eport, desc, desclen, ts);
 }
 
+static inline int
+used_by_other_s(unsigned short eport, const char * iaddr)
+{
+	struct in6_addr a;
+	int family;
+	if(memmap_pton(iaddr, &family, &a) < 0)
+		return 0;
+	return memmap_eport_used_by_other(family, NULL, eport, &a);
+}
+
+static inline int
+redirected_s(const char * ifname, unsigned short eport, int proto,
+             const char * iaddr, unsigned short iport)
+{
+	struct memmap_key k;
+	struct in6_addr a;
+	int family;
+	if(memmap_pton(iaddr, &family, &a) < 0)
+		return 0;
+	memmap_key_init(&k, family, proto, NULL, eport, &a, iport);
+	return memmap_eport_redirected_elsewhere(ifname, &k);
+}
+
+
+/* 1000 clients ask for the external port another one holds: each is told the
+ * port is in use, by both checks, the holder is not, and the table keeps the
+ * one row */
+static void
+test_one_port_many_clients(void)
+{
+	static const char * holder = "10.0.0.1";
+	char h[INET_ADDRSTRLEN];
+	int i, in_use = 0, used_by_other = 0;
+
+	lease_table_clear();
+	memmap_map(0, 40001, holder, 5000, IPPROTO_UDP, "holder", 1000);
+	for(i = 1; i <= 1000; i++) {
+		snprintf(h, sizeof(h), "10.0.%d.%d", i / 250, i % 250 + 1);
+		in_use += redirected_s("wan", 40001, IPPROTO_UDP, h, 5000);
+		used_by_other += used_by_other_s(40001, h);
+	}
+	assert(in_use == 1000 && used_by_other == 1000);
+	assert(lease_table_count() == 1);
+
+	/* the holder may have it, but not for another internal port */
+	assert(redirected_s("wan", 40001, IPPROTO_UDP, holder, 5000) == 0);
+	assert(redirected_s("wan", 40001, IPPROTO_UDP, holder, 5001) == 1);
+	assert(used_by_other_s(40001, holder) == 0);
+	/* the other protocol has no mapping of the port */
+	assert(redirected_s("wan", 40001, IPPROTO_TCP, h, 5000) == 0);
+	/* once the holder is gone, the port is free for any of them */
+	memmap_map_gone(40001, IPPROTO_UDP);
+	assert(redirected_s("wan", 40001, IPPROTO_UDP, h, 5000) == 0);
+	assert(used_by_other_s(40001, h) == 0);
+	lease_table_clear();
+}
+
 static void
 test_find_map(void)
 {
@@ -476,7 +533,6 @@ test_find_map(void)
 	lease_table_clear();
 }
 
-#ifdef USE_NFTABLES
 static void
 test_expired_maps(void)
 {
@@ -522,7 +578,6 @@ test_expired_maps(void)
 	assert(memmap_expired_maps(100, expired, 3, &next) == 3 && next == 100);
 	lease_table_clear();
 }
-#endif /* USE_NFTABLES */
 
 #ifdef TEST_MAP6
 /* One expiry pass over the pinholes at time now, in which the firewall removes
@@ -655,9 +710,8 @@ main(void)
 	test_ipv4();
 	test_ipv6();
 	test_find_map();
-#ifdef USE_NFTABLES
+	test_one_port_many_clients();
 	test_expired_maps();
-#endif
 #ifdef TEST_MAP6
 	test_map6_expiry();
 	test_map6_keys();
