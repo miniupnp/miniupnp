@@ -37,6 +37,7 @@
 #include <libnftnl/chain.h>
 #include <libnftnl/rule.h>
 #include <libnftnl/expr.h>
+#include <libnftnl/gen.h>
 
 #include "../commonrdr.h"
 #include "nftnlrdr_misc.h"
@@ -92,6 +93,11 @@ struct rule_list head_peer = LIST_HEAD_INITIALIZER(head_peer);
 static uint32_t rule_list_filter_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_redirect_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_peer_validate = RULE_CACHE_INVALID;
+/* the generation of the ruleset each cache was read in: another program
+ * which changes the ruleset changes it */
+static uint32_t rule_list_filter_gen;
+static uint32_t rule_list_redirect_gen;
+static uint32_t rule_list_peer_gen;
 
 
 /*
@@ -656,37 +662,89 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 }
 #undef CB_DATA
 
+static int
+gen_cb(const struct nlmsghdr *nlh, void *data)
+{
+	struct nftnl_gen *g = nftnl_gen_alloc();
+
+	if (g == NULL)
+		return MNL_CB_ERROR;
+	if (nftnl_gen_nlmsg_parse(nlh, g) < 0) {
+		nftnl_gen_free(g);
+		return MNL_CB_ERROR;
+	}
+	*(uint32_t *)data = nftnl_gen_get_u32(g, NFTNL_GEN_ID);
+	nftnl_gen_free(g);
+	return MNL_CB_OK;
+}
+
+/* The generation of the ruleset, which each commit of any program changes.
+ * 0, or -1 if it could not be read. */
+static int
+ruleset_gen(uint32_t *gen)
+{
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *nlh;
+	ssize_t n;
+
+	if (mnl_sock == NULL)
+		return -1;
+	mnl_seq = time(NULL);
+	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETGEN, AF_UNSPEC, 0, mnl_seq);
+	if (mnl_socket_sendto(mnl_sock, nlh, nlh->nlmsg_len) < 0)
+		return -1;
+	n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+	if (n <= 0)
+		return -1;
+	return mnl_cb_run(buf, n, mnl_seq, mnl_portid, gen_cb, gen) < 0 ? -1 : 0;
+}
+
+/* Read a chain into its cache, unless the cache holds it as it is: read in
+ * the generation the ruleset still has. */
+static int
+refresh_cache(uint32_t *valid, uint32_t *gen, struct rule_list *head,
+              const char *table, const char *chain, uint32_t family,
+              enum rule_type type)
+{
+	uint32_t now;
+
+	if (ruleset_gen(&now) < 0)
+		*valid = RULE_CACHE_INVALID;
+	else if (*valid == RULE_CACHE_VALID && now == *gen)
+		return 0;
+	/* a commit during the read changes the generation again: the next
+	 * call reads the chain once more */
+	if (refresh_nft_cache(head, table, chain, family, type) < 0) {
+		*valid = RULE_CACHE_INVALID;
+		return -1;
+	}
+	*valid = RULE_CACHE_VALID;
+	*gen = now;
+	return 0;
+}
+
 int
 refresh_nft_cache_filter(void)
 {
-	if (rule_list_filter_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_filter, nft_table, nft_forward_chain, nft_ipv4_family, RULE_FILTER) < 0)
-			return -1;
-		rule_list_filter_validate = RULE_CACHE_VALID;
-	}
-	return 0;
+	return refresh_cache(&rule_list_filter_validate, &rule_list_filter_gen,
+	                     &head_filter, nft_table, nft_forward_chain,
+	                     nft_ipv4_family, RULE_FILTER);
 }
 
 int
 refresh_nft_cache_peer(void)
 {
-	if (rule_list_peer_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_peer, nft_nat_table, nft_postrouting_chain, nft_nat_family, RULE_NAT) < 0)
-			return -1;
-		rule_list_peer_validate = RULE_CACHE_VALID;
-	}
-	return 0;
+	return refresh_cache(&rule_list_peer_validate, &rule_list_peer_gen,
+	                     &head_peer, nft_nat_table, nft_postrouting_chain,
+	                     nft_nat_family, RULE_NAT);
 }
 
 int
 refresh_nft_cache_redirect(void)
 {
-	if (rule_list_redirect_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_redirect, nft_nat_table, nft_prerouting_chain, nft_nat_family, RULE_NAT) < 0)
-			return -1;
-		rule_list_redirect_validate = RULE_CACHE_VALID;
-	}
-	return 0;
+	return refresh_cache(&rule_list_redirect_validate, &rule_list_redirect_gen,
+	                     &head_redirect, nft_nat_table, nft_prerouting_chain,
+	                     nft_nat_family, RULE_NAT);
 }
 
 void
