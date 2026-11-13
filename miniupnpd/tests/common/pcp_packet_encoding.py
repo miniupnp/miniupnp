@@ -56,8 +56,10 @@ def parse_map_response(response):
 
 
 def parse_natpmp_response(response):
-    """Fields of a NAT-PMP response: result code, plus the address or the port/lifetime fields."""
+    """Fields of a NAT-PMP response: result code and epoch, plus the address or the port/lifetime fields."""
     fields = {"version": response[0], "opcode": response[1], "result": struct.unpack("!H", response[2:4])[0]}
+    if len(response) >= 8:
+        fields["epoch"] = struct.unpack("!I", response[4:8])[0]
     if response[1] == 128:
         fields["address"] = socket.inet_ntop(socket.AF_INET, response[8:12])
     elif len(response) >= 16:

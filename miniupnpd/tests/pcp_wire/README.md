@@ -17,7 +17,7 @@ limits on what the tests establish.
 | [`run_pcp_wire_cases.py`](run_pcp_wire_cases.py) | Execute YAML cases against a daemon, or check the harness with `--self-test`. |
 | [`pcp-wire-cases.yaml`](pcp-wire-cases.yaml) | Define protocol requests, operations, profiles, and expected outcomes. |
 | [`tools/compare_pcap_wire_fields.py`](tools/compare_pcap_wire_fields.py) | Decode and compare two packet captures. |
-| [`tools/compare_daemon_branches.py`](tools/compare_daemon_branches.py) | Run identical cases against two committed daemon versions and report regressions. |
+| [`../common/tools/compare_daemon_branches.py`](../common/tools/compare_daemon_branches.py) | Run identical cases against two committed daemon versions and report regressions (every suite with a `compare.py`; this one's is [`compare.py`](compare.py)). |
 | [`../common/traffic_agent.py`](../common/traffic_agent.py) | Configure the WAN fixture and run the [shared traffic agent](../common/traffic_agent.md). |
 | [`../common/lib_test.py`](../common/lib_test.py) | Code both PCP runners share: sending requests and checking responses, LAN/WAN probes, the lease file, packet capture, the status report. |
 | [`../common/pcp_packet_encoding.py`](../common/pcp_packet_encoding.py) | PCP / NAT-PMP names, request encoding and response decoding (no I/O). |
@@ -209,7 +209,8 @@ fills the `freebsd` column:
 ./miniupnpd/tests/pcp_wire/run-freebsd.sh
 ```
 
-It boots a throwaway FreeBSD VM under QEMU (KVM when available) and runs
+It boots a throwaway FreeBSD VM under QEMU (KVM when available, `../common/freebsd_vm.sh`, the
+newest release unless `--freebsd-version` or `PCP_TEST_FREEBSD_VERSION` names one) and runs
 `freebsd/ci.sh` inside it: build miniupnpd with pf on an `epair(4)` router
 topology (a WAN and two LANs, default route out of the WAN), run the whole YAML
 suite from a client jail on LAN1, then the cases that restart the daemon. The
@@ -217,7 +218,7 @@ client is a vnet jail because the daemon decides which LAN a request came from b
 routing to the sender; for the router's own address that route is `lo0`, so a
 runner on the router itself is ignored over IPv6. Requires `qemu-system-x86_64`,
 `qemu-img`, `xz`, `curl`, `ssh` and `xorriso`/`genisoimage`/`mkisofs` on the host;
-the header of the script lists its environment variables. The first run builds a
+the headers of the script and of `../common/freebsd_vm.sh` list the environment variables. The first run builds a
 cached VM image with the build tools, Python and PyYAML. Results, captures and
 logs go to `.tmp/ci/out/freebsd/announce/`, and the merged `status.md` is updated.
 
@@ -379,7 +380,7 @@ Add `--capture` to collect pcaps, tcpdump logs and decoded before/after
 Markdown field tables:
 
 ```sh
-python3 miniupnpd/tests/pcp_wire/tools/compare_daemon_branches.py \
+python3 miniupnpd/tests/common/tools/compare_daemon_branches.py --suite wire \
   --master-source /path/to/master-checkout \
   --candidate-source /path/to/pr-checkout \
   --output .tmp/master-pr-comparison --capture
@@ -387,10 +388,18 @@ python3 miniupnpd/tests/pcp_wire/tools/compare_daemon_branches.py \
 
 Arguments:
 
+- `--suite NAME`: the suite to compare (required): `wire` is this one. Each suite directory with a
+  `compare.py` is a suite: it says how the suite runs and where its results are
+  ([`compare.py`](compare.py) here; the interface is in
+  [`../common/tools/suite_compare.py`](../common/tools/suite_compare.py)).
+  `--suite NAME --help` lists the options of a suite.
 - `--master-source DIR`: master git checkout (required).
 - `--candidate-source DIR`: candidate git checkout (required).
 - `--output DIR`: new artifact directory (required); an existing directory is rejected.
 - `--case NAME`: select a YAML case; repeat to select several cases.
+
+Options of the `wire` suite:
+
 - `--profile NAME`: server fixture profile (default: `baseline`).
 - `--wan-peer`: enable WAN TCP/UDP traffic checks (disabled by default).
 - `--capture`: collect pcaps, tcpdump logs, and decoded comparisons (disabled by default).
@@ -398,8 +407,8 @@ Arguments:
 With `--capture`, captures use separate timestamped `master` and `candidate`
 folders. Raw payload hex dumps are omitted from the field tables.
 Daemon sources come from the committed HEAD of each checkout; uncommitted
-daemon edits are excluded. The harness comes from this invocation's
-`pcp_wire/` directory and its sibling `common/` directory. Python with tarfile's
+daemon edits are excluded. The harness is this invocation's
+`miniupnpd/tests/` directory, for both daemons. Python with tarfile's
 `data` extraction filter is required (Python 3.12 or newer supports it).
 
 Exit statuses:
@@ -418,7 +427,8 @@ address family, and each case's status and detail.
 Run the offline comparison-policy and report-completeness checks with:
 
 ```sh
-python3 miniupnpd/tests/pcp_wire/tools/test_compare_daemon_branches.py
+python3 miniupnpd/tests/common/tools/test_compare_daemon_branches.py
+python3 miniupnpd/tests/pcp_wire/test_compare.py
 ```
 
 ## Corpus and expected failures
@@ -517,7 +527,7 @@ Only one instance of the fixed-subnet Docker fixture can run on a host at once.
 Master/PR comparison and local packet diagnostics support the same profiles:
 
 ```sh
-python3 miniupnpd/tests/pcp_wire/tools/compare_daemon_branches.py \
+python3 miniupnpd/tests/common/tools/compare_daemon_branches.py --suite wire \
   --master-source /path/to/master --candidate-source /path/to/pr \
   --output .tmp/port-set-details --profile port-set --wan-peer --capture
 ```

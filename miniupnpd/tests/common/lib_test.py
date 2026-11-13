@@ -17,6 +17,7 @@ import shlex
 import shutil
 import signal
 import socket
+import ssl
 import struct
 import subprocess
 import sys
@@ -2975,9 +2976,16 @@ def http_raw(host, port, data, timeout=5):
 
 
 def http_request(url, method="GET", body=None, headers=None, timeout=5):
-    """A well-formed request with http.client: (status, {lower-case header: value}, body)."""
+    """A well-formed request with http.client: (status, {lower-case header: value}, body). An https URL
+    does not check the daemon's test certificate."""
     host, port, path = url_parts(url)
-    connection = http.client.HTTPConnection(host, port, timeout=timeout)
+    if url.startswith("https:"):
+        tls = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        tls.check_hostname = False
+        tls.verify_mode = ssl.CERT_NONE
+        connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=tls)
+    else:
+        connection = http.client.HTTPConnection(host, port, timeout=timeout)
     try:
         connection.request(method, path, body, headers or {})
         response = connection.getresponse()
@@ -3563,3 +3571,382 @@ def check_wan_exposure(agent, protocol, host, port, payload, timeout=1.0):
     outcome = traffic_agent.request_probe(agent, protocol, host, port, payload.encode().hex(), timeout=timeout)
     if "error" not in outcome:
         raise AssertionError(f"{protocol} {host_literal(host)}:{port} answered a WAN peer ({outcome})")
+
+
+# The daemon_options suite: every case runs under its own daemon configuration (config: [key=value,
+# ...]), and the driver starts a fresh daemon for each configuration. The PCP and NAT-PMP cases are
+# the kinds of the pcp_wire corpus (run_case); a UPnP case is one SOAP request (kind upnp).
+
+
+OPTION_NAME_PATTERN = re.compile(r'\{\s*UPNP[A-Z0-9_]+\s*,\s*"([a-z0-9_]+)"\s*\}')
+PERMISSION_LINE = re.compile(r"(allow|deny) [0-9-]+ [0-9./]+ [0-9-]+")
+CASE_SIDES = ("lan", "wan")     # where a case sends from: the LAN client, or a host on the WAN
+UPNP_OUTCOMES = ("SUCCESS", "NO_LISTENER", "NO_REPLY")     # and UPNP_<errorCode>
+
+
+def daemon_option_names(options_c):
+    """The option names of miniupnpd's configuration file, from the optionids table of options.c
+    (the names of every build: the #ifdefs are not evaluated)."""
+    with open(options_c, encoding="utf-8") as source:
+        names = set(OPTION_NAME_PATTERN.findall(source.read()))
+    if not names:
+        raise CorpusError(f"no option names found in {options_c}")
+    return names
+
+
+def case_config(case):
+    """The daemon configuration of a case: its config lines, in their order."""
+    return tuple(case.get("config", ()))
+
+
+def case_side(case):
+    return case.get("from", "lan")
+
+
+def config_label(config):
+    return "; ".join(config) if config else "fixture defaults"
+
+
+def config_options(config):
+    """{option: value} of the key=value lines of a configuration."""
+    return dict(line.split("=", 1) for line in config if not PERMISSION_LINE.fullmatch(line))
+
+
+def config_word(line):
+    """A configuration line as one word of --list-runs and --config: an allow / deny line has
+    blanks, and the driver splits on them. No configuration line holds a +."""
+    return line.replace(" ", "+")
+
+
+def config_line(word):
+    return word.replace("+", " ")
+
+
+def check_case_config(case, option_names=None):
+    """config is a list of key=value lines without blanks, of options miniupnpd knows (option_names,
+    when given); from is lan or wan."""
+    config = case.get("config")
+    if not isinstance(config, list):
+        raise CorpusError(f"{case.get('name')}: config must be a list of key=value lines")
+    for line in config:
+        if isinstance(line, str) and PERMISSION_LINE.fullmatch(line):
+            continue
+        if not isinstance(line, str) or not re.fullmatch(r"[a-z0-9_]+=[^\s=+]+", line):
+            raise CorpusError(f"{case['name']}: config line {line!r} is not key=value (no blanks) "
+                              "or an allow / deny line")
+        option = line.split("=", 1)[0]
+        if option_names is not None and option not in option_names:
+            raise CorpusError(f"{case['name']}: {option} is not an option of miniupnpd (options.c)")
+    if case_side(case) not in CASE_SIDES:
+        raise CorpusError(f"{case['name']}: from must be one of {', '.join(CASE_SIDES)}")
+
+
+def check_upnp_case(case):
+    """A UPnP case: one AddPortMapping / DeletePortMapping on IPv4, a daemon whose HTTP port is
+    UPNP_HTTP_PORT (also when UPnP is off, or nothing there would prove nothing) and the outcomes it
+    accepts."""
+    where = case["name"]
+    if case.get("protocol") != "upnp" or case.get("families") != ["ipv4"]:
+        raise CorpusError(f"{where}: a UPnP case has protocol upnp and families [ipv4]")
+    request = case["request"]
+    if request.get("internal_client", "neighbour") != "neighbour":
+        raise CorpusError(f"{where}: internal_client can only be neighbour")
+    if request.get("action") not in ("AddPortMapping", "DeletePortMapping"):
+        raise CorpusError(f"{where}: unknown UPnP action {request.get('action')!r}")
+    try:
+        validate_upnp_request(where, request, "ipv4")
+    except ValueError as error:
+        raise CorpusError(str(error)) from None
+    options = config_options(case_config(case))
+    if options.get("http_port", options.get("port")) != str(UPNP_HTTP_PORT):
+        raise CorpusError(f"{where}: a UPnP case needs http_port={UPNP_HTTP_PORT} in its config")
+    expect = case.get("expect", {})
+    results = expect.get("result")
+    if expect.get("kind") != "upnp" or not isinstance(results, list) or not results or any(
+            not isinstance(result, str) or not (result in UPNP_OUTCOMES or re.fullmatch(r"UPNP_\d+", result))
+            for result in results):
+        raise CorpusError(f"{where}: a UPnP case expects kind upnp and a result list of "
+                          f"{', '.join(UPNP_OUTCOMES)} or UPNP_<errorCode>")
+
+
+def validate_option_cases(cases, profiles, option_names=None):
+    """Check every case of a daemon_options corpus (validate_cases for the PCP and NAT-PMP ones);
+    returns the cases by protocol/name, as validate_cases does."""
+    upnp = [case for case in cases if case.get("request", {}).get("kind") == "upnp"]
+    stepped = [case for case in cases if case.get("request", {}).get("kind") == "option_steps"]
+    for case in cases:
+        check_case_config(case, option_names)
+    for case in upnp:
+        check_upnp_case(case)
+    for case in stepped:
+        if case.get("expect", {}).get("kind") not in ("steps", "daemon_exits"):
+            raise CorpusError(f"{case['name']}: option_steps expects kind steps or daemon_exits")
+        for step in case["request"]["steps"]:
+            check_step(case["name"], step)
+    earlier_cases = validate_cases([case for case in cases if case not in upnp and case not in stepped], profiles)
+    identities = [(case["protocol"], case["name"]) for case in cases]
+    if len(identities) != len(set(identities)):
+        raise CorpusError("duplicate case names in YAML corpus")
+    earlier_cases.update({f"{case['protocol']}/{case['name']}": case for case in upnp + stepped})
+    return earlier_cases
+
+
+def config_runs(cases):
+    """(config, side, family) of every run a driver makes, in corpus order of the configurations: one
+    daemon per configuration, then a run from each side and family that has cases."""
+    runs = {}
+    for case in cases:
+        for family in case["families"]:
+            runs.setdefault(case_config(case), {}).setdefault((case_side(case), family), None)
+    return [(config, side, family) for config, sides in runs.items()
+            for side, family in sorted(sides, key=lambda key: (CASE_SIDES.index(key[0]), key[1]))]
+
+
+def cases_of_run(cases, config, side):
+    """The cases a daemon with this configuration runs from this side."""
+    return [case for case in cases if case_config(case) == tuple(config) and case_side(case) == side]
+
+
+def option_status_sections(sections):
+    """The sections for the status report: a case's description starts with its configuration and side."""
+    return [dict(section, cases=[
+        dict(case, description=f"[{config_label(case_config(case))}; from {case_side(case)}] "
+                               f"{case.get('description', '')}".strip())
+        for case in section["cases"]]) for section in sections]
+
+
+def upnp_outcome(router, client, spec):
+    """The result of a UPnP SOAP request (upnp_request): SUCCESS or UPNP_<errorCode>; NO_LISTENER
+    when nothing accepts the TCP connection, NO_REPLY when it is closed or times out without an
+    HTTP response."""
+    try:
+        return upnp_request(router, client, spec)[0]
+    except ConnectionRefusedError:
+        return "NO_LISTENER"
+    except (http.client.RemoteDisconnected, ConnectionResetError, socket.timeout):
+        return "NO_REPLY"
+
+
+def lan_neighbour(client):
+    """An address beside the client on its LAN, for a mapping to another host."""
+    return str(ipaddress.ip_address(client) + 1)
+
+
+def run_upnp_case(sock, address, case):
+    """One UPnP request from the address the socket sends to `address` from, for that address or
+    (internal_client: neighbour) the next one on its LAN; a mapping it made is deleted again."""
+    spec = dict(case["request"], protocol_family="UPnP")
+    client = client_address(sock, address)
+    if spec.get("internal_client") == "neighbour":
+        client = lan_neighbour(client)
+    result = upnp_outcome(address[0], client, spec)
+    cleanup_error = None
+    if result == "SUCCESS" and spec["action"] == "AddPortMapping":
+        try:
+            upnp_request(address[0], client, cleanup_request(spec))
+        except Exception as error:     # reported after the result, which it must not hide
+            cleanup_error = error
+    assert result in case["expect"]["result"], \
+        f"UPnP {spec['action']} expected {' or '.join(case['expect']['result'])}, got {result}"
+    if cleanup_error is not None:
+        raise AssertionError(f"cleanup DeletePortMapping failed: {cleanup_error!r}") from cleanup_error
+
+
+def run_option_case(sock, address, case, call_dir=None, daemon_down=False):
+    """One case of a daemon_options corpus: a daemon that must not start, option steps, a UPnP
+    request, or a PCP / NAT-PMP case (run_case)."""
+    if case["expect"].get("kind") == "daemon_exits":
+        assert daemon_down, "the daemon started"
+        run_option_steps(sock, address, case, call_dir)     # the reason, from its log
+    elif daemon_down:
+        raise AssertionError("the daemon did not start")
+    elif case["request"]["kind"] == "option_steps":
+        run_option_steps(sock, address, case, call_dir)
+    elif case["request"]["kind"] == "upnp":
+        run_upnp_case(sock, address, case)
+    else:
+        run_case(sock, address, case, mutating=True)
+
+
+# The steps of a daemon_options case (request kind option_steps): checks that need more than one
+# request, or that look at the router. A router step goes through the driver, the only one that can
+# reach the container: the runner drops the command into a directory the driver watches
+# (router_call), as `ruleset`, `log`, `cat:PATH`, `restart`, `firewall-flush`, `wan-probe:PORT` or
+# `wan-reserved` (daemon_options/README.md).
+
+
+STEP_KINDS = frozenset({"natpmp_address", "natpmp_map", "pcp_map", "upnp_add", "upnp_get", "http_get", "soap",
+                        "router", "sleep", "ssdp"})
+
+
+def check_text(where, text, step):
+    for wanted in step.get("contains", ()):
+        assert wanted in text, f"{where}: {wanted!r} not found in: {text[-400:]!r}"
+    for unwanted in step.get("absent", ()):
+        assert unwanted not in text, f"{where}: {unwanted!r} found"
+
+
+def check_step(where, step):
+    """A step is one kind from STEP_KINDS with its arguments."""
+    kinds = STEP_KINDS.intersection(step) if isinstance(step, dict) else ()
+    if len(kinds) != 1:
+        raise CorpusError(f"{where}: a step has one of {', '.join(sorted(STEP_KINDS))}")
+
+
+def natpmp_address_step(sock, address, spec):
+    response = exchange(sock, address, b"\x00\x00")
+    assert len(response) == 12 and response[1] == 128, f"bad public address response {response.hex()}"
+    fields = pcp_packet_encoding.parse_natpmp_response(response)
+    assert fields["result"] == spec.get("result", 0), f"NAT-PMP result {fields['result']}"
+    if spec.get("equals") == "@ROUTER_LAN4@":
+        assert fields["address"] == address[0], fields["address"]
+    elif "equals" in spec:
+        assert fields["address"] == spec["equals"], fields["address"]
+    if "epoch_below" in spec:
+        assert fields["epoch"] < spec["epoch_below"], f"epoch {fields['epoch']}"
+    if spec.get("epoch_is_uptime"):
+        with open("/proc/uptime", encoding="ascii") as uptime:
+            assert abs(float(uptime.read().split()[0]) - fields["epoch"]) < 60, f"epoch {fields['epoch']}"
+
+
+def natpmp_map_step(sock, address, spec):
+    opcode = 1
+    request = pcp_packet_encoding.natpmp_packet(opcode, spec["port"], spec["port"], spec.get("lifetime", 600))
+    response = exchange(sock, address, request)
+    # an error reply of the mapping opcodes is as long as a success
+    assert len(response) == 16 and response[1] == 128 + opcode, f"bad NAT-PMP map response {response.hex()}"
+    result = pcp_packet_encoding.parse_natpmp_response(response)["result"]
+    assert result == spec.get("result", 0), f"NAT-PMP map result {result}"
+
+
+def pcp_map_step(sock, address, spec):
+    client = client_address(sock, address)
+    request = {"pcp": "MAP", "lifetime": spec.get("lifetime", 600), "protocol": spec.get("protocol", "tcp"),
+               "internal_port": spec["port"], "suggested_external_port": spec["port"]}
+    packet = build_map_packet(client, request, {}, nonce_of(spec) if "nonce_hex" in spec else None)[0]
+    if spec.get("third_party") == "neighbour":
+        mapped = ipaddress.ip_address("::ffff:" + lan_neighbour(client))
+        packet += pcp_packet_encoding.pcp_option(pcp_packet_encoding.OPTIONS["THIRD_PARTY"], mapped.packed)
+    response = exchange(sock, address, packet)
+    assert len(response) >= pcp_packet_encoding.MAP_REQUEST_SIZE, f"bad PCP MAP response {response.hex()}"
+    fields = pcp_packet_encoding.parse_map_response(response)
+    assert fields["result"] == spec.get("result", 0), f"PCP result {fields['result']}"
+    if "external" in spec:
+        mapped = ipaddress.ip_address(fields["external_address"])
+        shown = str(mapped.ipv4_mapped or mapped)
+        assert shown == spec["external"], f"external address {shown}"
+
+
+def daemon_url(address, path, https_port=None):
+    """The URL of `path` on the daemon's HTTP port, or on its https_port."""
+    host = host_literal(address[0])
+    return f"https://{host}:{https_port}{path}" if https_port else f"http://{host}:{UPNP_HTTP_PORT}{path}"
+
+
+def http_get_step(address, spec):
+    """A GET on the HTTP port, or over TLS on `https_port`."""
+    url = daemon_url(address, spec.get("path", "/rootDesc.xml"), spec.get("https_port"))
+    return http_request(url)[2].decode("utf-8", "replace")
+
+
+def soap_step(address, spec, client=None, saved=None):
+    """A SOAP action that succeeds, with the out arguments in `values`. `args` are its arguments: the
+    value $client is the client's address and $NAME what an earlier step of the case saved. `save`
+    {NAME: argument} keeps an out argument in `saved` for the steps after it."""
+    saved = {} if saved is None else saved
+    args = [(name, client if value == "$client" else
+             saved[value[1:]] if str(value).startswith("$") else value)
+            for name, value in spec.get("args", {}).items()]
+    status, result = soap_call(daemon_url(address, spec["path"]), spec["service"], spec["action"], args)
+    assert status == 200 and isinstance(result, dict), f"{spec['action']}: HTTP {status}, {result!r}"
+    for name, argument in spec.get("save", {}).items():
+        saved[name] = result[argument]
+    for name, value in spec.get("values", {}).items():
+        assert result.get(name) == value, f"{spec['action']}: {name} is {result.get(name)!r}, not {value!r}"
+
+
+def upnp_get_step(address, spec):
+    status, result = soap_call(daemon_url(address, "/ctl/IPConn"), UPNP_SERVICE, "GetSpecificPortMappingEntry",
+                               [("NewRemoteHost", ""), ("NewExternalPort", spec["port"]), ("NewProtocol", "TCP")])
+    if spec.get("present", True):
+        assert status == 200 and "NewInternalClient" in result, f"mapping {spec['port']} is missing: {result!r}"
+    else:
+        assert isinstance(result, SoapFault) and result.code == 714, f"mapping {spec['port']} is not absent: {result!r}"
+
+
+def ssdp_step(sock, address, spec):
+    """Count the ssdp:alive NOTIFYs seen on the IPv4 SSDP group on the client's LAN in `seconds`."""
+    with ssdp_notify_listener(client_address(sock, address)) as listener:
+        alive = receive_ssdp(listener, spec["seconds"], lambda _start, headers: headers.get("nts") == "ssdp:alive")
+    count = len(alive)
+    assert spec.get("min", 0) <= count <= spec.get("max", 10**6), f"{count} NOTIFYs in {spec['seconds']} s"
+
+
+def run_option_step(sock, address, step, call_dir, saved):
+    kind = next(iter(STEP_KINDS.intersection(step)))
+    spec = step[kind]
+    if kind == "natpmp_address":
+        natpmp_address_step(sock, address, spec)
+    elif kind == "natpmp_map":
+        natpmp_map_step(sock, address, spec)
+    elif kind == "pcp_map":
+        pcp_map_step(sock, address, spec)
+    elif kind == "upnp_add":
+        client = client_address(sock, address)
+        request = {"action": "AddPortMapping", "protocol": "tcp", "external_port": spec["port"],
+                   "internal_port": spec["port"], "lease_duration": spec.get("lease", 600)}
+        result = upnp_outcome(address[0], client, request)
+        assert result in spec.get("results", ["SUCCESS"]), f"UPnP add: {result}"
+    elif kind == "upnp_get":
+        upnp_get_step(address, spec)
+    elif kind == "http_get":
+        check_text("http_get", http_get_step(address, spec), spec)
+    elif kind == "soap":
+        soap_step(address, spec, client_address(sock, address), saved)
+    elif kind == "router":
+        check_text(spec["command"], router_call(call_dir, spec["command"]), spec)
+    elif kind == "sleep":
+        time.sleep(spec)
+    elif kind == "ssdp":
+        ssdp_step(sock, address, spec)
+
+
+def run_option_steps(sock, address, case, call_dir):
+    pcp_address = (address[0], pcp_packet_encoding.PCP_PORT)
+    saved = {}     # what the case's soap steps save, for its later steps only
+    for index, step in enumerate(case["request"]["steps"], 1):
+        try:
+            run_option_step(sock, pcp_address, step, call_dir, saved)
+        except AssertionError as error:
+            raise AssertionError(f"step {index}: {error}") from error
+        except Exception as error:     # what a malformed reply raises fails the case, not the run
+            raise AssertionError(f"step {index}: {error!r}") from error
+
+
+PERMISSION_LINE_PATTERN = re.compile(r'memcmp\(\s*name\s*,\s*"(allow|deny)"')
+
+
+def permission_line_kinds(options_c):
+    """The permission lines options.c parses apart from its option table (allow, deny)."""
+    with open(options_c, encoding="utf-8") as source:
+        return sorted(set(PERMISSION_LINE_PATTERN.findall(source.read())))
+
+
+def option_coverage(cases, option_names):
+    """(varied, untested): the options of option_names that a case config sets, and the others,
+    each sorted. A permission line (allow / deny) is not an option and counts in neither."""
+    varied = {line.split("=", 1)[0] for case in cases for line in case_config(case) if "=" in line}
+    return sorted(varied & set(option_names)), sorted(set(option_names) - varied)
+
+
+def option_coverage_line(cases, option_names, permission_kinds=()):
+    """The INFO line of a self-test: how many options of miniupnpd a case config varies, which ones
+    no case sets, and how many cases vary a permission line."""
+    varied, untested = option_coverage(cases, option_names)
+    permission_cases = sum(1 for case in cases if any(
+        line.split(" ", 1)[0] in permission_kinds for line in case_config(case)))
+    line = (f"INFO options: {len(varied)} of {len(option_names)} varied by a case ({', '.join(varied) or 'none'}); "
+            f"untested: {', '.join(untested) or 'none'}")
+    if permission_kinds:
+        line += f"; permission lines ({'/'.join(permission_kinds)}): varied by {permission_cases} case(s)"
+    return line

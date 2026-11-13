@@ -16,6 +16,7 @@ RUN mkdir -p /etc/miniupnpd \
  && ln -s /opt/miniupnpd/scripts /etc/miniupnpd/scripts
 
 COPY entrypoint.sh /usr/local/bin/miniupnpd-test-entrypoint
+COPY conf_replace.awk /usr/local/share/miniupnpd-test/conf_replace.awk
 RUN chmod 0755 /usr/local/bin/miniupnpd-test-entrypoint
 
 EXPOSE 5351/udp

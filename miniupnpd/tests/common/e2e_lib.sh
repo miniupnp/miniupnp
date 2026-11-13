@@ -172,7 +172,8 @@ e2e_self_test() {
   fi
 }
 
-# e2e_parse_args "$@": --case NAME (repeatable) selects cases into SELECTED_CASES.
+# e2e_parse_args "$@": --case NAME (repeatable) selects cases into SELECTED_CASES; --freebsd-version
+# RELEASE sets PCP_TEST_FREEBSD_VERSION for the VM drivers.
 e2e_parse_args() {
   SELECTED_CASES=
   while [ "$#" -gt 0 ]; do
@@ -183,7 +184,15 @@ e2e_parse_args() {
         SELECTED_CASES="$SELECTED_CASES $2"
         shift 2
         ;;
-      *) echo "unsupported option: $1 (only --case NAME is accepted)" >&2; exit 2 ;;
+      # the FreeBSD release of the VM drivers (default: PCP_TEST_FREEBSD_VERSION, else the newest)
+      --freebsd-version)
+        [ "$#" -ge 2 ] || { echo "--freebsd-version requires a release (for example 14.5)" >&2; exit 2; }
+        case "$2" in *[!0-9.]*|'') echo "invalid FreeBSD release: $2" >&2; exit 2 ;; esac
+        PCP_TEST_FREEBSD_VERSION=$2
+        export PCP_TEST_FREEBSD_VERSION
+        shift 2
+        ;;
+      *) echo "unsupported option: $1 (--case NAME and --freebsd-version RELEASE are accepted)" >&2; exit 2 ;;
     esac
   done
 }
