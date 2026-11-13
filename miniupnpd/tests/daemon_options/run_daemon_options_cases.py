@@ -153,6 +153,12 @@ def build_parser():
     return parser
 
 
+def on_platform(case, platform):
+    """A case runs on its platform, or on each of a list of platforms; without one, everywhere."""
+    wanted = case.get("platform", platform)
+    return platform in wanted if isinstance(wanted, list) else wanted == platform
+
+
 def main():
     parser = build_parser()
     args = parser.parse_args()
@@ -163,7 +169,7 @@ def main():
         sections, cases, profiles, earlier_cases = read_corpus()
         if args.list_runs:
             listed = [case for case in cases if (not args.case or case["name"] in args.case)
-                      and case.get("platform", args.platform) == args.platform]
+                      and on_platform(case, args.platform)]
             for config, side, family in config_runs(listed):
                 print(" ".join((side, family) + tuple(config_word(line) for line in config)))
             return 0

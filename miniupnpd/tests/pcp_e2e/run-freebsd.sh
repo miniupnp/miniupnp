@@ -303,7 +303,7 @@ vm_boot() {
   fi
   set_router_name
   vmlib_seed miniupnpd-pcp-test
-  # the FreeBSD image is the one of ../common/freebsd_vm.sh: one prepared image for both
+  # the FreeBSD and OpenBSD images are those of ../common/freebsd_vm.sh: one prepared image for both
   if [ "$ROUTER" = freebsd-pf ]; then
     vmlib_prepared "$PREPARE" "prepared-$VERSION"
   elif [ "$ROUTER" = openbsd-pf ]; then

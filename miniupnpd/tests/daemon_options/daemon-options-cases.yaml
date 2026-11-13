@@ -1513,14 +1513,16 @@ sections:
       kind: steps
     description: A THIRD_PARTY mapping forwards WAN traffic to the other LAN host.
 - title: Firewall names (pf)
-  description: 'The options of the pf backend, on FreeBSD only: the rules a mapping makes.'
+  description: 'The options of the pf backend, on FreeBSD and OpenBSD: the rules a mapping makes.'
   cases:
   - name: pf-anchor
     protocol: daemon
     families:
     - ipv4
     mutating: true
-    platform: freebsd
+    platform:
+    - freebsd
+    - openbsd
     config:
     - anchor=optanchor
     request:
@@ -1540,7 +1542,9 @@ sections:
     families:
     - ipv4
     mutating: true
-    platform: freebsd
+    platform:
+    - freebsd
+    - openbsd
     config:
     - tag=opttag
     request:
@@ -1560,7 +1564,9 @@ sections:
     families:
     - ipv4
     mutating: true
-    platform: freebsd
+    platform:
+    - freebsd
+    - openbsd
     config:
     - queue=optqueue
     request:
@@ -1580,7 +1586,9 @@ sections:
     families:
     - ipv4
     mutating: true
-    platform: freebsd
+    platform:
+    - freebsd
+    - openbsd
     config:
     - quickrules=no
     request:
