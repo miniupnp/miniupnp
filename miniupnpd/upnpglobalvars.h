@@ -63,7 +63,7 @@ extern unsigned long int max_lifetime;
 
 /*! \brief runtime boolean flags */
 extern int runtime_flags;
-/*! \brief enable packet log (pf/ipf) */
+/*! \brief enable packet log (pf) */
 #define LOGPACKETSMASK		0x0001
 /*! \brief report system uptime */
 #define SYSUPTIMEMASK		0x0002

@@ -386,12 +386,12 @@ static struct nlist list[] = {
 	}
 /* #elif __NetBSD__ */
 #else
-/* TODO : NetBSD / Darwin (OS X) / Solaris code */
+/* TODO : NetBSD / Darwin (OS X) code */
 #error "No port_in_use() implementation available for this OS"
 #endif
 
 	/* Phase 2 : check existing mappings
-	 * TODO : implement for pf/ipfw/etc. */
+	 * TODO : implement for pf/etc. */
 #if defined(USE_NETFILTER)
 	if (!found) {
 		char iaddr_old[16];

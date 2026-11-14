@@ -70,21 +70,8 @@ const char * proto_itoa(int proto);
 /**
  * define portability macros
  */
-#if defined(__sun)
-static __inline size_t _sa_len(const struct sockaddr *addr)
-{
-        if (addr->sa_family == AF_INET)
-                return (sizeof(struct sockaddr_in));
-        else if (addr->sa_family == AF_INET6)
-                return (sizeof(struct sockaddr_in6));
-        else
-                return (sizeof(struct sockaddr));
-}
-# define SA_LEN(sa) (_sa_len(sa))
-#else
 #if !defined(SA_LEN)
 # define SA_LEN(sa) ((sa)->sa_len)
-#endif
 #endif
 
 #ifndef MAX
