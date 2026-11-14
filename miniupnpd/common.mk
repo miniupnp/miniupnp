@@ -25,6 +25,10 @@ testifacewatcher:	testifacewatcher.o ifacewatcher.o
 testupnphttp:	testupnphttp.o upnphttp.o upnputils.o getroute.o \
 	getosversion.o
 
+testleasetable:	testleasetable.o lease_table.o
+
+testmemmap:	testmemmap.o memmap.o lease_table.o
+
 miniupnpdctl:	miniupnpdctl.o
 
 dox:	$(SRCDIR)/miniupnpd.doxyconf

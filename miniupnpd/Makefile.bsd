@@ -55,7 +55,7 @@ CPPFLAGS += -DMINIUPNPD_GIT_REF=\"$(GITREF)\"
 
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
-          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
+          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o lease_table.o memmap.o \
           pcplearndscp.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
@@ -111,12 +111,15 @@ TESTSTUNOBJS = teststun.o upnpstun.o upnputils.o getroute.o $(FWOBJS) \
                getifaddr.o
 TESTUPNPHTTPOBJS = testupnphttp.o upnphttp.o upnputils.o getosversion.o \
                    getroute.o
+TESTLEASETABLEOBJS = testleasetable.o lease_table.o
+TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp \
-              testifacewatcher teststun testupnphttp
+              testifacewatcher teststun testupnphttp \
+              testleasetable testmemmap
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -152,6 +155,8 @@ clean:
 	$(RM) $(TESTGETROUTEOBJS)
 	$(RM) testssdppktgen.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen validateupnphttp
+	$(RM) validateleasetable testleasetable.o
+	$(RM) validatememmap testmemmap.o
 
 install:	miniupnpd
 	$(STRIP) miniupnpd
@@ -164,7 +169,7 @@ install:	miniupnpd
 	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
 
 check:  validateupnppermissions validategetifaddr validatessdppktgen \
-        validateupnphttp
+        validateupnphttp validateleasetable validatememmap
 
 validateupnppermissions: $(SRCDIR)/testupnppermissions.sh testupnppermissions
 	$(SRCDIR)/testupnppermissions.sh
@@ -180,6 +185,14 @@ validatessdppktgen:	testssdppktgen
 
 validateupnphttp:	$(SRCDIR)/testupnphttp.sh testupnphttp
 	$(SRCDIR)/testupnphttp.sh
+	touch $@
+
+validateleasetable:	testleasetable
+	./testleasetable
+	touch $@
+
+validatememmap:	testmemmap
+	./testmemmap
 	touch $@
 
 depend:	$(ALLSRCS)
@@ -232,6 +245,12 @@ teststun: config.h $(TESTSTUNOBJS)
 
 testupnphttp:	config.h $(TESTUPNPHTTPOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTUPNPHTTPOBJS) $(LIBS)
+
+testleasetable:	config.h $(TESTLEASETABLEOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTLEASETABLEOBJS)
+
+testmemmap:	config.h $(TESTMEMMAPOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTMEMMAPOBJS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^

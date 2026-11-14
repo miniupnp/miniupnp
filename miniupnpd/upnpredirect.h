@@ -139,6 +139,23 @@ upnp_delete_redirection(unsigned short eport, const char * protocol);
 int
 _upnp_delete_redir(unsigned short eport, int proto);
 
+/* mapping_owner_of()
+ * the protocol which made a mapping, from its description : "PCP MAP " and
+ * a nonce of 24 hexadecimal digits, or "NAT-PMP eport proto". Anything else
+ * is UPnP. */
+enum mapping_owner { MAPPING_UPNP, MAPPING_NATPMP, MAPPING_PCP };
+enum mapping_owner
+mapping_owner_of(const char * desc, unsigned short eport, int proto);
+
+/* upnp_eport_used_by_other()
+ * is the external port eport mapped (TCP or UDP) to another internal
+ * address than iaddr ?  RFC 6886 section 3.3: such a port is reserved
+ * for the client which maps it, on both protocols, so another client
+ * gets another port.  The client's own mappings do not count.
+ * return value : 1 when used by another client, 0 otherwise */
+int
+upnp_eport_used_by_other(unsigned short eport, const char * iaddr);
+
 /* Periodic cleanup functions
  */
 struct rule_state

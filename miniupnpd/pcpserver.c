@@ -61,6 +61,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -81,6 +82,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "getifaddr.h"
 #include "asyncsendto.h"
 #include "upnputils.h"
+#include "memmap.h"
 #include "portinuse.h"
 #include "pcp_msg_struct.h"
 #ifdef ENABLE_UPNPPINHOLE
@@ -723,7 +725,7 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
 	struct sockaddr_storage extip;
-	struct sockaddr_storage ret_extip;
+	struct sockaddr_storage ret_extip = {0};
 
 	uint8_t  proto = pcp_msg_info->protocol;
 
@@ -733,6 +735,10 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	time_t timestamp = upnp_time() + pcp_msg_info->lifetime;
 	int r;
 	const char * ext_if = ext_if_name;
+	int index, proto_old;
+	unsigned short eport_old, iport_old, rport_old;
+	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
@@ -743,6 +749,26 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 
 	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
+
+	/* RFC 6887 sections 12.3 and 15.1: authenticate the full PEER
+	 * mapping key before refreshing it or adding any rules. */
+	for (index = 0;
+	     get_peer_rule_by_index(index, NULL, &eport_old,
+	                            iaddr_old, sizeof(iaddr_old), &iport_old,
+	                            &proto_old, desc_old, sizeof(desc_old),
+	                            rhost_old, sizeof(rhost_old), &rport_old,
+	                            NULL, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
+		    rport_old == pcp_msg_info->peer_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0 &&
+		    strcmp(rhost_old, peerip_s) == 0) {
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0)
+				return PCP_ERR_NOT_AUTHORIZED;
+			eport = eport_old;
+			break;
+		}
+	}
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
@@ -939,10 +965,38 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
+	int index, proto_old;
 	char iaddr_old[INET6_ADDRSTRLEN];
+	char desc_old[64];
 	uint16_t iport_old, eport_first = 0;
+	unsigned short eport_old, eport_own = 0;
+	unsigned int timestamp_old;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+
+	/* RFC 6887 section 11.3: the mapping key uses the internal
+	 * address, protocol and port, not the suggested external port. */
+	for (index = 0;
+	     get_redirect_rule_by_index(index, NULL, &eport_old,
+	                               iaddr_old, sizeof(iaddr_old), &iport_old,
+	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
+	                               &timestamp_old, NULL, NULL) >= 0;
+	     index++) {
+		if (proto_old == pcp_msg_info->protocol &&
+		    iport_old == pcp_msg_info->int_port &&
+		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0) {
+			/* Check ownership before changing any state, even when the
+			 * client suggests a different external port. */
+			if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
+				if (timestamp_old > upnp_time())
+					pcp_msg_info->error_lifetime = timestamp_old - upnp_time();
+				return PCP_ERR_NOT_AUTHORIZED;
+			}
+			pcp_msg_info->ext_port = eport_old;
+			eport_own = eport_old;
+			break;
+		}
+	}
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -999,6 +1053,22 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			continue;
 		}
 #endif
+		/* A NAT mapping shares the external address: as for NAT-PMP
+		 * (RFC 6886 section 3.3), an external port another client maps,
+		 * on either protocol, is reserved for that client.  A port the
+		 * client already holds is kept on renewal. */
+		if (pcp_msg_info->ext_port != eport_own &&
+		    upnp_eport_used_by_other(pcp_msg_info->ext_port,
+					     pcp_msg_info->mapped_str)) {
+			if (pcp_msg_info->pfailure_present) {
+				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+			}
+			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
+			continue;
+		}
 		r = get_redirect_rule(ext_if_name,
 				      pcp_msg_info->ext_port,
 				      pcp_msg_info->protocol,
@@ -1075,6 +1145,10 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
+		memmap_map((unsigned short)uid, pcp_msg_info->int_port,
+		           pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		           pcp_msg_info->protocol, pcp_msg_info->desc,
+		           upnp_time() + pcp_msg_info->lifetime);
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
 		return PCP_SUCCESS;
 	} else {
@@ -1579,6 +1653,11 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 
 	if (response[1] == 0x81) { /* MAP response */
+		if (pcp_msg_info->is_map_op) {
+			/* Reserved bytes follow Protocol in either MAP version. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+		}
 		if (response[0] == 1) {	/* version */
 			/* 24 reserved bits, MUST be sent as 0 */
 			memset(response + PCP_COMMON_RESPONSE_SIZE + 1, 0, 3);
@@ -1598,6 +1677,13 @@ static void createPCPResponse(unsigned char *response, const pcp_info_t *pcp_msg
 	}
 #ifdef PCP_PEER
 	else if (response[1] == 0x82) { /* PEER response */
+		if (pcp_msg_info->is_peer_op) {
+			/* Clear the reserved fields in a complete PEER body. */
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 13 : 1), 0, 3);
+			memset(response + PCP_COMMON_RESPONSE_SIZE +
+			       (response[0] == 2 ? 38 : 26), 0, 2);
+		}
 		if (response[0] == 1) {
 			memset(response + PCP_COMMON_RESPONSE_SIZE + 1, 0, 3);	/* reserved : 0 */
 			WRITENU16(response + PCP_COMMON_RESPONSE_SIZE + 4, pcp_msg_info->int_port);
@@ -1770,16 +1856,31 @@ int OpenAndConfPCPv6Socket(void)
 }
 #endif /*ENABLE_IPV6*/
 
+/* RFC 6887 section 14.1.3: restart announcements MAY be sent up to ten
+ * times, the first two at least 250 ms apart and every later interval at
+ * least double the previous one. Ten sends take about 127 s; test builds
+ * shorten that with -DPCP_ANNOUNCE_COUNT=5 (see tests/pcp_pmp). */
+#ifndef PCP_ANNOUNCE_COUNT
+#define PCP_ANNOUNCE_COUNT 10
+#endif
+#define PCP_ANNOUNCE_FIRST_INTERVAL_MS 250
+
+static unsigned int announce_remaining = 0;	/* retransmissions still due */
+static unsigned int announce_interval_ms = 0;	/* gap before the next one */
+static struct timeval announce_next;
+static struct timeval announce_last;	/* when the last one was sent */
+
 #ifdef ENABLE_IPV6
-void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets, int socket6)
+static void PCPSendAnnounceOnce(int * sockets, int n_sockets, int socket6)
 #else /* IPv4 only */
-void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
+static void PCPSendAnnounceOnce(int * sockets, int n_sockets)
 #endif
 {
 	int i;
 	unsigned char buff[PCP_MIN_LEN];
 	pcp_info_t info;
 	ssize_t len;
+	struct lan_addr_s * lan_addr;
 	struct sockaddr_in addr;
 #ifdef ENABLE_IPV6
 	struct sockaddr_in6 addr6;
@@ -1797,8 +1898,18 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr("224.0.0.1");
 	addr.sin_port = htons(5350);
-	for(i = 0; i < n_sockets; i++) {
+	/* sockets[] are in the same order as lan_addrs : force the multicast
+	 * output interface to the LAN one so the announce never goes out
+	 * through the external interface */
+	for(i = 0, lan_addr = lan_addrs.lh_first;
+	    i < n_sockets && lan_addr != NULL;
+	    i++, lan_addr = lan_addr->list.le_next) {
 		if (sockets[i] < 0) {
+			continue;
+		}
+		if (setsockopt(sockets[i], IPPROTO_IP, IP_MULTICAST_IF,
+		               &lan_addr->addr, sizeof(lan_addr->addr)) < 0) {
+			syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce(sockets[%d]) setsockopt(IP_MULTICAST_IF): %m", i);
 			continue;
 		}
 		len = sendto_or_schedule(sockets[i], buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
@@ -1808,16 +1919,107 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 	}
 #ifdef ENABLE_IPV6
 	if (socket6 >= 0) {
-		memset(&addr6, 0, sizeof(struct sockaddr_in6));
-		addr6.sin6_family = AF_INET6;
-		inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
-		addr6.sin6_port = htons(5350);
-		len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
-		if( len < 0 ) {
-			syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(): %m");
+		/* send on each LAN interface only (link-local scope) */
+		for(lan_addr = lan_addrs.lh_first; lan_addr != NULL;
+		    lan_addr = lan_addr->list.le_next) {
+			unsigned int ifindex = lan_addr->index;
+			if (ifindex == 0 && lan_addr->ifname[0] != '\0')
+				ifindex = if_nametoindex(lan_addr->ifname);
+			if (ifindex == 0)
+				continue;
+			memset(&addr6, 0, sizeof(struct sockaddr_in6));
+			addr6.sin6_family = AF_INET6;
+			inet_pton(AF_INET6, "FF02::1", &(addr6.sin6_addr));
+			addr6.sin6_port = htons(5350);
+			addr6.sin6_scope_id = ifindex;
+			if (setsockopt(socket6, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+			               &ifindex, sizeof(ifindex)) < 0) {
+				syslog(LOG_WARNING, "PCPSendUnsolicitedAnnounce() setsockopt(IPV6_MULTICAST_IF, %s): %m", lan_addr->ifname);
+				continue;
+			}
+			len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
+			if( len < 0 ) {
+				syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(%s): %m", lan_addr->ifname);
+			}
 		}
 	}
 #endif /* ENABLE_IPV6 */
+}
+
+#ifdef ENABLE_IPV6
+void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets, int socket6)
+#else /* IPv4 only */
+void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
+#endif
+{
+#ifdef ENABLE_IPV6
+	PCPSendAnnounceOnce(sockets, n_sockets, socket6);
+#else
+	PCPSendAnnounceOnce(sockets, n_sockets);
+#endif
+	/* (re)start the retransmission schedule */
+	announce_remaining = PCP_ANNOUNCE_COUNT - 1;
+	announce_interval_ms = PCP_ANNOUNCE_FIRST_INTERVAL_MS;
+	if (announce_remaining > 0) {
+		if (upnp_gettimeofday(&announce_next) < 0) {
+			announce_remaining = 0;
+			return;
+		}
+		announce_last = announce_next;
+		announce_next.tv_usec += announce_interval_ms * 1000;
+		announce_next.tv_sec += announce_next.tv_usec / 1000000;
+		announce_next.tv_usec %= 1000000;
+	}
+}
+
+#ifdef ENABLE_IPV6
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, int socket6, struct timeval * timeout)
+#else /* IPv4 only */
+void PCPAnnounceRetransmit(int * sockets, int n_sockets, struct timeval * timeout)
+#endif
+{
+	struct timeval now;
+	long gap_ms;
+
+	if (announce_remaining == 0 || upnp_gettimeofday(&now) < 0)
+		return;
+	if (now.tv_sec > announce_next.tv_sec ||
+	    (now.tv_sec == announce_next.tv_sec && now.tv_usec >= announce_next.tv_usec)) {
+#ifdef ENABLE_IPV6
+		PCPSendAnnounceOnce(sockets, n_sockets, socket6);
+#else
+		PCPSendAnnounceOnce(sockets, n_sockets);
+#endif
+		/* the interval actually measured: a late send must not make the
+		 * next interval less than double this one */
+		gap_ms = (long)(now.tv_sec - announce_last.tv_sec) * 1000 +
+		         (now.tv_usec - announce_last.tv_usec) / 1000;
+		announce_last = now;
+		if (--announce_remaining == 0)
+			return;
+		if (gap_ms > (long)announce_interval_ms)
+			announce_interval_ms = (unsigned int)gap_ms;
+		announce_interval_ms *= 2;
+		announce_next = now;
+		announce_next.tv_usec += announce_interval_ms * 1000;
+		announce_next.tv_sec += announce_next.tv_usec / 1000000;
+		announce_next.tv_usec %= 1000000;
+	}
+	/* shorten the caller's select() timeout to the next retransmission */
+	{
+		struct timeval wait;
+		wait.tv_sec = announce_next.tv_sec - now.tv_sec;
+		wait.tv_usec = announce_next.tv_usec - now.tv_usec;
+		if (wait.tv_usec < 0) {
+			wait.tv_usec += 1000000;
+			wait.tv_sec--;
+		}
+		if (wait.tv_sec < 0)
+			wait.tv_sec = wait.tv_usec = 0;
+		if (timeout->tv_sec > wait.tv_sec ||
+		    (timeout->tv_sec == wait.tv_sec && timeout->tv_usec > wait.tv_usec))
+			*timeout = wait;
+	}
 }
 
 #ifdef ENABLE_IPV6
