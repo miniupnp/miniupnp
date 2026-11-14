@@ -2,7 +2,7 @@
 BASEOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o portinuse.o \
            upnpredirect.o getifaddr.o daemonize.o \
-           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
+           options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o lease_table.o memmap.o \
            upnpglobalvars.o upnpevents.o upnputils.o getconnstatus.o \
            upnpstun.o upnppinhole.o pcplearndscp.o asyncsendto.o \
            getosversion.o
@@ -14,4 +14,5 @@ LNXOBJS = getifstats.o ifacewatcher.o getroute.o
 OTHEROBJS = miniupnpdctl.o testupnpdescgen.o testgetifstats.o \
             testupnppermissions.o testgetifaddr.o testgetroute.o \
             testssdppktgen.o testasyncsendto.o testportinuse.o testminissdp.o \
-            testifacewatcher.o teststun.o testupnphttp.o
+            testifacewatcher.o teststun.o testupnphttp.o \
+            testleasetable.o testmemmap.o memmap_stub.o

@@ -25,6 +25,7 @@
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
 #include "upnputils.h"
+#include "memmap.h"
 #include "upnppinhole.h"
 #ifdef __APPLE__
 /* XXX - Apple version of PF API seems to differ from what
@@ -603,19 +604,25 @@ int reload_from_lease_file6(void)
 
 #endif
 
+/* Write the row of a pinhole: a mapping, or a mapping with its remote peer. */
+static void
+record_pinhole(unsigned short uid, const char * raddr, unsigned short rport,
+               const char * iaddr, unsigned short iport, int proto,
+               const char * desc, unsigned int timestamp)
+{
+	if(raddr != NULL && raddr[0] != '\0')
+		memmap_remote_peer(uid, raddr, rport, iport, iaddr, iport, proto, desc, timestamp);
+	else
+		memmap_map(uid, iport, iaddr, iport, proto, desc, timestamp);
+}
+
 int
 upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
                          const char * iaddr, unsigned short iport,
                          int proto, char * desc, int desc_len, unsigned int * leasetime)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	int uid;
-	uid = find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
-	                   desc, desc_len, leasetime);
-	return uid;
-#else
-	return -42;
-#endif
+	return memmap_find_pinhole(raddr, rport, iaddr, iport, proto,
+	                           desc, desc_len, leasetime);
 }
 
 /* upnp_add_inboundpinhole()
@@ -654,6 +661,9 @@ upnp_add_inboundpinhole(const char * raddr,
 	if(*uid >= 0) {
 		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, *uid);
 		r = upnp_update_inboundpinhole(*uid, leasetime);
+		if (r >= 0)	/* a pinhole which survived a restart has no row yet */
+			record_pinhole((unsigned short)*uid, raddr, rport, iaddr, iport,
+			               proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {
 			lease_file6_remove(iaddr, iport, proto, -1);
@@ -665,6 +675,9 @@ upnp_add_inboundpinhole(const char * raddr,
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	*uid = add_pinhole (ext_if_name6, raddr, rport,
 	                    iaddr, iport, proto, desc, timestamp);
+	if (*uid >= 0)
+		record_pinhole((unsigned short)*uid, raddr, rport, iaddr, iport,
+		               proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (*uid >= 0) {
 		lease_file6_remove(iaddr, iport, proto, -1);
@@ -769,14 +782,12 @@ upnp_get_pinhole_info(unsigned short uid,
 	int r;
 	unsigned int timestamp;
 	u_int64_t packets_tmp;
-	/*u_int64_t bytes_tmp;*/
 
-	r = get_pinhole_info(uid, raddr, raddrlen, rport,
-	                     iaddr, iaddrlen, iport,
-	                     proto, desc, desclen,
-	                     leasetime ? &timestamp : NULL,
-	                     packets ? &packets_tmp : NULL,
-	                     NULL/*&bytes_tmp*/);
+	r = memmap_get_pinhole(uid, raddr, raddrlen, rport,
+	                       iaddr, iaddrlen, iport,
+	                       proto, desc, desclen,
+	                       leasetime ? &timestamp : NULL,
+	                       packets ? &packets_tmp : NULL);
 	if(r >= 0) {
 		if(leasetime) {
 			time_t current_time;
@@ -803,12 +814,7 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_get_pinhole_uid_by_index(int index)
 {
-#if defined (USE_NETFILTER)
-	return get_pinhole_uid_by_index(index);
-#else
-	UNUSED(index);
-	return -42;
-#endif /* defined (USE_NETFILTER) */
+	return memmap_pinhole_uid_at(index);
 }
 
 int
@@ -820,6 +826,8 @@ upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
 
 	timestamp = upnp_time() + leasetime;
 	ret = update_pinhole(uid, timestamp);
+	if (ret == 0)
+		memmap_renew_uid(uid, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
 		lease_file6_update(uid, timestamp);
@@ -837,7 +845,16 @@ upnp_delete_inboundpinhole(unsigned short uid)
 {
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	int ret;
+	char iaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN] = "";
+	unsigned short iport = 0, rport = 0;
+	int proto = 0;
+	int known = upnp_get_pinhole_info(uid, raddr, sizeof(raddr), &rport, iaddr, sizeof(iaddr),
+	                                  &iport, &proto, NULL, 0, NULL, NULL) >= 0;
 	ret = delete_pinhole(uid);
+	if (ret == 0 && known)
+		memmap_remote_peer_gone_at(uid, raddr, rport, iaddr, iport, proto);
+	else if (ret == 0)
+		memmap_remote_peer_gone(uid);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
 		lease_file6_remove((const char *)"*", 0, 0, uid);
@@ -1075,7 +1092,7 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	ret = clean_pinhole_list(next_timestamp);
+	ret = memmap_expire_pinholes(next_timestamp);
 #else
 	UNUSED(next_timestamp);
 #endif

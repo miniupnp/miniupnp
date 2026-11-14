@@ -43,6 +43,7 @@
 #include "config.h"
 #include "../macros.h"
 #include "../commonrdr.h"
+#include "../memmap.h"
 #include "nftnlrdr.h"
 
 #include "nftnlrdr_misc.h"
@@ -53,15 +54,6 @@
 #define d_printf(x)
 #endif
 
-/* list to keep timestamps for port mappings having a lease duration */
-struct timestamp_entry {
-	struct timestamp_entry * next;
-	unsigned int timestamp;
-	unsigned short eport;
-	short protocol;
-};
-
-static struct timestamp_entry * timestamp_list = NULL;
 
 #define NAT_CHAIN_TYPE		"nat"
 #define FILTER_CHAIN_TYPE	"filter"
@@ -131,59 +123,7 @@ set_rdr_name(rdr_name_type param, const char *string)
 static unsigned int
 get_timestamp(unsigned short eport, int proto)
 {
-	struct timestamp_entry * e;
-	e = timestamp_list;
-	while(e) {
-		if(e->eport == eport && e->protocol == (short)proto) {
-			syslog(LOG_DEBUG, "timestamp entry found (%hu, %d, %u)", eport, proto, e->timestamp);
-			return e->timestamp;
-		}
-		e = e->next;
-	}
-	syslog(LOG_WARNING, "get_timestamp(%hu, %d) no entry found", eport, proto);
-	return 0;
-}
-
-static void
-remove_timestamp_entry(unsigned short eport, int proto)
-{
-	struct timestamp_entry * e;
-	struct timestamp_entry * * p;
-	p = &timestamp_list;
-	e = *p;
-	while(e) {
-		if(e->eport == eport && e->protocol == (short)proto) {
-			syslog(LOG_DEBUG, "timestamp entry removed (%hu, %d, %u)", eport, proto, e->timestamp);
-			/* remove the entry */
-			*p = e->next;
-			free(e);
-			return;
-		}
-		p = &(e->next);
-		e = *p;
-	}
-	syslog(LOG_WARNING, "remove_timestamp_entry(%hu, %d) no entry found", eport, proto);
-}
-
-static void
-add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
-{
-	struct timestamp_entry * tmp;
-	tmp = malloc(sizeof(struct timestamp_entry));
-	if(tmp)
-	{
-		tmp->next = timestamp_list;
-		tmp->timestamp = timestamp;
-		tmp->eport = eport;
-		tmp->protocol = (short)proto;
-		timestamp_list = tmp;
-		syslog(LOG_DEBUG, "timestamp entry added (%hu, %d, %u)", eport, proto, timestamp);
-	}
-	else
-	{
-		syslog(LOG_ERR, "add_timestamp_entry() malloc(%lu) error",
-		       sizeof(struct timestamp_entry));
-	}
+	return memmap_map_expiry(eport, proto);
 }
 
 int
@@ -206,10 +146,8 @@ add_redirect_rule2(const char * ifname,
 	                  rhost_addr, eport,
 	                  inet_addr(iaddr), iport,  desc, NULL);
 
+	UNUSED(timestamp);	/* the lifetime is in the table */
 	ret = nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
-	if (ret >= 0) {
-		add_timestamp_entry(eport, proto, timestamp);
-	}
 	return ret;
 }
 
@@ -307,6 +245,7 @@ delete_filter_rule(const char * ifname, unsigned short port, int proto)
 
 /*
  * Clear all rules corresponding eport/proto
+ * return -1 if the redirect rule is still there, else 0 (also when not found)
  */
 int
 delete_redirect_and_filter_rules(unsigned short eport, int proto)
@@ -315,6 +254,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	struct nftnl_rule *r = NULL;
 	in_addr_t iaddr = 0;
 	uint16_t iport = 0;
+	int ret = 0;
 
 	d_printf(("delete_redirect_and_filter_rules(%d %d)\n", eport, proto));
 	refresh_nft_cache_redirect();
@@ -333,7 +273,10 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT);
+			/* the rule stays : the caller keeps its row and tries again.
+			 * A rule which is not found is gone, and that is a success. */
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
+				ret = -1;
 			break;
 		}
 	}
@@ -392,7 +335,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		}
 	}
 
-	return 0;
+	return ret;
 }
 
 /*
@@ -494,22 +437,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	                             desc, desclen,
 	                             rhost, rhostlen,
 	                             timestamp, packets, bytes);
-}
-
-/* get_redirect_rule_count()
- * return value : -1 for error or the number of redirection rules */
-int
-get_redirect_rule_count(const char * ifname)
-{
-	rule_t *r;
-	int n = 0;
-	UNUSED(ifname);
-
-	refresh_nft_cache_redirect();
-	LIST_FOREACH(r, &head_redirect, entry) {
-		n++;
-	}
-	return n;
 }
 
 /*
@@ -713,9 +640,8 @@ update_portmapping_desc_timestamp(const char * ifname,
                    const char * desc, unsigned int timestamp)
 {
 	UNUSED(ifname);
-	UNUSED(desc);
-	remove_timestamp_entry(eport, proto);
-	add_timestamp_entry(eport, proto, timestamp);
+	UNUSED(eport); UNUSED(proto);
+	UNUSED(desc); UNUSED(timestamp);
 	return 0;
 }
 

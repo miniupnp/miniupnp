@@ -76,6 +76,7 @@
 #include "options.h"
 #include "minissdp.h"
 #include "upnpredirect.h"
+#include "memmap.h"
 #include "upnppinhole.h"
 #include "upnpstun.h"
 #include "miniupnpdtypes.h"
@@ -203,6 +204,8 @@ tomato_load(void)
 
 	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
 	{
+		/* upnp_redirect() must see the rules which survived */
+		memmap_adopt_rules();
 		current_time = time(NULL);
 		s[sizeof(s) - 1] = 0;
 		while (fgets(s, sizeof(s) - 1, f)) {
@@ -2641,6 +2644,8 @@ main(int argc, char * * argv)
 	}
 #endif
 
+	memmap_adopt_rules();
+
 	/* for miniupnpdctl */
 #ifdef USE_MINIUPNPDCTL
 	sctl = OpenAndConfCtlUnixSocket("/var/run/miniupnpd.ctl");
@@ -2865,7 +2870,7 @@ main(int argc, char * * argv)
 		  && ((unsigned int)timeofday.tv_sec >= nextruletoclean_timestamp))
 		{
 			syslog(LOG_DEBUG, "cleaning expired Port Mappings");
-			get_upnp_rules_state_list(0);
+			expire_upnp_rules();
 		}
 		if(nextruletoclean_timestamp
 		  && ((unsigned int)timeout.tv_sec >= (nextruletoclean_timestamp - timeofday.tv_sec)))
@@ -2885,6 +2890,17 @@ main(int argc, char * * argv)
 			timeout.tv_usec = 0;
 		}
 #endif /* ENABLE_UPNPPINHOLE */
+
+#ifdef ENABLE_PCP
+		if(GETFLAG(ENABLENATPMPMASK))
+		{
+#ifdef ENABLE_IPV6
+			PCPAnnounceRetransmit(snatpmp, addr_count, spcp_v6, &timeout);
+#else /* IPv4 only */
+			PCPAnnounceRetransmit(snatpmp, addr_count, &timeout);
+#endif
+		}
+#endif /* ENABLE_PCP */
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
 		FD_ZERO(&readset);
