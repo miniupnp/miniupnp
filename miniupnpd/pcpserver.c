@@ -943,6 +943,61 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	uint16_t iport_old, eport_first = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+	uint16_t eport_old = 0;
+	char desc_old[64];
+	char rhost_old[16];
+	unsigned int lifetime_old;
+
+	/* RFC 6887 section 11.3 :
+	 * It is possible that a mapping might already exist for a requested
+	 * internal address, protocol, and port.  If so, the PCP server takes
+	 * the following actions:
+	 * 1.  If the MAP request contains the PREFER_FAILURE option, but the
+	 *     suggested external address and port do not match the external
+	 *     address and port of the existing mapping, the PCP server MUST
+	 *     return CANNOT_PROVIDE_EXTERNAL.
+	 * 2.  If the existing mapping is static (created outside of PCP), the
+	 *     PCP server MUST return the external address and port of the
+	 *     existing mapping in its response and SHOULD indicate a lifetime
+	 *     of 2^32-1 seconds, regardless of the suggested external address
+	 *     and port in the request.
+	 * 3.  If the existing mapping is explicit dynamic inbound (created by a
+	 *     previous MAP request), the PCP server MUST return the existing
+	 *     external address and port in its response, regardless of the
+	 *     suggested external address and port in the request.
+	 *     Additionally, the PCP server MUST update the lifetime of the
+	 *     existing mapping, in accordance with Section 15, "Mapping
+	 *     Lifetime and Deletion".
+	 * 4.  If the existing mapping is dynamic outbound (created by outgoing
+	 *     traffic or a previous PEER request), the PCP server SHOULD create
+	 *     a new explicit inbound mapping, replicating the ports and
+	 *     addresses from the outbound mapping (but the outbound mapping
+	 *     continues to exist, and remains in effect if the explicit inbound
+	 *     mapping is later deleted). */
+	if (upnp_get_redirection_infos_by_ituple(pcp_msg_info->int_port,
+	                                         pcp_msg_info->mapped_str, pcp_msg_info->protocol,
+	                                         &eport_old, desc_old, sizeof(desc_old),
+	                                         rhost_old, sizeof(rhost_old), &lifetime_old) == 0) {
+		if (strcmp(desc_old, pcp_msg_info->desc) != 0) {
+			/* If operating in the Simple Threat Model (Section 18.1), and the
+			 * internal port, protocol, and internal address match an existing
+			 * explicit dynamic mapping, but the mapping nonce does not match, the
+			 * request MUST be rejected with a NOT_AUTHORIZED error with the
+			 * lifetime of the error indicating duration of that existing mapping.
+			 * The PCP server only needs to remember one Mapping Nonce value for
+			 * each explicit dynamic mapping. */
+			pcp_msg_info->error_lifetime = lifetime_old;
+			return PCP_ERR_NOT_AUTHORIZED;
+		}
+		if (pcp_msg_info->pfailure_present && pcp_msg_info->ext_port != 0
+		    && pcp_msg_info->ext_port != eport_old) {
+			return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+		}
+		pcp_msg_info->ext_port = eport_old;
+		/* TODO: update the lifetime */
+		/* r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp); */
+		return PCP_SUCCESS;
+	}
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
