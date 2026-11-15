@@ -1286,7 +1286,8 @@ GetListOfPortMappings(struct upnphttp * h, const char * action, const char * ns)
 	number_s = GetValueFromNameValueList(&data, "NewNumberOfPorts");
 	if(startport_s == NULL || endport_s == NULL || protocol == NULL ||
 	   number_s == NULL || !is_numeric(number_s) ||
-	   !is_numeric(startport_s) || !is_numeric(endport_s)) {
+	   !is_numeric(startport_s) || !is_numeric(endport_s) ||
+	   !(strcmp(protocol, "TCP") == 0 || strcmp(protocol, "UDP") == 0)) {
 		SoapError(h, 402, "Invalid Args");
 		ClearNameValueList(&data);
 		return;
