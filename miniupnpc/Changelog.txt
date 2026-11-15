@@ -1,6 +1,8 @@
 $Id: Changelog.txt,v 1.281 2025/05/26 22:56:38 nanard Exp $
 miniUPnP client Changelog.
 
+VERSION 2.3.4 : released 2026/11/15
+
 2026/08/30:
   minissdpc.c: fix deduping of devices
 

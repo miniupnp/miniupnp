@@ -3,7 +3,7 @@
  * Project: miniupnp
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * Author: Thomas Bernard
- * Copyright (c) 2005-2025 Thomas Bernard
+ * Copyright (c) 2005-2026 Thomas Bernard
  * This software is subjects to the conditions detailed
  * in the LICENCE file provided within this distribution */
 #ifndef MINIUPNPC_H_INCLUDED
@@ -42,7 +42,7 @@
 #define UPNPDISCOVER_MEMORY_ERROR (-102)
 
 /*! \brief software version */
-#define MINIUPNPC_VERSION	"2.3.3"
+#define MINIUPNPC_VERSION	"2.3.4"
 /*! \brief C API version */
 #define MINIUPNPC_API_VERSION	21
 
