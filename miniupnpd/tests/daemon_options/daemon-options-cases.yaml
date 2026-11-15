@@ -1,0 +1,1597 @@
+# The daemon_options corpus: the same requests under different daemon configurations.
+#
+# Every case declares `config:`, the miniupnpd.conf lines its daemon runs with (they replace the
+# fixture's default line of the same option, see README.md), and `from:`, where it sends from:
+# `lan` (the LAN client, the default) or `wan` (a host on the router's WAN link, which sends to the
+# router's WAN address). The driver starts a fresh daemon for each configuration.
+#
+# The request and expect kinds are those of pcp_wire/pcp-wire-cases.yaml (the same expander and
+# step engine), plus kind `upnp`: one SOAP AddPortMapping / DeletePortMapping to port 5000, with
+# expect {kind: upnp, result: [...]} of SUCCESS, UPNP_<errorCode>, NO_LISTENER (the TCP connection
+# is refused) or NO_REPLY (it is closed or times out without an HTTP response).
+#
+# enable_natpmp and enable_pcp_pmp are one option of miniupnpd (options.c: both NAT-PMP and PCP);
+# there is no switch for one of the two protocols alone.
+version: 1
+defs:
+  packets:
+    natpmp-public-address:
+      kind: raw
+      hex: '0000'
+    pcp-announce:
+      header: ANNOUNCE
+      client: source
+    pcp-map-lifecycle:
+      version: 2
+      opcode: 1
+      response_opcode: 129
+      protocol_number: 17
+      internal_port_base: 40000
+      port_range: 20000
+      response_length: 60
+      nonce_length: 12
+      nonce_offset: 24
+      version_offset: 0
+      opcode_offset: 1
+      result_offset: 3
+      kind: lifecycle
+      operation: pcp_map
+      captures:
+        external_port: {offset: 42, type: u16}
+        granted_lifetime: {offset: 4, type: u32}
+      cleanup: {lifetime: 0, external_port: $assigned_port}
+    natpmp-map-lifecycle:
+      version: 0
+      opcode: 1
+      response_opcode: 129
+      protocol_number: 17
+      reserved: 0
+      internal_port_base: 43000
+      port_range: 16000
+      response_length: 16
+      result_offset: 2
+      version_offset: 0
+      opcode_offset: 1
+      kind: lifecycle
+      operation: natpmp_mapping
+      captures:
+        external_port: {offset: 10, type: u16}
+        granted_lifetime: {offset: 12, type: u32}
+        private_port: {offset: 8, type: u16}
+      cleanup: {lifetime: 0, public_port: 0}
+sections:
+- title: Protocol switches
+  description: >-
+    enable_pcp_pmp (and its synonym enable_natpmp) and enable_upnp turn whole protocols on or off.
+    A protocol that is off gives no reply: no PCP / NAT-PMP response on UDP 5351, no listener on
+    the UPnP HTTP port. The protocols that stay on still answer.
+  cases:
+  # everything on
+  - name: all-on-natpmp-answers
+    protocol: natpmp
+    families: [ipv4]
+    config: [enable_pcp_pmp=yes, enable_upnp=yes, http_port=5000]
+    request: {use: natpmp-public-address}
+    expect:
+      kind: response
+      length: 12
+      version: 0
+      opcode: PUBLIC_ADDRESS_RESPONSE
+      result: [SUCCESS, NETWORK_FAILURE]
+    description: With every protocol on, a NAT-PMP public address request is answered.
+  - name: all-on-pcp-answers
+    protocol: pcp
+    families: [ipv4, ipv6]
+    config: [enable_pcp_pmp=yes, enable_upnp=yes, http_port=5000]
+    request: {use: pcp-announce}
+    expect:
+      kind: response
+      length: 24
+      version: 2
+      opcode: ANNOUNCE_RESPONSE
+      result: [SUCCESS, NETWORK_FAILURE]
+    description: With every protocol on, a PCP ANNOUNCE is answered.
+  - name: all-on-upnp-answers
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_pcp_pmp=yes, enable_upnp=yes, http_port=5000]
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 45001, internal_port: 45001,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [SUCCESS]}
+    description: With every protocol on, a UPnP AddPortMapping succeeds (the mapping is deleted again).
+  # PCP and NAT-PMP off (enable_pcp_pmp=no)
+  - name: pcp-pmp-off-natpmp-silent
+    protocol: natpmp
+    families: [ipv4]
+    config: [enable_pcp_pmp=no, enable_upnp=yes, http_port=5000]
+    request: {use: natpmp-public-address}
+    expect: {kind: silence}
+    description: enable_pcp_pmp=no turns NAT-PMP off; a public address request gets no reply.
+  - name: pcp-pmp-off-pcp-silent
+    protocol: pcp
+    families: [ipv4]
+    config: [enable_pcp_pmp=no, enable_upnp=yes, http_port=5000]
+    request: {use: pcp-announce}
+    expect: {kind: silence}
+    description: enable_pcp_pmp=no turns PCP off; an ANNOUNCE gets no reply.
+  - name: pcp-pmp-off-pcp-silent-ipv6
+    protocol: pcp
+    families: [ipv6]
+    config: [enable_pcp_pmp=no, enable_upnp=yes, http_port=5000]
+    request: {use: pcp-announce}
+    expect: {kind: silence}
+    description: enable_pcp_pmp=no turns PCP off; an ANNOUNCE gets no reply.
+  - name: pcp-pmp-off-upnp-answers
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_pcp_pmp=no, enable_upnp=yes, http_port=5000]
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 45002, internal_port: 45002,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [SUCCESS]}
+    description: With PCP and NAT-PMP off, UPnP still answers.
+  # the same through the synonym enable_natpmp=no
+  - name: natpmp-off-natpmp-silent
+    protocol: natpmp
+    families: [ipv4]
+    config: [enable_natpmp=no, enable_upnp=yes, http_port=5000]
+    request: {use: natpmp-public-address}
+    expect: {kind: silence}
+    description: enable_natpmp=no turns NAT-PMP off; a public address request gets no reply.
+  - name: natpmp-off-pcp-silent
+    protocol: pcp
+    families: [ipv4]
+    config: [enable_natpmp=no, enable_upnp=yes, http_port=5000]
+    request: {use: pcp-announce}
+    expect: {kind: silence}
+    description: >-
+      enable_natpmp=no turns PCP off too: it is the same option as enable_pcp_pmp (options.c).
+  - name: natpmp-off-pcp-silent-ipv6
+    protocol: pcp
+    families: [ipv6]
+    config: [enable_natpmp=no, enable_upnp=yes, http_port=5000]
+    request: {use: pcp-announce}
+    expect: {kind: silence}
+    description: >-
+      enable_natpmp=no turns PCP off too: it is the same option as enable_pcp_pmp (options.c).
+  - name: natpmp-off-upnp-answers
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_natpmp=no, enable_upnp=yes, http_port=5000]
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 45003, internal_port: 45003,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [SUCCESS]}
+    description: With enable_natpmp=no, UPnP still answers.
+  # UPnP off (enable_upnp=no), with the HTTP port set so that its absence means something
+  - name: upnp-off-upnp-no-listener
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_pcp_pmp=yes, enable_upnp=no, http_port=5000]
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 45004, internal_port: 45004,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [NO_LISTENER]}
+    description: enable_upnp=no opens no HTTP listener, also with http_port=5000.
+  - name: upnp-off-natpmp-answers
+    protocol: natpmp
+    families: [ipv4]
+    config: [enable_pcp_pmp=yes, enable_upnp=no, http_port=5000]
+    request: {use: natpmp-public-address}
+    expect:
+      kind: response
+      length: 12
+      version: 0
+      opcode: PUBLIC_ADDRESS_RESPONSE
+      result: [SUCCESS, NETWORK_FAILURE]
+    description: With UPnP off, NAT-PMP still answers.
+  - name: upnp-off-pcp-answers
+    protocol: pcp
+    families: [ipv4, ipv6]
+    config: [enable_pcp_pmp=yes, enable_upnp=no, http_port=5000]
+    request: {use: pcp-announce}
+    expect:
+      kind: response
+      length: 24
+      version: 2
+      opcode: ANNOUNCE_RESPONSE
+      result: [SUCCESS, NETWORK_FAILURE]
+    description: With UPnP off, PCP still answers.
+- title: WAN side
+  description: >-
+    Requests from a host on the router's WAN link to the router's WAN address, with every protocol
+    on: the daemon serves its LAN (listening_ip) only, so none of them gets a reply.
+  cases:
+  - name: wan-natpmp-silent
+    protocol: natpmp
+    families: [ipv4]
+    config: [enable_pcp_pmp=yes, enable_upnp=yes, http_port=5000]
+    from: wan
+    request: {use: natpmp-public-address}
+    expect: {kind: silence}
+    description: A NAT-PMP public address request to router-wan:5351 gets no reply.
+  - name: wan-pcp-announce-silent
+    protocol: pcp
+    families: [ipv4, ipv6]
+    config: [enable_pcp_pmp=yes, enable_upnp=yes, http_port=5000]
+    from: wan
+    request: {use: pcp-announce}
+    expect: {kind: silence}
+    description: A PCP ANNOUNCE to router-wan:5351 gets no reply.
+  - name: wan-pcp-map-silent
+    protocol: pcp
+    families: [ipv4, ipv6]
+    config: [enable_pcp_pmp=yes, enable_upnp=yes, http_port=5000]
+    from: wan
+    request:
+      pcp: MAP
+      lifetime: 120
+      protocol: UDP
+      internal_port: 45101
+      external_port: 45101
+    expect: {kind: silence}
+    description: A PCP MAP to router-wan:5351 gets no reply (and makes no mapping).
+  - name: wan-upnp-no-reply
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_pcp_pmp=yes, enable_upnp=yes, http_port=5000]
+    from: wan
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 45102, internal_port: 45102,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [NO_LISTENER, NO_REPLY]}
+    description: A UPnP AddPortMapping to router-wan:5000 gets no HTTP response.
+- title: Lifetime options
+  description: >-
+    min_lifetime and max_lifetime bound the lifetime the daemon grants a PCP mapping. The same kind
+    of request runs under different values. pcp_min_lifetime_override is not in this branch's
+    options.c and has no case here.
+  cases:
+  - name: max-lifetime-300-caps-pcp
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [max_lifetime=300]
+    request:
+      use: pcp-map-lifecycle
+      steps:
+      - lifetime: 3600
+        external_port: 0
+        assert:
+          external_port: {nonzero: true, remember: assigned_port}
+          granted_lifetime: {equals: 300}
+    expect: {kind: lifecycle, result: [SUCCESS]}
+    description: max_lifetime=300 grants 300 s for a request of 3600 s.
+  - name: max-lifetime-900-caps-pcp
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [max_lifetime=900]
+    request:
+      use: pcp-map-lifecycle
+      steps:
+      - lifetime: 3600
+        external_port: 0
+        assert:
+          external_port: {nonzero: true, remember: assigned_port}
+          granted_lifetime: {equals: 900}
+    expect: {kind: lifecycle, result: [SUCCESS]}
+    description: max_lifetime=900 grants 900 s for the same request of 3600 s.
+  - name: max-lifetime-clamped-to-86400
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [max_lifetime=100000]
+    request:
+      use: pcp-map-lifecycle
+      steps:
+      - lifetime: 200000
+        external_port: 0
+        assert:
+          external_port: {nonzero: true, remember: assigned_port}
+          granted_lifetime: {equals: 86400}
+    expect: {kind: lifecycle, result: [SUCCESS]}
+    description: A max_lifetime above 86400 is lowered to 86400 at startup.
+  - name: min-lifetime-300-raises-pcp
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [min_lifetime=300]
+    request:
+      use: pcp-map-lifecycle
+      steps:
+      - lifetime: 130
+        external_port: 0
+        assert:
+          external_port: {nonzero: true, remember: assigned_port}
+          granted_lifetime: {equals: 300}
+    expect: {kind: lifecycle, result: [SUCCESS]}
+    description: min_lifetime=300 grants 300 s for a request of 130 s.
+  - name: min-lifetime-clamped-to-120
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [min_lifetime=2]
+    request:
+      use: pcp-map-lifecycle
+      steps:
+      - lifetime: 1
+        external_port: 0
+        assert:
+          external_port: {nonzero: true, remember: assigned_port}
+          granted_lifetime: {equals: 120}
+    expect: {kind: lifecycle, result: [SUCCESS]}
+    description: A min_lifetime below 120 is raised to 120 at startup.
+  - name: max-lifetime-300-natpmp-not-capped
+    protocol: natpmp
+    families: [ipv4]
+    mutating: true
+    config: [max_lifetime=300]
+    request:
+      use: natpmp-map-lifecycle
+      steps:
+      - lifetime: 3600
+        public_port: $internal_port
+        assert:
+          external_port: {nonzero: true}
+          granted_lifetime: {equals: 3600}
+          private_port: {equals: $internal_port}
+    expect: {kind: lifecycle, result: [SUCCESS]}
+    description: max_lifetime is a PCP option (miniupnpd.conf); a NAT-PMP mapping keeps the lifetime it asked for.
+- title: Secure mode and third-party mappings
+  description: >-
+    secure_mode limits UPnP clients to mappings for their own address. pcp_allow_thirdparty lets a
+    PCP client map for another address with the THIRD_PARTY option.
+  cases:
+  - name: secure-on-upnp-other-client-refused
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_upnp=yes, http_port=5000, secure_mode=yes]
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 45201, internal_port: 45201,
+              internal_client: neighbour, lease_duration: 120}
+    expect: {kind: upnp, result: [UPNP_606, UPNP_718]}
+    description: secure_mode=yes refuses a UPnP mapping for another LAN address.
+  - name: secure-off-upnp-other-client-allowed
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_upnp=yes, http_port=5000, secure_mode=no]
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 45202, internal_port: 45202,
+              internal_client: neighbour, lease_duration: 120}
+    expect: {kind: upnp, result: [SUCCESS]}
+    description: secure_mode=no accepts a UPnP mapping for another LAN address.
+  - name: thirdparty-off-pcp-refused
+    protocol: daemon
+    families: [ipv4]
+    mutating: true
+    config: [pcp_allow_thirdparty=no]
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map: {port: 45201, protocol: udp, third_party: neighbour, result: 5}
+    expect: {kind: steps}
+    description: With pcp_allow_thirdparty=no, THIRD_PARTY for a LAN neighbour is refused.
+  - name: thirdparty-on-secure-on-pcp
+    protocol: daemon
+    families: [ipv4]
+    mutating: true
+    config: [pcp_allow_thirdparty=yes, secure_mode=yes]
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map: {port: 45201, protocol: udp, third_party: neighbour, result: 0}
+    expect: {kind: steps}
+    description: pcp_allow_thirdparty=yes maps for a LAN neighbour; secure_mode covers UPnP only (pcpserver.c does not read it).
+  - name: thirdparty-on-secure-off-pcp
+    protocol: daemon
+    families: [ipv4]
+    mutating: true
+    config: [pcp_allow_thirdparty=yes, secure_mode=no]
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map: {port: 45201, protocol: udp, third_party: neighbour, result: 0}
+    expect: {kind: steps}
+    description: The same THIRD_PARTY request with secure_mode=no.
+  - name: thirdparty-on-wan-pcp-silent
+    protocol: pcp
+    families: [ipv4]
+    config: [pcp_allow_thirdparty=yes, secure_mode=yes]
+    from: wan
+    request:
+      pcp: MAP
+      lifetime: 120
+      protocol: UDP
+      internal_port: 45203
+      external_port: 45203
+    expect: {kind: silence}
+    description: pcp_allow_thirdparty=yes skips the LAN check of the sender; a PCP MAP from the WAN side still gets no reply.
+- title: Permission rules
+  description: >-
+    allow and deny lines decide which mappings a client gets, for all three protocols: the first
+    line that matches the external port, the client address and the internal port decides, and
+    without a match the mapping is accepted. miniupnpd has no quota option and no static mappings,
+    so the plan's limits and static scenarios have nothing to vary.
+  cases:
+  - name: perm-pcp-inside
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {pcp: MAP, lifetime: 120, protocol: UDP, internal_port: 46001, external_port: 46001}
+    expect: {kind: response, length: request, version: 2, opcode: MAP_RESPONSE, result: [SUCCESS]}
+    description: A PCP MAP inside the allowed ports succeeds.
+  - name: perm-pcp-outside
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {pcp: MAP, lifetime: 120, protocol: UDP, internal_port: 47001, external_port: 47001}
+    expect: {kind: response, length: request, version: 2, opcode: MAP_RESPONSE, result: [NOT_AUTHORIZED]}
+    description: A PCP MAP for an internal port no rule allows is refused.
+  - name: perm-natpmp-inside
+    protocol: natpmp
+    families: [ipv4]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {natpmp: MAP_UDP, private_port: 46002, public_port: 46002, lifetime: 120}
+    expect: {kind: response, length: 16, version: 0, opcode: MAP_UDP_RESPONSE, result: [SUCCESS]}
+    description: A NAT-PMP mapping inside the allowed ports succeeds.
+  - name: perm-natpmp-outside
+    protocol: natpmp
+    families: [ipv4]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {natpmp: MAP_UDP, private_port: 47002, public_port: 47002, lifetime: 120}
+    expect: {kind: response, length: 16, version: 0, opcode: MAP_UDP_RESPONSE, result: [NOT_AUTHORIZED]}
+    description: A NAT-PMP mapping for an internal port no rule allows is refused.
+  - name: perm-upnp-inside
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 46003, internal_port: 46003,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [SUCCESS]}
+    description: A UPnP mapping inside the allowed ports succeeds.
+  - name: perm-upnp-outside
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 47003, internal_port: 47003,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [UPNP_606, UPNP_718]}
+    description: A UPnP mapping outside the allowed ports is refused.
+  - name: perm-pcp-moves-external-port
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request:
+      use: pcp-map-lifecycle
+      internal_port_base: 46004
+      port_range: 1
+      steps:
+      - lifetime: 120
+        external_port: 47004
+        assert:
+          external_port: {min: 46000, max: 46100, remember: assigned_port}
+    expect: {kind: lifecycle, result: [SUCCESS]}
+    description: A PCP MAP that suggests a denied external port gets an allowed one.
+  - name: perm-pcp-ipv6-outside-refused
+    protocol: pcp
+    families: [ipv6]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 0.0.0.0/0 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {pcp: MAP, lifetime: 120, protocol: UDP, internal_port: 47005, external_port: 47005}
+    expect: {kind: response, length: request, version: 2, opcode: MAP_RESPONSE, result: [NOT_AUTHORIZED]}
+    description: A PCP MAP over IPv6 for a port no rule allows is refused, as it is over IPv4.
+  - name: perm-address-pcp-refused
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 10.0.0.0/8 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {pcp: MAP, lifetime: 120, protocol: UDP, internal_port: 46011, external_port: 46011}
+    expect: {kind: response, length: request, version: 2, opcode: MAP_RESPONSE, result: [NOT_AUTHORIZED]}
+    description: A rule for another subnet does not allow this client (PCP).
+  - name: perm-address-natpmp-refused
+    protocol: natpmp
+    families: [ipv4]
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 10.0.0.0/8 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {natpmp: MAP_UDP, private_port: 46012, public_port: 46012, lifetime: 120}
+    expect: {kind: response, length: 16, version: 0, opcode: MAP_UDP_RESPONSE, result: [NOT_AUTHORIZED]}
+    description: A rule for another subnet does not allow this client (NAT-PMP).
+  - name: perm-address-upnp-refused
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_upnp=yes, http_port=5000, 'allow 46000-46100 10.0.0.0/8 46000-46100', 'deny 0-65535 0.0.0.0/0 0-65535']
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 46013, internal_port: 46013,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [UPNP_606, UPNP_718]}
+    description: A rule for another subnet does not allow this client (UPnP).
+  - name: perm-deny-only-denied-port
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_upnp=yes, http_port=5000, 'deny 46200-46300 0.0.0.0/0 0-65535']
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 46201, internal_port: 46201,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [UPNP_606, UPNP_718]}
+    description: A deny line refuses its ports.
+  - name: perm-deny-only-other-port-accepted
+    protocol: upnp
+    families: [ipv4]
+    config: [enable_upnp=yes, http_port=5000, 'deny 46200-46300 0.0.0.0/0 0-65535']
+    request: {kind: upnp, action: AddPortMapping, protocol: tcp, external_port: 46301, internal_port: 46301,
+              lease_duration: 120}
+    expect: {kind: upnp, result: [SUCCESS]}
+    description: Without a matching line a mapping is accepted.
+- title: Daemon start
+  description: 'Configurations the daemon must refuse: it exits instead of listening.'
+  cases:
+  - name: both-protocols-off-exits
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=no
+    - enable_pcp_pmp=no
+    request:
+      kind: option_steps
+      steps:
+      - router: {command: log, contains: ['Why did you run me anyway']}
+    expect:
+      kind: daemon_exits
+    description: With UPnP and PCP/NAT-PMP off the daemon exits at start.
+  - name: min-above-max-lifetime-exits
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - min_lifetime=600
+    - max_lifetime=300
+    request:
+      kind: option_steps
+      steps:
+      - router: {command: log, contains: ['greater than or equal']}
+    expect:
+      kind: daemon_exits
+    description: min_lifetime at or above max_lifetime is refused at start.
+  - name: ext-ip-with-stun-exits
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_ip=203.0.113.9
+    - ext_perform_stun=yes
+    - ext_stun_host=@WAN4@.5
+    request:
+      kind: option_steps
+      steps:
+      - router: {command: log, contains: ['cannot be specified together']}
+    expect:
+      kind: daemon_exits
+    description: ext_ip and ext_perform_stun are refused together.
+  - name: stun-without-host-exits
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_perform_stun=yes
+    request:
+      kind: option_steps
+      steps:
+      - router: {command: log, contains: ['You must specify ext_stun_host']}
+    expect:
+      kind: daemon_exits
+    description: ext_perform_stun needs ext_stun_host.
+- title: External address
+  description: 'The address the daemon reports and how it finds it: ext_ip, STUN, ext_ifname, ext_ifname6
+    and the check of a private address.'
+  cases:
+  - name: ext-ip-reported
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_ip=203.0.113.9
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_address:
+          equals: 203.0.113.9
+    expect:
+      kind: steps
+    description: ext_ip is the address NAT-PMP reports.
+  - name: ext-ifname-address-reported
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_ifname=eth0
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_address:
+          equals: '@ROUTER_LAN4@'
+    expect:
+      kind: steps
+    description: ext_ifname selects the interface whose address is reported.
+  - name: private-address-allowed
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_allow_private_ipv4=yes
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46301
+    expect:
+      kind: steps
+    description: ext_allow_private_ipv4=yes forwards on a reserved WAN address.
+  - name: private-address-refused
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_allow_private_ipv4=no
+    request:
+      kind: option_steps
+      steps:
+      - router:
+          command: wan-reserved
+          contains:
+          - changed
+      - natpmp_map:
+          port: 46302
+          result: 3
+    expect:
+      kind: steps
+    description: ext_allow_private_ipv4=no refuses mappings once the WAN address is a reserved one.
+  - name: stun-address-default-port
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_perform_stun=allow-filtered
+    - ext_stun_host=@WAN4@.5
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_address:
+          equals: 203.0.113.7
+    expect:
+      kind: steps
+    description: STUN sets the external address, from the default port 3478.
+  - name: stun-address-other-port
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_perform_stun=allow-filtered
+    - ext_stun_host=@WAN4@.5
+    - ext_stun_port=3479
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_address:
+          equals: 203.0.113.8
+    expect:
+      kind: steps
+    description: ext_stun_port selects the STUN port.
+  - name: stun-filtered-refuses-mappings
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - ext_perform_stun=yes
+    - ext_stun_host=@WAN4@.5
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46303
+          result: 3
+    expect:
+      kind: steps
+    description: ext_perform_stun=yes behind a filtering firewall disables port forwarding.
+  - name: ext-ifname6-used
+    protocol: daemon
+    families:
+    - ipv6
+    mutating: true
+    config:
+    - ext_ifname6=eth0
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46304
+      - router:
+          command: log
+          contains:
+          - '46304'
+    expect:
+      kind: steps
+    description: ext_ifname6 is accepted and an IPv6 mapping is made through it.
+- title: Addresses the daemon listens on
+  description: listening_ip, ipv6_listening_ip and ipv6_disable.
+  cases:
+  - name: listening-ip-by-address
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - listening_ip=@LAN4@.1/24
+    - ipv6_disable=yes
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_address: {}
+    expect:
+      kind: steps
+    description: listening_ip takes an address and mask instead of an interface.
+  - name: ipv6-listening-ip
+    protocol: daemon
+    families:
+    - ipv6
+    mutating: true
+    config:
+    - ipv6_listening_ip=@LAN6@1
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46311
+    expect:
+      kind: steps
+    description: ipv6_listening_ip binds the IPv6 PCP socket.
+  - name: ipv6-disable-silent
+    protocol: pcp
+    families:
+    - ipv6
+    config:
+    - ipv6_disable=yes
+    request:
+      use: pcp-announce
+    expect:
+      kind: silence
+    description: ipv6_disable=yes opens no IPv6 PCP socket.
+  - name: ipv6-disable-upnp-starts
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - ipv6_disable=yes
+    request:
+      kind: option_steps
+      steps:
+      - http_get:
+          contains:
+          - InternetGatewayDevice
+    expect:
+      kind: steps
+    description: ipv6_disable=yes with UPnP on starts and serves the description; an --https build opens
+      one IPv4 HTTPS socket.
+- title: UPnP description
+  description: The strings of the device description, and the numbers of the WAN common interface.
+  cases:
+  - name: description-strings
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - friendly_name=OptFriendly
+    - manufacturer_name=OptMaker
+    - manufacturer_url=http://maker.example/
+    - model_name=OptModel
+    - model_description=OptDescription
+    - model_url=http://model.example/
+    - model_number=OptNumber
+    - serial=OptSerial
+    - uuid=12345678-1234-1234-1234-123456789abc
+    - presentation_url=http://router.example/ui
+    request:
+      kind: option_steps
+      steps:
+      - http_get:
+          contains:
+          - OptFriendly
+          - OptMaker
+          - http://maker.example/
+          - OptModel
+          - OptDescription
+          - http://model.example/
+          - OptNumber
+          - OptSerial
+          - 12345678-1234-1234-1234-123456789abc
+          - http://router.example/ui
+    expect:
+      kind: steps
+    description: Each description option appears in rootDesc.xml.
+  - name: description-default
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    request:
+      kind: option_steps
+      steps:
+      - http_get:
+          contains:
+          - InternetGatewayDevice:2
+          absent:
+          - OptFriendly
+          - OptMaker
+          - http://maker.example/
+          - OptModel
+          - OptDescription
+          - http://model.example/
+          - OptNumber
+          - OptSerial
+          - 12345678-1234-1234-1234-123456789abc
+          - http://router.example/ui
+    expect:
+      kind: steps
+    description: Without the options none of the strings appear, and an IGDv2 build describes itself as
+      v2.
+  - name: force-igd-desc-v1
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - force_igd_desc_v1=yes
+    request:
+      kind: option_steps
+      steps:
+      - http_get:
+          contains:
+          - InternetGatewayDevice:1
+          absent:
+          - InternetGatewayDevice:2
+    expect:
+      kind: steps
+    description: force_igd_desc_v1 describes the device as IGD v1.
+  - name: bitrates
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - bitrate_up=1000000
+    - bitrate_down=2000000
+    request:
+      kind: option_steps
+      steps:
+      - soap:
+          service: urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1
+          path: /ctl/CmnIfCfg
+          action: GetCommonLinkProperties
+          values:
+            NewLayer1UpstreamMaxBitRate: "1000000"
+            NewLayer1DownstreamMaxBitRate: "2000000"
+    expect:
+      kind: steps
+    description: bitrate_up and bitrate_down are the reported link speeds.
+  - name: https-port
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - https_port=5443
+    request:
+      kind: option_steps
+      steps:
+      - http_get:
+          https_port: 5443
+          contains:
+          - InternetGatewayDevice
+    expect:
+      kind: steps
+    description: https_port serves the description over TLS.
+  - name: minissdpd-socket
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - minissdpdsocket=/tmp/minissdpd.sock
+    request:
+      kind: option_steps
+      steps:
+      - router:
+          command: cat:/tmp/minissdpd.received
+          contains:
+          - upnp:rootdevice
+    expect:
+      kind: steps
+    description: The daemon submits its services to the minissdpd socket.
+  - name: packet-log-accepted
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - packet_log=yes
+    request:
+      kind: option_steps
+      steps:
+      - http_get:
+          contains:
+          - InternetGatewayDevice
+    expect:
+      kind: steps
+    description: packet_log=yes is accepted; the daemon sets the flag and never reads it.
+- title: Timers
+  description: notify_interval, system_uptime, and the clean_ruleset pair.
+  cases:
+  - name: notify-interval-short
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - notify_interval=2
+    request:
+      kind: option_steps
+      steps:
+      - ssdp:
+          seconds: 6
+          min: 3
+    expect:
+      kind: steps
+    description: notify_interval=2 repeats the SSDP NOTIFYs.
+  - name: notify-default-quiet
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    request:
+      kind: option_steps
+      steps:
+      - sleep: 2
+      - ssdp:
+          seconds: 4
+          max: 0
+    expect:
+      kind: steps
+    description: The default interval of 900 s sends none after the startup round.
+  - name: clean-ruleset-keeps-natpmp-mapping
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config: [enable_upnp=yes, http_port=5000, clean_ruleset_interval=3, clean_ruleset_threshold=0]
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46401
+      - sleep: 8
+      - router: {command: ruleset, contains: ['46401']}
+    expect:
+      kind: steps
+    description: clean_ruleset removes unused UPnP rules; a NAT-PMP mapping has a lifetime and stays until it expires.
+  - name: ssdp-off-with-upnp-off
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=no
+    request:
+      kind: option_steps
+      steps:
+      - ssdp:
+          seconds: 4
+          max: 0
+    expect:
+      kind: steps
+    description: With UPnP off there are no NOTIFYs.
+  - name: system-uptime-off
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - system_uptime=no
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_address:
+          epoch_below: 300
+    expect:
+      kind: steps
+    description: The NAT-PMP epoch counts from the start of the daemon.
+  - name: system-uptime-on
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - system_uptime=yes
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_address:
+          epoch_is_uptime: true
+    expect:
+      kind: steps
+    description: system_uptime=yes makes the epoch the uptime of the system.
+  - name: clean-ruleset-removes-idle
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - clean_ruleset_interval=2
+    - clean_ruleset_threshold=0
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46321
+          lease: 3600
+      - sleep: 3
+      - natpmp_address: {}
+      - sleep: 3
+      - natpmp_address: {}
+      - sleep: 3
+      - natpmp_address: {}
+      - upnp_get:
+          port: 46321
+          present: false
+    expect:
+      kind: steps
+    description: clean_ruleset_interval removes a mapping without traffic.
+  - name: clean-ruleset-threshold-keeps
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - clean_ruleset_interval=2
+    - clean_ruleset_threshold=10
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46322
+          lease: 3600
+      - sleep: 3
+      - natpmp_address: {}
+      - sleep: 3
+      - natpmp_address: {}
+      - sleep: 3
+      - natpmp_address: {}
+      - upnp_get:
+          port: 46322
+    expect:
+      kind: steps
+    description: Below clean_ruleset_threshold rules, nothing is removed.
+  - name: clean-ruleset-off-keeps
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - clean_ruleset_interval=0
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46323
+          lease: 3600
+      - sleep: 3
+      - natpmp_address: {}
+      - sleep: 3
+      - natpmp_address: {}
+      - sleep: 3
+      - natpmp_address: {}
+      - upnp_get:
+          port: 46323
+    expect:
+      kind: steps
+    description: clean_ruleset_interval=0 removes nothing.
+- title: Firewall rules lost
+  description: A reload of the firewall removes the rules and the daemon is not told. A renewal must
+    see that and add the rules again, or the client is told of a mapping which passes nothing.
+  cases:
+  - name: firewall-lost-upnp-renew
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=/var/lib/miniupnpd/firewall.leases
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46341
+      - router:
+          command: firewall-flush
+          contains:
+          - flushed
+      - upnp_add:
+          port: 46341
+      - router:
+          command: ruleset
+          contains:
+          - '46341'
+    expect:
+      kind: steps
+    description: A UPnP renewal adds rules which were lost.
+  - name: firewall-lost-pcp-renew
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=/var/lib/miniupnpd/firewall.leases
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46342
+          nonce_hex: '424242424242424242424242'
+      - router:
+          command: firewall-flush
+          contains:
+          - flushed
+      - pcp_map:
+          port: 46342
+          nonce_hex: '424242424242424242424242'
+      - router:
+          command: ruleset
+          contains:
+          - '46342'
+    expect:
+      kind: steps
+    description: A PCP renewal adds rules which were lost.
+  - name: firewall-lost-natpmp-renew
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=/var/lib/miniupnpd/firewall.leases
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46343
+      - router:
+          command: firewall-flush
+          contains:
+          - flushed
+      - natpmp_map:
+          port: 46343
+      - router:
+          command: ruleset
+          contains:
+          - '46343'
+    expect:
+      kind: steps
+    description: A NAT-PMP renewal adds rules which were lost.
+  - name: firewall-lost-after-restart
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=/var/lib/miniupnpd/firewall.leases
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46344
+      - sleep: 1
+      - router:
+          command: restart
+          contains:
+          - restarted
+      - router:
+          command: firewall-flush
+          contains:
+          - flushed
+      - upnp_add:
+          port: 46344
+      - router:
+          command: ruleset
+          contains:
+          - '46344'
+    expect:
+      kind: steps
+    description: A rule restored at startup is checked like one added by a request.
+  - name: firewall-lost-pinhole-update
+    protocol: daemon
+    families:
+    - ipv6
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=/var/lib/miniupnpd/firewall.leases
+    request:
+      kind: option_steps
+      steps:
+      - soap:
+          service: urn:schemas-upnp-org:service:WANIPv6FirewallControl:1
+          path: /ctl/IP6FCtl
+          action: AddPinhole
+          args:
+            RemoteHost: '2001:db8:7::1'
+            RemotePort: 6000
+            InternalClient: $client
+            InternalPort: 46345
+            Protocol: 17
+            LeaseTime: 3600
+          save:
+            uid: UniqueID
+      - router:
+          command: firewall-flush
+          contains:
+          - flushed
+      - soap:
+          service: urn:schemas-upnp-org:service:WANIPv6FirewallControl:1
+          path: /ctl/IP6FCtl
+          action: UpdatePinhole
+          args:
+            UniqueID: $uid
+            NewLeaseTime: 3600
+      - router:
+          command: ruleset
+          contains:
+          - '46345'
+      - soap:
+          service: urn:schemas-upnp-org:service:WANIPv6FirewallControl:1
+          path: /ctl/IP6FCtl
+          action: DeletePinhole
+          args:
+            UniqueID: $uid
+    expect:
+      kind: steps
+    description: UpdatePinhole adds a rule which was lost, and the UniqueID stays.
+  - name: firewall-lost-no-request
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    known_failure: miniupnpd re-adds a lost rule only when a client renews or updates the mapping
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=/var/lib/miniupnpd/firewall.leases
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46346
+          lease: 0
+      - pcp_map:
+          port: 46347
+          nonce_hex: '424242424242424242424242'
+      - router:
+          command: firewall-flush
+          contains:
+          - flushed
+      - sleep: 8
+      - router:
+          command: ruleset
+          contains:
+          - '46346'
+          - '46347'
+    expect:
+      kind: steps
+    description: The daemon sees the change of the firewall and adds the rules with no request from a client,
+      which a mapping of lease 0 never sends.
+- title: Lease files
+  description: A mapping survives a restart through the lease file only. The restart makes a new network
+    namespace, so the rules do not survive by themselves.
+  cases:
+  - name: lease-file-restores
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46331
+      - sleep: 1
+      - router:
+          command: restart
+          contains:
+          - restarted
+      - upnp_get:
+          port: 46331
+    expect:
+      kind: steps
+    description: With lease_file a UPnP mapping is back after a restart.
+  - name: lease-file-off-loses
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=@OFF@
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46332
+      - sleep: 1
+      - router:
+          command: restart
+          contains:
+          - restarted
+      - upnp_get:
+          port: 46332
+          present: false
+    expect:
+      kind: steps
+    description: Without lease_file the mapping is gone after a restart.
+  - name: lease-file-path
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file=/var/lib/miniupnpd/other.leases
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46333
+      - sleep: 1
+      - router:
+          command: cat:/var/lib/miniupnpd/other.leases
+          contains:
+          - '46333'
+    expect:
+      kind: steps
+    description: lease_file sets the path of the file.
+  - name: lease-file6-path
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv6
+    mutating: true
+    config:
+    - lease_file6=/var/lib/miniupnpd/pinholes.leases
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46334
+      - sleep: 1
+      - router:
+          command: cat:/var/lib/miniupnpd/pinholes.leases
+          contains:
+          - '46334'
+    expect:
+      kind: steps
+    description: lease_file6 sets the path of the IPv6 lease file, where a PCP IPv6 mapping is written too.
+- title: Firewall names (nftables)
+  description: The table and chain options, created by nft_init.sh -f and used by the daemon.
+  cases:
+  - name: nft-names
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - upnp_table_name=opttable
+    - upnp_nat_table_name=optnat
+    - upnp_forward_chain=optforward
+    - upnp_nat_chain=optprerouting
+    - upnp_nat_postrouting_chain=optpostrouting
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46341
+      - router:
+          command: ruleset
+          contains:
+          - table inet opttable
+          - table inet optnat
+          - chain optforward
+          - chain optprerouting
+          - chain optpostrouting
+          - '46341'
+    expect:
+      kind: steps
+    description: The mapping lands in the named tables and chains.
+  - name: nft-family-split
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - upnp_nftables_family_split=yes
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46342
+      - router:
+          command: ruleset
+          contains:
+          - table ip filter
+          - '46342'
+    expect:
+      kind: steps
+    description: With the family split the IPv4 rules are in an ip table.
+- title: Third party traffic
+  description: Traffic from the WAN reaches a second LAN host through a mapping another client made.
+  cases:
+  - name: thirdparty-traffic-reaches-neighbour
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - pcp_allow_thirdparty=yes
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 45300
+          protocol: tcp
+          third_party: neighbour
+      - router:
+          command: wan-probe:45300
+          contains:
+          - neighbour-served
+    expect:
+      kind: steps
+    description: A THIRD_PARTY mapping forwards WAN traffic to the other LAN host.
+- title: Firewall names (pf)
+  description: 'The options of the pf backend, on FreeBSD only: the rules a mapping makes.'
+  cases:
+  - name: pf-anchor
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    platform: freebsd
+    config:
+    - anchor=optanchor
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46351
+      - router:
+          command: ruleset:optanchor
+          contains:
+          - '46351'
+    expect:
+      kind: steps
+    description: The rules of a mapping land in the named anchor.
+  - name: pf-tag
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    platform: freebsd
+    config:
+    - tag=opttag
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46351
+      - router:
+          command: ruleset
+          contains:
+          - tag opttag
+    expect:
+      kind: steps
+    description: tag sets the tag of the filter rule.
+  - name: pf-queue
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    platform: freebsd
+    config:
+    - queue=optqueue
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46351
+      - router:
+          command: ruleset
+          contains:
+          - queue optqueue
+    expect:
+      kind: steps
+    description: queue sets the queue of the filter rule.
+  - name: pf-quickrules
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    platform: freebsd
+    config:
+    - quickrules=no
+    request:
+      kind: option_steps
+      steps:
+      - natpmp_map:
+          port: 46351
+      - router:
+          command: ruleset
+          contains:
+          - pass in on
+    expect:
+      kind: steps
+    description: quickrules=no makes the filter rule without quick.

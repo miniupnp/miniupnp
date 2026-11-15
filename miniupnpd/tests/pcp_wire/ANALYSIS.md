@@ -145,3 +145,11 @@ Client-side allocation strategies, stateless translation profiles and restart/
 failover scenarios are separate fixtures; see the coverage comments in the corpus.
 
 For WAN fixture setup and commands, see [Run with WAN traffic](README.md#run-with-wan-traffic).
+
+## Moved to daemon_options
+
+The gaps that depend on the configuration of the daemon are covered by the
+[`daemon_options`](../daemon_options/README.md) suite: modes and the WAN side, lifetimes,
+`secure_mode`, THIRD_PARTY (with traffic to a second LAN host), `allow` / `deny` lines, lease files
+and the other options. miniupnpd has no quota option and no static mappings. Two LAN clients and
+the WAN renumbering scenarios stay in this suite.

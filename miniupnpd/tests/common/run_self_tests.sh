@@ -1,7 +1,7 @@
 #!/bin/sh
-# The self-tests of the PCP test harness: the unit tests of common/ and of the pcp_wire tools, the
-# --self-test of both runners (the tests of their own code) and of the traffic agent, and a syntax
-# check of every shell script. No daemon, VM or Docker is needed (python3 with PyYAML is).
+# The self-tests of the PCP test harness: the unit tests of common/, common/tools/ and the pcp_wire
+# tools, the --self-test of both runners (the tests of their own code) and of the traffic agent,
+# and a syntax check of every shell script. No daemon, VM or Docker is needed (python3 with PyYAML is).
 #
 # The one list of them: pcp_e2e/run-docker.sh, pcp_e2e/run-freebsd.sh and the GitHub workflow
 # (regression-testing.yml) all call this file. Run it from anywhere:
@@ -34,8 +34,14 @@ check "daemon cache" common sh test_daemon_cache.sh
 check "run result" common sh test_e2e_result.sh
 check "traffic agent" common python3 traffic_agent.py --self-test
 check "pcp_wire runner" pcp_wire python3 run_pcp_wire_cases.py --self-test
+check "common tools" common/tools python3 -m unittest discover -p 'test_*.py'
 check "pcp_wire tools" pcp_wire/tools python3 -m unittest discover -p 'test_*.py'
 check "pcp_e2e runner" pcp_e2e python3 run_pcp_e2e_cases.py --self-test
+check "daemon_options runner" daemon_options python3 run_daemon_options_cases.py --self-test
+# the compare.py of each suite (common/tools/compare_daemon_branches.py)
+for test in $(cd "$TESTS" && ls -- */test_compare.py 2>/dev/null); do
+  check "${test%%/*} compare" "${test%%/*}" python3 -m unittest test_compare
+done
 for script in $(cd "$TESTS" && find . -name '*.sh' | sed 's|^\./||' | sort); do
   check "sh -n $script" . sh -n "$script"
 done

@@ -15,9 +15,10 @@
 # Requires: docker, qemu-system-x86_64 (>= 7.2), qemu-img, xz, curl, ssh, xorriso
 # (or genisoimage/mkisofs).
 #
-# Environment: PCP_TEST_FREEBSD_VERSION, PCP_TEST_FREEBSD_CACHE,
-# PCP_TEST_FREEBSD_MEMORY, PCP_TEST_FREEBSD_SSH_PORT (as for
-# pcp_wire/run-freebsd.sh, whose cached prepared image is shared),
+# Environment: PCP_TEST_FREEBSD_VERSION (or --freebsd-version; default the newest release),
+# PCP_TEST_FREEBSD_CACHE, PCP_TEST_FREEBSD_MEMORY, PCP_TEST_FREEBSD_SSH_PORT (as for
+# ../common/freebsd_vm.sh, whose cached prepared image is shared; the VM steps are those of
+# ../common/vm_lib.sh),
 # PCP_E2E_KEEP=1, PCP_E2E_ARTIFACT_DIR, E2E_STATUS_FILE (default status.md
 # beside this script: the freebsd column of the report run-docker.sh fills the linux
 # column of), DOCKER.
@@ -42,13 +43,14 @@
 #
 # The fixture lives in $PCP_TEST_FREEBSD_CACHE/e2e-vm/$PCP_E2E_VM_NAME (default name
 # "slotN"; SSH port PCP_E2E_FREEBSD_SSH_PORT, default 2230+N, so it does not clash with
-# the VM of pcp_wire/run-freebsd.sh from 2401). Without these options a run is
+# the VM of ../common/freebsd_vm.sh from 2401). Without these options a run is
 # fresh and leaves nothing behind.
 set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../../.." && pwd)
 DIR=$ROOT/miniupnpd/tests/pcp_e2e
 PMP=$ROOT/miniupnpd/tests/pcp_wire
+COMMON=$ROOT/miniupnpd/tests/common
 DOCKER=${DOCKER:-docker}
 SUFFIX=$$
 LAN=pcp-e2e-fbsd-lan-$SUFFIX
@@ -68,26 +70,26 @@ RUN_ID=$(date -u +%Y-%m-%dT%H-%M-%SZ)
 case "$ARTIFACTS" in /*) ;; *) ARTIFACTS=$ROOT/$ARTIFACTS ;; esac
 CACHE=${PCP_TEST_FREEBSD_CACHE:-"$HOME/.cache/miniupnpd-pcp-test"}
 MEMORY=${PCP_TEST_FREEBSD_MEMORY:-2048}
-VERSION=${PCP_TEST_FREEBSD_VERSION:-14.5}
-BASE_URL=https://download.freebsd.org/releases/VM-IMAGES
 # The router of the fixture. run-debian-iptables.sh sets debian-iptables.
 ROUTER=${PCP_E2E_ROUTER:-freebsd-pf}
 ROUTER_SCRIPT=miniupnpd/tests/pcp_e2e/freebsd/pf-router.sh
 VM_USER=freebsd
 LAN_IF=vtnet1
 WAN_IF=vtnet2
-ROUTER_NAME="FreeBSD $VERSION pf"
-PREPARE=$PMP/freebsd/prepare.sh
+PREPARE=$COMMON/freebsd/prepare.sh
 if [ "$ROUTER" = debian-iptables ]; then
   ROUTER_SCRIPT=miniupnpd/tests/pcp_e2e/debian/iptables-router.sh
   VM_USER=debian
   LAN_IF=lan0
   WAN_IF=wan0
   VERSION=13
-  ROUTER_NAME="Debian $VERSION iptables"
   PREPARE=$DIR/debian/prepare.sh
   E2E_PLATFORM=debian-iptables
 fi
+# the name of the router in the report, once VERSION is known (the boot looks up the newest)
+set_router_name() {
+  if [ "$ROUTER" = debian-iptables ]; then ROUTER_NAME="Debian $VERSION iptables"; else ROUTER_NAME="FreeBSD $VERSION pf"; fi
+}
 STATUS=0
 EXECUTED=0
 KEY=
@@ -135,6 +137,10 @@ while [ "$argc" -gt 0 ]; do
   esac
 done
 e2e_parse_args "$@"
+# --freebsd-version or PCP_TEST_FREEBSD_VERSION; empty: the newest (vmlib_freebsd_image)
+[ "$ROUTER" = debian-iptables ] || VERSION=${PCP_TEST_FREEBSD_VERSION:-}
+# shellcheck disable=SC1091
+. "$COMMON/vm_lib.sh"
 
 # Keep mode: the fixture outlives the script and is found again by a later run.
 KEEP_MODE=0
@@ -177,18 +183,7 @@ if [ "$KEEP_MODE" = 1 ]; then
   fi
 fi
 
-for tool in "$DOCKER" qemu-system-x86_64 qemu-img xz curl ssh ssh-keygen; do
-  command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required." >&2; exit 2; }
-done
-if command -v xorriso >/dev/null 2>&1; then
-  mkseed() { xorriso -as mkisofs -quiet -output "$1" -volid cidata -joliet -rock "$2" >/dev/null 2>&1; }
-elif command -v genisoimage >/dev/null 2>&1; then
-  mkseed() { genisoimage -quiet -output "$1" -volid cidata -joliet -rock "$2" >/dev/null 2>&1; }
-elif command -v mkisofs >/dev/null 2>&1; then
-  mkseed() { mkisofs -quiet -output "$1" -volid cidata -joliet -rock "$2" >/dev/null 2>&1; }
-else
-  echo "xorriso, genisoimage or mkisofs is required." >&2; exit 2
-fi
+vmlib_tools "$DOCKER" qemu-system-x86_64 qemu-img xz curl ssh ssh-keygen
 
 RUN_DIR=$ARTIFACTS/freebsd-$RUN_ID-slot$SLOT
 mkdir -p "$RUN_DIR"
@@ -272,132 +267,37 @@ docker_up() {
   start_agent "$THIRD" "$LAN4.14" "${LAN6}14" "$WAN4.200" "${WAN6}200"
 }
 
-# ---- FreeBSD VM: image, seed, prepared image, boot ----------------------
+# ---- The router VM: image, seed, prepared image, boot (../common/vm_lib.sh) ----
 vm_boot() {
-  mkdir -p "$CACHE"
-  # runs in other slots share the cached images: one downloads / prepares, the others wait
-  if command -v flock >/dev/null 2>&1; then exec 8>"$CACHE/image.lock"; flock 8; fi
   if [ "$ROUTER" = debian-iptables ]; then
     IMAGE_NAME=debian-$VERSION-generic-amd64.qcow2
     echo "Using Debian $VERSION"
+    vmlib_lock
     if [ ! -f "$CACHE/$IMAGE_NAME" ]; then
       curl -fL --retry 3 -o "$CACHE/$IMAGE_NAME.part" \
         "https://cloud.debian.org/images/cloud/trixie/latest/$IMAGE_NAME"
       mv "$CACHE/$IMAGE_NAME.part" "$CACHE/$IMAGE_NAME"
     fi
+    vmlib_unlock
   else
-    image_name() { echo "FreeBSD-$1-RELEASE-amd64-BASIC-CLOUDINIT-ufs.qcow2"; }
-    image_url() { echo "$BASE_URL/$1-RELEASE/amd64/Latest/$(image_name "$1").xz"; }
-    if [ -z "$VERSION" ]; then
-      for candidate in $(curl -fsS --retry 3 "$BASE_URL/" |
-          grep -o 'href="[0-9][0-9]*\.[0-9][0-9]*-RELEASE' | sed 's/href="//; s/-RELEASE//' |
-          sort -u -t. -k1,1nr -k2,2nr); do
-        if curl -fsIL -o /dev/null "$(image_url "$candidate")"; then VERSION=$candidate; break; fi
-      done
-      [ -n "$VERSION" ] || { echo "No FreeBSD cloud-init image found; set PCP_TEST_FREEBSD_VERSION." >&2; exit 1; }
-    fi
-    echo "Using FreeBSD $VERSION"
-    IMAGE_NAME=$(image_name "$VERSION")
-    if [ ! -f "$CACHE/$IMAGE_NAME" ]; then
-      curl -fL --retry 3 -o "$WORK/image.xz" "$(image_url "$VERSION")"
-      xz -d -c "$WORK/image.xz" >"$CACHE/$IMAGE_NAME.part"
-      mv "$CACHE/$IMAGE_NAME.part" "$CACHE/$IMAGE_NAME"
-    fi
+    vmlib_freebsd_image
   fi
-  KEY="$CACHE/id_ed25519"
-  [ -f "$KEY" ] || ssh-keygen -q -t ed25519 -N '' -f "$KEY"
-  rm -rf "$WORK/seed"
-  mkdir "$WORK/seed"
-  cat >"$WORK/seed/meta-data" <<META
-instance-id: miniupnpd-pcp-e2e
-local-hostname: pcp-bsd
-META
-  cat >"$WORK/seed/user-data" <<USER
-#cloud-config
-users:
-  - name: $VM_USER
-    groups: wheel
-    shell: /bin/sh
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    doas: permit nopass $VM_USER
-    ssh_authorized_keys:
-      - $(cat "$KEY.pub")
-USER
+  set_router_name
+  vmlib_seed miniupnpd-pcp-test
+  # the FreeBSD image is the one of ../common/freebsd_vm.sh: one prepared image for both
   if [ "$ROUTER" = freebsd-pf ]; then
-    cat >>"$WORK/seed/user-data" <<USER
-runcmd:
-  - mkdir -p /usr/local/etc
-  - echo 'IGNORE_OSVERSION = yes;' >> /usr/local/etc/pkg.conf
-  - yes | env IGNORE_OSVERSION=yes ASSUME_ALWAYS_YES=yes pkg install -y doas
-  - echo 'permit nopass freebsd' > /usr/local/etc/doas.conf
-USER
+    vmlib_prepared "$PREPARE" "prepared-$VERSION"
+  else
+    vmlib_prepared "$PREPARE" "prepared-$ROUTER-$VERSION"
   fi
-  mkseed "$WORK/seed.iso" "$WORK/seed"
-
-  ACCEL=tcg
-  if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL=kvm; else echo "No usable /dev/kvm; using slow software emulation." >&2; fi
-  RSH="ssh -p $SSH_PORT -i $KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
-  SSH="$RSH $VM_USER@127.0.0.1"
-
-  # boot_vm DISK [lan]: with "lan", also attach vtnet1 (LAN) and vtnet2 (WAN).
-  boot_vm() {
-    disk=$1
-    nics=
-    if [ "${2:-}" = lan ]; then
-      nics="-netdev stream,id=lan,addr.type=inet,addr.host=127.0.0.1,addr.port=$LAN_PORT,server=off,reconnect-ms=1000
-  -device virtio-net-pci,netdev=lan,mac=52:54:00:41:00:01
-  -netdev stream,id=wan,addr.type=inet,addr.host=127.0.0.1,addr.port=$WAN_PORT,server=off,reconnect-ms=1000
-  -device virtio-net-pci,netdev=wan,mac=52:54:00:09:00:01"
-    fi
-    # shellcheck disable=SC2086  # $nics is deliberately word-split (no spaces in values)
-    $DETACH qemu-system-x86_64 $MONITOR -machine accel=$ACCEL -cpu max -smp 2 -m "$MEMORY" \
-      -display none -serial "file:$WORK/console.log" \
-      -drive "file=$disk,if=virtio" \
-      -drive "file=$WORK/seed.iso,if=virtio,media=cdrom,readonly=on" \
-      -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
-      -device virtio-net-pci,netdev=n0 $nics </dev/null >"$WORK/qemu.log" 2>&1 9>&- &
-    QEMU_PID=$!
-    echo "Waiting for the VM to accept SSH"
-    attempt=0
-    until $SSH true 2>/dev/null; do
-      kill -0 "$QEMU_PID" 2>/dev/null || { echo "QEMU exited early" >&2; cat "$WORK/console.log" >&2; exit 1; }
-      attempt=$((attempt + 1))
-      [ "$attempt" -lt 120 ] || { echo "VM unreachable over SSH." >&2; tail -40 "$WORK/console.log" >&2; exit 1; }
-      sleep 5
-    done
-    PRIV=
-    attempt=0
-    while [ "$attempt" -lt 60 ]; do
-      PRIV=$($SSH 'for t in sudo doas; do
-        command -v $t >/dev/null || continue
-        if [ $t = doas ] && [ ! -s /usr/local/etc/doas.conf ]; then continue; fi
-        echo $t; break
-      done' 2>/dev/null || true)
-      [ -n "$PRIV" ] && break
-      attempt=$((attempt + 1)); sleep 5
-    done
-    [ -n "$PRIV" ] || { echo "No sudo or doas in the VM." >&2; exit 1; }
-  }
-
-  # Same naming as pcp_wire/run-freebsd.sh so its prepared image is reused.
-  PREPARE_ID=$( (sha256sum "$PREPARE" 2>/dev/null || shasum -a 256 "$PREPARE") | cut -c1-8)
-  PREPARED="$CACHE/prepared-$VERSION-$PREPARE_ID.qcow2"
-  [ "$ROUTER" = freebsd-pf ] || PREPARED="$CACHE/prepared-$ROUTER-$VERSION-$PREPARE_ID.qcow2"
-  if [ ! -f "$PREPARED" ]; then
-    echo "Preparing a cached $ROUTER_NAME image (first run only)"
-    qemu-img create -q -f qcow2 -F qcow2 -b "$CACHE/$IMAGE_NAME" "$WORK/prep.qcow2" 10G
-    boot_vm "$WORK/prep.qcow2"
-    $SSH "$PRIV env PCP_TEST_PYTHON=1 sh -c \"\$(cat)\"" <"$PREPARE"
-    $SSH "$PRIV sync; if [ \$(uname) = Linux ]; then $PRIV poweroff; else $PRIV shutdown -p now; fi" || true
-    wait "$QEMU_PID" || true
-    QEMU_PID=
-    qemu-img convert -O qcow2 "$WORK/prep.qcow2" "$PREPARED.part"
-    mv "$PREPARED.part" "$PREPARED"
-  fi
-  exec 8>&-
   qemu-img create -q -f qcow2 -F qcow2 -b "$PREPARED" "$WORK/disk.qcow2" 10G
-  boot_vm "$WORK/disk.qcow2" lan
-  # lets a later run tell this VM from the one of pcp_wire/run-freebsd.sh
+  # vtnet1 (LAN) and vtnet2 (WAN): QEMU stream netdevs to the relay container
+  vmlib_boot "$WORK/disk.qcow2" \
+    -netdev "stream,id=lan,addr.type=inet,addr.host=127.0.0.1,addr.port=$LAN_PORT,server=off,reconnect-ms=1000" \
+    -device virtio-net-pci,netdev=lan,mac=52:54:00:41:00:01 \
+    -netdev "stream,id=wan,addr.type=inet,addr.host=127.0.0.1,addr.port=$WAN_PORT,server=off,reconnect-ms=1000" \
+    -device virtio-net-pci,netdev=wan,mac=52:54:00:09:00:01
+  # lets a later run tell this VM from the one of ../common/freebsd_vm.sh
   TOKEN=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
   $SSH "$PRIV sh -c 'echo $TOKEN > /root/.pcp-e2e-token'"
   QEMU_START=$(ps -o lstart= -p "$QEMU_PID" 2>/dev/null || true)
@@ -413,7 +313,6 @@ set_vm_clock() {
 
 sync_tree() {
   set_vm_clock
-  echo "Copying the checkout into the VM"
   # Tracked and unignored files, plus the e2e fixture files themselves: a local
   # exclude rule (e.g. .git/info/exclude ignoring miniupnpd/tests/) must not drop
   # freebsd/*.sh from the copy.
@@ -422,14 +321,7 @@ sync_tree() {
      cd "$ROOT" && find miniupnpd/tests/pcp_e2e/freebsd miniupnpd/tests/pcp_e2e/debian miniupnpd/tests/pcp_e2e/run-freebsd.sh miniupnpd/tests/common/freebsd_lib.sh \
        -type f ! -name '*.pyc' -print0) | sort -z -u
   }
-  if $SSH 'command -v rsync >/dev/null'; then
-    checkout_files |
-      rsync -rlpc --delete --from0 --files-from=- --ignore-missing-args \
-        -e "$RSH" --rsync-path="$PRIV rsync" "$ROOT/" $VM_USER@127.0.0.1:/root/miniupnp/
-  else
-    checkout_files | (cd "$ROOT" && tar --null -T - -cf -) |
-      $SSH "$PRIV rm -rf /root/miniupnp && $PRIV mkdir -p /root/miniupnp && $PRIV tar -xf - -C /root/miniupnp"
-  fi
+  vmlib_copy "$ROOT" checkout_files -rlpc
 }
 
 # ---- Build miniupnpd and start the router --------------------------------
@@ -465,11 +357,6 @@ wait_for_peers() {
 }
 
 # ---- The fixture: state file, liveness, stages ----------------------------
-define_ssh() {
-  KEY="$CACHE/id_ed25519"
-  RSH="ssh -p $SSH_PORT -i $KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
-  SSH="$RSH $VM_USER@127.0.0.1"
-}
 save_state() {
   {
     echo "QEMU_PID='$QEMU_PID'"
@@ -497,7 +384,8 @@ load_state() {
   KEEP_LAN_PORT=$LAN_PORT
   KEEP_WAN_PORT=$WAN_PORT
   set_names
-  define_ssh
+  set_router_name
+  vmlib_ssh
 }
 # The VM is ours and running: the process is the one we started, and it answers with our token.
 vm_alive() {
