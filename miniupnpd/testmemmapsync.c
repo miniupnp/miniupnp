@@ -109,6 +109,7 @@ WEAK int get_nat_ext_addr(struct sockaddr * src, struct sockaddr * dst, uint8_t 
 static int calls;		/* fw_sync() calls */
 static int sent;		/* changes in the last call */
 static int fail_at = -1;	/* the change which fails, -1 : none */
+static int fail_call;		/* only in this call (1 the first), 0 : in each */
 static enum fw_applied stays = FW_NOT_APPLIED;	/* what the changes before it are */
 static enum fw_applied failed_as = FW_NOT_APPLIED;	/* what the failed change is */
 static int uid_override;	/* the uid the backend gives the next pinhole */
@@ -133,7 +134,7 @@ fw_sync(struct fw_change * c, int n)
 	last_old_iport = c[0].old ? c[0].old->iport : 0;
 	last_old_eport = c[0].old ? c[0].old->eport : 0;
 	last_row_iport = c[0].row ? c[0].row->iport : 0;
-	if(fail_at < 0 || fail_at >= n)
+	if(fail_at < 0 || fail_at >= n || (fail_call != 0 && calls != fail_call))
 		return 0;
 	for(i = 0; i < fail_at; i++)
 		c[i].applied = stays;
@@ -149,6 +150,7 @@ reset(void)
 	lease_table_clear();
 	calls = sent = 0;
 	fail_at = -1;
+	fail_call = 0;
 	stays = failed_as = FW_NOT_APPLIED;
 	uid_override = 0;
 	nextruletoclean_timestamp = 0;
@@ -308,6 +310,8 @@ test_renew_map(void)
 /* Before a renewal the protocols ask memmap_map_in_firewall(). A rule the
  * firewall lost is added again from its row, which stays. If the add fails,
  * the row goes, so the caller maps anew instead of renewing a closed port. */
+static void test_renew_lost_rule_half(void);
+
 static void
 test_renew_lost_rule(void)
 {
@@ -342,6 +346,40 @@ test_renew_lost_rule(void)
 	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 5000) == 0);
 	assert(calls == 6 && lease_table_count() == 1);
 	firewall_trust = FW_TRUST_CHECK;
+}
+
+/* A lost rule whose add leaves the redirect rule without its filter rule: the
+ * part which stayed is deleted at once, and the row goes. If that delete
+ * fails too, the row stays and expires at once, so the expiry tries again:
+ * without the row nothing would delete the rule. */
+static void
+test_renew_lost_rule_half(void)
+{
+	struct memmap_change c;
+	reset();
+	rule_present = 1;
+	map(&c, MEMMAP_ADD, 1000, "192.168.1.10", 80, "web", 2000);
+	assert(memmap_sync(&c, 1) == 0 && calls == 1);
+	rule_present = 0;
+	/* the delete of what is left, the half add, the delete which works */
+	fail_at = 0;
+	failed_as = FW_HALF_APPLIED;
+	fail_call = 3;
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 0);
+	assert(calls == 4 && last[0].op == FW_DELETE && lease_table_count() == 0);
+
+	reset();
+	rule_present = 1;
+	map(&c, MEMMAP_ADD, 1000, "192.168.1.10", 80, "web", 2000);
+	assert(memmap_sync(&c, 1) == 0);
+	rule_present = 0;
+	/* each call fails half: the row stays, and expires now */
+	fail_at = 0;
+	failed_as = FW_HALF_APPLIED;
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 0);
+	assert(calls == 4 && lease_table_count() == 1);
+	assert(lease_table_find_mapping(IPPROTO_TCP, AF_INET, NULL, 1000)->expiry == (time_t)now);
+	assert(nextruletoclean_timestamp == (unsigned int)now);
 }
 
 /* a renewal with the description of another protocol gives the row to it, as
@@ -501,6 +539,7 @@ main(void)
 	test_update_in_place();
 	test_renew_map();
 	test_renew_lost_rule();
+	test_renew_lost_rule_half();
 	test_renew_owner();
 	test_update_new_port();
 	test_delete();

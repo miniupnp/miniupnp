@@ -456,8 +456,8 @@ memmap_each_map_counters(memmap_counters_fn fn, void * arg)
 
 /* Add the rules of a row again, after the firewall lost them. The row stays,
  * and with it what the table knows of the mapping. What is left of the rules
- * goes first, as a delete and add did: the delete may find nothing. 0, or -1
- * if the add failed. */
+ * goes first, as a delete and add did: the delete may find nothing. 0, -1 if
+ * the add failed and left nothing, or -2 if a part of the rules stayed. */
 static int
 restore_rules(const struct lease_entry * row)
 {
@@ -470,7 +470,15 @@ restore_rules(const struct lease_entry * row)
 	memset(&c, 0, sizeof(c));
 	c.op = FW_ADD;
 	c.row = row;
-	return fw_sync(&c, 1) < 0 ? -1 : 0;
+	if(fw_sync(&c, 1) == 0)
+		return 0;
+	if(c.applied != FW_HALF_APPLIED)
+		return -1;
+	/* the redirect rule stayed without its filter rule: delete it */
+	memset(&c, 0, sizeof(c));
+	c.op = FW_DELETE;
+	c.old = row;
+	return fw_sync(&c, 1) == 0 ? -1 : -2;
 }
 
 int
@@ -497,11 +505,22 @@ memmap_map_in_firewall(unsigned short eport, int proto)
 		return 0;
 	syslog(LOG_NOTICE, "port %hu %s has no rule in the firewall, adding it again",
 	       eport, proto_itoa(proto));
-	if(restore_rules(row) == 0)
+	r = restore_rules(row);
+	if(r == 0)
 		return 1;
-	/* the rule cannot come back: the row goes, and the caller maps anew */
 	syslog(LOG_WARNING, "port %hu %s: the lost rule could not be added again",
 	       eport, proto_itoa(proto));
+	if(r == -2) {
+		/* A part of the rules stayed and could not be deleted: the row
+		 * stays too, as memmap_sync() keeps one, and expires at once, so
+		 * the expiry tries the delete again. Without the row, nothing
+		 * would delete that rule. */
+		unsigned int now = (unsigned int)upnp_time();
+		row->expiry = now;
+		nextruletoclean_timestamp = now;
+		return 0;
+	}
+	/* the rule cannot come back: the row goes, and the caller maps anew */
 	lease_table_remove(row);
 	return 0;
 }
