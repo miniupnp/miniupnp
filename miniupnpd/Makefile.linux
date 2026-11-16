@@ -132,7 +132,7 @@ include $(SRCDIR)/check.mk
 include $(SRCDIR)/common.mk
 
 testportinuse:	testportinuse.o portinuse.o getifaddr.o \
-	iptcrdr.o upnputils.o getroute.o
+	iptcrdr.o upnputils.o getroute.o memmap_stub.o
 
 teststun: teststun.o upnpstun.o \
 	iptcrdr.o upnputils.o getroute.o

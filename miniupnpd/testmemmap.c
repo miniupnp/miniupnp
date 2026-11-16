@@ -342,6 +342,55 @@ test_ipv6(void)
 	assert(lease_table_count() == 0);
 }
 
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+/* the port forwards of other programs, which port_in_use() reads with iptables:
+ * there are none */
+int
+get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned short eport,
+                      int proto, char * iaddr, int iaddrlen, unsigned short * iport,
+                      char * desc, int desclen, char * rhost, int rhostlen,
+                      unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	UNUSED(nat_chain_name); UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(iaddr); UNUSED(iaddrlen); UNUSED(iport); UNUSED(desc); UNUSED(desclen);
+	UNUSED(rhost); UNUSED(rhostlen); UNUSED(timestamp); UNUSED(packets); UNUSED(bytes);
+	return -1;
+}
+#endif
+
+/* 1000 clients ask for the external port another one holds: each is told the
+ * port is in use, by both checks, the holder is not, and the table keeps the
+ * one row */
+static void
+test_one_port_many_clients(void)
+{
+	static const char * holder = "10.0.0.1";
+	char h[INET_ADDRSTRLEN];
+	int i, in_use = 0, used_by_other = 0;
+
+	lease_table_clear();
+	memmap_map(0, 40001, holder, 5000, IPPROTO_UDP, "holder", 1000);
+	for(i = 1; i <= 1000; i++) {
+		snprintf(h, sizeof(h), "10.0.%d.%d", i / 250, i % 250 + 1);
+		in_use += memmap_eport_redirected_elsewhere("wan", 40001, IPPROTO_UDP, h, 5000);
+		used_by_other += memmap_eport_used_by_other(40001, h);
+	}
+	assert(in_use == 1000 && used_by_other == 1000);
+	assert(lease_table_count() == 1);
+
+	/* the holder may have it, but not for another internal port */
+	assert(memmap_eport_redirected_elsewhere("wan", 40001, IPPROTO_UDP, holder, 5000) == 0);
+	assert(memmap_eport_redirected_elsewhere("wan", 40001, IPPROTO_UDP, holder, 5001) == 1);
+	assert(memmap_eport_used_by_other(40001, holder) == 0);
+	/* the other protocol has no mapping of the port */
+	assert(memmap_eport_redirected_elsewhere("wan", 40001, IPPROTO_TCP, h, 5000) == 0);
+	/* once the holder is gone, the port is free for any of them */
+	memmap_map_gone(40001, IPPROTO_UDP);
+	assert(memmap_eport_redirected_elsewhere("wan", 40001, IPPROTO_UDP, h, 5000) == 0);
+	assert(memmap_eport_used_by_other(40001, h) == 0);
+	lease_table_clear();
+}
+
 static void
 test_find_map(void)
 {
@@ -519,6 +568,7 @@ main(void)
 	test_ipv4();
 	test_ipv6();
 	test_find_map();
+	test_one_port_many_clients();
 	test_expired_maps();
 #ifdef TEST_PINHOLES
 	test_pinhole_expiry();

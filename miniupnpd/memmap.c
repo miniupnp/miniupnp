@@ -746,3 +746,48 @@ memmap_peer_nat_addr(struct sockaddr * intaddr, struct sockaddr * peer,
 	return get_nat_ext_addr(intaddr, peer, proto, ext);
 }
 #endif /* PCP_PEER */
+
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+/* The chains of other programs, where a port forward of theirs can use a port. */
+#ifdef TOMATO
+static const char * const foreign_nat_chains[] = { "WANPREROUTING", NULL };
+#else
+static const char * const foreign_nat_chains[] = { "PREROUTING", NULL };
+#endif
+#endif
+
+int
+memmap_eport_redirected_elsewhere(const char * ifname, unsigned short eport, int proto,
+                                  const char * iaddr, unsigned short iport)
+{
+	struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	char old[INET_ADDRSTRLEN];
+
+	/* ours: the table */
+	if(row != NULL && inet_ntop(AF_INET, row->iaddr.s6_addr + 12, old, sizeof(old)) != NULL &&
+	   (strcmp(iaddr, old) != 0 || row->iport != iport)) {
+		syslog(LOG_DEBUG, "port %hu %s is mapped to %s port %hu", eport,
+		       proto_itoa(proto), old, row->iport);
+		return 1;
+	}
+#if defined(USE_NETFILTER) && !defined(USE_NFTABLES)
+	/* those of other programs: only the firewall has them */
+	{
+		unsigned short iport_old;
+		int i;
+		for(i = 0; foreign_nat_chains[i] != NULL; i++) {
+			if(get_nat_redirect_rule(foreign_nat_chains[i], ifname, eport, proto,
+			                         old, sizeof(old), &iport_old,
+			                         NULL, 0, NULL, 0, NULL, NULL, NULL) == 0 &&
+			   (strcmp(iaddr, old) != 0 || iport != iport_old)) {
+				syslog(LOG_DEBUG, "port %hu %s is redirected to %s port %hu on chain %s",
+				       eport, proto_itoa(proto), old, iport_old, foreign_nat_chains[i]);
+				return 1;
+			}
+		}
+	}
+#else
+	UNUSED(ifname);
+#endif
+	return 0;
+}

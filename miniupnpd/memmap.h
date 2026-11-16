@@ -92,6 +92,12 @@ unsigned short * memmap_ports_in_range(unsigned short startport, unsigned short 
  * logs who. */
 int memmap_eport_used_by_other(unsigned short eport, const char * iaddr);
 
+/* 1 if the external port is redirected to another internal endpoint than
+ * iaddr:iport: by a mapping of ours, from the table, or with iptables by a
+ * port forward of another program, from the firewall. For port_in_use(). */
+int memmap_eport_redirected_elsewhere(const char * ifname, unsigned short eport, int proto,
+                                      const char * iaddr, unsigned short iport);
+
 /* The reads below are those only the firewall can answer. The protocols call
  * them here, and never the firewall backend. */
 

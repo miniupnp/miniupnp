@@ -12,3 +12,11 @@ void
 memmap_remote_peers_partial(void)
 {
 }
+
+int
+memmap_eport_redirected_elsewhere(const char * ifname, unsigned short eport, int proto,
+                                  const char * iaddr, unsigned short iport)
+{
+	(void)ifname; (void)eport; (void)proto; (void)iaddr; (void)iport;
+	return 0;
+}
