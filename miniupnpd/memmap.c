@@ -886,6 +886,17 @@ stage_change(struct memmap_change * c, struct stage * st, struct fw_change * fw)
 		}
 		if(st->row == NULL)
 			return -1;
+		/* A change with a key renews the row at that key. The row of the
+		 * uid may be another one, which kept a uid the firewall has given
+		 * again: replacing it would leave two rows with one key */
+		if(st->old != NULL && c->iaddr != NULL) {
+			struct lease_entry * at = row_at_key(st->row);
+			if(at != st->old) {
+				syslog(LOG_INFO, "memmap: uid %d is the row of another key, the renewal takes the row of its key",
+				       c->uid);
+				st->old = at;
+			}
+		}
 		if(st->old == NULL)
 			st->old = row_at_key(st->row);
 		if(st->old == NULL) {

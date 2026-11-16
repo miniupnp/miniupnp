@@ -481,6 +481,20 @@ test_ipv6(void)
 	add_map(3, 0, "2001:db8::zz", 8080, IPPROTO_UDP, "upnp", 100);
 	assert(lease_table_count() == 0);
 
+	/* A PCP pinhole renewed with the uid the firewall gave it, which a
+	 * UPnP row of another key holds: the renewal takes the row of its key,
+	 * and the other row stays */
+	add_map(11, 0, h, 6060, IPPROTO_UDP, "upnp", 100);
+	add_map(11, 0, h, 6061, IPPROTO_UDP, PCP_DESC, 100);
+	assert(lease_table_count() == 2);
+	renew(11, NULL, 0, h, 6061, IPPROTO_UDP, PCP_DESC, 200);
+	assert(lease_table_count() == 2);
+	row = pinhole(h, 6061, NULL, 0);
+	assert(row != NULL && row->kind == LEASE_PCP_MAP && row->expiry == 200);
+	row = lease_table_find_uid(11);
+	assert(row != NULL && row->iport == 6060 && row->expiry == 100);
+	lease_table_clear();
+
 	/* a remote host which does not parse : no row, not a pinhole for any
 	 * remote */
 	add_peer(4, "example.com", 0, 0, h, 7070, IPPROTO_UDP, "upnp", 100);
