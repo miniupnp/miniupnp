@@ -67,6 +67,15 @@ WEAK int get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
                                                 void * arg),
                                      void * arg)
 { (void)fn; (void)arg; return -1; }
+/* the port forwards of other programs, for memmap_eport_redirected_elsewhere() */
+WEAK int get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
+                               unsigned short eport, int proto,
+                               char * iaddr, int iaddrlen, unsigned short * iport,
+                               char * desc, int desclen, char * rhost, int rhostlen,
+                               unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{ (void)nat_chain_name; (void)ifname; (void)eport; (void)proto; (void)iaddr; (void)iaddrlen;
+  (void)iport; (void)desc; (void)desclen; (void)rhost; (void)rhostlen; (void)timestamp;
+  (void)packets; (void)bytes; return -1; }
 #endif
 #ifdef FW_PINHOLES
 WEAK int find_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
