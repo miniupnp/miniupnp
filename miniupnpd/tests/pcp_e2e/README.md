@@ -41,6 +41,26 @@ section 15). Docker fixtures and networks are removed on exit. The fixture is
 
 The VM has its own kernel. miniupnpd uses libiptc, so the router uses the legacy iptables tables, and the host does not need their modules. The result of each case fills the `debian-iptables` column of `status.md`.
 
+## Run with an OpenBSD router
+
+`run-openbsd.sh` runs the same corpus on an OpenBSD VM running miniupnpd with pf. It is
+`run-freebsd.sh` with another router, so it has the same options (`up`, `--reuse`, `--slot N`,
+`down`), and `freebsd/pf-router.sh` drives both BSDs. The result of each case fills the `openbsd`
+column of `status.md`; the kept fixture is `openbsd-pf-slotN`.
+
+```sh
+./miniupnpd/tests/pcp_e2e/run-openbsd.sh --slot 8
+```
+
+- OpenBSD publishes no cloud image. The first run installs one with the official installer,
+  unattended (`../common/openbsd_image.sh`): the VM boots by PXE from QEMU's TFTP server, the
+  installer reads `install.conf` from the host, and the sets come from `cdn.openbsd.org`. It takes
+  about five minutes and is cached as `openbsd-<version>-base.qcow2`.
+- `PCP_TEST_OPENBSD_VERSION` picks the release (default 8.0).
+- OpenBSD translates in its filter rules (`rdr-to`, `nat-to`): the main ruleset has only
+  `anchor "miniupnpd"`, no `rdr-anchor` or `nat-anchor`.
+- The interfaces are `vio1` (LAN) and `vio2` (WAN).
+
 ## Run with a FreeBSD router
 
 `run-freebsd.sh` runs the same corpus (`--case NAME` works too) with a FreeBSD
@@ -79,6 +99,8 @@ a GitHub Ubuntu runner (KVM, FreeBSD 14.5 and 15.1; the downloaded and prepared 
 cached), with master's daemon and the pull request's, at the same time as `end2end-linux`, which
 does the same with `run-docker.sh`. Both run `../common/tools/compare_daemon_branches.py
 --suite end2end`; [`compare.py`](compare.py) tells it how to run this suite and read its results.
+`end2end-openbsd` does the same with `run-openbsd.sh` (OpenBSD 8.0); it caches the installed and
+prepared images, so only its first run installs OpenBSD.
 
 ### Keeping the VM between runs
 

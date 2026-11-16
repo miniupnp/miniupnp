@@ -2142,13 +2142,7 @@ def case_families(case):
 
 
 def resolve_family(value, family):
-    if isinstance(value, dict):
-        if set(value) == {"ipv4", "ipv6"}:
-            return resolve_family(value[family], family)
-        return {key: resolve_family(item, family) for key, item in value.items()}
-    if isinstance(value, list):
-        return [resolve_family(item, family) for item in value]
-    return value
+    return resolve_variant(value, ("ipv4", "ipv6"), family)
 
 
 def case_for_family(case, family):
@@ -2728,6 +2722,9 @@ class CaseRun:
         result, port, nonce = self.send(spec, prior[2] if prior else None)
         if self.args.router_call_dir:
             router_call(self.args.router_call_dir, f"snapshot:{request_index}")
+        if request_index == 1 and "restart" in self.case.get("requires", []):
+            # the rest of the case runs on a restarted daemon (upnp_e2e: a mapping kept in the lease file)
+            run_restart({"router_call_dir": self.args.router_call_dir})
         if result != wanted:
             raise AssertionError(f"{spec.get('protocol_family', 'PCP')} response expected {wanted}, got {result}")
         if (result == "SUCCESS" and spec.get("opcode") == "PUBLIC_ADDRESS"
@@ -2940,7 +2937,7 @@ def read_http_response(reader, head_only=False):
             "headers": headers, "body": body}
 
 
-def http_exchange(host, port, data, count=1, timeout=5, family=None):
+def http_exchange(host, port, data, count=1, timeout=5, family=None, source=None):
     """Send exact bytes on one TCP connection and read up to `count` responses. Returns (responses,
     closed): closed when the server closed the connection before (or right after) the last one."""
     address_family = family or (socket.AF_INET6 if ":" in host else socket.AF_INET)
@@ -2948,6 +2945,8 @@ def http_exchange(host, port, data, count=1, timeout=5, family=None):
     closed = False
     with socket.socket(address_family, socket.SOCK_STREAM) as sock:
         sock.settimeout(timeout)
+        if source:
+            sock.bind((source, 0))
         sock.connect((host, port))
         if data:
             sock.sendall(data)
@@ -2975,17 +2974,19 @@ def http_raw(host, port, data, timeout=5):
     return responses[0]["status"], responses[0]["headers"], responses[0]["body"]
 
 
-def http_request(url, method="GET", body=None, headers=None, timeout=5):
+def http_request(url, method="GET", body=None, headers=None, timeout=5, source=None):
     """A well-formed request with http.client: (status, {lower-case header: value}, body). An https URL
-    does not check the daemon's test certificate."""
+    does not check the daemon's test certificate. source binds the client end to that address."""
     host, port, path = url_parts(url)
+    source_address = (source, 0) if source else None
     if url.startswith("https:"):
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         tls.check_hostname = False
         tls.verify_mode = ssl.CERT_NONE
-        connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=tls)
+        connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=tls,
+                                                 source_address=source_address)
     else:
-        connection = http.client.HTTPConnection(host, port, timeout=timeout)
+        connection = http.client.HTTPConnection(host, port, timeout=timeout, source_address=source_address)
     try:
         connection.request(method, path, body, headers or {})
         response = connection.getresponse()
@@ -3014,7 +3015,8 @@ def parse_description(body, location):
 
     def device(element):
         tree = {"type": xml_text(element, "d:deviceType", ns), "udn": xml_text(element, "d:UDN", ns),
-                "friendly_name": xml_text(element, "d:friendlyName", ns), "services": [], "devices": []}
+                "friendly_name": xml_text(element, "d:friendlyName", ns), "services": [], "devices": [],
+                "manufacturer": xml_text(element, "d:manufacturer", ns), "model_name": xml_text(element, "d:modelName", ns)}
         device_types.append(tree["type"])
         udns.append(tree["udn"])
         for service in element.findall("d:serviceList/d:service", ns):
@@ -3034,7 +3036,8 @@ def parse_description(body, location):
     tree = device(top)
     major, minor = xml_text(root, "d:specVersion/d:major", ns), xml_text(root, "d:specVersion/d:minor", ns)
     return {"spec_version": f"{major}.{minor}", "udn": tree["udn"], "udns": udns, "device_types": device_types,
-            "services": services, "device": tree}
+            "services": services, "device": tree, "config_id": root.get("configId"),
+            "url_base": xml_text(root, "d:URLBase", ns)}
 
 
 def fetch_description(location, timeout=5):
@@ -3060,9 +3063,12 @@ def parse_scpd(body):
     variables = {}
     for variable in root.findall("s:serviceStateTable/s:stateVariable", ns):
         variables[xml_text(variable, "s:name", ns)] = {
-            "type": xml_text(variable, "s:dataType", ns), "evented": variable.get("sendEvents", "yes") == "yes"}
+            "type": xml_text(variable, "s:dataType", ns), "evented": variable.get("sendEvents", "yes") == "yes",
+            "allowed": [value.text for value in variable.findall("s:allowedValueList/s:allowedValue", ns)],
+            "range": [xml_text(variable, f"s:allowedValueRange/s:{bound}", ns) for bound in ("minimum", "maximum")]}
     major, minor = xml_text(root, "s:specVersion/s:major", ns), xml_text(root, "s:specVersion/s:minor", ns)
-    return {"spec_version": f"{major}.{minor}", "actions": actions, "variables": variables}
+    return {"spec_version": f"{major}.{minor}", "actions": actions, "variables": variables,
+            "config_id": root.get("configId")}
 
 
 def fetch_scpd(url, timeout=5):
@@ -3114,7 +3120,8 @@ def parse_soap_response(body):
     return out
 
 
-def soap_call(control_url, service_type, action, args=(), soapaction=None, raw_body=None, headers=None, timeout=5):
+def soap_call(control_url, service_type, action, args=(), soapaction=None, raw_body=None, headers=None, timeout=5,
+              source=None):
     """POST an action to a control URL. Returns (HTTP status, result): result is a SoapFault, the out
     arguments (parse_soap_response), or None. soapaction overrides the SOAPAction header (False leaves it
     out); raw_body replaces the envelope."""
@@ -3124,7 +3131,7 @@ def soap_call(control_url, service_type, action, args=(), soapaction=None, raw_b
         request_headers["SOAPAction"] = soapaction if soapaction is not None else f'"{service_type}#{action}"'
     request_headers.update(headers or {})
     status, _response_headers, response_body = http_request(
-        control_url, "POST", body.encode() if isinstance(body, str) else body, request_headers, timeout)
+        control_url, "POST", body.encode() if isinstance(body, str) else body, request_headers, timeout, source)
     return status, parse_soap_response(response_body)
 
 
@@ -3186,7 +3193,8 @@ class EventListener:
                     properties = None
                 seq = self.headers.get("SEQ")
                 event = {"sid": self.headers.get("SID"), "seq": int(seq) if seq and seq.isdigit() else seq,
-                         "nt": self.headers.get("NT"), "nts": self.headers.get("NTS"), "properties": properties}
+                         "host": self.headers.get("HOST"), "content_type": self.headers.get("Content-Type"),
+                         "path": self.path, "nt": self.headers.get("NT"), "nts": self.headers.get("NTS"), "properties": properties}
                 with listener.condition:
                     listener.events.append(event)
                     listener.condition.notify_all()
@@ -3233,7 +3241,7 @@ class EventListener:
 # client, family, ifindex, http_port, and _resources (a list the runner closes after the case).
 
 
-UPNP_STEP_KINDS = {"ssdp", "ssdp-listen", "http", "soap", "subscribe", "notify-wait", "restart", "upnp-lease"}
+UPNP_STEP_KINDS = {"ssdp", "ssdp-listen", "http", "soap", "subscribe", "notify-wait", "restart", "upnp-lease", "wait"}
 
 
 def check_upnp_values(values, checks, variables):
@@ -3369,7 +3377,24 @@ def http_values(responses, closed):
 def description_values(body, location):
     description = parse_description(body, location)
     urls = [service[key] for service in description["services"] for key in ("scpd", "control", "event")]
+    placement, children, names = [], [], {"friendly_name": [], "manufacturer": [], "model_name": []}
+
+    def walk(device):
+        placement.extend(f'{device["type"]} {service["type"]}' for service in device["services"])
+        children.extend(f'{device["type"]} {child["type"]}' for child in device["devices"])
+        for key, found in names.items():
+            found.append(device[key])
+        for child in device["devices"]:
+            walk(child)
+
+    walk(description["device"])
     return {"desc.spec_version": description["spec_version"], "desc.udn": description["udn"],
+            "desc.config_id": description["config_id"], "desc.service_ids": sorted(
+                service["id"] for service in description["services"]),
+            "desc.event_urls": [service["event"] for service in description["services"]],
+            "desc.service_placement": placement, "desc.device_children": children,
+            "desc.friendly_names": names["friendly_name"], "desc.manufacturers": names["manufacturer"],
+            "desc.model_names": names["model_name"], "desc.url_base": description["url_base"],
             "desc.udns": description["udns"], "desc.device_types": description["device_types"],
             "desc.service_types": [service["type"] for service in description["services"]],
             "desc.urls": urls, "desc.services": description["services"],
@@ -3379,10 +3404,15 @@ def description_values(body, location):
 def scpd_values(body):
     scpd = parse_scpd(body)
     values = {"scpd.spec_version": scpd["spec_version"], "scpd.actions": sorted(scpd["actions"]),
+              "scpd.config_id": scpd["config_id"],
               "scpd.variables": sorted(scpd["variables"]),
               "scpd.evented": sorted(name for name, var in scpd["variables"].items() if var["evented"])}
     for action, arguments in scpd["actions"].items():
         values[f"scpd.args.{action}"] = [argument["name"] for argument in arguments]
+        values[f"scpd.directions.{action}"] = [argument["direction"] for argument in arguments]
+    for name, variable in scpd["variables"].items():
+        values.update({f"scpd.type.{name}": variable["type"], f"scpd.allowed.{name}": variable["allowed"],
+                       f"scpd.range.{name}": variable["range"]})
     return values
 
 
@@ -3398,7 +3428,7 @@ def run_http_step(step, variables):
             data = data.replace("{pad}", "X-Pad: " + "a" * request["pad_header"])
         data = data.encode() * request.get("repeat", 1)
         responses, closed = http_exchange(host, port, data, request.get("count", request.get("repeat", 1)),
-                                          request.get("timeout", 5))
+                                          request.get("timeout", 5), source=step_source(request, variables))
         values = http_values(responses, closed)
     else:
         url = upnp_url(variables, request.get("path", "/rootDesc.xml"))
@@ -3423,6 +3453,17 @@ def run_http_step(step, variables):
     return values
 
 
+def step_source(request, variables):
+    """client: second sends a step from the runner's second LAN address (the `client2` variable)."""
+    return variables["client2"] if request.get("client") == "second" else None
+
+
+def run_wait_step(step, variables):
+    """A pause, for what takes time: a lease that counts down or expires."""
+    time.sleep(resolve_request(step, variables)["seconds"])
+    return {}
+
+
 def run_soap_step(step, variables):
     """A SOAP action on a service of the build: service is a key of the `services` variable ({name:
     {type, control}}); args are pairs or a dict; soapaction / raw_body / path / service_type override."""
@@ -3439,7 +3480,7 @@ def run_soap_step(step, variables):
         raw_body = raw_body.replace("{service_type}", str(service_type)).replace("{action}", request["action"])
         raw_body = raw_body.replace("{pad}", "a" * request.get("pad", 0))
     status, result = soap_call(control, service_type, request["action"], args, request.get("soapaction"),
-                               raw_body, request.get("headers"), request.get("timeout", 5))
+                               raw_body, request.get("headers"), request.get("timeout", 5), step_source(request, variables))
     values = {"status": status, "fault": None, "fault_description": None, "parsed": result is not None}
     if isinstance(result, SoapFault):
         values.update(fault=result.code, fault_description=result.description)
@@ -3517,7 +3558,8 @@ def run_upnp_lease_step(step, variables, lease):
 
 
 UPNP_STEPS = {"ssdp": run_ssdp_step, "ssdp-listen": run_ssdp_listen_step, "http": run_http_step,
-              "soap": run_soap_step, "subscribe": run_subscribe_step, "notify-wait": run_notify_wait_step}
+              "soap": run_soap_step, "subscribe": run_subscribe_step, "notify-wait": run_notify_wait_step,
+              "wait": run_wait_step}
 
 
 def run_upnp_step(step, variables, lease=NO_LEASE):
@@ -3547,6 +3589,34 @@ def case_builds(case, builds):
     if not isinstance(listed, list) or not listed:
         raise ValueError(f"{case.get('name', '<unnamed>')}: invalid builds list")
     return listed
+
+
+def fill_placeholders(value, values):
+    """A corpus value with its @NAME@ placeholders replaced: values {"@NAME@": text}."""
+    if isinstance(value, dict):
+        return {key: fill_placeholders(item, values) for key, item in value.items()}
+    if isinstance(value, list):
+        return [fill_placeholders(item, values) for item in value]
+    if isinstance(value, str):
+        for name, text in values.items():
+            value = value.replace(name, text)
+    return value
+
+
+def select_build_cases(corpus, args, resolve):
+    """resolve(case) of the cases of --build, --family and --case, in corpus order."""
+    if args.build not in corpus["builds"]:
+        raise CorpusError(f"unknown build {args.build}")
+    builds = set(corpus["builds"])
+    return select_family_cases(corpus, args, resolve, lambda case: args.build in case_builds(case, builds))
+
+
+def print_build_runs(corpus, count):
+    """The self-test line of a corpus with builds: its cases, and the family runs of each build."""
+    builds = set(corpus["builds"])
+    runs = {build: sum(len(case_families(case)) for case in flatten_cases(corpus) if build in case_builds(case, builds))
+            for build in sorted(builds)}
+    print(f"PASS corpus ({count} cases; family runs: " + ", ".join(f"{b} {n}" for b, n in runs.items()) + ")")
 
 
 def resolve_variant(value, choices, chosen):

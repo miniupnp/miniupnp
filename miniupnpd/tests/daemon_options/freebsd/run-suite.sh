@@ -1,12 +1,14 @@
 #!/bin/sh
-# Runs inside the FreeBSD VM as root, from the daemon tree: the daemon_options corpus on pf.
+# Runs inside the FreeBSD or OpenBSD VM as root, from the daemon tree: the daemon_options corpus on pf.
 #
 #   run-suite.sh RESULTS_DIR
 #
-# The topology, with epair(4) and vnet jails that share the root filesystem (as pcp_wire/freebsd):
-#   bridge0 LAN 172.28.41.1: jail client (.2), jail neighbour (.3, an HTTP server)
-#   bridge1 WAN 198.51.100.1: jail wan (.3, the runner; .5, the STUN server)
+# The topology, with hosts that share the root filesystem (bsd_host in common/freebsd_lib.sh: vnet
+# jails on FreeBSD, as pcp_wire/freebsd, routing domains on OpenBSD):
+#   LAN 172.28.41.1: host client (.2), host neighbour (.3, an HTTP server)
+#   WAN 198.51.100.1: host wan (.3, the runner; .5, the STUN server)
 # The runner cannot run on the router: the daemon ignores a sender it routes through lo0.
+# OpenBSD translates in its filter rules: its main ruleset has no rdr-anchor and no nat-anchor.
 set -eu
 
 [ "$#" -eq 1 ] || { echo "usage: $0 RESULTS_DIR" >&2; exit 2; }
@@ -19,6 +21,8 @@ CALLS=$WORK/calls
 LAN4=172.28.41 LAN6=2001:db8:1:: WAN4=198.51.100 WAN6=2001:db8:9000::
 LEASES="/var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6 /var/tmp/other.leases /var/tmp/pinholes.leases"
 STATUS=0
+OS=$(uname)
+PLATFORM=$(echo "$OS" | tr '[:upper:]' '[:lower:]')
 rm -rf "$WORK"
 mkdir -p "$CALLS"
 . "$HERE/../common/freebsd_lib.sh"
@@ -46,35 +50,26 @@ cleanup() {
 	trap - EXIT INT TERM
 	[ -z "$CALL_LOOP" ] || kill "$CALL_LOOP" 2>/dev/null || true
 	pkill -x miniupnpd 2>/dev/null || true
-	for name in client neighbour wan; do jail -r "$name" >/dev/null 2>&1 || true; done
+	for name in client neighbour wan; do bsd_remove "$name"; done
 	exit "$result"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-kldload -n if_epair if_bridge pf || true
-ifconfig epair0 create >/dev/null
-ifconfig epair1 create >/dev/null
-ifconfig epair2 create >/dev/null
-ifconfig bridge0 create >/dev/null
-ifconfig bridge1 create >/dev/null
-ifconfig bridge0 addm epair0a addm epair1a up
-ifconfig bridge1 addm epair2a up
-ifconfig epair0a up
-ifconfig epair1a up
-ifconfig epair2a up
-ifconfig bridge0 inet "$LAN4.1/24"
-ifconfig bridge0 inet6 "${LAN6}1/64"
-ifconfig bridge1 inet "$WAN4.1/24"
-ifconfig bridge1 inet6 "${WAN6}1/64"
-sysctl net.inet.ip.forwarding=1 net.inet6.ip6.forwarding=1 >/dev/null
-# pf sees the bridge, where the rules of the daemon are, not its members
-sysctl net.link.bridge.pfil_member=0 net.link.bridge.pfil_bridge=1 >/dev/null
-freebsd_make_jail client epair0b "$LAN4.2" "${LAN6}2" "$LAN4.1" "${LAN6}1"
-freebsd_make_jail neighbour epair1b "$LAN4.3" "${LAN6}3" "$LAN4.1" "${LAN6}1"
-freebsd_make_jail wan epair2b "$WAN4.3" "${WAN6}3" "$WAN4.1" "${WAN6}1"
-jexec wan ifconfig epair2b inet "$WAN4.5/32" alias
+[ "$OS" = OpenBSD ] || kldload -n if_epair if_bridge pf || true
+bsd_switch lan "$LAN4.1" "${LAN6}1"
+LAN_IF=$SWITCH_IF
+bsd_switch wan "$WAN4.1" "${WAN6}1"
+WAN_IF=$SWITCH_IF
+sysctl net.inet.ip.forwarding=1 >/dev/null
+sysctl net.inet6.ip6.forwarding=1 >/dev/null
+# pf sees the bridge, where the rules of the daemon are, not its members (OpenBSD: the vport)
+[ "$OS" = OpenBSD ] || sysctl net.link.bridge.pfil_member=0 net.link.bridge.pfil_bridge=1 >/dev/null
+bsd_host client lan "$LAN4.2" "${LAN6}2" "$LAN4.1" "${LAN6}1"
+bsd_host neighbour lan "$LAN4.3" "${LAN6}3" "$LAN4.1" "${LAN6}1"
+bsd_host wan wan "$WAN4.3" "${WAN6}3" "$WAN4.1" "${WAN6}1"
+bsd_exec wan ifconfig "$HOST_IF" inet "$WAN4.5/32" alias
 sleep 3 # let IPv6 DAD finish
 
 # the VM's own default routes would win over the WAN; SSH keeps the connected route
@@ -85,34 +80,38 @@ route -n add -inet6 default "${WAN6}3" >/dev/null
 mkdir -p "$WORK/srv"
 echo neighbour-served >"$WORK/srv/index.html"
 # not http.server: HTTPServer looks up the name of its address before listen(), and a jail has no DNS
-jexec neighbour sh -c "cd $WORK/srv && exec python3 -c \"
+bsd_exec neighbour sh -c "cd $WORK/srv && exec python3 -c \"
 import http.server, socketserver
 socketserver.TCPServer(('$LAN4.3', 45300), http.server.SimpleHTTPRequestHandler).serve_forever()\"" >/dev/null 2>&1 &
-jexec wan python3 "$HERE/stun_server.py" >/dev/null 2>&1 &
+bsd_exec wan python3 "$HERE/stun_server.py" >/dev/null 2>&1 &
 attempt=0
-until jexec client fetch -q -T 1 -o /dev/null "http://$LAN4.3:45300/" 2>/dev/null; do
+until bsd_exec client sh -c ". '$HERE/../common/freebsd_lib.sh' && bsd_fetch http://$LAN4.3:45300/"; do
 	attempt=$((attempt + 1))
 	[ "$attempt" -lt 100 ] || { echo "FAIL: the neighbour's HTTP server did not start" >&2; exit 1; }
 	sleep 0.1
 done
 
-cat >"$WORK/pf.conf" <<'PF'
-nat-anchor "miniupnpd"
-rdr-anchor "miniupnpd"
-block in on bridge1 all
-pass in quick on bridge1 inet6 proto icmp6 icmp6-type { neighbrsol, neighbradv }
+{
+	if [ "$OS" != OpenBSD ]; then
+		echo 'nat-anchor "miniupnpd"'
+		echo 'rdr-anchor "miniupnpd"'
+	fi
+	cat <<PF
+block in on $WAN_IF all
+pass in quick on $WAN_IF inet6 proto icmp6 icmp6-type { neighbrsol, neighbradv }
 anchor "miniupnpd"
-pass in on bridge0 all keep state
+pass in on $LAN_IF all keep state
 pass out all keep state
 PF
+} >"$WORK/pf.conf"
 pfctl -F all >/dev/null 2>&1 || true
 pfctl -e >/dev/null 2>&1 || true
 pfctl -f "$WORK/pf.conf"
 
-cat >"$WORK/base.conf" <<'CONF'
-ext_ifname=bridge1
+cat >"$WORK/base.conf" <<CONF
+ext_ifname=$WAN_IF
 ext_allow_private_ipv4=yes
-listening_ip=bridge0
+listening_ip=$LAN_IF
 enable_upnp=no
 enable_pcp_pmp=yes
 lease_file=/var/tmp/miniupnpd.leases
@@ -145,8 +144,9 @@ start_process() {
 
 router_call() {
 	case $1 in
-		ruleset) pfctl -a 'miniupnpd/*' -sn; pfctl -a 'miniupnpd/*' -sr ;;
-		ruleset:*) pfctl -a "${1#ruleset:}" -sn; pfctl -a "${1#ruleset:}" -sr ;;
+		# OpenBSD has no separate nat ruleset to show
+		ruleset) [ "$OS" = OpenBSD ] || pfctl -a 'miniupnpd/*' -sn; pfctl -a 'miniupnpd/*' -sr ;;
+		ruleset:*) [ "$OS" = OpenBSD ] || pfctl -a "${1#ruleset:}" -sn; pfctl -a "${1#ruleset:}" -sr ;;
 		log) cat "$LOG" ;;
 		cat:*) cat "$(printf '%s' "${1#cat:}" | sed 's#/var/lib/miniupnpd#/var/tmp#')" ;;
 		restart) start_process && echo restarted ;;
@@ -157,7 +157,7 @@ router_call() {
 			pfctl -a miniupnpd -F all >/dev/null 2>&1
 			echo flushed ;;
 		wan-reserved) echo changed ;;	# the WAN of this fixture is reserved already
-		wan-probe:*) jexec wan python3 -c "
+		wan-probe:*) bsd_exec wan python3 -c "
 import urllib.request
 try:
     print(urllib.request.urlopen('http://$WAN4.1:${1#wan-probe:}/', timeout=5).read().decode())
@@ -184,7 +184,7 @@ start_daemon() {
 	: >"$WORK/extra.conf"
 	for word in "$@"; do
 		line=$(printf '%s' "$word" | tr + ' ' | sed -e "s/@WAN4@/$WAN4/g" -e "s/@LAN4@/$LAN4/g" -e "s/@LAN6@/$LAN6/g" \
-			-e 's/eth0/bridge0/g' -e 's#/var/lib/miniupnpd#/var/tmp#g')
+			-e "s/eth0/$LAN_IF/g" -e 's#/var/lib/miniupnpd#/var/tmp#g')
 		[ "${line%%=*}" != anchor ] || anchor=${line#*=}
 		printf '%s\n' "$line" >>"$WORK/extra.conf"
 	done
@@ -192,7 +192,8 @@ start_daemon() {
 	awk -f "$HERE/../common/docker/conf_replace.awk" "$WORK/extra.conf" "$WORK/base.conf" >"$WORK/opt.conf"
 	grep -v '=@OFF@$' "$WORK/extra.conf" >>"$WORK/opt.conf" || true
 	# the main ruleset calls the anchor of this configuration
-	sed -i '' -E "s/anchor \"[^\"]*\"/anchor \"$anchor\"/" "$WORK/pf.conf"
+	sed -E "s/anchor \"[^\"]*\"/anchor \"$anchor\"/" "$WORK/pf.conf" >"$WORK/pf.conf.new"
+	mv "$WORK/pf.conf.new" "$WORK/pf.conf"
 	pfctl -f "$WORK/pf.conf"
 	start_process
 }
@@ -200,7 +201,7 @@ start_daemon() {
 case_args=
 for selected in ${DAEMON_OPTIONS_CASES:-}; do case_args="$case_args --case $selected"; done
 # shellcheck disable=SC2086
-runs=$(python3 "$RUNNER" --list-runs --platform freebsd $case_args)
+runs=$(python3 "$RUNNER" --list-runs --platform "$PLATFORM" $case_args)
 active=-
 while read -r side family config; do
 	[ -n "$side" ] || continue
@@ -218,10 +219,10 @@ while read -r side family config; do
 	set --
 	for word in $config; do set -- "$@" --config "$word"; done
 	# shellcheck disable=SC2086
-	jexec "$jail" env PYTHONDONTWRITEBYTECODE=1 python3 "$RUNNER" --router-call-dir "$CALLS" $down $case_args \
-		--host "$host" --family "$family" --side "$side" --platform freebsd \
+	bsd_exec "$jail" env PYTHONDONTWRITEBYTECODE=1 python3 "$RUNNER" --router-call-dir "$CALLS" $down $case_args \
+		--host "$host" --family "$family" --side "$side" --platform "$PLATFORM" \
 		--status-file "$RESULTS/status.md" --status-data-file "$RESULTS/status-data.json" \
-		--run-info "daemon=${DAEMON_OPTIONS_DAEMON:-unknown}" --run-info "router=FreeBSD pf" "$@" </dev/null || STATUS=1
+		--run-info "daemon=${DAEMON_OPTIONS_DAEMON:-unknown}" --run-info "router=$OS pf" "$@" </dev/null || STATUS=1
 done <<EOF
 $runs
 EOF

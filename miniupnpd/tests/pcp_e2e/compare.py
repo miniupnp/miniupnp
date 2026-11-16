@@ -1,6 +1,6 @@
-"""end2end: the forwarding suite, on Docker (run-docker.sh) or with a FreeBSD pf router in QEMU
-(run-freebsd.sh), for ../common/tools/compare_daemon_branches.py (the interface is in
-../common/tools/suite_compare.py)."""
+"""end2end: the forwarding suite, on Docker (run-docker.sh) or with a FreeBSD or OpenBSD pf router in
+QEMU (run-freebsd.sh, run-openbsd.sh), for ../common/tools/compare_daemon_branches.py (the interface
+is in ../common/tools/suite_compare.py)."""
 
 import os
 import sys
@@ -14,7 +14,7 @@ from suite_compare import STATUSES, TESTS, check_exit, digest, run_driver  # noq
 SUITE = 'end2end'
 TITLE = 'PCP end-to-end'
 CORPUS = 'pcp-e2e-cases.yaml'
-DRIVERS = {'linux': 'run-docker.sh', 'freebsd': 'run-freebsd.sh'}
+DRIVERS = {'linux': 'run-docker.sh', 'freebsd': 'run-freebsd.sh', 'openbsd': 'run-openbsd.sh'}
 PLATFORMS = tuple(DRIVERS)
 
 

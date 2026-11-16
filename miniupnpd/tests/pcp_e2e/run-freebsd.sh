@@ -70,7 +70,7 @@ RUN_ID=$(date -u +%Y-%m-%dT%H-%M-%SZ)
 case "$ARTIFACTS" in /*) ;; *) ARTIFACTS=$ROOT/$ARTIFACTS ;; esac
 CACHE=${PCP_TEST_FREEBSD_CACHE:-"$HOME/.cache/miniupnpd-pcp-test"}
 MEMORY=${PCP_TEST_FREEBSD_MEMORY:-2048}
-# The router of the fixture. run-debian-iptables.sh sets debian-iptables.
+# The router of the fixture. run-debian-iptables.sh sets debian-iptables, run-openbsd.sh openbsd-pf.
 ROUTER=${PCP_E2E_ROUTER:-freebsd-pf}
 ROUTER_SCRIPT=miniupnpd/tests/pcp_e2e/freebsd/pf-router.sh
 VM_USER=freebsd
@@ -86,9 +86,21 @@ if [ "$ROUTER" = debian-iptables ]; then
   PREPARE=$DIR/debian/prepare.sh
   E2E_PLATFORM=debian-iptables
 fi
+if [ "$ROUTER" = openbsd-pf ]; then
+  # pf-router.sh serves both BSDs
+  VM_USER=openbsd
+  LAN_IF=vio1
+  WAN_IF=vio2
+  PREPARE=$COMMON/openbsd/prepare.sh
+  E2E_PLATFORM=openbsd
+fi
 # the name of the router in the report, once VERSION is known (the boot looks up the newest)
 set_router_name() {
-  if [ "$ROUTER" = debian-iptables ]; then ROUTER_NAME="Debian $VERSION iptables"; else ROUTER_NAME="FreeBSD $VERSION pf"; fi
+  case "$ROUTER" in
+    debian-iptables) ROUTER_NAME="Debian $VERSION iptables" ;;
+    openbsd-pf) ROUTER_NAME="OpenBSD $VERSION pf" ;;
+    *) ROUTER_NAME="FreeBSD $VERSION pf" ;;
+  esac
 }
 STATUS=0
 EXECUTED=0
@@ -138,7 +150,12 @@ while [ "$argc" -gt 0 ]; do
 done
 e2e_parse_args "$@"
 # --freebsd-version or PCP_TEST_FREEBSD_VERSION; empty: the newest (vmlib_freebsd_image)
-[ "$ROUTER" = debian-iptables ] || VERSION=${PCP_TEST_FREEBSD_VERSION:-}
+# PCP_TEST_OPENBSD_VERSION for OpenBSD (default: vmlib_openbsd_image's)
+case "$ROUTER" in
+  debian-iptables) ;;
+  openbsd-pf) VERSION=${PCP_TEST_OPENBSD_VERSION:-} ;;
+  *) VERSION=${PCP_TEST_FREEBSD_VERSION:-} ;;
+esac
 # shellcheck disable=SC1091
 . "$COMMON/vm_lib.sh"
 
@@ -185,7 +202,7 @@ fi
 
 vmlib_tools "$DOCKER" qemu-system-x86_64 qemu-img xz curl ssh ssh-keygen
 
-RUN_DIR=$ARTIFACTS/freebsd-$RUN_ID-slot$SLOT
+RUN_DIR=$ARTIFACTS/$E2E_PLATFORM-$RUN_ID-slot$SLOT
 mkdir -p "$RUN_DIR"
 if [ "$KEEP_MODE" = 1 ]; then WORK=$STATE; else WORK=$(mktemp -d); fi
 QEMU_PID=
@@ -279,14 +296,18 @@ vm_boot() {
       mv "$CACHE/$IMAGE_NAME.part" "$CACHE/$IMAGE_NAME"
     fi
     vmlib_unlock
+  elif [ "$ROUTER" = openbsd-pf ]; then
+    vmlib_openbsd_image
   else
     vmlib_freebsd_image
   fi
   set_router_name
   vmlib_seed miniupnpd-pcp-test
-  # the FreeBSD image is the one of ../common/freebsd_vm.sh: one prepared image for both
+  # the FreeBSD and OpenBSD images are those of ../common/freebsd_vm.sh: one prepared image for both
   if [ "$ROUTER" = freebsd-pf ]; then
     vmlib_prepared "$PREPARE" "prepared-$VERSION"
+  elif [ "$ROUTER" = openbsd-pf ]; then
+    vmlib_prepared "$PREPARE" "prepared-openbsd-$VERSION"
   else
     vmlib_prepared "$PREPARE" "prepared-$ROUTER-$VERSION"
   fi
@@ -307,7 +328,7 @@ vm() { $SSH "cd /root/miniupnp && $PRIV $*"; }
 
 # ---- Copy the checkout into the VM ---------------------------------------
 set_vm_clock() {
-  [ "$ROUTER" = freebsd-pf ] || return 0
+  [ "$ROUTER" != debian-iptables ] || return 0
   $SSH "$PRIV date -u $(date -u +%Y%m%d%H%M.%S)" >/dev/null 2>&1 || true
 }
 
@@ -328,7 +349,7 @@ sync_tree() {
 build_router() {
   # --rebuild: configure again, which also cleans
   if [ "$REBUILD" = 1 ]; then vm rm -f miniupnpd/.e2e-configure.stamp; fi
-  vm sh $ROUTER_SCRIPT build
+  vm sh $ROUTER_SCRIPT build "'${E2E_CONFIGURE_OPTIONS:-}'"
   $SSH "$PRIV cat /tmp/pcp-e2e/build.log" >"$RUN_DIR/daemon-build.log" 2>&1 || true
 }
 
@@ -338,7 +359,8 @@ start_router() {
   if ! vm sh $ROUTER_SCRIPT has-net "$LAN4" 2>/dev/null; then
     vm sh $ROUTER_SCRIPT net "$LAN4" "$LAN6" "$WAN4" "$WAN6"
   fi
-  vm sh $ROUTER_SCRIPT start
+  vm sh $ROUTER_SCRIPT host allowed-peer.e2e.test "$WAN4.2" "${WAN6}2"
+  vm sh $ROUTER_SCRIPT start "'${E2E_EXTRA_CONF:-}'"
 }
 
 # ---- Wait for the peers --------------------------------------------------
@@ -631,6 +653,12 @@ run_restart_check() {
     STATUS=1
   fi
 }
+
+# Another suite on this fixture (upnp_e2e/run-freebsd.sh): a file that replaces the functions above.
+if [ -n "${PCP_E2E_SUITE_HOOKS:-}" ]; then
+  # shellcheck disable=SC1090
+  . "$PCP_E2E_SUITE_HOOKS"
+fi
 
 # PCP_E2E_PF_MAKE=1 : build the development test programs of miniupnpd/pf in the VM
 if [ "${PCP_E2E_PF_MAKE:-0}" = 1 ]; then

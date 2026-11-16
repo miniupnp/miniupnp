@@ -251,7 +251,7 @@ e2e_router_policy() {
 }
 
 # e2e_case_rows FAMILY: "section<TAB>case<TAB>flag" for every case that runs on FAMILY (the flag of
-# pcp_e2e is nat66).
+# pcp_e2e is nat66; upnp_e2e has none).
 e2e_case_rows() {
   # shellcheck disable=SC2086 # E2E_RUNNER_ARGS is a list of options
   "$DOCKER" run --rm --volume "$ROOT/miniupnpd/tests:/pcp-tests:ro" --entrypoint python3 "$IMAGE" \
@@ -287,10 +287,15 @@ e2e_start_runner() {
 # router_call COMMAND: what a runner asks of the driver (lib_test.router_call); the output is the answer.
 # A driver replaces it to add commands. snapshot:N, after request N of a case, needs snapshot_daemon_state.
 # lose-rules needs lose_rules, which removes the rules of the daemon and prints their number before and after.
+# restart needs restart_daemon, which restarts the daemon with its state (the lease file) and returns once
+# it answers again.
 router_call() {
   case $1 in
     snapshot:*) snapshot_daemon_state "$case_dir/daemon-expect-${1#snapshot:}.txt" ;;
     lose-rules) lose_rules ;;
+    restart)
+      echo "restarting the daemon for the runner" >&2
+      restart_daemon >/dev/null && echo restarted ;;
     *) echo "unknown router command: $1" ;;
   esac
 }
@@ -329,13 +334,47 @@ e2e_wait_runner() {
   e2e_serve_runner "$RUN_DIR/calls"
   e2e_collect_runner "$case_dir/runner.log"
   sed '/^Summary: /d' "$case_dir/runner.log"
-  if [ "$runner_exit" = 0 ]; then
+  # a known_failure that still fails exits 0, but is an XFAIL in the report, not a PASS
+  case_note=$(sed -n 's/^XFAIL [^:]*: //p' "$case_dir/runner.log" | head -n 1)
+  if [ "$runner_exit" = 0 ] && [ -n "$case_note" ]; then
+    case_result=XFAIL
+  elif [ "$runner_exit" = 0 ]; then
     case_result=PASS
     case_note="all configured assertions passed"
   else
     STATUS=1
     case_result=FAIL
     case_note=$(sed -n 's/^FAIL [^:]*: //p' "$case_dir/runner.log" | head -n 1)
+  fi
+}
+
+# e2e_run_family FAMILY [RUNNER OPTION ...]: a runner that takes all the selected cases of FAMILY in one
+# LAN container (upnp_wire), as the client .2 with a second address .3 it adds itself. Its router calls are
+# answered, its log goes to RUN_DIR/runner-FAMILY.log and its rows to RESULTS_FILE. Uses DIR, E2E_RUNNER,
+# E2E_RUNNER_ARGS, LAN, RUNNER; RUN_DIR is /out in the container.
+e2e_run_family() {
+  family=$1; shift
+  if [ "$family" = ipv4 ]; then router=$LAN4.1 client=$LAN4.2 second=$LAN4.3
+  else router=${LAN6}1 client=${LAN6}2 second=${LAN6}3; fi
+  mkdir -p "$RUN_DIR/calls"
+  chmod 777 "$RUN_DIR" "$RUN_DIR/calls"   # the runner may be another user
+  for selected in $SELECTED_CASES; do set -- "$@" --case "$selected"; done
+  # shellcheck disable=SC2086 # E2E_RUNNER_ARGS is a list of options
+  "$DOCKER" run -d --name "$RUNNER" --network "$LAN" --ip "$LAN4.2" --ip6 "${LAN6}2" --cap-add NET_ADMIN \
+    --volume "$ROOT/miniupnpd/tests:/pcp-tests:ro" --volume "$RUN_DIR:/out" --entrypoint python3 "$IMAGE" \
+    "/pcp-tests/${DIR##*/}/$E2E_RUNNER" ${E2E_RUNNER_ARGS:-} --family "$family" --router "$router" \
+    --client-address "$client" --second-client "$second" --interface eth0 --router-call-dir /out/calls \
+    --lan4 "$LAN4" --lan6 "$LAN6" --results "/out/results-$family.tsv" "$@" >/dev/null
+  e2e_serve_runner "$RUN_DIR/calls"
+  e2e_collect_runner "$RUN_DIR/runner-$family.log"
+  grep -E '^(PASS|XFAIL|FAIL|SKIP|Summary)' "$RUN_DIR/runner-$family.log" || true
+  [ "$runner_exit" = 0 ] || STATUS=1
+  if [ -f "$RUN_DIR/results-$family.tsv" ]; then
+    EXECUTED=$((EXECUTED + 1))
+    cat "$RUN_DIR/results-$family.tsv" >> "$RESULTS_FILE"
+  else
+    echo "The runner wrote no results ($family); see $RUN_DIR/runner-$family.log" >&2
+    STATUS=1
   fi
 }
 

@@ -65,7 +65,7 @@ services:
       - --peer-port=42100
     networks:
       lan: { ipv4_address: "${LAN4}.12", ipv6_address: "${LAN6}12", interface_name: eth0, gw_priority: 1 }
-      wan: { ipv4_address: "${WAN4}.2", ipv6_address: "${WAN6}2", interface_name: eth1 }
+      wan: { aliases: [allowed-peer.e2e.test], ipv4_address: "${WAN4}.2", ipv6_address: "${WAN6}2", interface_name: eth1 }
 
   deny:
     <<: *agent

@@ -222,6 +222,19 @@ the headers of the script and of `../common/freebsd_vm.sh` list the environment 
 cached VM image with the build tools, Python and PyYAML. Results, captures and
 logs go to `.tmp/ci/out/freebsd/announce/`, and the merged `status.md` is updated.
 
+The OpenBSD wrapper fills the `openbsd` column:
+
+```sh
+./miniupnpd/tests/pcp_wire/run-openbsd.sh --slot 8
+```
+
+OpenBSD has no vnet jail to hold the client in the VM, so this wrapper uses the kept fixture of
+`../pcp_e2e/run-openbsd.sh` (the VM with its LAN and WAN on Docker bridges) and runs the runner on
+the host, a LAN host of the fixture. The daemon runs without UPnP, as in the FreeBSD VM, and the
+runner reads its lease files over SSH. The cases that restart the daemon or renumber the WAN need a
+fixture command this wrapper does not provide; they are SKIP. Logs go to
+`.tmp/ci/out/openbsd/wire/`.
+
 Features a platform's daemon cannot offer are declared per run with
 `--unsupported FEATURE` and tagged in the YAML with `requires`; those cases are
 reported as SKIP. The FreeBSD run passes `--unsupported pcp-peer`: PCP PEER is

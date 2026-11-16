@@ -919,7 +919,8 @@ class ShellScriptTests(unittest.TestCase):
 
     def test_every_called_helper_is_defined(self):
         scripts = list(self.scripts())
-        defined = set()
+        # system commands with an underscore in their name
+        defined = {"pkg_add"}
         for _path, text in scripts:
             defined.update(re.findall(r"^\s*([a-z_][a-z0-9_]*)\(\)", text, re.M))
         call = re.compile(r"(?:^\s*|\$\(\s*|\|\s*|&&\s*|\bthen\s+|\belse\s+|!\s+)([a-z][a-z0-9]*_[a-z0-9_]+)(?=[\s)\"]|$)", re.M)
@@ -1429,6 +1430,22 @@ class SecondClientTests(unittest.TestCase):
         run.close = lambda: None
         run.run_traffic = traffic or (lambda _traffic: None)
         return run
+
+    def test_a_restart_case_has_the_driver_restart_after_its_first_request(self):
+        calls = []
+        original = lib_test.router_call
+        lib_test.router_call = lambda _directory, command, _timeout=None: calls.append(command) or "restarted"
+        try:
+            run = self.case_run(lambda _spec, _nonce: ("SUCCESS", 1, None))
+            run.args.router_call_dir = "calls"
+            run.case["requires"] = ["restart"]
+            for index in (1, 2):
+                run.run_request(index, {"protocol": "UDP", "internal_port": index}, "SUCCESS")
+            run.case["requires"] = []
+            run.run_request(1, {"protocol": "UDP", "internal_port": 3}, "SUCCESS")
+        finally:
+            lib_test.router_call = original
+        self.assertEqual(calls, ["snapshot:1", "restart", "snapshot:2", "snapshot:1"])
 
     def test_cleanup_tries_every_mapping_and_reports_the_failures(self):
         sent = []
@@ -2077,6 +2094,10 @@ class DescriptionTests(unittest.TestCase):
         values = lib_test.scpd_values(SCPD.encode())
         self.assertEqual(values["scpd.evented"], ["ExternalIPAddress"])
         self.assertEqual(values["scpd.args.GetExternalIPAddress"], ["NewExternalIPAddress"])
+        self.assertEqual(values["scpd.directions.GetExternalIPAddress"], ["out"])
+        self.assertEqual(values["scpd.type.ExternalIPAddress"], "string")
+        self.assertEqual(values["scpd.allowed.ExternalIPAddress"], [])
+        self.assertEqual(values["scpd.range.ExternalIPAddress"], [None, None])
 
     def test_fetch_from_a_server(self):
         igd = FakeIgd()
@@ -2250,6 +2271,19 @@ class UpnpStepTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "did not restart"):
                 self.sequence([{"kind": "restart"}])
             thread.join()
+
+    def test_placeholders_are_filled_at_any_depth(self):
+        corpus = {"a": ["@X@.2", {"b": "http://@X@.2/"}], "n": 3}
+        self.assertEqual(lib_test.fill_placeholders(corpus, {"@X@": "10.0"}), {"a": ["10.0.2", {"b": "http://10.0.2/"}], "n": 3})
+
+    def test_select_build_cases_rejects_a_case_of_no_build(self):
+        corpus = {"builds": {"igd1": {}, "igd2": {}}, "sections": [{"name": "S", "cases": [
+            {"name": "a", "builds": ["igd1"]}, {"name": "b"}]}]}
+        args = SimpleNamespace(build="igd2", family="ipv4", case=["b"])
+        self.assertEqual([case["name"] for case in lib_test.select_build_cases(corpus, args, dict)], ["b"])
+        args.case = ["b", "typo"]
+        with self.assertRaisesRegex(lib_test.CorpusError, "typo"):
+            lib_test.select_build_cases(corpus, args, dict)
 
     @staticmethod
     def answer_router_call(directory, text):

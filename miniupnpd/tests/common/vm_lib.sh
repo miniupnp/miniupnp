@@ -1,6 +1,6 @@
 # shellcheck shell=sh
-# The QEMU VM steps the FreeBSD drivers share (freebsd_vm.sh for pcp_wire and daemon_options,
-# pcp_e2e/run-freebsd.sh): the image, the cloud-init seed, the cached prepared image, the boot
+# The QEMU VM steps the FreeBSD and OpenBSD drivers share (freebsd_vm.sh for pcp_wire and
+# daemon_options, pcp_e2e/run-freebsd.sh): the image, the cloud-init seed, the cached prepared image, the boot
 # and the copy of the checkout. Sourced; the functions read and set the driver's variables:
 #
 #   CACHE     image cache dir (PCP_TEST_FREEBSD_CACHE, default ~/.cache/miniupnpd-pcp-test)
@@ -8,8 +8,10 @@
 #   WORK      the run's work dir (seed, console.log, disks)
 #   SSH_PORT  host port forwarded to the VM's SSH
 #   VM_USER   the cloud-init user (default freebsd)
-#   VERSION   the FreeBSD release; empty: the newest with a cloud-init image
+#   VERSION   the FreeBSD release; empty: the newest with a cloud-init image (OpenBSD: see
+#             vmlib_openbsd_image)
 #   DETACH, MONITOR  optional: a command QEMU starts under, and its -monitor option
+#   COMMON    this directory (for openbsd_image.sh)
 # set: IMAGE_NAME, KEY, RSH, SSH, ACCEL, QEMU_PID, PRIV, PREPARED.
 
 CACHE=${CACHE:-${PCP_TEST_FREEBSD_CACHE:-"$HOME/.cache/miniupnpd-pcp-test"}}
@@ -75,6 +77,21 @@ vmlib_freebsd_image() {
 		mv "$CACHE/$IMAGE_NAME.part" "$CACHE/$IMAGE_NAME"
 	fi
 	vmlib_unlock
+}
+
+# vmlib_openbsd_image: VERSION (default 8.0) and an installed OpenBSD image in CACHE, made on the
+# first use (openbsd_image.sh: OpenBSD has no cloud image); sets IMAGE_NAME. VM_USER is the user of
+# the image, with doas.
+vmlib_openbsd_image() {
+	VERSION=${VERSION:-8.0}
+	echo "Using OpenBSD $VERSION"
+	vmlib_ssh
+	# shellcheck disable=SC1091
+	. "$COMMON/openbsd_image.sh"
+	vmlib_lock
+	openbsd_base_image "$VERSION" "$CACHE" "$KEY" "$VM_USER" || exit 1
+	vmlib_unlock
+	IMAGE_NAME=openbsd-$VERSION-base.qcow2
 }
 
 # vmlib_ssh: the key (fixed, in CACHE, so a prepared image keeps accepting it), RSH and SSH
@@ -162,7 +179,7 @@ vmlib_boot() {
 	while [ "$attempt" -lt 60 ]; do
 		PRIV=$($SSH 'for t in sudo doas; do
 			command -v $t >/dev/null || continue
-			if [ $t = doas ] && [ ! -s /usr/local/etc/doas.conf ]; then continue; fi
+			if [ $t = doas ] && [ ! -s /usr/local/etc/doas.conf ] && [ ! -s /etc/doas.conf ]; then continue; fi
 			echo $t; break
 		done' 2>/dev/null || true)
 		[ -n "$PRIV" ] && break
@@ -187,7 +204,7 @@ vmlib_prepared() {
 		qemu-img create -q -f qcow2 -F qcow2 -b "$CACHE/$IMAGE_NAME" "$WORK/prep.qcow2" 10G
 		vmlib_boot "$WORK/prep.qcow2"
 		$SSH "$PRIV env PCP_TEST_PYTHON=1 sh -c \"\$(cat)\"" <"$1"
-		$SSH "$PRIV sync; if [ \$(uname) = Linux ]; then $PRIV poweroff; else $PRIV shutdown -p now; fi" || true
+		$SSH "$PRIV sync; case \$(uname) in Linux) $PRIV poweroff ;; OpenBSD) $PRIV halt -p ;; *) $PRIV shutdown -p now ;; esac" || true
 		wait "$QEMU_PID" || true
 		QEMU_PID=
 		qemu-img convert -O qcow2 "$WORK/prep.qcow2" "$PREPARED.part"

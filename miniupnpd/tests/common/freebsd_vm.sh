@@ -1,6 +1,7 @@
 #!/bin/sh
-# Run a command of a test suite in a throwaway FreeBSD VM (QEMU), for the FreeBSD drivers of the
-# suites (pcp_wire/run-freebsd.sh, daemon_options/run-freebsd.sh): boot the VM, copy the checkout
+# Run a command of a test suite in a throwaway FreeBSD or OpenBSD VM (QEMU), for the BSD drivers of
+# the suites (pcp_wire/run-freebsd.sh, daemon_options/run-freebsd.sh, daemon_options/run-openbsd.sh):
+# boot the VM, copy the checkout
 # into /root/miniupnp, run the command there as root and bring its results back. The VM steps
 # are those of vm_lib.sh, which pcp_e2e/run-freebsd.sh uses as well.
 #
@@ -15,6 +16,8 @@
 #   PCP_TEST_RESULTS_DIR       where status.md is written
 #   PCP_TEST_DATA_DIR          where status-data.json is kept
 # Environment:
+#   PCP_TEST_VM_OS             freebsd (default) or openbsd
+#   PCP_TEST_OPENBSD_VERSION   OpenBSD release (default 8.0; installed once, common/openbsd_image.sh)
 #   PCP_TEST_FREEBSD_VERSION   FreeBSD release (--freebsd-version of the drivers; default: the
 #                              newest release that has a cloud-init image, looked up at run time)
 #   PCP_TEST_FREEBSD_CACHE     image cache dir (default: ~/.cache/miniupnpd-pcp-test)
@@ -34,7 +37,12 @@ set -eu
 : "${PCP_TEST_DATA_DIR:?where status-data.json is kept}"
 COMMON=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$COMMON/../../.." && pwd)
-VERSION=${PCP_TEST_FREEBSD_VERSION:-}
+VM_OS=${PCP_TEST_VM_OS:-freebsd}
+case "$VM_OS" in
+	freebsd) VERSION=${PCP_TEST_FREEBSD_VERSION:-} ;;
+	openbsd) VERSION=${PCP_TEST_OPENBSD_VERSION:-}; VM_USER=openbsd ;;
+	*) echo "PCP_TEST_VM_OS: freebsd or openbsd, not $VM_OS" >&2; exit 2 ;;
+esac
 # shellcheck disable=SC1091
 . "$COMMON/e2e_lib.sh"
 # shellcheck disable=SC1091
@@ -74,9 +82,15 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-vmlib_freebsd_image
-vmlib_seed miniupnpd-pcp-test
-vmlib_prepared "$COMMON/freebsd/prepare.sh" "prepared-$VERSION"
+if [ "$VM_OS" = openbsd ]; then
+	vmlib_openbsd_image
+	vmlib_seed miniupnpd-pcp-test
+	vmlib_prepared "$COMMON/openbsd/prepare.sh" "prepared-openbsd-$VERSION"
+else
+	vmlib_freebsd_image
+	vmlib_seed miniupnpd-pcp-test
+	vmlib_prepared "$COMMON/freebsd/prepare.sh" "prepared-$VERSION"
+fi
 # Throwaway overlay so the cached image is never modified.
 qemu-img create -q -f qcow2 -F qcow2 -b "$PREPARED" "$WORK/disk.qcow2" 10G
 vmlib_boot "$WORK/disk.qcow2"
@@ -121,6 +135,6 @@ fi
 # Collect the VM-side logs and the status report next to the captures.
 $SSH "$PRIV tar -cf - -C /tmp pcp-fixture" 2>/dev/null | tar -xf - -C "$OUT_DIR" || true
 cp "$WORK/console.log" "$OUT_DIR/console.log" 2>/dev/null || true
-echo "FreeBSD $VERSION, exit status $status" >"$OUT_DIR/summary.txt"
+echo "$VM_OS $VERSION, exit status $status" >"$OUT_DIR/summary.txt"
 echo "Results saved to $OUT_DIR" >&2
 exit "$status"

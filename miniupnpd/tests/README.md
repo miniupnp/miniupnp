@@ -1,6 +1,6 @@
 # miniupnpd tests
 
-Integration tests of the PCP and NAT-PMP support. Run them from the repository root.
+Integration tests of the PCP, NAT-PMP and UPnP IGD support. Run them from the repository root.
 
 Each suite has a `README.md` with its options and a `status.md` with its latest results. Runs need
 Docker (`run-docker.sh` also needs Compose); the FreeBSD drivers also need QEMU. The self-tests need only python3 with PyYAML.

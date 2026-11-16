@@ -1,0 +1,375 @@
+# UPnP IGD end-to-end cases: mappings made with SOAP, checked with traffic from the WAN peers of the
+# pcp_e2e topology (allowed-peer, denied-peer, third-peer). The request and traffic keys are those of
+# pcp_e2e/pcp-e2e-cases.yaml (pcp_corpus_expander.expand_e2e_request, lib_test.CaseRun):
+#
+#   {upnp: AddPortMapping | DeletePortMapping, protocol, internal_port, external_port, lease_duration,
+#          remote_host (a peer name, or the host name allowed-peer.e2e.test), enabled}  IPv4
+#   {upnp: AddAnyPortMapping, ...}  the traffic goes to the port the daemon reserved   IPv4, igd2
+#   {upnp: DeletePortMappingRange, protocol, start_port, end_port}                     IPv4, igd2
+#   {upnp: AddPinhole, protocol, internal_port, remote_host, remote_port, lease_time}  IPv6, igd2
+#   {upnp: UpdatePinhole | DeletePinhole, protocol, internal_port, lease_time}  (the pinhole's UniqueID)
+#
+# A case lists its builds (igd1: the default build, igd2: --igd2; default both) as it lists its
+# families; a value {igd1: .., igd2: ..} is chosen for the build. The UPnP port mapping requests of an
+# igd2 run go to WANIPConnection:2. `requires: [restart]`: the runner has the driver restart the daemon after the first
+# request (traffic_stages after_request 1 then run on the restarted daemon). `exposure:` cases send a
+# payload from a WAN peer to the router's WAN address and check that nothing answers.
+
+builds:
+  igd1: {wanipc: "urn:schemas-upnp-org:service:WANIPConnection:1"}
+  igd2: {wanipc: "urn:schemas-upnp-org:service:WANIPConnection:2"}
+
+sections:
+  - name: PortMapping
+    description: IPv4 port mappings made with AddPortMapping / AddAnyPortMapping (WANIPC1 §2.4.16, WANIPC2
+      §2.5.16-§2.5.19), checked with traffic from the WAN peers.
+    cases:
+      - name: upnp-e2e-udp-lifecycle
+        families: [ipv4]
+        description: A UDP mapping forwards UDP (and not TCP); after DeletePortMapping it forwards nothing.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 45000, external_port: 45000, lease_duration: 3600}
+          - {upnp: DeletePortMapping, protocol: udp, internal_port: 45000, external_port: 45000}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 45000, external_port: 45000, expect: delivered}
+                - {from: allowed-peer, protocol: tcp, service_port: 45000, external_port: 45000, expect: blocked}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45000, external_port: 45000, expect: blocked}
+      - name: upnp-e2e-tcp-lifecycle
+        families: [ipv4]
+        description: A TCP mapping forwards TCP from every peer; after DeletePortMapping it forwards nothing.
+        requests:
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 45001, external_port: 45001, lease_duration: 3600}
+          - {upnp: DeletePortMapping, protocol: tcp, internal_port: 45001, external_port: 45001}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 45001, external_port: 45001, expect: delivered}
+                - {from: third-peer, protocol: tcp, service_port: 45001, external_port: 45001, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 45001, external_port: 45001, expect: blocked}
+      - name: upnp-e2e-port-translation
+        families: [ipv4]
+        description: External port 45010 is translated to internal port 45011.
+        request: {upnp: AddPortMapping, protocol: udp, internal_port: 45011, external_port: 45010, lease_duration: 3600}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45011, external_port: 45010, expect: delivered}
+            - {from: allowed-peer, protocol: udp, service_port: 45011, external_port: 45011, expect: blocked}
+      - name: upnp-e2e-lease-expiry
+        families: [ipv4]
+        description: A 4-second lease forwards traffic, and the daemon removes the mapping when it ends.
+        request: {upnp: AddPortMapping, protocol: udp, internal_port: 45012, external_port: 45012, lease_duration: 4,
+                  wait_after: 10}
+        expect:
+          result: SUCCESS
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 45012, external_port: 45012, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45012, external_port: 45012, expect: blocked}
+      - name: upnp-e2e-remote-host
+        families: [ipv4]
+        description: A mapping for NewRemoteHost allowed-peer forwards the allowed peer's traffic and not the
+          denied peer's.
+        request: {upnp: AddPortMapping, protocol: udp, internal_port: 45020, external_port: 45020, lease_duration: 3600,
+                  remote_host: allowed-peer}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45020, external_port: 45020, expect: delivered}
+            - {from: denied-peer, protocol: udp, service_port: 45020, external_port: 45020, expect: blocked}
+      - name: upnp-e2e-wanipc2-2.3.17-may-remote-host-name
+        families: [ipv4]
+        builds: [igd2]
+        description: A mapping for a NewRemoteHost which is a host name of the allowed peer forwards that peer's
+          traffic and not the denied peer's (WANIPC2 §2.3.17). The name resolves on the router.
+        known_failure: "not implemented: NewRemoteHost is not resolved, so the rule has no usable address"
+        request: {upnp: AddPortMapping, protocol: udp, internal_port: 45029, external_port: 45029, lease_duration: 3600,
+                  remote_host: allowed-peer.e2e.test}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45029, external_port: 45029, expect: delivered}
+            - {from: denied-peer, protocol: udp, service_port: 45029, external_port: 45029, expect: blocked}
+      - name: upnp-e2e-disabled-mapping
+        # spec gap: upnpsoap.c ignores NewEnabled, the mapping forwards
+        families: [ipv4]
+        description: A mapping added with NewEnabled 0 is kept but forwards nothing (WANIPC1 §2.2.13).
+        request: {upnp: AddPortMapping, protocol: udp, internal_port: 45021, external_port: 45021, lease_duration: 3600,
+                  enabled: 0}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45021, external_port: 45021, expect: blocked, listen: true}
+      - name: upnp-e2e-delete-range
+        families: [ipv4]
+        builds: [igd2]
+        description: DeletePortMappingRange removes both mappings of the range, and both ports stop forwarding.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 45030, external_port: 45030, lease_duration: 3600}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 45031, external_port: 45031, lease_duration: 3600}
+          - {upnp: DeletePortMappingRange, protocol: udp, internal_port: 45030, start_port: 45030, end_port: 45031}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 45030, external_port: 45030, expect: delivered}
+                - {from: allowed-peer, protocol: udp, service_port: 45031, external_port: 45031, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45030, external_port: 45030, expect: blocked}
+            - {from: allowed-peer, protocol: udp, service_port: 45031, external_port: 45031, expect: blocked}
+      - name: upnp-e2e-addany-free-port
+        families: [ipv4]
+        builds: [igd2]
+        description: AddAnyPortMapping on a free port reserves it, and it forwards traffic.
+        request: {upnp: AddAnyPortMapping, protocol: tcp, internal_port: 45040, external_port: 45040, lease_duration: 3600}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 45040, expect: delivered}
+      - name: upnp-e2e-lease-zero-igd2
+        families: [ipv4]
+        builds: [igd2]
+        description: NewLeaseDuration 0 on WANIPConnection:2 (taken as 604800 seconds) forwards traffic.
+        request: {upnp: AddPortMapping, protocol: udp, internal_port: 45041, external_port: 45041, lease_duration: 0}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45041, external_port: 45041, expect: delivered}
+
+  - name: Pinholes
+    description: IPv6 pinholes made with WANIPv6FirewallControl (6FC1 §2.6.3-§2.6.5, IGDv2) for this client's
+      GUA, checked with traffic from the WAN peers.
+    cases:
+      - name: upnp-e2e-pinhole-wildcard
+        families: [ipv6]
+        builds: [igd2]
+        description: A pinhole with a wildcard RemoteHost lets every peer's UDP in.
+        request: {upnp: AddPinhole, protocol: udp, internal_port: 45100, lease_time: 3600}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45100, expect: delivered}
+            - {from: third-peer, protocol: udp, service_port: 45100, expect: delivered}
+            - {from: allowed-peer, protocol: tcp, service_port: 45100, external_port: 45100, expect: blocked}
+      - name: upnp-e2e-pinhole-remote-host
+        families: [ipv6]
+        builds: [igd2]
+        description: A pinhole for RemoteHost allowed-peer lets the allowed peer in and not the denied peer.
+        request: {upnp: AddPinhole, protocol: udp, internal_port: 45101, remote_host: allowed-peer, lease_time: 3600}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45101, expect: delivered}
+            - {from: denied-peer, protocol: udp, service_port: 45101, expect: blocked}
+      - name: upnp-e2e-pinhole-remote-host-name
+        families: [ipv6]
+        builds: [igd2]
+        description: A pinhole for a RemoteHost which is a host name of the allowed peer lets that peer in and not
+          the denied peer. The name resolves on the router.
+        request: {upnp: AddPinhole, protocol: udp, internal_port: 45106, remote_host: allowed-peer.e2e.test, lease_time: 3600}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45106, expect: delivered}
+            - {from: denied-peer, protocol: udp, service_port: 45106, expect: blocked}
+      - name: upnp-e2e-pinhole-tcp
+        families: [ipv6]
+        builds: [igd2]
+        description: A TCP pinhole lets TCP in.
+        request: {upnp: AddPinhole, protocol: tcp, internal_port: 45102, lease_time: 3600}
+        expect:
+          result: SUCCESS
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 45102, expect: delivered}
+      - name: upnp-e2e-pinhole-delete
+        families: [ipv6]
+        builds: [igd2]
+        description: After DeletePinhole the pinhole lets nothing in.
+        requests:
+          - {upnp: AddPinhole, protocol: udp, internal_port: 45103, lease_time: 3600}
+          - {upnp: DeletePinhole, protocol: udp, internal_port: 45103}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 45103, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45103, external_port: 45103, expect: blocked}
+      - name: upnp-e2e-pinhole-update
+        # spec gap on FreeBSD pf: UpdatePinhole answers 501
+        families: [ipv6]
+        builds: [igd2]
+        description: UpdatePinhole extends a 5-second pinhole, which still lets traffic in after 8 seconds.
+        requests:
+          - {upnp: AddPinhole, protocol: udp, internal_port: 45104, lease_time: 5}
+          - {upnp: UpdatePinhole, protocol: udp, internal_port: 45104, lease_time: 120, wait_after: 8}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45104, expect: delivered}
+      - name: upnp-e2e-pinhole-expiry
+        families: [ipv6]
+        builds: [igd2]
+        description: A 4-second pinhole lets traffic in, and lets nothing in once it expired.
+        request: {upnp: AddPinhole, protocol: udp, internal_port: 45105, lease_time: 4, wait_after: 12}
+        expect:
+          result: SUCCESS
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 45105, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45105, external_port: 45105, expect: blocked}
+
+  - name: PCP interplay
+    description: UPnP and PCP mappings of one daemon, which no spec covers in one box; a port one mechanism holds
+      is not given to the other, and their rules work side by side.
+    cases:
+      - name: upnp-then-pcp-same-port
+        families: [ipv4]
+        description: After a UPnP mapping of 45200, a PCP MAP suggesting 45200 gets another external port; both
+          mappings forward traffic.
+        requests:
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 45200, external_port: 45200, lease_duration: 3600}
+          - {pcp: MAP, protocol: udp, internal_port: 45201, suggested_external_port: 45200, lifetime: 120}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45200, external_port: 45200, expect: delivered}
+            - {from: allowed-peer, protocol: udp, service_port: 45201, expect: delivered}
+      - name: pcp-then-upnp-same-port
+        # spec gap: answers 200 and takes the port over: upnp_redirect() finds the PCP mapping of the same client and updates it to the UPnP request's internal port (the PCP rule is deleted)
+        families: [ipv4]
+        description: After a PCP MAP of 45210, a UPnP AddPortMapping of 45210 (another internal port) is refused
+          (718 ConflictInMappingEntry on v1, 729 ConflictWithOtherMechanisms on v2); the PCP mapping still forwards.
+        requests:
+          - {pcp: MAP, protocol: udp, internal_port: 45210, suggested_external_port: 45210, lifetime: 120}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 45211, external_port: 45210, lease_duration: 3600}
+        expect:
+          results: [SUCCESS, {igd1: UPNP_718, igd2: UPNP_729}]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45210, expect: delivered}
+      - name: pcp-then-upnp-addany
+        families: [ipv4]
+        builds: [igd2]
+        description: After a PCP MAP of 45220, AddAnyPortMapping of 45220 reserves another port; both forward.
+        requests:
+          - {pcp: MAP, protocol: udp, internal_port: 45220, suggested_external_port: 45220, lifetime: 120}
+          - {upnp: AddAnyPortMapping, protocol: udp, internal_port: 45221, external_port: 45220, lease_duration: 3600}
+        expect:
+          results: [SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45220, expect: delivered}
+            - {from: allowed-peer, protocol: udp, service_port: 45221, expect: delivered}
+      - name: pcp-then-upnp-range-keeps-pcp
+        families: [ipv4]
+        builds: [igd2]
+        description: DeletePortMappingRange skips a PCP MAP in the range and deletes the UPnP mapping.
+        requests:
+          - {pcp: MAP, protocol: udp, internal_port: 45230, suggested_external_port: 45230, lifetime: 120}
+          - {upnp: AddPortMapping, protocol: udp, internal_port: 45231, external_port: 45231, lease_duration: 3600}
+          - {upnp: DeletePortMappingRange, protocol: udp, internal_port: 45231, start_port: 45230, end_port: 45231}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45230, expect: delivered}
+            - {from: allowed-peer, protocol: udp, service_port: 45231, external_port: 45231, expect: blocked}
+      - name: pcp-only-range-refused
+        families: [ipv4]
+        builds: [igd2]
+        description: A range which holds only a PCP MAP gets 606 and the mapping stays.
+        requests:
+          - {pcp: MAP, protocol: udp, internal_port: 45232, suggested_external_port: 45232, lifetime: 120}
+          - {upnp: DeletePortMappingRange, protocol: udp, internal_port: 45233, start_port: 45232, end_port: 45232}
+        expect:
+          results: [SUCCESS, UPNP_606]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45232, expect: delivered}
+      - name: pcp-pinhole-then-upnp-addpinhole-refused
+        families: [ipv6]
+        builds: [igd2]
+        description: UPnP AddPinhole of the tuple of a PCP pinhole gets 606, so it can not renew it.
+        requests:
+          - {pcp: MAP, protocol: udp, internal_port: 45234, suggested_external_port: 45234, lifetime: 120}
+          - {upnp: AddPinhole, protocol: udp, internal_port: 45234, lease_time: 3600}
+        expect:
+          results: [SUCCESS, UPNP_606]
+          traffic:
+            - {from: allowed-peer, protocol: udp, service_port: 45234, expect: delivered}
+      - name: upnp-and-pcp-different-ports
+        families: [ipv4]
+        description: A UPnP mapping and a PCP mapping on different ports both forward, and deleting the UPnP one
+          leaves the PCP one.
+        requests:
+          - {upnp: AddPortMapping, protocol: tcp, internal_port: 45230, external_port: 45230, lease_duration: 3600}
+          - {pcp: MAP, protocol: tcp, internal_port: 45231, suggested_external_port: 45231, lifetime: 120}
+          - {upnp: DeletePortMapping, protocol: tcp, internal_port: 45230, external_port: 45230}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          traffic_stages:
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 45230, external_port: 45230, expect: delivered}
+                - {from: allowed-peer, protocol: tcp, service_port: 45231, expect: delivered}
+          traffic:
+            - {from: allowed-peer, protocol: tcp, service_port: 45230, external_port: 45230, expect: blocked}
+            - {from: allowed-peer, protocol: tcp, service_port: 45231, expect: delivered}
+
+  - name: Persistence
+    description: A mapping restored from the lease_file after a daemon restart still forwards traffic.
+    cases:
+      - name: upnp-e2e-mapping-survives-restart
+        families: [ipv4]
+        requires: [restart]
+        description: A UDP mapping (lease 3600) forwards traffic after the daemon restarted.
+        request: {upnp: AddPortMapping, protocol: udp, internal_port: 45300, external_port: 45300, lease_duration: 3600}
+        expect:
+          result: SUCCESS
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 45300, external_port: 45300, expect: delivered}
+      - name: upnp-e2e-permanent-mapping-survives-restart
+        families: [ipv4]
+        builds: [igd1]
+        requires: [restart]
+        description: A permanent TCP mapping (lease 0, IGDv1) forwards traffic after the daemon restarted.
+        request: {upnp: AddPortMapping, protocol: tcp, internal_port: 45301, external_port: 45301, lease_duration: 0}
+        expect:
+          result: SUCCESS
+          traffic_stages:
+            - after_request: 1
+              traffic:
+                - {from: allowed-peer, protocol: tcp, service_port: 45301, external_port: 45301, expect: delivered}
+
+  - name: WAN exposure
+    description: The daemon's UPnP side is for the LAN only (IGD2 §2.3.2); a WAN peer sending to the router's
+      WAN address gets no SSDP answer, no HTTP connection and so no SOAP control.
+    cases:
+      - name: wan-ssdp-msearch-unanswered
+        description: A unicast M-SEARCH from a WAN peer to the router's WAN address, port 1900, gets no answer.
+        exposure:
+          - {protocol: udp, port: 1900, payload: msearch}
+      - name: wan-http-not-reachable
+        description: A WAN peer cannot connect to the router's WAN address, port 5000 (description and SOAP).
+        exposure:
+          - {protocol: tcp, port: 5000, payload: "GET /rootDesc.xml HTTP/1.1\r\nHOST: router\r\n\r\n"}
+      - name: wan-soap-not-reachable
+        families: [ipv4]
+        description: A SOAP request (GetExternalIPAddress) from a WAN peer to port 5000 gets no answer.
+        exposure:
+          - protocol: tcp
+            port: 5000
+            payload: "POST /ctl/IPConn HTTP/1.1\r\nHOST: router\r\nContent-Type: text/xml\r\nSOAPAction: \"urn:schemas-upnp-org:service:WANIPConnection:1#GetExternalIPAddress\"\r\nContent-Length: 0\r\n\r\n"

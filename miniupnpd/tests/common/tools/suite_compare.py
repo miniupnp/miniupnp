@@ -20,6 +20,7 @@ and may define:
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -70,4 +71,39 @@ def read_status_results(path, platform, corpus_digest):
             outcomes[(family, protocol, name)] = {'status': status, 'detail': detail}
     if not any(not is_filtered_skip(item['status'], item['detail']) for item in outcomes.values()):
         raise ValueError(f'no cases executed in {path}')
+    return outcomes, corpus_digest
+
+
+def read_build_results(path, corpus_digest):
+    """The results of every platform in a status-data.json, for a driver whose one run fills several
+    columns (a column per daemon build: linux-igd1, linux-igd2): keyed ('PLATFORM FAMILY', protocol, case)."""
+    platforms = json.loads(Path(path).read_text())['platforms']
+    outcomes = {}
+    for platform in platforms:
+        found, _ = read_status_results(path, platform, corpus_digest)
+        outcomes.update({(f'{platform} {family}', protocol, name): result
+                         for (family, protocol, name), result in found.items()})
+    if not outcomes:
+        raise ValueError(f'no results in {path}')
+    return outcomes, corpus_digest
+
+
+def run_build_driver(suite_dir, label, tree, output, args, driver, corpus, env_prefix):
+    """run() of a suite whose driver runs every daemon build in one go (the UPnP suites): `driver` in
+    suite_dir, its report and status data put under output/label through its {env_prefix}_STATUS_FILE and
+    {env_prefix}_STATUS_DATA_FILE. The corpus has FAILs (spec gaps), so the comparison decides; the exit
+    code must only agree with them."""
+    folder = output / label
+    directory = TESTS / Path(suite_dir).name
+    env = dict(os.environ, PCP_TEST_SELF_TEST='0', **{f'{env_prefix}_STATUS_FILE': str(folder / 'status.md'),
+                                                      f'{env_prefix}_STATUS_DATA_FILE': str(folder / 'status-data.json')})
+    command = [f'./{directory / driver}']
+    for name in args.case:
+        command += ['--case', name]
+    exit_code = run_driver(f'{label} ({args.platform})', tree, folder, command, env)
+    data = folder / 'status-data.json'
+    if not data.is_file():
+        raise ValueError(f'{label}: the driver wrote no results (exit {exit_code}); see {folder / "run.log"}')
+    outcomes, corpus_digest = read_build_results(data, digest(tree / directory / corpus))
+    check_exit(outcomes, exit_code)
     return outcomes, corpus_digest
