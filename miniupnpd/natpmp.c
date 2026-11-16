@@ -421,7 +421,14 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							timestamp = upnp_time() + lifetime;
 							snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
 							         eport, proto_itoa(proto));
-							if(upnp_renew_redirect_internal(NULL, eport, senderaddrstr,
+							if(disable_port_forwarding) {
+								/* no port forwarding now: the mapping goes and
+								 * the renewal fails, as a new one would */
+								syslog(LOG_INFO, "port forwarding is off, removing NAT-PMP %hu %s",
+								       eport, proto_itoa(proto));
+								_upnp_delete_redir(eport, proto);
+								resp[3] = 3;  /* Failure */
+							} else if(upnp_renew_redirect_internal(NULL, eport, senderaddrstr,
 							                                iport, proto, desc,
 							                                timestamp) < 0) {
 								syslog(LOG_ERR, "Failed to renew NAT-PMP %hu %s->%s:%hu",

@@ -1094,6 +1094,14 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, renewing",
 				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
 				       iaddr_old, iport_old);
+				/* no port forwarding now: the mapping goes and the
+				 * renewal fails, as a new one would */
+				if (disable_port_forwarding) {
+					syslog(LOG_INFO, "port forwarding is off, removing PCP %hu %s",
+					       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol));
+					_upnp_delete_redir(pcp_msg_info->ext_port, pcp_msg_info->protocol);
+					return PCP_ERR_NO_RESOURCES;
+				}
 				/* the same rule, with a new expiry */
 				if (upnp_renew_redirect_internal(NULL, pcp_msg_info->ext_port,
 						pcp_msg_info->mapped_str,
