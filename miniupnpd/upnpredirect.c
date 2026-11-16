@@ -688,7 +688,7 @@ expire_maps(void)
 	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
 	unsigned int now = (unsigned int)upnp_time();
 	unsigned int next;
-	int n, i, failed = 0;
+	int n, i, failed = 0, removed = 0;
 
 	n = memmap_expired_maps(now, expired, EXPIRE_MAX_PER_PASS, &next);
 	for (i = 0; i < n; i++) {
@@ -696,9 +696,13 @@ expire_maps(void)
 		       expired[i].eport, proto_itoa(expired[i].proto));
 		if (_upnp_delete_redir(expired[i].eport, expired[i].proto) < 0)
 			failed = 1;
+		else
+			removed++;
 	}
-	/* what could not be removed still has its row */
-	if (failed && (next == 0 || now + 60 < next))
+	/* What could not be removed still has its row: try it again in a
+	 * minute. A full pass (next is now) which removed nothing would pick
+	 * the same rows at once, so it waits too. */
+	if (failed && (next == 0 || now + 60 < next || (next == now && removed == 0)))
 		next = now + 60;
 	nextruletoclean_timestamp = next;
 }
