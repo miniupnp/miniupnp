@@ -637,6 +637,9 @@ test_each_map_counters(void)
 	add_map(0, 40001, "192.0.2.10", 5000, IPPROTO_TCP, "a", 0);
 	add_map(0, 40002, "192.0.2.10", 5001, IPPROTO_UDP, "b", 0);	/* its rule is gone */
 	add_map(7, 6000, "2001:db8::1", 6000, IPPROTO_TCP, "c", 0);	/* not a port mapping */
+	/* NAT-PMP and PCP: their lease ends them, not their counters */
+	add_map(0, 40004, "192.0.2.11", 5002, IPPROTO_TCP, "NAT-PMP 40004 tcp", 0);
+	add_map(0, 40005, "192.0.2.12", 5003, IPPROTO_TCP, PCP_DESC, 0);
 	fake_rules[0].eport = 40001;
 	fake_rules[0].proto = IPPROTO_TCP;
 	fake_rules[0].packets = 5;
@@ -645,7 +648,11 @@ test_each_map_counters(void)
 	fake_rules[1].proto = IPPROTO_TCP;
 	fake_rules[1].packets = 9;
 	fake_rules[1].bytes = 900;
-	fake_rule_count = 2;
+	fake_rules[2].eport = 40004;
+	fake_rules[2].proto = IPPROTO_TCP;
+	fake_rules[3].eport = 40005;
+	fake_rules[3].proto = IPPROTO_TCP;
+	fake_rule_count = 4;
 	fake_reads = 0;
 	seen_count = 0;
 

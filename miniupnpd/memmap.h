@@ -115,8 +115,9 @@ int memmap_sync(struct memmap_change * changes, int n);
 int memmap_map_counters(unsigned short eport, int proto,
                         u_int64_t * packets, u_int64_t * bytes);
 
-/* fn(eport, proto, packets, bytes, arg) for each IPv4 port mapping which has
- * a row and a rule. iptables walks its chain once and pf reads its rules by
+/* fn(eport, proto, packets, bytes, arg) for each UPnP IPv4 port mapping which
+ * has a row and a rule. A PCP or NAT-PMP mapping is left out: it lasts the
+ * lifetime its client asked for, so idle counters must not end it. iptables walks its chain once and pf reads its rules by
  * index, once each; the other firewalls are read once per mapping. 0, or -1 if
  * the firewall could not be read. */
 typedef void (*memmap_counters_fn)(unsigned short eport, int proto,

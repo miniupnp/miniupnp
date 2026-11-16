@@ -393,13 +393,22 @@ struct counters_of_rows {
 	void * arg;
 };
 
-/* Pass on the counters of a rule which has a row. */
+/* 1 if idle counters may end the mapping of the row: a UPnP one. A PCP or
+ * NAT-PMP mapping lasts the lifetime its client asked for, and its expiry
+ * ends it. */
+static int
+counters_matter(const struct lease_entry * row)
+{
+	return row != NULL && row->kind == LEASE_UPNP;
+}
+
+/* Pass on the counters of a rule whose row they matter for. */
 static void
 counters_of_row(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
                 void * arg)
 {
 	struct counters_of_rows * c = arg;
-	if(lease_table_find_mapping(proto, AF_INET, NULL, eport) != NULL)
+	if(counters_matter(lease_table_find_mapping(proto, AF_INET, NULL, eport)))
 		c->fn(eport, proto, packets, bytes, c->arg);
 }
 
@@ -435,7 +444,7 @@ memmap_each_map_counters(memmap_counters_fn fn, void * arg)
 #else
 	/* nftables reads its rules once into a cache */
 	for(row = lease_table_next_port(NULL); row != NULL; row = lease_table_next_port(row)) {
-		if(row->family == AF_INET &&
+		if(row->family == AF_INET && counters_matter(row) &&
 		   memmap_map_counters(row->eport, row->proto, &packets, &bytes) == 0)
 			counters_of_row(row->eport, row->proto, packets, bytes, &c);
 	}
