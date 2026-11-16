@@ -1457,6 +1457,16 @@ class SecondClientTests(unittest.TestCase):
             self.case_run(send).cleanup()
         self.assertEqual(len(sent), 2)
 
+    def test_cleanup_takes_a_upnp_mapping_which_is_gone_already(self):
+        run = self.case_run(lambda _spec, _nonce: ("UPNP_714", None, None))
+        run.active = {("UDP", 1): ({"protocol_family": "UPnP", "action": "AddPortMapping", "protocol": "udp",
+                                     "lease_duration": 9}, 1, None)}
+        run.cleanup()
+        # for PCP, an error is still a failed cleanup
+        run.active = {("UDP", 1): ({"lifetime": 9}, 1, None)}
+        with self.assertRaisesRegex(AssertionError, "cleanup of PCP UDP/1 returned UPNP_714"):
+            run.cleanup()
+
     def test_a_cleanup_failure_does_not_hide_the_failure_of_the_case(self):
         def traffic(_traffic):
             raise AssertionError("the real failure")

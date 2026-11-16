@@ -2658,7 +2658,10 @@ class CaseRun:
                 result, _assigned, _ = self.send(delete, nonce)
             except (AssertionError, OSError) as error:
                 result = error
-            if result != "SUCCESS":
+            # a mapping the case replaced or deleted itself is gone already: UPnP
+            # answers NoSuchEntryInArray (714) for it, which leaves nothing behind
+            gone = original.get("protocol_family") == "UPnP" and result == "UPNP_714"
+            if result != "SUCCESS" and not gone:
                 problems.append(f"cleanup of {label} returned {result}")
         if problems:
             raise AssertionError("; ".join(problems))
