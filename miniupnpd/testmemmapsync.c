@@ -297,8 +297,8 @@ test_renew_map(void)
 }
 
 /* Before a renewal the protocols ask memmap_map_in_firewall(). A rule the
- * firewall lost drops the row, so the caller adds the mapping again instead
- * of renewing a closed port. */
+ * firewall lost is added again from its row, which stays. If the add fails,
+ * the row goes, so the caller maps anew instead of renewing a closed port. */
 static void
 test_renew_lost_rule(void)
 {
@@ -310,16 +310,24 @@ test_renew_lost_rule(void)
 	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
 	assert(lease_table_count() == 1);
 	rule_present = 0;
+	/* lost: a delete of what is left, and an add of the row's rule */
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
+	assert(calls == 3 && lease_table_count() == 1);
+	assert(last[0].op == FW_ADD && last[0].row->eport == 1000 && last[0].row->iport == 80);
+	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 3000) == 0);
+	/* lost, and the add fails: the row goes */
+	fail_at = 0;
 	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 0);
-	assert(lease_table_count() == 0 && calls == 1);
+	assert(calls == 5 && lease_table_count() == 0);
 	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 3000) < 0);
+	fail_at = -1;
 	/* trusted, the firewall is not asked: the row stays, and renews */
 	firewall_trust = FW_TRUST_TRUST;
 	map(&c, MEMMAP_ADD, 1000, "192.168.1.10", 80, "web", 2000);
-	assert(memmap_sync(&c, 1) == 0 && calls == 2);
+	assert(memmap_sync(&c, 1) == 0 && calls == 6);
 	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
 	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 5000) == 0);
-	assert(calls == 2 && lease_table_count() == 1);
+	assert(calls == 6 && lease_table_count() == 1);
 	firewall_trust = FW_TRUST_CHECK;
 }
 

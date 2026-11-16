@@ -452,6 +452,25 @@ memmap_each_map_counters(memmap_counters_fn fn, void * arg)
 #endif
 }
 
+/* Add the rules of a row again, after the firewall lost them. The row stays,
+ * and with it what the table knows of the mapping. What is left of the rules
+ * goes first, as a delete and add did: the delete may find nothing. 0, or -1
+ * if the add failed. */
+static int
+restore_rules(const struct lease_entry * row)
+{
+	struct fw_change c;
+
+	memset(&c, 0, sizeof(c));
+	c.op = FW_DELETE;
+	c.old = row;
+	(void)fw_sync(&c, 1);
+	memset(&c, 0, sizeof(c));
+	c.op = FW_ADD;
+	c.row = row;
+	return fw_sync(&c, 1) < 0 ? -1 : 0;
+}
+
 int
 memmap_map_in_firewall(unsigned short eport, int proto)
 {
@@ -462,12 +481,17 @@ memmap_map_in_firewall(unsigned short eport, int proto)
 		return 1;
 	if(memmap_map_counters(eport, proto, &packets, &bytes) == 0)
 		return 1;
-	syslog(LOG_INFO, "port %hu %s has no rule in the firewall, adding it again",
-	       eport, proto_itoa(proto));
-	/* the rule is gone already: only the row goes */
 	row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
-	if(row != NULL)
-		lease_table_remove(row);
+	if(row == NULL)
+		return 0;
+	syslog(LOG_NOTICE, "port %hu %s has no rule in the firewall, adding it again",
+	       eport, proto_itoa(proto));
+	if(restore_rules(row) == 0)
+		return 1;
+	/* the rule cannot come back: the row goes, and the caller maps anew */
+	syslog(LOG_WARNING, "port %hu %s: the lost rule could not be added again",
+	       eport, proto_itoa(proto));
+	lease_table_remove(row);
 	return 0;
 }
 

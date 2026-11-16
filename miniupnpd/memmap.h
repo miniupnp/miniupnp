@@ -117,17 +117,20 @@ int memmap_map_counters(unsigned short eport, int proto,
 
 /* fn(eport, proto, packets, bytes, arg) for each UPnP IPv4 port mapping which
  * has a row and a rule. A PCP or NAT-PMP mapping is left out: it lasts the
- * lifetime its client asked for, so idle counters must not end it. iptables walks its chain once and pf reads its rules by
- * index, once each; the other firewalls are read once per mapping. 0, or -1 if
- * the firewall could not be read. */
+ * lifetime its client asked for, so idle counters must not end it. iptables
+ * walks its chain once and pf reads its rules by index, once each; the other
+ * firewalls are read once per mapping. 0, or -1 if the firewall could not be
+ * read. */
 typedef void (*memmap_counters_fn)(unsigned short eport, int proto,
                                    u_int64_t packets, u_int64_t bytes, void * arg);
 int memmap_each_map_counters(memmap_counters_fn fn, void * arg);
 
-/* 1 if the firewall still has the rule of an IPv4 port mapping with a row.
- * A flush or another program can remove a rule: then drop the row and return
- * 0, so the caller adds the mapping again instead of renewing a closed port.
- * With firewall_trust FW_TRUST_TRUST the firewall is not asked: 1. */
+/* 1 if the firewall has the rule of an IPv4 port mapping with a row. A flush
+ * or another program can remove a rule: then it is added again from the row,
+ * which stays, as the rule of a pinhole is. 0 if there is no row, or the rule
+ * could not be added again: then the row goes, so the caller maps anew
+ * instead of renewing a closed port. With firewall_trust FW_TRUST_TRUST the
+ * firewall is not asked: 1. */
 int memmap_map_in_firewall(unsigned short eport, int proto);
 
 /* Give a row to each rule of an earlier run which has none, so the rule can be
