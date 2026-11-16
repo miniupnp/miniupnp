@@ -1105,7 +1105,9 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	}
 
 	del_redirect_desc(eport, proto);
-	return r*r2;
+	/* r : the redirect and filter rules, r2 : a PEER (and DSCP) rule. The
+	 * delete worked if either went; -1 for both is a failure */
+	return (r == 0 || r2 == 0) ? 0 : -1;
 }
 
 /* ==================================== */
