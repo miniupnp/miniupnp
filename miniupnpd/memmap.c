@@ -488,6 +488,15 @@ memmap_map_in_firewall(unsigned short eport, int proto)
 	struct lease_entry * row;
 	int r;
 
+	row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+	/* A failed change left a part of the rules of the row: the redirect
+	 * rule is there, its filter rule may not be. It is not renewed as it
+	 * is, whatever the trust in the firewall: the daemon knows */
+	if(row != NULL && row->fw_partial) {
+		syslog(LOG_NOTICE, "port %hu %s has a part of its rules, adding them again",
+		       eport, proto_itoa(proto));
+		goto restore;
+	}
 	if(firewall_trust == FW_TRUST_TRUST)
 		return 1;
 	r = memmap_map_counters(eport, proto, &packets, &bytes);
@@ -500,14 +509,16 @@ memmap_map_in_firewall(unsigned short eport, int proto)
 		       eport, proto_itoa(proto));
 		return 1;
 	}
-	row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
 	if(row == NULL)
 		return 0;
 	syslog(LOG_NOTICE, "port %hu %s has no rule in the firewall, adding it again",
 	       eport, proto_itoa(proto));
+restore:
 	r = restore_rules(row);
-	if(r == 0)
+	if(r == 0) {
+		row->fw_partial = 0;
 		return 1;
+	}
 	syslog(LOG_WARNING, "port %hu %s: the lost rule could not be added again",
 	       eport, proto_itoa(proto));
 	if(r == -2) {
@@ -517,6 +528,7 @@ memmap_map_in_firewall(unsigned short eport, int proto)
 		 * would delete that rule. */
 		unsigned int now = (unsigned int)upnp_time();
 		row->expiry = now;
+		row->fw_partial = 1;
 		nextruletoclean_timestamp = now;
 		return 0;
 	}
@@ -1043,9 +1055,11 @@ memmap_sync(struct memmap_change * changes, int n)
 		if(r == 0 || fw[i].applied == FW_APPLIED) {
 			apply_change(&changes[i], &st[i]);
 		} else if(fw[i].applied == FW_HALF_APPLIED) {
-			/* a part of the rules stayed: the expiry tries the delete again */
+			/* a part of the rules stayed: the expiry tries the delete
+			 * again, and a renewal before it adds them again */
 			unsigned int now = (unsigned int)upnp_time();
 			st[i].row->expiry = now;
+			st[i].row->fw_partial = 1;
 			apply_change(&changes[i], &st[i]);
 			nextruletoclean_timestamp = now;
 		} else {

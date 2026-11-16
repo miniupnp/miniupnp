@@ -250,6 +250,18 @@ test_half_applied(void)
 	assert(has_map(1000, NULL, &ts));
 	assert(ts == (unsigned int)now);
 	assert(nextruletoclean_timestamp == (unsigned int)now);
+	/* the client tries again before the expiry: the redirect rule is
+	 * there, but the row is not renewed as it is. Its rules go and come
+	 * again, with no check of the firewall, trusted or not */
+	fail_at = -1;
+	rule_present = 1;
+	firewall_trust = FW_TRUST_TRUST;
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
+	assert(calls == 3 && last[0].op == FW_ADD);
+	assert(!lease_table_find_mapping(IPPROTO_TCP, AF_INET, NULL, 1000)->fw_partial);
+	/* whole again: a renewal checks no more */
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1 && calls == 3);
+	firewall_trust = FW_TRUST_CHECK;
 }
 
 /* an update of the same rule keeps the row and its place on the list */

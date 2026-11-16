@@ -55,6 +55,8 @@ struct lease_entry {
 	unsigned char kind;		/* enum lease_kind PCP, PMP-NAT  */
 	unsigned char family;	/* AF_INET, AF_INET6 */
 	unsigned char proto;	/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
+	unsigned char fw_partial;	/* a failed change left a part of its rules:
+					 * not renewed as it is, see memmap.c */
 	unsigned short eport;	/* host order.  for NON NAT equals iport */
 	unsigned short iport;	/* host order */
 	struct in6_addr iaddr;	/* IPv4 as ::ffff:a.b.c.d   Always populated. */
