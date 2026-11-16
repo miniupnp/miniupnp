@@ -13,6 +13,8 @@ name: 'miniupnpd: Regression testing'
 #   options-linux   the daemon_options suite (one daemon per miniupnpd.conf) on Docker, master's
 #                   daemon against the pull request's
 #   options-freebsd the same in a FreeBSD QEMU VM (pf), 14.5 and 15.1
+#   upnp-wire-linux, upnp-e2e-linux  the UPnP suites on Docker (every daemon build), master's
+#                   daemon against the pull request's
 # The comparisons build both daemons with the pull request's harness; a case that passed
 # with master's daemon and fails with the pull request's fails the job. On a push to
 # master, "master" is the commit before the push.
@@ -40,6 +42,14 @@ name: 'miniupnpd: Regression testing'
         type: string
       options_case:
         description: 'Optional single daemon_options case (daemon-options-cases.yaml; empty runs all; both platforms)'
+        required: false
+        type: string
+      upnp_wire_case:
+        description: 'Optional single upnp_wire case (upnp-wire-cases.yaml; empty runs all; every build)'
+        required: false
+        type: string
+      upnp_e2e_case:
+        description: 'Optional single upnp_e2e case (upnp-e2e-cases.yaml; empty runs all; every build)'
         required: false
         type: string
       profile:
@@ -495,5 +505,119 @@ jobs:
         with:
           name: options-freebsd-${{ matrix.release }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: options-freebsd/
+          if-no-files-found: warn
+          retention-days: 14
+
+  upnp-wire-linux:
+    # upnp_wire/run-docker.sh on every daemon build, with master's daemon and with the pull request's
+    # (both with the pull request's harness). The corpus has FAILs (spec gaps): only a case that
+    # passed on master and fails now fails the job.
+    name: upnp-wire-linux (Docker, master against the pull request)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Check out master baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || 'master' }}
+          path: master
+          persist-credentials: false
+
+      - name: Install YAML parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+
+      - name: Compare master with pull request on linux
+        env:
+          CASE_NAME: ${{ inputs.upnp_wire_case }}
+        run: |
+          args=()
+          if [ -n "$CASE_NAME" ]; then
+            args+=(--case "$CASE_NAME")
+          fi
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite upnp-wire --platform linux \
+            --master-source master \
+            --candidate-source candidate \
+            --output upnp-wire-linux "${args[@]}"
+
+      - name: Publish comparison summary
+        if: always()
+        run: |
+          if [ -f upnp-wire-linux/summary.md ]; then
+            cat upnp-wire-linux/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results and comparison report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upnp-wire-linux-${{ github.run_id }}-${{ github.run_attempt }}
+          path: upnp-wire-linux/
+          if-no-files-found: warn
+          retention-days: 14
+
+  upnp-e2e-linux:
+    # upnp_e2e/run-docker.sh on every daemon build, with master's daemon and with the pull request's
+    # (both with the pull request's harness). The corpus has FAILs (spec gaps): only a case that
+    # passed on master and fails now fails the job.
+    name: upnp-e2e-linux (Docker, master against the pull request)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Check out master baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || 'master' }}
+          path: master
+          persist-credentials: false
+
+      - name: Install YAML parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+
+      - name: Compare master with pull request on linux
+        env:
+          CASE_NAME: ${{ inputs.upnp_e2e_case }}
+        run: |
+          args=()
+          if [ -n "$CASE_NAME" ]; then
+            args+=(--case "$CASE_NAME")
+          fi
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite upnp-e2e --platform linux \
+            --master-source master \
+            --candidate-source candidate \
+            --output upnp-e2e-linux "${args[@]}"
+
+      - name: Publish comparison summary
+        if: always()
+        run: |
+          if [ -f upnp-e2e-linux/summary.md ]; then
+            cat upnp-e2e-linux/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results and comparison report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upnp-e2e-linux-${{ github.run_id }}-${{ github.run_attempt }}
+          path: upnp-e2e-linux/
           if-no-files-found: warn
           retention-days: 14

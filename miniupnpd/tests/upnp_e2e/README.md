@@ -48,3 +48,10 @@ the status report; it is part of `common/run_self_tests.sh`.
 The driver runs the cases with the functions of `common/e2e_lib.sh` (`e2e_case_rows`, `e2e_start_runner`,
 `e2e_record_result`, `e2e_write_report`), with `E2E_RUNNER` set to this suite's runner and
 `E2E_RUNNER_ARGS` to its build.
+
+## Master against a pull request
+
+The `upnp-e2e-linux` job of `regression-testing.yml` runs `../common/tools/compare_daemon_branches.py
+--suite upnp-e2e`: both daemons, every build, with the pull request's harness. [`compare.py`](compare.py)
+tells it how to run this suite. The corpus has FAILs (spec gaps), so only a case that passed with master's
+daemon and does not now fails the job.

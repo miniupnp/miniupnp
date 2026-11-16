@@ -60,3 +60,10 @@ or `{ipv4: .., ipv6: ..}` is chosen for the build and family of the run.
 `python3 run_upnp_wire_cases.py --self-test` checks the corpus (unique names, every ref cites a spec of the
 corpus's `specs` list and a section, known builds, families and step kinds) and the status report; it is
 part of `common/run_self_tests.sh`.
+
+## Master against a pull request
+
+The `upnp-wire-linux` job of `regression-testing.yml` runs `../common/tools/compare_daemon_branches.py
+--suite upnp-wire`: both daemons, every build, with the pull request's harness. [`compare.py`](compare.py)
+tells it how to run this suite. The corpus has FAILs (spec gaps), so only a case that passed with master's
+daemon and does not now fails the job.

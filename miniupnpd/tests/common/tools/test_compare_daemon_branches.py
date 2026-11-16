@@ -141,6 +141,57 @@ class StatusDataTests(unittest.TestCase):
                 suite_compare.read_status_results(data, 'linux', 'digest')
 
 
+BUILD_DATA = {'version': 1, 'platforms': {
+    'linux-igd1': {'results': {'ipv4': {'upnp/a': ['PASS', ''], 'upnp/b': ['FAIL', 'gap']}}},
+    'linux-igd2': {'results': {'ipv6': {'upnp/a': ['XFAIL', 'no feature']}}}}}
+
+
+class BuildDriverTests(unittest.TestCase):
+    """The UPnP suites: one driver run fills a column per daemon build."""
+
+    def test_every_platform_is_read_and_keyed_by_platform_and_family(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'status-data.json'
+            path.write_text(json.dumps(BUILD_DATA))
+            outcomes, digest = suite_compare.read_build_results(path, 'sha')
+        self.assertEqual(digest, 'sha')
+        self.assertEqual(outcomes[('linux-igd1 ipv4', 'upnp', 'b')], {'status': 'FAIL', 'detail': 'gap'})
+        self.assertEqual(outcomes[('linux-igd2 ipv6', 'upnp', 'a')]['status'], 'XFAIL')
+        self.assertEqual(len(outcomes), 3)
+
+    def run_build(self, root, exit_code, write=True):
+        suite = root / 'tree' / suite_compare.TESTS / 'upnp_x'
+        suite.mkdir(parents=True)
+        (suite / 'cases.yaml').write_text('version: 1\n')
+        data = json.dumps(BUILD_DATA)
+        driver = suite / 'run-docker.sh'
+        driver.write_text('#!/bin/sh\n' + (f"echo '{data}' > \"$UPNP_X_STATUS_DATA_FILE\"\n" if write else '')
+                          + 'echo "$@"\n' + f'exit {exit_code}\n')
+        driver.chmod(0o755)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return suite_compare.run_build_driver(suite, 'master', root / 'tree', root / 'out',
+                                                  SimpleNamespace(platform='linux', case=['a']),
+                                                  'run-docker.sh', 'cases.yaml', 'UPNP_X')
+
+    def test_the_driver_writes_its_status_data_under_the_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            outcomes, digest = self.run_build(root, 1)
+            self.assertEqual(len(digest), 64)
+            self.assertIn(('linux-igd1 ipv4', 'upnp', 'b'), outcomes)
+            self.assertEqual((root / 'out/master/run.log').read_text(), '--case a\n')
+
+    def test_an_exit_code_which_disagrees_with_the_failures_is_an_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(ValueError, 'disagrees'):
+                self.run_build(Path(temporary), 0)
+
+    def test_a_driver_without_results_is_an_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(ValueError, 'wrote no results'):
+                self.run_build(Path(temporary), 2, write=False)
+
+
 class SuiteTests(unittest.TestCase):
     def test_each_suite_directory_with_a_compare_py_is_a_suite(self):
         with tempfile.TemporaryDirectory() as temporary:
