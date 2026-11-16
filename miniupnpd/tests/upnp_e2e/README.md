@@ -49,6 +49,14 @@ The driver runs the cases with the functions of `common/e2e_lib.sh` (`e2e_case_r
 `e2e_record_result`, `e2e_write_report`), with `E2E_RUNNER` set to this suite's runner and
 `E2E_RUNNER_ARGS` to its build.
 
+## On OpenBSD
+
+    sh miniupnpd/tests/upnp_e2e/run-openbsd.sh [--slot N] [--case NAME]...
+
+`run-openbsd.sh` is `run-freebsd.sh` with the OpenBSD pf router of `pcp_e2e/run-openbsd.sh` (the same
+`pf-router.sh`, slots and options; `PCP_TEST_OPENBSD_VERSION` picks the release, default 8.0). It fills
+the `openbsd-igd2` column of [status.md](status.md).
+
 ## Master against a pull request
 
 The `upnp-e2e-linux` job of `regression-testing.yml` runs `../common/tools/compare_daemon_branches.py

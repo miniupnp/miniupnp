@@ -49,6 +49,14 @@ them are skipped.
 replace its PCP ones: this suite's settings, `restart_daemon` in the VM, and `run_family`, which runs
 `e2e_run_family` as the Docker driver does. The cases of the lease file SKIP, as the file is in the VM.
 
+## On OpenBSD
+
+    sh miniupnpd/tests/upnp_wire/run-openbsd.sh [--slot N] [--case NAME]...
+
+`run-openbsd.sh` is `run-freebsd.sh` with the OpenBSD pf router of `pcp_e2e/run-openbsd.sh` (the same
+`pf-router.sh`, slots and options; `PCP_TEST_OPENBSD_VERSION` picks the release, default 8.0). It fills
+the `openbsd-igd2` column of [status.md](status.md).
+
 ## The corpus
 
 A case has `name`, `ref`, `description`, optionally `builds` and `families` (default: all), `requires`
