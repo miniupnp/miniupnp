@@ -732,15 +732,25 @@ row_of(const struct memmap_change * c, struct lease_entry * e,
 		e->eaddr = e->iaddr;
 		e->family = AF_INET6;
 		e->eport = c->iport;
-		/* the firewall gives :: for a rule with no remote */
-		*has_remote = !any && inet_pton(AF_INET6, c->raddr, raddr) == 1 &&
-		              !IN6_IS_ADDR_UNSPECIFIED(raddr);
+		/* A remote host which does not parse is refused: as "any" it would
+		 * open the port to every source. The firewall gives :: for a rule
+		 * with no remote */
+		if(!any && inet_pton(AF_INET6, c->raddr, raddr) != 1)
+			return -1;
+		*has_remote = !any && !IN6_IS_ADDR_UNSPECIFIED(raddr);
+		/* a remote port with any remote host: the remote is :: and the port */
+		if(!*has_remote && c->rport != 0) {
+			*raddr = in6addr_any;
+			*has_remote = 1;
+		}
 	} else {
 		if(v4_mapped(c->iaddr, &e->iaddr) < 0)
 			return -1;
 		e->family = AF_INET;
 		e->eport = c->eport;
-		*has_remote = !any && v4_mapped(c->raddr, raddr) == 0;
+		if(!any && v4_mapped(c->raddr, raddr) < 0)
+			return -1;
+		*has_remote = !any;
 	}
 	e->proto = (unsigned char)c->proto;
 	e->iport = c->iport;

@@ -403,6 +403,12 @@ test_ipv4(void)
 	/* an address which is not IPv4 or IPv6 : no row */
 	add_map(0, 40002, "not an address", 8080, IPPROTO_TCP, "web", 600);
 	assert(lease_table_count() == 1);
+
+	/* a remote host which does not parse : no row, not a mapping for any
+	 * remote */
+	add_peer(0, "example.com", 0, 40003, "192.0.2.10", 8080, IPPROTO_TCP, "web", 600);
+	add_peer(0, " 192.0.2.99", 0, 40004, "192.0.2.10", 8080, IPPROTO_TCP, "web", 600);
+	assert(lease_table_count() == 1);
 }
 
 static void
@@ -474,6 +480,20 @@ test_ipv6(void)
 	/* a bad internal address : no row */
 	add_map(3, 0, "2001:db8::zz", 8080, IPPROTO_UDP, "upnp", 100);
 	assert(lease_table_count() == 0);
+
+	/* a remote host which does not parse : no row, not a pinhole for any
+	 * remote */
+	add_peer(4, "example.com", 0, 0, h, 7070, IPPROTO_UDP, "upnp", 100);
+	assert(lease_table_count() == 0);
+
+	/* a remote port with any remote host : the row keeps the port */
+	add_peer(5, "", 5000, 0, h, 7071, IPPROTO_UDP, "upnp", 100);
+	row = lease_table_find_uid(5);
+	assert(row != NULL && row->remote != NULL && row->remote->rport == 5000);
+	assert(IN6_IS_ADDR_UNSPECIFIED(&row->remote->raddr));
+	/* the key with no remote port is another pinhole */
+	assert(pinhole(h, 7071, NULL, 0) == NULL);
+	lease_table_clear();
 }
 
 #if defined(USE_NETFILTER) && !defined(USE_NFTABLES)

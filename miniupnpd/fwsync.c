@@ -57,8 +57,11 @@ rule_of(const struct lease_entry * e, struct fw_rule * r)
 	memset(r, 0, sizeof(*r));
 	addr_str(e->family, &e->iaddr, r->iaddr, sizeof(r->iaddr));
 	if(e->remote != NULL) {
-		addr_str(e->family, &e->remote->raddr, r->raddr, sizeof(r->raddr));
-		r->rhost = r->raddr;
+		/* a pinhole with a remote port and any remote host has :: */
+		if(!IN6_IS_ADDR_UNSPECIFIED(&e->remote->raddr)) {
+			addr_str(e->family, &e->remote->raddr, r->raddr, sizeof(r->raddr));
+			r->rhost = r->raddr;
+		}
 		r->rport = e->remote->rport;
 	}
 	r->eport = e->eport;
