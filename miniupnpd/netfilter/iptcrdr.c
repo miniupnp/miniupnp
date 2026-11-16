@@ -413,7 +413,7 @@ add_filter_rule2(const char * ifname,
 }
 
 /* get_redirect_rule()
- * returns -1 if the rule is not found */
+ * returns -2 if the rule is not found, -1 if the rules could not be read, as pf */
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,
@@ -438,7 +438,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned
                   unsigned int * timestamp,
                   u_int64_t * packets, u_int64_t * bytes)
 {
-	int r = -1;
+	int r = -2;	/* not found */
 	IPTC_HANDLE h;
 	const struct ipt_entry * e;
 	const struct ipt_entry_target * target;
@@ -456,6 +456,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned
 	if(!iptc_is_chain(nat_chain_name, h))
 	{
 		syslog(LOG_ERR, "chain %s not found", nat_chain_name);
+		r = -1;
 	}
 	else
 	{
