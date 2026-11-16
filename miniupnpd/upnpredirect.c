@@ -581,13 +581,10 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
 			return 0;
 		}
 	}
-	/* not found */
-	if(index > 0) {
-		/* clean the mess */
-		*eport = 0;
-		desc[0] = '\0';
-		rhost[0] = '\0';
-	}
+	/* not found : clean the mess */
+	*eport = 0;
+	desc[0] = '\0';
+	rhost[0] = '\0';
 	return -1;
 }
 
