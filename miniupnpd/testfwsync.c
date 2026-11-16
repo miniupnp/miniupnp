@@ -25,7 +25,7 @@ static int adds, deletes, updates;
 static unsigned short last_update_iport;
 static int update_with_port_zero;
 static int fail_delete;		/* delete_redirect_and_filter_rules() fails */
-static int rule_present;	/* what get_redirect_rule() says */
+static int rule_present;	/* 1: get_redirect_rule() finds the rule, 0: not, -1: an error */
 
 int
 add_redirect_rule2(const char * ifname, const char * rhost, unsigned short eport,
@@ -101,7 +101,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	(void)ifname; (void)eport; (void)proto; (void)iaddr; (void)iaddrlen; (void)iport;
 	(void)desc; (void)desclen; (void)rhost; (void)rhostlen; (void)timestamp;
 	(void)packets; (void)bytes;
-	return rule_present ? 0 : -1;
+	return rule_present > 0 ? 0 : rule_present == 0 ? -2 : -1;
 }
 
 int
@@ -289,6 +289,11 @@ test_delete_lost_rule(void)
 	assert(fw_sync(&c, 1) == 0);
 	assert(c.applied == FW_APPLIED);
 	rule_present = 1;
+	assert(fw_sync(&c, 1) < 0);
+	assert(c.applied == FW_NOT_APPLIED);
+	/* a firewall which cannot be read is not one without the rule: the row
+	 * stays */
+	rule_present = -1;
 	assert(fw_sync(&c, 1) < 0);
 	assert(c.applied == FW_NOT_APPLIED);
 	/* with no row, the port is not mapped: the error of the backend stays */

@@ -71,20 +71,25 @@ rule_of(const struct lease_entry * e, struct fw_rule * r)
 	r->timestamp = (unsigned int)e->expiry;
 }
 
-/* 1 if the firewall has the redirect rule of an IPv4 row */
+/* 1 if the firewall has the redirect rule of an IPv4 row, 0 if it has not,
+ * -1 if it could not be read: get_redirect_rule() gives -2 for a rule not
+ * found and -1 for an error (iptables, nftables and pf) */
 static int
 map_rule_present(const struct lease_entry * e)
 {
 	unsigned short iport;
 	unsigned int timestamp;
 	u_int64_t packets, bytes;
-	return get_redirect_rule(ext_if_name, e->eport, e->proto, NULL, 0, &iport, NULL, 0,
-	                         NULL, 0, &timestamp, &packets, &bytes) >= 0;
+	int r = get_redirect_rule(ext_if_name, e->eport, e->proto, NULL, 0, &iport, NULL, 0,
+	                          NULL, 0, &timestamp, &packets, &bytes);
+	return r >= 0 ? 1 : r == -2 ? 0 : -1;
 }
 
 /* Delete the rules of a row. The result of the backend, or 0 if the backend
  * failed on an IPv4 rule which it does not have and the table has its row
- * (has_row): then the row can go. A flush or another program can remove a
+ * (has_row): then the row can go. A firewall which cannot be read is not
+ * taken for one without the rule: the row stays, and the next delete or
+ * expiry tries again. A flush or another program can remove a
  * rule, and pf reports the missing rule as an error. Without a row, the port
  * is not mapped, and the error stays. An IPv6 row whose rule is gone goes at
  * its expiry. */
@@ -109,7 +114,7 @@ delete_rules(const struct lease_entry * e, unsigned short uid, int has_row)
 	r = delete_redirect_rule(ext_if_name, e->eport, e->proto);
 	delete_filter_rule(ext_if_name, e->eport, e->proto);
 #endif
-	if(r < 0 && has_row && !map_rule_present(e)) {
+	if(r < 0 && has_row && map_rule_present(e) == 0) {
 		syslog(LOG_INFO, "port %hu %s has no rule in the firewall, its row goes",
 		       e->eport, e->proto == IPPROTO_UDP ? "UDP" : "TCP");
 		return 0;

@@ -45,14 +45,14 @@ mapping_owner_of(const char * desc, unsigned short eport, int proto)
 
 /* the backend reads of memmap.c, which the tests do not reach */
 #define WEAK __attribute__((weak))
-static int rule_present;	/* what get_redirect_rule() says */
+static int rule_present;	/* 1: get_redirect_rule() finds the rule, 0: not, -1: an error */
 WEAK int get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                            char * iaddr, int iaddrlen, unsigned short * iport,
                            char * desc, int desclen, char * rhost, int rhostlen,
                            unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
 { (void)ifname; (void)eport; (void)proto; (void)iaddr; (void)iaddrlen; (void)iport;
   (void)desc; (void)desclen; (void)rhost; (void)rhostlen; (void)timestamp;
-  (void)packets; (void)bytes; return rule_present ? 0 : -1; }
+  (void)packets; (void)bytes; return rule_present > 0 ? 0 : rule_present == 0 ? -2 : -1; }
 WEAK int get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
                                     char * iaddr, int iaddrlen, unsigned short * iport,
                                     int * proto, char * desc, int desclen,
@@ -318,6 +318,10 @@ test_renew_lost_rule(void)
 	assert(memmap_sync(&c, 1) == 0 && calls == 1);
 	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
 	assert(lease_table_count() == 1);
+	/* a firewall which cannot be read: the rule is not added again */
+	rule_present = -1;
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
+	assert(calls == 1 && lease_table_count() == 1);
 	rule_present = 0;
 	/* lost: a delete of what is left, and an add of the row's rule */
 	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);

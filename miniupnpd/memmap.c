@@ -376,15 +376,17 @@ memmap_eport_used_by_other(unsigned short eport, const char * iaddr)
 	return 1;
 }
 
-/* Read the counters of an IPv4 port mapping from the firewall. */
+/* Read the counters of an IPv4 port mapping from the firewall. 0, -2 if the
+ * firewall has no rule for it, -1 if the firewall could not be read. */
 int
 memmap_map_counters(unsigned short eport, int proto,
                     u_int64_t * packets, u_int64_t * bytes)
 {
 	unsigned short iport;
 	unsigned int timestamp;
-	return get_redirect_rule(ext_if_name, eport, proto, NULL, 0, &iport, NULL, 0,
-	                         NULL, 0, &timestamp, packets, bytes) >= 0 ? 0 : -1;
+	int r = get_redirect_rule(ext_if_name, eport, proto, NULL, 0, &iport, NULL, 0,
+	                          NULL, 0, &timestamp, packets, bytes);
+	return r >= 0 ? 0 : r == -2 ? -2 : -1;
 }
 
 /* the callback of memmap_each_map_counters(), and its argument */
@@ -476,11 +478,20 @@ memmap_map_in_firewall(unsigned short eport, int proto)
 {
 	u_int64_t packets, bytes;
 	struct lease_entry * row;
+	int r;
 
 	if(firewall_trust == FW_TRUST_TRUST)
 		return 1;
-	if(memmap_map_counters(eport, proto, &packets, &bytes) == 0)
+	r = memmap_map_counters(eport, proto, &packets, &bytes);
+	if(r == 0)
 		return 1;
+	/* a firewall which cannot be read is not one without the rule: adding
+	 * the rule again could put it there twice */
+	if(r != -2) {
+		syslog(LOG_WARNING, "port %hu %s: the firewall could not be read, the rule is taken as there",
+		       eport, proto_itoa(proto));
+		return 1;
+	}
 	row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
 	if(row == NULL)
 		return 0;

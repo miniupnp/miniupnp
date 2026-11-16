@@ -111,7 +111,8 @@ int memmap_sync(struct memmap_change * changes, int n);
  * them here, and never the firewall backend. */
 
 /* The packet and byte counters of an IPv4 port mapping, which only the kernel
- * has. 0, or -1 if the firewall has no such rule. */
+ * has. 0, -2 if the firewall has no such rule, or -1 if it could not be
+ * read. */
 int memmap_map_counters(unsigned short eport, int proto,
                         u_int64_t * packets, u_int64_t * bytes);
 
@@ -129,7 +130,8 @@ int memmap_each_map_counters(memmap_counters_fn fn, void * arg);
  * or another program can remove a rule: then it is added again from the row,
  * which stays, as the rule of a pinhole is. 0 if there is no row, or the rule
  * could not be added again: then the row goes, so the caller maps anew
- * instead of renewing a closed port. With firewall_trust FW_TRUST_TRUST the
+ * instead of renewing a closed port. A firewall which cannot be read gives 1:
+ * the rule is not added a second time. With firewall_trust FW_TRUST_TRUST the
  * firewall is not asked: 1. */
 int memmap_map_in_firewall(unsigned short eport, int proto);
 
