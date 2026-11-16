@@ -27,6 +27,8 @@
 #define IP6TC_HANDLE struct ip6tc_handle *
 
 static int next_uid = 1;
+/* the entries of pinhole_list: each holds one of the uids 1 to 65535 */
+static unsigned int pinhole_count;
 
 static const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
 
@@ -60,6 +62,7 @@ void shutdown_iptpinhole(void)
 		LIST_REMOVE(p, entries);
 		free(p);
 	}
+	pinhole_count = 0;
 }
 
 /* return uid */
@@ -83,6 +86,7 @@ add_to_pinhole_list(struct in6_addr * saddr, unsigned short sport,
 	p->timestamp = timestamp;
 	p->proto = (unsigned char)proto;
 	LIST_INSERT_HEAD(&pinhole_list, p, entries);
+	pinhole_count++;
 	while(get_pinhole(next_uid) != NULL) {
 		next_uid++;
 		if(next_uid > 65535)
@@ -225,6 +229,12 @@ int add_pinhole(const char * ifname,
 	struct ip6t_entry_match *match = NULL;
 	struct ip6t_entry_target *target = NULL;
 
+	/* with every uid in use, add_to_pinhole_list() would look for a free
+	 * one forever, after the rule is in the chain */
+	if(pinhole_count >= 65535) {
+		syslog(LOG_WARNING, "add_pinhole: all %u pinhole uids are in use", pinhole_count);
+		return -1;
+	}
 	e = calloc(1, sizeof(struct ip6t_entry));
 	if(!e) {
 		syslog(LOG_ERR, "%s: calloc(%d) failed",
@@ -381,6 +391,7 @@ delete_pinhole(unsigned short uid)
 				}
 				ip6tc_free(h);
 				LIST_REMOVE(p, entries);
+				pinhole_count--;
 				return 0;	/* ok */
 			}
 		}
@@ -389,6 +400,7 @@ delete_pinhole(unsigned short uid)
 	ip6tc_free(h);
 	syslog(LOG_WARNING, "delete_pinhole() rule with PID=%hu not found", uid);
 	LIST_REMOVE(p, entries);
+	pinhole_count--;
 	return -2;	/* not found */
 error:
 	ip6tc_free(h);
