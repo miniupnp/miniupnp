@@ -17,8 +17,8 @@ struct index {
 };
 
 /* The indexes are empty until the first row: see ready(). The external and
- * internal indexes grow with the rows. The UID index keeps its size: a uid is
- * 16 bits, so its chains stay short. */
+ * internal indexes grow with the rows, the UID index with the uids, up to
+ * one bucket for each of the 65534 uids: its chains stay short. */
 static struct index ext_index, int_index, uid_index;
 static unsigned int count = 0;	/* the number of rows */
 
@@ -277,6 +277,31 @@ lease_table_find_uid(unsigned short uid)
 #define UID_MAX	65534
 static unsigned int uid_count;
 
+/* Double the UID index and move the rows over, once it holds more uids than
+ * buckets: 1024 buckets for 65534 uids would give chains of 64. On failure
+ * the old one stays: only the chains get longer. */
+static void
+grow_uid(void)
+{
+	struct index uid2;
+	unsigned int size = uid_index.size * 2, i;
+	if(uid_count < uid_index.size || uid_index.size >= 65536)
+		return;
+	if(index_init(&uid2, size) < 0)
+		return;
+	for(i = 0; i < uid_index.size; i++) {
+		struct lease_entry * e = uid_index.buckets[i], * next;
+		for(; e != NULL; e = next) {
+			unsigned int b = uid_hash(lease_uid(e)) & (size - 1);
+			next = e->uid_next;
+			e->uid_next = uid2.buckets[b];
+			uid2.buckets[b] = e;
+		}
+	}
+	free(uid_index.buckets);
+	uid_index = uid2;
+}
+
 /* Look for a free uid from the one after the last given. With every uid in
  * use, there is no need to look. */
 unsigned short
@@ -424,6 +449,7 @@ lease_table_link(struct lease_entry * e)
 	e->int_next = int_index.buckets[b];
 	int_index.buckets[b] = e;
 	if(lease_uid(e) != 0) {
+		grow_uid();
 		b = uid_hash(lease_uid(e)) & (uid_index.size - 1);
 		e->uid_next = uid_index.buckets[b];
 		uid_index.buckets[b] = e;
@@ -478,6 +504,7 @@ lease_table_link_uid(struct lease_entry * e, unsigned short uid)
 	if(lease_uid(e) != 0 || uid == 0)
 		return;
 	lease_set_uid(e, uid);
+	grow_uid();
 	b = uid_hash(uid) & (uid_index.size - 1);
 	e->uid_next = uid_index.buckets[b];
 	uid_index.buckets[b] = e;

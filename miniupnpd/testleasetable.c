@@ -77,6 +77,9 @@ test_uids_full(void)
 		x = lease_table_add(&e, NULL, 0);
 		assert(x != NULL);
 	}
+	/* the UID index grew with them: each is found by its uid */
+	for(i = 1; i <= 65534; i++)
+		assert(lease_uid(lease_table_find_uid((unsigned short)i)) == i);
 	assert(lease_table_new_uid() == 0);
 	lease_table_remove(x);
 	assert(lease_table_new_uid() == 65534);
