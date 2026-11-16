@@ -86,6 +86,15 @@ typedef struct rule_t {
 
 LIST_HEAD(rule_list, rule_t);
 extern struct rule_list head_filter;
+
+/* The map6 rules: their list, read if needed; a number which changes
+ * whenever it does; the generation it is valid in (1, or 0 if not); and
+ * the end of a rule the daemon deleted in one commit, which keeps the list
+ * valid when no other commit came between */
+struct rule_list * nft_map6_rules(void);
+uint32_t nft_map6_cache_epoch(void);
+int nft_map6_cache_gen(uint32_t * gen);
+void nft_map6_cache_forget(rule_t * p, uint32_t gen_before);
 extern struct rule_list head_redirect;
 extern struct rule_list head_peer;
 

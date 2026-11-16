@@ -85,6 +85,9 @@ static uint32_t mnl_seq = 0;
 
 // FILTER
 struct rule_list head_filter = LIST_HEAD_INITIALIZER(head_filter);
+/* the filter rules of the IPv6 table, when IPv6 has a table of its own
+ * (upnp_nftables_family_split): the map6 rules are there */
+static struct rule_list head_filter6 = LIST_HEAD_INITIALIZER(head_filter6);
 // DNAT
 struct rule_list head_redirect = LIST_HEAD_INITIALIZER(head_redirect);
 // SNAT
@@ -98,6 +101,11 @@ static uint32_t rule_list_peer_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_filter_gen;
 static uint32_t rule_list_redirect_gen;
 static uint32_t rule_list_peer_gen;
+static uint32_t rule_list_filter6_validate = RULE_CACHE_INVALID;
+static uint32_t rule_list_filter6_gen;
+/* bumped at each change of the rules the map6 list holds, see
+ * nft_map6_cache_epoch() */
+static uint32_t map6_cache_epoch;
 
 
 /*
@@ -539,6 +547,7 @@ struct table_cb_data {
 	const char * table;
 	const char * chain;
 	enum rule_type type;
+	struct rule_list * filter_head;	/* where a filter rule goes */
 	int alloc_failed;
 };
 
@@ -641,7 +650,8 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					break;
 
 				case RULE_FILTER:
-					LIST_INSERT_HEAD(&head_filter, r, entry);
+					LIST_INSERT_HEAD(CB_DATA(filter_head), r, entry);
+					map6_cache_epoch++;
 					r = NULL;
 					break;
 
@@ -731,6 +741,65 @@ refresh_nft_cache_filter(void)
 	                     nft_ipv4_family, RULE_FILTER);
 }
 
+/* the list the map6 rules are in, read if it is not as the ruleset is:
+ * head_filter, or with a table of its own for IPv6, the filter chain of
+ * that table */
+struct rule_list *
+nft_map6_rules(void)
+{
+	if (nft_ipv6_family == nft_ipv4_family) {
+		refresh_nft_cache_filter();
+		return &head_filter;
+	}
+	refresh_cache(&rule_list_filter6_validate, &rule_list_filter6_gen, &head_filter6,
+	              nft_table, nft_forward_chain, nft_ipv6_family, RULE_FILTER);
+	return &head_filter6;
+}
+
+uint32_t
+nft_map6_cache_epoch(void)
+{
+	return map6_cache_epoch;
+}
+
+/* The generation a valid map6 list was read in: 1, or 0 if it is not valid */
+int
+nft_map6_cache_gen(uint32_t * gen)
+{
+	int split = nft_ipv6_family != nft_ipv4_family;
+	if ((split ? rule_list_filter6_validate : rule_list_filter_validate) != RULE_CACHE_VALID)
+		return 0;
+	*gen = split ? rule_list_filter6_gen : rule_list_filter_gen;
+	return 1;
+}
+
+/* A map6 rule p of the list was deleted, by a commit of the daemon made
+ * when the list was valid in generation gen_before. If no other commit came
+ * between, the list stays valid without p, and the next lookup reads no
+ * chain: N deletes then read the chain once, not N times. */
+void
+nft_map6_cache_forget(rule_t * p, uint32_t gen_before)
+{
+	int split = nft_ipv6_family != nft_ipv4_family;
+	uint32_t now;
+
+	if (ruleset_gen(&now) < 0 || now != gen_before + 1)
+		return;
+	LIST_REMOVE(p, entry);
+	free(p->desc);
+	free(p->table);
+	free(p->chain);
+	free(p);
+	map6_cache_epoch++;
+	if (split) {
+		rule_list_filter6_validate = RULE_CACHE_VALID;
+		rule_list_filter6_gen = now;
+	} else {
+		rule_list_filter_validate = RULE_CACHE_VALID;
+		rule_list_filter_gen = now;
+	}
+}
+
 int
 refresh_nft_cache_peer(void)
 {
@@ -751,6 +820,9 @@ void
 flush_nft_cache(struct rule_list *head)
 {
 	rule_t *p1, *p2;
+
+	if (head == &head_filter || head == &head_filter6)
+		map6_cache_epoch++;
 
 	p1 = LIST_FIRST(head);
 	while (p1 != NULL) {
@@ -811,6 +883,7 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	data.table = table;
 	data.chain = chain;
 	data.type = type;
+	data.filter_head = type == RULE_FILTER ? head : &head_filter;
 	data.alloc_failed = 0;
 	do {
 		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
@@ -1388,6 +1461,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		switch (chain_type) {
 			case RULE_CHAIN_FILTER:
 				rule_list_filter_validate = RULE_CACHE_INVALID;
+				rule_list_filter6_validate = RULE_CACHE_INVALID;
 				break;
 			case RULE_CHAIN_PEER:
 				rule_list_peer_validate = RULE_CACHE_INVALID;
