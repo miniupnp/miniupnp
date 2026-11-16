@@ -127,7 +127,7 @@ get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
 
 #ifdef TEST_PINHOLES
 int
-get_pinhole_packets(const char * rem_host, unsigned short rem_port,
+get_map6_packets(const char * rem_host, unsigned short rem_port,
                     const char * int_client, unsigned short int_port, int proto,
                     u_int64_t * packets)
 {
@@ -138,7 +138,7 @@ get_pinhole_packets(const char * rem_host, unsigned short rem_port,
 }
 
 int
-get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
+get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port, char * int_client, int int_clientlen,
                     unsigned short * int_port, int * proto, char * desc, int desclen)
 {
@@ -283,7 +283,7 @@ static void
 drop_pinhole(int uid, const char * raddr, unsigned short rport,
              const char * iaddr, unsigned short iport, int proto)
 {
-	(void)sync1(MEMMAP_DELETE_PINHOLE, uid, raddr, rport, 0, iaddr, iport, proto, NULL, 0);
+	(void)sync1(MEMMAP_DELETE_MAP6, uid, raddr, rport, 0, iaddr, iport, proto, NULL, 0);
 }
 
 static struct in6_addr

@@ -9,7 +9,7 @@
  * never stands for a rule which was refused.
  *
  * memmap_sync() is the one write, of the table and of the firewall. iaddr gives
- * the family. An IPv4 row is a port mapping, and an IPv6 row is a pinhole:
+ * the family. An IPv4 row is a port mapping, and an IPv6 row is a map6:
  * eport is iport, and the rule is that of a MAP without a remote peer, or of a
  * PEER with one. */
 #ifndef MEMMAP_H_INCLUDED
@@ -74,11 +74,11 @@ int memmap_eport_redirected_elsewhere(const char * ifname, unsigned short eport,
 
 /* What a change of a request does */
 enum memmap_op {
-	MEMMAP_ADD,		/* add a port mapping or a pinhole */
+	MEMMAP_ADD,		/* add a port mapping or a map6 */
 	MEMMAP_UPDATE,		/* an IPv4 port mapping: new iport, description, expiry */
-	MEMMAP_RENEW,		/* a pinhole by uid: new expiry. With iaddr, its rule */
+	MEMMAP_RENEW,		/* a map6 by uid: new expiry. With iaddr, its rule */
 	MEMMAP_DELETE,		/* an IPv4 port mapping, by eport */
-	MEMMAP_DELETE_PINHOLE	/* a pinhole by uid, or by its rule (iaddr) */
+	MEMMAP_DELETE_MAP6	/* a map6 by uid, or by its rule (iaddr) */
 };
 
 /* One change of a request. The strings stay the caller's. */
@@ -86,15 +86,15 @@ struct memmap_change {
 	enum memmap_op op;
 	const char * raddr;	/* NULL, "" or "*" : any remote */
 	unsigned short rport;
-	unsigned short eport;	/* a pinhole: unused, it is iport */
+	unsigned short eport;	/* a map6: unused, it is iport */
 	const char * iaddr;	/* gives the family */
 	unsigned short iport;
 	int proto;
 	const char * desc;
 	unsigned int timestamp;	/* the expiry, 0 for none */
-	int uid;		/* a pinhole: set by MEMMAP_ADD, read by the others. 0 : none */
-	int give_uid;		/* MEMMAP_ADD of a pinhole: 1 gives it a uid, which UPnP
-				 * names it by. PCP finds a pinhole by its rule: 0 */
+	int uid;		/* a map6: set by MEMMAP_ADD, read by the others. 0 : none */
+	int give_uid;		/* MEMMAP_ADD of a map6: 1 gives it a uid, which UPnP
+				 * names it by. PCP finds a map6 by its rule: 0 */
 };
 
 /* Fill a change, with every field it does not name zero. A pinhole has no
@@ -136,7 +136,7 @@ int memmap_each_map_counters(memmap_counters_fn fn, void * arg);
 
 /* 1 if the firewall has the rule of an IPv4 port mapping with a row. A flush
  * or another program can remove a rule: then it is added again from the row,
- * which stays, as the rule of a pinhole is. 0 if there is no row, or the rule
+ * which stays, as the rule of a map6 is. 0 if there is no row, or the rule
  * could not be added again: then the row goes, so the caller maps anew
  * instead of renewing a closed port. A firewall which cannot be read gives 1:
  * the rule is not added a second time. With firewall_trust FW_TRUST_TRUST the
@@ -163,43 +163,43 @@ int memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
                         int max, unsigned int * next);
 
 #ifdef ENABLE_UPNPPINHOLE
-/* The pinholes, read from the table. Each one has a row: the rules of an
+/* The map6s, read from the table. Each one has a row: the rules of an
  * earlier run which have none are deleted at startup, by
- * memmap_remove_old_pinholes(). A UPnP pinhole also has a uid, its UniqueID.
- * A PCP pinhole has none (uid 0): PCP finds it by its rule. */
+ * memmap_remove_old_map6s(). A UPnP pinhole also has a uid, its UniqueID.
+ * A PCP map6 has none (uid 0): PCP finds it by its rule. */
 
-/* The uid of the pinhole of this rule, 0 if it has none, or -2 if there is
- * no such pinhole. desc and timestamp may be NULL. */
-int memmap_find_pinhole(const char * raddr, unsigned short rport,
+/* The uid of the map6 of this rule, 0 if it has none, or -2 if there is
+ * no such map6. desc and timestamp may be NULL. */
+int memmap_find_map6(const char * raddr, unsigned short rport,
                         const char * iaddr, unsigned short iport, int proto,
                         char * desc, int desclen, unsigned int * timestamp);
-/* The rule of a pinhole, with its packet counter from the firewall. raddr is
- * "" for none. 0, or -2 if there is no such pinhole. */
-int memmap_get_pinhole(unsigned short uid, char * raddr, int raddrlen,
+/* The rule of a map6, with its packet counter from the firewall. raddr is
+ * "" for none. 0, or -2 if there is no such map6. */
+int memmap_get_map6(unsigned short uid, char * raddr, int raddrlen,
                        unsigned short * rport, char * iaddr, int iaddrlen,
                        unsigned short * iport, int * proto, char * desc, int desclen,
                        unsigned int * timestamp, u_int64_t * packets);
-/* The uid of the pinhole at this place in a walk of the pinholes which have a
+/* The uid of the map6 at this place in a walk of the map6s which have a
  * uid, or -1 past the end. The order is that of the table, and changes with
  * it. */
-int memmap_pinhole_uid_at(int index);
-/* Renew a pinhole: a new expiry, and a new description unless desc is NULL, in
+int memmap_map6_uid_at(int index);
+/* Renew a map6: a new expiry, and a new description unless desc is NULL, in
  * the table. The expiry is the table's, so the firewall changes only if it lost
  * the rule, which is then added again; with firewall_trust FW_TRUST_TRUST it
- * is not asked. 0, -1 if there is no such pinhole, -2 if
+ * is not asked. 0, -1 if there is no such map6, -2 if
  * there is no memory, -3 if the lost rule could not be added again. */
-int memmap_renew_pinhole(unsigned short uid, const char * desc, unsigned int expiry);
-/* The same, for the pinhole of this rule, which may have no uid (PCP). With
- * give_uid, a pinhole with no uid gets one (UPnP). Its uid (0 : none), or < 0
- * as for memmap_renew_pinhole(), and -4 if there is no free uid. */
-int memmap_renew_pinhole_at(const char * raddr, unsigned short rport,
+int memmap_renew_map6(unsigned short uid, const char * desc, unsigned int expiry);
+/* The same, for the map6 of this rule, which may have no uid (PCP). With
+ * give_uid, a map6 with no uid gets one (UPnP). Its uid (0 : none), or < 0
+ * as for memmap_renew_map6(), and -4 if there is no free uid. */
+int memmap_renew_map6_at(const char * raddr, unsigned short rport,
                             const char * iaddr, unsigned short iport, int proto,
                             const char * desc, unsigned int expiry, int give_uid);
-/* the pinholes removed by a pass of the main loop */
-#define PINHOLE_EXPIRE_PER_PASS	64
+/* the map6s removed by a pass of the main loop */
+#define MAP6_EXPIRE_PER_PASS	64
 
-/* a pinhole past its expiry, with its rule */
-struct expired_pinhole {
+/* a map6 past its expiry, with its rule */
+struct expired_map6 {
 	unsigned short uid;
 	int proto;
 	unsigned short iport;
@@ -208,15 +208,15 @@ struct expired_pinhole {
 	char raddr[INET6_ADDRSTRLEN];	/* "" : any remote */
 };
 
-/* Fills expired with at most max pinholes past their lifetime, and next with
+/* Fills expired with at most max map6s past their lifetime, and next with
  * the next expiry (0 : none, now : more to do), from the table with no read of
  * the firewall. Returns the number filled. */
-int memmap_expired_pinholes(unsigned int now, struct expired_pinhole * expired,
+int memmap_expired_map6s(unsigned int now, struct expired_map6 * expired,
                             int max, unsigned int * next);
 
-/* Delete the pinhole rules of an earlier run which have no row: their expiry
+/* Delete the map6 rules of an earlier run which have no row: their expiry
  * is not known. This reads the firewall, once at startup. */
-void memmap_remove_old_pinholes(void);
+void memmap_remove_old_map6s(void);
 #endif
 
 #ifdef PCP_PEER

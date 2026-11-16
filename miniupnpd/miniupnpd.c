@@ -2260,7 +2260,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	/* IPv6 allow rules of an earlier run can still be in the firewall.
 	 * Their expiry is not known, so those with no row go, before the lease
 	 * file adds back the ones it lists. */
-	memmap_remove_old_pinholes();
+	memmap_remove_old_map6s();
 	reload_from_lease_file6();
 #endif
 #endif
@@ -2661,7 +2661,7 @@ main(int argc, char * * argv)
 	memmap_adopt_rules();
 #if defined(ENABLE_UPNPPINHOLE) && !defined(ENABLE_LEASEFILE)
 	/* with a lease file, init() did this before it read lease_file6 */
-	memmap_remove_old_pinholes();
+	memmap_remove_old_map6s();
 #endif
 
 	/* for miniupnpdctl */

@@ -40,7 +40,7 @@
 #include "../memmap.h"
 #include "rtickets.h"
 
-/* the pass rules created by add_pinhole_rule() are as follow :
+/* the pass rules created by add_map6_rule() are as follow :
  *
  * pass in quick on ep0 inet6 proto udp
  *   from any to dead:beef::42:42 port = 8080
@@ -69,7 +69,7 @@ extern int dev;
 	 (iport) == ntohs(RULE.dst.port[0]) && \
 	 0 == memcmp(&(saddr), &RULE.src.addr.v.a.addr.v6, sizeof(struct in6_addr)) && \
 	 0 == memcmp(&(daddr), &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)) && \
-	 pinhole_label_desc(RULE_LABEL) != NULL)
+	 map6_label_desc(RULE_LABEL) != NULL)
 
 /* the addresses of a key. 0, or -1 if one does not parse */
 static int
@@ -77,7 +77,7 @@ key_addrs(const char * rem_host, const char * int_client,
           struct in6_addr * saddr, struct in6_addr * daddr)
 {
 	memset(saddr, 0, sizeof(*saddr));
-	if(!pinhole_any_remote(rem_host) && inet_pton(AF_INET6, rem_host, saddr) != 1) {
+	if(!map6_any_remote(rem_host) && inet_pton(AF_INET6, rem_host, saddr) != 1) {
 		syslog(LOG_ERR, "inet_pton(%s) failed", rem_host);
 		return -1;
 	}
@@ -90,7 +90,7 @@ key_addrs(const char * rem_host, const char * int_client,
 
 #define RULE (pr.rule)
 
-int add_pinhole_rule(const char * ifname,
+int add_map6_rule(const char * ifname,
                      const char * rem_host, unsigned short rem_port,
                      const char * int_client, unsigned short int_port,
                      int proto, const char * desc, unsigned int timestamp)
@@ -145,7 +145,7 @@ int add_pinhole_rule(const char * ifname,
 		RULE.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		RULE.keep_state = 1;
-		pinhole_label(RULE.label, PF_RULE_LABEL_SIZE, desc);
+		map6_label(RULE.label, PF_RULE_LABEL_SIZE, desc);
 		if(queue)
 			strlcpy(RULE.qname, queue, PF_QNAME_SIZE);
 		if(tag)
@@ -155,7 +155,7 @@ int add_pinhole_rule(const char * ifname,
 			RULE.src.port_op = PF_OP_EQ;
 			RULE.src.port[0] = htons(rem_port);
 		}
-		if(!pinhole_any_remote(rem_host)) {
+		if(!map6_any_remote(rem_host)) {
 			RULE.src.addr.type = PF_ADDR_ADDRMASK;
 			if(inet_pton(AF_INET6, rem_host, &RULE.src.addr.v.a.addr.v6) != 1) {
 				syslog(LOG_ERR, "inet_pton(%s) failed", rem_host);
@@ -190,7 +190,7 @@ int add_pinhole_rule(const char * ifname,
 	return 0;
 }
 
-int get_pinhole_packets(const char * rem_host, unsigned short rem_port,
+int get_map6_packets(const char * rem_host, unsigned short rem_port,
                         const char * int_client, unsigned short int_port,
                         int proto, u_int64_t * packets)
 {
@@ -272,7 +272,7 @@ int get_pinhole_packets(const char * rem_host, unsigned short rem_port,
 	return -2;
 }
 
-int delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
+int delete_map6_rule(const char * rem_host, unsigned short rem_port,
                         const char * int_client, unsigned short int_port,
                         int proto)
 {
@@ -369,7 +369,7 @@ int delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
 }
 
 int
-get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
+get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
                     unsigned short * int_port, int * proto,
@@ -435,7 +435,7 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
 			return -1;
 		}
 #endif /* USE_LIBPFCTL */
-		if((d = pinhole_label_desc(RULE_LABEL)) == NULL || index-- > 0)
+		if((d = map6_label_desc(RULE_LABEL)) == NULL || index-- > 0)
 			continue;
 		if(rem_host && rem_hostlen > 0) {
 			rem_host[0] = '\0';
@@ -464,15 +464,15 @@ get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
 
 /* A label cannot change in place: the rule is deleted and added again, which
  * resets its counters. */
-int update_pinhole_rule(const char * ifname,
+int update_map6_rule(const char * ifname,
                         const char * rem_host, unsigned short rem_port,
                         const char * int_client, unsigned short int_port,
                         int proto, const char * desc, unsigned int timestamp)
 {
-	int r = delete_pinhole_rule(rem_host, rem_port, int_client, int_port, proto);
+	int r = delete_map6_rule(rem_host, rem_port, int_client, int_port, proto);
 	if(r < 0)
 		return r;
-	return add_pinhole_rule(ifname, rem_host, rem_port, int_client, int_port,
+	return add_map6_rule(ifname, rem_host, rem_port, int_client, int_port,
 	                        proto, desc, timestamp);
 }
 

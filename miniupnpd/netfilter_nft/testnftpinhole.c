@@ -30,11 +30,11 @@ static void print_infos(void)
 	unsigned int timestamp;
 	u_int64_t packets;
 
-	for (i = 0; get_pinhole_rule_at(i, rem_host, sizeof(rem_host), &rem_port,
+	for (i = 0; get_map6_rule_at(i, rem_host, sizeof(rem_host), &rem_port,
 	                                int_client, sizeof(int_client), &int_port,
 	                                &proto, desc, sizeof(desc)) == 0; i++) {
 		packets = 0;
-		get_pinhole_packets(rem_host, rem_port, int_client, int_port, proto, &packets);
+		get_map6_packets(rem_host, rem_port, int_client, int_port, proto, &packets);
 		syslog(LOG_INFO, "pinhole %d : [%s]:%hu => [%s]:%hu %s desc \"%s\" ts=%u packets=%llu",
 		       i, rem_host, rem_port, int_client, int_port,
 		       proto == IPPROTO_TCP ? "tcp" : "udp", desc, timestamp,
@@ -59,18 +59,18 @@ int main(int argc, char * * argv)
 		return 1;
 	}
 
-	r = add_pinhole_rule(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP,
+	r = add_map6_rule(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP,
 	                     "dummy description", upnp_time() + 60 /* timestamp */);
-	syslog(LOG_INFO, "add_pinhole_rule() returned %d", r);
+	syslog(LOG_INFO, "add_map6_rule() returned %d", r);
 	print_infos();
 
-	r = update_pinhole_rule(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP,
+	r = update_map6_rule(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP,
 	                        "dummy description", upnp_time() + 3600);
-	syslog(LOG_INFO, "update_pinhole_rule() returned %d", r);
+	syslog(LOG_INFO, "update_map6_rule() returned %d", r);
 	print_infos();
 
-	r = delete_pinhole_rule(rem_host, rem_port, int_client, int_port, IPPROTO_TCP);
-	syslog(LOG_INFO, "delete_pinhole_rule() returned %d", r);
+	r = delete_map6_rule(rem_host, rem_port, int_client, int_port, IPPROTO_TCP);
+	syslog(LOG_INFO, "delete_map6_rule() returned %d", r);
 	print_infos();
 
 	shutdown_redirect();

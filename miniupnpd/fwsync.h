@@ -19,13 +19,13 @@
 #include "config.h"
 #include "lease_table.h"
 
-/* The firewalls which have pinholes, and their pinhole functions. The PF API
- * of Apple differs from what pf/pfpinhole.c expects. A pinhole rule is found
+/* The firewalls which have map6s, and their map6 functions. The PF API
+ * of Apple differs from what pf/pfpinhole.c expects. A map6 rule is found
  * by its key: the uid is the map's alone. */
 #ifdef ENABLE_UPNPPINHOLE
 #if defined(USE_NETFILTER) || (defined(USE_PF) && !defined(__APPLE__))
-#define FW_PINHOLES
-#include "fwpinhole.h"
+#define FW_MAP6
+#include "fwmap6.h"
 #endif
 #endif
 
@@ -55,7 +55,7 @@ struct fw_change {
 
 /* Send the changes of one request to the firewall. 0: all are applied. < 0:
  * the request failed, and each change says if it is applied all the same.
- * A pinhole rule is found by the key of its row, not by its uid. */
+ * A map6 rule is found by the key of its row, not by its uid. */
 int fw_sync(struct fw_change * changes, int n);
 
 /* The redirect rule of an IPv4 port mapping, and its counters: 0, -2 if the

@@ -127,24 +127,24 @@ update_portmapping_desc_timestamp(const char * ifname, unsigned short eport, int
 
 /* the pinhole functions, which these tests do not reach */
 #define WEAK __attribute__((weak))
-#ifdef FW_PINHOLES
+#ifdef FW_MAP6
 /* the remote of the last IPv6 allow rule added: "(any)" for NULL */
-static char pinhole_rhost[64];
-static unsigned short pinhole_rport;
-WEAK int add_pinhole_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
-                          const char * int_client, unsigned short int_port, int proto,
-                          const char * desc, unsigned int timestamp)
+static char map6_rhost[64];
+static unsigned short map6_rport;
+WEAK int add_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
+                       const char * int_client, unsigned short int_port, int proto,
+                       const char * desc, unsigned int timestamp)
 { (void)ifname; (void)int_client; (void)int_port; (void)proto; (void)desc; (void)timestamp;
-  snprintf(pinhole_rhost, sizeof(pinhole_rhost), "%s", rem_host ? rem_host : "(any)");
-  pinhole_rport = rem_port;
+  snprintf(map6_rhost, sizeof(map6_rhost), "%s", rem_host ? rem_host : "(any)");
+  map6_rport = rem_port;
   return 0; }
-WEAK int update_pinhole_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
+WEAK int update_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
                              const char * int_client, unsigned short int_port, int proto,
                              const char * desc, unsigned int timestamp)
 { (void)ifname; (void)rem_host; (void)rem_port; (void)int_client; (void)int_port;
   (void)proto; (void)desc; (void)timestamp; return -1; }
-static int map6_delete_result = -1;	/* what delete_pinhole_rule() answers */
-WEAK int delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
+static int map6_delete_result = -1;	/* what delete_map6_rule() answers */
+WEAK int delete_map6_rule(const char * rem_host, unsigned short rem_port,
                              const char * int_client, unsigned short int_port, int proto)
 { (void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
   return map6_delete_result; }
@@ -309,11 +309,11 @@ test_delete_lost_rule(void)
 	assert(c.applied == FW_NOT_APPLIED);
 }
 
-#ifdef FW_PINHOLES
-/* a pinhole with a remote port and any remote host keeps its port: the rule
+#ifdef FW_MAP6
+/* an IPv6 allow rule with a remote port and any remote host keeps its port: the rule
  * must not take traffic from every source port */
 static void
-test_pinhole_remote_port(void)
+test_map6_remote_port(void)
 {
 	struct lease_entry e;
 	struct lease_remote r;
@@ -333,12 +333,25 @@ test_pinhole_remote_port(void)
 	memset(&c, 0, sizeof(c));
 	c.op = FW_ADD; c.row = &e;
 	assert(fw_sync(&c, 1) == 0);
-	assert(strcmp(pinhole_rhost, "(any)") == 0 && pinhole_rport == 5000);
+	assert(strcmp(map6_rhost, "(any)") == 0 && map6_rport == 5000);
 	/* a remote host too */
 	r.raddr.s6_addr[0] = 0x20;
 	r.raddr.s6_addr[15] = 0x05;
 	assert(fw_sync(&c, 1) == 0);
-	assert(strcmp(pinhole_rhost, "2000::5") == 0 && pinhole_rport == 5000);
+	assert(strcmp(map6_rhost, "2000::5") == 0 && map6_rport == 5000);
+}
+
+/* the label a map6 rule gets reads back as its description, and so do the
+ * labels of older daemons; another program's label is not the daemon's */
+static void
+test_map6_label(void)
+{
+	char label[64];
+	map6_label(label, sizeof(label), "game");
+	assert(strcmp(label, "pinhole: game") == 0);
+	assert(strcmp(map6_label_desc(label), "game") == 0);
+	assert(strcmp(map6_label_desc("pinhole-12 ts-34: old"), "old") == 0);
+	assert(map6_label_desc("other: x") == NULL);
 }
 
 /* an IPv6 delete of a rule the firewall does not have (-2) lets the row go;
@@ -380,8 +393,9 @@ main(void)
 	test_delete_partial_stays();
 	test_delete_undone();
 	test_delete_lost_rule();
-#ifdef FW_PINHOLES
-	test_pinhole_remote_port();
+#ifdef FW_MAP6
+	test_map6_remote_port();
+	test_map6_label();
 	test_delete_lost_map6();
 #endif
 	printf("testfwsync: all tests passed\n");

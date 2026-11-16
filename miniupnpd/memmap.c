@@ -160,24 +160,23 @@ memmap_renew_map(unsigned short eport, int proto, const char * desc,
 	return 0;
 }
 
-
-/* what a walk over the rows gives pinhole_expiry_row() and gets back */
-struct pinhole_expiry {
+/* what a walk over the rows gives map6_expiry_row() and gets back */
+struct map6_expiry {
 	unsigned int now;
-	struct expired_pinhole * expired;
+	struct expired_map6 * expired;
 	int max;
 	int n;
 	unsigned int next;
 };
 
-/* Collect a pinhole row past its expiry, with its rule. Else keep the soonest
+/* Collect a map6 row past its expiry, with its rule. Else keep the soonest
  * expiry. When expired[] is full, the next pass is now. */
 static void
-pinhole_expiry_row(struct lease_entry * e, void * arg)
+map6_expiry_row(struct lease_entry * e, void * arg)
 {
-	struct pinhole_expiry * c = arg;
+	struct map6_expiry * c = arg;
 	unsigned int ts = (unsigned int)e->expiry;
-	struct expired_pinhole * x;
+	struct expired_map6 * x;
 	if(e->family != AF_INET6 || ts == 0)
 		return;
 	if(ts > c->now) {
@@ -201,16 +200,16 @@ pinhole_expiry_row(struct lease_entry * e, void * arg)
 	}
 }
 
-/* The pinholes which expired, from the table, with no read of the firewall. */
+/* The map6s which expired, from the table, with no read of the firewall. */
 int
-memmap_expired_pinholes(unsigned int now, struct expired_pinhole * expired,
+memmap_expired_map6s(unsigned int now, struct expired_map6 * expired,
                         int max, unsigned int * next)
 {
-	struct pinhole_expiry c = { now, expired, max, 0, 0 };
-	lease_table_foreach(pinhole_expiry_row, &c);
+	struct map6_expiry c = { now, expired, max, 0, 0 };
+	lease_table_foreach(map6_expiry_row, &c);
 	*next = c.next;
 	if(c.n > 0)
-		syslog(LOG_DEBUG, "memmap: %d pinholes expired, next at %u", c.n, c.next);
+		syslog(LOG_DEBUG, "memmap: %d map6s expired, next at %u", c.n, c.next);
 	return c.n;
 }
 
@@ -563,9 +562,9 @@ memmap_adopt_rules(void)
 }
 
 #ifdef ENABLE_UPNPPINHOLE
-/* the row of a pinhole by its key, or NULL */
+/* the row of a map6 by its key, or NULL */
 static struct lease_entry *
-pinhole_row(const char * raddr, unsigned short rport, const char * iaddr,
+map6_row(const char * raddr, unsigned short rport, const char * iaddr,
             unsigned short iport, int proto)
 {
 	struct memmap_change c;
@@ -586,13 +585,13 @@ pinhole_row(const char * raddr, unsigned short rport, const char * iaddr,
 	return row;
 }
 
-/* Find a pinhole by its rule, in the table. */
+/* Find a map6 by its rule, in the table. */
 int
-memmap_find_pinhole(const char * raddr, unsigned short rport,
+memmap_find_map6(const char * raddr, unsigned short rport,
                     const char * iaddr, unsigned short iport, int proto,
                     char * desc, int desclen, unsigned int * timestamp)
 {
-	const struct lease_entry * row = pinhole_row(raddr, rport, iaddr, iport, proto);
+	const struct lease_entry * row = map6_row(raddr, rport, iaddr, iport, proto);
 	if(row == NULL)
 		return -2;
 	if(desc != NULL && desclen > 0)
@@ -602,9 +601,9 @@ memmap_find_pinhole(const char * raddr, unsigned short rport,
 	return lease_uid(row);
 }
 
-/* Read a pinhole from the table, and its packet counter from the firewall. */
+/* Read a map6 from the table, and its packet counter from the firewall. */
 int
-memmap_get_pinhole(unsigned short uid, char * raddr, int raddrlen,
+memmap_get_map6(unsigned short uid, char * raddr, int raddrlen,
                    unsigned short * rport, char * iaddr, int iaddrlen,
                    unsigned short * iport, int * proto, char * desc, int desclen,
                    unsigned int * timestamp, u_int64_t * packets)
@@ -632,49 +631,49 @@ memmap_get_pinhole(unsigned short uid, char * raddr, int raddrlen,
 		*timestamp = (unsigned int)row->expiry;
 	if(packets != NULL) {
 		*packets = 0;
-#ifdef FW_PINHOLES
-		if(get_pinhole_packets(r[0] ? r : NULL, row->remote ? row->remote->rport : 0,
+#ifdef FW_MAP6
+		if(get_map6_packets(r[0] ? r : NULL, row->remote ? row->remote->rport : 0,
 		                       i, row->iport, row->proto, packets) < 0)
-			syslog(LOG_DEBUG, "memmap: no counter for pinhole uid %hu", uid);
+			syslog(LOG_DEBUG, "memmap: no counter for map6 uid %hu", uid);
 #endif
 	}
 	return 0;
 }
 
-/* what a walk gives pinhole_at_row() and gets back */
-struct pinhole_at {
+/* what a walk gives map6_at_row() and gets back */
+struct map6_at {
 	int index;
 	int uid;
 };
 
 static void
-pinhole_at_row(struct lease_entry * e, void * arg)
+map6_at_row(struct lease_entry * e, void * arg)
 {
-	struct pinhole_at * a = arg;
+	struct map6_at * a = arg;
 	if(e->family != AF_INET6 || lease_uid(e) == 0 || a->uid >= 0)
 		return;
 	if(a->index-- == 0)
 		a->uid = lease_uid(e);
 }
 
-/* The uid of a pinhole by its place in a walk of the pinholes with a uid. */
+/* The uid of a map6 by its place in a walk of the map6s with a uid. */
 int
-memmap_pinhole_uid_at(int index)
+memmap_map6_uid_at(int index)
 {
-	struct pinhole_at a;
+	struct map6_at a;
 	a.index = index;
 	a.uid = -1;
 	if(index >= 0)
-		lease_table_foreach(pinhole_at_row, &a);
+		lease_table_foreach(map6_at_row, &a);
 	return a.uid;
 }
 
-/* Renew the row of a pinhole in the table, and add its rule again if the
+/* Renew the row of a map6 in the table, and add its rule again if the
  * firewall lost it. */
 static int
-renew_pinhole_row(struct lease_entry * row, const char * desc, unsigned int expiry)
+renew_map6_row(struct lease_entry * row, const char * desc, unsigned int expiry)
 {
-#ifdef FW_PINHOLES
+#ifdef FW_MAP6
 	char r[INET6_ADDRSTRLEN] = "", i[INET6_ADDRSTRLEN];
 	u_int64_t packets;
 
@@ -684,9 +683,9 @@ renew_pinhole_row(struct lease_entry * row, const char * desc, unsigned int expi
 	if(row->remote != NULL)
 		inet_ntop(AF_INET6, &row->remote->raddr, r, sizeof(r));
 	if(firewall_trust == FW_TRUST_CHECK &&
-	   get_pinhole_packets(r[0] ? r : NULL, row->remote ? row->remote->rport : 0,
+	   get_map6_packets(r[0] ? r : NULL, row->remote ? row->remote->rport : 0,
 	                       i, row->iport, row->proto, &packets) == -2) {
-		syslog(LOG_NOTICE, "memmap: the rule of pinhole %s port %hu is gone, adding it again",
+		syslog(LOG_NOTICE, "memmap: the rule of map6 %s port %hu is gone, adding it again",
 		       proto_itoa(row->proto), row->iport);
 		if(restore_rules(row) < 0)
 			return -3;
@@ -695,51 +694,51 @@ renew_pinhole_row(struct lease_entry * row, const char * desc, unsigned int expi
 	if(desc != NULL && lease_table_set_label(row, desc) < 0)
 		return -2;
 	row->expiry = expiry;
-	syslog(LOG_DEBUG, "memmap: renew pinhole %s port %hu, uid %hu, expiry %u",
+	syslog(LOG_DEBUG, "memmap: renew map6 %s port %hu, uid %hu, expiry %u",
 	       proto_itoa(row->proto), row->iport, lease_uid(row), expiry);
 	return 0;
 }
 
-/* Renew a pinhole in the table, by its uid. */
+/* Renew a map6 in the table, by its uid. */
 int
-memmap_renew_pinhole(unsigned short uid, const char * desc, unsigned int expiry)
+memmap_renew_map6(unsigned short uid, const char * desc, unsigned int expiry)
 {
 	struct lease_entry * row = lease_table_find_uid(uid);
 	if(row == NULL || row->family != AF_INET6)
 		return -1;
-	return renew_pinhole_row(row, desc, expiry);
+	return renew_map6_row(row, desc, expiry);
 }
 
-/* Renew a pinhole in the table, by its rule. */
+/* Renew a map6 in the table, by its rule. */
 int
-memmap_renew_pinhole_at(const char * raddr, unsigned short rport,
+memmap_renew_map6_at(const char * raddr, unsigned short rport,
                         const char * iaddr, unsigned short iport, int proto,
                         const char * desc, unsigned int expiry, int give_uid)
 {
-	struct lease_entry * row = pinhole_row(raddr, rport, iaddr, iport, proto);
+	struct lease_entry * row = map6_row(raddr, rport, iaddr, iport, proto);
 	int r;
 	if(row == NULL)
 		return -1;
 	if(give_uid && lease_uid(row) == 0) {
-		/* a UPnP client takes over a pinhole with no uid */
+		/* a UPnP client takes over a map6 with no uid */
 		int uid = new_uid();
 		if(uid < 0)
 			return -4;
 		lease_table_link_uid(row, (unsigned short)uid);
 	}
-	r = renew_pinhole_row(row, desc, expiry);
+	r = renew_map6_row(row, desc, expiry);
 	return r < 0 ? r : lease_uid(row);
 }
 
-/* Delete the pinhole rules of an earlier run which have no row. Their expiry is
+/* Delete the map6 rules of an earlier run which have no row. Their expiry is
  * not known: the firewall rule does not hold it, and until the lease file has
- * the pinholes, a restart loses it. A client renews its pinhole as usual, and
+ * the map6s, a restart loses it. A client renews its map6 as usual, and
  * gets a new rule. This reads the firewall, once at startup. */
 void
-memmap_remove_old_pinholes(void)
+memmap_remove_old_map6s(void)
 {
-#ifdef FW_PINHOLES
-	struct old_pinhole {
+#ifdef FW_MAP6
+	struct old_map6 {
 		char raddr[INET6_ADDRSTRLEN];
 		char iaddr[INET6_ADDRSTRLEN];
 		unsigned short rport, iport;
@@ -747,13 +746,13 @@ memmap_remove_old_pinholes(void)
 	} * old = NULL, * grown;
 	struct memmap_change * changes;
 	int index, n = 0, size = 0, i, removed = 0;
-	struct old_pinhole o;
+	struct old_map6 o;
 
 	for(index = 0;
-	    get_pinhole_rule_at(index, o.raddr, sizeof(o.raddr), &o.rport, o.iaddr, sizeof(o.iaddr),
+	    get_map6_rule_at(index, o.raddr, sizeof(o.raddr), &o.rport, o.iaddr, sizeof(o.iaddr),
 	                        &o.iport, &o.proto, NULL, 0) == 0;
 	    index++) {
-		if(pinhole_row(o.raddr, o.rport, o.iaddr, o.iport, o.proto) != NULL)
+		if(map6_row(o.raddr, o.rport, o.iaddr, o.iport, o.proto) != NULL)
 			continue;
 		if(n == size) {
 			size = size ? 2 * size : 64;
@@ -774,7 +773,7 @@ memmap_remove_old_pinholes(void)
 		return;
 	}
 	for(i = 0; i < n; i++) {
-		changes[i].op = MEMMAP_DELETE_PINHOLE;
+		changes[i].op = MEMMAP_DELETE_MAP6;
 		changes[i].raddr = old[i].raddr;
 		changes[i].rport = old[i].rport;
 		changes[i].iaddr = old[i].iaddr;
@@ -790,7 +789,7 @@ memmap_remove_old_pinholes(void)
 			if(memmap_sync(&changes[i], 1) == 0)
 				removed++;
 	}
-	syslog(LOG_NOTICE, "removed %d of %d pinholes of an earlier run, which have no known expiry",
+	syslog(LOG_NOTICE, "removed %d of %d map6s of an earlier run, which have no known expiry",
 	       removed, n);
 	free(changes);
 	free(old);
@@ -880,7 +879,7 @@ new_uid(void)
 }
 
 /* Fill a row from the strings of a change. iaddr gives the family: an IPv6
- * row is a pinhole, with eaddr and eport those of the internal side. 0, or -1
+ * row is a map6, with eaddr and eport those of the internal side. 0, or -1
  * if an address does not parse. */
 static int
 row_of(const struct memmap_change * c, struct lease_entry * e,
@@ -971,23 +970,23 @@ struct stage {
 	struct lease_entry * row;	/* the new row, not linked, or NULL */
 	struct lease_entry * old;	/* the linked row which goes or is renewed */
 	struct lease_entry rule;	/* the rule of a delete or renewal with no row */
-	struct lease_entry * key;	/* the key of a pinhole delete with no row */
+	struct lease_entry * key;	/* the key of a map6 delete with no row */
 };
 
-/* Build the rows of a change, and the change for fw_sync(). 0, -2 if a pinhole
+/* Build the rows of a change, and the change for fw_sync(). 0, -2 if a map6
  * to delete has neither a row nor a key, or -1 if a row cannot be built: then
  * nothing is sent. */
 static int
 stage_change(struct memmap_change * c, struct stage * st, struct fw_change * fw)
 {
-	int pinhole = c->iaddr != NULL && strchr(c->iaddr, ':') != NULL;
+	int map6 = c->iaddr != NULL && strchr(c->iaddr, ':') != NULL;
 
 	memset(st, 0, sizeof(*st));
 	memset(fw, 0, sizeof(*fw));
 	switch(c->op) {
 	case MEMMAP_ADD:
-		/* a uid only for UPnP, which names a pinhole by it */
-		if(pinhole) {
+		/* a uid only for UPnP, which names a map6 by it */
+		if(map6) {
 			c->uid = c->give_uid ? new_uid() : 0;
 			if(c->uid < 0)
 				return -1;
@@ -1040,7 +1039,7 @@ stage_change(struct memmap_change * c, struct stage * st, struct fw_change * fw)
 		st->rule.eport = c->eport;
 		fw->op = FW_DELETE;
 		break;
-	case MEMMAP_DELETE_PINHOLE:
+	case MEMMAP_DELETE_MAP6:
 		st->old = lease_table_find_uid((unsigned short)c->uid);
 		if(st->old == NULL && c->iaddr != NULL) {
 			/* the firewall finds the rule by its key */
@@ -1086,16 +1085,16 @@ apply_change(const struct memmap_change * c, struct stage * st)
 			}
 			lease_table_link(st->row);
 			syslog(LOG_INFO, "memmap: add %s %s port %hu, uid %hu, remote %s, expiry %u",
-			       st->row->family == AF_INET6 ? "pinhole" : "mapping",
+			       st->row->family == AF_INET6 ? "map6" : "mapping",
 			       proto_itoa(st->row->proto), st->row->eport, lease_uid(st->row),
 			       st->row->remote ? "set" : "any", (unsigned int)st->row->expiry);
 		}
 		break;
 	case MEMMAP_DELETE:
-	case MEMMAP_DELETE_PINHOLE:
+	case MEMMAP_DELETE_MAP6:
 		if(st->old != NULL) {
 			syslog(LOG_INFO, "memmap: remove %s %s port %hu",
-			       st->old->family == AF_INET6 ? "pinhole" : "mapping",
+			       st->old->family == AF_INET6 ? "map6" : "mapping",
 			       proto_itoa(st->old->proto), st->old->eport);
 			lease_table_remove(st->old);
 		}

@@ -9,7 +9,7 @@
 
 #ifdef ENABLE_UPNPPINHOLE
 #include <sys/types.h>
-#include "../fwpinhole.h"
+#include "../fwmap6.h"
 
 int find_pinhole(const char * ifname,
                  const char * rem_host, unsigned short rem_port,

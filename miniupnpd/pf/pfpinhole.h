@@ -10,7 +10,7 @@
 
 #ifdef ENABLE_UPNPPINHOLE
 
-#include "../fwpinhole.h"
+#include "../fwmap6.h"
 
 #endif /* ENABLE_UPNPPINHOLE */
 

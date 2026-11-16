@@ -503,28 +503,28 @@ int get_pinhole_uid_by_index(int index)
 }
 
 
-/* The key-based API of fwpinhole.h, on top of the list of pinholes, which
+/* The key-based API of fwmap6.h, on top of the list of pinholes, which
  * keeps its own uids. */
 static int
 key_uid(const char * rem_host, unsigned short rem_port,
         const char * int_client, unsigned short int_port, int proto)
 {
-	return find_pinhole(NULL, pinhole_any_remote(rem_host) ? NULL : rem_host, rem_port,
+	return find_pinhole(NULL, map6_any_remote(rem_host) ? NULL : rem_host, rem_port,
 	                    int_client, int_port, proto, NULL, 0, NULL);
 }
 
 int
-add_pinhole_rule(const char * ifname,
+add_map6_rule(const char * ifname,
                  const char * rem_host, unsigned short rem_port,
                  const char * int_client, unsigned short int_port,
                  int proto, const char * desc, unsigned int timestamp)
 {
-	return add_pinhole(ifname, pinhole_any_remote(rem_host) ? NULL : rem_host, rem_port,
+	return add_pinhole(ifname, map6_any_remote(rem_host) ? NULL : rem_host, rem_port,
 	                   int_client, int_port, proto, desc, timestamp) < 0 ? -1 : 0;
 }
 
 int
-update_pinhole_rule(const char * ifname,
+update_map6_rule(const char * ifname,
                     const char * rem_host, unsigned short rem_port,
                     const char * int_client, unsigned short int_port,
                     int proto, const char * desc, unsigned int timestamp)
@@ -535,7 +535,7 @@ update_pinhole_rule(const char * ifname,
 }
 
 int
-delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
+delete_map6_rule(const char * rem_host, unsigned short rem_port,
                     const char * int_client, unsigned short int_port, int proto)
 {
 	int uid = key_uid(rem_host, rem_port, int_client, int_port, proto);
@@ -543,7 +543,7 @@ delete_pinhole_rule(const char * rem_host, unsigned short rem_port,
 }
 
 int
-get_pinhole_packets(const char * rem_host, unsigned short rem_port,
+get_map6_packets(const char * rem_host, unsigned short rem_port,
                     const char * int_client, unsigned short int_port,
                     int proto, u_int64_t * packets)
 {
@@ -558,7 +558,7 @@ get_pinhole_packets(const char * rem_host, unsigned short rem_port,
 }
 
 int
-get_pinhole_rule_at(int index, char * rem_host, int rem_hostlen,
+get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
                     unsigned short * int_port, int * proto,

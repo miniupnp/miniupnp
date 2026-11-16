@@ -599,7 +599,7 @@ int reload_from_lease_file6(void)
 
 /* One change of a pinhole, for memmap_sync(). iaddr NULL : by uid only */
 static void
-pinhole_change(struct memmap_change * c, enum memmap_op op, int uid,
+map6_change(struct memmap_change * c, enum memmap_op op, int uid,
                const char * raddr, unsigned short rport,
                const char * iaddr, unsigned short iport, int proto,
                const char * desc, unsigned int timestamp)
@@ -614,7 +614,7 @@ upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
                          const char * iaddr, unsigned short iport,
                          int proto, char * desc, int desc_len, unsigned int * leasetime)
 {
-	return memmap_find_pinhole(raddr, rport, iaddr, iport, proto,
+	return memmap_find_map6(raddr, rport, iaddr, iport, proto,
 	                           desc, desc_len, leasetime);
 }
 
@@ -658,7 +658,7 @@ upnp_add_inboundpinhole(const char * raddr,
 	if(found >= 0) {
 		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, found);
 		/* by its rule, as a PCP pinhole has no uid; UPnP gets one */
-		r = memmap_renew_pinhole_at(raddr, rport, iaddr, iport, proto, desc,
+		r = memmap_renew_map6_at(raddr, rport, iaddr, iport, proto, desc,
 		                            timestamp, uid != NULL);
 		if (uid != NULL)
 			*uid = r < 0 ? -1 : r;
@@ -670,7 +670,7 @@ upnp_add_inboundpinhole(const char * raddr,
 #endif /* ENABLE_LEASEFILE */
 		return (r >= 0) ? 1 : r;
 	}
-	pinhole_change(&c, MEMMAP_ADD, 0, raddr, rport, iaddr, iport, proto, desc,
+	map6_change(&c, MEMMAP_ADD, 0, raddr, rport, iaddr, iport, proto, desc,
 	               timestamp);
 	c.give_uid = uid != NULL;
 	r = memmap_sync(&c, 1) < 0 ? -1 : 1;
@@ -781,7 +781,7 @@ upnp_get_pinhole_info(unsigned short uid,
 	unsigned int timestamp;
 	u_int64_t packets_tmp;
 
-	r = memmap_get_pinhole(uid, raddr, raddrlen, rport,
+	r = memmap_get_map6(uid, raddr, raddrlen, rport,
 	                       iaddr, iaddrlen, iport,
 	                       proto, desc, desclen,
 	                       leasetime ? &timestamp : NULL,
@@ -812,7 +812,7 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_get_pinhole_uid_by_index(int index)
 {
-	return memmap_pinhole_uid_at(index);
+	return memmap_map6_uid_at(index);
 }
 
 int
@@ -827,7 +827,7 @@ upnp_renew_inboundpinhole(unsigned short uid, const char * desc, unsigned int le
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	unsigned int timestamp = upnp_time() + leasetime;
 	/* the expiry is the table's: the rule stays as it is */
-	int ret = memmap_renew_pinhole(uid, desc, timestamp);
+	int ret = memmap_renew_map6(uid, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
 		lease_file6_update(uid, timestamp);
@@ -851,7 +851,7 @@ upnp_delete_inboundpinhole(unsigned short uid)
 	struct memmap_change c;
 	int known = upnp_get_pinhole_info(uid, raddr, sizeof(raddr), &rport, iaddr, sizeof(iaddr),
 	                                  &iport, &proto, NULL, 0, NULL, NULL) >= 0;
-	pinhole_change(&c, MEMMAP_DELETE_PINHOLE, uid, raddr, rport,
+	map6_change(&c, MEMMAP_DELETE_MAP6, uid, raddr, rport,
 	               known ? iaddr : NULL, iport, proto, NULL, 0);
 	ret = memmap_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
@@ -874,7 +874,7 @@ upnp_delete_inboundpinhole_key(const char * raddr, unsigned short rport,
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	int ret;
 	struct memmap_change c;
-	pinhole_change(&c, MEMMAP_DELETE_PINHOLE, 0, raddr, rport, iaddr, iport, proto,
+	map6_change(&c, MEMMAP_DELETE_MAP6, 0, raddr, rport, iaddr, iport, proto,
 	               NULL, 0);
 	ret = memmap_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
@@ -1114,19 +1114,19 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	struct expired_pinhole expired[PINHOLE_EXPIRE_PER_PASS];
-	struct memmap_change changes[PINHOLE_EXPIRE_PER_PASS];
+	struct expired_map6 expired[MAP6_EXPIRE_PER_PASS];
+	struct memmap_change changes[MAP6_EXPIRE_PER_PASS];
 	unsigned int now = (unsigned int)upnp_time();
 	unsigned int next;
 	int n, i, failed = 0;
 
-	n = memmap_expired_pinholes(now, expired, PINHOLE_EXPIRE_PER_PASS, &next);
+	n = memmap_expired_map6s(now, expired, MAP6_EXPIRE_PER_PASS, &next);
 	for (i = 0; i < n; i++) {
 		const char * raddr = expired[i].raddr[0] != '\0' ? expired[i].raddr : NULL;
 		syslog(LOG_INFO, "remove pinhole %hu [%s]:%hu %s because it has expired",
 		       expired[i].uid, expired[i].iaddr, expired[i].iport,
 		       proto_itoa(expired[i].proto));
-		pinhole_change(&changes[i], MEMMAP_DELETE_PINHOLE, expired[i].uid, raddr,
+		map6_change(&changes[i], MEMMAP_DELETE_MAP6, expired[i].uid, raddr,
 		               expired[i].rport, expired[i].iaddr, expired[i].iport,
 		               expired[i].proto, NULL, 0);
 	}

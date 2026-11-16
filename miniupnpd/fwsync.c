@@ -108,10 +108,10 @@ delete_rules(const struct lease_entry * e, int has_row)
 	int r;
 
 	if(e->family == AF_INET6) {
-#ifdef FW_PINHOLES
+#ifdef FW_MAP6
 		struct fw_rule fr;
 		rule_of(e, &fr);
-		r = delete_pinhole_rule(fr.rhost, fr.rport, fr.iaddr, fr.iport, fr.proto);
+		r = delete_map6_rule(fr.rhost, fr.rport, fr.iaddr, fr.iport, fr.proto);
 		if(r == -2 && has_row) {
 			syslog(LOG_INFO, "IPv6 %s port %hu has no rule in the firewall, its row goes",
 			       e->proto == IPPROTO_UDP ? "UDP" : "TCP", e->iport);
@@ -148,8 +148,8 @@ add_rules(const struct lease_entry * e, int * half)
 
 	rule_of(e, &r);
 	if(e->family == AF_INET6) {
-#if defined(FW_PINHOLES)
-		return add_pinhole_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, r.iport,
+#if defined(FW_MAP6)
+		return add_map6_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, r.iport,
 		                        r.proto, r.desc, r.timestamp) < 0 ? -1 : 0;
 #else
 		return -1;
@@ -181,9 +181,9 @@ update_rules(const struct lease_entry * from, const struct lease_entry * to)
 	struct fw_rule r;
 	rule_of(to, &r);
 	if(to->family == AF_INET6) {
-#ifdef FW_PINHOLES
+#ifdef FW_MAP6
 		UNUSED(from);
-		return update_pinhole_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, r.iport,
+		return update_map6_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, r.iport,
 		                           r.proto, r.desc, r.timestamp);
 #else
 		UNUSED(from);
