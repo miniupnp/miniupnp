@@ -598,42 +598,27 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
                                      char * rhost, int rhostlen,
                                      unsigned int * leaseduration)
 {
-	/* that is a default implementation, iterating all rules */
-	int index;
+	unsigned int timestamp;
 
-	for(index = 0; ; index++) {
-		unsigned short other_iport = 0;
-		int other_proto = 0;
-		char other_iaddr[16] = "";
-		unsigned int timestamp;
-
-		if(get_redirect_rule_by_index(index, 0/*ifname*/, eport,
-		                              other_iaddr, sizeof(other_iaddr),
-		                              &other_iport, &other_proto,
-		                              desc, desclen,
-		                              rhost, rhostlen, &timestamp,
-		                              0, 0) < 0)
-			break;
-		if(other_proto == proto && other_iport == iport &&
-		   strcmp(other_iaddr, iaddr) == 0) {
-			/* found it ! */
-			if(leaseduration) {
-				time_t current_time = upnp_time();
-				*leaseduration = (timestamp > (unsigned int)current_time)
-				                 ? (timestamp - current_time)
-				                 : 0;
-			}
-			return 0;
-		}
-	}
-	/* not found */
-	if(index > 0) {
-		/* clean the mess */
-		*eport = 0;
+	if(desc && (desclen > 0))
 		desc[0] = '\0';
+	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
+	/* the first row of any protocol, as the walk of the rules found */
+	if(memmap_find_map(iaddr, iport, proto, -1, eport,
+	                   desc, desclen, &timestamp) < 0 ||
+	   memmap_get_map(*eport, proto, NULL, NULL, 0, NULL, 0,
+	                  rhost, rhostlen, NULL) < 0) {
+		*eport = 0;
+		return -1;
 	}
-	return -1;
+	if(leaseduration) {
+		time_t current_time = upnp_time();
+		*leaseduration = (timestamp > (unsigned int)current_time)
+		                 ? (timestamp - current_time)
+		                 : 0;
+	}
+	return 0;
 }
 
 /* called from natpmp.c too */
