@@ -238,15 +238,17 @@ lease_file6_update(int uid, unsigned int leaseduration)
 			continue;
 		}
 		*(desc++) = '\0';
+		desc[strcspn(desc, "\r\n")] = '\0';	/* the line end is written again below */
 		timestamp_rule = (unsigned int)strtoul(p2, NULL, 10);
 
 		if (uid == uid_rule) {
 			timestamp_rule = timestamp;
 		}
 
+		/* each line keeps its own uid: only the renewed one gets a new expiry */
 		fprintf(fdt, "%s;%s;%hu;%s;%hu;%u;%u;%s\n",
 	        proto, int_client, int_port, rem_client, rem_port,
-	        uid, timestamp_rule, desc);
+	        uid_rule, timestamp_rule, desc);
 	}
 
 	fclose(fdt);
