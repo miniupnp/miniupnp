@@ -659,8 +659,17 @@ upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr)
 int
 upnp_delete_redirection(unsigned short eport, const char * protocol)
 {
+	int proto = proto_atoi(protocol);
+
 	syslog(LOG_INFO, "removing redirect rule port %hu %s", eport, protocol);
-	return _upnp_delete_redir(eport, proto_atoi(protocol));
+	/* The table has every mapping, those of an earlier run too. Without a
+	 * row there is no such entry, whatever a delete in the firewall answers:
+	 * nftables answers success for a rule it does not have. */
+	if(memmap_get_map(eport, proto, NULL, NULL, 0, NULL, 0, NULL, 0, NULL) < 0) {
+		syslog(LOG_INFO, "port %hu %s has no mapping", eport, protocol);
+		return -1;
+	}
+	return _upnp_delete_redir(eport, proto);
 }
 
 /* upnp_get_portmapping_number_of_entries() */
