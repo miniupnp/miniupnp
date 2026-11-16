@@ -1457,14 +1457,19 @@ class SecondClientTests(unittest.TestCase):
             self.case_run(send).cleanup()
         self.assertEqual(len(sent), 2)
 
-    def test_cleanup_takes_a_upnp_mapping_which_is_gone_already(self):
-        run = self.case_run(lambda _spec, _nonce: ("UPNP_714", None, None))
-        run.active = {("UDP", 1): ({"protocol_family": "UPnP", "action": "AddPortMapping", "protocol": "udp",
-                                     "lease_duration": 9}, 1, None)}
-        run.cleanup()
-        # for PCP, an error is still a failed cleanup
-        run.active = {("UDP", 1): ({"lifetime": 9}, 1, None)}
-        with self.assertRaisesRegex(AssertionError, "cleanup of PCP UDP/1 returned UPNP_714"):
+    def test_a_upnp_add_which_moves_a_mapping_replaces_it(self):
+        run = self.case_run(lambda _spec, _nonce: ("SUCCESS", 41255, None))
+        run.active = {}
+        run.args.router_call_dir = None
+        add = {"protocol_family": "UPnP", "action": "AddPortMapping", "protocol": "udp",
+               "external_port": 41255, "lease_duration": 0}
+        run.run_request(0, dict(add, internal_port=41255), "SUCCESS")
+        run.run_request(1, dict(add, internal_port=41256), "SUCCESS")
+        # the cleanup deletes the external port once, for the mapping which is there
+        self.assertEqual(list(run.active), [("udp", 41256)])
+        # a UPnP mapping the daemon does not know is a failed cleanup: a leaked rule
+        run.send = lambda _spec, _nonce: ("UPNP_714", None, None)
+        with self.assertRaisesRegex(AssertionError, "cleanup of UPnP udp/41256 returned UPNP_714"):
             run.cleanup()
 
     def test_a_cleanup_failure_does_not_hide_the_failure_of_the_case(self):

@@ -2658,10 +2658,7 @@ class CaseRun:
                 result, _assigned, _ = self.send(delete, nonce)
             except (AssertionError, OSError) as error:
                 result = error
-            # a mapping the case replaced or deleted itself is gone already: UPnP
-            # answers NoSuchEntryInArray (714) for it, which leaves nothing behind
-            gone = original.get("protocol_family") == "UPnP" and result == "UPNP_714"
-            if result != "SUCCESS" and not gone:
+            if result != "SUCCESS":
                 problems.append(f"cleanup of {label} returned {result}")
         if problems:
             raise AssertionError("; ".join(problems))
@@ -2734,6 +2731,13 @@ class CaseRun:
                 and port != self.args.external_address):
             raise AssertionError(f"NAT-PMP public address expected {self.args.external_address}, got {port}")
         if result == "SUCCESS" and (spec.get("lifetime", 0) or spec.get("action") in UPNP_ADD_ACTIONS):
+            if spec.get("action") in UPNP_ADD_ACTIONS:
+                # a UPnP add on the external port of another UPnP mapping, which moves it to
+                # another internal port, replaces it: the cleanup deletes that port once
+                for other in [other for other, (added, assigned, _id) in self.active.items()
+                              if other != key and other[0] == protocol and assigned == port
+                              and added.get("action") in UPNP_ADD_ACTIONS]:
+                    self.active.pop(other)
             self.active[key] = (spec, port, nonce)
         elif result == "SUCCESS" and spec.get("action") == "DeletePortMappingRange":
             for other in [other for other, (added, assigned, _id) in self.active.items()
