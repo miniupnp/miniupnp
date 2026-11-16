@@ -128,11 +128,17 @@ update_portmapping_desc_timestamp(const char * ifname, unsigned short eport, int
 /* the pinhole functions, which these tests do not reach */
 #define WEAK __attribute__((weak))
 #ifdef FW_PINHOLES
+/* the remote of the last pinhole added: "(any)" for NULL */
+static char pinhole_rhost[64];
+static unsigned short pinhole_rport;
 WEAK int add_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
                      const char * int_client, unsigned short int_port, int proto,
                      const char * desc, unsigned int timestamp)
-{ (void)ifname; (void)rem_host; (void)rem_port; (void)int_client; (void)int_port;
-  (void)proto; (void)desc; (void)timestamp; return -1; }
+{ (void)ifname; (void)int_client; (void)int_port;
+  (void)proto; (void)desc; (void)timestamp;
+  snprintf(pinhole_rhost, sizeof(pinhole_rhost), "%s", rem_host ? rem_host : "(any)");
+  pinhole_rport = rem_port;
+  return 5; }
 WEAK int delete_pinhole(unsigned short uid) { (void)uid; return -1; }
 WEAK int update_pinhole(unsigned short uid, unsigned int timestamp)
 { (void)uid; (void)timestamp; return -1; }
@@ -292,6 +298,39 @@ test_delete_lost_rule(void)
 	assert(c.applied == FW_NOT_APPLIED);
 }
 
+#ifdef FW_PINHOLES
+/* a pinhole with a remote port and any remote host keeps its port: the rule
+ * must not take traffic from every source port */
+static void
+test_pinhole_remote_port(void)
+{
+	struct lease_entry e;
+	struct lease_remote r;
+	struct fw_change c;
+	reset();
+	memset(&e, 0, sizeof(e));
+	e.family = AF_INET6;
+	e.proto = IPPROTO_UDP;
+	e.eport = e.iport = 8080;
+	e.iaddr.s6_addr[0] = 0x20;
+	e.iaddr.s6_addr[15] = 0x10;
+	e.eaddr = e.iaddr;
+	e.label = "test";
+	memset(&r, 0, sizeof(r));	/* :: : any remote host */
+	r.rport = 5000;
+	e.remote = &r;
+	memset(&c, 0, sizeof(c));
+	c.op = FW_ADD; c.row = &e;
+	assert(fw_sync(&c, 1) == 0);
+	assert(strcmp(pinhole_rhost, "(any)") == 0 && pinhole_rport == 5000);
+	/* a remote host too */
+	r.raddr.s6_addr[0] = 0x20;
+	r.raddr.s6_addr[15] = 0x05;
+	assert(fw_sync(&c, 1) == 0);
+	assert(strcmp(pinhole_rhost, "2000::5") == 0 && pinhole_rport == 5000);
+}
+#endif
+
 int
 main(void)
 {
@@ -301,6 +340,9 @@ main(void)
 	test_delete_partial_stays();
 	test_delete_undone();
 	test_delete_lost_rule();
+#ifdef FW_PINHOLES
+	test_pinhole_remote_port();
+#endif
 	printf("testfwsync: all tests passed\n");
 	return 0;
 }
