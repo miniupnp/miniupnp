@@ -468,6 +468,11 @@ test_one_row_twice(void)
 	assert(calls == 1);
 	assert(has_map(1000, desc, NULL) && strcmp(desc, "a") == 0);
 	assert(memmap_map_count() == 1);
+	/* two adds of one new port: neither goes */
+	map(&c[0], MEMMAP_ADD, 1001, "192.168.1.10", 81, "c", 2000);
+	map(&c[1], MEMMAP_ADD, 1001, "192.168.1.11", 82, "d", 2000);
+	assert(memmap_sync(c, 2) < 0);
+	assert(calls == 1 && memmap_map_count() == 1);
 }
 
 int

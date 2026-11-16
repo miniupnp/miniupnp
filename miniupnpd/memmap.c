@@ -925,16 +925,32 @@ discard_change(const struct memmap_change * c, struct stage * st)
 	st->row = NULL;
 }
 
+/* 1 if two rows have one key, the one row_at_key() finds them by */
+static int
+same_key(const struct lease_entry * a, const struct lease_entry * b)
+{
+	if(a->family != b->family || a->proto != b->proto || a->eport != b->eport)
+		return 0;
+	if(a->family == AF_INET)
+		return 1;
+	if(memcmp(&a->eaddr, &b->eaddr, sizeof(a->eaddr)) != 0)
+		return 0;
+	if(a->remote == NULL || b->remote == NULL)
+		return a->remote == b->remote;
+	return a->remote->rport == b->remote->rport &&
+	       memcmp(&a->remote->raddr, &b->remote->raddr, sizeof(a->remote->raddr)) == 0;
+}
+
 /* 1 if change i goes to a row which a change before it in the request goes
- * to: the first would free the row the second uses. */
+ * to: the first would free the row the second uses. Two new rows with one
+ * key would both go into the table. */
 static int
 shares_row(const struct stage * st, int i)
 {
 	int j;
-	if(st[i].old == NULL)
-		return 0;
 	for(j = 0; j < i; j++) {
-		if(st[j].old == st[i].old) {
+		if((st[i].old != NULL && st[j].old == st[i].old) ||
+		   (st[i].row != NULL && st[j].row != NULL && same_key(st[j].row, st[i].row))) {
 			syslog(LOG_WARNING, "memmap_sync: changes %d and %d go to one row", j + 1, i + 1);
 			return 1;
 		}
