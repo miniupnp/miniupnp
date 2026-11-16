@@ -7,7 +7,9 @@
 #   pf-router.sh net [LAN4 LAN6 WAN4 WAN6]  configure the LAN and WAN NICs and the main pf ruleset;
 #                              the address plan of the fixture slot (run-freebsd.sh --slot), as
 #                              e2e_address_plan sets it (172.28.1 2001:db8:1:1:: 6.18.1 2001:db8:9000:1::)
-#   pf-router.sh start         start the daemon from a clean state (anchor, states, NAT66, leases)
+#   pf-router.sh start [CONF]  start the daemon from a clean state (anchor, states, NAT66, leases);
+#                              CONF: extra miniupnpd.conf lines, separated by commas
+#                              (pcp_wire/run-openbsd.sh: enable_upnp=no)
 #   pf-router.sh stop          stop the daemon
 #   pf-router.sh nat66 on|off  NAT for IPv6 on the WAN, for the sections which need it
 #   pf-router.sh restart       stop the daemon, flush its anchor, start it again
