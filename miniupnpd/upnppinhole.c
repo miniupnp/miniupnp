@@ -1115,7 +1115,7 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	struct expired_map6 expired[MAP6_EXPIRE_PER_PASS];
-	struct memmap_change changes[MAP6_EXPIRE_PER_PASS];
+	struct memmap_change change;
 	unsigned int now = (unsigned int)upnp_time();
 	unsigned int next;
 	int n, i, failed = 0;
@@ -1126,21 +1126,17 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 		syslog(LOG_INFO, "remove pinhole %hu [%s]:%hu %s because it has expired",
 		       expired[i].uid, expired[i].iaddr, expired[i].iport,
 		       proto_itoa(expired[i].proto));
-		map6_change(&changes[i], MEMMAP_DELETE_MAP6, expired[i].uid, raddr,
+		map6_change(&change, MEMMAP_DELETE_MAP6, expired[i].uid, raddr,
 		               expired[i].rport, expired[i].iaddr, expired[i].iport,
 		               expired[i].proto, NULL, 0);
-	}
-	/* one request for all, which the firewall applies whole or not at all */
-	if (n > 0 && memmap_sync(changes, n) == 0) {
-		ret = n;
-	} else {
-		/* one rule which cannot go must not keep the others */
-		for (i = 0; i < n; i++) {
-			if (memmap_sync(&changes[i], 1) == 0)
-				ret++;
-			else
-				failed = 1;
-		}
+		/* One request each: the backends change one rule at a time and
+		 * take the earlier changes back when one fails, which would add
+		 * the rules of expired map6s again. One rule which cannot go
+		 * does not keep the others. */
+		if (memmap_sync(&change, 1) == 0)
+			ret++;
+		else
+			failed = 1;
 	}
 	/* What could not be removed still has its row: try it again in a
 	 * minute. A full pass (next is now) which removed nothing would pick
