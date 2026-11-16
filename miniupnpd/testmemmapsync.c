@@ -105,6 +105,17 @@ WEAK int get_nat_ext_addr(struct sockaddr * src, struct sockaddr * dst, uint8_t 
                           struct sockaddr * ret_ext)
 { (void)src; (void)dst; (void)proto; (void)ret_ext; return -1; }
 
+/* fw_map_rule() of fwsync.c, which this test does not link: the same read */
+int
+fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes)
+{
+	unsigned short iport;
+	unsigned int timestamp;
+	int r = get_redirect_rule(NULL, eport, proto, NULL, 0, &iport, NULL, 0,
+	                          NULL, 0, &timestamp, packets, bytes);
+	return r >= 0 ? 0 : r == -2 ? -2 : -1;
+}
+
 /* the fake firewall */
 static int calls;		/* fw_sync() calls */
 static int sent;		/* changes in the last call */

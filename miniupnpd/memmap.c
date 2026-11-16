@@ -382,11 +382,7 @@ int
 memmap_map_counters(unsigned short eport, int proto,
                     u_int64_t * packets, u_int64_t * bytes)
 {
-	unsigned short iport;
-	unsigned int timestamp;
-	int r = get_redirect_rule(ext_if_name, eport, proto, NULL, 0, &iport, NULL, 0,
-	                          NULL, 0, &timestamp, packets, bytes);
-	return r >= 0 ? 0 : r == -2 ? -2 : -1;
+	return fw_map_rule(eport, proto, packets, bytes);
 }
 
 /* the callback of memmap_each_map_counters(), and its argument */

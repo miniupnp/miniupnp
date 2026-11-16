@@ -64,4 +64,9 @@ struct fw_change {
  * A pinhole add sets uid to the one the backend chose. */
 int fw_sync(struct fw_change * changes, int n);
 
+/* The redirect rule of an IPv4 port mapping, and its counters: 0, -2 if the
+ * firewall has no such rule, or -1 if the firewall could not be read. The one
+ * read of the firewall by eport, for fw_sync() and memmap. */
+int fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes);
+
 #endif

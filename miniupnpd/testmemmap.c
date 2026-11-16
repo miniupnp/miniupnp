@@ -89,7 +89,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 			return 0;
 		}
 	}
-	return -1;
+	return -2;	/* not found */
 }
 
 int
@@ -212,6 +212,17 @@ mapping_owner_of(const char * desc, unsigned short eport, int proto)
 }
 
 #define PCP_DESC	"PCP MAP 0102030405060708090a0b0c"
+
+/* fw_map_rule() of fwsync.c, which this test does not link: the same read */
+int
+fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes)
+{
+	unsigned short iport;
+	unsigned int timestamp;
+	int r = get_redirect_rule(NULL, eport, proto, NULL, 0, &iport, NULL, 0,
+	                          NULL, 0, &timestamp, packets, bytes);
+	return r >= 0 ? 0 : r == -2 ? -2 : -1;
+}
 
 /* The fake fw_sync(): it takes every change, and gives a new pinhole the uid
  * of fake_uid. */

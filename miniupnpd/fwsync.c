@@ -71,18 +71,26 @@ rule_of(const struct lease_entry * e, struct fw_rule * r)
 	r->timestamp = (unsigned int)e->expiry;
 }
 
-/* 1 if the firewall has the redirect rule of an IPv4 row, 0 if it has not,
- * -1 if it could not be read: get_redirect_rule() gives -2 for a rule not
- * found and -1 for an error (iptables, nftables and pf) */
-static int
-map_rule_present(const struct lease_entry * e)
+int
+fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes)
 {
 	unsigned short iport;
 	unsigned int timestamp;
+	/* get_redirect_rule() gives -2 for a rule not found and -1 for an error
+	 * (iptables, nftables and pf) */
+	int r = get_redirect_rule(ext_if_name, eport, proto, NULL, 0, &iport, NULL, 0,
+	                          NULL, 0, &timestamp, packets, bytes);
+	return r >= 0 ? 0 : r == -2 ? -2 : -1;
+}
+
+/* 1 if the firewall has the redirect rule of an IPv4 row, 0 if it has not,
+ * -1 if it could not be read */
+static int
+map_rule_present(const struct lease_entry * e)
+{
 	u_int64_t packets, bytes;
-	int r = get_redirect_rule(ext_if_name, e->eport, e->proto, NULL, 0, &iport, NULL, 0,
-	                          NULL, 0, &timestamp, &packets, &bytes);
-	return r >= 0 ? 1 : r == -2 ? 0 : -1;
+	int r = fw_map_rule(e->eport, e->proto, &packets, &bytes);
+	return r == 0 ? 1 : r == -2 ? 0 : -1;
 }
 
 /* Delete the rules of a row. The result of the backend, or 0 if the backend
