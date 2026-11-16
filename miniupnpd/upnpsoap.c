@@ -1985,7 +1985,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 		goto clear_and_exit;
 	}
 	if(proto != IPPROTO_UDP && proto != IPPROTO_TCP
-#ifdef IPPROTO_UDPLITE
+#if defined(IPPROTO_UDPLITE) && defined(ENABLE_UDPLITE)
 	   && atoi(protocol) != IPPROTO_UDPLITE
 #endif
 	  )
