@@ -770,6 +770,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	struct rule_state * * p;
 	int i = 0;
 	time_t current_time;
+	char desc[64];
 
 	/*ifname[0] = '\0';*/
 	tmp = malloc(sizeof(struct rule_state));
@@ -778,7 +779,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	current_time = upnp_time();
 	nextruletoclean_timestamp = 0;
 	while(memmap_get_map_at((unsigned int)i, &tmp->eport, &proto, &iport,
-	                        NULL, 0, NULL, 0, NULL, 0, &timestamp) >= 0)
+	                        NULL, 0, desc, sizeof(desc), NULL, 0, &timestamp) >= 0)
 	{
 		if(memmap_map_counters(tmp->eport, proto, &tmp->packets, &tmp->bytes) < 0)
 			tmp->packets = tmp->bytes = 0;
@@ -792,6 +793,13 @@ get_upnp_rules_state_list(int max_rules_number_target)
 				nextruletoclean_timestamp = timestamp;
 		}
 		tmp->proto = (short)proto;
+		/* A PCP or NAT-PMP mapping lasts the lifetime its client asked
+		 * for: idle counters must not end it, only its expiry does. */
+		if(!tmp->to_remove &&
+		   mapping_owner_of(desc, tmp->eport, proto) != MAPPING_UPNP) {
+			i++;
+			continue;
+		}
 		/* add tmp to list */
 		tmp->next = list;
 		list = tmp;
