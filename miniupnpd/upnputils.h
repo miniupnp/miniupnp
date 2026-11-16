@@ -1,7 +1,7 @@
 /* $Id: upnputils.h,v 1.13 2025/04/21 22:56:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2011-2025 Thomas Bernard
+ * (c) 2011-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -56,14 +56,14 @@ int upnp_gettimeofday(struct timeval * tv);
 /*!
  * convert the string "UDP" or "TCP" to IPPROTO_UDP and IPPROTO_UDP
  * \param[in] protocol "UDP" or "TCP" (or "UDPLITE")
- * \return IPPROTO_UDP or IPPROTO_TCP (or IPPROTO_UDPLITE)
+ * \return IPPROTO_UDP or IPPROTO_TCP (or IPPROTO_UDPLITE) or -1 for error
  */
 int proto_atoi(const char * protocol);
 
 /*!
  * convert IPPROTO_UDP, IPPROTO_UDP, etc. to "UDP", "TCP"
  * \param[in] proto IPPROTO_UDP or IPPROTO_TCP (or IPPROTO_UDPLITE)
- * \return "UDP" or "TCP" (or "UDPLITE")
+ * \return "UDP" or "TCP" (or "UDPLITE") or "*UNKNOWN*"
  */
 const char * proto_itoa(int proto);
 
