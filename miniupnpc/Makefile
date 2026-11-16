@@ -15,7 +15,7 @@ VERSION = $(shell cat VERSION)
 
 ifneq (, $(findstring darwin, $(OS)))
 JARSUFFIX=mac
-LIBTOOL ?= $(shell which libtool)
+LIBTOOL ?= $(shell command -v libtool)
 endif
 ifneq (, $(findstring linux, $(OS)))
 JARSUFFIX=linux
