@@ -1254,20 +1254,46 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 			                    -1, &eport2, desc, sizeof(desc), NULL) == 0)
 				found = 1;
 		} else {
-			int index;
-			/* internal port 0 is all ports (RFC 6887 section 11.1),
-			 * which has no index: the first mapping of the client */
+			/* internal port 0 is all ports (RFC 6887 section 11.1):
+			 * every mapping of the client, protocol and nonce goes, and
+			 * the mappings of another nonce stay. The ports are found
+			 * first, as a delete changes the places in the list. */
+			unsigned short * eports = NULL, * more;
+			unsigned int index, n = 0, size = 0, i;
 			for (index = 0;
 			     memmap_get_map_at(index, &eport2, &proto2, &iport2,
 			                       iaddr2, sizeof(iaddr2), desc, sizeof(desc),
 			                       NULL, 0, &timestamp) >= 0;
 			     index++) {
-				if (proto2 == proto &&
-				    strcmp(iaddr2, pcp_msg_info->mapped_str) == 0) {
-					found = 1;
-					break;
+				if (proto2 != proto ||
+				    strcmp(iaddr2, pcp_msg_info->mapped_str) != 0 ||
+				    strcmp(desc, pcp_msg_info->desc) != 0)
+					continue;
+				if (n == size) {
+					size = size ? 2 * size : 8;
+					more = realloc(eports, size * sizeof(*eports));
+					if (more == NULL) {
+						free(eports);
+						pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+						return;
+					}
+					eports = more;
+				}
+				eports[n++] = eport2;
+			}
+			/* RFC 6887 section 11.3: deleting an absent mapping succeeds */
+			for (i = 0; i < n; i++) {
+				if (_upnp_delete_redir(eports[i], proto) < 0) {
+					syslog(LOG_ERR, "Failed to remove PCP mapping of port %hu %s",
+					       eports[i], proto_itoa(proto));
+					pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 				}
 			}
+			free(eports);
+			if (n > 0 && pcp_msg_info->result_code == 0)
+				syslog(LOG_INFO, "PCP: %u %s mappings of %s removed", n,
+				       proto_itoa(proto), pcp_msg_info->mapped_str);
+			return;
 		}
 		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */
 		if (!found)
