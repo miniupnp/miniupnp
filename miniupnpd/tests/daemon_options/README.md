@@ -30,10 +30,11 @@ interfaces in routing domains for the hosts, as OpenBSD has no vnet jail (`bsd_h
 `../common/freebsd_lib.sh`); a case may list several platforms (`platform: [freebsd, openbsd]`). The `platform: linux` cases stay out. It builds the daemon of the tree with
 pf as pcp_e2e does: PCP PEER only where pf supports it, and no `PF_ENABLE_FILTER_RULES`.
 
-In CI, the `options-linux` and `options-freebsd` jobs of `.github/workflows/regression-testing.yml`
-run both drivers with master's daemon and the pull request's
-(`common/tools/compare_daemon_branches.py --suite daemon_options`, FreeBSD 14.5 and 15.1). A case
-that passes with master's daemon and fails with the pull request's fails the job.
+In CI, the `options-linux`, `options-freebsd` and `options-openbsd` jobs of
+`.github/workflows/regression-testing.yml` run the drivers with master's daemon and the pull
+request's (`common/tools/compare_daemon_branches.py --suite daemon_options`, FreeBSD 14.5 and 15.1,
+OpenBSD 8.0). A case that passes with master's daemon and fails with the pull request's fails the
+job.
 
 The driver runs `common/run_self_tests.sh` first (`PCP_TEST_SELF_TEST=0` skips it), compiles the
 daemon in the tools image (`e2e_tools_image`, with OpenSSL; `e2e_build_daemon`) and writes:

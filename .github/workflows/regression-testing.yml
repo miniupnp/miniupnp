@@ -10,9 +10,11 @@ name: 'miniupnpd: Regression testing'
 #                   master's daemon against the pull request's
 #   end2end-linux   the end-to-end suite on Docker (run-docker.sh), master's daemon against the pull request's
 #   end2end-freebsd the same with a FreeBSD pf router in QEMU (run-freebsd.sh), 14.5 and 15.1
+#   end2end-openbsd the same with an OpenBSD 8.0 pf router in QEMU (run-openbsd.sh)
 #   options-linux   the daemon_options suite (one daemon per miniupnpd.conf) on Docker, master's
 #                   daemon against the pull request's
 #   options-freebsd the same in a FreeBSD QEMU VM (pf), 14.5 and 15.1
+#   options-openbsd the same in an OpenBSD 8.0 QEMU VM (pf)
 #   upnp-wire-linux, upnp-e2e-linux  the UPnP suites on Docker (every daemon build), master's
 #                   daemon against the pull request's
 # The comparisons build both daemons with the pull request's harness; a case that passed
@@ -33,7 +35,7 @@ name: 'miniupnpd: Regression testing'
   workflow_dispatch:
     inputs:
       end2end_case:
-        description: 'Optional single end2end case (pcp-e2e-cases.yaml; empty runs all; both platforms)'
+        description: 'Optional single end2end case (pcp-e2e-cases.yaml; empty runs all; every platform)'
         required: false
         type: string
       wire_case:
@@ -41,7 +43,7 @@ name: 'miniupnpd: Regression testing'
         required: false
         type: string
       options_case:
-        description: 'Optional single daemon_options case (daemon-options-cases.yaml; empty runs all; both platforms)'
+        description: 'Optional single daemon_options case (daemon-options-cases.yaml; empty runs all; every platform)'
         required: false
         type: string
       upnp_wire_case:
@@ -228,6 +230,86 @@ jobs:
         with:
           name: end2end-freebsd-${{ github.run_id }}-${{ github.run_attempt }}
           path: end2end-freebsd/
+          if-no-files-found: warn
+          retention-days: 14
+
+  end2end-openbsd:
+    # end2end-freebsd with an OpenBSD QEMU VM as the router (pcp_e2e/run-openbsd.sh). OpenBSD
+    # publishes no cloud image: the image is installed once and cached.
+    name: end2end-openbsd ${{ matrix.release }} (pf in QEMU, master against the pull request)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['8.0']
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Check out master baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || 'master' }}
+          path: master
+          persist-credentials: false
+
+      - name: Install QEMU and the YAML parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils python3-yaml
+
+      - name: Let the job use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' |
+            sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Cache the OpenBSD images (installed and prepared)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/miniupnpd-pcp-test/openbsd-*-base.qcow2
+            ~/.cache/miniupnpd-pcp-test/prepared-openbsd-*.qcow2
+            ~/.cache/miniupnpd-pcp-test/id_ed25519*
+          # the key logs in to both images, so they are cached together. The first run installs
+          # OpenBSD with the official installer (common/openbsd_image.sh), about five minutes.
+          key: >-
+            end2end-openbsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/openbsd_image.sh', 'candidate/miniupnpd/tests/common/openbsd/prepare.sh') }}
+
+      - name: Compare master with pull request on openbsd
+        env:
+          CASE_NAME: ${{ inputs.end2end_case }}
+          PCP_TEST_OPENBSD_VERSION: ${{ matrix.release }}
+        run: |
+          args=()
+          if [ -n "$CASE_NAME" ]; then
+            args+=(--case "$CASE_NAME")
+          fi
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite end2end --platform openbsd \
+            --master-source master \
+            --candidate-source candidate \
+            --output end2end-openbsd "${args[@]}"
+
+      - name: Publish comparison summary
+        if: always()
+        run: |
+          if [ -f end2end-openbsd/summary.md ]; then
+            cat end2end-openbsd/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results, daemon logs, snapshots and packet captures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: end2end-openbsd-${{ matrix.release }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: end2end-openbsd/
           if-no-files-found: warn
           retention-days: 14
 
@@ -505,6 +587,86 @@ jobs:
         with:
           name: options-freebsd-${{ matrix.release }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: options-freebsd/
+          if-no-files-found: warn
+          retention-days: 14
+
+  options-openbsd:
+    # options-freebsd in an OpenBSD QEMU VM (daemon_options/run-openbsd.sh): the hosts are
+    # interfaces in their own routing domains, as OpenBSD has no vnet jail. Images as end2end-openbsd.
+    name: options-openbsd ${{ matrix.release }} (pf in QEMU, master against the pull request)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['8.0']
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Check out master baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || 'master' }}
+          path: master
+          persist-credentials: false
+
+      - name: Install QEMU and the YAML parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils python3-yaml
+
+      - name: Let the job use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' |
+            sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Cache the OpenBSD images (installed and prepared)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/miniupnpd-pcp-test/openbsd-*-base.qcow2
+            ~/.cache/miniupnpd-pcp-test/prepared-openbsd-*.qcow2
+            ~/.cache/miniupnpd-pcp-test/id_ed25519*
+          # the key logs in to both images, so they are cached together. The first run installs
+          # OpenBSD with the official installer (common/openbsd_image.sh), about five minutes.
+          key: >-
+            end2end-openbsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/openbsd_image.sh', 'candidate/miniupnpd/tests/common/openbsd/prepare.sh') }}
+
+      - name: Compare master with pull request on openbsd
+        env:
+          CASE_NAME: ${{ inputs.options_case }}
+          PCP_TEST_OPENBSD_VERSION: ${{ matrix.release }}
+        run: |
+          args=()
+          if [ -n "$CASE_NAME" ]; then
+            args+=(--case "$CASE_NAME")
+          fi
+          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
+            --suite daemon_options --platform openbsd \
+            --master-source master \
+            --candidate-source candidate \
+            --output options-openbsd "${args[@]}"
+
+      - name: Publish comparison summary
+        if: always()
+        run: |
+          if [ -f options-openbsd/summary.md ]; then
+            cat options-openbsd/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results and daemon logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: options-openbsd-${{ matrix.release }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: options-openbsd/
           if-no-files-found: warn
           retention-days: 14
 

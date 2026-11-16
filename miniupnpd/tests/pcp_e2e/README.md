@@ -99,6 +99,8 @@ a GitHub Ubuntu runner (KVM, FreeBSD 14.5 and 15.1; the downloaded and prepared 
 cached), with master's daemon and the pull request's, at the same time as `end2end-linux`, which
 does the same with `run-docker.sh`. Both run `../common/tools/compare_daemon_branches.py
 --suite end2end`; [`compare.py`](compare.py) tells it how to run this suite and read its results.
+`end2end-openbsd` does the same with `run-openbsd.sh` (OpenBSD 8.0); it caches the installed and
+prepared images, so only its first run installs OpenBSD.
 
 ### Keeping the VM between runs
 

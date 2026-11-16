@@ -1,6 +1,6 @@
-"""daemon_options: the daemon configurations, on Docker (run-docker.sh) or in a FreeBSD VM with pf
-(run-freebsd.sh), for ../common/tools/compare_daemon_branches.py (the interface is in
-../common/tools/suite_compare.py)."""
+"""daemon_options: the daemon configurations, on Docker (run-docker.sh) or in a FreeBSD or OpenBSD VM
+with pf (run-freebsd.sh, run-openbsd.sh), for ../common/tools/compare_daemon_branches.py (the
+interface is in ../common/tools/suite_compare.py)."""
 
 import os
 import shutil
@@ -15,11 +15,12 @@ from suite_compare import TESTS, digest, read_status_results, run_driver  # noqa
 SUITE = 'daemon_options'
 TITLE = 'Daemon options'
 CORPUS = 'daemon-options-cases.yaml'
-DRIVERS = {'linux': 'run-docker.sh', 'freebsd': 'run-freebsd.sh'}
+DRIVERS = {'linux': 'run-docker.sh', 'freebsd': 'run-freebsd.sh', 'openbsd': 'run-openbsd.sh'}
 PLATFORMS = tuple(DRIVERS)
 # where a driver leaves its results and daemon logs in the tree it ran in
 RESULTS = Path('.tmp/tests/daemon_options')
-LOGS = {'linux': Path('.tmp/daemon-options'), 'freebsd': Path('.tmp/ci/out/freebsd/daemon_options')}
+LOGS = {'linux': Path('.tmp/daemon-options'), 'freebsd': Path('.tmp/ci/out/freebsd/daemon_options'),
+        'openbsd': Path('.tmp/ci/out/openbsd/daemon_options')}
 
 
 def run(label, tree, output, args):
