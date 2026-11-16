@@ -261,7 +261,7 @@ jobs:
       - name: Install QEMU and the YAML parser
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils python3-yaml
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso python3-yaml
 
       - name: Let the job use KVM
         run: |
@@ -618,7 +618,7 @@ jobs:
       - name: Install QEMU and the YAML parser
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils python3-yaml
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso python3-yaml
 
       - name: Let the job use KVM
         run: |
