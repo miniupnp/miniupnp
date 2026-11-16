@@ -1,6 +1,9 @@
 $Id: Changelog.txt,v 1.281 2025/05/26 22:56:38 nanard Exp $
 miniUPnP client Changelog.
 
+VERSION 2.3.5 : released 2026/11/16
+  there was a packaging error with miniupnpc-2.3.4.tar.gz
+
 VERSION 2.3.4 : released 2026/11/15
 
 2026/08/30:
