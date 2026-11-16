@@ -119,7 +119,9 @@ int memmap_map_counters(unsigned short eport, int proto,
 /* fn(eport, proto, packets, bytes, arg) for each UPnP IPv4 port mapping which
  * has a row and a rule. A PCP or NAT-PMP mapping is left out: it lasts the
  * lifetime its client asked for, so idle counters must not end it. iptables
- * walks its chain once and pf reads its rules by index, once each; the other
+ * walks its chain once. pf reads its rules by index, as master's cleanup
+ * pass does: each read walks the rules to its index (OpenBSD 7.4 and later
+ * with one ioctl per rule), so a pass costs n^2/2 rule steps. The other
  * firewalls are read once per mapping. 0, or -1 if the firewall could not be
  * read. */
 typedef void (*memmap_counters_fn)(unsigned short eport, int proto,
