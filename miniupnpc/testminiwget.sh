@@ -29,8 +29,8 @@ EXPECTEDFILE="${TMPD}/expectedfile"
 DOWNLOADEDFILE="${TMPD}/downloadedfile"
 PORT=
 RET=0
-IPCONFIG=$(which ifconfig)
-IP=$(which ip)
+IPCONFIG=$(command -v ifconfig)
+IP=$(command -v ip)
 if [ "$IP" ] ; then
 	if ! $IP addr | grep inet6 ; then
 		HAVE_IPV6=no

@@ -27,7 +27,7 @@ if [ -f /etc/debian_version ]; then
 fi
 
 # use lsb_release (Linux Standard Base) when available
-LSB_RELEASE=`which lsb_release`
+LSB_RELEASE=`command -v lsb_release`
 if [ 0 -eq $? -a -x "${LSB_RELEASE}" ]; then
 	# On NixOS, lsb_release returns strings such as "NixOS" (with quotes),
 	# so we need to stript them with the following xargs trick:
