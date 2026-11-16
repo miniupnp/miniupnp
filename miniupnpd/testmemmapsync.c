@@ -46,7 +46,9 @@ mapping_owner_of(const char * desc, unsigned short eport, int proto)
 /* the backend reads of memmap.c, which the tests do not reach */
 #define WEAK __attribute__((weak))
 static int rule_present;	/* 1: get_redirect_rule() finds the rule, 0: not, -1: an error */
+#ifdef ENABLE_UPNPPINHOLE
 static int pinhole_gone;	/* get_map6_packets() finds no rule */
+#endif
 WEAK int get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                            char * iaddr, int iaddrlen, unsigned short * iport,
                            char * desc, int desclen, char * rhost, int rhostlen,
@@ -469,6 +471,7 @@ test_delete(void)
 	assert(last[0].op == FW_DELETE && last_old_eport == 1000);
 }
 
+#ifdef ENABLE_UPNPPINHOLE
 static void
 pinhole(struct memmap_change * c, enum memmap_op op, int uid, const char * iaddr,
         unsigned short iport, unsigned int ts)
@@ -610,6 +613,7 @@ test_pcp_pinhole(void)
 	assert(memmap_sync(&c, 1) == 0 && lease_table_count() == 0);
 	assert(lease_table_find_uid((unsigned short)r) == NULL);
 }
+#endif /* ENABLE_UPNPPINHOLE */
 
 /* a request whose row cannot be built sends nothing */
 static void
@@ -644,6 +648,7 @@ test_one_row_twice(void)
 	assert(calls == 1 && memmap_map_count() == 1);
 }
 
+#ifdef ENABLE_UPNPPINHOLE
 /* the expiry pass finds the expired pinholes in the table, with their rules,
  * and the next expiry; a full array makes the next pass run now */
 static void
@@ -682,6 +687,7 @@ test_pinhole_expiry(void)
 	assert(n == 0 && next == 3000);
 	assert(lease_table_count() == 1);
 }
+#endif /* ENABLE_UPNPPINHOLE */
 
 int
 main(void)
@@ -701,12 +707,16 @@ main(void)
 	test_renew_owner();
 	test_update_new_port();
 	test_delete();
+#ifdef ENABLE_UPNPPINHOLE
 	test_pinhole_uid();
 	test_pinhole_key();
 	test_pcp_pinhole();
+#endif
 	test_bad_address();
 	test_one_row_twice();
+#ifdef ENABLE_UPNPPINHOLE
 	test_pinhole_expiry();
+#endif
 	lease_table_clear();
 	printf("testmemmapsync: all tests passed\n");
 	return 0;

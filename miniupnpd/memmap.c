@@ -160,6 +160,7 @@ memmap_renew_map(unsigned short eport, int proto, const char * desc,
 	return 0;
 }
 
+#ifdef ENABLE_UPNPPINHOLE
 /* what a walk over the rows gives map6_expiry_row() and gets back */
 struct map6_expiry {
 	unsigned int now;
@@ -212,6 +213,7 @@ memmap_expired_map6s(unsigned int now, struct expired_map6 * expired,
 		syslog(LOG_DEBUG, "memmap: %d map6s expired, next at %u", c.n, c.next);
 	return c.n;
 }
+#endif /* ENABLE_UPNPPINHOLE */
 
 /* what a walk over the rows gives expiry_row() and gets back */
 struct expiry_ctx {
