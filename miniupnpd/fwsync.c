@@ -68,9 +68,25 @@ rule_of(const struct lease_entry * e, struct fw_rule * r)
 	r->timestamp = (unsigned int)e->expiry;
 }
 
-/* Delete the rules of a row. The result of the backend. */
+/* 1 if the firewall has the redirect rule of an IPv4 row */
 static int
-delete_rules(const struct lease_entry * e, unsigned short uid)
+map_rule_present(const struct lease_entry * e)
+{
+	unsigned short iport;
+	unsigned int timestamp;
+	u_int64_t packets, bytes;
+	return get_redirect_rule(ext_if_name, e->eport, e->proto, NULL, 0, &iport, NULL, 0,
+	                         NULL, 0, &timestamp, &packets, &bytes) >= 0;
+}
+
+/* Delete the rules of a row. The result of the backend, or 0 if the backend
+ * failed on an IPv4 rule which it does not have and the table has its row
+ * (has_row): then the row can go. A flush or another program can remove a
+ * rule, and pf reports the missing rule as an error. Without a row, the port
+ * is not mapped, and the error stays. An IPv6 row whose rule is gone goes at
+ * its expiry. */
+static int
+delete_rules(const struct lease_entry * e, unsigned short uid, int has_row)
 {
 	int r;
 
@@ -90,6 +106,11 @@ delete_rules(const struct lease_entry * e, unsigned short uid)
 	r = delete_redirect_rule(ext_if_name, e->eport, e->proto);
 	delete_filter_rule(ext_if_name, e->eport, e->proto);
 #endif
+	if(r < 0 && has_row && !map_rule_present(e)) {
+		syslog(LOG_INFO, "port %hu %s has no rule in the firewall, its row goes",
+		       e->eport, e->proto == IPPROTO_UDP ? "UDP" : "TCP");
+		return 0;
+	}
 	return r;
 }
 
@@ -166,7 +187,7 @@ send_change(struct fw_change * c, int * half)
 	case FW_UPDATE:
 		return update_rules(c->old, c->row, c->uid);
 	case FW_DELETE:
-		return delete_rules(c->old, c->uid);
+		return delete_rules(c->old, c->uid, !c->old_partial);
 	}
 	return -1;
 }
@@ -181,7 +202,7 @@ undo_change(struct fw_change * c)
 		return -1;
 	switch(c->op) {
 	case FW_ADD:
-		return delete_rules(c->row, c->uid);
+		return delete_rules(c->row, c->uid, 1);
 	case FW_UPDATE:
 		return update_rules(c->row, c->old, c->uid);
 	case FW_DELETE:
