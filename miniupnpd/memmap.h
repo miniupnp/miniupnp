@@ -98,6 +98,13 @@ struct memmap_change {
 	int uid;		/* a pinhole: set by MEMMAP_ADD, read by the others */
 };
 
+/* Fill a change, with every field it does not name zero. A pinhole has no
+ * eport of its own: pass its iport. */
+void memmap_change_init(struct memmap_change * c, enum memmap_op op, int uid,
+                        const char * raddr, unsigned short rport, unsigned short eport,
+                        const char * iaddr, unsigned short iport, int proto,
+                        const char * desc, unsigned int timestamp);
+
 /* Do a request: build its rows in memory, out of the table, and send them to
  * the firewall in one fw_sync(). If the firewall takes the request, the rows
  * go into the table, and the rows they replace or delete go out. If not, the

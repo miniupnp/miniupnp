@@ -1021,6 +1021,25 @@ shares_row(const struct stage * st, int i)
 	return 0;
 }
 
+void
+memmap_change_init(struct memmap_change * c, enum memmap_op op, int uid,
+                   const char * raddr, unsigned short rport, unsigned short eport,
+                   const char * iaddr, unsigned short iport, int proto,
+                   const char * desc, unsigned int timestamp)
+{
+	memset(c, 0, sizeof(*c));
+	c->op = op;
+	c->uid = uid;
+	c->raddr = raddr;
+	c->rport = rport;
+	c->eport = eport;
+	c->iaddr = iaddr;
+	c->iport = iport;
+	c->proto = proto;
+	c->desc = desc;
+	c->timestamp = timestamp;
+}
+
 /* The changes of a request up to this many are staged on the stack: the
  * protocols send one or two */
 #define SYNC_ON_STACK	4
