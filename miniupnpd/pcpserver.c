@@ -1148,13 +1148,12 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 		syslog(LOG_INFO, "updating pinhole %d to %s:%hu %s",
 		       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
 		       proto_itoa(pcp_msg_info->protocol));
-		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
+		r = upnp_renew_inboundpinhole((unsigned short)uid, NULL, 0,
+		                              pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		                              pcp_msg_info->protocol, pcp_msg_info->desc,
+		                              pcp_msg_info->lifetime);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
-		memmap_map((unsigned short)uid, pcp_msg_info->int_port,
-		           pcp_msg_info->mapped_str, pcp_msg_info->int_port,
-		           pcp_msg_info->protocol, pcp_msg_info->desc,
-		           upnp_time() + pcp_msg_info->lifetime);
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
 		return PCP_SUCCESS;
 	} else {

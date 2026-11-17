@@ -73,6 +73,13 @@ upnp_get_pinhole_uid_by_index(int index);
 int
 upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime);
 
+/* The same, for a caller which has the rule too: a pinhole of an earlier run
+ * then gets its row. 0, or < 0. */
+int
+upnp_renew_inboundpinhole(unsigned short uid, const char * raddr, unsigned short rport,
+                          const char * iaddr, unsigned short iport, int proto,
+                          const char * desc, unsigned int leasetime);
+
 /* remove the inbound pinhole */
 int
 upnp_delete_inboundpinhole(unsigned short uid);

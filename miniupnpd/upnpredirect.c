@@ -27,21 +27,6 @@
 #include "portinuse.h"
 #include "upnputils.h"
 #include "memmap.h"
-#if defined(USE_NETFILTER)
-#include "netfilter/iptcrdr.h"
-#ifdef USE_NFTABLES
-#include "netfilter_nft/nftnlrdr.h"
-#endif
-#endif
-#if defined(USE_PF)
-#include "pf/obsdrdr.h"
-#endif
-#if defined(USE_IPF)
-#include "ipf/ipfrdr.h"
-#endif
-#if defined(USE_IPFW)
-#include "ipfw/ipfwrdr.h"
-#endif
 #ifdef USE_MINIUPNPDCTL
 #include <stdio.h>
 #include <unistd.h>
@@ -343,17 +328,21 @@ upnp_map_in_firewall(unsigned short eport, int proto)
  *          -3 permission check failed
  *          -4 already redirected (other mechanism)
  */
-/* Write the row of a port mapping: a mapping, or a mapping with its remote peer.
- * rhost NULL, empty or "*" means any remote. */
+/* One change of a port mapping, for memmap_sync() */
 static void
-record_map(const char * rhost, unsigned short eport, const char * iaddr,
-           unsigned short iport, int proto, const char * desc,
-           unsigned int timestamp)
+map_change(struct memmap_change * c, enum memmap_op op, const char * rhost,
+           unsigned short eport, const char * iaddr, unsigned short iport,
+           int proto, const char * desc, unsigned int timestamp)
 {
-	if(rhost != NULL && rhost[0] != '\0' && strcmp(rhost, "*") != 0)
-		memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
-	else
-		memmap_map(0, eport, iaddr, iport, proto, desc, timestamp);
+	memset(c, 0, sizeof(*c));
+	c->op = op;
+	c->raddr = rhost;
+	c->eport = eport;
+	c->iaddr = iaddr;
+	c->iport = iport;
+	c->proto = proto;
+	c->desc = desc;
+	c->timestamp = timestamp;
 }
 
 int
@@ -368,6 +357,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	unsigned short iport_old;
 	struct in_addr address;
 	unsigned int timestamp;
+	struct memmap_change c;
 
 	proto = proto_atoi(protocol);
 	if(inet_aton(iaddr, &address) <= 0) {
@@ -429,13 +419,9 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old, iaddr_old, iport_old);
 			timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
-			if(iport != iport_old) {
-				r = update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
-			} else {
-				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
-			}
-			if(r == 0)
-				record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
+			map_change(&c, MEMMAP_UPDATE, rhost, eport, iaddr, iport, proto, desc,
+			           timestamp);
+			r = memmap_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
@@ -463,47 +449,19 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	}
 }
 
-/* a redirect rule whose filter rule failed. A rule which cannot be deleted
- * gets a row which has expired, so the expiry tries again */
-static void
-remove_half_added(const char * rhost, unsigned short eport, const char * iaddr,
-                  unsigned short iport, int proto, const char * desc)
-{
-#if defined(__linux__)
-	int r = delete_redirect_and_filter_rules(eport, proto);
-#else
-	int r = delete_redirect_rule(ext_if_name, eport, proto);
-#endif
-	if(r < 0) {
-		unsigned int now = (unsigned int)upnp_time();
-		syslog(LOG_WARNING, "could not remove the half added rule of port %hu", eport);
-		record_map(rhost, eport, iaddr, iport, proto, desc, now);
-		nextruletoclean_timestamp = now;
-	}
-}
-
 int
 upnp_redirect_internal(const char * rhost, unsigned short eport,
                        const char * iaddr, unsigned short iport,
                        int proto, const char * desc,
                        unsigned int timestamp)
 {
-	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-		eport, iaddr, iport, protocol, desc);			*/
+	struct memmap_change c;
+
 	if(disable_port_forwarding)
 		return -1;
-	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
-	                      desc, timestamp) < 0) {
+	map_change(&c, MEMMAP_ADD, rhost, eport, iaddr, iport, proto, desc, timestamp);
+	if(memmap_sync(&c, 1) < 0)
 		return -1;
-	}
-
-/*	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %s for: %s",
-		iaddr, iport, protocol, desc);*/
-	if(add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc) < 0) {
-		remove_half_added(rhost, eport, iaddr, iport, proto, desc);
-		return -1;
-	}
-	record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
 #endif
@@ -626,16 +584,10 @@ int
 _upnp_delete_redir(unsigned short eport, int proto)
 {
 	int r;
-#if defined(__linux__)
-	r = delete_redirect_and_filter_rules(eport, proto);
-#elif defined(USE_PF)
-	r = delete_redirect_and_filter_rules(ext_if_name, eport, proto);
-#else
-	r = delete_redirect_rule(ext_if_name, eport, proto);
-	delete_filter_rule(ext_if_name, eport, proto);
-#endif
-	if(r >= 0)
-		memmap_map_gone(eport, proto);
+	struct memmap_change c;
+
+	map_change(&c, MEMMAP_DELETE, NULL, eport, NULL, 0, proto, NULL, 0);
+	r = memmap_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
