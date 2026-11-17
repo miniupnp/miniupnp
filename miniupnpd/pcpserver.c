@@ -1090,13 +1090,17 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 				}
 			} else {
-				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, renewing",
 				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
 				       iaddr_old, iport_old);
-				/* remove and then add again */
-				if (_upnp_delete_redir(pcp_msg_info->ext_port,
-						       pcp_msg_info->protocol)==0) {
-					break;
+				/* the same rule, with a new expiry */
+				if (upnp_renew_redirect_internal(NULL, pcp_msg_info->ext_port,
+						pcp_msg_info->mapped_str,
+						pcp_msg_info->int_port,
+						pcp_msg_info->protocol,
+						pcp_msg_info->desc,
+						timestamp) == 0) {
+					return PCP_SUCCESS;
 				} else if (pcp_msg_info->pfailure_present) {
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 				}

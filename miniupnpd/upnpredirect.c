@@ -419,6 +419,10 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old, iaddr_old, iport_old);
 			timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
+			/* the same rule: a renewal, in the table only */
+			if(iport == iport_old)
+				return upnp_renew_redirect_internal(rhost, eport, iaddr, iport,
+				                                    proto, desc, timestamp);
 			map_change(&c, MEMMAP_UPDATE, rhost, eport, iaddr, iport, proto, desc,
 			           timestamp);
 			r = memmap_sync(&c, 1);

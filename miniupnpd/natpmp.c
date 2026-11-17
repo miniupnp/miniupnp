@@ -414,13 +414,20 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								break;
 							}
 							/* redirection already existing */
-							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, renewing",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
-							/* remove and then add again */
-							if(_upnp_delete_redir(eport, proto) < 0) {
-								syslog(LOG_ERR, "failed to remove port mapping");
-								break;
+							/* the same rule, with a new expiry */
+							timestamp = upnp_time() + lifetime;
+							snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
+							         eport, proto_itoa(proto));
+							if(upnp_renew_redirect_internal(NULL, eport, senderaddrstr,
+							                                iport, proto, desc,
+							                                timestamp) < 0) {
+								syslog(LOG_ERR, "Failed to renew NAT-PMP %hu %s->%s:%hu",
+								       eport, proto_itoa(proto), senderaddrstr, iport);
+								resp[3] = 3;  /* Failure */
 							}
+							break;
 						} else {
 							eport++;
 							if(eport == 0) eport++; /* skip port zero */
