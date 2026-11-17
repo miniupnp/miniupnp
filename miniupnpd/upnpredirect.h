@@ -67,6 +67,15 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp);
 
+/* upnp_renew_redirect_internal()
+ * renew a port mapping with the same rule: a new expiry and description, in
+ * the table and the lease file, and no change of the firewall. 0, or -1 */
+int
+upnp_renew_redirect_internal(const char * rhost, unsigned short eport,
+                             const char * iaddr, unsigned short iport,
+                             int proto, const char * desc,
+                             unsigned int timestamp);
+
 /*! \brief get port mapping from (external port, protocol)
  * \param[in] eport external port
  * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)

@@ -43,13 +43,14 @@ mapping_owner_of(const char * desc, unsigned short eport, int proto)
 
 /* the backend reads of memmap.c, which the tests do not reach */
 #define WEAK __attribute__((weak))
+static int rule_present;	/* what get_redirect_rule() says */
 WEAK int get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                            char * iaddr, int iaddrlen, unsigned short * iport,
                            char * desc, int desclen, char * rhost, int rhostlen,
                            unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
 { (void)ifname; (void)eport; (void)proto; (void)iaddr; (void)iaddrlen; (void)iport;
   (void)desc; (void)desclen; (void)rhost; (void)rhostlen; (void)timestamp;
-  (void)packets; (void)bytes; return -1; }
+  (void)packets; (void)bytes; return rule_present ? 0 : -1; }
 WEAK int get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
                                     char * iaddr, int iaddrlen, unsigned short * iport,
                                     int * proto, char * desc, int desclen,
@@ -261,6 +262,69 @@ test_update_in_place(void)
 	assert(strcmp(desc, "renamed") == 0 && ts == 3000);
 }
 
+/* a renewal changes the table, and sends nothing to the firewall */
+static void
+test_renew_map(void)
+{
+	struct memmap_change c;
+	char desc[64];
+	unsigned int ts;
+	reset();
+	map(&c, MEMMAP_ADD, 1000, "192.168.1.10", 80, "web", 2000);
+	assert(memmap_sync(&c, 1) == 0 && calls == 1);
+	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 3000) == 0);
+	assert(calls == 1);
+	assert(has_map(1000, desc, &ts));
+	assert(strcmp(desc, "web") == 0 && ts == 3000);
+	/* the description of the client changes with it */
+	assert(memmap_renew_map(1000, IPPROTO_TCP, "renamed", 4000) == 0);
+	assert(has_map(1000, desc, &ts));
+	assert(strcmp(desc, "renamed") == 0 && ts == 4000);
+	assert(calls == 1 && lease_table_count() == 1);
+	/* no row: nothing to renew */
+	assert(memmap_renew_map(1001, IPPROTO_TCP, "web", 3000) < 0);
+	assert(memmap_renew_map(1000, IPPROTO_UDP, "web", 3000) < 0);
+	assert(calls == 1 && lease_table_count() == 1);
+}
+
+/* Before a renewal the protocols ask memmap_map_in_firewall(). A rule the
+ * firewall lost drops the row, so the caller adds the mapping again instead
+ * of renewing a closed port. */
+static void
+test_renew_lost_rule(void)
+{
+	struct memmap_change c;
+	reset();
+	rule_present = 1;
+	map(&c, MEMMAP_ADD, 1000, "192.168.1.10", 80, "web", 2000);
+	assert(memmap_sync(&c, 1) == 0 && calls == 1);
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 1);
+	assert(lease_table_count() == 1);
+	rule_present = 0;
+	assert(memmap_map_in_firewall(1000, IPPROTO_TCP) == 0);
+	assert(lease_table_count() == 0 && calls == 1);
+	assert(memmap_renew_map(1000, IPPROTO_TCP, "web", 3000) < 0);
+}
+
+/* a renewal with the description of another protocol gives the row to it, as
+ * an add with that description does */
+static void
+test_renew_owner(void)
+{
+	struct memmap_change c;
+	unsigned short eport = 0;
+	char desc[64];
+	reset();
+	map(&c, MEMMAP_ADD, 1000, "192.168.1.10", 80, "NAT-PMP 1000 TCP", 2000);
+	assert(memmap_sync(&c, 1) == 0);
+	assert(memmap_renew_map(1000, IPPROTO_TCP, "upnp game", 3000) == 0);
+	assert(has_map(1000, desc, NULL) && strcmp(desc, "upnp game") == 0);
+	assert(memmap_find_map("192.168.1.10", 80, IPPROTO_TCP, MAPPING_UPNP, &eport,
+	                       NULL, 0, NULL) == 0 && eport == 1000);
+	assert(memmap_find_map("192.168.1.10", 80, IPPROTO_TCP, MAPPING_NATPMP, &eport,
+	                       NULL, 0, NULL) < 0);
+}
+
 /* an update to another internal port replaces the row */
 static void
 test_update_new_port(void)
@@ -392,6 +456,9 @@ main(void)
 	test_change_stays();
 	test_half_applied();
 	test_update_in_place();
+	test_renew_map();
+	test_renew_lost_rule();
+	test_renew_owner();
 	test_update_new_port();
 	test_delete();
 	test_pinhole_uid();

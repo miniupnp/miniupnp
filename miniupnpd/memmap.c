@@ -138,6 +138,26 @@ memmap_map_expiry(unsigned short eport, int proto)
 	return row != NULL ? (unsigned int)row->expiry : 0;
 }
 
+/* Renew an IPv4 mapping. The firewall does not hold the expiry, so its rule
+ * has nothing to change: the row takes the renewal, and the owner which the
+ * description gives, as an add does. */
+int
+memmap_renew_map(unsigned short eport, int proto, const char * desc,
+                 unsigned int expiry)
+{
+	struct lease_entry * row = lease_table_find_mapping(proto, AF_INET, NULL, eport);
+
+	if(row == NULL)
+		return -1;
+	if(lease_table_set_label(row, desc) < 0)
+		return -1;
+	set_owner(row, desc, eport, proto);
+	row->expiry = expiry;
+	syslog(LOG_DEBUG, "memmap: renew %s port %hu, expiry %u",
+	       proto_itoa(proto), eport, expiry);
+	return 0;
+}
+
 /* A row cannot go during lease_table_foreach(), so a walk collects up to this
  * many rows, removes them, and walks again until it found fewer. */
 #define PINHOLE_EXPIRE_MAX	256

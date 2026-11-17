@@ -477,6 +477,27 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 	return 0;
 }
 
+int
+upnp_renew_redirect_internal(const char * rhost, unsigned short eport,
+                             const char * iaddr, unsigned short iport,
+                             int proto, const char * desc,
+                             unsigned int timestamp)
+{
+	if(memmap_renew_map(eport, proto, desc, timestamp) < 0)
+		return -1;
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(eport, proto);
+	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
+#else
+	UNUSED(rhost); UNUSED(iaddr); UNUSED(iport);
+#endif
+	if(timestamp > 0) {
+		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
+			nextruletoclean_timestamp = timestamp;
+	}
+	return 0;
+}
+
 
 
 /* Firewall independent code which call the FW dependent code. */

@@ -32,6 +32,13 @@ int memmap_find_map(const char * iaddr, unsigned short iport, int proto,
  * whose rule does not hold it. 0 : no expiry, or no such row. */
 unsigned int memmap_map_expiry(unsigned short eport, int proto);
 
+/* Renew an IPv4 mapping: a new expiry and description, in the table only. The
+ * firewall does not hold the expiry. The caller first asks
+ * memmap_map_in_firewall() if the rule is still there. 0, or -1 if the table
+ * has no such mapping or no memory for the description. */
+int memmap_renew_map(unsigned short eport, int proto, const char * desc,
+                     unsigned int expiry);
+
 /* For a firewall backend: tell memmap_expire_pinholes() that this pass leaves
  * expired rules in the firewall, because a delete failed. The rows then stay. */
 void memmap_remote_peers_partial(void);
