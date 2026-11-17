@@ -14,6 +14,7 @@
 #include "commonrdr.h"
 #include "lease_table.h"
 #include "memmap.h"
+#include "fwsync.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
 #ifdef USE_NFTABLES
@@ -164,6 +165,17 @@ mapping_owner_of(const char * desc, unsigned short eport, int proto)
 }
 
 #define PCP_DESC	"PCP MAP 0102030405060708090a0b0c"
+
+/* memmap.c sends a request to the firewall with fw_sync(). These tests write
+ * the rows with the row writers, which do not reach it. */
+unsigned int nextruletoclean_timestamp;
+
+int
+fw_sync(struct fw_change * changes, int n)
+{
+	(void)changes; (void)n;
+	return -1;
+}
 
 static struct in6_addr
 addr(const char * s)

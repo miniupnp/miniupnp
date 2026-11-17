@@ -98,6 +98,38 @@ int memmap_eport_used_by_other(unsigned short eport, const char * iaddr);
 int memmap_eport_redirected_elsewhere(const char * ifname, unsigned short eport, int proto,
                                       const char * iaddr, unsigned short iport);
 
+/* What a change of a request does */
+enum memmap_op {
+	MEMMAP_ADD,		/* add a port mapping or a pinhole */
+	MEMMAP_UPDATE,		/* an IPv4 port mapping: new iport, description, expiry */
+	MEMMAP_RENEW,		/* a pinhole by uid: new expiry. With iaddr, its rule */
+	MEMMAP_DELETE,		/* an IPv4 port mapping, by eport */
+	MEMMAP_DELETE_PINHOLE	/* a pinhole by uid. With iaddr, its rule too */
+};
+
+/* One change of a request. The strings stay the caller's. */
+struct memmap_change {
+	enum memmap_op op;
+	const char * raddr;	/* NULL, "" or "*" : any remote */
+	unsigned short rport;
+	unsigned short eport;	/* a pinhole: unused, it is iport */
+	const char * iaddr;	/* gives the family */
+	unsigned short iport;
+	int proto;
+	const char * desc;
+	unsigned int timestamp;	/* the expiry, 0 for none */
+	int uid;		/* a pinhole: set by MEMMAP_ADD, read by the others */
+};
+
+/* Do a request: build its rows in memory, out of the table, and send them to
+ * the firewall in one fw_sync(). If the firewall takes the request, the rows
+ * go into the table, and the rows they replace or delete go out. If not, the
+ * new rows are freed and the table is as before, except for a change the
+ * firewall could not take back: its rule stays, and so does its row. Two
+ * changes of one request may not go to one row: then nothing is sent. Returns
+ * 0, or the negative result of the firewall. */
+int memmap_sync(struct memmap_change * changes, int n);
+
 /* The reads below are those only the firewall can answer. The protocols call
  * them here, and never the firewall backend. */
 
@@ -131,6 +163,9 @@ int memmap_expired_maps(unsigned int now, struct expired_redirect * expired,
                         int max, unsigned int * next);
 
 #ifdef ENABLE_UPNPPINHOLE
+/* 1 if the pinhole uid has a row: then it needs no read of the firewall. */
+int memmap_pinhole_has_row(unsigned short uid);
+
 /* The pinhole reads below go to the firewall: a pinhole of an earlier run has
  * no row, and the packet counter is only there. */
 
