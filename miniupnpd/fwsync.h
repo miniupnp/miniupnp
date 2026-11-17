@@ -20,8 +20,7 @@
 #include "lease_table.h"
 
 /* The firewalls which have map6s, and their map6 functions. The PF API
- * of Apple differs from what pf/pfpinhole.c expects. A map6 rule is found
- * by its key: the uid is the map's alone. */
+ * of Apple differs from what pf/pfpinhole.c expects. */
 #ifdef ENABLE_UPNPPINHOLE
 #if defined(USE_NETFILTER) || (defined(USE_PF) && !defined(__APPLE__))
 #define FW_MAP6
