@@ -912,11 +912,15 @@ stage_change(struct memmap_change * c, struct stage * st, struct fw_change * fw)
 	case MEMMAP_DELETE_PINHOLE:
 		st->old = lease_table_find_uid((unsigned short)c->uid);
 		if(st->old == NULL && c->iaddr != NULL) {
-			/* a PCP pinhole has no uid in the table : its row is by its rule */
-			struct lease_entry * e = new_row(c);
-			if(e != NULL) {
-				st->old = row_at_key(e);
-				lease_table_free(e);
+			/* a PCP pinhole has no uid in the table : its row is by its
+			 * rule, which needs no row of its own to look up */
+			struct lease_entry key;
+			struct lease_remote remote;
+			int has_remote;
+			if(row_of(c, &key, &remote.raddr, &has_remote) == 0) {
+				remote.rport = c->rport;
+				key.remote = has_remote ? &remote : NULL;
+				st->old = row_at_key(&key);
 			}
 		}
 		st->rule.family = AF_INET6;
@@ -1017,23 +1021,29 @@ shares_row(const struct stage * st, int i)
 	return 0;
 }
 
+/* The changes of a request up to this many are staged on the stack: the
+ * protocols send one or two */
+#define SYNC_ON_STACK	4
+
 /* Stage the rows of a request, send it, and link or free the rows. */
 int
 memmap_sync(struct memmap_change * changes, int n)
 {
-	struct stage * st;
-	struct fw_change * fw;
+	struct stage st_stack[SYNC_ON_STACK], * st = st_stack;
+	struct fw_change fw_stack[SYNC_ON_STACK], * fw = fw_stack;
 	int i, r;
 
 	if(n <= 0)
 		return 0;
-	st = calloc(n, sizeof(*st));
-	fw = calloc(n, sizeof(*fw));
-	if(st == NULL || fw == NULL) {
-		syslog(LOG_ERR, "memmap_sync: no memory for %d changes", n);
-		free(st);
-		free(fw);
-		return -1;
+	if(n > SYNC_ON_STACK) {
+		st = calloc(n, sizeof(*st));
+		fw = calloc(n, sizeof(*fw));
+		if(st == NULL || fw == NULL) {
+			syslog(LOG_ERR, "memmap_sync: no memory for %d changes", n);
+			free(st);
+			free(fw);
+			return -1;
+		}
 	}
 	for(i = 0; i < n; i++) {
 		if(stage_change(&changes[i], &st[i], &fw[i]) < 0)
@@ -1046,8 +1056,10 @@ memmap_sync(struct memmap_change * changes, int n)
 		discard_change(&changes[i], &st[i]);
 		while(i-- > 0)
 			discard_change(&changes[i], &st[i]);
-		free(st);
-		free(fw);
+		if(st != st_stack) {
+			free(st);
+			free(fw);
+		}
 		return -1;
 	}
 	r = fw_sync(fw, n);
@@ -1073,7 +1085,9 @@ memmap_sync(struct memmap_change * changes, int n)
 			discard_change(&changes[i], &st[i]);
 		}
 	}
-	free(st);
-	free(fw);
+	if(st != st_stack) {
+		free(st);
+		free(fw);
+	}
 	return r;
 }

@@ -232,6 +232,30 @@ test_request_all_or_nothing(void)
 	       has_map(1003, NULL, NULL));
 }
 
+/* a request of more changes than memmap_sync() stages on the stack is all or
+ * nothing too */
+static void
+test_large_request(void)
+{
+	struct memmap_change c[7];
+	char desc[7][8];
+	int i;
+	reset();
+	for(i = 0; i < 7; i++) {
+		snprintf(desc[i], sizeof(desc[i]), "m%d", i);
+		map(&c[i], MEMMAP_ADD, (unsigned short)(1001 + i), "192.168.1.10",
+		    (unsigned short)(81 + i), desc[i], 0);
+	}
+	fail_at = 5;
+	assert(memmap_sync(c, 7) < 0);
+	assert(calls == 1 && sent == 7 && lease_table_count() == 0);
+	fail_at = -1;
+	assert(memmap_sync(c, 7) == 0);
+	assert(calls == 2 && lease_table_count() == 7);
+	for(i = 0; i < 7; i++)
+		assert(has_map((unsigned short)(1001 + i), NULL, NULL));
+}
+
 /* a change the firewall could not take back keeps its row */
 static void
 test_change_stays(void)
@@ -557,6 +581,7 @@ main(void)
 	test_add();
 	test_add_refused();
 	test_request_all_or_nothing();
+	test_large_request();
 	test_change_stays();
 	test_half_applied();
 	test_update_in_place();
