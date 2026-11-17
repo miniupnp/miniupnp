@@ -120,9 +120,33 @@ admin_forward() {
   ' sh "$1" "$lanip" "$external"
 }
 
+# daemon_chain_forward FAMILY:PROTO:EXTERNAL:INTERNAL: a port forward of the administrator inside the NAT
+# chain of the daemon, written as the daemon writes its rules but without a comment, and appended. The
+# daemon lists the rules of its chain newest first, so this rule comes before its earlier mappings, as a
+# rule of another owner (no description) for the internal port.
+daemon_chain_forward() {
+  "$DOCKER" exec "$ROUTER" sh -c '
+    family=${1%%:*}; rest=${1#*:}
+    proto=${rest%%:*}; rest=${rest#*:}
+    eport=${rest%%:*}; iport=${rest#*:}
+    client=$2
+    [ "$family" = ipv4 ] || { echo "daemon-chain-forward: IPv4 only"; exit 0; }
+    nft --echo --handle add rule inet filter prerouting_miniupnpd \
+      iif wan0 ip protocol "$proto" "$proto" dport "$eport" dnat ip to "$client:$iport" |
+      sed -n "s/.* # handle \([0-9]*\)\$/\1/p" >>/tmp/admin-daemon-chain-handles &&
+      echo ok
+  ' sh "$1" "$lanip"
+}
+
 admin_clear() {
   "$DOCKER" exec "$ROUTER" sh -c '
     nft delete table ip admin 2>/dev/null
+    if [ -f /tmp/admin-daemon-chain-handles ]; then
+      while read -r handle; do
+        nft delete rule inet filter prerouting_miniupnpd handle "$handle"
+      done </tmp/admin-daemon-chain-handles
+      rm -f /tmp/admin-daemon-chain-handles
+    fi
     nft -a list chain inet filter forward | sed -n "s/.*comment \"admin\" # handle \([0-9]*\).*/\1/p" |
       while read -r handle; do nft delete rule inet filter forward handle "$handle"; done
     echo ok

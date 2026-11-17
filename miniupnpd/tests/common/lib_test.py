@@ -2270,7 +2270,9 @@ def validate_corpus(corpus):
                 kind = request.get("protocol_family", "PCP")
                 validator = REQUEST_VALIDATORS.get(kind) if isinstance(kind, str) else None
                 (validator or validate_pcp_request)(where, request, family)
-            for forward in resolved.get("admin_forwards", []):
+            stage_forwards = [forward for stage in resolved.get("expect", {}).get("traffic_stages", [])
+                              for forward in stage.get("daemon_chain_forwards", [])]
+            for forward in resolved.get("admin_forwards", []) + stage_forwards:
                 if forward.get("protocol") not in ("tcp", "udp"):
                     raise ValueError(f"{where}: invalid admin forward protocol")
                 check_port(where, forward, "external_port")
@@ -2503,6 +2505,15 @@ def add_admin_forward(directory, family, forward):
         family, forward["protocol"], forward["external_port"], forward["internal_port"]))
     if answer.strip() != "ok":
         raise AssertionError(f"admin-forward answered {answer!r}")
+
+
+def add_daemon_chain_forward(directory, family, forward):
+    """A port forward of the administrator inside the NAT chain of the daemon, without a comment. The
+    daemon lists it before its earlier mappings, as a rule of another owner."""
+    answer = router_call(directory, "daemon-chain-forward:{}:{}:{}:{}".format(
+        family, forward["protocol"], forward["external_port"], forward["internal_port"]))
+    if answer.strip() != "ok":
+        raise AssertionError(f"daemon-chain-forward answered {answer!r}")
 
 
 def check_external_port(wanted, port):
@@ -2778,6 +2789,8 @@ class CaseRun:
                 self.run_traffic(stage.get("traffic", []))
                 if stage.get("lose_rules"):
                     lose_firewall_rules(self.args.router_call_dir)
+                for forward in stage.get("daemon_chain_forwards", []):
+                    add_daemon_chain_forward(self.args.router_call_dir, self.args.family, forward)
         if spec.get("wait_after"):
             time.sleep(spec["wait_after"])
             if 0 < spec.get("lease_duration", spec.get("lease_time", 0)) <= spec["wait_after"]:
@@ -2794,6 +2807,8 @@ class CaseRun:
             raise AssertionError("requests/results lengths differ")
         failed = True
         forwards = self.case.get("admin_forwards", [])
+        router_rules = forwards or any(stage.get("daemon_chain_forwards")
+                                       for stage in self.case["expect"].get("traffic_stages", []))
         try:
             for forward in forwards:
                 add_admin_forward(self.args.router_call_dir, self.args.family, forward)
@@ -2810,7 +2825,7 @@ class CaseRun:
                 if not failed:      # else it would replace the failure of the case
                     raise
             finally:
-                if forwards:
+                if router_rules:
                     router_call(self.args.router_call_dir, "admin-clear")
 
 

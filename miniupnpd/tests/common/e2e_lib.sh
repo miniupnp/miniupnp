@@ -291,7 +291,9 @@ e2e_start_runner() {
 # it answers again.
 # admin-forward:FAMILY:PROTO:EXTERNAL:INTERNAL needs admin_forward, which adds a static mapping (a port
 # forward of the administrator, outside the rules of the daemon) and prints "ok"; admin-clear needs
-# admin_clear, which removes them.
+# admin_clear, which removes them. daemon-chain-forward:FAMILY:PROTO:EXTERNAL:INTERNAL needs
+# daemon_chain_forward, which adds a port forward without a comment inside the NAT chain of the daemon
+# and prints "ok"; admin_clear removes it too.
 router_call() {
   case $1 in
     snapshot:*) snapshot_daemon_state "$case_dir/daemon-expect-${1#snapshot:}.txt" ;;
@@ -300,6 +302,7 @@ router_call() {
       echo "restarting the daemon for the runner" >&2
       restart_daemon >/dev/null && echo restarted ;;
     admin-forward:*) admin_forward "${1#admin-forward:}" ;;
+    daemon-chain-forward:*) daemon_chain_forward "${1#daemon-chain-forward:}" ;;
     admin-clear) admin_clear ;;
     *) echo "unknown router command: $1" ;;
   esac
