@@ -474,17 +474,17 @@ test_ipv6(void)
 	add_map(1, 0, "2001:db8::zz", 8080, IPPROTO_UDP, "upnp", 100);
 	assert(lease_table_count() == 0);
 
-	/* A PCP pinhole renewed with the uid the firewall gave it, which a
-	 * UPnP row of another key holds: the renewal takes the row of its key,
-	 * and the other row stays */
-	add_map(11, 0, h, 6060, IPPROTO_UDP, "upnp", 100);
-	add_map(11, 0, h, 6061, IPPROTO_UDP, PCP_DESC, 100);
+	/* A renewal of one key with the uid of a UPnP row of another key: the
+	 * renewal takes the row of its key, and the other row stays */
+	add_map(1, 0, h, 6060, IPPROTO_UDP, "upnp", 100);
+	u = last_uid;
+	add_map(0, 0, h, 6061, IPPROTO_UDP, PCP_DESC, 100);
 	assert(lease_table_count() == 2);
-	renew(11, NULL, 0, h, 6061, IPPROTO_UDP, PCP_DESC, 200);
+	renew(u, NULL, 0, h, 6061, IPPROTO_UDP, PCP_DESC, 200);
 	assert(lease_table_count() == 2);
 	row = pinhole(h, 6061, NULL, 0);
 	assert(row != NULL && row->kind == LEASE_PCP_MAP && row->expiry == 200);
-	row = lease_table_find_uid(11);
+	row = lease_table_find_uid((unsigned short)u);
 	assert(row != NULL && row->iport == 6060 && row->expiry == 100);
 	lease_table_clear();
 
@@ -494,8 +494,8 @@ test_ipv6(void)
 	assert(lease_table_count() == 0);
 
 	/* a remote port with any remote host : the row keeps the port */
-	add_peer(5, "", 5000, 0, h, 7071, IPPROTO_UDP, "upnp", 100);
-	row = lease_table_find_uid(5);
+	add_peer(1, "", 5000, 0, h, 7071, IPPROTO_UDP, "upnp", 100);
+	row = lease_table_find_uid((unsigned short)last_uid);
 	assert(row != NULL && row->remote != NULL && row->remote->rport == 5000);
 	assert(IN6_IS_ADDR_UNSPECIFIED(&row->remote->raddr));
 	/* the key with no remote port is another pinhole */
