@@ -870,6 +870,75 @@ sections:
       result: [SUCCESS]
     description: Occupy a public UDP port, request it for another MAP with PREFER_FAILURE, require CANNOT_PROVIDE_EXTERNAL,
       and verify the first mapping remains intact.
+    # RFC 6887 §11.3 item 1 (MUST): a renewal with PREFER_FAILURE that suggests another external port
+    # cannot be given that port, so the server answers CANNOT_PROVIDE_EXTERNAL and keeps the mapping.
+  - name: prefer-failure-renewal-other-port
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    request:
+      kind: protocol_sequence
+      steps:
+      - protocol: pcp
+        request:
+          pcp: MAP
+          lifetime: 300
+          nonce: '161803398874989484820458'
+          protocol: UDP
+          internal_port: 47211
+          external_port: 48211
+        expect:
+          version: 2
+          opcode: MAP_RESPONSE
+          result: [SUCCESS]
+          length: 60
+        captures:
+          external_port: {offset: 42, type: u16}
+        assert:
+          external_port: {equals: 48211}
+      - protocol: pcp
+        request:
+          pcp: MAP
+          lifetime: 300
+          nonce: '161803398874989484820458'
+          protocol: UDP
+          internal_port: 47211
+          external_port: 48212
+          options: [PREFER_FAILURE]
+        expect:
+          version: 2
+          opcode: MAP_RESPONSE
+          result: [CANNOT_PROVIDE_EXTERNAL]
+          length: request
+      - protocol: pcp
+        request:
+          pcp: MAP
+          lifetime: 300
+          nonce: '161803398874989484820458'
+          protocol: UDP
+          internal_port: 47211
+          external_port: 48211
+        expect:
+          version: 2
+          opcode: MAP_RESPONSE
+          result: [SUCCESS]
+          length: 60
+        captures:
+          external_port: {offset: 42, type: u16}
+        assert:
+          external_port: {equals: 48211}
+      cleanup:
+      - use: map-success
+        request:
+          lifetime: 0
+          nonce: '161803398874989484820458'
+          protocol: UDP
+          internal_port: 47211
+    expect:
+      kind: lifecycle
+      result: [SUCCESS]
+    description: Map 48211, renew it with PREFER_FAILURE suggesting 48212, require CANNOT_PROVIDE_EXTERNAL, and
+      verify a plain renewal still gets 48211.
     # RFC 6887 §11.1.2 (THIRD_PARTY authorization).
   - name: third-party-disabled
     protocol: pcp
@@ -12965,6 +13034,36 @@ sections:
         equals: 287454020
         description: echoed unsupported-opcode payload
     description: "RFC 6886 \xA73.5: echo the entire unsupported-opcode request, preserving bytes after the response header."
+    # RFC 6886 §3.5
+  - name: unsupported-opcode-echo-bytes-4-to-7
+    protocol: natpmp
+    families: [ipv4]
+    request:
+      natpmp: 3
+      private_port: 4660
+      public_port: 22136
+      lifetime: 287454020
+    expect:
+      kind: response
+      version: 0
+      opcode: 131
+      result: [UNSUPP_OPCODE]
+      length: request
+      fields:
+      - offset: 4
+        type: u16
+        equals: 4660
+        description: echoed request bytes 4..5
+      - offset: 6
+        type: u16
+        equals: 22136
+        description: echoed request bytes 6..7
+      - offset: 8
+        type: u32
+        equals: 287454020
+        description: echoed request bytes 8..11
+    description: "RFC 6886 \xA73.5: echo the entire unsupported-opcode request; bytes 4..7 are the request's, not an\
+      \ epoch."
     # RFC 6886 §3.5
   - name: refused-mapping-response-fields
     protocol: natpmp
