@@ -1422,6 +1422,48 @@ sections:
                 - {from: allowed-peer, protocol: udp, service_port: 41224, external_port: 41224, expect: delivered}
           traffic:
             - {from: allowed-peer, protocol: udp, service_port: 41224, external_port: 41224, expect: blocked}
+      # A rule of the administrator inside the NAT chain of the daemon has no description, so the
+      # daemon takes it for another owner's rule of the internal port. Added after the mapping, it is
+      # listed first (nft lists newest first); a lookup that stops at the first rule of the internal
+      # port refuses the client its own renewal.
+      - name: owner-pcp-renewal-finds-own-rule-after-foreign
+        families: [ipv4]
+        description: >-
+          A PCP mapping 41340 is renewed after the administrator added a forward of 41341 to the
+          same internal port in the chain of the daemon. The renewal keeps 41340 and forwards.
+        requests:
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41340, suggested_external_port: 41340}
+          - {pcp: MAP, lifetime: 120, protocol: udp, internal_port: 41340, suggested_external_port: 41340}
+          - {pcp: MAP, lifetime: 0, protocol: udp, internal_port: 41340, suggested_external_port: 41340}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          external_ports: [41340, 41340, null]
+          traffic_stages:
+            - after_request: 1
+              daemon_chain_forwards:
+                - {protocol: udp, external_port: 41341, internal_port: 41340}
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41340, external_port: 41340, expect: delivered}
+      - name: owner-natpmp-renewal-finds-own-rule-after-foreign
+        families: [ipv4]
+        description: >-
+          A NAT-PMP mapping 41342 is renewed after the administrator added a forward of 41343 to the
+          same internal port in the chain of the daemon. The renewal keeps 41342 and forwards.
+        requests:
+          - {natpmp: UDP, private_port: 41342, public_port: 41342, lifetime: 120}
+          - {natpmp: UDP, private_port: 41342, public_port: 41342, lifetime: 120}
+          - {natpmp: UDP, private_port: 41342, public_port: 0, lifetime: 0}
+        expect:
+          results: [SUCCESS, SUCCESS, SUCCESS]
+          external_ports: [41342, 41342, null]
+          traffic_stages:
+            - after_request: 1
+              daemon_chain_forwards:
+                - {protocol: udp, external_port: 41343, internal_port: 41342}
+            - after_request: 2
+              traffic:
+                - {from: allowed-peer, protocol: udp, service_port: 41342, external_port: 41342, expect: delivered}
       - name: owner-peer-on-eport-of-other-internal-port-refused
         families: [ipv4]
         description: A PEER may not use the external port of a MAP of another internal port.
