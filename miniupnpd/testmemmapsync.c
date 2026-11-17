@@ -171,14 +171,7 @@ static void
 map(struct memmap_change * c, enum memmap_op op, unsigned short eport,
     const char * iaddr, unsigned short iport, const char * desc, unsigned int ts)
 {
-	memset(c, 0, sizeof(*c));
-	c->op = op;
-	c->eport = eport;
-	c->iaddr = iaddr;
-	c->iport = iport;
-	c->proto = IPPROTO_TCP;
-	c->desc = desc;
-	c->timestamp = ts;
+	memmap_change_init(c, op, 0, NULL, 0, eport, iaddr, iport, IPPROTO_TCP, desc, ts);
 }
 
 static int
@@ -488,15 +481,7 @@ static void
 pinhole(struct memmap_change * c, enum memmap_op op, int uid, const char * iaddr,
         unsigned short iport, unsigned int ts)
 {
-	memset(c, 0, sizeof(*c));
-	c->op = op;
-	c->uid = uid;
-	c->iaddr = iaddr;
-	c->iport = iport;
-	c->eport = iport;
-	c->proto = IPPROTO_UDP;
-	c->desc = "pinhole";
-	c->timestamp = ts;
+	memmap_change_init(c, op, uid, NULL, 0, iport, iaddr, iport, IPPROTO_UDP, "pinhole", ts);
 }
 
 /* the backend gives the uid, and a failed add leaves no row */

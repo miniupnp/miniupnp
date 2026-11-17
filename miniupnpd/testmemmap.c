@@ -249,17 +249,8 @@ sync1(enum memmap_op op, int uid, const char * raddr, unsigned short rport,
       const char * desc, unsigned int timestamp)
 {
 	struct memmap_change c;
-	memset(&c, 0, sizeof(c));
-	c.op = op;
-	c.raddr = raddr;
-	c.rport = rport;
-	c.eport = eport;
-	c.iaddr = iaddr;
-	c.iport = iport;
-	c.proto = proto;
-	c.desc = desc;
-	c.timestamp = timestamp;
-	c.uid = uid;
+	memmap_change_init(&c, op, uid, raddr, rport, eport, iaddr, iport, proto, desc,
+	                   timestamp);
 	fake_uid = uid;
 	return memmap_sync(&c, 1);
 }

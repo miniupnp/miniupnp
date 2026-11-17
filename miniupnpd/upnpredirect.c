@@ -334,15 +334,7 @@ map_change(struct memmap_change * c, enum memmap_op op, const char * rhost,
            unsigned short eport, const char * iaddr, unsigned short iport,
            int proto, const char * desc, unsigned int timestamp)
 {
-	memset(c, 0, sizeof(*c));
-	c->op = op;
-	c->raddr = rhost;
-	c->eport = eport;
-	c->iaddr = iaddr;
-	c->iport = iport;
-	c->proto = proto;
-	c->desc = desc;
-	c->timestamp = timestamp;
+	memmap_change_init(c, op, 0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
 }
 
 int

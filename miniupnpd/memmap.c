@@ -558,14 +558,8 @@ memmap_adopt_rules(void)
 			continue;
 		syslog(LOG_NOTICE, "adopting rule %hu %s to %s:%hu", eport,
 		       proto_itoa(proto), iaddr, iport);
-		memset(&c, 0, sizeof(c));
-		c.raddr = rhost;
-		c.eport = eport;
-		c.iaddr = iaddr;
-		c.iport = iport;
-		c.proto = proto;
-		c.desc = desc;
-		c.timestamp = timestamp;
+		memmap_change_init(&c, MEMMAP_ADD, 0, rhost, 0, eport, iaddr, iport, proto,
+		                   desc, timestamp);
 		row = new_row(&c);
 		if(row != NULL)
 			lease_table_link(row);
