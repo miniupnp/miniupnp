@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.54 2022/10/22 18:54:16 nanard Exp $
 
+2026/11/19:
+	check file descriptors are bellow FD_SETSIZE
+
 VERSION 1.6.0:
 
 2021/01/15:

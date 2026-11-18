@@ -535,7 +535,7 @@ upnp_get_redirection_infos_by_index(int index,
 		                 : 0;
 		if(proto == IPPROTO_TCP)
 			memcpy(protocol, "TCP", 4);
-#ifdef IPPROTO_UDPLITE
+#if defined(IPPROTO_UDPLITE) && defined(ENABLE_UDPLITE)
 		else if(proto == IPPROTO_UDPLITE)
 			memcpy(protocol, "UDPLITE", 8);
 #endif /* IPPROTO_UDPLITE */
