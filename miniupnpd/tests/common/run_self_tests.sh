@@ -10,6 +10,8 @@
 #
 # Prints one line per check and the failures' output; exits 1 when one fails.
 set -u
+# Python writes no bytecode caches into the source tree.
+export PYTHONDONTWRITEBYTECODE=1
 
 TESTS=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 FAILED=0
