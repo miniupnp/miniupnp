@@ -1408,18 +1408,24 @@ int main(int argc, char * * argv)
 	s_ifacewatch = OpenAndConfInterfaceWatchSocket();
 	/* open UDP socket(s) for receiving SSDP packets */
 	s_ssdp = OpenAndConfSSDPReceiveSocket(0, ttl);
-	if(s_ssdp < 0)
-	{
+	if(s_ssdp < 0) {
 		syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages, exiting");
+		ret = 1;
+		goto quit;
+	} else {
+		syslog(LOG_ERR, "file descriptor %d >= FD_SETSIZE. Exiting", s_ssdp);
 		ret = 1;
 		goto quit;
 	}
 #ifdef ENABLE_IPV6
 	if(ipv6) {
 		s_ssdp6 = OpenAndConfSSDPReceiveSocket(1, ttl);
-		if(s_ssdp6 < 0)
-		{
+		if(s_ssdp6 < 0) {
 			syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages (IPv6), exiting");
+			ret = 1;
+			goto quit;
+		} else {
+			syslog(LOG_ERR, "file descriptor %d >= FD_SETSIZE. Exiting", s_ssdp6);
 			ret = 1;
 			goto quit;
 		}
@@ -1428,9 +1434,12 @@ int main(int argc, char * * argv)
 	/* Open Unix socket to communicate with other programs on
 	 * the same machine */
 	s_unix = OpenUnixSocket(sockpath);
-	if(s_unix < 0)
-	{
+	if(s_unix < 0) {
 		syslog(LOG_ERR, "Cannot open unix socket for communicating with clients. Exiting");
+		ret = 1;
+		goto quit;
+	} else if (s_unix >= FD_SETSIZE) {
+		syslog(LOG_ERR, "file descriptor %d >= FD_SETSIZE. Exiting", s_unix);
 		ret = 1;
 		goto quit;
 	}
@@ -1648,6 +1657,9 @@ int main(int argc, char * * argv)
 			int s = accept(s_unix, NULL, NULL);
 			if(s < 0) {
 				syslog(LOG_ERR, "accept(s_unix): %m");
+			} else if (s >= FD_SETSIZE) {
+				syslog(LOG_ERR, "accept(s_unix): new file descriptor %d >= FD_SETSIZE, closing", s);
+				close(s);
 			} else {
 				syslog(LOG_INFO, "(s=%d) new request connection", s);
 				if(!set_non_blocking(s))
