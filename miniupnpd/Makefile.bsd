@@ -5,7 +5,7 @@
 #
 # Makefile for miniupnpd (MiniUPnP daemon)
 #
-# This Makefile should work for *BSD and SunOS/Solaris.
+# This Makefile should work for *BSD.
 # On Mac OS X, use "bsdmake" to build.
 # This Makefile is NOT compatible with GNU Make.
 # Linux users, please use Makefile.linux
@@ -37,15 +37,6 @@ CONFIG_OPTIONS != cat .configure.cache
 # OSNAME and FWNAME are used for building OS or FW dependent code.
 .include "bsdmake.inc"
 
-# Solaris specific CFLAGS
-.if $(OSNAME) == "SunOS"
-CPPFLAGS += -DSOLARIS2=`uname -r | cut -d. -f2`
-.if $(ARCH) == "amd64"
-CFLAGS += -m64 -mcmodel=kernel -mno-red-zone -ffreestanding
-.elif $(ARCH) == "sparc64"
-CFLAGS += -m64 -mcmodel=medlow
-.endif
-.endif
 
 ISGITREPO != git rev-parse --is-inside-work-tree 2> /dev/null || echo "false"
 .if $(ISGITREPO) == "true"
@@ -62,8 +53,6 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnppinhole.o asyncsendto.o portinuse.o
 OS_OBJS = getifstats.o ifacewatcher.o getroute.o
 PFOBJS = obsdrdr.o pfpinhole.o
-IPFOBJS = ipfrdr.o
-IPFWOBJS = ipfwrdr.o ipfwaux.o
 MISCOBJS = upnpreplyparse.o minixml.o
 
 ALLOBJS = $(STDOBJS) $(MISCOBJS)
@@ -74,9 +63,7 @@ TESTGETROUTEOBJS = testgetroute.o upnputils.o getroute.o
 
 ALLOBJS += $(OS_OBJS)
 
-.if $(OSNAME) == "SunOS"
-ALLSRCS += $(SRCDIR)/solaris/getifstats.c
-.elif $(OSNAME) == "Darwin"
+.if $(OSNAME) == "Darwin"
 ALLSRCS += $(SRCDIR)/mac/getifstats.c
 .else
 ALLSRCS += $(SRCDIR)/bsd/getifstats.c
@@ -86,12 +73,6 @@ ALLSRCS += $(SRCDIR)/bsd/ifacewatcher.c $(SRCDIR)/bsd/getroute.c
 .if $(FWNAME) == "pf"
 FWOBJS = $(PFOBJS)
 FWSRCS = $(PFOBJS:S/^/$(SRCDIR)\/pf\//:S/.o$/.c/)
-.elif $(FWNAME) == "ipfw"
-FWOBJS = $(IPFWOBJS)
-FWSRCS = $(IPFWOBJS:S/^/$(SRCDIR)\/ipfw\//:S/.o$/.c/)
-.else
-FWOBJS = $(IPFOBJS)
-FWSRCS = $(IPFOBJS:S/^/$(SRCDIR)\/ipf\//:S/.o$/.c/)
 .endif
 ALLOBJS += $(FWOBJS)
 ALLSRCS += $(FWSRCS)
@@ -120,9 +101,6 @@ EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
-.endif
-.if $(OSNAME) == "SunOS"
-LIBS += -lsocket -lnsl -lkstat -lresolv
 .endif
 
 # set PREFIX variable to install in the wanted place
@@ -243,12 +221,8 @@ config.h:	$(SRCDIR)/configure $(SRCDIR)/VERSION $(SRCDIR)/Makefile.bsd
 
 $(STDOBJS) $(MISCOBJS):	$(SRCDIR)/$(@:.o=.c)
 $(PFOBJS):	$(SRCDIR)/pf/$(@:.o=.c)
-$(IPFOBJS):	$(SRCDIR)/ipf/$(@:.o=.c)
-$(IPFWOBJS):	$(SRCDIR)/ipfw/$(@:.o=.c)
 
-.if $(OSNAME) == "SunOS"
-getifstats.o:	$(SRCDIR)/solaris/getifstats.c
-.elif $(OSNAME) == "Darwin"
+.if $(OSNAME) == "Darwin"
 getifstats.o:	$(SRCDIR)/mac/getifstats.c
 .else
 getifstats.o:	$(SRCDIR)/bsd/getifstats.c

@@ -45,25 +45,10 @@ To Build and Install :
   # PREFIX=/usr/local make install
 - run as root : The daemon needs rights to modify pf rules.
 
-=========================== *BSD,*Solaris/ipf =============================
-
-configure tries to detect whether ipf or pf should be
-used. If it fails, you can use ./configure --firewall=ipf
-Installation steps are almost the same as with pf.
-
-*Solaris users would be interested in reading informations from :
-https://web.archive.org/web/20110506013706/http://blogs.sun.com/avalon/category/IPFilter
-
-============================= Mac OS X/ipfw ===============================
-
-- To enable non standard compilation options,
-  > ./configure -h
-- use either 'bsdmake -f Makefile.bsd' (if available) or 'make' to build
-
 ============================== Mac OS X/pf ================================
 
-Starting with Mac OS X 10.7 Lion, pf replaced ipfw as the OS X firewall.
-also bsdmake is not available anymore.
+Mac OS X needs version 10.7 Lion or later, which has pf.
+bsdmake is not available anymore.
 Make sure you have installed the Xcode command line tools (from the
 Xcode Preferences menu or using 'xcode-select --install' command)
 

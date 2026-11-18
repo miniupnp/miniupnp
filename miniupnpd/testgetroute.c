@@ -17,11 +17,6 @@
 #include "upnputils.h"
 #include "upnpglobalvars.h"
 
-#ifndef LOG_PERROR
-/* solaris does not define LOG_PERROR */
-#define LOG_PERROR 0
-#endif
-
 struct lan_addr_list lan_addrs;
 int runtime_flags = 0;
 time_t startup_time = 0;

@@ -38,9 +38,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/param.h>
-#if defined(sun)
-#include <kstat.h>
-#elif !defined(__linux__)
+#if !defined(__linux__)
 /* for BSD's sysctl */
 #include <sys/sysctl.h>
 #endif
@@ -871,25 +869,6 @@ set_startup_time(void)
 			fclose(f);
 			startup_time -= uptime;
 		}
-#elif defined(SOLARIS_KSTATS)
-		kstat_ctl_t *kc;
-		kc = kstat_open();
-		if(kc != NULL)
-		{
-			kstat_t *ksp;
-			ksp = kstat_lookup(kc, "unix", 0, "system_misc");
-			if(ksp && (kstat_read(kc, ksp, NULL) != -1))
-			{
-				void *ptr = kstat_data_lookup(ksp, "boot_time");
-				if(ptr)
-					memcpy(&startup_time, ptr, sizeof(startup_time));
-				else
-					syslog(LOG_ERR, "cannot find boot_time kstat");
-			}
-			else
-				syslog(LOG_ERR, "cannot open kstats for unix/0/system_misc: %m");
-			kstat_close(kc);
-		}
 #else
 		struct timeval boottime;
 		size_t size = sizeof(boottime);
@@ -1264,7 +1243,7 @@ void print_usage(FILE * out, const char * argv0) {
 			" [-H https_port]"
 #endif
 			" [-p port] [-d] [-v]"
-#if defined(USE_PF) || defined(USE_IPF)
+#ifdef USE_PF
 			" [-L]"
 #endif
 			" [-U] [-S0]"
@@ -1307,8 +1286,8 @@ void print_usage(FILE * out, const char * argv0) {
 #ifdef ENABLE_IPV6
 			"\t-4 disable IPv6\n"
 #endif
-#if defined(USE_PF) || defined(USE_IPF)
-			"\t-L sets packet log in pf and ipf on.\n"
+#ifdef USE_PF
+			"\t-L sets packet log in pf on.\n"
 #endif
 			"\t-S0 disable \"secure\" mode so clients can add mappings to other ips\n"
 			"\t-U causes miniupnpd to report system uptime instead "
@@ -1579,12 +1558,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(SYSUPTIMEMASK);	/*sysuptime = 1;*/
 				break;
-#if defined(USE_PF) || defined(USE_IPF)
+#ifdef USE_PF
 			case UPNPPACKET_LOG:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(LOGPACKETSMASK);	/*logpackets = 1;*/
 				break;
-#endif	/* defined(USE_PF) || defined(USE_IPF) */
+#endif	/* USE_PF */
 			case UPNPUUID:
 				strncpy(uuidvalue_igd+5, ary_options[i].value,
 				        strlen(uuidvalue_igd+5) + 1);
@@ -1823,12 +1802,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		/*case 'l':
 			logfilename = argv[++i];
 			break;*/
-#if defined(USE_PF) || defined(USE_IPF)
+#ifdef USE_PF
 		case 'L':
 			/*logpackets = 1;*/
 			SETFLAG(LOGPACKETSMASK);
 			break;
-#endif	/* defined(USE_PF) || defined(USE_IPF) */
+#endif	/* USE_PF */
 		case 'S':
 			/* -S0 to disable secure mode, for backward compatibility
 			 * -S is ignored */
@@ -2330,12 +2309,6 @@ main(int argc, char * * argv)
 			     " " __DATE__ );
 #ifdef USE_PF
 			puts("using pf backend");
-#endif
-#ifdef USE_IPF
-			puts("using ipf backend");
-#endif
-#ifdef USE_IPFW
-			puts("using ipfw backend");
 #endif
 #ifdef USE_IPTABLES
 			puts("using netfilter(iptables) backend");
