@@ -609,7 +609,7 @@ run_restart_check() {
   mkdir -p "$restart_dir"
   lease_runner="python3 -I $PMP/run_pcp_wire_cases.py --port 5351 --platform $E2E_PLATFORM --mutating
     --profile baseline --snapshot-dir $restart_dir
-    --state-command '$RSH $VM_USER@127.0.0.1 cat /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6'"
+    --state-command '$RSH $VM_USER@127.0.0.1 \"for f in /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6; do [ ! -e \$f ] || cat \$f; done\"'"
   ports=
   for family in ipv4 ipv6; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
