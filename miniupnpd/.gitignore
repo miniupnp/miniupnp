@@ -26,6 +26,10 @@ pf/testobsdrdr
 pf/testpfpinhole
 netfilter/test_nfct_get
 testminissdp
+testifacewatcher
+teststun
+testupnphttp
+validateupnphttp
 dox/
 bsdmake.inc
 upnpstun
