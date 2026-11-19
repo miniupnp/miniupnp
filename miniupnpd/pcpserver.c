@@ -1939,7 +1939,8 @@ static void PCPSendAnnounceOnce(int * sockets, int n_sockets)
 	/* OpenAndConfNATPMPSocket() set the multicast output interface of
 	 * each socket to its LAN interface */
 	for(i = 0; i < n_sockets; i++) {
-		if (sockets[i] < 0) {
+		/* an IPv6-only LAN gets the IPv6 ANNOUNCE below only */
+		if (sockets[i] < 0 || !natpmp_socket_has_ipv4(i)) {
 			continue;
 		}
 		len = sendto_or_schedule(sockets[i], buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
