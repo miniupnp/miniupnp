@@ -30,6 +30,13 @@ extern const char * ext_stun_host;
 /*! \brief STUN server port */
 extern uint16_t ext_stun_port;
 
+/* How far the daemon trusts the firewall to keep the rules it was given:
+ * FW_TRUST_CHECK, a renewal looks its rule up by key and adds it again if
+ * it is gone; FW_TRUST_TRUST, a renewal changes the table only. */
+#define FW_TRUST_CHECK	0
+#define FW_TRUST_TRUST	1
+extern int firewall_trust;
+
 /* file to store all leases */
 #ifdef ENABLE_LEASEFILE
 extern const char * lease_file;

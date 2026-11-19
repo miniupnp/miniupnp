@@ -55,7 +55,7 @@ CPPFLAGS += -DMINIUPNPD_GIT_REF=\"$(GITREF)\"
 
 STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpredirect.o getifaddr.o daemonize.o upnpglobalvars.o \
-          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o \
+          options.o upnppermissions.o minissdp.o natpmp.o pcpserver.o lease_table.o memmap.o fwsync.o \
           pcplearndscp.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
@@ -108,15 +108,20 @@ TESTMINISSDPOBJS = testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
 TESTIFACEWATCHEROBJS = testifacewatcher.o ifacewatcher.o upnputils.o \
                        getroute.o
 TESTSTUNOBJS = teststun.o upnpstun.o upnputils.o getroute.o $(FWOBJS) \
-               getifaddr.o
+               memmap_stub.o getifaddr.o
 TESTUPNPHTTPOBJS = testupnphttp.o upnphttp.o upnputils.o getosversion.o \
                    getroute.o
+TESTLEASETABLEOBJS = testleasetable.o lease_table.o
+TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o
+TESTMEMMAPSYNCOBJS = testmemmapsync.o memmap.o lease_table.o
+TESTFWSYNCOBJS = testfwsync.o fwsync.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp \
-              testifacewatcher teststun testupnphttp
+              testifacewatcher teststun testupnphttp \
+              testleasetable testmemmap testmemmapsync testfwsync
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -152,6 +157,10 @@ clean:
 	$(RM) $(TESTGETROUTEOBJS)
 	$(RM) testssdppktgen.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen validateupnphttp
+	$(RM) validateleasetable testleasetable.o
+	$(RM) validatememmap testmemmap.o
+	$(RM) validatememmapsync testmemmapsync.o
+	$(RM) validatefwsync testfwsync.o
 
 install:	miniupnpd
 	$(STRIP) miniupnpd
@@ -164,7 +173,8 @@ install:	miniupnpd
 	$(INSTALL) -m 644 $(SRCDIR)/miniupnpd.8 $(DESTDIR)$(INSTALLMANDIR)/man8/miniupnpd.8
 
 check:  validateupnppermissions validategetifaddr validatessdppktgen \
-        validateupnphttp
+        validateupnphttp validateleasetable validatememmap \
+        validatememmapsync validatefwsync
 
 validateupnppermissions: $(SRCDIR)/testupnppermissions.sh testupnppermissions
 	$(SRCDIR)/testupnppermissions.sh
@@ -180,6 +190,22 @@ validatessdppktgen:	testssdppktgen
 
 validateupnphttp:	$(SRCDIR)/testupnphttp.sh testupnphttp
 	$(SRCDIR)/testupnphttp.sh
+	touch $@
+
+validateleasetable:	testleasetable
+	./testleasetable
+	touch $@
+
+validatememmap:	testmemmap
+	./testmemmap
+	touch $@
+
+validatememmapsync:	testmemmapsync
+	./testmemmapsync
+	touch $@
+
+validatefwsync:	testfwsync
+	./testfwsync
 	touch $@
 
 depend:	$(ALLSRCS)
@@ -232,6 +258,18 @@ teststun: config.h $(TESTSTUNOBJS)
 
 testupnphttp:	config.h $(TESTUPNPHTTPOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTUPNPHTTPOBJS) $(LIBS)
+
+testleasetable:	config.h $(TESTLEASETABLEOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTLEASETABLEOBJS)
+
+testmemmap:	config.h $(TESTMEMMAPOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTMEMMAPOBJS)
+
+testmemmapsync:	config.h $(TESTMEMMAPSYNCOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTMEMMAPSYNCOBJS)
+
+testfwsync:	config.h $(TESTFWSYNCOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTFWSYNCOBJS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^

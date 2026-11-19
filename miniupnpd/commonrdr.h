@@ -25,13 +25,6 @@ init_redirect(void);
 void
 shutdown_redirect(void);
 
-/*!
- * \param[in] ifname external interface name
- * \return -1 for error or the number of redirection rules
- */
-int
-get_redirect_rule_count(const char * ifname);
-
 
 
 /*! \brief get port mapping by external port and protocol

@@ -37,6 +37,7 @@
 #include <libnftnl/chain.h>
 #include <libnftnl/rule.h>
 #include <libnftnl/expr.h>
+#include <libnftnl/gen.h>
 
 #include "../commonrdr.h"
 #include "nftnlrdr_misc.h"
@@ -84,6 +85,9 @@ static uint32_t mnl_seq = 0;
 
 // FILTER
 struct rule_list head_filter = LIST_HEAD_INITIALIZER(head_filter);
+/* the filter rules of the IPv6 table, when IPv6 has a table of its own
+ * (upnp_nftables_family_split): the map6 rules are there */
+static struct rule_list head_filter6 = LIST_HEAD_INITIALIZER(head_filter6);
 // DNAT
 struct rule_list head_redirect = LIST_HEAD_INITIALIZER(head_redirect);
 // SNAT
@@ -92,6 +96,16 @@ struct rule_list head_peer = LIST_HEAD_INITIALIZER(head_peer);
 static uint32_t rule_list_filter_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_redirect_validate = RULE_CACHE_INVALID;
 static uint32_t rule_list_peer_validate = RULE_CACHE_INVALID;
+/* the generation of the ruleset each cache was read in: another program
+ * which changes the ruleset changes it */
+static uint32_t rule_list_filter_gen;
+static uint32_t rule_list_redirect_gen;
+static uint32_t rule_list_peer_gen;
+static uint32_t rule_list_filter6_validate = RULE_CACHE_INVALID;
+static uint32_t rule_list_filter6_gen;
+/* bumped at each change of the rules the map6 list holds, see
+ * nft_map6_cache_epoch() */
+static uint32_t map6_cache_epoch;
 
 
 /*
@@ -533,6 +547,7 @@ struct table_cb_data {
 	const char * table;
 	const char * chain;
 	enum rule_type type;
+	struct rule_list * filter_head;	/* where a filter rule goes */
 	int alloc_failed;
 };
 
@@ -635,7 +650,8 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					break;
 
 				case RULE_FILTER:
-					LIST_INSERT_HEAD(&head_filter, r, entry);
+					LIST_INSERT_HEAD(CB_DATA(filter_head), r, entry);
+					map6_cache_epoch++;
 					r = NULL;
 					break;
 
@@ -656,43 +672,157 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 }
 #undef CB_DATA
 
+static int
+gen_cb(const struct nlmsghdr *nlh, void *data)
+{
+	struct nftnl_gen *g = nftnl_gen_alloc();
+
+	if (g == NULL)
+		return MNL_CB_ERROR;
+	if (nftnl_gen_nlmsg_parse(nlh, g) < 0) {
+		nftnl_gen_free(g);
+		return MNL_CB_ERROR;
+	}
+	*(uint32_t *)data = nftnl_gen_get_u32(g, NFTNL_GEN_ID);
+	nftnl_gen_free(g);
+	return MNL_CB_OK;
+}
+
+/* The generation of the ruleset, which each commit of any program changes.
+ * 0, or -1 if it could not be read. */
+static int
+ruleset_gen(uint32_t *gen)
+{
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *nlh;
+	ssize_t n;
+
+	if (mnl_sock == NULL)
+		return -1;
+	mnl_seq = time(NULL);
+	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETGEN, AF_UNSPEC, 0, mnl_seq);
+	if (mnl_socket_sendto(mnl_sock, nlh, nlh->nlmsg_len) < 0)
+		return -1;
+	n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+	if (n <= 0)
+		return -1;
+	return mnl_cb_run(buf, n, mnl_seq, mnl_portid, gen_cb, gen) < 0 ? -1 : 0;
+}
+
+/* Read a chain into its cache, unless the cache holds it as it is: read in
+ * the generation the ruleset still has. */
+static int
+refresh_cache(uint32_t *valid, uint32_t *gen, struct rule_list *head,
+              const char *table, const char *chain, uint32_t family,
+              enum rule_type type)
+{
+	uint32_t now;
+
+	if (ruleset_gen(&now) < 0)
+		*valid = RULE_CACHE_INVALID;
+	else if (*valid == RULE_CACHE_VALID && now == *gen)
+		return 0;
+	/* a commit during the read changes the generation again: the next
+	 * call reads the chain once more */
+	if (refresh_nft_cache(head, table, chain, family, type) < 0) {
+		*valid = RULE_CACHE_INVALID;
+		return -1;
+	}
+	*valid = RULE_CACHE_VALID;
+	*gen = now;
+	return 0;
+}
+
 int
 refresh_nft_cache_filter(void)
 {
-	if (rule_list_filter_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_filter, nft_table, nft_forward_chain, nft_ipv4_family, RULE_FILTER) < 0)
-			return -1;
-		rule_list_filter_validate = RULE_CACHE_VALID;
+	return refresh_cache(&rule_list_filter_validate, &rule_list_filter_gen,
+	                     &head_filter, nft_table, nft_forward_chain,
+	                     nft_ipv4_family, RULE_FILTER);
+}
+
+/* the list the map6 rules are in, read if it is not as the ruleset is:
+ * head_filter, or with a table of its own for IPv6, the filter chain of
+ * that table */
+struct rule_list *
+nft_map6_rules(void)
+{
+	if (nft_ipv6_family == nft_ipv4_family) {
+		refresh_nft_cache_filter();
+		return &head_filter;
 	}
-	return 0;
+	refresh_cache(&rule_list_filter6_validate, &rule_list_filter6_gen, &head_filter6,
+	              nft_table, nft_forward_chain, nft_ipv6_family, RULE_FILTER);
+	return &head_filter6;
+}
+
+uint32_t
+nft_map6_cache_epoch(void)
+{
+	return map6_cache_epoch;
+}
+
+/* The generation a valid map6 list was read in: 1, or 0 if it is not valid */
+int
+nft_map6_cache_gen(uint32_t * gen)
+{
+	int split = nft_ipv6_family != nft_ipv4_family;
+	if ((split ? rule_list_filter6_validate : rule_list_filter_validate) != RULE_CACHE_VALID)
+		return 0;
+	*gen = split ? rule_list_filter6_gen : rule_list_filter_gen;
+	return 1;
+}
+
+/* A map6 rule p of the list was deleted, by a commit of the daemon made
+ * when the list was valid in generation gen_before. If no other commit came
+ * between, the list stays valid without p, and the next lookup reads no
+ * chain: N deletes then read the chain once, not N times. */
+void
+nft_map6_cache_forget(rule_t * p, uint32_t gen_before)
+{
+	int split = nft_ipv6_family != nft_ipv4_family;
+	uint32_t now;
+
+	if (ruleset_gen(&now) < 0 || now != gen_before + 1)
+		return;
+	LIST_REMOVE(p, entry);
+	free(p->desc);
+	free(p->table);
+	free(p->chain);
+	free(p);
+	map6_cache_epoch++;
+	if (split) {
+		rule_list_filter6_validate = RULE_CACHE_VALID;
+		rule_list_filter6_gen = now;
+	} else {
+		rule_list_filter_validate = RULE_CACHE_VALID;
+		rule_list_filter_gen = now;
+	}
 }
 
 int
 refresh_nft_cache_peer(void)
 {
-	if (rule_list_peer_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_peer, nft_nat_table, nft_postrouting_chain, nft_nat_family, RULE_NAT) < 0)
-			return -1;
-		rule_list_peer_validate = RULE_CACHE_VALID;
-	}
-	return 0;
+	return refresh_cache(&rule_list_peer_validate, &rule_list_peer_gen,
+	                     &head_peer, nft_nat_table, nft_postrouting_chain,
+	                     nft_nat_family, RULE_NAT);
 }
 
 int
 refresh_nft_cache_redirect(void)
 {
-	if (rule_list_redirect_validate != RULE_CACHE_VALID) {
-		if (refresh_nft_cache(&head_redirect, nft_nat_table, nft_prerouting_chain, nft_nat_family, RULE_NAT) < 0)
-			return -1;
-		rule_list_redirect_validate = RULE_CACHE_VALID;
-	}
-	return 0;
+	return refresh_cache(&rule_list_redirect_validate, &rule_list_redirect_gen,
+	                     &head_redirect, nft_nat_table, nft_prerouting_chain,
+	                     nft_nat_family, RULE_NAT);
 }
 
 void
 flush_nft_cache(struct rule_list *head)
 {
 	rule_t *p1, *p2;
+
+	if (head == &head_filter || head == &head_filter6)
+		map6_cache_epoch++;
 
 	p1 = LIST_FIRST(head);
 	while (p1 != NULL) {
@@ -753,6 +883,7 @@ refresh_nft_cache(struct rule_list *head, const char *table, const char *chain, 
 	data.table = table;
 	data.chain = chain;
 	data.type = type;
+	data.filter_head = type == RULE_FILTER ? head : &head_filter;
 	data.alloc_failed = 0;
 	do {
 		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
@@ -1247,12 +1378,12 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	}
 #endif
 
-	/* Destination Port */
+	/* Destination Port. UDP-Lite has its ports where UDP has them. */
 	dport = htons(iport);
 	if (proto == IPPROTO_TCP) {
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct tcphdr, dest), sizeof(uint16_t));
-	} else if (proto == IPPROTO_UDP) {
+	} else {
 		expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 		                 offsetof(struct udphdr, dest), sizeof(uint16_t));
 	}
@@ -1264,7 +1395,7 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 		if (proto == IPPROTO_TCP) {
 			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 			                 offsetof(struct tcphdr, source), sizeof(uint16_t));
-		} else if (proto == IPPROTO_UDP) {
+		} else {
 			expr_add_payload(r, NFT_PAYLOAD_TRANSPORT_HEADER, NFT_REG_1,
 			                 offsetof(struct udphdr, source), sizeof(uint16_t));
 		}
@@ -1330,6 +1461,7 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain
 		switch (chain_type) {
 			case RULE_CHAIN_FILTER:
 				rule_list_filter_validate = RULE_CACHE_INVALID;
+				rule_list_filter6_validate = RULE_CACHE_INVALID;
 				break;
 			case RULE_CHAIN_PEER:
 				rule_list_peer_validate = RULE_CACHE_INVALID;

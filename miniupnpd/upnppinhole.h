@@ -28,7 +28,8 @@ upnp_check_outbound_pinhole(int proto, int * timeout);
 #endif
 
 /* find an inbound pinhole base on remove host:port / local host:port
- * return the (positive) uid or a negative value if not found */
+ * return the uid, 0 for a pinhole with none (PCP), or a negative value if not
+ * found */
 int
 upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
                          const char * iaddr, unsigned short iport,
@@ -36,7 +37,8 @@ upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
                          char * desc, int desc_len, unsigned int * leasetime);
 
 
-/* add an inbound pinehole
+/* add an inbound pinehole. With uid, for UPnP, the pinhole gets a uid, set in
+ * *uid. With uid NULL, for PCP, it gets none: PCP finds it by its rule.
  * return value :
  *  1 = success
  * -1 = Pinhole space exhausted
@@ -73,9 +75,19 @@ upnp_get_pinhole_uid_by_index(int index);
 int
 upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime);
 
+/* The same, with a new description unless desc is NULL. 0, or < 0. */
+int
+upnp_renew_inboundpinhole(unsigned short uid, const char * desc, unsigned int leasetime);
+
 /* remove the inbound pinhole */
 int
 upnp_delete_inboundpinhole(unsigned short uid);
+
+/* remove the inbound pinhole of this rule, which may have no uid (PCP).
+ * 0, or < 0. */
+int
+upnp_delete_inboundpinhole_key(const char * raddr, unsigned short rport,
+                                const char * iaddr, unsigned short iport, int proto);
 
 /* ... */
 #if 0

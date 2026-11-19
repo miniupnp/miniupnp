@@ -25,6 +25,7 @@
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
 #include "upnputils.h"
+#include "memmap.h"
 #include "upnppinhole.h"
 #ifdef __APPLE__
 /* XXX - Apple version of PF API seems to differ from what
@@ -33,16 +34,6 @@
 #undef USE_PF
 #endif /* USE_PF */
 #endif /* __APPLE__ */
-#if defined(USE_NETFILTER)
-#include "netfilter/iptpinhole.h"
-#endif
-#if defined(USE_PF)
-#include "pf/pfpinhole.h"
-#endif
-#if defined(USE_IPF)
-#endif
-#if defined(USE_IPFW)
-#endif
 #ifdef ENABLE_LEASEFILE
 #include <sys/stat.h>
 #endif
@@ -247,15 +238,17 @@ lease_file6_update(int uid, unsigned int leaseduration)
 			continue;
 		}
 		*(desc++) = '\0';
+		desc[strcspn(desc, "\r\n")] = '\0';	/* the line end is written again below */
 		timestamp_rule = (unsigned int)strtoul(p2, NULL, 10);
 
 		if (uid == uid_rule) {
 			timestamp_rule = timestamp;
 		}
 
+		/* each line keeps its own uid: only the renewed one gets a new expiry */
 		fprintf(fdt, "%s;%s;%hu;%s;%hu;%u;%u;%s\n",
 	        proto, int_client, int_port, rem_client, rem_port,
-	        uid, timestamp_rule, desc);
+	        uid_rule, timestamp_rule, desc);
 	}
 
 	fclose(fdt);
@@ -585,8 +578,9 @@ int reload_from_lease_file6(void)
 			leaseduration = 0;	/* default value */
 		}
 
+		/* a line with uid 0 is a PCP pinhole, which has none */
 		r = upnp_add_inboundpinhole(rem_client, rem_port, int_client, int_port, proto_atoi(proto),
-                        		desc, leaseduration, &uid);
+                        		desc, leaseduration, uid > 0 ? &uid : NULL);
 		if(r == -1) {
 			syslog(LOG_ERR, "Failed to add %s:%hu -> %s:%hu protocol %s",
 			       rem_client, rem_port, int_client, int_port, proto);
@@ -603,22 +597,30 @@ int reload_from_lease_file6(void)
 
 #endif
 
+/* One change of a pinhole, for memmap_sync(). iaddr NULL : by uid only */
+static void
+map6_change(struct memmap_change * c, enum memmap_op op, int uid,
+               const char * raddr, unsigned short rport,
+               const char * iaddr, unsigned short iport, int proto,
+               const char * desc, unsigned int timestamp)
+{
+	/* a pinhole has no external port of its own */
+	memmap_change_init(c, op, uid, raddr, rport, iport, iaddr, iport, proto, desc,
+	                   timestamp);
+}
+
 int
 upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
                          const char * iaddr, unsigned short iport,
                          int proto, char * desc, int desc_len, unsigned int * leasetime)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	int uid;
-	uid = find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
-	                   desc, desc_len, leasetime);
-	return uid;
-#else
-	return -42;
-#endif
+	return memmap_find_map6(raddr, rport, iaddr, iport, proto,
+	                           desc, desc_len, leasetime);
 }
 
 /* upnp_add_inboundpinhole()
+ * uid NULL : the pinhole gets no uid, as for PCP, which finds it by its rule.
+ * Else *uid is set to the uid of the pinhole, for UPnP.
  * returns:  1 on success
  *          -1 Pinhole space exhausted
  *          -4 invalid arguments
@@ -635,10 +637,11 @@ upnp_add_inboundpinhole(const char * raddr,
                         unsigned int leasetime,
                         int * uid)
 {
-	int r;
+	int r, found;
 	time_t current;
 	unsigned int timestamp;
 	struct in6_addr address;
+	struct memmap_change c;
 
 	r = inet_pton(AF_INET6, iaddr, &address);
 	if(r <= 0) {
@@ -650,28 +653,36 @@ upnp_add_inboundpinhole(const char * raddr,
 	timestamp = current + leasetime;
 	r = 0;
 
-	*uid = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
-	if(*uid >= 0) {
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, *uid);
-		r = upnp_update_inboundpinhole(*uid, leasetime);
+#if defined(USE_PF) || defined(USE_NETFILTER)
+	found = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
+	if(found >= 0) {
+		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, found);
+		/* by its rule, as a PCP pinhole has no uid; UPnP gets one */
+		r = memmap_renew_map6_at(raddr, rport, iaddr, iport, proto, desc,
+		                            timestamp, uid != NULL);
+		if (uid != NULL)
+			*uid = r < 0 ? -1 : r;
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {
 			lease_file6_remove(iaddr, iport, proto, -1);
-			lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
+			lease_file6_add(raddr, rport, iaddr, iport, proto, r, desc, timestamp);
 		}
 #endif /* ENABLE_LEASEFILE */
 		return (r >= 0) ? 1 : r;
 	}
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	*uid = add_pinhole (ext_if_name6, raddr, rport,
-	                    iaddr, iport, proto, desc, timestamp);
+	map6_change(&c, MEMMAP_ADD, 0, raddr, rport, iaddr, iport, proto, desc,
+	               timestamp);
+	c.give_uid = uid != NULL;
+	r = memmap_sync(&c, 1) < 0 ? -1 : 1;
+	if (uid != NULL)
+		*uid = r < 0 ? -1 : c.uid;
 #ifdef ENABLE_LEASEFILE
-	if (*uid >= 0) {
+	if (r >= 0) {
 		lease_file6_remove(iaddr, iport, proto, -1);
-		lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
+		lease_file6_add(raddr, rport, iaddr, iport, proto, c.uid, desc, timestamp);
 	}
 #endif /* ENABLE_LEASEFILE */
-	return *uid >= 0 ? 1 : -1;
+	return r;
 #else
 	return -42;	/* not implemented */
 #endif
@@ -769,14 +780,12 @@ upnp_get_pinhole_info(unsigned short uid,
 	int r;
 	unsigned int timestamp;
 	u_int64_t packets_tmp;
-	/*u_int64_t bytes_tmp;*/
 
-	r = get_pinhole_info(uid, raddr, raddrlen, rport,
-	                     iaddr, iaddrlen, iport,
-	                     proto, desc, desclen,
-	                     leasetime ? &timestamp : NULL,
-	                     packets ? &packets_tmp : NULL,
-	                     NULL/*&bytes_tmp*/);
+	r = memmap_get_map6(uid, raddr, raddrlen, rport,
+	                       iaddr, iaddrlen, iport,
+	                       proto, desc, desclen,
+	                       leasetime ? &timestamp : NULL,
+	                       packets ? &packets_tmp : NULL);
 	if(r >= 0) {
 		if(leasetime) {
 			time_t current_time;
@@ -803,30 +812,29 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_get_pinhole_uid_by_index(int index)
 {
-#if defined (USE_NETFILTER)
-	return get_pinhole_uid_by_index(index);
-#else
-	UNUSED(index);
-	return -42;
-#endif /* defined (USE_NETFILTER) */
+	return memmap_map6_uid_at(index);
 }
 
 int
 upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	unsigned int timestamp;
-	int ret;
+	return upnp_renew_inboundpinhole(uid, NULL, leasetime);
+}
 
-	timestamp = upnp_time() + leasetime;
-	ret = update_pinhole(uid, timestamp);
+int
+upnp_renew_inboundpinhole(unsigned short uid, const char * desc, unsigned int leasetime)
+{
+#if defined(USE_PF) || defined(USE_NETFILTER)
+	unsigned int timestamp = upnp_time() + leasetime;
+	/* the expiry is the table's: the rule stays as it is */
+	int ret = memmap_renew_map6(uid, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
 		lease_file6_update(uid, timestamp);
 #endif
 	return ret;
 #else
-	UNUSED(uid); UNUSED(leasetime);
+	UNUSED(uid); UNUSED(desc); UNUSED(leasetime);
 
 	return -42; /* not implemented */
 #endif
@@ -837,7 +845,15 @@ upnp_delete_inboundpinhole(unsigned short uid)
 {
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	int ret;
-	ret = delete_pinhole(uid);
+	char iaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN] = "";
+	unsigned short iport = 0, rport = 0;
+	int proto = 0;
+	struct memmap_change c;
+	int known = upnp_get_pinhole_info(uid, raddr, sizeof(raddr), &rport, iaddr, sizeof(iaddr),
+	                                  &iport, &proto, NULL, 0, NULL, NULL) >= 0;
+	map6_change(&c, MEMMAP_DELETE_MAP6, uid, raddr, rport,
+	               known ? iaddr : NULL, iport, proto, NULL, 0);
+	ret = memmap_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
 		lease_file6_remove((const char *)"*", 0, 0, uid);
@@ -846,6 +862,29 @@ upnp_delete_inboundpinhole(unsigned short uid)
 	return ret;
 #else
 	UNUSED(uid);
+
+	return -1;
+#endif
+}
+
+int
+upnp_delete_inboundpinhole_key(const char * raddr, unsigned short rport,
+                                const char * iaddr, unsigned short iport, int proto)
+{
+#if defined(USE_PF) || defined(USE_NETFILTER)
+	int ret;
+	struct memmap_change c;
+	map6_change(&c, MEMMAP_DELETE_MAP6, 0, raddr, rport, iaddr, iport, proto,
+	               NULL, 0);
+	ret = memmap_sync(&c, 1);
+#ifdef ENABLE_LEASEFILE
+	if (ret == 0)
+		lease_file6_remove(iaddr, iport, proto, -1);
+#endif
+
+	return ret;
+#else
+	UNUSED(raddr); UNUSED(rport); UNUSED(iaddr); UNUSED(iport); UNUSED(proto);
 
 	return -1;
 #endif
@@ -1075,7 +1114,37 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	ret = clean_pinhole_list(next_timestamp);
+	struct expired_map6 expired[MAP6_EXPIRE_PER_PASS];
+	struct memmap_change change;
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int next;
+	int n, i, failed = 0;
+
+	n = memmap_expired_map6s(now, expired, MAP6_EXPIRE_PER_PASS, &next);
+	for (i = 0; i < n; i++) {
+		const char * raddr = expired[i].raddr[0] != '\0' ? expired[i].raddr : NULL;
+		syslog(LOG_INFO, "remove pinhole %hu [%s]:%hu %s because it has expired",
+		       expired[i].uid, expired[i].iaddr, expired[i].iport,
+		       proto_itoa(expired[i].proto));
+		map6_change(&change, MEMMAP_DELETE_MAP6, expired[i].uid, raddr,
+		               expired[i].rport, expired[i].iaddr, expired[i].iport,
+		               expired[i].proto, NULL, 0);
+		/* One request each: the backends change one rule at a time and
+		 * take the earlier changes back when one fails, which would add
+		 * the rules of expired map6s again. One rule which cannot go
+		 * does not keep the others. */
+		if (memmap_sync(&change, 1) == 0)
+			ret++;
+		else
+			failed = 1;
+	}
+	/* What could not be removed still has its row: try it again in a
+	 * minute. A full pass (next is now) which removed nothing would pick
+	 * the same rows at once, so it waits too. */
+	if (failed && (next == 0 || now + 60 < next || (next == now && ret == 0)))
+		next = now + 60;
+	if (next != 0)
+		*next_timestamp = next;
 #else
 	UNUSED(next_timestamp);
 #endif
