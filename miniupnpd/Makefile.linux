@@ -86,7 +86,8 @@ EXECUTABLES += testupnpdescgen testgetifstats \
                testupnppermissions testgetifaddr \
                testgetroute testasyncsendto testportinuse \
                testssdppktgen testminissdp testifacewatcher \
-               teststun testupnphttp
+               teststun testupnphttp testleasetable \
+               testmemmap testmemmapsync testfwsync
 endif
 
 .PHONY:	all clean install dox
@@ -98,6 +99,7 @@ clean:
 	$(RM) -r $(DEPDIR)
 	$(RM) $(EXECUTABLES)
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen
+	$(RM) validateleasetable validatememmap validatememmapsync validatefwsync
 	$(RM) validateversion
 	$(RM) -r dox/
 
@@ -130,7 +132,7 @@ include $(SRCDIR)/check.mk
 include $(SRCDIR)/common.mk
 
 testportinuse:	testportinuse.o portinuse.o getifaddr.o \
-	iptcrdr.o upnputils.o getroute.o
+	iptcrdr.o upnputils.o getroute.o memmap_stub.o
 
 teststun: teststun.o upnpstun.o \
 	iptcrdr.o upnputils.o getroute.o

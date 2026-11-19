@@ -413,7 +413,7 @@ add_filter_rule2(const char * ifname,
 }
 
 /* get_redirect_rule()
- * returns -1 if the rule is not found */
+ * returns -2 if the rule is not found, -1 if the rules could not be read, as pf */
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,
@@ -438,7 +438,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned
                   unsigned int * timestamp,
                   u_int64_t * packets, u_int64_t * bytes)
 {
-	int r = -1;
+	int r = -2;	/* not found */
 	IPTC_HANDLE h;
 	const struct ipt_entry * e;
 	const struct ipt_entry_target * target;
@@ -456,6 +456,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned
 	if(!iptc_is_chain(nat_chain_name, h))
 	{
 		syslog(LOG_ERR, "chain %s not found", nat_chain_name);
+		r = -1;
 	}
 	else
 	{
@@ -599,6 +600,60 @@ get_redirect_rule_by_index(int index,
 		iptc_free(h);
 #else
 		iptc_free(&h);
+#endif
+	return r;
+}
+
+/* get_redirect_rules_counters()
+ * One walk of the chain, where get_redirect_rule() reads the whole nat table
+ * for each rule. */
+int
+get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
+                                       u_int64_t packets, u_int64_t bytes, void * arg),
+                            void * arg)
+{
+	int r = -1;
+	IPTC_HANDLE h;
+	const struct ipt_entry * e;
+	const struct ipt_entry_match *match;
+	unsigned short eport;
+
+	h = iptc_init("nat");
+	if(!h)
+	{
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "get_redirect_rules_counters", iptc_strerror(errno));
+		return -1;
+	}
+	if(!iptc_is_chain(miniupnpd_nat_chain, h))
+	{
+		syslog(LOG_ERR, "chain %s not found", miniupnpd_nat_chain);
+	}
+	else
+	{
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_nat_chain, h);
+		    e;
+			e = iptc_next_rule(e, h))
+#else
+		for(e = iptc_first_rule(miniupnpd_nat_chain, &h);
+		    e;
+			e = iptc_next_rule(e, &h))
+#endif
+		{
+			match = (const struct ipt_entry_match *)&e->elems;
+			if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+				eport = ((const struct ipt_tcp *)match->data)->dpts[0];
+			else
+				eport = ((const struct ipt_udp *)match->data)->dpts[0];
+			fn(eport, e->ip.proto, e->counters.pcnt, e->counters.bcnt, arg);
+		}
+		r = 0;
+	}
+#ifdef IPTABLES_143
+	iptc_free(h);
+#else
+	iptc_free(&h);
 #endif
 	return r;
 }
@@ -1051,7 +1106,9 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	}
 
 	del_redirect_desc(eport, proto);
-	return r*r2;
+	/* r : the redirect and filter rules, r2 : a PEER (and DSCP) rule. The
+	 * delete worked if either went; -1 for both is a failure */
+	return (r == 0 || r2 == 0) ? 0 : -1;
 }
 
 /* ==================================== */

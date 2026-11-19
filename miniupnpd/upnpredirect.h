@@ -54,11 +54,27 @@ upnp_redirect(const char * rhost, unsigned short eport,
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */
+/* 1 if the firewall still has the rule of the IPv4 port mapping of eport,
+ * else 0. A rule which a flush or another program removed takes the row of
+ * its mapping and its line of the lease file with it, so the caller adds the
+ * mapping again, and a restart does not bring back the old one. */
+int
+upnp_map_in_firewall(unsigned short eport, int proto);
+
 int
 upnp_redirect_internal(const char * rhost, unsigned short eport,
                        const char * iaddr, unsigned short iport,
                        int proto, const char * desc,
                        unsigned int timestamp);
+
+/* upnp_renew_redirect_internal()
+ * renew a port mapping with the same rule: a new expiry and description, in
+ * the table and the lease file, and no change of the firewall. 0, or -1 */
+int
+upnp_renew_redirect_internal(const char * rhost, unsigned short eport,
+                             const char * iaddr, unsigned short iport,
+                             int proto, const char * desc,
+                             unsigned int timestamp);
 
 /*! \brief get port mapping from (external port, protocol)
  * \param[in] eport external port
@@ -139,6 +155,24 @@ upnp_delete_redirection(unsigned short eport, const char * protocol);
 int
 _upnp_delete_redir(unsigned short eport, int proto);
 
+/* mapping_owner_of()
+ * the protocol which made a mapping, from its description : "PCP MAP " and
+ * a nonce of 24 hexadecimal digits, or "NAT-PMP eport proto". Anything else
+ * is UPnP. */
+enum mapping_owner { MAPPING_UPNP, MAPPING_NATPMP, MAPPING_PCP };
+enum mapping_owner
+mapping_owner_of(const char * desc, unsigned short eport, int proto);
+
+/* upnp_eport_used_by_other()
+ * is the external port eport mapped (TCP or UDP, other than proto) to
+ * another internal address than iaddr ?  RFC 6886 section 3.3: such a
+ * port is reserved for the client which maps it, on both protocols, so
+ * another client gets another port.  The client's own mappings do not
+ * count.  The caller looks proto up itself.
+ * return value : 1 when used by another client, 0 otherwise */
+int
+upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr);
+
 /* Periodic cleanup functions
  */
 struct rule_state
@@ -151,9 +185,9 @@ struct rule_state
 	unsigned char to_remove;
 };
 
-/* return a linked list of all rules
- * or an empty list if there are not enough
- * As a "side effect", delete rules which are expired */
+/* return a linked list of the counters of all port mappings,
+ * or an empty list if there are not more than max_rules_number_target.
+ * Expiry is left to expire_upnp_rules(). */
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target);
 
@@ -161,6 +195,12 @@ get_upnp_rules_state_list(int max_rules_number_target);
  * \return the number of port mapping entries */
 int
 upnp_get_portmapping_number_of_entries(void);
+
+/* expire_upnp_rules()
+ * remove port mappings past their lifetime, and set
+ * nextruletoclean_timestamp */
+void
+expire_upnp_rules(void);
 
 /* remove_unused_rules() :
  * also free the list */
