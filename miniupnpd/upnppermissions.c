@@ -511,26 +511,49 @@ match_permission_internal(const struct upnpperm * perm,
 }
 #endif
 
+/* the index of the first rule which matches, or -1 */
+static int
+first_matching_permission(const struct upnpperm * permary,
+                          int n_perms,
+                          u_short eport, struct in_addr address,
+                          u_short iport, const char * desc)
+{
+	int i;
+	for(i=0; i<n_perms; i++)
+	{
+		if(match_permission(permary + i, eport, address, iport, desc))
+			return i;
+	}
+	return -1;
+}
+
 int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     int n_perms,
                                     u_short eport, struct in_addr address,
                                     u_short iport, const char * desc)
 {
-	int i;
-	for(i=0; i<n_perms; i++)
+	int i = first_matching_permission(permary, n_perms, eport, address, iport, desc);
+	if(i >= 0)
 	{
-		if(match_permission(permary + i, eport, address, iport, desc))
-		{
-			syslog(LOG_DEBUG,
-			       "UPnP permission rule %d matched : port mapping %s",
-			       i, (permary[i].type == UPNPPERM_ALLOW)?"accepted":"rejected"
-			       );
-			return (permary[i].type == UPNPPERM_ALLOW);
-		}
+		syslog(LOG_DEBUG,
+		       "UPnP permission rule %d matched : port mapping %s",
+		       i, (permary[i].type == UPNPPERM_ALLOW)?"accepted":"rejected"
+		       );
+		return (permary[i].type == UPNPPERM_ALLOW);
 	}
 	syslog(LOG_DEBUG, "no permission rule matched : accept by default (n_perms=%d)", n_perms);
 	return 1;	/* Default : accept */
+}
+
+int
+upnp_permission_allows(const struct upnpperm * permary,
+                       int n_perms,
+                       u_short eport, struct in_addr address,
+                       u_short iport, const char * desc)
+{
+	int i = first_matching_permission(permary, n_perms, eport, address, iport, desc);
+	return i < 0 || permary[i].type == UPNPPERM_ALLOW;	/* default: accept */
 }
 
 void
