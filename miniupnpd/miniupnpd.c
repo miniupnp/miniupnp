@@ -1377,11 +1377,12 @@ void print_usage(FILE * out, const char * argv0) {
 #ifdef IGD_V2
 			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
 #endif
-			"\t-v, -vv, -vvv raise the log level by one each, from log_level=,\n"
-			"\t  else from LOG_NOTICE (LOG_WARNING with -d), up to LOG_DEBUG.\n"
+			"\t-v, -vv, -vvv raise the log level by one each, from the environment\n"
+			"\t  variable MINIUPNPD_LOG_LEVEL, else from log_level=, else from\n"
+			"\t  LOG_NOTICE (LOG_WARNING with -d), up to LOG_DEBUG.\n"
 			"\t--log-level (or -l) sets the log level: error, warning, notice,\n"
-			"\t  info or debug, as log_level= does. It takes precedence over -v\n"
-			"\t  and log_level=.\n"
+			"\t  info or debug, as log_level= does. It takes precedence over -v,\n"
+			"\t  MINIUPNPD_LOG_LEVEL and log_level=.\n"
 			"\t-h / --help prints this help and quits.\n"
 	        "", argv0, argv0, argv0,
 #ifndef NO_BACKGROUND_NO_PIDFILE
@@ -1416,6 +1417,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	int verbosity_level = 0;	/* -v, -vv, -vvv: levels above the base */
 	int log_level = -1;		/* --log-level, -l */
 	int conf_log_level = -1;	/* log_level= */
+	int env_log_level = -1;		/* MINIUPNPD_LOG_LEVEL */
+	const char * env_value;
 	int openlog_option;
 	struct in_addr addr;
 	struct sigaction sa;
@@ -2119,12 +2122,24 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			goto print_usage;
 		}
 	}
+	/* MINIUPNPD_LOG_LEVEL, for a run under systemd (Environment=) or in a
+	 * container, where the command line is fixed */
+	env_value = getenv("MINIUPNPD_LOG_LEVEL");
+	if(env_value != NULL && env_value[0] != '\0') {
+		env_log_level = log_level_of(env_value);
+		if(env_log_level < 0) {
+			INIT_PRINT_ERR("MINIUPNPD_LOG_LEVEL=%s: use error, warning, notice, info or debug\n",
+			               env_value);
+			return 1;
+		}
+	}
 	/* The log level, as soon as the command line is read: --log-level, or
-	 * log_level= (else the base: LOG_NOTICE, and LOG_WARNING with -d, whose
-	 * log is on stderr) raised by one for each -v */
+	 * MINIUPNPD_LOG_LEVEL, or log_level= (else the base: LOG_NOTICE, and
+	 * LOG_WARNING with -d, whose log is on stderr) raised by one for each -v */
 	if(log_level < 0)
 	{
-		log_level = conf_log_level >= 0 ? conf_log_level
+		log_level = env_log_level >= 0 ? env_log_level
+		            : conf_log_level >= 0 ? conf_log_level
 		            : debug_flag ? LOG_WARNING : LOG_NOTICE;
 		log_level += verbosity_level;
 		if(log_level > LOG_DEBUG)
@@ -2205,7 +2220,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	/* the one line written at any level: what the level is, and how to
 	 * change it */
 	setlogmask(LOG_UPTO(LOG_INFO));
-	syslog(LOG_INFO, "log level %s: --log-level or log_level= sets it",
+	syslog(LOG_INFO, "log level %s: --log-level, MINIUPNPD_LOG_LEVEL or log_level= sets it",
 	       log_level_name(log_level));
 	setlogmask(LOG_UPTO(log_level));
 
