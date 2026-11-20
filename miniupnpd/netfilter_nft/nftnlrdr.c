@@ -356,8 +356,8 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 			}
 		}
 	} else {
-		syslog(LOG_INFO, "%s: redirect rule with eport=%hu proto %d NOT FOUND",
-		       "delete_redirect_and_filter_rules", eport, proto);
+		syslog(LOG_INFO, "Non-existing IPv4 port map to delete %hu:?:?/%s via UPnP IGD",
+			eport, proto == IPPROTO_TCP ? "TCP" : "UDP");
 	}
 
 	iaddr = 0;

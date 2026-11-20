@@ -941,6 +941,9 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 				iptc_free(&h);
 #endif
 		}
+	} else {
+		syslog(LOG_INFO, "Non-existing IPv4 port map to delete %hu:?:?/%s via UPnP IGD",
+			eport, proto == IPPROTO_TCP ? "TCP" : "UDP");
 	}
 
 	/*delete PEER rule*/

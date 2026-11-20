@@ -570,7 +570,7 @@ int reload_from_lease_file6(void)
 
 		if(timestamp > 0) {
 			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_INFO, "already expired lease in lease file");
+				syslog(LOG_INFO, "Expire IPv6 port map ?:[?]:[?]/? reason lease file reload");
 				continue;
 			} else {
 				leaseduration = timestamp - current_unix_time;
@@ -647,7 +647,8 @@ upnp_add_inboundpinhole(const char * raddr,
 
 	*uid = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
 	if(*uid >= 0) {
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, *uid);
+		syslog(LOG_INFO, "Renew IPv6 port map [%s]:%hu/%s remote IP %s remote port %hu lifetime %d via UPnP IGDv2 IPv6 UID %d",
+			iaddr, iport, proto_itoa(proto), raddr[0] != '\0' ? raddr : "any", rport, leasetime, *uid);
 		r = upnp_update_inboundpinhole(*uid, leasetime);
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {

@@ -90,12 +90,12 @@ int add_pinhole(const char * ifname,
 		if (inet_pton(AF_INET6, rem_host, &rhost_addr) == 1) {
 			rhost_addr_p = &rhost_addr;
 		} else {
-			syslog(LOG_DEBUG, "Failed to parse INET6 address \"%s\"", rem_host);
+			syslog(LOG_DEBUG, "Failed to parse remote IPv6 address (%s)", rem_host);
 		}
 	}
 
 	if (inet_pton(AF_INET6, int_client, &ihost_addr) != 1) {
-		syslog(LOG_DEBUG, "Failed to parse INET6 address \"%s\"", int_client);
+		syslog(LOG_DEBUG, "Failed to parse IPv6 address (%s)", int_client);
 	}
 
 	snprintf(comment, NFT_DESCR_SIZE,
@@ -133,7 +133,7 @@ find_pinhole(const char * ifname,
 
 	if (rem_host && rem_host[0] != '\0' && rem_host[0] != '*') {
 		if (inet_pton(AF_INET6, rem_host, &saddr) < 1) {
-			syslog(LOG_DEBUG, "Failed to parse INET6 address \"%s\"", rem_host);
+			syslog(LOG_DEBUG, "Failed to parse remote IPv6 address (%s)", rem_host);
 			memset(&saddr, 0, sizeof(struct in6_addr));
 		}
 	} else {
@@ -141,7 +141,7 @@ find_pinhole(const char * ifname,
 	}
 
 	if (inet_pton(AF_INET6, int_client, &daddr) < 1) {
-		syslog(LOG_DEBUG, "Failed to parse INET6 address \"%s\"", int_client);
+		syslog(LOG_DEBUG, "Failed to parse IPv6 address (%s)", int_client);
 		memset(&daddr, 0, sizeof(struct in6_addr));
 	}
 
@@ -469,7 +469,7 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		}
 
 		if (ts <= (unsigned int)current_time) {
-			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
+			syslog(LOG_INFO, "Expire IPv6 port map [?]:?/?");
 			r = rule_del_handle(p);
 			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
 			n++;
