@@ -604,18 +604,6 @@ int reload_from_lease_file6(void)
 
 #endif
 
-/* Write the row of a pinhole: a mapping, or a mapping with its remote peer. */
-static void
-record_pinhole(unsigned short uid, const char * raddr, unsigned short rport,
-               const char * iaddr, unsigned short iport, int proto,
-               const char * desc, unsigned int timestamp)
-{
-	if(raddr != NULL && raddr[0] != '\0')
-		memmap_remote_peer(uid, raddr, rport, iport, iaddr, iport, proto, desc, timestamp);
-	else
-		memmap_map(uid, iport, iaddr, iport, proto, desc, timestamp);
-}
-
 int
 upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
                          const char * iaddr, unsigned short iport,
@@ -674,8 +662,8 @@ upnp_add_inboundpinhole(const char * raddr,
 		/* a pinhole which survived a restart has no row yet. The renewal
 		 * keeps the description of the rule, and the row takes it too */
 		if (r >= 0)
-			record_pinhole((unsigned short)*uid, raddr, rport, iaddr, iport,
-			               proto, fw_desc[0] ? fw_desc : desc, timestamp);
+			memmap_remote_peer((unsigned short)*uid, raddr, rport, iport, iaddr, iport,
+			                   proto, fw_desc[0] ? fw_desc : desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {
 			lease_file6_remove(iaddr, iport, proto, -1);
@@ -688,8 +676,8 @@ upnp_add_inboundpinhole(const char * raddr,
 	*uid = add_pinhole (ext_if_name6, raddr, rport,
 	                    iaddr, iport, proto, desc, timestamp);
 	if (*uid >= 0)
-		record_pinhole((unsigned short)*uid, raddr, rport, iaddr, iport,
-		               proto, desc, timestamp);
+		memmap_remote_peer((unsigned short)*uid, raddr, rport, iport, iaddr, iport,
+		                   proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (*uid >= 0) {
 		lease_file6_remove(iaddr, iport, proto, -1);
@@ -868,7 +856,9 @@ upnp_delete_inboundpinhole(unsigned short uid)
 {
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	int ret;
-	char iaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN] = "";
+	/* raddr not empty: iptables get_pinhole_info() fills only a buffer which
+	 * is. :: is any remote host */
+	char iaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN] = "::";
 	unsigned short iport = 0, rport = 0;
 	int proto = 0;
 	int known = upnp_get_pinhole_info(uid, raddr, sizeof(raddr), &rport, iaddr, sizeof(iaddr),
@@ -1111,14 +1101,19 @@ upnp_check_pinhole_working(const char * uid,
 #endif
 
 #if defined(USE_PF) || defined(USE_NETFILTER)
-/* memmap_map6_lookup : is the rule of a pinhole still in the firewall */
+/* memmap_map6_lookup : is the rule of a pinhole still in the firewall.
+ * find_pinhole() gives -2 for no such rule, and -1 if it cannot read the
+ * firewall */
 static int
 pinhole_in_firewall(const char * raddr, unsigned short rport,
                     const char * iaddr, unsigned short iport,
                     int proto, unsigned int * timestamp)
 {
-	return find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
-	                    NULL, 0, timestamp) >= 0 ? 0 : -1;
+	int r = find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
+	                     NULL, 0, timestamp);
+	if(r >= 0)
+		return 0;
+	return r == -2 ? -1 : 1;
 }
 #endif
 
@@ -1128,10 +1123,9 @@ upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 	int ret = 0;
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	ret = clean_pinhole_list(next_timestamp);
-	/* the rows go by the rules the firewall really removed */
-	if(ret > 0)
-		memmap_remote_peers_expired((unsigned int)upnp_time(),
-		                            pinhole_in_firewall);
+	/* the rows go by the rules the firewall really removed. Also after an
+	 * error: pf can fail after it removed some */
+	memmap_remote_peers_expired((unsigned int)upnp_time(), pinhole_in_firewall);
 #else
 	UNUSED(next_timestamp);
 #endif

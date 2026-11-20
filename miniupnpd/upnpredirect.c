@@ -319,19 +319,6 @@ void lease_file_rewrite(void)
 #endif
 #endif
 
-/* Write the row of a port mapping: a mapping, or a mapping with its remote peer.
- * rhost NULL, empty or "*" means any remote. */
-static void
-record_map(const char * rhost, unsigned short eport, const char * iaddr,
-           unsigned short iport, int proto, const char * desc,
-           unsigned int timestamp)
-{
-	if(rhost != NULL && rhost[0] != '\0' && strcmp(rhost, "*") != 0)
-		memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
-	else
-		memmap_map(0, eport, iaddr, iport, proto, desc, timestamp);
-}
-
 /* upnp_redirect()
  * calls OS/fw dependent implementation of the redirection.
  * protocol should be the string "TCP" or "UDP"
@@ -420,7 +407,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
 			}
 			if(r == 0)
-				record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
+				memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
@@ -475,7 +462,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #endif
 		return -1;
 	}
-	record_map(rhost, eport, iaddr, iport, proto, desc, timestamp);
+	memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;

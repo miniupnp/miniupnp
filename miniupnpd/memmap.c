@@ -173,6 +173,19 @@ memmap_map_gone(unsigned short eport, int proto)
 		lease_table_remove(row);
 }
 
+/* The remote of a pinhole as the key of its row: an address, or :: with a
+ * port for a remote port with any remote host. 1 and *r, or 0 for none. NULL,
+ * empty, "*" and :: are any remote host. */
+static int
+map6_remote(const char * raddr, unsigned short rport, struct in6_addr * r)
+{
+	if(raddr != NULL && raddr[0] != '\0' && inet_pton(AF_INET6, raddr, r) == 1 &&
+	   !IN6_IS_ADDR_UNSPECIFIED(r))
+		return 1;
+	memset(r, 0, sizeof(*r));
+	return rport != 0;
+}
+
 /* Add the row of an IPv6 pinhole, with its remote peer if raddr is set, or renew
  * it. */
 static void
@@ -191,16 +204,17 @@ ipv6_row(unsigned short uid, const char * raddr, unsigned short rport,
 	}
 	if(iaddr == NULL || inet_pton(AF_INET6, iaddr, &i) != 1)
 		return;
-	has_remote = raddr != NULL && raddr[0] != '\0' &&
-	             inet_pton(AF_INET6, raddr, &r) == 1;
+	has_remote = map6_remote(raddr, rport, &r);
 	/* PCP has no uid : the row of this rule is by its key */
 	if(row == NULL)
 		row = lease_table_find_external(proto, AF_INET6, &i, iport,
 		                                has_remote ? &r : NULL, rport);
 	if(row != NULL) {
-		/* a renewal : the row stays */
+		/* a renewal : the row stays. A UPnP row found by its key keeps
+		 * it only with the same uid, or the uid index would be wrong */
 		if(desc != NULL && row->label != NULL && strcmp(desc, row->label) == 0 &&
-		   row->iport == iport && memcmp(&row->iaddr, &i, sizeof(i)) == 0) {
+		   row->iport == iport && memcmp(&row->iaddr, &i, sizeof(i)) == 0 &&
+		   (row->kind != LEASE_UPNP || lease_uid(row) == uid)) {
 			row->expiry = timestamp;
 			return;
 		}
@@ -272,10 +286,8 @@ memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned shor
 {
 	struct lease_entry * row = lease_table_find_uid(uid);
 	struct in6_addr a, r;
-	/* the firewall gives :: for a rule with no remote */
-	int has_remote = raddr != NULL && raddr[0] != '\0' &&
-	                 inet_pton(AF_INET6, raddr, &r) == 1 &&
-	                 !IN6_IS_ADDR_UNSPECIFIED(&r);
+	/* the firewall gives :: for a rule with no remote host */
+	int has_remote = map6_remote(raddr, rport, &r);
 	if(row != NULL) {
 		lease_table_remove(row);
 		return;
@@ -296,18 +308,22 @@ map6_expiry_check(struct lease_entry * e, memmap_map6_lookup lookup)
 {
 	char iaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN];
 	unsigned int timestamp = 0;
+	int remote_addr = e->remote != NULL && !IN6_IS_ADDR_UNSPECIFIED(&e->remote->raddr);
+	int r;
 
 	if(inet_ntop(AF_INET6, &e->iaddr, iaddr, sizeof(iaddr)) == NULL)
 		return;
-	if(e->remote != NULL &&
+	if(remote_addr &&
 	   inet_ntop(AF_INET6, &e->remote->raddr, raddr, sizeof(raddr)) == NULL)
 		return;
-	if(lookup(e->remote ? raddr : NULL, e->remote ? e->remote->rport : 0,
-	          iaddr, e->iport, e->proto, &timestamp) == 0) {
+	/* a remote port with any remote host is :: and the port */
+	r = lookup(remote_addr ? raddr : NULL, e->remote ? e->remote->rport : 0,
+	           iaddr, e->iport, e->proto, &timestamp);
+	if(r == 0)
 		e->expiry = timestamp;
-		return;
-	}
-	lease_table_remove(e);
+	else if(r < 0)
+		lease_table_remove(e);
+	/* else the firewall could not be read: the row stays, for the next pass */
 }
 
 /* what a walk over the rows gives map6_expiry_row() */
