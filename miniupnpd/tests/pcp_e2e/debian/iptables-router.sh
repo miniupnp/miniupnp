@@ -130,11 +130,12 @@ cmd_stop() {
 	fi
 }
 
+# restart : a cold start of the daemon, its rules are lost, as after a reboot.
+# restart keep : a restart of the service, the rules stay in the firewall.
 cmd_restart() {
 	set -e
-	# a cold start of the daemon : its rules are lost, as after a reboot
 	cmd_stop
-	flush_chains
+	[ "${1:-}" = keep ] || flush_chains
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >>"$WORK/miniupnpd.log" 2>&1 &
 	echo $! >"$WORK/miniupnpd.pid"
 	sleep 3
@@ -225,12 +226,12 @@ has-net) cmd_has_net "$@" ;;
 start) cmd_start "$@" ;;
 stop) cmd_stop ;;
 nat66) cmd_nat66 "$@" ;;
-restart) cmd_restart ;;
+restart) cmd_restart "$@" ;;
 lose-rules) cmd_lose_rules ;;
 host) cmd_host "$@" ;;
 rules) cmd_rules "$@" ;;
 restored) cmd_restored ;;
 snapshot) cmd_snapshot ;;
 capture) cmd_capture "$@" ;;
-*) echo "usage: $0 build | net | has-net | start | stop | nat66 on|off | restart | rules PORTS | restored | snapshot | capture start|stop" >&2; exit 2 ;;
+*) echo "usage: $0 build | net | has-net | start | stop | nat66 on|off | restart [keep] | rules PORTS | restored | snapshot | capture start|stop" >&2; exit 2 ;;
 esac

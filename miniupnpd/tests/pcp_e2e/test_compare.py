@@ -27,11 +27,12 @@ class End2endComparisonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             folder = artifacts(Path(temporary), [('ipv4', 'MAP', 'map-a', 'PASS', 'ok'),
                                                  ('ipv6', 'NAT', 'nat-b', 'FAIL', 'timed out')])
-            log = 'x\nFAIL restart: the rules changed\n'
+            log = 'x\nFAIL restart: the rules changed\nPASS restart-keep: the same\n'
             outcomes, digest = compare.read_results(folder, log, 1, 'sha')
             self.assertEqual(digest, 'sha')
             self.assertEqual(outcomes[('ipv6', 'NAT', 'nat-b')], {'status': 'FAIL', 'detail': 'timed out'})
             self.assertEqual(outcomes[('both', 'restart', 'lease-file')]['status'], 'FAIL')
+            self.assertEqual(outcomes[('both', 'restart', 'lease-file-rules-kept')]['status'], 'PASS')
             with self.assertRaisesRegex(ValueError, 'disagrees'):
                 compare.read_results(folder, log, 0, 'sha')
 

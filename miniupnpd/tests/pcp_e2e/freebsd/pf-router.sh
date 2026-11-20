@@ -121,12 +121,13 @@ cmd_lose_rules() {
 	echo "$before $(count)"
 }
 
+# restart : a cold start of the daemon, the rules of its anchor are lost, as after a
+# reboot. restart keep : a restart of the service, the rules stay in the firewall.
 cmd_restart() {
 	set -e
-	# a cold start of the daemon : the rules of its anchor are lost, as after a reboot
 	kill "$(cat "$WORK/miniupnpd.pid")" 2>/dev/null || true
 	sleep 2
-	flush_anchor
+	[ "${1:-}" = keep ] || flush_anchor
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >>"$WORK/miniupnpd.log" 2>&1 &
 	echo $! >"$WORK/miniupnpd.pid"
 	sleep 3
@@ -318,7 +319,7 @@ has-net) cmd_has_net "$@" ;;
 start) cmd_start "$@" ;;
 stop) cmd_stop ;;
 nat66) write_pf "${1:-off}" ;;
-restart) cmd_restart ;;
+restart) cmd_restart "$@" ;;
 lose-rules) cmd_lose_rules ;;
 host) cmd_host "$@" ;;
 rules) cmd_rules "$@" ;;
@@ -326,5 +327,5 @@ restored) cmd_restored ;;
 snapshot) cmd_snapshot ;;
 capture) cmd_capture "$@" ;;
 pf-make) cmd_pf_make ;;
-*) echo "usage: $0 setup | build | net | start | stop | nat66 on|off | restart | rules PORTS | restored | snapshot | capture start|stop | pf-make" >&2; exit 2 ;;
+*) echo "usage: $0 setup | build | net | start | stop | nat66 on|off | restart [keep] | rules PORTS | restored | snapshot | capture start|stop | pf-make" >&2; exit 2 ;;
 esac

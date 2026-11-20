@@ -20,8 +20,8 @@ PLATFORMS = tuple(DRIVERS)
 
 def read_results(artifacts, log_text, exit_code, corpus_digest):
     """The cases of a driver run: the rows of its results.tsv (family, section, case, result, note), keyed
-    (family, section, case), and the lease-restart check of run-freebsd.sh as a case of its own (its
-    PASS / FAIL restart line)."""
+    (family, section, case), and the lease-restart checks of run-freebsd.sh as cases of their own (their
+    PASS / FAIL restart and restart-keep lines)."""
     tables = sorted(artifacts.glob('*/results.tsv'))
     if len(tables) != 1:
         raise ValueError(f'expected one results.tsv under {artifacts}, found {len(tables)}')
@@ -37,9 +37,10 @@ def read_results(artifacts, log_text, exit_code, corpus_digest):
         outcomes[key] = {'status': status, 'detail': detail}
     for line in log_text.splitlines():
         for status in ('PASS', 'FAIL'):
-            prefix = f'{status} restart: '
-            if prefix in line:
-                outcomes[('both', 'restart', 'lease-file')] = {'status': status, 'detail': line.split(prefix, 1)[1]}
+            for label, name in (('restart', 'lease-file'), ('restart-keep', 'lease-file-rules-kept')):
+                prefix = f'{status} {label}: '
+                if prefix in line:
+                    outcomes[('both', 'restart', name)] = {'status': status, 'detail': line.split(prefix, 1)[1]}
     if not outcomes:
         raise ValueError('no cases executed')
     check_exit(outcomes, exit_code)

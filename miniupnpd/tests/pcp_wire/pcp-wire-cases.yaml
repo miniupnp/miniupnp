@@ -14053,6 +14053,92 @@ sections:
       kind: lease_restart
     description: Restart the daemon with an IPv6 filtered MAP (4 peers) and a MAP; the lease file lines must be the same
       afterwards.
+  # The lease-restart-keep cases: the driver stops the daemon and starts it again with its rules left in the
+  # firewall, as a restart of the service does. The daemon finds the rule of each lease line and takes it back.
+  - name: lease-restart-keep-ipv4
+    requires: [lease-restart]
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    request:
+      kind: lease_restart
+      phases:
+        create:
+        - protocol: pcp
+          request:
+            pcp: MAP
+            lifetime: 3000
+            nonce: e1e2e3e4e5e6e7e8e9eaebec
+            protocol: UDP
+            internal_port: 43337
+            external_port: 43337
+          expect: &keep-map4-ok {version: 2, opcode: MAP_RESPONSE, result: [SUCCESS], length: 60}
+        - protocol: natpmp
+          request:
+            natpmp: MAP_UDP
+            private_port: 42223
+            public_port: 42223
+            lifetime: 3000
+          expect: &keep-pmp-ok {version: 0, opcode: MAP_UDP_RESPONSE, result: [SUCCESS], length: 16}
+        - kind: lease_file
+          save: before
+          lines:
+          - {kind: PCP-M, family: IPv4, internal_port: 43337, count: 1}
+          - {kind: NAT-PMP, internal_port: 42223, count: 1}
+        verify:
+        - kind: lease_file
+          same_as: before
+          expiry_tolerance: 1
+          lines:
+          - {kind: PCP-M, family: IPv4, internal_port: 43337, count: 1}
+          - {kind: NAT-PMP, internal_port: 42223, count: 1}
+      cleanup:
+      - protocol: pcp
+        request: {pcp: MAP, lifetime: 0, nonce: e1e2e3e4e5e6e7e8e9eaebec, protocol: UDP, internal_port: 43337}
+        expect: *keep-map4-ok
+      - protocol: natpmp
+        request: {natpmp: MAP_UDP, private_port: 42223, public_port: 0, lifetime: 0}
+        expect: *keep-pmp-ok
+    expect:
+      kind: lease_restart
+    description: Restart the daemon with its rules left in the firewall, with a PCP MAP and a NAT-PMP mapping; the
+      lease file lines must be the same afterwards, and each mapping keeps its one rule.
+  - name: lease-restart-keep-ipv6
+    requires: [lease-restart]
+    protocol: pcp
+    families: [ipv6]
+    mutating: true
+    request:
+      kind: lease_restart
+      phases:
+        create:
+        - protocol: pcp
+          request:
+            pcp: MAP
+            lifetime: 3000
+            nonce: f1f2f3f4f5f6f7f8f9fafbfc
+            protocol: UDP
+            internal_port: 43338
+            external_port: 43338
+          expect: &keep-map6-ok {version: 2, opcode: MAP_RESPONSE, result: [SUCCESS], length: 60}
+        - kind: lease_file
+          save: before
+          lines:
+          - {kind: PCP-M, family: IPv6, internal_port: 43338, count: 1}
+        verify:
+        - kind: lease_file
+          same_as: before
+          expiry_tolerance: 1
+          lines:
+          - {kind: PCP-M, family: IPv6, internal_port: 43338, count: 1}
+      cleanup:
+      - protocol: pcp
+        request: {pcp: MAP, lifetime: 0, nonce: f1f2f3f4f5f6f7f8f9fafbfc, protocol: UDP, internal_port: 43338}
+        expect: *keep-map6-ok
+    expect:
+      kind: lease_restart
+    description: Restart the daemon with its rules left in the firewall, with a PCP IPv6 MAP; the lease file line
+      must be the same afterwards, and the MAP keeps its one rule.
   # A lifetime under 120 s needs pcp_min_lifetime_override; min_lifetime alone does not go under 120 s.
   - name: lease-short-lifetime-granted
     profiles: [short-lifetime]

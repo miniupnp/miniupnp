@@ -603,9 +603,22 @@ EOT
 # the PCP lease file: the runner reads the file in the VM (--state-command) and compares
 # its lines, and the rules of the anchor are compared here. PCP_E2E_RESTART=0 skips it,
 # PCP_E2E_ONLY_RESTART=1 skips the cases.
+# run_restart_check keep : the lease-restart-keep cases, with a restart which leaves the
+# rules in the firewall, as a restart of the service does. The daemon has to take each
+# rule back from its lease line: the lease files and the rules are the same afterwards,
+# with no second rule.
 run_restart_check() {
-  echo "Restart check of the lease files"
-  restart_dir=$RUN_DIR/restart
+  restart_mode=${1:-cold}
+  if [ "$restart_mode" = keep ]; then
+    restart_label=restart-keep
+    restart_cases=lease-restart-keep
+    echo "Restart check of the lease files, with the rules kept"
+  else
+    restart_label=restart
+    restart_cases=lease-restart
+    echo "Restart check of the lease files"
+  fi
+  restart_dir=$RUN_DIR/$restart_label
   mkdir -p "$restart_dir"
   lease_runner="python3 -I $PMP/run_pcp_wire_cases.py --port 5351 --platform $E2E_PLATFORM --mutating
     --profile baseline --snapshot-dir $restart_dir
@@ -614,28 +627,30 @@ run_restart_check() {
   for family in ipv4 ipv6; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
     # shellcheck disable=SC2086
-    ports="$ports $(eval $lease_runner --host $router --family $family --case lease-restart-$family \
+    ports="$ports $(eval $lease_runner --host $router --family $family --case $restart_cases-$family \
       --list-lease-ports)"
   done
   ports=$(echo $ports | tr ' ' '|')
   for family in ipv4 ipv6; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
     # shellcheck disable=SC2086
-    eval $lease_runner --host $router --family $family --case lease-restart-$family --phase create \
-      || { echo "FAIL restart: the create phase failed ($family)"; STATUS=1; return 0; }
+    eval $lease_runner --host $router --family $family --case $restart_cases-$family --phase create \
+      || { echo "FAIL $restart_label: the create phase failed ($family)"; STATUS=1; return 0; }
   done
   vm sh $ROUTER_SCRIPT rules "'$ports'" >"$restart_dir/before.txt" 2>&1 || true
   if [ "${PCP_E2E_BREAK_RESTART:-0}" = 1 ]; then
     # to check the test itself : lose the lease files, this has to fail
     $SSH "$PRIV rm -f /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6"
   fi
-  vm sh $ROUTER_SCRIPT restart >"$restart_dir/restart.log" 2>&1 || \
-    { echo "FAIL restart: the daemon did not start again"; STATUS=1; return 0; }
+  restart_arg=
+  [ "$restart_mode" = keep ] && restart_arg=keep
+  vm sh $ROUTER_SCRIPT restart $restart_arg >"$restart_dir/restart.log" 2>&1 || \
+    { echo "FAIL $restart_label: the daemon did not start again"; STATUS=1; return 0; }
   vm sh $ROUTER_SCRIPT rules "'$ports'" >"$restart_dir/after.txt" 2>&1 || true
   restart_ok=1
-  [ -s "$restart_dir/before.txt" ] || { echo "FAIL restart: no rules for the mappings before the restart"; restart_ok=0; }
+  [ -s "$restart_dir/before.txt" ] || { echo "FAIL $restart_label: no rules for the mappings before the restart"; restart_ok=0; }
   if ! diff "$restart_dir/before.txt" "$restart_dir/after.txt" >"$restart_dir/diff.txt"; then
-    echo "FAIL restart: the rules of the anchor changed over the restart:"
+    echo "FAIL $restart_label: the rules of the anchor changed over the restart:"
     cat "$restart_dir/diff.txt"
     restart_ok=0
   fi
@@ -644,11 +659,11 @@ run_restart_check() {
   for family in ipv4 ipv6; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
     # shellcheck disable=SC2086
-    eval $lease_runner --host $router --family $family --case lease-restart-$family --phase verify \
-      || { echo "FAIL restart: the verify phase failed ($family)"; restart_ok=0; }
+    eval $lease_runner --host $router --family $family --case $restart_cases-$family --phase verify \
+      || { echo "FAIL $restart_label: the verify phase failed ($family)"; restart_ok=0; }
   done
   if [ "$restart_ok" = 1 ]; then
-    echo "PASS restart: the PCP lease file and the rules of the anchor are the same after the restart"
+    echo "PASS $restart_label: the PCP lease file and the rules of the anchor are the same after the restart"
   else
     STATUS=1
   fi
@@ -679,6 +694,7 @@ if [ "${PCP_E2E_ONLY_RESTART:-0}" != 1 ] && stage_on cases; then
 fi
 if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
   run_restart_check
+  run_restart_check keep
 fi
 if [ "${PCP_E2E_ONLY_RESTART:-0}" = 1 ]; then
   exit "$STATUS"
