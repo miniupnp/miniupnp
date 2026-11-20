@@ -41,12 +41,13 @@ The log level starts at warning.
 .TP
 .B \-v
 raise the log level by one: \-v, \-vv and \-vvv.
-They count from log_level of the configuration file, else from notice,
-or from warning with \-d.
+They count from the environment variable MINIUPNPD_LOG_LEVEL, else from
+log_level of the configuration file, else from notice, or from warning with \-d.
 .TP
 .BI \-\-log\-level " level" ", \-l " level
 log level: error, warning, notice, info or debug, as the log_level option
-of the configuration file. It takes precedence over \-v and log_level.
+of the configuration file. It takes precedence over \-v, MINIUPNPD_LOG_LEVEL
+and log_level.
 The daemon logs the level it runs at when it starts, whatever the level.
 .TP
 .B \-U
@@ -95,6 +96,13 @@ sets the value of BOOTID.UPNP.ORG SSDP header
 .TP
 .B \-1
 force reporting IGDv1 in rootDesc when compiled as IGDv2 *use with care*
+.SH ENVIRONMENT
+.TP
+.B MINIUPNPD_LOG_LEVEL
+the log level, as \-\-log\-level gives it, for a run whose command line
+is fixed, such as a systemd unit (Environment=) or a container.
+\-\-log\-level takes precedence over it, and it takes precedence over
+log_level. \-v counts from it. An unknown level stops the daemon at start.
 .SH "SEE ALSO"
 minissdpd(1) miniupnpc(3)
 .SH BUGS
