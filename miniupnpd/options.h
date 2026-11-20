@@ -34,6 +34,8 @@ enum upnpconfigoptions {
 	UPNPIPV6_LISTENING_IP,		/*!< listening address for IPv6 */
 	UPNPIPV6_DISABLE,		/*!< ipv6_disable */
 #endif /* ENABLE_IPV6 */
+	DEFAULT_MIN_PORT,		/*!< default_min_port */
+	DEFAULT_MAX_PORT,		/*!< default_max_port */
 	UPNPPORT,				/*!< "port" / "http_port" */
 #ifdef ENABLE_HTTPS
 	UPNPHTTPSPORT,			/*!< "https_port" */

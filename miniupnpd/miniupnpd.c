@@ -1518,6 +1518,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					SETFLAG(IPV6DISABLEDMASK);
 				break;
 #endif /* ENABLE_IPV6 */
+			case DEFAULT_MIN_PORT:
+				default_min_port = atoi(ary_options[i].value);
+				break;
+			case DEFAULT_MAX_PORT:
+				default_max_port = atoi(ary_options[i].value);
+				break;
 			case UPNPPORT:
 				v->port = atoi(ary_options[i].value);
 				break;
@@ -2253,6 +2259,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		ext_if_name, upnp_bootid);
 	syslog(LOG_INFO, "More information at https://miniupnp.tuxfamily.org or http://miniupnp.free.fr");
 	syslog(LOG_NOTICE, "Extra logging with log level info (-v) or debug (-v -v)");
+
+	syslog(LOG_INFO, "Options default_min/max_port set to %d/%d apply to IPv6 and to IPv4 only, with no matching or default reject ACL entries",
+		default_min_port, default_max_port);
 
 #ifdef USE_SYSTEMD
 	if (systemd_flag) {

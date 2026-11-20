@@ -1844,11 +1844,10 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 	}
 #endif
 
-	/* Pinhole InternalPort must be greater than or equal to 1024 */
-	if (int_port < 1024)
+	if (int_port < default_min_port || int_port > default_max_port)
 	{
-		syslog(LOG_INFO, "Client %s tried to access pinhole with port < 1024 and is not authorized to do it",
-		       clientaddr_str);
+		syslog(LOG_INFO, "Reject IPv6 port map [%s]:%hu/? via UPnP IGDv2 IPv6 reason default-min/max-port",
+		       clientaddr_str, int_port);
 		SoapError(h, 606, "Action not authorized");
 		return 0;
 	}

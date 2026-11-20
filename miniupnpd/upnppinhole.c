@@ -560,11 +560,6 @@ int reload_from_lease_file6(void)
 		while(isspace(*p) && (p > desc))
 			*(p--) = '\0';
 
-		/* Ensure port is non-privileged and RemoteHost is valid */
-		if (int_port < 1024) {
-		    syslog(LOG_WARNING, "ignoring lease file pinhole with privileged port %hu", int_port);
-		    continue;
-		}
 		if (rem_client && rem_client[0] != '\0' && rem_client[0] != '*') {
 			struct in6_addr rem_addr;
 			if (inet_pton(AF_INET6, rem_client, &rem_addr) != 1) {
