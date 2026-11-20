@@ -25,8 +25,8 @@ enum upnpconfigoptions {
 	UPNPEXT_IFNAME6,		/*!< ext_ifname6 */
 #endif
 	UPNPEXT_IP,				/*!< ext_ip */
-	UPNPEXT_ALLOW_PRIVATE_IPV4,	/*!< ext_allow_private_ipv4 */
-	UPNPEXT_PERFORM_STUN,		/*!< ext_perform_stun */
+	UPNPEXT_ALLOW_CGNAT,		/*!< ext_allow_cgnat */
+	UPNPEXT_REPORT_PRIVATE_IPV4,	/*!< old ext_allow_private_ipv4 */
 	UPNPEXT_STUN_HOST,		/*!< ext_stun_host */
 	UPNPEXT_STUN_PORT,		/*!< ext_stun_port */
 	UPNPLISTENING_IP,		/*!< listening_ip */

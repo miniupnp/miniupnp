@@ -1059,8 +1059,8 @@ parselanaddr(struct lan_addr_s * lan_addr, const char * str, int debug_flag)
 				return -1;
 			}
 			if(addr_is_reserved(&lan_addr->ext_ip_addr)) {
-				if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-					syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check security note if not set");
+				if (GETFLAG(REPORTPRIVATEIPV4MASK)) {
+					syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_cgnat=report-private-ipv4 set; check security note if not set");
 				} else {
 					/* error */
 					INIT_PRINT_ERR("Option ext_ip set to private/CGNAT-reserved (%s) IPv4, exiting\n", lan_addr->ext_ip_str);
@@ -1153,11 +1153,11 @@ int update_ext_ip_addr_from_stun(void)
 		if (!restrictive_nat) {
 			syslog(LOG_NOTICE, "IPv4 mapping enabled, and reachability/non-filtering tested via STUN");
 		} else {
-			syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_perform_stun=allow-filtered set; check security note if not set");
+			syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_cgnat=allow-filtered set; check security note if not set");
 		}
 		disable_port_forwarding = 0;
 	} else {
-		syslog(LOG_WARNING, "IPv4 mapping disabled, as own/upstream router filters incoming, or there is an address- and port-dependent (symmetric) CGNAT; to workaround current daemon limitation, or enable it anyway, set ext_perform_stun=allow-filtered; check security note if not set");
+		syslog(LOG_WARNING, "IPv4 mapping disabled, as own/upstream router filters incoming, or there is an address- and port-dependent (symmetric) CGNAT; to workaround current daemon limitation, or enable it anyway, set ext_allow_cgnat=allow-filtered; check security note if not set");
 		disable_port_forwarding = 1;
 	}
 	return 0;
@@ -1195,11 +1195,11 @@ static void update_disable_port_forwarding(void)
 			syslog(LOG_INFO, "Detected private/CGNAT-reserved external IPv4 %s on %s, IPv4 mapping may not work", if_addr, ext_if_name);
 		}
 
-		if (!reserved || GETFLAG(ALLOWPRIVATEIPV4MASK)) {
+		if (!reserved || GETFLAG(REPORTPRIVATEIPV4MASK)) {
 			if (!reserved) {
 				syslog(LOG_NOTICE, "IPv4 mapping enabled");
 			} else {
-				syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check compatibility/security notes if not set");
+				syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_cgnat=report-private-ipv4 set; check compatibility/security notes if not set");
 			}
 			disable_port_forwarding = 0;
 		} else {
@@ -1208,10 +1208,10 @@ static void update_disable_port_forwarding(void)
 			syslog(LOG_WARNING, "- Compatibility, as many UPnP IGD & PCP/NAT-PMP clients require a returned public external IPv4 address");
 			syslog(LOG_WARNING, "- Security, to prevent access via internet if the external/internal network interface has been configured swapped");
 			syslog(LOG_WARNING, "To enable IPv4 mapping in this case, select a priority-listed option:");
-			syslog(LOG_WARNING, "A) Detect public external IPv4 and test for unrestricted endpoint-independent (1:1) CGNAT via STUN server, set ext_perform_stun=yes");
-			syslog(LOG_WARNING, "B) As A, but workaround filtered CGNAT result daemon limitation (without extra firewall rule), set ext_perform_stun=allow-filtered; check security note");
+			syslog(LOG_WARNING, "A) Detect public external IPv4 and test for unrestricted endpoint-independent (1:1) CGNAT via STUN server, set ext_allow_cgnat=yes");
+			syslog(LOG_WARNING, "B) As A, but workaround filtered CGNAT result daemon limitation (without extra firewall rule), set ext_allow_cgnat=allow-filtered; check security note");
 			syslog(LOG_WARNING, "C) Manually override reported external IPv4 with public, set ext_ip; check security note");
-			syslog(LOG_WARNING, "D) Report private/CGNAT-reserved external IPv4 to clients, set ext_allow_private_ipv4=yes; check compatibility/security notes");
+			syslog(LOG_WARNING, "D) Report private/CGNAT-reserved external IPv4 to clients, set ext_allow_cgnat=report-private-ipv4; check compatibility/security notes");
 			syslog(LOG_WARNING, "IPv4 mapping disabled");
 			disable_port_forwarding = 1;
 		}
@@ -1463,11 +1463,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPEXT_IP:
 				use_ext_ip_addr = ary_options[i].value;
 				break;
-			case UPNPEXT_ALLOW_PRIVATE_IPV4:
-				if(strcmp(ary_options[i].value, "yes") == 0)
-					SETFLAG(ALLOWPRIVATEIPV4MASK);
-				break;
-			case UPNPEXT_PERFORM_STUN:
+			case UPNPEXT_ALLOW_CGNAT:
 				if(strcmp(ary_options[i].value, "yes") == 0)
 					SETFLAG(PERFORMSTUNMASK);
 				else if(strcmp(ary_options[i].value, "allow-filtered") == 0)
@@ -1475,6 +1471,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					SETFLAG(PERFORMSTUNMASK);
 					SETFLAG(ALLOWFILTEREDSTUNMASK);
 				}
+				else if(strcmp(ary_options[i].value, "report-private-ipv4") == 0)
+				{
+					SETFLAG(REPORTPRIVATEIPV4MASK);
+				}
+				break;
+			case UPNPEXT_REPORT_PRIVATE_IPV4:
+				if(strcmp(ary_options[i].value, "yes") == 0)
+					SETFLAG(REPORTPRIVATEIPV4MASK);
 				break;
 			case UPNPEXT_STUN_HOST:
 				ext_stun_host = ary_options[i].value;
@@ -1701,7 +1705,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		}
 #endif	/* ENABLE_PCP */
 		if (GETFLAG(PERFORMSTUNMASK) && !ext_stun_host) {
-			INIT_PRINT_ERR("You must specify ext_stun_host= when ext_perform_stun=yes\n");
+			INIT_PRINT_ERR("You must specify ext_stun_host= when ext_allow_cgnat=yes/allow-filtered\n");
 			return 1;
 		}
 	}
@@ -2088,7 +2092,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #endif
 
 	if (use_ext_ip_addr && GETFLAG(PERFORMSTUNMASK)) {
-		INIT_PRINT_ERR("Error: options ext_ip= and ext_perform_stun=yes cannot be specified together\n");
+		INIT_PRINT_ERR("Error: options ext_ip= and ext_allow_cgnat=yes/allow-filtered cannot be specified together\n");
 		return 1;
 	}
 
@@ -2098,8 +2102,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			return 1;
 		}
 		if (addr_is_reserved(&addr)) {
-			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-				syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_private_ipv4=yes set; check compatibility/security notes if not set");
+			if (GETFLAG(REPORTPRIVATEIPV4MASK)) {
+				syslog(LOG_WARNING, "WARNING: IPv4 mapping enabled forcibly, as ext_allow_cgnat=report-private-ipv4 set; check compatibility/security notes if not set");
 			} else {
 				INIT_PRINT_ERR("Option ext_ip set to private/CGNAT-reserved (%s) IPv4, exiting\n", use_ext_ip_addr);
 				return 1;
