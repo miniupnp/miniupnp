@@ -136,6 +136,14 @@ test_ipv4(void)
 	assert(lease_table_count() == 1);
 	row = lease_table_find_external(IPPROTO_TCP, AF_INET, NULL, 40001, NULL, 0);
 	assert(row != NULL && row->expiry == 600);
+	/* a remote NULL, empty or "*" is no remote: the UPnP RemoteHost of any
+	 * host */
+	memmap_remote_peer(0, NULL, 0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web", 610);
+	memmap_remote_peer(0, "", 0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web", 620);
+	memmap_remote_peer(0, "*", 0, 40001, "192.0.2.10", 8080, IPPROTO_TCP, "web", 630);
+	assert(lease_table_count() == 1);
+	row = lease_table_find_external(IPPROTO_TCP, AF_INET, NULL, 40001, NULL, 0);
+	assert(row != NULL && row->remote == NULL && row->expiry == 630);
 
 	/* other protocol, other row */
 	memmap_map(0, 40001, "192.0.2.10", 8080, IPPROTO_UDP, "web", 600);
@@ -231,6 +239,7 @@ static struct {
 	unsigned int timestamp;
 } fw_rules[4];
 static unsigned int fw_n, fw_lookups;
+static int fw_error;	/* the firewall cannot be read */
 
 static int
 fw_lookup(const char * raddr, unsigned short rport, const char * iaddr,
@@ -239,13 +248,17 @@ fw_lookup(const char * raddr, unsigned short rport, const char * iaddr,
 	unsigned int i;
 	(void)proto;
 	fw_lookups++;
+	if(fw_error)
+		return 1;
+	/* as find_pinhole(): the remote port is compared, also with no remote
+	 * host */
 	for(i = 0; i < fw_n; i++) {
-		if(strcmp(fw_rules[i].iaddr, iaddr) != 0 || fw_rules[i].iport != iport)
+		if(strcmp(fw_rules[i].iaddr, iaddr) != 0 || fw_rules[i].iport != iport ||
+		   fw_rules[i].rport != rport)
 			continue;
 		if((fw_rules[i].raddr == NULL) != (raddr == NULL))
 			continue;
-		if(raddr != NULL && (strcmp(fw_rules[i].raddr, raddr) != 0 ||
-		                     fw_rules[i].rport != rport))
+		if(raddr != NULL && strcmp(fw_rules[i].raddr, raddr) != 0)
 			continue;
 		*timestamp = fw_rules[i].timestamp;
 		return 0;
@@ -326,6 +339,61 @@ test_expiry_rule_kept(void)
 	assert(lease_table_count() == 0);
 }
 
+/* A remote port with any remote host, a row found by its key with another
+ * uid, and a firewall which cannot be read */
+static void
+test_map6_keys(void)
+{
+	static const char * h = "2001:db8::10";
+	struct lease_entry * a, * b;
+
+	lease_table_clear();
+	fw_n = 0;
+	/* two pinholes which differ only by the remote port : two rows */
+	memmap_remote_peer(1, "", 1000, 0, h, 8080, IPPROTO_UDP, "IGD2 pinhole", 100);
+	memmap_remote_peer(2, "*", 2000, 0, h, 8080, IPPROTO_UDP, "IGD2 pinhole", 100);
+	a = lease_table_find_uid(1);
+	b = lease_table_find_uid(2);
+	assert(a != NULL && b != NULL && a != b && lease_table_count() == 2);
+	assert(a->remote != NULL && a->remote->rport == 1000);
+	assert(IN6_IS_ADDR_UNSPECIFIED(&a->remote->raddr));
+	assert(map6(h, 8080, NULL, 0) == NULL);
+	/* :: with port 0 is no remote at all */
+	memmap_remote_peer(3, "::", 0, 0, h, 8080, IPPROTO_UDP, "IGD2 pinhole", 100);
+	assert(map6(h, 8080, NULL, 0) == lease_table_find_uid(3));
+	assert(lease_table_count() == 3);
+
+	/* the expiry asks for the remote port: the rule of uid 1 is still
+	 * there, those of 2 and 3 are gone */
+	fw_rules[0].iaddr = h; fw_rules[0].iport = 8080;
+	fw_rules[0].raddr = NULL; fw_rules[0].rport = 1000; fw_rules[0].timestamp = 150;
+	fw_n = 1;
+	memmap_remote_peers_expired(100, fw_lookup);
+	assert(lease_table_find_uid(1) == a && a->expiry == 150);
+	assert(lease_table_find_uid(2) == NULL && lease_table_find_uid(3) == NULL);
+
+	/* the delete fallback by the rule, with the port */
+	memmap_remote_peer_gone_at(99, "::", 1000, h, 8080, IPPROTO_UDP);
+	assert(lease_table_count() == 0);
+	fw_rules[0].rport = 0;
+	fw_n = 0;
+
+	/* a row on the key with another uid : the new uid replaces it */
+	memmap_map(5, 0, h, 7070, IPPROTO_UDP, "upnp", 100);
+	memmap_map(6, 0, h, 7070, IPPROTO_UDP, "upnp", 200);
+	a = lease_table_find_uid(6);
+	assert(a != NULL && lease_uid(a) == 6 && a->expiry == 200);
+	assert(lease_table_find_uid(5) == NULL && lease_table_count() == 1);
+
+	/* the firewall cannot be read : the expired row stays */
+	fw_error = 1;
+	memmap_remote_peers_expired(300, fw_lookup);
+	assert(lease_table_find_uid(6) == a && a->expiry == 200);
+	fw_error = 0;
+	memmap_remote_peers_expired(300, fw_lookup);
+	assert(lease_table_count() == 0);
+}
+
 int
 main(void)
 {
@@ -333,6 +401,7 @@ main(void)
 	test_ipv6();
 	test_expiry();
 	test_expiry_rule_kept();
+	test_map6_keys();
 	printf("testmemmap: all tests passed\n");
 	return 0;
 }
