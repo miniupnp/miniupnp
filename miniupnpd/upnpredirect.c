@@ -26,6 +26,7 @@
 #include "upnpevents.h"
 #include "portinuse.h"
 #include "upnputils.h"
+#include "memmap.h"
 #if defined(USE_NETFILTER)
 #include "netfilter/iptcrdr.h"
 #endif
@@ -405,6 +406,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			} else {
 				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
 			}
+			if(r == 0)
+				memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
@@ -459,6 +462,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #endif
 		return -1;
 	}
+	memmap_remote_peer(0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;
@@ -604,6 +608,8 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	r = delete_redirect_rule(ext_if_name, eport, proto);
 	delete_filter_rule(ext_if_name, eport, proto);
 #endif
+	if(r >= 0)
+		memmap_map_gone(eport, proto);
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
@@ -612,6 +618,31 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	upnp_event_var_change_notify(EWanIPC);
 #endif
 	return r;
+}
+
+/* called from natpmp.c and pcpserver.c */
+int
+upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr)
+{
+	static const int protos[] = { IPPROTO_TCP, IPPROTO_UDP };
+	char iaddr_old[INET6_ADDRSTRLEN];
+	unsigned short iport_old;
+	size_t i;
+
+	for(i = 0; i < sizeof(protos)/sizeof(protos[0]); i++) {
+		if(protos[i] == proto)
+			continue;	/* the caller looks it up */
+		if(get_redirect_rule(ext_if_name, eport, protos[i],
+		                     iaddr_old, sizeof(iaddr_old), &iport_old,
+		                     0, 0, 0, 0, NULL, 0, 0) != 0)
+			continue;
+		if(strcmp(iaddr, iaddr_old) == 0)
+			continue;	/* the client's own mapping */
+		syslog(LOG_INFO, "external port %hu is used by %s (%s)",
+		       eport, iaddr_old, proto_itoa(protos[i]));
+		return 1;
+	}
+	return 0;
 }
 
 int

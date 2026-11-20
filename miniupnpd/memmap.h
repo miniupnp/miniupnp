@@ -1,0 +1,91 @@
+/* The layer between the protocols and the mapping table (lease_table.c).
+ *
+ * The code of the protocols works with strings and the arguments of a firewall
+ * rule. The table works with rows. These functions turn the one into the other,
+ * so upnpredirect.c and upnppinhole.c never touch a row. PCP and NAT-PMP call
+ * those two files, so this covers all the protocols.
+ *
+ * A write goes to the firewall first, and here only if that worked. A row then
+ * never stands for a rule which was refused.
+ *
+ * There are three adds, on either family. memmap_map() adds a mapping,
+ * memmap_remote_peer() adds a mapping with its remote peer, and a filter has its
+ * own add. iaddr gives the family. An IPv4 row is a port mapping, and an IPv6 row
+ * is a pinhole: eport is iport, and the rule is that of a MAP without a remote
+ * peer, or of a PEER with one. The other "peer" functions take either pinhole. */
+#ifndef MEMMAP_H_INCLUDED
+#define MEMMAP_H_INCLUDED
+
+#include <sys/types.h>
+#include <netinet/in.h>
+#include "lease_table.h"
+
+/* Turn the text of an address into the form of the table: IPv4 a.b.c.d as
+ * ::ffff:a.b.c.d with *family AF_INET, IPv6 as it is with AF_INET6. 0, or -1 if
+ * s is no address. */
+int memmap_pton(const char * s, int * family, struct in6_addr * a);
+
+/* The text of an address of the table, in buf of len bytes. buf, or NULL if
+ * it does not fit. */
+const char * memmap_ntop(int family, const struct in6_addr * a, char * buf, size_t len);
+
+/* The owner of a row: kind is an enum lease_kind. A PCP owner also has its
+ * nonce, as on the wire. UPnP and NAT-PMP leave the nonce zero: any client of
+ * the protocol may change their rows. */
+struct memmap_owner {
+	unsigned char kind;
+	unsigned char nonce[LEASE_NONCE_LEN];
+};
+
+/* Fill an owner. nonce NULL : zero. */
+void memmap_owner_init(struct memmap_owner * o, int kind, const void * nonce);
+
+/* The owner a description names: a PCP description ends in its nonce. See
+ * mapping_owner_of(). */
+void memmap_owner_from_desc(const char * desc, unsigned short eport, int proto,
+                            struct memmap_owner * o);
+
+/* The firewall added or changed a mapping with no remote peer: write its row.
+ * A row on the same external port is replaced. uid is the UniqueID of a UPnP
+ * pinhole, else 0. timestamp is the expiry, 0 for none. */
+void memmap_map(unsigned short uid, unsigned short eport, const char * iaddr,
+                unsigned short iport, int proto, const char * desc,
+                unsigned int timestamp);
+/* The firewall removed an IPv4 mapping: remove its row, if it has one. */
+void memmap_map_gone(unsigned short eport, int proto);
+
+/* The same for a mapping limited to a remote peer, a PEER or a UPnP mapping with
+ * a remote host. Its row has a struct lease_remote. raddr NULL, empty, "*" or ::
+ * is any remote host: with rport 0 the same as memmap_map(), else the remote
+ * is :: and rport. An IPv4 port has one row, whatever its remote; IPv6
+ * pinholes with and without a remote can share a port. An IPv4 PCP PEER has
+ * no row here yet. */
+void memmap_remote_peer(unsigned short uid, const char * raddr, unsigned short rport,
+                        unsigned short eport, const char * iaddr, unsigned short iport,
+                        int proto, const char * desc, unsigned int timestamp);
+/* The firewall renewed a UPnP pinhole: give its row the new expiry. PCP has no
+ * uid, and renews through memmap_map() with the key of the row. */
+void memmap_renew_uid(unsigned short uid, unsigned int timestamp);
+
+/* The firewall removed the pinhole of uid: remove its row, if it has one. */
+void memmap_remote_peer_gone(unsigned short uid);
+
+/* The same, for a caller which has the rule too: if no row has the uid, find
+ * the row by the rule. This is the case of a PCP pinhole, which has no uid in
+ * the table. */
+void memmap_remote_peer_gone_at(unsigned short uid, const char * raddr, unsigned short rport,
+                                const char * iaddr, unsigned short iport, int proto);
+/* Find the rule of a pinhole in the firewall. raddr is NULL for a rule with no
+ * remote host. 0 and the expiry of the rule in timestamp if it is there, -1 if
+ * it is not, 1 if the firewall cannot be read. */
+typedef int (*memmap_map6_lookup)(const char * raddr, unsigned short rport,
+                                     const char * iaddr, unsigned short iport,
+                                     int proto, unsigned int * timestamp);
+
+/* The firewall removed the pinholes which expired. A row with an expiry at or
+ * before now goes if lookup does not find its rule. A rule which is still
+ * there keeps its row, with the expiry of the rule, and so does a row whose
+ * rule cannot be read. */
+void memmap_remote_peers_expired(unsigned int now, memmap_map6_lookup lookup);
+
+#endif
