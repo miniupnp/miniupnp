@@ -16,7 +16,6 @@
 #   pf-router.sh rules PORTS   the rules of the miniupnpd anchor for the internal ports PORTS (an
 #                              extended regular expression, 43333|44444), without the creation
 #                              time and the pinhole number in their labels (ts-N, pinhole-N); what the restart check compares
-#   pf-router.sh restored      how many times the daemon logged the restore of its PCP lease file
 #   pf-router.sh snapshot      print the router state, for the per-case snapshots
 #   pf-router.sh capture start|stop   tcpdump on the LAN and WAN NICs into /tmp/pcp-e2e/cap-*.pcap
 #   pf-router.sh pf-make       build the development test programs of miniupnpd/pf
@@ -136,10 +135,6 @@ cmd_restart() {
 
 cmd_rules() {
 	freebsd_rules_normalised "${1:?ports}"
-}
-
-cmd_restored() {
-	grep -c 'Restored .* PCP and NAT-PMP mappings' "$WORK/miniupnpd.log"
 }
 
 cmd_snapshot() {
@@ -323,9 +318,8 @@ restart) cmd_restart "$@" ;;
 lose-rules) cmd_lose_rules ;;
 host) cmd_host "$@" ;;
 rules) cmd_rules "$@" ;;
-restored) cmd_restored ;;
 snapshot) cmd_snapshot ;;
 capture) cmd_capture "$@" ;;
 pf-make) cmd_pf_make ;;
-*) echo "usage: $0 setup | build | net | start | stop | nat66 on|off | restart [keep] | rules PORTS | restored | snapshot | capture start|stop | pf-make" >&2; exit 2 ;;
+*) echo "usage: $0 setup | build | net | start | stop | nat66 on|off | restart [keep] | rules PORTS | snapshot | capture start|stop | pf-make" >&2; exit 2 ;;
 esac

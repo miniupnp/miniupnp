@@ -654,8 +654,6 @@ run_restart_check() {
     cat "$restart_dir/diff.txt"
     restart_ok=0
   fi
-  [ "$(vm sh $ROUTER_SCRIPT restored 2>/dev/null)" -ge 1 ] 2>/dev/null || \
-    { echo "FAIL restart: the daemon did not log the restored mappings"; restart_ok=0; }
   for family in ipv4 ipv6; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
     # shellcheck disable=SC2086

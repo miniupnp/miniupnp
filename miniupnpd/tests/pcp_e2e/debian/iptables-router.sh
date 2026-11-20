@@ -13,7 +13,6 @@
 #   iptables-router.sh restart       stop the daemon, flush its chains, start it again
 #   iptables-router.sh rules PORTS   the rules of miniupnpd for the internal ports PORTS (an
 #                                    extended regular expression, 43333|44444)
-#   iptables-router.sh restored      how many times the daemon logged the restore of its PCP lease file
 #   iptables-router.sh snapshot      print the router state, for the per-case snapshots
 #   iptables-router.sh capture start|stop   tcpdump on lan0 and wan0 into /tmp/pcp-e2e/cap-*.pcap
 #
@@ -147,10 +146,6 @@ cmd_rules() {
 	{ iptables-save; ip6tables-save; } | grep -E "$1" | sed 's/^\[[0-9:]*\] //' | sort || true
 }
 
-cmd_restored() {
-	grep -c 'Restored .* PCP and NAT-PMP mappings' "$WORK/miniupnpd.log"
-}
-
 cmd_snapshot() {
 	echo "=== miniupnpd process ==="; ps -ww -p "$(cat "$WORK/miniupnpd.pid")" -o pid,command
 	echo "=== miniupnpd configuration ==="; cat "$WORK/miniupnpd.conf"
@@ -230,8 +225,7 @@ restart) cmd_restart "$@" ;;
 lose-rules) cmd_lose_rules ;;
 host) cmd_host "$@" ;;
 rules) cmd_rules "$@" ;;
-restored) cmd_restored ;;
 snapshot) cmd_snapshot ;;
 capture) cmd_capture "$@" ;;
-*) echo "usage: $0 build | net | has-net | start | stop | nat66 on|off | restart [keep] | rules PORTS | restored | snapshot | capture start|stop" >&2; exit 2 ;;
+*) echo "usage: $0 build | net | has-net | start | stop | nat66 on|off | restart [keep] | rules PORTS | snapshot | capture start|stop" >&2; exit 2 ;;
 esac
