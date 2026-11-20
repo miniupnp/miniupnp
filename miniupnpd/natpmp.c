@@ -351,7 +351,10 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						}
 						break;
 					}
-					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport, "NAT-PMP")) {
+					/* which rule matched is logged for the asked port only */
+					if(!(eport == eport_first ?
+					     check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport, "NAT-PMP") :
+					     upnp_permission_allows(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport, "NAT-PMP"))) {
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
 						continue;

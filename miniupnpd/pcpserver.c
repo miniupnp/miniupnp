@@ -971,8 +971,14 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			pcp_msg_info->ext_port++;
 			continue;
 		}
+		/* which rule matched is logged for the asked port only */
 		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
-		     (!check_upnp_rule_against_permissions(upnppermlist,
+		     !(pcp_msg_info->ext_port == eport_first ?
+		       check_upnp_rule_against_permissions(upnppermlist,
+							   num_upnpperm, pcp_msg_info->ext_port,
+							   ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
+							   pcp_msg_info->int_port, pcp_msg_info->desc) :
+		       upnp_permission_allows(upnppermlist,
 							   num_upnpperm, pcp_msg_info->ext_port,
 							   ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
 							   pcp_msg_info->int_port, pcp_msg_info->desc)))) {
