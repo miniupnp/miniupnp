@@ -50,20 +50,10 @@
 #include "portinuse.h"
 #include "upnputils.h"
 
-#if defined(USE_NETFILTER)
-#include "netfilter/iptcrdr.h"
-#endif
+#include "memmap.h"
 
 #ifdef CHECK_PORTINUSE
 
-#if defined(USE_NETFILTER)
-/* Hardcoded for now.  Ideally would come from .conf file */
-#	ifdef TOMATO
-		const char *chains_to_check[] = { "WANPREROUTING" , 0 };
-#	else
-		const char *chains_to_check[] = { "PREROUTING" , 0 };
-#	endif
-#endif
 
 int
 port_in_use(const char *if_name,
@@ -390,26 +380,18 @@ static struct nlist list[] = {
 #error "No port_in_use() implementation available for this OS"
 #endif
 
-	/* Phase 2 : check existing mappings
+	/* Phase 2 : check existing mappings: ours in the table, and with iptables
+	 * the port forwards of other programs
 	 * TODO : implement for pf/ipfw/etc. */
 #if defined(USE_NETFILTER)
 	if (!found) {
-		char iaddr_old[16];
-		unsigned short iport_old;
-		int i;
-		for (i = 0; chains_to_check[i]; i++) {
-			if (get_nat_redirect_rule(chains_to_check[i], if_name, eport, proto,
-					iaddr_old, sizeof(iaddr_old), &iport_old,
-					0, 0, 0, 0, 0, 0, 0) == 0)
-			{
-				syslog(LOG_DEBUG, "port_in_use check port %d on nat chain %s redirected to %s port %d", eport,
-						chains_to_check[i], iaddr_old, iport_old);
-				if (!(strcmp(iaddr, iaddr_old)==0 && iport==iport_old)) {
-					/* only "in use" if redirected to somewhere else */
-					found++;
-					break;  /* don't care how many, just that we found at least one */
-				}
-			}
+		struct memmap_key key;
+		struct in6_addr a;
+		int family;
+		if (memmap_pton(iaddr, &family, &a) == 0) {
+			memmap_key_init(&key, family, proto, NULL, (unsigned short)eport,
+			                &a, (unsigned short)iport);
+			found = memmap_eport_redirected_elsewhere(if_name, &key);
 		}
 	}
 #else /* USE_NETFILTER */

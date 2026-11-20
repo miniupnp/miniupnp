@@ -17,6 +17,7 @@
 #include "iptpinhole.h"
 #include "../upnpglobalvars.h"
 #include "../upnputils.h"
+#include "../memmap.h"
 
 #ifdef ENABLE_UPNPPINHOLE
 
@@ -502,8 +503,12 @@ clean_pinhole_list(unsigned int * next_timestamp)
 			p = p->entries.le_next;
 			if(delete_pinhole(uid) == 0)
 				n++;
-			else
+			else {
+				/* the rule stays, and so do the rows of the expired
+				 * pinholes: the next pass tries again */
+				memmap_remote_peers_partial();
 				break;
+			}
 		} else {
 			if(p->timestamp < min_ts)
 				min_ts = p->timestamp;

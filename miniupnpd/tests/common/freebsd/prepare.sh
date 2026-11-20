@@ -1,5 +1,6 @@
 #!/bin/sh
-# Runs inside the FreeBSD VM as root: installs what the PCP restart cases need.
+# Runs inside the FreeBSD VM as root: installs what the PCP restart cases need,
+# and curl for a `make check` by hand in the VM (validateupnphttp).
 #
 #   PCP_TEST_PYTHON=1   also install python3 and PyYAML (to run the YAML runner
 #                       inside the VM, as the GitHub workflow does)
@@ -10,7 +11,7 @@
 set -eu
 
 export IGNORE_OSVERSION=yes ASSUME_ALWAYS_YES=yes
-packages="gmake pkgconf rsync"
+packages="gmake pkgconf rsync curl"
 [ "${PCP_TEST_PYTHON:-0}" = 1 ] && packages="$packages python3"
 # shellcheck disable=SC2086
 yes | pkg install -y $packages >/dev/null

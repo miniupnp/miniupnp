@@ -67,6 +67,14 @@ int proto_atoi(const char * protocol);
  */
 const char * proto_itoa(int proto);
 
+/* mapping_owner_of()
+ * the protocol which made a mapping, from its description : "PCP MAP " and
+ * a nonce of 24 hexadecimal digits, or "NAT-PMP eport proto". Anything else
+ * is UPnP. */
+enum mapping_owner { MAPPING_UPNP, MAPPING_NATPMP, MAPPING_PCP };
+enum mapping_owner
+mapping_owner_of(const char * desc, unsigned short eport, int proto);
+
 /**
  * define portability macros
  */
