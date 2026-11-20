@@ -53,6 +53,7 @@ enable_pcp_pmp=yes
 lease_file=/var/lib/miniupnpd/miniupnpd.leases
 lease_file6=/var/lib/miniupnpd/miniupnpd.leases6
 max_lifetime=600
+log_level=info
 secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
@@ -80,6 +81,12 @@ fi
 if [ -n "${PCP_TEST_EXTRA_CONF:-}" ]; then
 	printf '%s\n' "$PCP_TEST_EXTRA_CONF" >> /etc/miniupnpd.conf
 	sed -i '/=@OFF@$/d' /etc/miniupnpd.conf     # key=@OFF@: leave the option out
+fi
+
+# log_level only for a daemon which has the option: one without it refuses to start
+# (an option name is a string of its own in the binary).
+if ! grep -qaxz log_level /usr/sbin/miniupnpd; then
+	sed -i '/^log_level=/d' /etc/miniupnpd.conf
 fi
 
 # Bind the IPv6 PCP socket to the LAN address instead of "::", as routers with
@@ -144,17 +151,6 @@ if [ -n "${PCP_TEST_CAPTURE_DIR:-}" ]; then
 	sleep 1
 fi
 mkdir -p /var/lib/miniupnpd
-# PCP_TEST_QUIET=1: without -d (the log mask is then LOG_NOTICE, no debug lines), for
-# long runs. The daemon goes to the background: wait for it, and stop it with the
-# container (it then writes its pending PCP lease file save).
-if [ "${PCP_TEST_QUIET:-0}" = 1 ]; then
-	rm -f /var/run/miniupnpd.pid
-	/usr/sbin/miniupnpd -f /etc/miniupnpd.conf "$@" || exit 1
-	sleep 1
-	pid=$(cat /var/run/miniupnpd.pid 2>/dev/null)
-	[ -n "$pid" ] || { echo "miniupnpd did not start" >&2; exit 1; }
-	trap 'kill "$pid" 2>/dev/null; while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done; exit 0' TERM INT
-	while kill -0 "$pid" 2>/dev/null; do sleep 1 & wait $!; done
-	exit 1
-fi
+# The daemon logs at log_level=info. MINIUPNPD_LOG_LEVEL, passed from the host by the drivers,
+# sets another level, e.g. notice for long runs.
 exec /usr/sbin/miniupnpd -d -f /etc/miniupnpd.conf "$@"
