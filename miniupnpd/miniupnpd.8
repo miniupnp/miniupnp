@@ -6,6 +6,7 @@ miniupnpd \- UPnP Internet Gateway Device Daemon
 .RB [--version]
 .RB [ "\-f \fIconfig_file" "] [" "\-i \fIext_ifname" "] [" "\-I \fIext_ifname6" "] [" "\-o \fIext_ip" ]
 .RB [ "\-a \fIlistening_ip" "] [" "\-p \fIport" "] [" \-d "] [" \-U "] [" \-S0 "] [" \-N ]
+.RB [ \-v "] [" "\-\-log\-level \fIlevel" ]
 .RB [ "\-u \fIuuid" "] [" "\-s \fIserial" "] [" "\-m \fImodel_number" ]
 .RB [ "\-t \fInotify_interval" "] [" "\-P \fIpid_filename" ]
 .RB [ "\-B \fIdown up" "] [" "\-w \fIurl" "] [" "\-r \fIclean_ruleset_interval" ]
@@ -35,8 +36,18 @@ subdivised in several subnetworks.
 port used for HTTP.
 .TP
 .B \-d
-debug mode : do not go to background, output messages on console
-and do not filter out low priority messages.
+do not go to background, and output messages on the console too.
+The log level starts at warning.
+.TP
+.B \-v
+raise the log level by one: \-v, \-vv and \-vvv.
+They count from log_level of the configuration file, else from notice,
+or from warning with \-d.
+.TP
+.BI \-\-log\-level " level" ", \-l " level
+log level: error, warning, notice, info or debug, as the log_level option
+of the configuration file. It takes precedence over \-v and log_level.
+The daemon logs the level it runs at when it starts, whatever the level.
 .TP
 .B \-U
 report system uptime instead of daemon uptime to clients.
