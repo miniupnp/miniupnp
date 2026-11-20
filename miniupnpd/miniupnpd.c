@@ -1320,9 +1320,9 @@ void print_usage(FILE * out, const char * argv0) {
 			"of daemon uptime.\n"
 #ifdef ENABLE_NATPMP
 #ifdef ENABLE_PCP
-			"\t-N enables NAT-PMP and PCP functionality.\n"
+			"\t-N enable PCP and NAT-PMP protocols.\n"
 #else
-			"\t-N enables NAT-PMP functionality.\n"
+			"\t-N enable NAT-PMP protocol.\n"
 #endif
 #endif
 			"\t-B sets bitrates reported by daemon in bits per second.\n"
@@ -1342,7 +1342,7 @@ void print_usage(FILE * out, const char * argv0) {
 			"\t  \"deny 0-65535 0.0.0.0/0 0-65535\"\n"
 			"\t-b sets the value of BOOTID.UPNP.ORG SSDP header\n"
 #ifdef IGD_V2
-			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
+			"\t-1 force reporting IGDv1 in rootDesc\n"
 #endif
 			"\t-v enables LOG_INFO messages, -vv LOG_DEBUG as well (default with -d)\n"
 			"\t-h / --help prints this help and quits.\n"
