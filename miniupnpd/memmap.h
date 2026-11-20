@@ -55,8 +55,11 @@ void memmap_map(unsigned short uid, unsigned short eport, const char * iaddr,
 void memmap_map_gone(unsigned short eport, int proto);
 
 /* The same for a mapping limited to a remote peer, a PEER or a UPnP mapping with
- * a remote host. Its row has a struct lease_remote, and the remote is part of
- * the key of the row: rows with and without a remote can share a port. */
+ * a remote host. Its row has a struct lease_remote. raddr NULL, empty, "*" or ::
+ * is any remote host: with rport 0 the same as memmap_map(), else the remote
+ * is :: and rport. An IPv4 port has one row, whatever its remote; IPv6
+ * pinholes with and without a remote can share a port. An IPv4 PCP PEER has
+ * no row here yet. */
 void memmap_remote_peer(unsigned short uid, const char * raddr, unsigned short rport,
                         unsigned short eport, const char * iaddr, unsigned short iport,
                         int proto, const char * desc, unsigned int timestamp);
