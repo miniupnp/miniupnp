@@ -319,15 +319,6 @@ void lease_file_rewrite(void)
 #endif
 #endif
 
-/* upnp_redirect()
- * calls OS/fw dependent implementation of the redirection.
- * protocol should be the string "TCP" or "UDP"
- * returns: 0 on success
- *          -1 failed to redirect
- *          -2 already redirected
- *          -3 permission check failed
- *          -4 already redirected (other mechanism)
- */
 /* Write the row of a port mapping: a mapping, or a mapping with its remote peer.
  * rhost NULL, empty or "*" means any remote. */
 static void
@@ -341,6 +332,15 @@ record_map(const char * rhost, unsigned short eport, const char * iaddr,
 		memmap_map(0, eport, iaddr, iport, proto, desc, timestamp);
 }
 
+/* upnp_redirect()
+ * calls OS/fw dependent implementation of the redirection.
+ * protocol should be the string "TCP" or "UDP"
+ * returns: 0 on success
+ *          -1 failed to redirect
+ *          -2 already redirected
+ *          -3 permission check failed
+ *          -4 already redirected (other mechanism)
+ */
 int
 upnp_redirect(const char * rhost, unsigned short eport,
               const char * iaddr, unsigned short iport,
