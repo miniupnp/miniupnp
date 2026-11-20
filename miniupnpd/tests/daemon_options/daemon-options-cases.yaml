@@ -583,6 +583,46 @@ sections:
     expect:
       kind: daemon_exits
     description: ext_perform_stun needs ext_stun_host.
+- title: Log level
+  description: 'log_level= sets the level of the log, and the daemon names the level at start, whatever it is.
+    The fixtures wait for a LOG_NOTICE line, so no case sets a level below it.'
+  cases:
+  - name: log-level-bad-value-exits
+    protocol: daemon
+    requires:
+    - option:log_level
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - log_level=loud
+    request:
+      kind: option_steps
+      steps:
+      - router: {command: log, contains: ['log_level=loud: use error, warning, notice, info or debug']}
+    expect:
+      kind: daemon_exits
+    description: A log_level the daemon does not know is refused at start.
+  - name: log-level-debug
+    protocol: daemon
+    requires:
+    - option:log_level
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - log_level=debug
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46340
+      - router: {command: log, contains: ['log level debug: --log-level, MINIUPNPD_LOG_LEVEL or log_level= sets it',
+                                          'UPnP permission rule 0 matched : port mapping accepted']}
+    expect:
+      kind: steps
+    description: log_level=debug writes the LOG_DEBUG lines, here the permission rule of the port a PCP MAP
+      asks for, and the daemon names its level at start.
 - title: External address
   description: 'The address the daemon reports and how it finds it: ext_ip, STUN, ext_ifname, ext_ifname6
     and the check of a private address.'
