@@ -246,12 +246,12 @@ int find_pinhole(const char * ifname,
 		   (0 == memcmp(&daddr, &RULE.dst.addr.v.a.addr.v6, sizeof(struct in6_addr)))) {
 #ifdef USE_LIBPFCTL
 			if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+				/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);*/
 				continue;
 			}
 #else /* USE_LIBPFCTL */
 			if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-				syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+				/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);*/
 				continue;
 			}
 #endif /* USE_LIBPFCTL */
@@ -565,7 +565,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			return -1;
 		}
 		if(sscanf(RULE.label[0], PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);
+			/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label[0]);*/
 			continue;
 		}
 #else /* USE_LIBPFCTL */
@@ -576,7 +576,7 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			return -1;
 		}
 		if(sscanf(RULE.label, PINEHOLE_LABEL_FORMAT_SKIPDESC, &uid, &ts) != 2) {
-			syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);
+			/*syslog(LOG_DEBUG, "rule with label '%s' is not a IGD pinhole", RULE.label);*/
 			continue;
 		}
 #endif /* USE_LIBPFCTL */
@@ -589,9 +589,9 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			pr.ticket = ri.ticket;
 			pr.nr = i;
 			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label[0]);
+			syslog(LOG_INFO, "Expire IPv6 port map [?]:?/?");
 #else /* USE_LIBPFCTL */
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label);
+			syslog(LOG_INFO, "Expire IPv6 port map [?]:?/?");
 #endif /* USE_LIBPFCTL */
 			pr.action = PF_CHANGE_GET_TICKET;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {

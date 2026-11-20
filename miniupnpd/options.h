@@ -25,8 +25,8 @@ enum upnpconfigoptions {
 	UPNPEXT_IFNAME6,		/*!< ext_ifname6 */
 #endif
 	UPNPEXT_IP,				/*!< ext_ip */
-	UPNPEXT_ALLOW_PRIVATE_IPV4,	/*!< ext_allow_private_ipv4 */
-	UPNPEXT_PERFORM_STUN,		/*!< ext_perform_stun */
+	UPNPEXT_ALLOW_CGNAT,		/*!< ext_allow_cgnat */
+	UPNPEXT_REPORT_PRIVATE_IPV4,	/*!< old ext_allow_private_ipv4 */
 	UPNPEXT_STUN_HOST,		/*!< ext_stun_host */
 	UPNPEXT_STUN_PORT,		/*!< ext_stun_port */
 	UPNPLISTENING_IP,		/*!< listening_ip */
@@ -34,6 +34,8 @@ enum upnpconfigoptions {
 	UPNPIPV6_LISTENING_IP,		/*!< listening address for IPv6 */
 	UPNPIPV6_DISABLE,		/*!< ipv6_disable */
 #endif /* ENABLE_IPV6 */
+	DEFAULT_MIN_PORT,		/*!< default_min_port */
+	DEFAULT_MAX_PORT,		/*!< default_max_port */
 	UPNPPORT,				/*!< "port" / "http_port" */
 #ifdef ENABLE_HTTPS
 	UPNPHTTPSPORT,			/*!< "https_port" */

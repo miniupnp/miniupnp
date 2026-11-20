@@ -106,10 +106,10 @@ static void FillPublicAddressResponse(unsigned char * resp, in_addr_t senderaddr
 			resp[3] = 3;	/* Network Failure (e.g. NAT box itself
 			                 * has not obtained a DHCP lease) */
 		} else if(getifaddr(ext_if_name, tmp, INET_ADDRSTRLEN, &addr, NULL) < 0) {
-			syslog(LOG_ERR, "Failed to get IP for interface %s", ext_if_name);
+			syslog(LOG_DEBUG, "Failed to get IP for interface %s", ext_if_name);
 			resp[3] = 3;	/* Network Failure (e.g. NAT box itself
 			                 * has not obtained a DHCP lease) */
-		} else if (!GETFLAG(ALLOWPRIVATEIPV4MASK) && addr_is_reserved(&addr)) {
+		} else if (!GETFLAG(REPORTPRIVATEIPV4MASK) && addr_is_reserved(&addr)) {
 			resp[3] = 3;	/* Network Failure, box has not obtained
 			                   public IP address */
 		} else {
@@ -231,7 +231,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		syslog(LOG_ERR, "inet_ntop(natpmp): %m");
 	}
 
-	syslog(LOG_INFO, "NAT-PMP request received from %s:%hu %dbytes",
+	syslog(LOG_DEBUG, "NAT-PMP request received from %s:%hu %d bytes",
 	       senderaddrstr, ntohs(senderaddr->sin_port), n);
 
 	if(n<2 || ((((req[1]-1)&~1)==0) && n<12)) {
@@ -260,7 +260,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		resp[3] = 1;	/* unsupported version */
 	} else switch(req[1]) {
 	case 0:	/* Public address request */
-		syslog(LOG_INFO, "NAT-PMP public address request");
+		syslog(LOG_DEBUG, "NAT-PMP public address request");
 		FillPublicAddressResponse(resp, senderaddr->sin_addr.s_addr);
 		resplen = 12;
 		break;
@@ -281,10 +281,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			eport = READNU16(req+6);
 			lifetime = READNU32(req+8);
 			proto = (req[1]==1)?IPPROTO_UDP:IPPROTO_TCP;
-			syslog(LOG_INFO, "NAT-PMP port mapping request : "
-			                 "%hu->%s:%hu %s lifetime=%us",
-			                 eport, senderaddrstr, iport,
-			                 (req[1]==1)?"udp":"tcp", lifetime);
 			/* TODO: accept port mapping if iport ok but eport not ok
 			 * (and set eport correctly) */
 			if(lifetime == 0) {
@@ -321,8 +317,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								resp[3] = 2;	/* Not Authorized/Refused */
 								break;
 							} else {
-								syslog(LOG_INFO, "NAT-PMP %s port %hu mapping removed",
-								       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
+								syslog(LOG_INFO, "Delete IPv4 port map %hu:%s:%hu/%s via NAT-PMP",
+									eport2, senderaddrstr, iport, proto2 == IPPROTO_TCP ? "TCP" : "UDP");
 								index--;
 							}
 						}
@@ -334,15 +330,20 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
-				if(eport==0)	/* if no suggested external port, use same a internal port */
-					eport = iport;
+				if (eport == 0) {
+					if (iport >= 1024) {
+						eport = iport;
+					} else {
+						eport = 1024;
+					}
+				}
 				while(resp[3] == 0) {
 					if(eport_first == 0) { /* first time in loop */
 						eport_first = eport;
 					} else if(eport == eport_first) { /* no eport available */
 						if(any_eport_allowed == 0) { /* all eports rejected by permissions */
-							syslog(LOG_ERR, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
-							       eport, proto_itoa(proto), senderaddrstr, iport);
+							syslog(LOG_INFO, "Reject IPv4 port map %hu:%s:%hu/%s via NAT-PMP reason ACL/default-min/max-port",
+								eport, senderaddrstr, iport, proto_itoa(proto));
 							resp[3] = 2;	/* Not Authorized/Refused */
 						} else { /* at least one eport allowed (but none available) */
 							syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
@@ -359,7 +360,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					any_eport_allowed = 1;	/* at lease one eport is allowed */
 #ifdef CHECK_PORTINUSE
 					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
-						syslog(LOG_INFO, "port %hu protocol %s already in use",
+						syslog(LOG_INFO, "Reject IPv4 port map %hu:?:?/%s via NAT-PMP reason port in use",
 						       eport, proto_itoa(proto));
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
@@ -379,8 +380,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								break;
 							}
 							/* redirection already existing */
-							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
-							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
+							syslog(LOG_INFO, "Renew IPv4 port map %hu:%s:%hu/%s lifetime %u via NAT-PMP",
+								eport, iaddr_old, iport_old, proto_itoa(proto), lifetime);
 							/* remove and then add again */
 							if(_upnp_delete_redir(eport, proto) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");
@@ -400,12 +401,16 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					if(upnp_redirect_internal(NULL, eport, senderaddrstr,
 					                          iport, proto, desc,
 					                          timestamp) < 0) {
-						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
+						syslog(LOG_DEBUG, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
 						       eport, proto_itoa(proto), senderaddrstr, iport, desc);
 						resp[3] = 3;  /* Failure */
 					}
 					break;
 				}
+			}
+			if (resp[3] == 0 && lifetime) {
+				syslog(LOG_INFO, "Add IPv4 port map %hu:%s:%hu/%s lifetime %u via NAT-PMP",
+					eport, senderaddrstr, iport, req[1] == 1 ? "UDP" : "TCP", lifetime);
 			}
 			WRITENU16(resp+8, iport);	/* private port */
 			WRITENU16(resp+10, eport);	/* public port */
@@ -416,6 +421,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	default:
 		resp[3] = 5;	/* Unsupported OPCODE */
 	}
+
 	n = sendto_or_schedule(s, resp, resplen, 0,
 	           (struct sockaddr *)senderaddr, sizeof(*senderaddr));
 	if(n<0) {
@@ -449,7 +455,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 	FillPublicAddressResponse(notif, 0);
 	if(notif[3])
 	{
-		syslog(LOG_WARNING, "%s: cannot get public IP address, stopping",
+		syslog(LOG_DEBUG, "%s: cannot get public IP address, stopping",
 		       "SendNATPMPPublicAddressChangeNotification");
 		return;
 	}
@@ -477,7 +483,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d, port=%d): %m",
+			syslog(LOG_DEBUG, "%s: sendto(s_udp=%d, port=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j], NATPMP_PORT);
 			return;
 		}
@@ -487,7 +493,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 		           (struct sockaddr *)&sockname, sizeof(struct sockaddr_in));
 		if(n < 0)
 		{
-			syslog(LOG_ERR, "%s: sendto(s_udp=%d, port=%d): %m",
+			syslog(LOG_DEBUG, "%s: sendto(s_udp=%d, port=%d): %m",
 			       "SendNATPMPPublicAddressChangeNotification", sockets[j], NATPMP_NOTIF_PORT);
 			return;
 		}

@@ -102,7 +102,7 @@ extern int runtime_flags;
 #define PERFORMSTUNMASK    0x1000
 
 /*! \brief Allow the external IPv4 to be private */
-#define ALLOWPRIVATEIPV4MASK 0x2000
+#define REPORTPRIVATEIPV4MASK 0x2000
 /*! \brief do not stop on STUN detecting restricive NAT */
 #define ALLOWFILTEREDSTUNMASK 0x4000
 

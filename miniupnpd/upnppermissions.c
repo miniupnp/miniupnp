@@ -23,6 +23,9 @@
 #include "upnppermissions.h"
 #include "upnputils.h"
 
+uint16_t default_min_port = 1;
+uint16_t default_max_port = 65535;
+
 static int
 isodigit(char c)
 {
@@ -523,14 +526,19 @@ check_upnp_rule_against_permissions(const struct upnpperm * permary,
 		if(match_permission(permary + i, eport, address, iport, desc))
 		{
 			syslog(LOG_DEBUG,
-			       "UPnP permission rule %d matched : port mapping %s",
+			       "ACL entry %d matched, port mapping %s",
 			       i, (permary[i].type == UPNPPERM_ALLOW)?"accepted":"rejected"
 			       );
 			return (permary[i].type == UPNPPERM_ALLOW);
 		}
 	}
-	syslog(LOG_DEBUG, "no permission rule matched : accept by default (n_perms=%d)", n_perms);
-	return 1;	/* Default : accept */
+
+	if (iport < default_min_port || eport < default_min_port || iport > default_max_port || eport > default_max_port) {
+		return 0;
+	} else {
+		syslog(LOG_DEBUG, "No ACL entry matched, ACL accepted by default");
+		return 1;	/* Default : accept */
+	}
 }
 
 void

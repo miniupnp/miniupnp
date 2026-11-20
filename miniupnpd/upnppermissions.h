@@ -18,6 +18,9 @@
 #include <regex.h>
 #endif
 
+extern uint16_t default_min_port;
+extern uint16_t default_max_port;
+
 /* UPnP permission rule samples:
  * allow 1024-65535 192.168.3.0/24 1024-65535
  * deny 0-65535 192.168.1.125/32 0-65535 */

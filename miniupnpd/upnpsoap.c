@@ -412,18 +412,9 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 	else
 	{
 		struct in_addr addr;
-		if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0)
-		{
-			syslog(LOG_ERR, "Failed to get ip address for interface %s",
-				ext_if_name);
-			ext_ip_addr[0] = '\0';
-		} else if (addr_is_reserved(&addr)) {
-			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-				syslog(LOG_WARNING, "IGNORED : private/reserved address %s is not suitable for external IP", ext_ip_addr);
-			} else {
-				syslog(LOG_NOTICE, "private/reserved address %s is not suitable for external IP", ext_ip_addr);
+		if (getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0 ||
+			(addr_is_reserved(&addr) && !GETFLAG(REPORTPRIVATEIPV4MASK))) {
 				ext_ip_addr[0] = '\0';
-			}
 		}
 	}
 #else
@@ -545,7 +536,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		}
 		else
 		{
-			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip);
+			syslog(LOG_INFO, "Failed to parse or resolve to (%s) IPv4 address via UPnP IGD", int_ip);
 			ClearNameValueList(&data);
 			SoapError(h, 402, "Invalid Args");
 			return;
@@ -557,8 +548,8 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	{
 		if(h->clientaddr.s_addr != result_ip.s_addr)
 		{
-			syslog(LOG_INFO, "Client %s tried to redirect port to %s",
-			       inet_ntoa(h->clientaddr), int_ip);
+			syslog(LOG_INFO, "Reject IPv4 port map ?:%s:?/? via UPnP IGD reason for third-party from %s",
+				int_ip, inet_ntoa(h->clientaddr));
 			ClearNameValueList(&data);
 #ifdef IGD_V2
 			SoapError(h, 606, "Action not authorized");
@@ -606,9 +597,9 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		leaseduration = 604800;
 #endif
 
-	syslog(LOG_INFO, "%s: ext port %hu to %s:%hu protocol %s for: %s leaseduration=%u rhost=%s",
-	       action, eport, int_ip, iport, protocol, desc, leaseduration,
-	       r_host ? r_host : "NULL");
+	syslog(LOG_INFO, "Add IPv4 port map %hu:%s:%hu/%s remote IP %s lifetime %u via UPnP IGD",
+		eport, int_ip, iport, protocol, r_host[0] != '\0' ? r_host : "any",
+		leaseduration);
 
 	r = upnp_redirect(r_host, eport, int_ip, iport, protocol, desc, leaseduration);
 
@@ -750,7 +741,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		}
 		else
 		{
-			syslog(LOG_ERR, "Failed to convert hostname '%s' to ip address", int_ip);
+			syslog(LOG_INFO, "Failed to parse or resolve to (%s) IPv4 address via UPnP IGDv2 AddAny", int_ip);
 			ClearNameValueList(&data);
 			SoapError(h, 402, "Invalid Args");
 			return;
@@ -762,8 +753,8 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	{
 		if(h->clientaddr.s_addr != result_ip.s_addr)
 		{
-			syslog(LOG_INFO, "Client %s tried to redirect port to %s",
-			       inet_ntoa(h->clientaddr), int_ip);
+			syslog(LOG_INFO, "Reject IPv4 port map ?:%s:?/? via UPnP IGDv2 AddAny reason for third-party from %s",
+				int_ip, inet_ntoa(h->clientaddr));
 			ClearNameValueList(&data);
 			SoapError(h, 606, "Action not authorized");
 			return;
@@ -826,6 +817,8 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 			SoapError(h, 501, "Action Failed");
 			return;
 		}
+		syslog(LOG_INFO, "Add IPv4 port map %hu:%s:%hu/%s remote IP %s lifetime %u via UPnP IGDv2 AddAny",
+			eport, int_ip, iport, protocol, r_host[0] != '\0' ? r_host : "any", leaseduration);
 		BuildSendAndCloseSoapResp(h, body, bodylen);
 		break;
 	case -2:	/* already redirected */
@@ -913,7 +906,7 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 	}
 	else
 	{
-		syslog(LOG_INFO, "%s: rhost='%s' %s %s found => %s:%u desc='%s' duration=%u",
+		syslog(LOG_DEBUG, "%s: rhost='%s' %s %s found => %s:%u desc='%s' duration=%u",
 		       action,
 		       r_host ? r_host : "NULL", ext_port, protocol, int_ip,
 		       (unsigned int)iport, desc, leaseduration);
@@ -995,7 +988,7 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: external port: %hu, protocol: %s",
+	syslog(LOG_DEBUG, "%s: external port: %hu, protocol: %s",
 		action, eport, protocol);
 
 	/* if in secure mode, check the IP
@@ -1034,6 +1027,8 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 
 	if(r < 0)
 	{
+		syslog(LOG_INFO, "Non-existing IPv4 port map to delete %hu:?:?/%s via UPnP IGD",
+			eport, protocol);
 		SoapError(h, 714, "NoSuchEntryInArray");
 	}
 	else
@@ -1101,8 +1096,8 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: deleting external ports: %hu-%hu, protocol: %s",
-	       action, startport, endport, protocol);
+	syslog(LOG_INFO, "Delete IPv4 port map %hu-%hu:?:?/%s via UPnP IGDv2 DeleteRange",
+		startport, endport, protocol);
 
 	port_list = upnp_get_portmappings_in_range(startport, endport,
 	                                           protocol, &number);
@@ -1117,7 +1112,7 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	for(i = 0; i < number; i++)
 	{
 		r = upnp_delete_redirection(port_list[i], protocol);
-		syslog(LOG_INFO, "%s: deleting external port: %hu, protocol: %s: %s",
+		syslog(LOG_DEBUG, "%s: deleting external port: %hu, protocol: %s: %s",
 		       action, port_list[i], protocol, r < 0 ? "failed" : "ok");
 	}
 	free(port_list);
@@ -1188,7 +1183,7 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: index=%d", action, (int)index);
+	syslog(LOG_DEBUG, "%s: index=%d", action, (int)index);
 
 	rhost[0] = '\0';
 	r = upnp_get_redirection_infos_by_index((int)index, &eport, protocol, &iport,
@@ -1762,8 +1757,8 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 			struct addrinfo hints, *ai, *p;
 			int found = 0;
 
-			syslog(LOG_INFO, "%s: InternalClient %s is not an IPv6, assume hostname and convert",
-			       "PinholeVerification", int_ip);
+			syslog(LOG_DEBUG, "Resolve hostname (%s) to IPv6 address",
+			       int_ip);
 
 			memset(&hints, 0, sizeof(hints));
 			hints.ai_family = AF_UNSPEC;
@@ -1773,8 +1768,8 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 			r = getaddrinfo(int_ip, NULL, &hints, &ai);
 			if (r != 0)
 			{
-				syslog(LOG_WARNING, "%s: Failed to convert hostname '%s' to IP address : %s",
-				       "PinholeVerification", int_ip, gai_strerror(r));
+				syslog(LOG_INFO, "Failed to parse or resolve to (%s) IPv6 address via UPnP IGDv2 IPv6",
+				       int_ip);
 				SoapError(h, 402, "Invalid Args");
 				return -1;
 			}
@@ -1788,12 +1783,12 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 
 						if (inet_ntop(AF_INET6, &result_ip, int_ip_resolved, INET6_ADDRSTRLEN) == NULL)
 						{
-							syslog(LOG_WARNING, "%s: inet_ntop(): %m", "PinholeVerification");
+							syslog(LOG_INFO, "%s: inet_ntop(): %m", "PinholeVerification");
 							SoapError(h, 501, "Action Failed");
 							return -1;
 						}
-						syslog(LOG_INFO, "%s: InternalClient \"%s\" resolved as %s",
-						       "PinholeVerification", int_ip, int_ip_resolved);
+						syslog(LOG_DEBUG, "Resolve hostname (%s) to IPv6 address (%s)",
+						       int_ip, int_ip_resolved);
 						found = 1;
 					}
 					else
@@ -1808,8 +1803,8 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 			freeaddrinfo(ai);
 			if (!found)
 			{
-				syslog(LOG_NOTICE, "%s: No IPv6 address for hostname '%s'",
-				       "PinholeVerification", int_ip);
+				syslog(LOG_INFO, "Failed to parse or resolve to (%s) IPv6 address via UPnP IGDv2 IPv6",
+				       int_ip);
 				SoapError(h, 402, "Invalid Args");
 				return -1;
 			}
@@ -1826,7 +1821,7 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 		/* no need to copy to int_ip_resolved, but we still need to fill result_ip up */
 		if (inet_pton(AF_INET6, int_ip, &result_ip) <= 0)
 		{
-			syslog(LOG_ERR, "inet_pton(%s)", int_ip);
+			syslog(LOG_DEBUG, "inet_pton(%s)", int_ip);
 			SoapError(h, 501, "Action Failed");
 			return -1;
 		}
@@ -1840,8 +1835,8 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 
 	if(memcmp(&h->clientaddr_v6, &result_ip, sizeof(struct in6_addr)) != 0)
 	{
-		syslog(LOG_INFO, "%s: Client %s tried to access pinhole for internal %s and is not authorized",
-		       "PinholeVerification", clientaddr_str, int_ip_resolved == NULL ? int_ip : int_ip_resolved);
+		syslog(LOG_INFO, "Reject IPv6 port map [%s]:?/? via UPnP IGDv2 IPv6 reason for third-party from %s",
+		       int_ip_resolved == NULL ? int_ip : int_ip_resolved, clientaddr_str);
 		SoapError(h, 606, "Action not authorized");
 		return 0;
 	}
@@ -1853,11 +1848,10 @@ PinholeVerification(struct upnphttp * h, const char * int_ip, unsigned short int
 	}
 #endif
 
-	/* Pinhole InternalPort must be greater than or equal to 1024 */
-	if (int_port < 1024)
+	if (int_port < default_min_port || int_port > default_max_port)
 	{
-		syslog(LOG_INFO, "Client %s tried to access pinhole with port < 1024 and is not authorized to do it",
-		       clientaddr_str);
+		syslog(LOG_INFO, "Reject IPv6 port map [%s]:%hu/? via UPnP IGDv2 IPv6 reason default-min/max-port",
+		       clientaddr_str, int_port);
 		SoapError(h, 606, "Action not authorized");
 		return 0;
 	}
@@ -1959,7 +1953,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 					inet_ntop(AF_INET6,
 					          &(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr),
 					          rem_ip, sizeof(rem_ip));
-					syslog(LOG_INFO, "resolved '%s' to '%s'", rem_host, rem_ip);
+					syslog(LOG_DEBUG, "Resolve hostname (%s) to IPv6 address (%s)", rem_host, rem_ip);
 					rem_host = rem_ip;
 					break;
 				}
@@ -1968,8 +1962,8 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 		}
 		else
 		{
-			syslog(LOG_WARNING, "AddPinhole : getaddrinfo(%s) : %s",
-			       rem_host, gai_strerror(err));
+			syslog(LOG_INFO, "Failed to parse or resolve to (%s) IPv6 address via UPnP IGDv2 IPv6",
+				rem_host);
 #if 0
 			SoapError(h, 402, "Invalid Args");
 			goto clear_and_exit;
@@ -2002,10 +1996,8 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	if(PinholeVerification(h, int_ip, iport, int_ip_resolved) <= 0)
 		goto clear_and_exit;
 
-	syslog(LOG_INFO, "%s: (inbound) from [%s]:%hu to [%s]:%hu with proto %ld during %d sec",
-	       action, rem_host?rem_host:"any",
-	       rport, int_ip_resolved, iport,
-	       proto, ltime);
+	syslog(LOG_INFO, "Add IPv6 port map [%s]:%hu/%s remote IP %s remote port %hu lifetime %d via UPnP IGDv2 IPv6",
+	       int_ip_resolved, iport, proto_itoa(proto), rem_host[0] != '\0' ? rem_host : "any", rport, ltime);
 
 	/* In cases where the RemoteHost, RemotePort, InternalPort,
 	 * InternalClient and Protocol are the same than an existing pinhole,
@@ -2109,8 +2101,8 @@ UpdatePinhole(struct upnphttp * h, const char * action, const char * ns)
 		return;
 	}
 
-	syslog(LOG_INFO, "%s: (inbound) updating lease duration to %d for pinhole with ID: %d",
-	       action, ltime, uid);
+	syslog(LOG_INFO, "Renew IPv6 port map [?]:?/? lifetime %d via UPnP IGDv2 IPv6 Update UID %d",
+		ltime, uid);
 
 	n = upnp_update_inboundpinhole(uid, ltime);
 	if(n == -1)
@@ -2173,7 +2165,7 @@ GetOutboundPinholeTimeout(struct upnphttp * h, const char * action, const char *
 	iport = (unsigned short)atoi(int_port);
 	/*proto = atoi(protocol);*/
 
-	syslog(LOG_INFO, "%s: retrieving timeout for outbound pinhole from [%s]:%hu to [%s]:%hu protocol %s", action, int_ip, iport,rem_host, rport, protocol);
+	syslog(LOG_DEBUG, "%s: retrieving timeout for outbound pinhole from [%s]:%hu to [%s]:%hu protocol %s", action, int_ip, iport,rem_host, rport, protocol);
 
 	/* TODO */
 	r = -1;/*upnp_check_outbound_pinhole(proto, &opt);*/
@@ -2249,11 +2241,14 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 	                          &leasetime, NULL);
 	if (n >= 0)
 	{
-		if(PinholeVerification(h, iaddr, iport, NULL) <= 0)
+		if(PinholeVerification(h, iaddr, iport, NULL) <= 0) {
+			syslog(LOG_INFO, "Non-existing IPv6 port map to delete via UPnP IGDv2 IPv2 UID %d", uid);
 			return;
+		}
 	}
 	else if(n == -2)
 	{
+		syslog(LOG_INFO, "Non-existing IPv6 port map to delete via UPnP IGDv2 IPv2 UID %d", uid);
 		SoapError(h, 704, "NoSuchEntry");
 		return;
 	}
@@ -2271,8 +2266,8 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 		SoapError(h, 501, "Action Failed");
 		return;
 	}
-	syslog(LOG_INFO, "%s: (inbound) pinhole with ID %d successfully removed",
-	       action, uid);
+	syslog(LOG_INFO, "Delete IPv6 port map [?]:?/? via UPnP IGDv2 IPv6 UID %d",
+	       uid);
 	bodylen = snprintf(body, sizeof(body), resp,
 	                   action, ns, action);
 	if (bodylen < 0 || bodylen >= (int)sizeof(body)) {
@@ -2681,7 +2676,7 @@ SoapError(struct upnphttp * h, int errCode, const char * errDesc)
 	char body[2048];
 	int bodylen;
 
-	syslog(LOG_INFO, "Returning UPnPError %d: %s", errCode, errDesc);
+	syslog(LOG_DEBUG, "Returning UPnPError %d: %s", errCode, errDesc);
 	bodylen = snprintf(body, sizeof(body), resp, errCode, errDesc);
 	if(bodylen < 0) {
 		syslog(LOG_ERR, "snprintf() returned %d", bodylen);
