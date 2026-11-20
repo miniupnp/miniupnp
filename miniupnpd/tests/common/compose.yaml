@@ -43,6 +43,7 @@ services:
       PCP_TEST_EXTRA_CONF: ${PCP_TEST_EXTRA_CONF:-}
       PCP_TEST_WAN4: ${WAN4}
       PCP_TEST_CONF_REPLACE: ${PCP_TEST_CONF_REPLACE:-0}
+      MINIUPNPD_LOG_LEVEL: ${MINIUPNPD_LOG_LEVEL:-}
     sysctls:
       net.ipv4.ip_forward: "1"
       net.ipv6.conf.all.forwarding: "1"
