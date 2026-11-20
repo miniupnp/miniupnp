@@ -85,6 +85,7 @@ enum upnpconfigoptions {
 #endif
 #endif
 	UPNPMINISSDPDSOCKET,	/*!< minissdpdsocket */
+	UPNPLOGLEVEL,			/*!< log_level */
 #ifdef IGD_V2
 	UPNPFORCEIGDDESCV1,		/*!< force_igd_desc_v1 */
 #endif

@@ -201,10 +201,15 @@ enable_pcp_pmp=yes
 lease_file=/var/tmp/miniupnpd.leases
 lease_file6=/var/tmp/miniupnpd.leases6
 max_lifetime=600
+log_level=info
 secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+	# log_level only for a daemon which has the option: one without it refuses to start
+	if ! grep -q '"log_level"' miniupnpd/options.c; then
+		sed -i.bak '/^log_level=/d' "$WORK/miniupnpd.conf" && rm -f "$WORK/miniupnpd.conf.bak"
+	fi
 	# extra configuration lines, separated by commas (a suite on this fixture)
 	printf '%s\n' "${1:-}" | tr ',' '\n' >>"$WORK/miniupnpd.conf"
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >"$WORK/miniupnpd.log" 2>&1 &

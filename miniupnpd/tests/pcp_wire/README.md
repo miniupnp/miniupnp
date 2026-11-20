@@ -150,6 +150,9 @@ Environment variables:
   (default: this script's directory).
 - `PCP_TEST_DATA_DIR`: choose the directory for `status-data.json` (default: `.tmp/tests/pcp_wire` in the repository)
 - `PCP_TEST_WAN_PEER=1`: enable the optional [WAN fixture](#run-with-wan-traffic).
+- `MINIUPNPD_LOG_LEVEL`: the daemon's log level (default: `info`, from the fixture's
+  `log_level=info`), e.g. `notice` for long runs. The Docker drivers of pcp_wire, pcp_e2e and
+  daemon_options pass it to the daemon.
 - `DOCKER`: choose the Docker executable (default: `docker`).
 
 The wrapper passes command-line arguments to the Python runner. Common options
