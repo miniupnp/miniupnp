@@ -168,25 +168,14 @@ the wrong mask would be picked. You can force the mask when using interface
 names :
 listening_ip=eth0/24
 
-Some users want to use miniupnpd on a NAT router which is connected to the
-internet through another NAT router (NAT behind NAT). This kind of setup is
-strongly discouraged. By default, miniupnpd will refuses to launch when
-detecting a private (RFC1918) "WAN" IP address. The ext_ip option sould be
-added :
-ext_ifname=eth1  # "WAN" network interface, whose IP could be 192.168.1.22
-ext_ip=80.1.2.3  # Real public IP address
-listening_ip=eth0
-Please note that miniupnpd doesn't redirect any port on the other NAT router.
-UPNP requests forwarding is not implemented.
-In such NAT behind NAT setups, it is also possible to use STUN :
-See the ext_perform_stun / ext_stun_host / ext_stun_port options.
-If you know what you do and want to disable the restriction on the "WAN" IP
-address, you can use the option :
-ext_allow_private_ipv4=yes
-
 it is also possible to set a different interface for IPv6 WAN
 ext_ifname=eth0
 ext_ifname6=sit0
+
+Allow CGNAT use
+To enable IPv4 mapping even when using a CGNAT with a private/CGNAT-reserved
+external IPv4 address, users should refer to the documentation for the
+ext_allow_cgnat option in the sample miniupnpd.conf config file
 
 miniupnpd supports some kind of security check for allowing or disallowing
 redirection to be made. The UPnP permission rules are read from the
