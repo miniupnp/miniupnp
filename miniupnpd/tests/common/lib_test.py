@@ -1247,7 +1247,7 @@ def check_dependencies(case, earlier_cases, profiles):
             raise CorpusError(f"{case['name']}: prerequisite {dependency} lacks a required family")
         if not set(case.get("profiles", profiles)).issubset(prerequisite.get("profiles", profiles)):
             raise CorpusError(f"{case['name']}: prerequisite {dependency} lacks a required profile")
-    if set(case.get("requires", [])) - REQUIRES:
+    if {item for item in case.get("requires", []) if not item.startswith("option:")} - REQUIRES:
         raise CorpusError(f"{case['name']}: unknown required fixture")
 
 
@@ -3664,6 +3664,17 @@ def daemon_option_names(options_c):
     return names
 
 
+def missing_option(case, option_names):
+    """The option a case requires (requires: option:NAME) that options.c of this tree lacks, or None.
+    Such a case is skipped: a daemon refuses to start with an option it does not have."""
+    if option_names is None:
+        return None
+    for item in case.get("requires", []):
+        if item.startswith("option:") and item[len("option:"):] not in option_names:
+            return item[len("option:"):]
+    return None
+
+
 def case_config(case):
     """The daemon configuration of a case: its config lines, in their order."""
     return tuple(case.get("config", ()))
@@ -3705,7 +3716,8 @@ def check_case_config(case, option_names=None):
             raise CorpusError(f"{case['name']}: config line {line!r} is not key=value (no blanks) "
                               "or an allow / deny line")
         option = line.split("=", 1)[0]
-        if option_names is not None and option not in option_names:
+        if option_names is not None and option not in option_names and \
+                f"option:{option}" not in case.get("requires", []):
             raise CorpusError(f"{case['name']}: {option} is not an option of miniupnpd (options.c)")
     if case_side(case) not in CASE_SIDES:
         raise CorpusError(f"{case['name']}: from must be one of {', '.join(CASE_SIDES)}")
