@@ -57,6 +57,15 @@ check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     u_short eport, struct in_addr address,
                                     u_short iport, const char * desc);
 
+/* upnp_permission_allows()
+ * the same as check_upnp_rule_against_permissions(), with no log line:
+ * for the search of an external port, which may check each of 65535 */
+int
+upnp_permission_allows(const struct upnpperm * permary,
+                       int n_perms,
+                       u_short eport, struct in_addr address,
+                       u_short iport, const char * desc);
+
 /**
  * Build an array of all allowed external ports (for the address and internal port)
  */
