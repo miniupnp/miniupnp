@@ -10,9 +10,10 @@
 /*! \file upnpstun.c
  * \brief STUN client implementation
  *
- * - https://datatracker.ietf.org/doc/html/rfc3489 (obsolete)
- * - https://datatracker.ietf.org/doc/html/rfc5389
- * - https://datatracker.ietf.org/doc/html/rfc5780 (experimental)
+ * - https://www.rfc-editor.org/info/rfc3489/ (classic STUN, obsoleted)
+ * - https://www.rfc-editor.org/info/rfc5389/ (STUN obsoleted)
+ * - https://www.rfc-editor.org/info/rfc5780/ (STUN NAT behavior, experimental)
+ * - https://www.rfc-editor.org/info/rfc8489/ (STUN current, not implemented)
  */
 #include <sys/select.h>
 #include <sys/time.h>
@@ -124,8 +125,8 @@ static int resolve_stun_host(const char *stun_host, unsigned short stun_port, st
 
 	r = getaddrinfo(stun_host, service, &hints, &result);
 	if (r != 0) {
-		syslog(LOG_ERR, "%s: getaddrinfo(%s, %s, ...) failed : %s",
-		       "resolve_stun_host", stun_host, service, gai_strerror(r));
+		syslog(LOG_ERR, "STUN: Failed to resolve hostname (%s) to IPv4 address (%s)",
+		       stun_host, gai_strerror(r));
 		errno = EHOSTUNREACH;
 		return -1;
 	}
@@ -149,8 +150,8 @@ static int resolve_stun_host(const char *stun_host, unsigned short stun_port, st
 	} else {
 		char addr_str[48];
 		if (sockaddr_to_string((struct sockaddr *)sock_addr, addr_str, sizeof(addr_str)) > 0) {
-			syslog(LOG_DEBUG, "%s: %s:%s => %s",
-			       "resolve_stun_host", stun_host, service, addr_str);
+			syslog(LOG_DEBUG, "%s: Resolve hostname (%s) and connect to %s",
+				"resolve_stun_host", stun_host, addr_str);
 		}
 	}
 
@@ -274,7 +275,7 @@ static int wait_for_stun_responses(int fds[4], unsigned char *transaction_ids[4]
 			FD_SET(fds[i], &fdset);
 		}
 
-		syslog(LOG_DEBUG, "%s: waiting %ld secs and %ld usecs", "wait_for_stun_responses", (long)timeout.tv_sec, (long)timeout.tv_usec);
+		syslog(LOG_DEBUG, "%s: waiting %ld.%ld s", "wait_for_stun_responses", (long)timeout.tv_sec, (long)timeout.tv_usec);
 		ret = select(max_fd+1, &fdset, NULL, NULL, &timeout);
 		if (ret < 0) {
 			if (errno == EINTR)
@@ -484,7 +485,8 @@ static int parse_stun_response(unsigned char *buffer, size_t len, struct sockadd
 	if (!have_other_address && have_address) {
 		syslog(LOG_ERR, "STUN server not supported, not returning "
 			"OTHER-ADDRESS / support CHANGE-REQUEST's required for "
-			"endpoint-independent (1:1) CGNAT filtering tests per RFC 5780.");
+			"endpoint-independent (1:1) CGNAT filtering tests per RFC 5780, "
+			"see compatible servers in sample config");
 		return -1;
 	}
 	return (have_address && have_other_address) ? 0 : -1;
@@ -529,13 +531,13 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 
 		/* Determine unrestricted endpoint-independent (1:1) CGNAT in two STUN requests per RFC 5780 4.4 test I/II */
 		/* 1. Connectivity (binding, detect public IPv4), 2. CHANGE-REQUEST with change-IP and change-port set */
-		/* https://datatracker.ietf.org/doc/html/rfc5780#section-4.4 */
+		/* https://www.rfc-editor.org/info/rfc5780/#section-4.4 */
 		fill_request(requests[i], i, i);
 		transaction_ids[i] = requests[i]+8;
 	}
 
-	syslog(LOG_INFO, "%s: local ports %hu %hu %hu %hu",
-	       "perform_stun", local_ports[0], local_ports[1],
+	syslog(LOG_INFO, "STUN: Testing with local UDP ports %hu %hu %hu %hu",
+		local_ports[0], local_ports[1],
 	       local_ports[2], local_ports[3]);
 
 	/* Unblock local ports */
@@ -600,16 +602,15 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 	if (mapped_addrs_count < 4) {
 		/* We have not received all four responses,
 		 * therefore NAT or firewall is doing some filtering */
-		syslog(LOG_NOTICE, "%s: %d response out of 4 received",
-		       "perform_stun", mapped_addrs_count);
+		syslog(LOG_NOTICE, "STUN: Filtering detected as %d/4 responses received (1: IPv4 detection, 2-4: filtering tests)",
+			mapped_addrs_count);
 		*restrictive_nat = 1;
 	}
 
 	if (memcmp(&remote_addr, &peer_addrs[0], sizeof(peer_addrs[0])) != 0) {
 		/* We received STUN response from different address
 		 * even we did not asked for it, so some strange NAT is active */
-		syslog(LOG_NOTICE, "%s: address changed",
-		       "perform_stun");
+		syslog(LOG_NOTICE, "STUN: Public IPv4 change detected in responses");
 		*restrictive_nat = 1;
 	}
 
@@ -621,8 +622,8 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 			sockaddr_to_string((struct sockaddr *)&mapped_addrs[i], mapped_addr_str, sizeof(mapped_addr_str));
 			/* External IP address or port was changed,
 			 * therefore symmetric NAT is active */
-			syslog(LOG_NOTICE, "%s: #%d external address or port changed : %s:%hu => %s",
-			       "perform_stun", i, inet_ntoa(*ext_addr), local_ports[i], mapped_addr_str);
+			syslog(LOG_NOTICE, "STUN: Public IPv4/port change detected in response #%d (%s:%hu => %s)",
+				i+1, inet_ntoa(*ext_addr), local_ports[i], mapped_addr_str);
 			*restrictive_nat = 1;
 		}
 	}
