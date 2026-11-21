@@ -31,7 +31,7 @@ void lease_file_rewrite(void);
  * \param[in] eport external port
  * \param[in] iaddr internal IPv4 address
  * \param[in] iport internal port
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
+ * \param[in] protocol "TCP" or "UDP"
  * \param[in] desc port mapping description
  * \param[in] leaseduration lease duration in seconds (0 for infinite)
  * \return 0 on success, -1 failed to redirect,
@@ -48,7 +48,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
  * \param[in] eport external port
  * \param[in] iaddr internal IPv4 address
  * \param[in] iport internal port
- * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
+ * \param[in] proto IPPROTO_TCP or IPPROTO_UDP
  * \param[in] desc port mapping description
  * \param[in] timestamp unix epoch of the end of the port mapping, or 0 for infinite duration
  * \return 0 on success, -1 failed to redirect,
@@ -62,7 +62,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 
 /*! \brief get port mapping from (external port, protocol)
  * \param[in] eport external port
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
+ * \param[in] protocol "TCP" or "UDP"
  * \param[out] iport internal port
  * \param[out] iaddr internal IPv4 address
  * \param[in] iaddrlen iaddr buffer length
@@ -82,7 +82,7 @@ upnp_get_redirection_infos(unsigned short eport, const char * protocol,
 /*! \brief get port mapping from index
  * \param[in] index 0-based index of the port mapping to get
  * \param[out] eport external port
- * \param[out] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
+ * \param[out] protocol "TCP" or "UDP"
  * \param[out] iport internal port
  * \param[out] iaddr internal IPv4 address
  * \param[in] iaddrlen iaddr buffer length
@@ -107,7 +107,7 @@ upnp_get_redirection_infos_by_index(int index,
  * is the source.
  * \param[in] iport internal port
  * \param[in] iaddr internal IPv4 address
- * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
+ * \param[in] proto IPPROTO_TCP or IPPROTO_UDP
  * \param[out] eport external port
  * \param[out] desc port mapping description
  * \param[in] desclen desc buffer length
@@ -125,7 +125,7 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
 
 /*! \brief delete a port mapping based on (external port, protocol)
  * \param[in] eport external port
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
+ * \param[in] protocol "TCP" or "UDP"
  * \return 0 on success, -1 on failure*/
 int
 upnp_delete_redirection(unsigned short eport, const char * protocol);
@@ -134,7 +134,7 @@ upnp_delete_redirection(unsigned short eport, const char * protocol);
  *
  * same as _upnp_delete_redir()
  * \param[in] eport external port
- * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
+ * \param[in] proto IPPROTO_TCP or IPPROTO_UDP
  * \return 0 on success, -1 on failure*/
 int
 _upnp_delete_redir(unsigned short eport, int proto);
@@ -171,7 +171,7 @@ remove_unused_rules(struct rule_state * list);
  * mapping exists
  * \param[in] startport lowest port in the interval
  * \param[in] endport highest port in theinterval
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
+ * \param[in] protocol "TCP" or "UDP"
  * \param[out] number number of ports in the returned array
  * \return a malloc'ed array of ports or NULL for error
  */
