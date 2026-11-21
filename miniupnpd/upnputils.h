@@ -55,15 +55,15 @@ int upnp_gettimeofday(struct timeval * tv);
 
 /*!
  * convert the string "UDP" or "TCP" to IPPROTO_UDP and IPPROTO_UDP
- * \param[in] protocol "UDP" or "TCP" (or "UDPLITE")
- * \return IPPROTO_UDP or IPPROTO_TCP (or IPPROTO_UDPLITE)
+ * \param[in] protocol "UDP" or "TCP"
+ * \return IPPROTO_UDP or IPPROTO_TCP
  */
 int proto_atoi(const char * protocol);
 
 /*!
  * convert IPPROTO_UDP, IPPROTO_UDP, etc. to "UDP", "TCP"
- * \param[in] proto IPPROTO_UDP or IPPROTO_TCP (or IPPROTO_UDPLITE)
- * \return "UDP" or "TCP" (or "UDPLITE")
+ * \param[in] proto IPPROTO_UDP or IPPROTO_TCP
+ * \return "UDP" or "TCP"
  */
 const char * proto_itoa(int proto);
 

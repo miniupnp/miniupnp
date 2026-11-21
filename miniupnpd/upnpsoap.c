@@ -1982,11 +1982,10 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 		SoapError(h, 707, "ProtocolWilcardingNotAllowed");
 		goto clear_and_exit;
 	}
-	if(proto != IPPROTO_UDP && proto != IPPROTO_TCP
-#ifdef IPPROTO_UDPITE
-	   && atoi(protocol) != IPPROTO_UDPLITE
-#endif
-	  )
+	/* UDPLITE is intentionally not accepted here (see #924: a
+	 * netfilter IPv6 pinhole for it cannot be listed or saved by
+	 * ip6tables, breaking ip6tables-restore for the whole table). */
+	if(proto != IPPROTO_UDP && proto != IPPROTO_TCP)
 	{
 		SoapError(h, 705, "ProtocolNotSupported");
 		goto clear_and_exit;
