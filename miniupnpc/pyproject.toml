@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "miniupnpc"
+dynamic = ["version"]
+authors = [{name = "Thomas BERNARD", email = "miniupnp@free.fr"}]
+description = "MiniUPnP IGD client"
+readme = {file = "DESCRIPTION", content-type = "text/plain"}
+license = "BSD-3-Clause"
+requires-python = ">=3.9"
+urls = {Homepage = "https://miniupnp.tuxfamily.org/"}
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
