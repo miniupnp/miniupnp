@@ -506,7 +506,11 @@ int update_pinhole(unsigned short uid, unsigned int timestamp)
 
 /* return the number of rules removed
  * or a negative integer in case of error */
-int clean_pinhole_list(unsigned int * next_timestamp)
+int clean_pinhole_list(unsigned int * next_timestamp,
+                       void (*expired)(int proto, const struct in6_addr * iaddr,
+                                       unsigned short iport,
+                                       const struct in6_addr * raddr,
+                                       unsigned short rport, unsigned short uid))
 {
 	int i;
 #undef RULE
@@ -581,6 +585,10 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 		}
 #endif /* USE_LIBPFCTL */
 		if(ts <= (unsigned int)current_time) {
+			if(expired != NULL)
+				expired(RULE.proto, &RULE.dst.addr.v.a.addr.v6, ntohs(RULE.dst.port[0]),
+				        &RULE.src.addr.v.a.addr.v6, ntohs(RULE.src.port[0]),
+				        (unsigned short)uid);
 #ifdef USE_LIBPFCTL
 			/* TODO: convert DIOCCHANGERULE to libpfctl */
 			struct pfioc_rule pr;

@@ -35,6 +35,8 @@ validateleasetable
 testoutgoingtable
 validateoutgoingtable
 testmemmap
+testpinhole
+validatepinhole
 validatememmap
 dox/
 bsdmake.inc

@@ -27,6 +27,7 @@
 #include "upnpsoap.h"
 #include "upnpreplyparse.h"
 #include "upnpredirect.h"
+#include "lease_table.h"
 #include "upnppermissions.h"
 #include "upnppinhole.h"
 #include "getifaddr.h"
@@ -388,22 +389,18 @@ GetNATRSIPStatus(struct upnphttp * h, const char * action, const char * ns)
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
+/* The external IPv4 address of the client of h, as GetExternalIPAddress gives
+ * it, in ext_ip_addr of INET_ADDRSTRLEN bytes: empty if there is none. Why
+ * there is none goes to syslog if verbose: GetExternalIPAddress, not each
+ * mapping. */
 static void
-GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
+upnp_ext_ip(const struct upnphttp * h, char * ext_ip_addr, int verbose)
 {
-	static const char resp[] =
-		"<u:%sResponse "
-		"xmlns:u=\"%s\">"
-		"<NewExternalIPAddress>%s</NewExternalIPAddress>"
-		"</u:%sResponse>";
-
-	char body[512];
-	int bodylen;
-	char ext_ip_addr[INET_ADDRSTRLEN];
 	/* Does that method need to work with IPv6 ?
 	 * There is usually no NAT with IPv6 */
 
 #ifndef MULTIPLE_EXTERNAL_IP
+	UNUSED(h);
 	if(use_ext_ip_addr)
 	{
 		strncpy(ext_ip_addr, use_ext_ip_addr, INET_ADDRSTRLEN);
@@ -414,20 +411,24 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 		struct in_addr addr;
 		if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0)
 		{
-			syslog(LOG_ERR, "Failed to get ip address for interface %s",
-				ext_if_name);
+			if(verbose)
+				syslog(LOG_ERR, "Failed to get ip address for interface %s",
+					ext_if_name);
 			ext_ip_addr[0] = '\0';
 		} else if (addr_is_reserved(&addr)) {
 			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-				syslog(LOG_WARNING, "IGNORED : private/reserved address %s is not suitable for external IP", ext_ip_addr);
+				if(verbose)
+					syslog(LOG_WARNING, "IGNORED : private/reserved address %s is not suitable for external IP", ext_ip_addr);
 			} else {
-				syslog(LOG_NOTICE, "private/reserved address %s is not suitable for external IP", ext_ip_addr);
+				if(verbose)
+					syslog(LOG_NOTICE, "private/reserved address %s is not suitable for external IP", ext_ip_addr);
 				ext_ip_addr[0] = '\0';
 			}
 		}
 	}
 #else
 	struct lan_addr_s * lan_addr;
+	UNUSED(verbose);
 	ext_ip_addr[0] = '\0';
 	for(lan_addr = lan_addrs.lh_first; lan_addr != NULL; lan_addr = lan_addr->list.le_next)
 	{
@@ -450,6 +451,21 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 	 * string. */
 	if (strcmp(ext_ip_addr, "0.0.0.0") == 0)
 		ext_ip_addr[0] = '\0';
+}
+
+static void
+GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
+{
+	static const char resp[] =
+		"<u:%sResponse "
+		"xmlns:u=\"%s\">"
+		"<NewExternalIPAddress>%s</NewExternalIPAddress>"
+		"</u:%sResponse>";
+
+	char body[512];
+	int bodylen;
+	char ext_ip_addr[INET_ADDRSTRLEN];
+	upnp_ext_ip(h, ext_ip_addr, 1);
 	bodylen = snprintf(body, sizeof(body), resp,
 	              action, ns, /*SERVICE_TYPE_WANIPC,*/
 				  ext_ip_addr, action);
@@ -462,11 +478,13 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 }
 
-/* Fill the request of an IPv4 port mapping of UPnP. RemoteHost r_host
- * empty or "*" is any remote host. 0, -1 if int_ip is no IPv4 address, as
- * upnp_redirect() failed on it, -2 if r_host is no address. */
+/* Fill req, an empty row of lease_table_new(), as the IPv4 port mapping of
+ * UPnP. A RemoteHost r_host which is not any remote host (map_any_host())
+ * needs room for one filter, else the row holds none. 0, -1 if int_ip is
+ * no IPv4 address, as upnp_redirect() failed on it, -2 if r_host is no
+ * address. */
 static int
-fill_port_request(struct lease_entry * req, struct map_filter * filter,
+fill_port_request(struct lease_entry * req,
                   const struct upnphttp * h, const char * r_host,
                   const char * int_ip, unsigned short iport,
                   unsigned short eport, const char * protocol,
@@ -474,11 +492,10 @@ fill_port_request(struct lease_entry * req, struct map_filter * filter,
 {
 	int family;
 
-	lease_entry_init(req, MAP_KIND_UPNP, NULL);
-	if(map_filter_set(filter, r_host, 0) < 0)
-		return -2;
-	if(filter->prefix != 0) {
-		req->filters = filter;
+	lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
+	if(!map_any_host(r_host)) {
+		if(map_filter_set(&req->filters[0], r_host, 0) < 0)
+			return -2;
 		req->nfilters = 1;
 	}
 	/* int_ip as text, as upnp_redirect() took it: the empty
@@ -492,6 +509,13 @@ fill_port_request(struct lease_entry * req, struct map_filter * filter,
 	req->proto = proto_atoi(protocol);
 	req->iport = iport;
 	req->eport = eport;
+	{
+		/* the external address the client is told: the row keeps it */
+		char ext_ip[INET_ADDRSTRLEN];
+		upnp_ext_ip(h, ext_ip, 0);
+		if(ext_ip[0] != '\0')
+			map_pton(ext_ip, &family, &req->eaddr);
+	}
 	req->label = desc;
 	req->timestamp = leaseduration > 0 ? upnp_time() + leaseduration : 0;
 	return 0;
@@ -519,8 +543,7 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	unsigned int leaseduration;
 	char * r_host;
 	unsigned short iport, eport;
-	struct lease_entry req;
-	struct map_filter filter;
+	struct lease_entry * req;
 
 	struct hostent *hp; /* getbyhostname() */
 	char ** ptr; /* getbyhostname() */
@@ -647,17 +670,26 @@ AddPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	       action, eport, int_ip, iport, protocol, desc, leaseduration,
 	       r_host ? r_host : "NULL");
 
-	r = fill_port_request(&req, &filter, h, r_host, int_ip, iport, eport,
+	req = lease_table_new(map_any_host(r_host) ? 0 : 1);
+	if(req == NULL) {
+		ClearNameValueList(&data);
+		SoapError(h, 501, "Action Failed");
+		return;
+	}
+	r = fill_port_request(req, h, r_host, int_ip, iport, eport,
 	                      protocol, desc, leaseduration);
 	if(r == -2) {
+		lease_table_free(req);
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
 	}
 	if(r == 0) {
-		req.flags |= MAP_PREFER_FAILURE;
-		r = upnp_redirect(&req);
+		req->flags |= MAP_PREFER_FAILURE;
+		r = upnp_redirect(req);
 	}
+	if(r != 0)
+		lease_table_free(req);	/* on success the lease table took it */
 
 	ClearNameValueList(&data);
 
@@ -734,8 +766,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	unsigned short iport, eport;
 	const char * leaseduration_str;
 	unsigned int leaseduration;
-	struct lease_entry req;
-	struct map_filter filter;
+	struct lease_entry * req;
 
 	struct hostent *hp; /* getbyhostname() */
 	char ** ptr; /* getbyhostname() */
@@ -819,9 +850,16 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		}
 	}
 
-	r = fill_port_request(&req, &filter, h, r_host, int_ip, iport, eport,
+	req = lease_table_new(map_any_host(r_host) ? 0 : 1);
+	if(req == NULL) {
+		ClearNameValueList(&data);
+		SoapError(h, 501, "Action Failed");
+		return;
+	}
+	r = fill_port_request(req, h, r_host, int_ip, iport, eport,
 	                      protocol, desc, leaseduration);
 	if(r == -2) {
+		lease_table_free(req);
 		ClearNameValueList(&data);
 		SoapError(h, 402, "Invalid Args");
 		return;
@@ -829,7 +867,7 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 	/* first try the port asked in request, then
 	 * try +1, -1, +2, -2, etc. */
 	if(r == 0)
-		r = upnp_redirect(&req);
+		r = upnp_redirect(req);
 	if (r != 0 && r != -1) {
 		unsigned short eport_below, eport_above;
 		struct in_addr address;
@@ -856,8 +894,8 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 			}
 			if (!(allowed_eports[eport / 32] & ((uint32_t)1U << (eport % 32))))
 				continue;	/* not allowed */
-			req.eport = eport;
-			r = upnp_redirect(&req);
+			req->eport = eport;
+			r = upnp_redirect(req);
 			if (r == 0 || r == -1) {
 				/* OK or failure : Stop */
 				break;
@@ -867,6 +905,8 @@ AddAnyPortMapping(struct upnphttp * h, const char * action, const char * ns)
 		}
 	}
 
+	if(r != 0)
+		lease_table_free(req);	/* on success the lease table took it */
 	ClearNameValueList(&data);
 
 	switch(r)
@@ -1951,8 +1991,8 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	int ltime;
 	long proto;
 	char rem_ip[INET6_ADDRSTRLEN];
-	struct lease_entry req;
-	struct map_filter filter;
+	struct lease_entry * req;
+	unsigned short uid;
 
 	if(CheckStatus(h)==0)
 		return;
@@ -2081,23 +2121,29 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	 * InternalClient and Protocol are the same than an existing pinhole,
 	 * but LeaseTime is different, the device MUST extend the existing
 	 * pinhole's lease time and return the UniqueID of the existing pinhole. */
-	lease_entry_init(&req, MAP_KIND_UPNP, NULL);
-	if(map_filter_set(&filter, rem_host, rport) < 0 ||
-	   (filter.prefix != 0 && IN6_IS_ADDR_V4MAPPED(&filter.raddr)) ||
-	   map_pton(int_ip_resolved, &family, &req.iaddr) < 0 || family != AF_INET6)
+	req = lease_table_new(1);
+	if(req == NULL) {
+		SoapError(h, 501, "Action Failed");
+		goto clear_and_exit;
+	}
+	lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
+	if(map_filter_set(&req->filters[0], rem_host, rport) < 0 ||
+	   (req->filters[0].prefix != 0 && IN6_IS_ADDR_V4MAPPED(&req->filters[0].raddr)) ||
+	   map_pton(int_ip_resolved, &family, &req->iaddr) < 0 || family != AF_INET6)
 	{
+		lease_table_free(req);
 		SoapError(h, 402, "Invalid Args");
 		goto clear_and_exit;
 	}
-	req.family = AF_INET6;
-	req.proto = (int)proto;
-	req.iport = iport;
-	req.eaddr = req.iaddr;
-	req.eport = iport;
-	req.filters = &filter;
-	req.nfilters = 1;
-	req.timestamp = upnp_time() + ltime;
-	r = upnp_add_inboundpinhole(&req);
+	req->family = AF_INET6;
+	req->proto = (int)proto;
+	req->iport = iport;
+	req->eaddr = req->iaddr;
+	req->eport = iport;
+	req->timestamp = upnp_time() + ltime;
+	r = upnp_add_inboundpinhole(req, &uid);
+	if(r != 1)
+		lease_table_free(req);	/* on success the lease table took it */
 
 	switch(r)
 	{
@@ -2105,7 +2151,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 			bodylen = snprintf(body, sizeof(body),
 			                   resp, action,
 			                   ns/*"urn:schemas-upnp-org:service:WANIPv6FirewallControl:1"*/,
-			                   filter.uid, action);
+			                   uid, action);
 			if (bodylen < 0 || bodylen >= (int)sizeof(body)) {
 				/* snprintf() output was truncated */
 				syslog(LOG_WARNING, "snprintf() returned %d, %lu bytes were available", bodylen, sizeof(body));
@@ -2213,7 +2259,7 @@ UpdatePinhole(struct upnphttp * h, const char * action, const char * ns)
 	req.filters = &filter;
 	req.nfilters = 1;
 	req.timestamp = upnp_time() + ltime;
-	n = upnp_update_inboundpinhole(&req);
+	n = upnp_update_inboundpinhole(&req, (unsigned short)uid);
 	if(n == -1)
 		SoapError(h, 704, "NoSuchEntry");
 	else if(n < 0)
@@ -2322,6 +2368,8 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 	struct NameValueParserData data;
 	const char * uid_str;
 	char iaddr[INET6_ADDRSTRLEN];
+	char raddr[INET6_ADDRSTRLEN];
+	unsigned short rport;
 	int proto;
 	unsigned short iport;
 	unsigned int leasetime;
@@ -2345,7 +2393,7 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 
 	/* Check that client is not deleting an pinhole
 	 * it doesn't have access to, because of its public access */
-	n = upnp_get_pinhole_info(uid, NULL, 0, NULL,
+	n = upnp_get_pinhole_info(uid, raddr, sizeof(raddr), &rport,
 	                          iaddr, sizeof(iaddr), &iport,
 	                          &proto,
 	                          NULL, 0, /* desc, desclen */
@@ -2373,11 +2421,14 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 		req.eaddr = req.iaddr;
 	req.iport = iport;
 	req.eport = iport;
-	memset(&filter, 0, sizeof(filter));
+	/* the remote of the pinhole too: a pinhole of PCP has no uid in the
+	 * lease table, its key and remote find it */
+	if(map_filter_set(&filter, raddr, rport) < 0 || IN6_IS_ADDR_UNSPECIFIED(&filter.raddr))
+		map_filter_set(&filter, NULL, rport);
 	filter.uid = (unsigned short)uid;
 	req.filters = &filter;
 	req.nfilters = 1;
-	n = upnp_delete_inboundpinhole(&req);
+	n = upnp_delete_inboundpinhole(&req, (unsigned short)uid);
 	if(n < 0)
 	{
 		syslog(LOG_INFO, "%s: (inbound) failed to remove pinhole with ID: %d",

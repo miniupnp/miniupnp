@@ -85,9 +85,10 @@ struct lease_entry {
 	unsigned char proto;	/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
 	unsigned char nonce[MAP_NONCE_LEN];	/* PCP, else zero */
 	struct in6_addr iaddr;
-	/* The external side. IPv4: the WAN address, :: for that of
-	 * ext_if_name. IPv6 with no translation: iaddr and iport. eport is the
-	 * port asked for, 0 : any, and the port used once it is mapped. */
+	/* The external side. IPv4: the WAN address the client was told, ::
+	 * in a reloaded row. IPv6 with no translation: iaddr and iport. eport
+	 * is the port asked for, 0 : any, and the port used once it is
+	 * mapped. */
 	struct in6_addr eaddr;
 	unsigned short iport;
 	unsigned short eport;
@@ -137,8 +138,9 @@ struct outgoing_entry {
 				 * read yet */
 };
 
-/* An empty request of a protocol. nonce NULL : zero. Not for a row of
- * lease_table_new(): it would lose the filter array of the row. */
+/* An empty request of a protocol on the stack. nonce NULL : zero. Not for a
+ * row of lease_table_new(), which is empty already: it would lose its filter
+ * array. */
 static inline void
 lease_entry_init(struct lease_entry * r, int kind, const void * nonce)
 {
@@ -146,6 +148,18 @@ lease_entry_init(struct lease_entry * r, int kind, const void * nonce)
 	r->kind = (unsigned char)kind;
 	if(nonce != NULL)
 		memcpy(r->nonce, nonce, MAP_NONCE_LEN);
+}
+
+/* Set the protocol and nonce of an empty entry, a row or a request. nonce
+ * NULL : zero. */
+static inline void
+lease_entry_set_kind(struct lease_entry * r, int kind, const void * nonce)
+{
+	r->kind = (unsigned char)kind;
+	if(nonce != NULL)
+		memcpy(r->nonce, nonce, MAP_NONCE_LEN);
+	else
+		memset(r->nonce, 0, MAP_NONCE_LEN);
 }
 
 /* a.b.c.d as ::ffff:a.b.c.d, the form of a request */
@@ -189,15 +203,22 @@ map_ntop(int family, const struct in6_addr * a, char * buf, size_t len)
 	return inet_ntop(AF_INET6, a, buf, len);
 }
 
-/* The filter of a remote host given as text: NULL, empty and "*" are any
- * host. 0, or -1 if host is no address. */
+/* 1 if the remote host given as text is any host: NULL, empty or "*" */
+static inline int
+map_any_host(const char * host)
+{
+	return host == NULL || host[0] == '\0' || strcmp(host, "*") == 0;
+}
+
+/* The filter of a remote host given as text, see map_any_host(). 0, or -1
+ * if host is no address. */
 static inline int
 map_filter_set(struct map_filter * f, const char * host, unsigned short rport)
 {
 	int family;
 	memset(f, 0, sizeof(*f));
 	f->rport = rport;
-	if(host == NULL || host[0] == '\0' || strcmp(host, "*") == 0)
+	if(map_any_host(host))
 		return 0;
 	if(map_pton(host, &family, &f->raddr) < 0)
 		return -1;
