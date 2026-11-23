@@ -118,13 +118,16 @@ TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o outgoing_table.o
 TESTPINHOLEOBJS = testpinhole.o upnppinhole.o memmap.o lease_table.o \
                   outgoing_table.o
 TESTFWSYNCOBJS = testfwsync.o fwsync.o testfwfake.o
+TESTCALLERSOBJS = testcallers.o testfwfake.o upnpredirect.o upnppinhole.o memmap.o lease_table.o outgoing_table.o fwsync.o upnpglobalvars.o upnputils.o upnppermissions.o \
+                  natpmp.o asyncsendto.o getifaddr.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp \
               testifacewatcher teststun testupnphttp \
-              testleasetable testoutgoingtable testmemmap testpinhole testfwsync
+              testleasetable testoutgoingtable testmemmap testpinhole testfwsync \
+              testcallers
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -160,10 +163,11 @@ clean:
 	$(RM) $(TESTGETROUTEOBJS)
 	$(RM) $(TESTLEASETABLEOBJS)
 	$(RM) $(TESTOUTGOINGTABLEOBJS)
-	$(RM) testmemmap.o testpinhole.o testfwsync.o testfwfake.o
+	$(RM) testmemmap.o testpinhole.o testfwsync.o testfwfake.o testcallers.o
 	$(RM) testssdppktgen.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen validateupnphttp
-	$(RM) validateleasetable validateoutgoingtable validatememmap validatepinhole validatefwsync
+	$(RM) validateleasetable validateoutgoingtable validatememmap validatepinhole validatefwsync \
+	      validatecallers
 
 install:	miniupnpd
 	$(STRIP) miniupnpd
@@ -177,7 +181,7 @@ install:	miniupnpd
 
 check:  validateupnppermissions validategetifaddr validatessdppktgen \
         validateupnphttp validateleasetable validateoutgoingtable validatememmap \
-        validatepinhole validatefwsync
+        validatepinhole validatefwsync validatecallers
 
 validateupnppermissions: $(SRCDIR)/testupnppermissions.sh testupnppermissions
 	$(SRCDIR)/testupnppermissions.sh
@@ -212,6 +216,10 @@ validatepinhole:	testpinhole
 
 validatefwsync:	testfwsync
 	./testfwsync
+	touch $@
+
+validatecallers:	testcallers
+	./testcallers
 	touch $@
 
 depend:	$(ALLSRCS)
@@ -279,6 +287,9 @@ testpinhole:	config.h $(TESTPINHOLEOBJS)
 
 testfwsync:	config.h $(TESTFWSYNCOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTFWSYNCOBJS)
+
+testcallers:	config.h $(TESTCALLERSOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTCALLERSOBJS) $(LIBS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^

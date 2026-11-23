@@ -40,6 +40,8 @@ validatepinhole
 validatememmap
 testfwsync
 validatefwsync
+testcallers
+validatecallers
 dox/
 bsdmake.inc
 upnpstun

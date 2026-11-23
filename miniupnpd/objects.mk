@@ -16,4 +16,4 @@ OTHEROBJS = miniupnpdctl.o testupnpdescgen.o testgetifstats.o \
             testssdppktgen.o testasyncsendto.o testportinuse.o testminissdp.o \
             testifacewatcher.o teststun.o testupnphttp.o \
             testleasetable.o testoutgoingtable.o testmemmap.o \
-            testpinhole.o testfwsync.o testfwfake.o
+            testpinhole.o testfwsync.o testfwfake.o testcallers.o
