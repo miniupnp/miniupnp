@@ -23,6 +23,7 @@
 #include "config.h"
 #include "upnpredirect.h"
 #include "memmap.h"
+#include "fwsync.h"
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
 #include "portinuse.h"
@@ -357,26 +358,61 @@ int reload_from_lease_file(void)
 	return 0;
 }
 
-#ifdef LEASEFILE_USE_REMAINING_TIME
-void lease_file_rewrite(void)
+/* the lease file line of the IPv4 port mapping e */
+static int
+lease_file_add_row(const struct lease_entry * e)
 {
-	const struct lease_entry * e;
 	char iaddr[INET_ADDRSTRLEN];
 	char desc[64];
 	char rhost[INET6_ADDRSTRLEN];
 
+	map_ntop(AF_INET, &e->iaddr, iaddr, sizeof(iaddr));
+	return lease_file_add(map_rhost(e, rhost, sizeof(rhost)), e->eport, iaddr,
+	                      e->iport, e->proto, map_rule_desc(e, desc, sizeof(desc)),
+	                      e->timestamp);
+}
+
+#ifdef LEASEFILE_USE_REMAINING_TIME
+void lease_file_rewrite(void)
+{
+	const struct lease_entry * e;
+
 	if (lease_file == NULL) return;
 	remove(lease_file);
 	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e)) {
-		map_ntop(AF_INET, &e->iaddr, iaddr, sizeof(iaddr));
-		if(lease_file_add(map_rhost(e, rhost, sizeof(rhost)), e->eport, iaddr,
-		                  e->iport, e->proto,
-		                  map_rule_desc(e, desc, sizeof(desc)), e->timestamp) < 0)
+		if(lease_file_add_row(e) < 0)
 			break;
 	}
 }
 #endif
 #endif
+
+/* the next expiry, ts if it is sooner */
+static void
+next_to_clean(unsigned int ts)
+{
+	if(nextruletoclean_timestamp == 0 || ts < nextruletoclean_timestamp)
+		nextruletoclean_timestamp = ts;
+}
+
+/* An add which failed left a part of the rules of e in the firewall: the
+ * table keeps a row of them, which expires at once, so the expiry pass
+ * deletes them again. */
+static void
+keep_partial_row(const struct lease_entry * e)
+{
+	struct lease_entry * k = lease_table_copy(e);
+
+	if(k == NULL) {
+		syslog(LOG_ERR, "port %hu %s: no row for the rules which stay",
+		       e->eport, proto_itoa(e->proto));
+		return;
+	}
+	k->fw_partial = 1;
+	k->timestamp = (unsigned int)upnp_time();
+	next_to_clean(k->timestamp);
+	memmap_add(k);	/* the table takes k */
+}
 
 /* upnp_redirect()
  * calls OS/fw dependent implementation of the redirection.
@@ -400,8 +436,8 @@ upnp_redirect(struct lease_entry * req)
 	char rhost_old_buf[INET6_ADDRSTRLEN];
 	const char * rhost_old;
 	unsigned short iport_old;
-	unsigned int timestamp;
 	struct lease_entry * old;
+	struct fw_change c;
 	const unsigned short eport = req->eport;
 	const unsigned short iport = req->iport;
 	const int proto = req->proto;
@@ -457,16 +493,12 @@ upnp_redirect(struct lease_entry * req)
 		    (rhost && rhost_old && (strcmp(rhost, rhost_old) == 0)))) {
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old ? rhost_old : "", iaddr_old, iport_old);
-			timestamp = req->timestamp;
-			if(iport != iport_old) {
-				r = update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
-			} else {
-				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
-			}
+			fw_change_init(&c, FW_UPDATE, req, old);
+			r = fw_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
-				lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
+				lease_file_add_row(req);
 			}
 #endif /* ENABLE_LEASEFILE */
 			if(r == 0)
@@ -493,40 +525,22 @@ upnp_redirect(struct lease_entry * req)
 int
 upnp_redirect_internal(struct lease_entry * req)
 {
-	char desc_buf[64];
-	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
-	char iaddr[INET_ADDRSTRLEN];
-	char rhost_buf[INET6_ADDRSTRLEN];
-	const char * rhost = map_rhost(req, rhost_buf, sizeof(rhost_buf));
-	const unsigned short eport = req->eport;
-	const unsigned short iport = req->iport;
-	const int proto = req->proto;
-	const unsigned int timestamp = req->timestamp;
+	struct fw_change c;
 
-	map_ntop(AF_INET, &req->iaddr, iaddr, sizeof(iaddr));
 	if(disable_port_forwarding)
 		return -1;
-	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
-	                      desc, timestamp) < 0) {
+	fw_change_init(&c, FW_ADD, req, NULL);
+	c.fresh = 1;	/* the callers found no row on the port */
+	if(fw_sync(&c, 1) < 0) {
+		if(c.applied != FW_NOT_APPLIED)
+			keep_partial_row(req);
 		return -1;
 	}
-
 #ifdef ENABLE_LEASEFILE
-	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
+	lease_file_add_row(req);
 #endif
-/*	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %s for: %s",
-		iaddr, iport, protocol, desc);*/
-	if(add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc) < 0) {
-		/* clean up the redirect rule */
-#if !defined(__linux__)
-		delete_redirect_rule(ext_if_name, eport, proto);
-#endif
-		return -1;
-	}
-	if(timestamp > 0) {
-		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
-			nextruletoclean_timestamp = timestamp;
-	}
+	if(req->timestamp > 0)
+		next_to_clean(req->timestamp);
 #ifdef ENABLE_EVENTS
 	/* the number of port mappings changed, we must
 	 * inform the subscribers */
@@ -708,10 +722,21 @@ upnp_check_map(struct lease_entry * e)
 int
 upnp_delete_map(struct lease_entry * e)
 {
-	int r = _upnp_delete_redir(e->eport, e->proto);
-	if(r >= 0)
-		memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
-	return r;
+	struct fw_change c;
+	int r;
+
+	fw_change_init(&c, FW_DELETE, NULL, e);
+	r = fw_sync(&c, 1);
+	if(r < 0)
+		return r;
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(e->eport, e->proto);
+#endif
+#ifdef ENABLE_EVENTS
+	upnp_event_var_change_notify(EWanIPC);
+#endif
+	memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
+	return 0;
 }
 
 int
@@ -771,13 +796,8 @@ upnp_get_portmapping_number_of_entries(void)
 	return (int)lease_table_port_count();
 }
 
-/* the next expiry, ts if it is sooner */
-static void
-next_to_clean(unsigned int ts)
-{
-	if(nextruletoclean_timestamp == 0 || ts < nextruletoclean_timestamp)
-		nextruletoclean_timestamp = ts;
-}
+/* seconds before an expired mapping whose rules stayed is deleted again */
+#define EXPIRY_RETRY	60
 
 #ifdef PCP_PEER
 /* Delete the PEER rules of the keys of expired peers: one transaction. */
@@ -817,15 +837,21 @@ upnp_expire_mappings(void)
 			next_to_clean(e->timestamp);
 			continue;
 		}
+		if(e->retry > now) {
+			next_to_clean(e->retry);
+			continue;
+		}
 		syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
 		       e->eport, proto_itoa(e->proto));
-		/* The row goes also if its rules do not: a rule which vanished
-		 * unseen can not be deleted, and the row would expire on every
-		 * pass. */
-		if(_upnp_delete_redir(e->eport, e->proto) < 0)
-			syslog(LOG_WARNING, "port mapping %hu %s expired, its rules were not deleted",
-			       e->eport, proto_itoa(e->proto));
-		memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
+		/* A rule the firewall lost deletes fine (fw_sync()). A delete
+		 * which fails keeps the row, so the rule is not left without
+		 * one: the next try is a minute later. */
+		if(upnp_delete_map(e) < 0) {
+			e->retry = now + EXPIRY_RETRY;
+			next_to_clean(e->retry);
+			syslog(LOG_WARNING, "port mapping %hu %s expired, its rules were not deleted, "
+			       "next try in %d s", e->eport, proto_itoa(e->proto), EXPIRY_RETRY);
+		}
 	}
 #ifdef PCP_PEER
 	/* the PEER peers: the rule of each peer, never the port mapping on the

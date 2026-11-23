@@ -517,6 +517,32 @@ lease_table_free(struct lease_entry * e)
 	free(e);
 }
 
+struct lease_entry *
+lease_table_copy(const struct lease_entry * r)
+{
+	struct lease_entry * e = lease_table_new(r->nfilters);
+	int i;
+
+	if(e == NULL)
+		return NULL;
+	e->kind = r->kind;
+	e->flags = r->flags;
+	e->family = r->family;
+	e->proto = r->proto;
+	memcpy(e->nonce, r->nonce, sizeof(e->nonce));
+	e->iaddr = r->iaddr;
+	e->eaddr = r->eaddr;
+	e->iport = r->iport;
+	e->eport = r->eport;
+	e->timestamp = r->timestamp;
+	e->label = r->label;
+	for(i = 0; i < r->nfilters; i++) {
+		e->filters[i] = r->filters[i];
+		e->filters[i].map = e;
+	}
+	return e;
+}
+
 void
 lease_table_link(struct lease_entry * e)
 {

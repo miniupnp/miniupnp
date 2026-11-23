@@ -54,6 +54,11 @@ struct lease_entry * lease_table_new(int nfilters);
  * the caller's. */
 void lease_table_free(struct lease_entry * e);
 
+/* A new row as lease_table_new(), with the mapping of r: its key, ports,
+ * owner, expiry and filters. The label is r's, the caller's until the link.
+ * NULL if there is no memory. */
+struct lease_entry * lease_table_copy(const struct lease_entry * r);
+
 /* Put a row of lease_table_new() in all the indexes, and on the port list if
  * it is an IPv4 port mapping. The row takes a copy of its label, which was
  * the caller's until then. The caller makes sure no linked row has the same
