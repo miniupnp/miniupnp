@@ -26,6 +26,8 @@ static int redirect_calls;
 static int fail_add_filter;	/* add_filter_rule2() fails */
 static int fail_delete;		/* the deletes fail */
 static int rule_present;	/* get_redirect_rule(): 1 the rule, 0 none, -1 an error */
+static const char * rule_iaddr = "192.168.1.10";	/* the target of that rule */
+static unsigned short rule_iport = 5000;
 static int adds, deletes, updates;
 static unsigned short last_update_iport;
 
@@ -112,10 +114,19 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   char * desc, int desclen, char * rhost, int rhostlen,
                   unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
 {
-	(void)ifname; (void)eport; (void)proto; (void)iaddr; (void)iaddrlen; (void)iport;
-	(void)desc; (void)desclen; (void)rhost; (void)rhostlen; (void)timestamp;
-	(void)packets; (void)bytes;
-	return rule_present > 0 ? 0 : rule_present == 0 ? -2 : -1;
+	(void)ifname; (void)eport; (void)proto;
+	(void)timestamp; (void)packets; (void)bytes;
+	if(rule_present <= 0)
+		return rule_present == 0 ? -2 : -1;
+	if(iaddr != NULL && iaddrlen > 0)
+		snprintf(iaddr, (size_t)iaddrlen, "%s", rule_iaddr);
+	if(iport != NULL)
+		*iport = rule_iport;
+	if(desc != NULL && desclen > 0)
+		desc[0] = '\0';
+	if(rhost != NULL && rhostlen > 0)
+		rhost[0] = '\0';
+	return 0;
 }
 
 /* the firewall has the rules of ports 5000 and 5001, with counters */
@@ -239,6 +250,7 @@ get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
 
 #ifdef FW_MAP6
 static int map6_adds, map6_deletes, fail_map6_add_at, map6_gone;
+static int map6_lost;	/* get_map6_packets() finds no rule */
 
 int
 add_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
@@ -286,7 +298,7 @@ get_map6_packets(const char * rem_host, unsigned short rem_port,
 {
 	(void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
 	*packets = 0;
-	return 0;
+	return map6_lost ? -2 : 0;
 }
 #endif
 
@@ -298,10 +310,12 @@ reset(void)
 	fail_add_filter = 0;
 	fail_delete = 0;
 	rule_present = 1;
+	rule_iaddr = "192.168.1.10";
+	rule_iport = 5000;
 	adds = deletes = updates = 0;
 	last_update_iport = 0;
 #ifdef FW_MAP6
-	map6_adds = map6_deletes = fail_map6_add_at = map6_gone = 0;
+	map6_adds = map6_deletes = fail_map6_add_at = map6_gone = map6_lost = 0;
 #endif
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 	peer_adds = 0;
@@ -615,6 +629,79 @@ test_map6_filters(void)
 }
 #endif
 
+/* The renewal check of an IPv4 row: there, gone, pointed elsewhere,
+ * unreadable, gone for good. */
+static void
+test_check_row4(void)
+{
+	struct lease_entry e;
+
+	reset();
+	mapping(&e, 10, 5000, 5000);
+	CHECK(fw_check_row(&e) == 0 && adds == 0 && deletes == 0);
+
+	reset();
+	rule_present = 0;	/* gone: added back */
+	CHECK(fw_check_row(&e) == 1 && adds == 1 && deletes == 0);
+
+	reset();
+	rule_iaddr = "192.168.1.99";	/* elsewhere: its rule goes, the row's comes */
+	CHECK(fw_check_row(&e) == 1 && deletes == 1 && adds == 1);
+
+	reset();
+	rule_iport = 6000;	/* another internal port is elsewhere too */
+	CHECK(fw_check_row(&e) == 1 && deletes == 1 && adds == 1);
+
+	reset();
+	rule_present = -1;	/* unreadable: nothing known, nothing sent */
+	CHECK(fw_check_row(&e) == -1 && adds == 0 && deletes == 0);
+
+	reset();
+	rule_present = 0;
+	fail_add_redirect = 1;	/* gone, and the add fails */
+	CHECK(fw_check_row(&e) == -2 && !e.fw_partial);
+}
+
+#ifdef FW_MAP6
+/* An IPv6 map whose rule is lost: what is left goes, all come back. */
+/* An IPv6 map with no filter has one rule, of any remote. */
+static void
+test_map6_no_filter(void)
+{
+	struct lease_entry e;
+	struct fw_change c;
+
+	reset();
+	map6(&e, NULL, 0);
+	fw_change_init(&c, FW_ADD, &e, NULL);
+	CHECK(fw_sync(&c, 1) == 0 && map6_adds == 1);
+	reset();
+	fw_change_init(&c, FW_DELETE, NULL, &e);
+	CHECK(fw_sync(&c, 1) == 0 && map6_deletes == 1);
+}
+
+static void
+test_check_row6(void)
+{
+	static struct map_filter f[3];
+	struct lease_entry e;
+
+	reset();
+	map6(&e, f, 3);
+	CHECK(fw_check_row(&e) == 0 && map6_adds == 0);
+	reset();
+	map6_lost = 1;
+	CHECK(fw_check_row(&e) == 1 && map6_adds == 3);
+	/* a map with no filter: its one rule of any remote */
+	reset();
+	map6(&e, NULL, 0);
+	CHECK(fw_check_row(&e) == 0 && map6_adds == 0);
+	reset();
+	map6_lost = 1;
+	CHECK(fw_check_row(&e) == 1 && map6_adds == 1);
+}
+#endif
+
 int
 main(void)
 {
@@ -626,8 +713,11 @@ main(void)
 	test_delete_lost_rule();
 	test_delete_taken_back();
 	test_each_map_counters();
+	test_check_row4();
 #ifdef FW_MAP6
 	test_map6_filters();
+	test_map6_no_filter();
+	test_check_row6();
 #endif
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 	test_peer();

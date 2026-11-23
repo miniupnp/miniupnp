@@ -71,21 +71,28 @@ fw_change_init(struct fw_change * c, enum fw_op op,
 	c->old = old;
 }
 
-int
-fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes)
+/* The result of get_redirect_rule() as 0, -2 for a rule not found or -1
+ * for an error. iptables, nftables and pf give these. ipfw and ipf give -1
+ * for not found and cannot tell an error apart. */
+static int
+redirect_result(int r)
 {
-	unsigned short iport;
-	unsigned int timestamp;
-	/* get_redirect_rule() gives -2 for a rule not found and -1 for an error
-	 * (iptables, nftables and pf). ipfw and ipf give -1 for not found and
-	 * cannot tell an error apart */
-	int r = get_redirect_rule(ext_if_name, eport, proto, NULL, 0, &iport, NULL, 0,
-	                          NULL, 0, &timestamp, packets, bytes);
 #if defined(USE_IPFW) || defined(USE_IPF)
 	return r >= 0 ? 0 : -2;
 #else
 	return r >= 0 ? 0 : r == -2 ? -2 : -1;
 #endif
+}
+
+int
+fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes)
+{
+	unsigned short iport;
+	unsigned int timestamp;
+
+	return redirect_result(get_redirect_rule(ext_if_name, eport, proto, NULL, 0,
+	                                         &iport, NULL, 0, NULL, 0, &timestamp,
+	                                         packets, bytes));
 }
 
 int
@@ -107,15 +114,6 @@ fw_each_map_counters(fw_counters_fn fn, void * arg)
 		fn(eport, proto, packets, bytes, arg);
 	return 0;
 #endif
-}
-
-/* 1 if the firewall has the redirect rule of an IPv4 row, 0 if it has not,
- * -1 if it could not be read */
-static int
-map_rule_present(const struct lease_entry * e)
-{
-	int r = fw_map_rule(e->eport, e->proto, NULL, NULL);
-	return r == 0 ? 1 : r == -2 ? 0 : -1;
 }
 
 #ifdef FW_MAP6
@@ -209,18 +207,6 @@ add_map6_rules(const struct lease_entry * e, int * half)
 }
 
 int
-fw_map6_rule(const struct lease_entry * e, int i)
-{
-	struct map6_rule r;
-	u_int64_t packets;
-	int ret;
-
-	map6_rule_of(e, i, &r);
-	ret = get_map6_packets(r.rhost, r.rport, r.iaddr, e->iport, e->proto, &packets);
-	return ret == 0 ? 0 : ret == -2 ? -2 : -1;
-}
-
-int
 fw_map6_packets(const struct lease_entry * e, int i, u_int64_t * packets)
 {
 	struct map6_rule r;
@@ -228,26 +214,33 @@ fw_map6_packets(const struct lease_entry * e, int i, u_int64_t * packets)
 	map6_rule_of(e, i, &r);
 	return get_map6_packets(r.rhost, r.rport, r.iaddr, e->iport, e->proto, packets);
 }
+#else
+static int
+delete_map6_rules(const struct lease_entry * e)
+{
+	UNUSED(e);
+	return -1;
+}
+
+static int
+add_map6_rules(const struct lease_entry * e, int * half)
+{
+	UNUSED(e); UNUSED(half);
+	return -1;
+}
 #endif /* FW_MAP6 */
 
-/* Delete the rules of a row. The result of the backend, or 0 if the backend
- * failed on a rule which it does not have: then the row can go. A firewall
- * which cannot be read is not taken for one without the rule: the row
- * stays, and the next delete or expiry tries again. A flush or another
- * program can remove a rule, and pf reports the missing rule as an
- * error. */
+/* Delete the rules of an IPv4 port mapping. The result of the backend, or 0
+ * if the backend failed on a rule which it does not have: then the row can
+ * go. A firewall which cannot be read is not taken for one without the
+ * rule: the row stays, and the next delete or expiry tries again. A flush
+ * or another program can remove a rule, and pf reports the missing rule as
+ * an error. */
 static int
-delete_rules(const struct lease_entry * e)
+delete_map4_rules(const struct lease_entry * e)
 {
 	int r;
 
-	if(e->family == AF_INET6) {
-#ifdef FW_MAP6
-		return delete_map6_rules(e);
-#else
-		return -1;
-#endif
-	}
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(e->eport, e->proto);
 #elif defined(USE_PF)
@@ -256,7 +249,7 @@ delete_rules(const struct lease_entry * e)
 	r = delete_redirect_rule(ext_if_name, e->eport, e->proto);
 	delete_filter_rule(ext_if_name, e->eport, e->proto);
 #endif
-	if(r < 0 && map_rule_present(e) == 0) {
+	if(r < 0 && fw_map_rule(e->eport, e->proto, NULL, NULL) == -2) {
 		syslog(LOG_INFO, "port %hu %s has no rule in the firewall, its row goes",
 		       e->eport, proto_itoa(e->proto));
 		return 0;
@@ -264,30 +257,29 @@ delete_rules(const struct lease_entry * e)
 	return r;
 }
 
-/* Add the rules of a row. *half is set when the redirect rule of a port
- * mapping stays although the add failed. fresh: the port had no rule before
+/* Delete the rules of a row, as delete_map4_rules() */
+static int
+delete_rules(const struct lease_entry * e)
+{
+	return e->family == AF_INET6 ? delete_map6_rules(e) : delete_map4_rules(e);
+}
+
+/* Add the rules of an IPv4 port mapping. *half is set when its redirect
+ * rule stays although the add failed. fresh: the port had no rule before
  * the add, so a rule found after it failed is its own. The result of the
  * backend. */
 static int
-add_rules(const struct lease_entry * e, int * half, int fresh)
+add_map4_rules(const struct lease_entry * e, int * half, int fresh)
 {
 	struct fw_rule r;
 
-	if(e->family == AF_INET6) {
-#ifdef FW_MAP6
-		UNUSED(fresh);
-		return add_map6_rules(e, half);
-#else
-		return -1;
-#endif
-	}
 	rule_of(e, &r);
 	if(add_redirect_rule2(ext_if_name, r.rhost, r.eport, r.iaddr, r.iport, r.proto,
 	                      r.desc, r.timestamp) < 0) {
 		/* A backend which adds more than one rule takes back the first
 		 * when a later one fails, and that can fail too: iptables adds a
 		 * MASQUERADE rule after the DNAT rule */
-		if(fresh && map_rule_present(e) == 1) {
+		if(fresh && fw_map_rule(e->eport, e->proto, NULL, NULL) == 0) {
 			syslog(LOG_WARNING, "the add of port %hu failed, and its redirect rule stays",
 			       r.eport);
 			*half = 1;
@@ -305,6 +297,15 @@ add_rules(const struct lease_entry * e, int * half, int fresh)
 		*half = 1;
 	}
 	return -1;
+}
+
+/* Add the rules of a row, as add_map4_rules() and add_map6_rules() */
+static int
+add_rules(const struct lease_entry * e, int * half, int fresh)
+{
+	if(e->family == AF_INET6)
+		return add_map6_rules(e, half);
+	return add_map4_rules(e, half, fresh);
 }
 
 /* Change the rules of from into those of to. The result of the backend. */
@@ -542,4 +543,132 @@ fw_sync_out(struct fw_out_change * c, int n)
 			syslog(LOG_WARNING, "fw_sync_out: change %d of %d stays", i + 1, n);
 	}
 	return r < 0 ? r : -1;
+}
+
+int
+fw_read_map(struct lease_entry * e, char * desc, int desclen)
+{
+	char iaddr[INET6_ADDRSTRLEN];
+	char rhost[INET6_ADDRSTRLEN];
+	unsigned short iport;
+	int family, r;
+
+	iaddr[0] = rhost[0] = '\0';
+	if(desc != NULL && desclen > 0)
+		desc[0] = '\0';
+	r = get_redirect_rule(ext_if_name, e->eport, e->proto, iaddr, sizeof(iaddr),
+	                      &iport, desc, desclen, rhost, sizeof(rhost),
+	                      NULL, 0, 0);
+	if(r != 0) {
+#if defined(USE_IPFW) || defined(USE_IPF)
+		return -2;	/* they cannot tell an error from no rule */
+#else
+		return r == -2 ? -2 : -1;
+#endif
+	}
+	if(map_pton(iaddr, &family, &e->iaddr) < 0 || family != AF_INET ||
+	   e->filters_alloc < 1 || map_filter_set(&e->filters[0], rhost, 0) < 0)
+		return -1;
+	e->family = AF_INET;
+	e->iport = iport;
+	e->nfilters = e->filters[0].prefix != 0 ? 1 : 0;
+	return 0;
+}
+
+/* the IPv4 mapping e: 0, 1, -1 or -2 as fw_check_row() */
+static int
+check_map4(struct lease_entry * e)
+{
+	struct lease_entry rule;	/* the rule the firewall has, on the stack */
+	struct map_filter f;
+	struct lease_entry * fw = &rule;
+	struct fw_change c[2];
+	int r, n = 0;
+
+	lease_entry_init(fw, 0, NULL);
+	fw->filters = &f;
+	fw->filters_alloc = 1;
+	fw->proto = e->proto;
+	fw->eport = e->eport;
+	if(e->fw_partial) {
+		/* only a part of the rules is there: send them all again */
+		syslog(LOG_NOTICE, "port mapping %hu %s has a part of its rules, sending them again",
+		       e->eport, proto_itoa(e->proto));
+		fw_change_init(&c[n++], FW_DELETE, NULL, e);
+		r = -2;
+	} else {
+		r = fw_read_map(fw, NULL, 0);
+		if(r == -1 || (r == 0 && IN6_ARE_ADDR_EQUAL(&fw->iaddr, &e->iaddr) &&
+		               fw->iport == e->iport))
+			return r;	/* unreadable, or as the row says */
+	}
+	if(r == 0) {
+		/* another program pointed the port elsewhere: its rule goes,
+		 * the row's comes back, in one request */
+		syslog(LOG_NOTICE, "port mapping %hu %s points elsewhere, putting it back",
+		       e->eport, proto_itoa(e->proto));
+		fw_change_init(&c[n++], FW_DELETE, NULL, fw);
+	} else if(!e->fw_partial) {
+		syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, adding it back",
+		       e->eport, proto_itoa(e->proto));
+	}
+	fw_change_init(&c[n], FW_ADD, e, NULL);
+	c[n].fresh = 1;
+	n++;
+	r = fw_sync(c, n);
+	/* a failed send leaves a part: that of the add, or the part there
+	 * was, when its delete failed */
+	if(r == 0)
+		e->fw_partial = 0;
+	else if(c[n - 1].applied != FW_NOT_APPLIED)
+		e->fw_partial = 1;
+	return r == 0 ? 1 : -2;
+}
+
+#ifdef FW_MAP6
+/* the IPv6 map e: 0, 1, -1 or -2 as fw_check_row(). The key of a map6
+ * rule is its target, so it cannot point elsewhere: only gone. */
+static int
+check_map6(struct lease_entry * e)
+{
+	struct fw_change c[2];
+	u_int64_t packets;
+	int i, r, unknown = 0;
+
+	/* only a part of the rules is there: send them all again */
+	for(i = 0; !e->fw_partial && i < map6_rules(e); i++) {
+		r = fw_map6_packets(e, i, &packets);
+		if(r == -2)
+			break;
+		if(r < 0)
+			unknown = 1;
+	}
+	if(!e->fw_partial && i == map6_rules(e))
+		return unknown ? -1 : 0;
+	syslog(LOG_NOTICE, "map6 port %hu %s lost its rules, adding them back",
+	       e->iport, proto_itoa(e->proto));
+	/* what is left of them goes, then all come back, in one request */
+	fw_change_init(&c[0], FW_DELETE, NULL, e);
+	fw_change_init(&c[1], FW_ADD, e, NULL);
+	r = fw_sync(c, 2);
+	/* as check_map4(): a part there was stays a part */
+	if(r == 0)
+		e->fw_partial = 0;
+	else if(c[1].applied != FW_NOT_APPLIED)
+		e->fw_partial = 1;
+	return r == 0 ? 1 : -2;
+}
+#else
+static int
+check_map6(struct lease_entry * e)
+{
+	UNUSED(e);
+	return -1;
+}
+#endif
+
+int
+fw_check_row(struct lease_entry * e)
+{
+	return e->family == AF_INET6 ? check_map6(e) : check_map4(e);
 }

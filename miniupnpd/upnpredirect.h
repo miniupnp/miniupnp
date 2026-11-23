@@ -104,27 +104,6 @@ upnp_get_redirection_infos_by_index(int index,
                                     char * rhost, int rhostlen,
                                     unsigned int * leaseduration);
 
-/*! \brief get a port mapping from its internal tuple (address, port, protocol)
- *
- * That is the destination of the port mapping, when the external port
- * is the source.
- * \param[in] iport internal port
- * \param[in] iaddr internal IPv4 address
- * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
- * \param[out] eport external port
- * \param[out] desc port mapping description
- * \param[in] desclen desc buffer length
- * \param[out] rhost remote host
- * \param[in] rhostlen rhost buffer length
- * \param[out] leaseduration lease duration in seconds (0 for infinite)
- * \return 0 on success, -1 failed to get the port mapping entry or no entry exists */
-int
-upnp_get_redirection_infos_by_ituple(unsigned short iport,
-                                     const char * iaddr, int proto,
-                                     unsigned short * eport,
-                                     char * desc, int desclen,
-                                     char * rhost, int rhostlen,
-                                     unsigned int * leaseduration);
 
 /*! \brief delete the port mapping a client asks to delete
  * \param[in] req the request: the mapping is found in the lease table by

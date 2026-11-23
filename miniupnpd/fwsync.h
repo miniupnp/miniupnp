@@ -92,11 +92,26 @@ int fw_sync_out(struct fw_out_change * changes, int n);
  * packets and bytes may be NULL. */
 int fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes);
 
-#ifdef FW_MAP6
-/* The rule of filter i of the IPv6 map e: 0, -2 if the firewall has no such
- * rule, or -1 if it could not be read. */
-int fw_map6_rule(const struct lease_entry * e, int i);
+/* The redirect rule of the IPv4 port e->eport, e->proto, as a row: its
+ * internal address and port and its remote host into e, a row of
+ * lease_table_new(1), and the description of the rule into desc. 0, -2 if
+ * the firewall has no such rule, or -1 if it could not be read. For the
+ * rules of an earlier run, at startup. */
+int fw_read_map(struct lease_entry * e, char * desc, int desclen);
 
+/* The renewal check of a row of the table: is its firewall side as the row
+ * says? An IPv4 mapping is read by its external port, an IPv6 map by the
+ * key of each filter.
+ *   0   the firewall has it
+ *   1   it was gone, or another program pointed the port at another
+ *       internal client, and the rules of the row were sent again
+ *  -1   the firewall could not be read: nothing is known, nothing changed
+ *  -2   it was gone and could not be sent again
+ * A part of the rules which stays after a failed send marks the row
+ * fw_partial. */
+int fw_check_row(struct lease_entry * e);
+
+#ifdef FW_MAP6
 /* The packet counter of the rule of filter i of the IPv6 map e: 0, -2 if
  * there is no such rule, or < 0. */
 int fw_map6_packets(const struct lease_entry * e, int i, u_int64_t * packets);

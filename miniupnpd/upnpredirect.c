@@ -184,33 +184,18 @@ lease_file_remove(unsigned short eport, int proto)
 static void
 reload_adopt_rule(const struct lease_entry * line)
 {
-	char iaddr_s[INET6_ADDRSTRLEN];
 	char desc[64];
-	char rhost[INET6_ADDRSTRLEN];
-	unsigned short iport;
-	int family;
-	struct lease_entry * e;
+	struct lease_entry * e = lease_table_new(1);
 
-	rhost[0] = '\0';
-	desc[0] = '\0';
-	if(get_redirect_rule(ext_if_name, line->eport, line->proto, iaddr_s, sizeof(iaddr_s),
-	                     &iport, desc, sizeof(desc), rhost, sizeof(rhost),
-	                     NULL, 0, 0) != 0)
-		return;
-	e = lease_table_new(1);
 	if(e == NULL)
 		return;
-	if(map_pton(iaddr_s, &family, &e->iaddr) < 0 || family != AF_INET ||
-	   map_filter_set(&e->filters[0], rhost, 0) < 0) {
+	e->proto = line->proto;
+	e->eport = line->eport;
+	if(fw_read_map(e, desc, sizeof(desc)) != 0) {
 		lease_table_free(e);
 		return;
 	}
-	e->nfilters = e->filters[0].prefix != 0 ? 1 : 0;
-	e->family = AF_INET;
-	e->proto = line->proto;
-	e->iport = iport;
 	e->eaddr = line->eaddr;
-	e->eport = line->eport;
 	/* the lease of the line, so the rule expires also if the renewal
 	 * below fails */
 	e->timestamp = line->timestamp;
@@ -560,6 +545,10 @@ upnp_renew_map(struct lease_entry * req, struct lease_entry * old)
 {
 	const unsigned short iport_old = old->iport;
 
+	/* a part of its rules is missing: no renewal in the table, the row
+	 * expires and the client maps anew */
+	if(old->fw_partial)
+		return -1;
 	if(disable_port_forwarding) {
 		/* no port forwarding now: the mapping goes and the renewal
 		 * fails, as a new one would */
@@ -651,79 +640,20 @@ upnp_get_redirection_infos_by_index(int index,
 	return 0;
 }
 
-int
-upnp_get_redirection_infos_by_ituple(unsigned short iport,
-                                     const char * iaddr, int proto,
-                                     unsigned short * eport,
-                                     char * desc, int desclen,
-                                     char * rhost, int rhostlen,
-                                     unsigned int * leaseduration)
-{
-	/* that is a default implementation, iterating all rules */
-	int index;
-
-	for(index = 0; ; index++) {
-		unsigned short other_iport = 0;
-		int other_proto = 0;
-		char other_iaddr[16] = "";
-		unsigned int timestamp;
-
-		if(get_redirect_rule_by_index(index, 0/*ifname*/, eport,
-		                              other_iaddr, sizeof(other_iaddr),
-		                              &other_iport, &other_proto,
-		                              desc, desclen,
-		                              rhost, rhostlen, &timestamp,
-		                              0, 0) < 0)
-			break;
-		if(other_proto == proto && other_iport == iport &&
-		   strcmp(other_iaddr, iaddr) == 0) {
-			/* found it ! */
-			if(leaseduration) {
-				time_t current_time = upnp_time();
-				*leaseduration = (timestamp > (unsigned int)current_time)
-				                 ? (timestamp - current_time)
-				                 : 0;
-			}
-			return 0;
-		}
-	}
-	/* not found */
-	if(index > 0) {
-		/* clean the mess */
-		*eport = 0;
-		desc[0] = '\0';
-		rhost[0] = '\0';
-	}
-	return -1;
-}
-
 struct lease_entry *
 upnp_check_map(struct lease_entry * e)
 {
-	struct fw_change c;
-	int r;
-
-	if(e == NULL || firewall_trust == FW_TRUST_TRUST)
+	/* a row of a part of its rules is checked even in a trusted firewall:
+	 * the daemon knows they are not all there */
+	if(e == NULL || (firewall_trust == FW_TRUST_TRUST && !e->fw_partial))
 		return e;
-	/* a failed read (-1) is no missing rule (-2): the row of a rule which
-	 * may be there stays */
-	r = fw_map_rule(e->eport, e->proto, NULL, NULL);
-	if(r != -2)
-		return e;
-	/* The rule went without the daemon. The row says what it was: add it
-	 * back in place, so the mapping keeps its row, and the UPnP index of
-	 * the mappings after it does not move. */
-	fw_change_init(&c, FW_ADD, e, NULL);
-	c.fresh = 1;
-	if(fw_sync(&c, 1) == 0) {
-		syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, added it back",
-		       e->eport, proto_itoa(e->proto));
-		e->fw_partial = 0;
-		return e;
-	}
-	if(c.applied != FW_NOT_APPLIED) {
-		/* a part of the rules is back: the row stays with them */
-		e->fw_partial = 1;
+	if(fw_check_row(e) != -2)
+		return e;	/* there, sent again, or not known */
+	if(e->fw_partial) {
+		/* a part of the rules stays: so does the row, which expires
+		 * at once, so the expiry deletes them */
+		e->timestamp = (unsigned int)upnp_time();
+		next_to_clean(e->timestamp);
 		return e;
 	}
 	syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, which could not be added "
@@ -1143,32 +1073,35 @@ upnp_get_portmappings_in_range(unsigned short startport,
 void
 write_ruleset_details(int s)
 {
-	int proto = 0;
-	unsigned short eport, iport;
+	const struct lease_entry * e;
 	char desc[64];
-	char iaddr[32];
-	char rhost[32];
-	unsigned int timestamp;
+	char iaddr[INET_ADDRSTRLEN];
+	char rhost[INET6_ADDRSTRLEN];
+	const char * r;
 	u_int64_t packets;
 	u_int64_t bytes;
 	int i = 0;
 	char buffer[256];
 	int n;
 
+	/* the port mappings of the table, with the counters of their rules,
+	 * which only the firewall has */
 	write(s, "Ruleset :\n", 10);
-	while(get_redirect_rule_by_index(i, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
-	                                 &iport, &proto, desc, sizeof(desc),
-	                                 rhost, sizeof(rhost),
-	                                 &timestamp,
-	                                 &packets, &bytes) >= 0)
-	{
+	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e)) {
+		if(fw_map_rule(e->eport, e->proto, &packets, &bytes) != 0)
+			packets = bytes = 0;
+		if(map_ntop(AF_INET, &e->iaddr, iaddr, sizeof(iaddr)) == NULL)
+			iaddr[0] = '\0';
+		r = map_rhost(e, rhost, sizeof(rhost));
 		n = snprintf(buffer, sizeof(buffer),
 		             "%2d %s %s:%hu->%s:%hu "
 		             "'%s' %u %" PRIu64 " %" PRIu64 "\n",
-		             /*"'%s' %llu %llu\n",*/
-		             i, proto_itoa(proto), rhost,
-		             eport, iaddr, iport, desc, timestamp, packets, bytes);
-		write(s, buffer, n);
+		             i, proto_itoa(e->proto), r ? r : "",
+		             e->eport, iaddr, e->iport,
+		             map_rule_desc(e, desc, sizeof(desc)), e->timestamp,
+		             packets, bytes);
+		if(n > 0 && n < (int)sizeof(buffer))
+			write(s, buffer, n);
 		i++;
 	}
 }

@@ -372,8 +372,9 @@ reload_adopt_pinhole(const struct lease_entry * line)
 {
 #ifdef FW_MAP6
 	struct lease_entry * e;
+	u_int64_t packets;
 
-	if(fw_map6_rule(line, 0) != 0)
+	if(fw_map6_packets(line, 0, &packets) != 0)
 		return;
 	e = lease_table_copy(line);
 	if(e == NULL)
@@ -804,8 +805,6 @@ upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 #ifdef FW_MAP6
 	const struct lease_entry * e = NULL;
 	const struct map_filter * f;
-	struct fw_change c;
-	int i;
 
 	/* UpdatePinhole names the pinhole by its UniqueID alone; PCP by the
 	 * key of its filter */
@@ -821,20 +820,9 @@ upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 	/* The rule holds no expiry: a renewal changes the table. Unless the
 	 * firewall is trusted, the rules are looked up by key first, and a
 	 * rule the firewall lost is added back, so its UniqueID stays. */
-	if(firewall_trust != FW_TRUST_TRUST) {
-		for(i = 0; i < e->nfilters; i++) {
-			if(fw_map6_rule(e, i) != -2)
-				continue;
-			syslog(LOG_NOTICE, "map6 port %hu %s lost its rules, adding them back",
-			       e->iport, proto_itoa(e->proto));
-			fw_change_init(&c, FW_DELETE, NULL, e);
-			fw_sync(&c, 1);	/* what is left of them */
-			fw_change_init(&c, FW_ADD, e, NULL);
-			if(fw_sync(&c, 1) < 0)
-				return -2;
-			break;
-		}
-	}
+	if((firewall_trust != FW_TRUST_TRUST || e->fw_partial) &&
+	   fw_check_row((struct lease_entry *)e) == -2)
+		return -2;
 #ifdef ENABLE_LEASEFILE
 	lease_file6_update(req);
 #endif
