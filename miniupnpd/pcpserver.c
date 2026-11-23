@@ -721,13 +721,15 @@ static const char* inet_satop(struct sockaddr* sa, char* buf, size_t buf_len)
 	}
 }
 
-/* The request of a PCP PEER: its nonce, protocol, internal side, the
- * suggested external side and peer p, the remote. No label. */
+/* Fill req, an empty entry with one peer (a binding of
+ * outgoing_table_new(), or a request on the stack), as a PCP PEER: its
+ * nonce, protocol, internal side, the suggested external side and the
+ * remote. No label. */
 static void fill_outgoing_entry(const pcp_info_t *pcp_msg_info,
-                                  struct outgoing_entry *req,
-                                  struct outgoing_peer *p)
+                                struct outgoing_entry *req)
 {
-	memset(req, 0, sizeof(*req));
+	struct outgoing_peer *p = &req->peers[0];
+
 	memcpy(req->nonce, pcp_msg_info->nonce, MAP_NONCE_LEN);
 	req->family = IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) ? AF_INET : AF_INET6;
 	req->proto = pcp_msg_info->protocol;
@@ -735,15 +737,14 @@ static void fill_outgoing_entry(const pcp_info_t *pcp_msg_info,
 	req->iport = pcp_msg_info->int_port;
 	req->eaddr = *pcp_msg_info->ext_ip;
 	req->eport = pcp_msg_info->ext_port;
-	memset(p, 0, sizeof(*p));
 	p->raddr = *pcp_msg_info->peer_ip;
 	p->rport = pcp_msg_info->peer_port;
 	p->timestamp = upnp_time() + pcp_msg_info->lifetime;
-	req->peers = p;
-	req->npeers = 1;
 }
 
-static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
+/* The rules of the PEER of b, a filled binding. b->eport is the port used
+ * once added. */
+static int add_peer_rules(pcp_info_t *pcp_msg_info, struct outgoing_entry *b)
 {
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
@@ -755,8 +756,6 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
 
 	char peerip_s[INET6_ADDRSTRLEN], extip_s[INET6_ADDRSTRLEN];
-	struct outgoing_entry req;
-	struct outgoing_peer peer;
 	char desc[64];
 	unsigned int timestamp;
 	int r;
@@ -766,9 +765,8 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
 	char desc_old[64];
 
-	fill_outgoing_entry(pcp_msg_info, &req, &peer);
-	outgoing_rule_desc(&req, desc, sizeof(desc));
-	timestamp = peer.timestamp;
+	outgoing_rule_desc(b, desc, sizeof(desc));
+	timestamp = b->peers[0].timestamp;
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
@@ -875,9 +873,25 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 				    timestamp);
 	if (r < 0)
 		return PCP_ERR_NO_RESOURCES;
-	req.eport = eport;
+	b->eport = eport;
 	pcp_msg_info->ext_port = eport;
 	return PCP_SUCCESS;
+}
+
+static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
+{
+	struct outgoing_entry *b = outgoing_table_new(1);
+	int r;
+
+	if (b == NULL)
+		return PCP_ERR_NO_RESOURCES;
+	fill_outgoing_entry(pcp_msg_info, b);
+	r = add_peer_rules(pcp_msg_info, b);
+	if (r == PCP_SUCCESS)
+		memmap_link_outgoing(b);	/* the table takes b */
+	else
+		outgoing_table_free(b);
+	return r;
 }
 
 static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
@@ -950,7 +964,11 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		return;
 	}
 
-	fill_outgoing_entry(pcp_msg_info, &req, &peer);
+	memset(&req, 0, sizeof(req));
+	memset(&peer, 0, sizeof(peer));
+	req.peers = &peer;
+	req.npeers = 1;
+	fill_outgoing_entry(pcp_msg_info, &req);
 	outgoing_rule_desc(&req, req_desc, sizeof(req_desc));
 
 	inet_n46top((struct in6_addr*)pcp_msg_info->peer_ip, rhost, sizeof(rhost));
@@ -992,6 +1010,8 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 			} else {
 				syslog(LOG_INFO, "PCP PEER: %s port %hu peer mapping removed",
 				       proto_itoa(proto2), eport2);
+				req.eport = eport2;
+				memmap_drop_outgoing(&req, &peer.raddr, peer.rport);
 			}
 			return;
 		}

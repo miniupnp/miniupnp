@@ -19,9 +19,10 @@
  * endpoint, and holds a filter per rule, found by its remote. A map with no
  * filter has one rule, of any remote.
  *
- * A row keeps the external address its client was given (eaddr): there can
- * be several WAN addresses, and the rules of an old one must be found. The
- * protocol fills it; a reloaded row has :: until its next request. */
+ * A row keeps the external address its client was given (eaddr), as there
+ * can be several WAN addresses. The protocol fills it; a reloaded row has ::
+ * until its next request. memmap only stores it: nothing acts on a WAN
+ * address change yet. */
 #ifndef MEMMAP_H_INCLUDED
 #define MEMMAP_H_INCLUDED
 
@@ -70,9 +71,14 @@ void memmap_pinhole_expired(int proto, const struct in6_addr * iaddr, unsigned s
 void memmap_link_outgoing(struct outgoing_entry * b);
 
 /* The PEER rule of key to raddr:rport was deleted: the peer goes, and the
- * binding with its last one. key: proto, family, iaddr:iport and eport. */
+ * binding with its last one. key: proto, family, iaddr:iport and
+ * eaddr:eport. */
 void memmap_drop_outgoing(const struct outgoing_entry * key,
                           const struct in6_addr * raddr, unsigned short rport);
+
+/* The expiry pass removed the PEER rules whose expiry is now or before:
+ * their peers go, and a binding with its last one. */
+void memmap_outgoing_expired(unsigned int now);
 
 /* For debugging: write the lease table and the outgoing table to path as
  * text. 0, or -1 if the file could not be written. */
