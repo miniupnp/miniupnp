@@ -933,47 +933,6 @@ static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 	       pcp_msg_info->peer_port,
 	       pcp_msg_info->desc);
 }
-
-static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
-{
-	uint16_t iport = pcp_msg_info->int_port;  /* private port */
-	struct outgoing_entry req;
-	struct outgoing_peer peer;
-	struct outgoing_entry *b;
-	unsigned short eport;
-	int r;
-
-	if (pcp_msg_info->is_fw) {
-		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
-		return;
-	}
-
-	memset(&req, 0, sizeof(req));
-	memset(&peer, 0, sizeof(peer));
-	req.peers = &peer;
-	req.npeers = 1;
-	fill_outgoing_entry(pcp_msg_info, &req);
-
-	/* the client's binding of the internal side and peer: the one with
-	 * the nonce of the request */
-	b = memmap_find_peer(req.proto, req.family, &req.iaddr, req.iport,
-	                     &peer.raddr, peer.rport);
-	if (b == NULL || memcmp(b->nonce, req.nonce, MAP_NONCE_LEN) != 0) {
-		syslog(LOG_ERR, "PCP PEER: Failed to find PCP mapping internal port %hu, protocol %s",
-		       iport, proto_itoa(pcp_msg_info->protocol));
-		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
-		return;
-	}
-	eport = b->eport;
-	r = _upnp_delete_redir(eport, b->proto);
-	if (r < 0) {
-		syslog(LOG_ERR, "PCP PEER: failed to remove peer mapping");
-		return;
-	}
-	syslog(LOG_INFO, "PCP PEER: %s port %hu peer mapping removed",
-	       proto_itoa(req.proto), eport);
-	memmap_drop_outgoing(b, &peer.raddr, peer.rport);
-}
 #endif /* PCP_PEER */
 
 /* Fill req, an empty entry (a row of lease_table_new(), or a request of
@@ -1513,11 +1472,14 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			parsePCPOptions(req, remainingSize, pcp_msg_info);
 
 			if (ValidatePCPMsg(pcp_msg_info)) {
-				if (pcp_msg_info->lifetime == 0) {
-					DeletePCPPeer(pcp_msg_info);
-				} else {
+				/* RFC 6887 section 11.1: "it is not possible to
+				 * reduce the lifetime of a mapping (or delete it,
+				 * with requested lifetime=0) using PEER." The
+				 * mapping stays. */
+				if (pcp_msg_info->lifetime == 0)
+					pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
+				else
 					CreatePCPPeer(pcp_msg_info);
-				}
 			} else {
 				syslog(LOG_ERR, "PCP: Invalid PCP v1 PEER message.");
 				 return pcp_msg_info->result_code;
@@ -1599,11 +1561,14 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 			parsePCPOptions(req, remainingSize, pcp_msg_info);
 
 			if (ValidatePCPMsg(pcp_msg_info)) {
-				if (pcp_msg_info->lifetime == 0) {
-					DeletePCPPeer(pcp_msg_info);
-				} else {
+				/* RFC 6887 section 11.1: "it is not possible to
+				 * reduce the lifetime of a mapping (or delete it,
+				 * with requested lifetime=0) using PEER." The
+				 * mapping stays. */
+				if (pcp_msg_info->lifetime == 0)
+					pcp_msg_info->result_code = PCP_ERR_MALFORMED_REQUEST;
+				else
 					CreatePCPPeer(pcp_msg_info);
-				}
 			} else {
 				syslog(LOG_ERR, "PCP: Invalid PCP v2 PEER message.");
 			}
