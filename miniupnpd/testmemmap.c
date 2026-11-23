@@ -391,6 +391,7 @@ test_outgoing(void)
 	key.proto = IPPROTO_UDP;
 	key.iaddr = addr("::ffff:192.0.2.10");
 	key.iport = 5000;
+	key.eaddr = addr("::ffff:0.0.0.0");
 	key.eport = 6000;
 	memmap_drop_outgoing(&key, &p1, 80);
 	assert(outgoing_table_count() == 1 && outgoing_table_peer_count() == 1);

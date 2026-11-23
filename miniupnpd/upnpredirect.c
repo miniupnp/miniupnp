@@ -800,6 +800,10 @@ get_upnp_rules_state_list(int max_rules_number_target)
 			p = &(tmp->next);
 		}
 	}
+#ifdef PCP_PEER
+	/* the expired PEER rules went with the others */
+	memmap_outgoing_expired((unsigned int)current_time);
+#endif
 	/* return empty list if not enough redirections */
 	if(i<=max_rules_number_target)
 		while(list)

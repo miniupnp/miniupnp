@@ -12,11 +12,6 @@
 
 #include "memmap.h"
 
-/* the external address of an IPv4 PEER binding in the outgoing table: the
- * firewall has one per port */
-static const struct in6_addr v4_any = { { { 0, 0, 0, 0, 0, 0, 0, 0,
-                                            0, 0, 0xff, 0xff, 0, 0, 0, 0 } } };
-
 /* 1 if the rules of e have no translation: an IPv6 map of the endpoint,
  * with a filter per rule */
 static int
@@ -193,8 +188,6 @@ memmap_link_outgoing(struct outgoing_entry * b)
 {
 	if(!b->row)
 		return;
-	if(b->family == AF_INET)
-		b->eaddr = v4_any;
 	outgoing_table_link(b);
 }
 
@@ -202,18 +195,21 @@ void
 memmap_drop_outgoing(const struct outgoing_entry * key,
                      const struct in6_addr * raddr, unsigned short rport)
 {
-	struct outgoing_entry k = *key;
 	struct outgoing_entry * b;
 	struct outgoing_peer * p;
 
-	if(k.family == AF_INET)
-		k.eaddr = v4_any;
-	b = outgoing_table_find(&k);
+	b = outgoing_table_find(key);
 	if(b == NULL)
 		return;
 	p = outgoing_table_find_peer(b, raddr, rport);
 	if(p != NULL)
 		outgoing_table_remove_peer(b, p);
+}
+
+void
+memmap_outgoing_expired(unsigned int now)
+{
+	outgoing_table_expire(now);
 }
 
 int
