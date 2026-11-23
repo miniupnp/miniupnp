@@ -184,22 +184,24 @@ lease_file_remove(unsigned short eport, int proto)
 static void
 reload_adopt_rule(const struct lease_entry * line)
 {
-	char desc[64];
 	struct lease_entry * e = lease_table_new(1);
 
 	if(e == NULL)
 		return;
 	e->proto = line->proto;
 	e->eport = line->eport;
-	if(fw_read_map(e, desc, sizeof(desc)) != 0) {
+	if(fw_read_map(e, NULL, 0) != 0) {
 		lease_table_free(e);
 		return;
 	}
 	e->eaddr = line->eaddr;
-	/* the lease of the line, so the rule expires also if the renewal
-	 * below fails */
+	/* The owner and lease are those of the line: a backend may not keep
+	 * the description of its rules over a restart (iptables keeps them
+	 * in memory). The lease, so the rule expires also if the renewal
+	 * below fails. */
+	lease_entry_set_kind(e, line->kind, line->nonce);
+	e->label = line->label;
 	e->timestamp = line->timestamp;
-	lease_entry_from_desc(e, desc);
 	memmap_add(e);	/* the table takes e, with a copy of its label */
 }
 
@@ -479,6 +481,13 @@ upnp_redirect(struct lease_entry * req)
 		if(strcmp(iaddr, iaddr_old)==0 &&
 		   ((rhost == NULL && rhost_old == NULL) ||
 		    (rhost && rhost_old && (strcmp(rhost, rhost_old) == 0)))) {
+			/* the same client: only the protocol which made the
+			 * mapping changes it */
+			if(old->kind != req->kind) {
+				syslog(LOG_INFO, "port %hu %s is a %s mapping, which %s may not change",
+				       eport, protocol, map_kind_name(old->kind), map_kind_name(req->kind));
+				return -4;
+			}
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old ? rhost_old : "", iaddr_old, iport_old);
 			if(iport == iport_old)

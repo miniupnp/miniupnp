@@ -33,6 +33,18 @@
  * not set is no valid request. */
 enum map_kind { MAP_KIND_PCP = 1, MAP_KIND_NATPMP, MAP_KIND_UPNP };
 
+/* the name of a kind of map, for the logs */
+static inline const char *
+map_kind_name(int kind)
+{
+	switch(kind) {
+	case MAP_KIND_PCP:	return "PCP";
+	case MAP_KIND_NATPMP:	return "NAT-PMP";
+	case MAP_KIND_UPNP:	return "UPnP";
+	default:		return "none";
+	}
+}
+
 /* the size of a PCP mapping nonce (RFC 6887 section 11.1) */
 #define MAP_NONCE_LEN	12
 

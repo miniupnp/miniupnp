@@ -1099,7 +1099,8 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	r = upnp_add_inboundpinhole(req, NULL);
 	if (r < 0) {
 		lease_table_free(req);	/* on success the lease table took it */
-		return r == -3 ? PCP_ERR_CANNOT_PROVIDE_EXTERNAL : PCP_ERR_NO_RESOURCES;
+		return r == -3 ? PCP_ERR_CANNOT_PROVIDE_EXTERNAL :
+		       r == -4 ? PCP_ERR_NOT_AUTHORIZED : PCP_ERR_NO_RESOURCES;
 	}
 	pcp_msg_info->ext_port = pcp_msg_info->int_port;
 	return PCP_SUCCESS;

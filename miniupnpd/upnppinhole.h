@@ -48,6 +48,7 @@ upnp_find_inboundpinhole(struct lease_entry * req);
  *  1 = success
  * -1 = Pinhole space exhausted
  * -3 = the external port asked cannot be given
+ * -4 = the map of the remote and internal endpoint is of another protocol
  * .. = error */
 int
 upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out);

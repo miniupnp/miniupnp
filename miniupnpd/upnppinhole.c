@@ -620,6 +620,7 @@ upnp_add_inboundpinhole_internal(struct lease_entry * req, unsigned short * uid_
  * returns:  1 on success
  *          -1 Pinhole space exhausted
  *          -3 the external port asked cannot be given
+ *          -4 the map there is is of another protocol
  *         -42 not implemented
  */
 int
@@ -627,6 +628,7 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 {
 #ifdef FW_MAP6
 	int r, i;
+	const struct lease_entry * old;
 #ifdef ENABLE_LEASEFILE
 	char desc_buf[64];
 	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
@@ -646,10 +648,19 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 		return -3;
 	}
 	req->eport = req->iport;
-	if(upnp_find_inboundpinhole(req) != NULL) {
+	old = upnp_find_inboundpinhole(req);
+	if(old != NULL) {
 		/* a UPnP filter's uid; a PCP map has none */
 		const unsigned short uid = req->nfilters > 0 ? req->filters[0].uid : 0;
 
+		/* the same client: only the protocol which made the map renews
+		 * it */
+		if(old->kind != req->kind) {
+			syslog(LOG_INFO, "map6 port %hu %s is a %s map, which %s may not change",
+			       req->iport, proto_itoa(req->proto), map_kind_name(old->kind),
+			       map_kind_name(req->kind));
+			return -4;
+		}
 		syslog(LOG_INFO, "map6 port %hu %s found, renewing it",
 		       req->iport, proto_itoa(req->proto));
 		r = upnp_update_inboundpinhole(req, uid);
@@ -671,14 +682,28 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 		memmap_update(req, req->iport);	/* the table takes req */
 		return 1;
 	}
+	/* the map of the endpoint, which a new filter joins, is of the same
+	 * protocol */
+	old = lease_table_find_entry(req->proto, AF_INET6, &req->iaddr, req->iport, req->iport);
+	if(old != NULL && old->kind != req->kind) {
+		syslog(LOG_INFO, "map6 port %hu %s is a %s map, which %s may not join",
+		       req->iport, proto_itoa(req->proto), map_kind_name(old->kind),
+		       map_kind_name(req->kind));
+		return -4;
+	}
 	if (max_filters_per_map >= 0) {
-		/* the filters the map of the endpoint would have */
-		const struct lease_entry * e = lease_table_find_entry(req->proto, AF_INET6,
-		                                   &req->iaddr, req->iport, req->iport);
-		int n = e != NULL ? e->nfilters : 0;
+		/* the filters the map of the endpoint would have. One of any
+		 * remote (prefix 0) does not count: 0 lets in only maps with
+		 * no remote host. */
+		const struct lease_entry * e = old;
+		int n = 0;
+		for (i = 0; e != NULL && i < e->nfilters; i++)
+			if (e->filters[i].prefix != 0)
+				n++;
 		for (i = 0; i < req->nfilters; i++) {
 			const struct map_filter * f = &req->filters[i];
-			if (e == NULL || lease_filter_find(e, &f->raddr, f->prefix, f->rport) == NULL)
+			if (f->prefix != 0 &&
+			    (e == NULL || lease_filter_find(e, &f->raddr, f->prefix, f->rport) == NULL))
 				n++;
 		}
 		if (n > max_filters_per_map) {

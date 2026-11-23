@@ -2182,6 +2182,9 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 		case -1: 	/* not permitted */
 			SoapError(h, 701, "PinholeSpaceExhausted");
 			break;
+		case -4:	/* the pinhole is of another protocol */
+			SoapError(h, 606, "Action not authorized");
+			break;
 		default:
 			SoapError(h, 501, "Action Failed");
 			break;

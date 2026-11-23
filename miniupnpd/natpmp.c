@@ -458,8 +458,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					if(old != NULL) {
 						if(IN6_ARE_ADDR_EQUAL(&old->iaddr, &mreq.iaddr)
 						    && iport==old->iport) {
-							if(old->kind == MAP_KIND_PCP) {
-								/* Preserve PCP mapping ownership and nonce state. */
+							if(old->kind != MAP_KIND_NATPMP) {
+								/* only the protocol which made
+								 * the mapping changes it */
+								syslog(LOG_INFO, "port %hu %s is a %s mapping, which %s may not change",
+								       eport, proto_itoa(proto), map_kind_name(old->kind),
+								       map_kind_name(MAP_KIND_NATPMP));
 								resp[3] = 2; /* Not Authorized/Refused */
 								break;
 							}

@@ -736,18 +736,6 @@ lease_table_clear(void)
 	uid_count = 0;
 }
 
-/* the name of a kind of map, for the dump */
-static const char *
-kind_name(int kind)
-{
-	switch(kind) {
-	case MAP_KIND_PCP:	return "PCP";
-	case MAP_KIND_NATPMP:	return "NAT-PMP";
-	case MAP_KIND_UPNP:	return "UPnP";
-	default:		return "none";
-	}
-}
-
 /* the name of a protocol, for the dump. Not proto_itoa(): the table links
  * alone in testleasetable */
 static const char *
@@ -776,7 +764,7 @@ dump_row(struct lease_entry * e, void * arg)
 	if(map_ntop(e->family, &e->eaddr, eaddr, sizeof(eaddr)) == NULL)
 		eaddr[0] = '\0';
 	fprintf(f, "id=%llu %s %s %s [%s]:%hu <- [%s]:%hu expiry=%u",
-	        e->id, kind_name(e->kind), e->family == AF_INET ? "IPv4" : "IPv6",
+	        e->id, map_kind_name(e->kind), e->family == AF_INET ? "IPv4" : "IPv6",
 	        proto_name(e->proto), iaddr, e->iport, eaddr, e->eport,
 	        e->timestamp);
 	if(e->kind == MAP_KIND_PCP) {
