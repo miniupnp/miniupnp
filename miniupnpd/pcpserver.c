@@ -1024,12 +1024,11 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 #endif /* PCP_PEER */
 
 /* Fill req, an empty entry (a row of lease_table_new(), or a request of
- * lease_entry_init()), as a PCP MAP: its nonce, protocol and internal side,
- * and filter f of any remote if it is not NULL. The caller sets the
- * external side and the expiry. The DESCRIPTION option is not read: no
- * label. */
+ * lease_entry_init()), as a PCP MAP: its nonce, protocol and internal side.
+ * No filter: any remote. The caller sets the external side and the expiry.
+ * The DESCRIPTION option is not read: no label. */
 static void fill_lease_entry(const pcp_info_t *pcp_msg_info,
-                             struct lease_entry *req, struct map_filter *f)
+                             struct lease_entry *req)
 {
 	lease_entry_set_kind(req, MAP_KIND_PCP, pcp_msg_info->nonce);
 	if (pcp_msg_info->pfailure_present)
@@ -1038,11 +1037,6 @@ static void fill_lease_entry(const pcp_info_t *pcp_msg_info,
 	req->proto = pcp_msg_info->protocol;
 	req->iaddr = *pcp_msg_info->mapped_ip;
 	req->iport = pcp_msg_info->int_port;
-	if (f != NULL) {
-		memset(f, 0, sizeof(*f));
-		req->filters = f;
-		req->nfilters = 1;
-	}
 }
 
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
@@ -1058,6 +1052,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
 	struct lease_entry req;		/* the delete of the client's own mapping */
+	struct lease_entry perm;	/* the permission check of each eport */
 	struct lease_entry * row;	/* the add */
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
@@ -1111,6 +1106,8 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		return PCP_ERR_MALFORMED_REQUEST;
 	}
 
+	lease_entry_init(&perm, 0, NULL);
+	fill_lease_entry(pcp_msg_info, &perm);
 	do {
 		if (eport_first == 0) { /* first time in loop */
 			eport_first = pcp_msg_info->ext_port;
@@ -1129,11 +1126,10 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			pcp_msg_info->ext_port++;
 			continue;
 		}
-		if ((IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
-		     (!check_upnp_rule_against_permissions(upnppermlist,
-							   num_upnpperm, pcp_msg_info->ext_port,
-							   ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
-							   pcp_msg_info->int_port, pcp_msg_info->desc)))) {
+		perm.eport = pcp_msg_info->ext_port;
+		if (perm.family == AF_INET &&
+		    !check_upnp_rule_against_permissions(upnppermlist,
+							 num_upnpperm, &perm)) {
 			if (pcp_msg_info->pfailure_present) {
 				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			}
@@ -1194,7 +1190,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				       iaddr_old, iport_old);
 				/* remove and then add again */
 				lease_entry_init(&req, 0, NULL);
-				fill_lease_entry(pcp_msg_info, &req, NULL);
+				fill_lease_entry(pcp_msg_info, &req);
 				req.eaddr = *pcp_msg_info->ext_ip;
 				req.eport = pcp_msg_info->ext_port;
 				if (upnp_delete_redirection(&req)==0) {
@@ -1213,7 +1209,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	row = lease_table_new(0);
 	if (row == NULL)
 		return PCP_ERR_NO_RESOURCES;
-	fill_lease_entry(pcp_msg_info, row, NULL);
+	fill_lease_entry(pcp_msg_info, row);
 	row->eaddr = *pcp_msg_info->ext_ip;
 	row->eport = pcp_msg_info->ext_port;
 	row->timestamp = timestamp;
@@ -1238,7 +1234,7 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	req = lease_table_new(0);
 	if (req == NULL)
 		return PCP_ERR_NO_RESOURCES;
-	fill_lease_entry(pcp_msg_info, req, NULL);
+	fill_lease_entry(pcp_msg_info, req);
 	req->eaddr = req->iaddr;
 	req->eport = req->iport;
 	req->timestamp = upnp_time() + pcp_msg_info->lifetime;
@@ -1370,7 +1366,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 					return;
 				} else {
 					lease_entry_init(&req, 0, NULL);
-					fill_lease_entry(pcp_msg_info, &req, NULL);
+					fill_lease_entry(pcp_msg_info, &req);
 					req.iport = iport2;
 					req.eaddr = *pcp_msg_info->ext_ip;
 					req.eport = eport2;
@@ -1386,7 +1382,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
 		lease_entry_init(&req, 0, NULL);
-		fill_lease_entry(pcp_msg_info, &req, NULL);
+		fill_lease_entry(pcp_msg_info, &req);
 		req.eaddr = req.iaddr;
 		req.eport = req.iport;
 		uid = upnp_find_inboundpinhole(&req, desc, sizeof(desc), NULL /* lifetime */);

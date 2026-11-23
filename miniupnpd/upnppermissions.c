@@ -22,6 +22,7 @@
 #include "macros.h"
 #include "upnppermissions.h"
 #include "upnputils.h"
+#include "mapreq.h"
 
 static int
 isodigit(char c)
@@ -514,13 +515,16 @@ match_permission_internal(const struct upnpperm * perm,
 int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     int n_perms,
-                                    u_short eport, struct in_addr address,
-                                    u_short iport, const char * desc)
+                                    const struct lease_entry * req)
 {
 	int i;
+	struct in_addr address;
+
+	memcpy(&address, req->iaddr.s6_addr + 12, sizeof(address));
 	for(i=0; i<n_perms; i++)
 	{
-		if(match_permission(permary + i, eport, address, iport, desc))
+		if(match_permission(permary + i, req->eport, address, req->iport,
+		                    req->label))
 		{
 			syslog(LOG_DEBUG,
 			       "UPnP permission rule %d matched : port mapping %s",
