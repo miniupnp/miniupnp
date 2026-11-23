@@ -70,10 +70,6 @@ void memmap_link_outgoing(struct outgoing_entry * b);
 void memmap_drop_outgoing(const struct outgoing_entry * key,
                           const struct in6_addr * raddr, unsigned short rport);
 
-/* The expiry pass removed the PEER rules whose expiry is now or before:
- * their peers go, and a binding with its last one. */
-void memmap_outgoing_expired(unsigned int now);
-
 /* The mapping of proto on eaddr:eport, or NULL: the row of eaddr, else the
  * row on eport whose address is :: (a reloaded row, its address not
  * stored). eaddr is the address the protocol tells its client. */

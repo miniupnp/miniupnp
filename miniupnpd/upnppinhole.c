@@ -363,121 +363,6 @@ lease_file6_remove(const char * int_client, unsigned short int_port, int proto, 
 
 }
 
-int lease_file6_expire(void)
-{
-	FILE* fd, *fdt;
-	char * p, * p2;
-	int tmp;
-	char buf[512];
-	char line[512];
-	char tmpfilename[128];
-	char * desc;
-	int buf_size;
-	unsigned int timestamp;
-	time_t current_unix_time;
-
-	if (lease_file6 == NULL) return 0;
-
-	if (strlen(lease_file6) + 7 > sizeof(tmpfilename)) {
-		syslog(LOG_ERR, "Lease filename is too long");
-		return -1;
-	}
-
-	snprintf( tmpfilename, sizeof(tmpfilename), "%sXXXXXX", lease_file6);
-
-	fd = fopen( lease_file6, "r");
-	if (fd==NULL) {
-		return 0;
-	}
-
-	current_unix_time = time(NULL);
-
-	tmp = mkstemp(tmpfilename);
-	if (tmp==-1) {
-		fclose(fd);
-		syslog(LOG_ERR, "could not open temporary lease file");
-		return -1;
-	}
-	fchmod(tmp, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	fdt = fdopen(tmp, "a");
-
-	buf[sizeof(buf)-1] = 0;
-	while(fgets(line, sizeof(line), fd)) {
-		strncpy(buf, line, sizeof(buf));
-
-		syslog(LOG_DEBUG, "Expire: parsing lease file line '%s'", line);
-		// Internal Host
-		p = strchr(line, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		// Internal Port
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		// External Host
-		p = strchr(p2, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		// External Port
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		// uid
-		p = strchr(p2, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		// Timestamp
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		// descr
-		desc = strchr(p2, ';');
-		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(desc++) = '\0';
-		/*timestamp = (unsigned int)atoi(p2);*/
-		timestamp = (unsigned int)strtoul(p2, NULL, 10);
-		syslog(LOG_DEBUG, "Expire: timestamp is '%u'", timestamp);
-		syslog(LOG_DEBUG, "Expire: current timestamp is '%u'", (unsigned int)current_unix_time);
-		if((timestamp > 0 && timestamp <= (unsigned int)current_unix_time) || timestamp <= 0) {
-			continue;
-		}
-
-		buf_size = strlen(buf);
-		fwrite(buf, buf_size, 1, fdt);
-	}
-
-	fclose(fdt);
-	fclose(fd);
-
-	if (rename(tmpfilename, lease_file6) < 0) {
-		syslog(LOG_ERR, "could not rename temporary lease file to %s", lease_file6);
-		remove(tmpfilename);
-	}
-
-	return 0;
-}
-
 /* At startup the table is empty, but the rule of a lease file line may
  * have outlived the daemon. It gets a row first, so that
  * upnp_add_inboundpinhole() renews it and adds no second rule. One firewall
@@ -782,6 +667,8 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 #endif /* ENABLE_LEASEFILE */
 	if (uid_out != NULL)
 		*uid_out = (unsigned short)uid;
+	if (req->timestamp > 0)
+		next_to_clean(req->timestamp);
 	memmap_add(req);	/* the table takes req */
 	return 1;
 #else
@@ -959,6 +846,8 @@ upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 #ifdef ENABLE_LEASEFILE
 	lease_file6_update(req);
 #endif
+	if(req->timestamp > 0)
+		next_to_clean(req->timestamp);
 	memmap_renew(req);
 	return 0;
 #else
@@ -1211,75 +1100,29 @@ upnp_check_pinhole_working(const char * uid,
 }
 #endif
 
-#ifdef FW_MAP6
-/* at most this many maps go in one pass, so a large expiry does not hold
- * up the requests */
-#define MAP6_EXPIRE_MAX	64
-
-struct map6_expiry {
-	unsigned int now;
-	unsigned int next;	/* the next expiry, 0 : none */
-	struct lease_entry * due[MAP6_EXPIRE_MAX];
-	int n;
-};
-
-static void
-map6_due(struct lease_entry * e, void * arg)
-{
-	struct map6_expiry * x = arg;
-	unsigned int ts;
-
-	if(e->family != AF_INET6 || e->timestamp == 0)
-		return;
-	ts = e->retry > e->timestamp ? e->retry : e->timestamp;
-	if(ts > x->now || x->n >= MAP6_EXPIRE_MAX) {
-		if(x->next == 0 || ts < x->next)
-			x->next = ts > x->now ? ts : x->now + 1;
-		return;
-	}
-	x->due[x->n++] = e;
-}
-#endif
-
 int
-upnp_clean_expired_pinholes(unsigned int * next_timestamp)
+upnp_delete_map6(struct lease_entry * e)
 {
-	int ret = 0;
 #ifdef FW_MAP6
-	/* the expiry is the table's: the rules of a map due go */
-	struct map6_expiry x;
 	struct fw_change c;
-	struct lease_entry * e;
-	int i;
-
-	memset(&x, 0, sizeof(x));
-	x.now = (unsigned int)upnp_time();
-	lease_table_foreach(map6_due, &x);
-	for(i = 0; i < x.n; i++) {
-		e = x.due[i];
-		syslog(LOG_NOTICE, "remove map6 port %hu %s because it has expired",
-		       e->iport, proto_itoa(e->proto));
-		fw_change_init(&c, FW_DELETE, NULL, e);
-		if(fw_sync(&c, 1) < 0) {
-			/* a rule stays: so does the map, tried again later */
-			e->retry = x.now + 60;
-			if(x.next == 0 || e->retry < x.next)
-				x.next = e->retry;
-			continue;
-		}
-		memmap_delete(e->proto, AF_INET6, &e->iaddr, e->iport, e->eport);
-		ret++;
-	}
-	if(x.next != 0)
-		*next_timestamp = x.next;
-#else
-	UNUSED(next_timestamp);
-#endif
 #ifdef ENABLE_LEASEFILE
-	lease_file6_expire();
+	char iaddr[INET6_ADDRSTRLEN];
 #endif
 
-	return ret;
+	fw_change_init(&c, FW_DELETE, NULL, e);
+	if(fw_sync(&c, 1) < 0)
+		return -1;
+#ifdef ENABLE_LEASEFILE
+	/* the lines of every filter of the map */
+	if(map_ntop(AF_INET6, &e->iaddr, iaddr, sizeof(iaddr)) != NULL)
+		lease_file6_remove(iaddr, e->iport, e->proto, -1);
+#endif
+	memmap_delete(e->proto, AF_INET6, &e->iaddr, e->iport, e->eport);
+	return 0;
+#else
+	UNUSED(e);
+	return -1;
+#endif
 }
 
 #endif /* ENABLE_UPNPPINHOLE */

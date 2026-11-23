@@ -175,11 +175,15 @@ struct rule_state
 	unsigned char to_remove;
 };
 
-/* Remove the expired port mappings, and the expired PEER peers, from the
- * firewall and the tables, and set nextruletoclean_timestamp to the next
- * expiry, 0 : none. */
+/* Remove the expired mappings of every kind from the firewall and the
+ * tables: the IPv4 port mappings, the IPv6 maps and the PEER peers, at most
+ * 64 a pass. Set nextruletoclean_timestamp to the next expiry, 0 : none. */
 void
-upnp_expire_mappings(void);
+expire_mappings(void);
+
+/* The next expiry pass is at ts, if that is sooner. */
+void
+next_to_clean(unsigned int ts);
 
 /* Expire the mappings, then return a linked list of the UPnP port
  * mappings with their counters, or NULL if there are not more than

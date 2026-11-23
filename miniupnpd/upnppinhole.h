@@ -16,7 +16,6 @@
 
 #ifdef ENABLE_LEASEFILE
 int reload_from_lease_file6(void);
-int lease_file6_expire(void);
 #endif
 
 /* functions to be used by WANIPv6_FirewallControl implementation
@@ -85,11 +84,10 @@ int
 upnp_check_pinhole_working(const char * uid, char * eaddr, char * iaddr, unsigned short * eport, unsigned short * iport, char * protocol, int * rulenum_used);
 #endif
 
-/* return the number of expired pinhole removed
- * write timestamp to next pinhole to exprire to next_timestamp
- * next_timestamp is left untouched if there is no pinhole lest */
+/* delete the rules of the IPv6 map e, a row of the table, its lease file
+ * lines and its row. 0, or -1 if a rule stays: e stays too */
 int
-upnp_clean_expired_pinholes(unsigned int * next_timestamp);
+upnp_delete_map6(struct lease_entry * e);
 
 #endif /* ENABLE_UPNPPINHOLE */
 

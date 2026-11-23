@@ -2354,9 +2354,6 @@ main(int argc, char * * argv)
 	struct rule_state * rule_list = 0;
 	struct timeval checktime = {0, 0};
 	struct lan_addr_s * lan_addr;
-#ifdef ENABLE_UPNPPINHOLE
-	unsigned int next_pinhole_ts;
-#endif
 
 	for(i = 0; i < argc; i++) {
 		if(strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
@@ -2916,7 +2913,7 @@ main(int argc, char * * argv)
 		  && ((unsigned int)timeofday.tv_sec >= nextruletoclean_timestamp))
 		{
 			syslog(LOG_DEBUG, "cleaning expired Port Mappings");
-			upnp_expire_mappings();
+			expire_mappings();
 		}
 		if(nextruletoclean_timestamp
 		  && ((unsigned int)timeout.tv_sec >= (nextruletoclean_timestamp - timeofday.tv_sec)))
@@ -2926,16 +2923,6 @@ main(int argc, char * * argv)
 			syslog(LOG_DEBUG, "setting timeout to %u sec",
 			       (unsigned)timeout.tv_sec);
 		}
-#ifdef ENABLE_UPNPPINHOLE
-		/* Clean up expired IPv6 PinHoles */
-		next_pinhole_ts = 0;
-		upnp_clean_expired_pinholes(&next_pinhole_ts);
-		if(next_pinhole_ts &&
-		   timeout.tv_sec >= (int)(next_pinhole_ts - timeofday.tv_sec)) {
-			timeout.tv_sec = next_pinhole_ts - timeofday.tv_sec;
-			timeout.tv_usec = 0;
-		}
-#endif /* ENABLE_UPNPPINHOLE */
 
 #ifdef ENABLE_PCP
 		if(GETFLAG(ENABLENATPMPMASK))

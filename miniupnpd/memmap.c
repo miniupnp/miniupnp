@@ -185,12 +185,6 @@ memmap_drop_outgoing(const struct outgoing_entry * key,
 		outgoing_table_remove_peer(b, p);
 }
 
-void
-memmap_outgoing_expired(unsigned int now)
-{
-	outgoing_table_expire(now);
-}
-
 struct lease_entry *
 memmap_find_map(int proto, int family, const struct in6_addr * eaddr,
                 unsigned short eport)

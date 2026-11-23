@@ -24,6 +24,9 @@
 #include "upnpredirect.h"
 #include "memmap.h"
 #include "fwsync.h"
+#ifdef ENABLE_UPNPPINHOLE
+#include "upnppinhole.h"
+#endif
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
 #include "portinuse.h"
@@ -388,7 +391,7 @@ void lease_file_rewrite(void)
 #endif
 
 /* the next expiry, ts if it is sooner */
-static void
+void
 next_to_clean(unsigned int ts)
 {
 	if(nextruletoclean_timestamp == 0 || ts < nextruletoclean_timestamp)
@@ -811,70 +814,151 @@ upnp_get_portmapping_number_of_entries(void)
 
 /* seconds before an expired mapping whose rules stayed is deleted again */
 #define EXPIRY_RETRY	60
+/* at most this many mappings go in one pass, of any kind, so a large expiry
+ * does not hold up the requests: the next pass comes at once */
+#define EXPIRE_MAX_PER_PASS	64
+
+/* 1 if the row is due: its expiry, or the retry after a failed delete, has
+ * come. Else 0, and its time is the next expiry if it is sooner. */
+static int
+row_due(const struct lease_entry * e, unsigned int now)
+{
+	unsigned int ts;
+
+	if(e->timestamp == 0)
+		return 0;
+	ts = e->retry > e->timestamp ? e->retry : e->timestamp;
+	if(ts > now) {
+		next_to_clean(ts);
+		return 0;
+	}
+	return 1;
+}
+
+/* A delete of an expired row failed: the row keeps its rules, and the next
+ * try is a minute later. A rule the firewall lost deletes fine
+ * (fw_sync()), so such a row does not come back on every pass. */
+static void
+retry_later(struct lease_entry * e, unsigned int now, const char * what)
+{
+	e->retry = now + EXPIRY_RETRY;
+	next_to_clean(e->retry);
+	syslog(LOG_WARNING, "%s %hu %s expired, its rules were not deleted, next try in %d s",
+	       what, e->family == AF_INET ? e->eport : e->iport,
+	       proto_itoa(e->proto), EXPIRY_RETRY);
+}
+
+#ifdef ENABLE_UPNPPINHOLE
+/* the IPv6 maps due, which the walk of the table collects: the rows can
+ * not go while it walks */
+struct map6_due {
+	unsigned int now;
+	int left;
+	int n;
+	struct lease_entry * due[EXPIRE_MAX_PER_PASS];
+};
+
+static void
+collect_map6(struct lease_entry * e, void * arg)
+{
+	struct map6_due * d = arg;
+
+	if(e->family != AF_INET6 || !row_due(e, d->now))
+		return;
+	if(d->n >= d->left) {
+		next_to_clean(d->now);	/* the next pass takes it */
+		return;
+	}
+	d->due[d->n++] = e;
+}
+#endif
 
 
 void
-upnp_expire_mappings(void)
+expire_mappings(void)
 {
 	struct lease_entry * e, * next;
 	unsigned int now = (unsigned int)upnp_time();
-#ifdef PCP_PEER
-	struct outgoing_entry * b;
-	struct fw_out_change c;
+	int left = EXPIRE_MAX_PER_PASS;
+#ifdef ENABLE_UPNPPINHOLE
+	struct map6_due d;
 	int i;
+#endif
+#ifdef PCP_PEER
+	struct outgoing_entry * b, * b_next;
+	struct fw_out_change c;
+	int p, last;
 #endif
 
 	nextruletoclean_timestamp = 0;
+	/* the IPv4 port mappings: the port list */
 	for(e = lease_table_next_port(NULL); e != NULL; e = next) {
 		next = lease_table_next_port(e);
-		if(e->timestamp == 0)
+		if(!row_due(e, now))
 			continue;
-		if(e->timestamp > now) {
-			next_to_clean(e->timestamp);
-			continue;
+		if(left == 0) {
+			next_to_clean(now);
+			break;
 		}
-		if(e->retry > now) {
-			next_to_clean(e->retry);
-			continue;
-		}
+		left--;
 		syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
 		       e->eport, proto_itoa(e->proto));
-		/* A rule the firewall lost deletes fine (fw_sync()). A delete
-		 * which fails keeps the row, so the rule is not left without
-		 * one: the next try is a minute later. */
-		if(upnp_delete_map(e) < 0) {
-			e->retry = now + EXPIRY_RETRY;
-			next_to_clean(e->retry);
-			syslog(LOG_WARNING, "port mapping %hu %s expired, its rules were not deleted, "
-			       "next try in %d s", e->eport, proto_itoa(e->proto), EXPIRY_RETRY);
-		}
+		if(upnp_delete_map(e) < 0)
+			retry_later(e, now, "port mapping");
 	}
+#ifdef ENABLE_UPNPPINHOLE
+	/* the IPv6 maps: the rows of the table */
+	memset(&d, 0, sizeof(d));
+	d.now = now;
+	d.left = left;
+	lease_table_foreach(collect_map6, &d);
+	for(i = 0; i < d.n; i++) {
+		e = d.due[i];
+		left--;
+		syslog(LOG_NOTICE, "remove map6 port %hu %s because it has expired",
+		       e->iport, proto_itoa(e->proto));
+		if(upnp_delete_map6(e) < 0)
+			retry_later(e, now, "map6 port");
+	}
+#endif
 #ifdef PCP_PEER
-	/* the PEER peers: the rule of each peer, never the port mapping on the
-	 * same external port, nor the other peers of its binding. */
-	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b)) {
-		for(i = 0; i < b->npeers; i++) {
-			if(b->peers[i].timestamp == 0)
+	/* the PEER peers: the outgoing table. A peer goes once its rule is
+	 * deleted. */
+	for(b = outgoing_table_next(NULL); b != NULL; b = b_next) {
+		b_next = outgoing_table_next(b);
+		/* backwards: a peer which goes moves only those after it */
+		for(p = b->npeers - 1; p >= 0; p--) {
+			struct outgoing_peer * q = &b->peers[p];
+			unsigned int ts;
+			if(q->timestamp == 0)
 				continue;
-			if(b->peers[i].timestamp > now) {
-				next_to_clean(b->peers[i].timestamp);
+			ts = q->retry > q->timestamp ? q->retry : q->timestamp;
+			if(ts > now) {
+				next_to_clean(ts);
 				continue;
 			}
+			if(left == 0) {
+				next_to_clean(now);
+				continue;
+			}
+			left--;
 			syslog(LOG_NOTICE, "remove PEER mapping %hu %s because it has expired",
 			       b->eport, proto_itoa(b->proto));
-			fw_out_change_init(&c, FW_OUT_DELETE, b, i);
+			fw_out_change_init(&c, FW_OUT_DELETE, b, p);
 			if(fw_sync_out(&c, 1) < 0) {
-				/* the rule stays: so does the peer, which is
-				 * tried again later */
-				b->peers[i].timestamp = now + EXPIRY_RETRY;
-				next_to_clean(b->peers[i].timestamp);
+				/* the rule stays: so does the peer */
+				q->retry = now + EXPIRY_RETRY;
+				next_to_clean(q->retry);
 				syslog(LOG_WARNING, "PEER mapping %hu %s expired, its rule was not deleted, "
 				       "next try in %d s", b->eport, proto_itoa(b->proto), EXPIRY_RETRY);
+				continue;
 			}
+			last = b->npeers == 1;
+			memmap_drop_outgoing(b, &q->raddr, q->rport);
+			if(last)
+				break;	/* the binding went with its last peer */
 		}
 	}
-	/* the expired PEER rules went above */
-	memmap_outgoing_expired(now);
 #endif
 }
 
@@ -950,7 +1034,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	struct rule_state * list = 0;
 	struct state_index ix;
 
-	upnp_expire_mappings();
+	expire_mappings();
 	if(lease_table_port_count() <= (unsigned int)max_rules_number_target)
 		return NULL;
 	/* Only UPnP mappings are removed when unused: those of PCP and
