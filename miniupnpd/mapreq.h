@@ -114,19 +114,27 @@ struct outgoing_peer {
 /* An outgoing binding as a client asks for it, an SNAT rule (PCP PEER,
  * RFC 6887 section 12): traffic from iaddr:iport to its peers leaves with
  * the source eaddr:eport, and only the replies come back. Not a DNAT map:
- * no kind, no flags, no filters. */
+ * no kind, no flags, no filters. A request, and the binding of the
+ * outgoing table (outgoing_table.h) once it is linked. */
 struct outgoing_entry {
+	/* the links of the outgoing table, see outgoing_table.h */
+	struct outgoing_entry * next;	/* the next binding */
+	int peers_alloc;	/* the room of peers, in a binding of the table */
+	unsigned char row;	/* made by outgoing_table_new(): the table may
+				 * link it. 0 : a request on the stack */
+	/* the binding. The small fields first, then the addresses, so the
+	 * binding has no holes. */
+	unsigned char family;	/* of the internal side: AF_INET, AF_INET6 */
+	unsigned char proto;	/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
 	unsigned char nonce[MAP_NONCE_LEN];	/* the PCP mapping nonce */
-	int family;		/* of the internal side: AF_INET, AF_INET6 */
-	int proto;		/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
 	struct in6_addr iaddr;	/* the source inside. IPv4 as ::ffff:a.b.c.d */
-	unsigned short iport;
 	struct in6_addr eaddr;	/* the source outside, the WAN address */
+	unsigned short iport;
 	unsigned short eport;	/* asked for, 0 : any; the one used once added */
+	int npeers;
+	struct outgoing_peer * peers;	/* the caller's array, at least one */
 	const char * label;	/* NULL: the PCP DESCRIPTION option is not
 				 * read yet */
-	struct outgoing_peer * peers;	/* the caller's array, at least one */
-	int npeers;
 };
 
 /* An empty request of a protocol. nonce NULL : zero. Not for a row of
