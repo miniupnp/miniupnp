@@ -136,6 +136,9 @@ volatile sig_atomic_t should_send_public_address_change_notif = 0;
 #if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 volatile sig_atomic_t should_rewrite_leasefile = 0;
 #endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#ifndef TOMATO
+static volatile sig_atomic_t should_dump_tables = 0;
+#endif /* !TOMATO */
 
 #ifdef TOMATO
 #if 1
@@ -841,15 +844,19 @@ sigusr1(int sig)
 	should_send_public_address_change_notif = 1;
 }
 
-#if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
-/* Handler for the SIGUSR2 signal to request rewrite of lease_file */
+#ifndef TOMATO
+/* Handler for the SIGUSR2 signal: write the tables to table_dump_file, and
+ * rewrite lease_file */
 static void
 sigusr2(int sig)
 {
 	UNUSED(sig);
+	should_dump_tables = 1;
+#if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 	should_rewrite_leasefile = 1;
+#endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
 }
-#endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#endif /* !TOMATO */
 
 /* record the startup time, for returning uptime */
 static void
@@ -1686,6 +1693,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 #endif	/* ENABLE_UPNPPINHOLE */
 #endif	/* ENABLE_LEASEFILE */
+			case UPNPTABLEDUMPFILE:
+				table_dump_file = ary_options[i].value;
+				break;
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
@@ -2215,13 +2225,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	{
 		syslog(LOG_NOTICE, "Failed to set %s handler", "SIGUSR1");
 	}
-#if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
+#ifndef TOMATO
 	sa.sa_handler = sigusr2;
 	if(sigaction(SIGUSR2, &sa, NULL) < 0)
 	{
 		syslog(LOG_NOTICE, "Failed to set %s handler", "SIGUSR2");
 	}
-#endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#endif /* !TOMATO */
 
 	/* initialize random number generator */
 	srandom((unsigned int)time(NULL));
@@ -2782,6 +2792,14 @@ main(int argc, char * * argv)
 			should_rewrite_leasefile = 0;
 		}
 #endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#ifndef TOMATO
+		if(should_dump_tables)
+		{
+			if(table_dump_file != NULL)
+				memmap_dump(table_dump_file);
+			should_dump_tables = 0;
+		}
+#endif /* !TOMATO */
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
 		{
