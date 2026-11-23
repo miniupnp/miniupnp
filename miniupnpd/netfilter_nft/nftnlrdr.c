@@ -484,7 +484,8 @@ get_peer_rule_by_index(int index,
 
 /*
  * get_redirect_rule()
- * returns -1 if the rule is not found
+ * returns -2 if the rule is not found, -1 if the rules could not be read,
+ * as pf
  */
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
@@ -611,7 +612,8 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 	UNUSED(nat_chain_name);
 	UNUSED(ifname);
 
-	refresh_nft_cache_redirect();
+	if (refresh_nft_cache_redirect() < 0)
+		return -1;
 
 	LIST_FOREACH(p, &head_redirect, entry) {
 		if (p->proto == proto &&
@@ -657,7 +659,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 		}
 	}
 
-	return -1;
+	return -2;	/* not found */
 }
 
 /*

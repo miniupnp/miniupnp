@@ -712,21 +712,15 @@ _upnp_delete_redir(unsigned short eport, int proto)
 struct lease_entry *
 upnp_check_map(struct lease_entry * e)
 {
-	unsigned short iport;
 	int r;
 
 	if(e == NULL)
 		return NULL;
-	r = get_redirect_rule(ext_if_name, e->eport, e->proto, 0, 0, &iport,
-	                      0, 0, 0, 0, NULL, 0, 0);
-	if(r == 0)
-		return e;
-#ifdef USE_PF
-	/* pf tells a failed read (-1) from a missing rule (-2): the row of a
-	 * rule which may be there stays */
+	/* a failed read (-1) is no missing rule (-2): the row of a rule which
+	 * may be there stays */
+	r = fw_map_rule(e->eport, e->proto, NULL, NULL);
 	if(r != -2)
 		return e;
-#endif
 	syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, its row goes",
 	       e->eport, proto_itoa(e->proto));
 #ifdef ENABLE_LEASEFILE
