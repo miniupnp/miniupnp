@@ -117,7 +117,7 @@ TESTOUTGOINGTABLEOBJS = testoutgoingtable.o outgoing_table.o
 TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o outgoing_table.o
 TESTPINHOLEOBJS = testpinhole.o upnppinhole.o memmap.o lease_table.o \
                   outgoing_table.o
-TESTFWSYNCOBJS = testfwsync.o fwsync.o
+TESTFWSYNCOBJS = testfwsync.o fwsync.o testfwfake.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
@@ -160,7 +160,7 @@ clean:
 	$(RM) $(TESTGETROUTEOBJS)
 	$(RM) $(TESTLEASETABLEOBJS)
 	$(RM) $(TESTOUTGOINGTABLEOBJS)
-	$(RM) testmemmap.o testpinhole.o testfwsync.o
+	$(RM) testmemmap.o testpinhole.o testfwsync.o testfwfake.o
 	$(RM) testssdppktgen.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen validateupnphttp
 	$(RM) validateleasetable validateoutgoingtable validatememmap validatepinhole validatefwsync
