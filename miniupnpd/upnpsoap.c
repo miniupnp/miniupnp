@@ -453,6 +453,23 @@ upnp_ext_ip(const struct upnphttp * h, char * ext_ip_addr, int verbose)
 		ext_ip_addr[0] = '\0';
 }
 
+/* The external address of the client of h, as a request keeps it: the
+ * address its port mappings are on. :: if there is none. */
+static void
+upnp_ext_addr(const struct upnphttp * h, struct in6_addr * a)
+{
+	char ext_ip[INET_ADDRSTRLEN];
+	int family;
+
+	upnp_ext_ip(h, ext_ip, 0);
+	if(ext_ip[0] != '\0' && map_pton(ext_ip, &family, a) == 0)
+		return;
+	/* None told (a private WAN address): the rows go by the address of
+	 * the interface, as for PCP, so all the protocols see one port. */
+	if(getifaddr_in6(ext_if_name, AF_INET, a) < 0)
+		memset(a, 0, sizeof(*a));
+}
+
 static void
 GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 {
@@ -509,13 +526,7 @@ fill_port_request(struct lease_entry * req,
 	req->proto = proto_atoi(protocol);
 	req->iport = iport;
 	req->eport = eport;
-	{
-		/* the external address the client is told: the row keeps it */
-		char ext_ip[INET_ADDRSTRLEN];
-		upnp_ext_ip(h, ext_ip, 0);
-		if(ext_ip[0] != '\0')
-			map_pton(ext_ip, &family, &req->eaddr);
-	}
+	upnp_ext_addr(h, &req->eaddr);	/* the address the client is told */
 	req->label = desc;
 	req->timestamp = leaseduration > 0 ? upnp_time() + leaseduration : 0;
 	return 0;
@@ -1132,6 +1143,7 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 	lease_entry_init(&req, MAP_KIND_UPNP, NULL);
 	req.family = AF_INET;
 	req.proto = proto_atoi(protocol);
+	upnp_ext_addr(h, &req.eaddr);
 	req.eport = eport;
 	r = upnp_delete_redirection(&req);
 
@@ -1221,6 +1233,7 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	lease_entry_init(&req, MAP_KIND_UPNP, NULL);
 	req.family = AF_INET;
 	req.proto = proto_atoi(protocol);
+	upnp_ext_addr(h, &req.eaddr);
 	for(i = 0; i < number; i++)
 	{
 		req.eport = port_list[i];

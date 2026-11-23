@@ -265,13 +265,8 @@ tomato_delete(void)
 	FILE *f;
 	char s[128];
 	unsigned short eport;
-	unsigned short iport;
-	unsigned int leaseduration;
 	char proto[4];
-	char iaddr[32];
-	char desc[64];
-	char rhost[32];
-	int n;
+	struct lease_entry *e, *next;
 
 	if ((f = fopen("/etc/upnp/delete", "r")) != NULL)
 	{
@@ -282,19 +277,16 @@ tomato_delete(void)
 			{
 				if (proto[0] == '*')
 				{
-					n = upnp_get_portmapping_number_of_entries();
-					while (--n >= 0)
+					for (e = lease_table_next_port(NULL); e != NULL; e = next)
 					{
-						if (upnp_get_redirection_infos_by_index(n, &eport, proto, &iport, iaddr, sizeof(iaddr), desc, sizeof(desc), rhost, sizeof(rhost), &leaseduration) == 0)
-						{
-							_upnp_delete_redir(eport, proto_atoi(proto));
-						}
+						next = lease_table_next_port(e);
+						upnp_delete_map(e);
 					}
 					break;
 				}
 				else
 				{
-					_upnp_delete_redir(eport, proto_atoi(proto));
+					upnp_delete_port(eport, proto_atoi(proto));
 				}
 			}
 		}
