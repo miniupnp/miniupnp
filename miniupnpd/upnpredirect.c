@@ -712,6 +712,7 @@ _upnp_delete_redir(unsigned short eport, int proto)
 struct lease_entry *
 upnp_check_map(struct lease_entry * e)
 {
+	struct fw_change c;
 	int r;
 
 	if(e == NULL)
@@ -721,8 +722,24 @@ upnp_check_map(struct lease_entry * e)
 	r = fw_map_rule(e->eport, e->proto, NULL, NULL);
 	if(r != -2)
 		return e;
-	syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, its row goes",
-	       e->eport, proto_itoa(e->proto));
+	/* The rule went without the daemon. The row says what it was: add it
+	 * back in place, so the mapping keeps its row, and the UPnP index of
+	 * the mappings after it does not move. */
+	fw_change_init(&c, FW_ADD, e, NULL);
+	c.fresh = 1;
+	if(fw_sync(&c, 1) == 0) {
+		syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, added it back",
+		       e->eport, proto_itoa(e->proto));
+		e->fw_partial = 0;
+		return e;
+	}
+	if(c.applied != FW_NOT_APPLIED) {
+		/* a part of the rules is back: the row stays with them */
+		e->fw_partial = 1;
+		return e;
+	}
+	syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, which could not be added "
+	       "back: its row goes", e->eport, proto_itoa(e->proto));
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(e->eport, e->proto);
 #endif
