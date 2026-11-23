@@ -760,10 +760,7 @@ static int add_peer_rules(pcp_info_t *pcp_msg_info, struct outgoing_entry *b)
 	unsigned int timestamp;
 	int r;
 	const char * ext_if = ext_if_name;
-	int index, proto_old;
-	unsigned short eport_old, iport_old, rport_old;
-	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
-	char desc_old[64];
+	const struct outgoing_entry *old;
 
 	outgoing_rule_desc(b, desc, sizeof(desc));
 	timestamp = b->peers[0].timestamp;
@@ -778,29 +775,29 @@ static int add_peer_rules(pcp_info_t *pcp_msg_info, struct outgoing_entry *b)
 	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
 	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
 
-	/* RFC 6887 sections 12.3 and 15.1: authenticate the full PEER
-	 * mapping key before refreshing it or adding any rules. iptables
-	 * keeps one description per external port and protocol, shared with
-	 * a MAP rule on the same port: a MAP description says nothing about
-	 * the owner of this rule. */
-	for (index = 0, desc_old[0] = '\0';
-	     get_peer_rule_by_index(index, NULL, &eport_old,
-	                            iaddr_old, sizeof(iaddr_old), &iport_old,
-	                            &proto_old, desc_old, sizeof(desc_old),
-	                            rhost_old, sizeof(rhost_old), &rport_old,
-	                            NULL, NULL, NULL) >= 0;
-	     index++, desc_old[0] = '\0') {
-		if (proto_old == proto && iport_old == pcp_msg_info->int_port &&
-		    rport_old == pcp_msg_info->peer_port &&
-		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0 &&
-		    strcmp(rhost_old, peerip_s) == 0) {
-			if (strncmp(desc_old, "PCP MAP ", 8) != 0 &&
-			    strcmp(desc_old, desc) != 0)
-				return PCP_ERR_NOT_AUTHORIZED;
-			eport = eport_old;
-			break;
-		}
+	/* RFC 6887 section 12.3: "if the internal port, protocol, and
+	 * internal address match a mapping that already exists, but the
+	 * mapping nonce does not match ..., the request MUST be rejected with
+	 * a NOT_AUTHORIZED error with the lifetime of the error indicating
+	 * duration of that existing mapping." The nonce is the binding's, for
+	 * all its peers: a request of a new peer with another nonce does not
+	 * join it. */
+	old = memmap_find_peer(b->proto, b->family, &b->iaddr, b->iport, NULL, 0);
+	if (old != NULL && memcmp(old->nonce, b->nonce, MAP_NONCE_LEN) != 0) {
+		unsigned int now = upnp_time(), end = 0;
+		int i;
+		for (i = 0; i < old->npeers; i++)
+			if (old->peers[i].timestamp > end)
+				end = old->peers[i].timestamp;
+		if (end > now)
+			pcp_msg_info->error_lifetime = end - now;
+		return PCP_ERR_NOT_AUTHORIZED;
 	}
+	/* the client's own peer: its renewal keeps the external port */
+	old = memmap_find_peer(b->proto, b->family, &b->iaddr, b->iport,
+	                       &b->peers[0].raddr, b->peers[0].rport);
+	if (old != NULL)
+		eport = old->eport;
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
@@ -940,24 +937,11 @@ static void CreatePCPPeer(pcp_info_t *pcp_msg_info)
 static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 {
 	uint16_t iport = pcp_msg_info->int_port;  /* private port */
-	uint16_t rport = pcp_msg_info->peer_port;  /* private port */
-	uint8_t  proto = pcp_msg_info->protocol;
-	char rhost[INET6_ADDRSTRLEN];
-	int r = -1;
-
-	/* remove requested mappings for this client */
-	int index = 0;
-	unsigned short eport2, iport2, rport2;
-	char iaddr2[INET6_ADDRSTRLEN], rhost2[INET6_ADDRSTRLEN];
-	int proto2;
-	char desc[64];
-	unsigned int timestamp;
 	struct outgoing_entry req;
 	struct outgoing_peer peer;
-	char req_desc[64];
-#if 0
-	int uid;
-#endif /* 0 */
+	struct outgoing_entry *b;
+	unsigned short eport;
+	int r;
 
 	if (pcp_msg_info->is_fw) {
 		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
@@ -969,57 +953,26 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 	req.peers = &peer;
 	req.npeers = 1;
 	fill_outgoing_entry(pcp_msg_info, &req);
-	outgoing_rule_desc(&req, req_desc, sizeof(req_desc));
 
-	inet_n46top((struct in6_addr*)pcp_msg_info->peer_ip, rhost, sizeof(rhost));
-
-	for (index = 0 ;
-	     (!pcp_msg_info->is_fw &&
-	      get_peer_rule_by_index(index, 0,
-				     &eport2, iaddr2, sizeof(iaddr2),
-				     &iport2, &proto2,
-				     desc, sizeof(desc),
-				     rhost2, sizeof(rhost2), &rport2,
-				     &timestamp, 0, 0) >= 0)
-#if 0
-		     /* Some day if outbound pinholes are supported.. */
-		     ||
-		     (pcp_msg_info->is_fw &&
-		      (uid=upnp_get_pinhole_uid_by_index(index))>=0 &&
-		      upnp_get_pinhole_info((unsigned short)uid,
-					    rhost2, sizeof(rhost2), &rport2,
-					    iaddr2, sizeof(iaddr2), &iport2,
-					    &proto2, desc, sizeof(desc),
-					    &timestamp, NULL) >= 0)
-#endif /* 0 */
-		     ;
-	     index++)
-		if((0 == strcmp(iaddr2, pcp_msg_info->mapped_str))
-		   && (0 == strcmp(rhost2, rhost))
-		   && (proto2==proto)
-		   && 0 == strcmp(desc, req_desc)
-		   && (iport2==iport) && (rport2==rport)) {
-			if (!pcp_msg_info->is_fw)
-				r = _upnp_delete_redir(eport2, proto2);
-#if 0
-			else
-				r = upnp_delete_outboundpinhole(uid);
-#endif /* 0 */
-			if(r<0) {
-				syslog(LOG_ERR, "PCP PEER: failed to remove peer mapping");
-			} else {
-				syslog(LOG_INFO, "PCP PEER: %s port %hu peer mapping removed",
-				       proto_itoa(proto2), eport2);
-				req.eport = eport2;
-				memmap_drop_outgoing(&req, &peer.raddr, peer.rport);
-			}
-			return;
-		}
-	if (r==-1) {
+	/* the client's binding of the internal side and peer: the one with
+	 * the nonce of the request */
+	b = memmap_find_peer(req.proto, req.family, &req.iaddr, req.iport,
+	                     &peer.raddr, peer.rport);
+	if (b == NULL || memcmp(b->nonce, req.nonce, MAP_NONCE_LEN) != 0) {
 		syslog(LOG_ERR, "PCP PEER: Failed to find PCP mapping internal port %hu, protocol %s",
 		       iport, proto_itoa(pcp_msg_info->protocol));
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
+		return;
 	}
+	eport = b->eport;
+	r = _upnp_delete_redir(eport, b->proto);
+	if (r < 0) {
+		syslog(LOG_ERR, "PCP PEER: failed to remove peer mapping");
+		return;
+	}
+	syslog(LOG_INFO, "PCP PEER: %s port %hu peer mapping removed",
+	       proto_itoa(req.proto), eport);
+	memmap_drop_outgoing(b, &peer.raddr, peer.rport);
 }
 #endif /* PCP_PEER */
 
