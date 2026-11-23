@@ -1447,6 +1447,24 @@ class SecondClientTests(unittest.TestCase):
             lib_test.router_call = original
         self.assertEqual(calls, ["snapshot:1", "restart", "snapshot:2", "snapshot:1"])
 
+    def test_a_upnp_mapping_moved_to_another_internal_port_is_one_mapping(self):
+        run = self.case_run(lambda spec, _nonce: ("SUCCESS", spec["external_port"], None))
+        run.args.router_call_dir = None
+        run.active = {}
+        for internal_port in (41255, 41256):
+            run.run_request(1, {"action": "AddPortMapping", "protocol": "udp",
+                                "internal_port": internal_port, "external_port": 41255}, "SUCCESS")
+        self.assertEqual(list(run.active), [("udp", 41256)])
+        run.run_request(2, {"action": "DeletePortMapping", "protocol": "udp",
+                            "internal_port": 41256, "external_port": 41255}, "SUCCESS")
+        self.assertEqual(run.active, {})
+        # another external port of the same internal port stays a mapping of its own
+        for external_port in (41255, 41257):
+            run.run_request(3, {"action": "AddPortMapping", "protocol": "udp",
+                                "internal_port": 41255 if external_port == 41255 else 41256,
+                                "external_port": external_port}, "SUCCESS")
+        self.assertEqual(len(run.active), 2)
+
     def test_cleanup_tries_every_mapping_and_reports_the_failures(self):
         sent = []
 

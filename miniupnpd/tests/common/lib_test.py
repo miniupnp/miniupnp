@@ -2304,6 +2304,7 @@ def upnp_soap_body(spec, client):
 
 
 UPNP_ADD_ACTIONS = ("AddPortMapping", "AddAnyPortMapping", "AddPinhole")
+UPNP_PORT_MAPPING_ADDS = ("AddPortMapping", "AddAnyPortMapping")
 UPNP_PINHOLE_ACTIONS = ("AddPinhole", "UpdatePinhole", "DeletePinhole")
 UPNP_PINHOLE_SERVICE = "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1"
 
@@ -2731,10 +2732,17 @@ class CaseRun:
                 and port != self.args.external_address):
             raise AssertionError(f"NAT-PMP public address expected {self.args.external_address}, got {port}")
         if result == "SUCCESS" and (spec.get("lifetime", 0) or spec.get("action") in UPNP_ADD_ACTIONS):
+            if spec.get("action") in UPNP_PORT_MAPPING_ADDS:
+                # UPnP names a port mapping by its external port: an add on the port of a
+                # mapping of another internal port moved that mapping, it made no second one
+                for other in [other for other, (added, assigned, _id) in self.active.items()
+                              if other != key and other[0] == protocol and assigned == port
+                              and added.get("action") in UPNP_PORT_MAPPING_ADDS]:
+                    self.active.pop(other)
             self.active[key] = (spec, port, nonce)
         elif result == "SUCCESS" and spec.get("action") == "DeletePortMappingRange":
             for other in [other for other, (added, assigned, _id) in self.active.items()
-                          if added.get("action") in ("AddPortMapping", "AddAnyPortMapping")
+                          if added.get("action") in UPNP_PORT_MAPPING_ADDS
                           and other[0] == protocol and spec["start_port"] <= assigned <= spec["end_port"]]:
                 self.active.pop(other)
         elif result == "SUCCESS" and spec.get("action") != "UpdatePinhole":
