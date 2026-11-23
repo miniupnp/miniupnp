@@ -48,6 +48,16 @@ upnp_redirect(struct lease_entry * req);
 int
 upnp_redirect_internal(struct lease_entry * req);
 
+/*! \brief renew the mapping old with the values of req: the same rule, as
+ * req has the internal endpoint of old. The firewall holds nothing which a
+ * renewal changes, so only the table and the lease file change.
+ * \param[in] req a row of lease_table_new(), which the table takes
+ * \param[in] old the row of the mapping, found by the caller
+ * \return 0
+ */
+int
+upnp_renew_map(struct lease_entry * req, struct lease_entry * old);
+
 /*! \brief get port mapping from (external port, protocol)
  * \param[in] eaddr the external address the client is told, as
  *            memmap_find_map() takes it

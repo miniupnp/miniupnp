@@ -1096,15 +1096,11 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 				}
 			} else {
-				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, renewing",
 				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
 				       pcp_msg_info->mapped_str, old->iport);
-				/* remove and then add again */
-				if (upnp_delete_map(old)==0) {
-					break;
-				} else if (pcp_msg_info->pfailure_present) {
-					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
-				}
+				/* the same rule, with a new expiry */
+				break;
 			}
 			pcp_msg_info->ext_port++;
 			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
@@ -1120,6 +1116,8 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	row->eaddr = *pcp_msg_info->ext_ip;
 	row->eport = pcp_msg_info->ext_port;
 	row->timestamp = timestamp;
+	if (old != NULL)
+		return upnp_renew_map(row, old) == 0 ? PCP_SUCCESS : PCP_ERR_NO_RESOURCES;
 	r = upnp_redirect_internal(row);
 	if (r < 0) {
 		lease_table_free(row);	/* on success the lease table took it */

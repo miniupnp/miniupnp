@@ -463,14 +463,10 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								resp[3] = 2; /* Not Authorized/Refused */
 								break;
 							}
-							/* redirection already existing */
-							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+							/* redirection already existing: the
+							 * same rule, with a new expiry */
+							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, renewing",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, old->iport);
-							/* remove and then add again */
-							if(upnp_delete_map(old) < 0) {
-								syslog(LOG_ERR, "failed to remove port mapping");
-								break;
-							}
 						} else {
 							eport++;
 							if(eport == 0) eport++; /* skip port zero */
@@ -487,7 +483,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					}
 					natpmp_request(row, senderaddr, &eaddr, proto, iport, eport);
 					row->timestamp = timestamp;
-					if(upnp_redirect_internal(row) < 0) {
+					if(old != NULL)
+						upnp_renew_map(row, old);	/* the table takes row */
+					else if(upnp_redirect_internal(row) < 0) {
 						/* on success the lease table took it */
 						lease_table_free(row);
 						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu",

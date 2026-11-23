@@ -493,6 +493,8 @@ upnp_redirect(struct lease_entry * req)
 		    (rhost && rhost_old && (strcmp(rhost, rhost_old) == 0)))) {
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old ? rhost_old : "", iaddr_old, iport_old);
+			if(iport == iport_old)
+				return upnp_renew_map(req, old);
 			fw_change_init(&c, FW_UPDATE, req, old);
 			r = fw_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
@@ -547,6 +549,21 @@ upnp_redirect_internal(struct lease_entry * req)
 	upnp_event_var_change_notify(EWanIPC);
 #endif
 	memmap_add(req);	/* the table takes req */
+	return 0;
+}
+
+int
+upnp_renew_map(struct lease_entry * req, struct lease_entry * old)
+{
+	const unsigned short iport_old = old->iport;
+
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(req->eport, req->proto);
+	lease_file_add_row(req);
+#endif
+	if(req->timestamp > 0)
+		next_to_clean(req->timestamp);
+	memmap_update(req, iport_old);	/* the table takes req; old goes */
 	return 0;
 }
 
