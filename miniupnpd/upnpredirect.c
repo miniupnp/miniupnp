@@ -22,6 +22,7 @@
 #include "macros.h"
 #include "config.h"
 #include "upnpredirect.h"
+#include "memmap.h"
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
 #include "portinuse.h"
@@ -192,8 +193,7 @@ int reload_from_lease_file(void)
 #endif
 	char line[320];
 	int r, family;
-	struct lease_entry req;
-	struct map_filter filter;
+	struct lease_entry * req;
 
 	if(!lease_file) return -1;
 	fd = fopen( lease_file, "r");
@@ -279,24 +279,28 @@ int reload_from_lease_file(void)
 		} else {
 			leaseduration = 0;	/* default value */
 		}
-		lease_entry_init(&req, MAP_KIND_UPNP, NULL);
-		if(map_pton(iaddr, &family, &req.iaddr) < 0 || family != AF_INET ||
-		   map_filter_set(&filter, rhost, 0) < 0) {
+		req = lease_table_new(1);
+		if(req == NULL)
+			continue;
+		lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
+		if(map_pton(iaddr, &family, &req->iaddr) < 0 || family != AF_INET ||
+		   map_filter_set(&req->filters[0], rhost, 0) < 0) {
 			syslog(LOG_WARNING, "ignoring lease file line with an invalid address (%hu=>%s:%hu %s)",
 			       eport, iaddr, iport, proto);
+			lease_table_free(req);
 			continue;
 		}
-		req.family = AF_INET;
-		req.proto = proto_atoi(proto);
-		req.iport = iport;
-		req.eport = eport;
-		if(filter.prefix != 0) {
-			req.filters = &filter;
-			req.nfilters = 1;
-		}
-		lease_entry_from_desc(&req, desc);
-		req.timestamp = leaseduration > 0 ? timestamp : 0;
-		r = upnp_redirect(&req);
+		req->family = AF_INET;
+		req->proto = proto_atoi(proto);
+		req->iport = iport;
+		req->eport = eport;
+		/* any remote host: no filter */
+		req->nfilters = req->filters[0].prefix != 0 ? 1 : 0;
+		lease_entry_from_desc(req, desc);
+		req->timestamp = leaseduration > 0 ? timestamp : 0;
+		r = upnp_redirect(req);
+		if(r != 0)
+			lease_table_free(req);	/* on success the lease table took it */
 		if(r == -1) {
 			syslog(LOG_ERR, "Failed to redirect %hu -> %s:%hu protocol %s",
 			       eport, iaddr, iport, proto);
@@ -433,6 +437,8 @@ upnp_redirect(struct lease_entry * req)
 				lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
 			}
 #endif /* ENABLE_LEASEFILE */
+			if(r == 0)
+				memmap_update(req, iport_old);	/* the table takes req */
 			return r;
 		} else {
 			syslog(LOG_INFO, "port %hu %s (rhost '%s') already redirected to %s:%hu",
@@ -494,6 +500,7 @@ upnp_redirect_internal(struct lease_entry * req)
 	 * inform the subscribers */
 	upnp_event_var_change_notify(EWanIPC);
 #endif
+	memmap_add(req);	/* the table takes req */
 	return 0;
 }
 
@@ -621,7 +628,15 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
 int
 _upnp_delete_redir(unsigned short eport, int proto)
 {
-	int r;
+	int r, family = 0, known;
+	char iaddr_s[INET6_ADDRSTRLEN];
+	unsigned short iport;
+	struct in6_addr iaddr;
+
+	/* the internal side of the rule: the key of its row in the lease table */
+	known = get_redirect_rule(ext_if_name, eport, proto, iaddr_s, sizeof(iaddr_s), &iport,
+	                          0, 0, 0, 0, NULL, 0, 0) == 0 &&
+	        map_pton(iaddr_s, &family, &iaddr) == 0;
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(eport, proto);
 #elif defined(USE_PF)
@@ -633,6 +648,8 @@ _upnp_delete_redir(unsigned short eport, int proto)
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
+	if(r >= 0 && known)
+		memmap_delete(proto, family, &iaddr, iport, eport);
 
 #ifdef ENABLE_EVENTS
 	upnp_event_var_change_notify(EWanIPC);

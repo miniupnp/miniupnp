@@ -439,7 +439,11 @@ int get_pinhole_uid_by_index(int index)
 }
 
 int
-clean_pinhole_list(unsigned int * next_timestamp)
+clean_pinhole_list(unsigned int * next_timestamp,
+                   void (*expired)(int proto, const struct in6_addr * iaddr,
+                                   unsigned short iport,
+                                   const struct in6_addr * raddr,
+                                   unsigned short rport, unsigned short uid))
 {
 	rule_t *p;
 	struct nftnl_rule *r;
@@ -470,6 +474,9 @@ clean_pinhole_list(unsigned int * next_timestamp)
 
 		if (ts <= (unsigned int)current_time) {
 			syslog(LOG_INFO, "removing expired pinhole '%s'", p->desc);
+			if (expired != NULL)
+				expired(p->proto, &p->daddr6, p->dport, &p->saddr6, p->sport,
+				        (unsigned short)uid);
 			r = rule_del_handle(p);
 			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
 			n++;

@@ -20,7 +20,8 @@ int lease_file6_expire(void);
 #endif
 
 /* functions to be used by WANIPv6_FirewallControl implementation
- * and PCP (IPv6). Each req has exactly one filter: filters[0] */
+ * and PCP (IPv6). A UPnP req has one filter, filters[0]: the remote, and the
+ * uid of the pinhole. A PCP req has none: its one rule lets any remote in. */
 
 #if 0
 /* retrieve outbound pinhole timeout */
@@ -28,8 +29,8 @@ int
 upnp_check_outbound_pinhole(int proto, int * timeout);
 #endif
 
-/* find the inbound pinhole of req: its first filter, the remote, and its
- * internal side. Sets the uid of the filter.
+/* find the inbound pinhole of req: the remote of its filter (any remote if
+ * it has none) and its internal side. Sets the uid of the filter.
  * return the (positive) uid or a negative value if not found */
 int
 upnp_find_inboundpinhole(struct lease_entry * req,
@@ -37,15 +38,17 @@ upnp_find_inboundpinhole(struct lease_entry * req,
 
 
 /* add an inbound pinhole, or renew the one of the same remote and
- * internal endpoint. req: the IPv6 iaddr, iport, proto, timestamp and one
- * filter, the remote; its uid is set on success. The rule gets
- * map_rule_desc().
+ * internal endpoint. req: the IPv6 iaddr, iport, proto, timestamp and its
+ * filter, the remote, or none for any remote. The rule gets map_rule_desc(). On success *uid_out
+ * (if not NULL) is the uid of the pinhole, and the lease table takes a row
+ * of lease_table_new() (memmap_add(), or memmap_update() for the pinhole
+ * there was): the caller frees req only on failure.
  * return value :
  *  1 = success
  * -1 = Pinhole space exhausted
  * .. = error */
 int
-upnp_add_inboundpinhole(struct lease_entry * req);
+upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out);
 
 /* get from uid
  * return values :
@@ -69,15 +72,13 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_get_pinhole_uid_by_index(int index);
 
-/* renew the pinhole of the uid of the first filter of req to
- * req->timestamp */
+/* renew the pinhole uid of req to req->timestamp */
 int
-upnp_update_inboundpinhole(const struct lease_entry * req);
+upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid);
 
-/* remove the inbound pinhole a client asks to delete: the uid of the first
- * filter of req */
+/* remove the inbound pinhole uid of req, which a client asks to delete */
 int
-upnp_delete_inboundpinhole(const struct lease_entry * req);
+upnp_delete_inboundpinhole(const struct lease_entry * req, unsigned short uid);
 
 /* ... */
 #if 0

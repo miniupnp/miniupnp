@@ -79,6 +79,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "upnpglobalvars.h"
 #include "pcplearndscp.h"
 #include "upnpredirect.h"
+#include "memmap.h"
 #include "commonrdr.h"
 #include "getifaddr.h"
 #include "asyncsendto.h"
@@ -1002,13 +1003,15 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 }
 #endif /* PCP_PEER */
 
-/* The request of a PCP MAP: its nonce, protocol and internal side, and
- * filter f of any remote if it is not NULL. The caller sets the external
- * side and the expiry. The DESCRIPTION option is not read: no label. */
+/* Fill req, an empty entry (a row of lease_table_new(), or a request of
+ * lease_entry_init()), as a PCP MAP: its nonce, protocol and internal side,
+ * and filter f of any remote if it is not NULL. The caller sets the
+ * external side and the expiry. The DESCRIPTION option is not read: no
+ * label. */
 static void fill_lease_entry(const pcp_info_t *pcp_msg_info,
                              struct lease_entry *req, struct map_filter *f)
 {
-	lease_entry_init(req, MAP_KIND_PCP, pcp_msg_info->nonce);
+	lease_entry_set_kind(req, MAP_KIND_PCP, pcp_msg_info->nonce);
 	if (pcp_msg_info->pfailure_present)
 		req->flags |= MAP_PREFER_FAILURE;
 	req->family = IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) ? AF_INET : AF_INET6;
@@ -1034,7 +1037,8 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	int foreign = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
-	struct lease_entry req;
+	struct lease_entry req;		/* the delete of the client's own mapping */
+	struct lease_entry * row;	/* the add */
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
 	 * address, protocol and port, not the suggested external port.
@@ -1169,6 +1173,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
 				       iaddr_old, iport_old);
 				/* remove and then add again */
+				lease_entry_init(&req, 0, NULL);
 				fill_lease_entry(pcp_msg_info, &req, NULL);
 				req.eaddr = *pcp_msg_info->ext_ip;
 				req.eport = pcp_msg_info->ext_port;
@@ -1185,13 +1190,18 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		}
 	} while (r==0);
 
-	fill_lease_entry(pcp_msg_info, &req, NULL);
-	req.eaddr = *pcp_msg_info->ext_ip;
-	req.eport = pcp_msg_info->ext_port;
-	req.timestamp = timestamp;
-	r = upnp_redirect_internal(&req);
-	if (r < 0)
+	row = lease_table_new(0);
+	if (row == NULL)
 		return PCP_ERR_NO_RESOURCES;
+	fill_lease_entry(pcp_msg_info, row, NULL);
+	row->eaddr = *pcp_msg_info->ext_ip;
+	row->eport = pcp_msg_info->ext_port;
+	row->timestamp = timestamp;
+	r = upnp_redirect_internal(row);
+	if (r < 0) {
+		lease_table_free(row);	/* on success the lease table took it */
+		return PCP_ERR_NO_RESOURCES;
+	}
 	return PCP_SUCCESS;
 }
 
@@ -1200,18 +1210,20 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 #ifdef ENABLE_UPNPPINHOLE
 	int uid;
 	int r;
-	struct lease_entry req;
-	struct map_filter filter;
+	struct lease_entry * req;
 	char desc[64];
 	unsigned int timestamp = 0;
 	/* the request: an IPv6 firewall rule of any remote, on the internal
 	 * side */
-	fill_lease_entry(pcp_msg_info, &req, &filter);
-	req.eaddr = req.iaddr;
-	req.eport = req.iport;
-	req.timestamp = upnp_time() + pcp_msg_info->lifetime;
+	req = lease_table_new(0);
+	if (req == NULL)
+		return PCP_ERR_NO_RESOURCES;
+	fill_lease_entry(pcp_msg_info, req, NULL);
+	req->eaddr = req->iaddr;
+	req->eport = req->iport;
+	req->timestamp = upnp_time() + pcp_msg_info->lifetime;
 	/* first check if pinhole already exists */
-	uid = upnp_find_inboundpinhole(&req, desc, sizeof(desc), &timestamp);
+	uid = upnp_find_inboundpinhole(req, desc, sizeof(desc), &timestamp);
 	if(uid >= 0) {
 		/* pinhole already exists, updating */
 		if (0 != strcmp(desc, pcp_msg_info->desc)) {
@@ -1221,21 +1233,26 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 			/* the refusal lasts until the pinhole expires */
 			if (timestamp > upnp_time())
 				pcp_msg_info->error_lifetime = timestamp - upnp_time();
+			lease_table_free(req);
 			return PCP_ERR_NOT_AUTHORIZED;
 		}
 		syslog(LOG_INFO, "updating pinhole %d to %s:%hu %s",
 		       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
 		       proto_itoa(pcp_msg_info->protocol));
-		r = upnp_update_inboundpinhole(&req);
+		/* a renewal changes the row of the pinhole in place */
+		r = upnp_update_inboundpinhole(req, (unsigned short)uid);
+		lease_table_free(req);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
 		return PCP_SUCCESS;
 	} else {
 		/* create new */
-		r = upnp_add_inboundpinhole(&req);
-		if (r < 0)
+		r = upnp_add_inboundpinhole(req, NULL);
+		if (r < 0) {
+			lease_table_free(req);	/* on success the lease table took it */
 			return PCP_ERR_NO_RESOURCES;
+		}
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
 		return PCP_SUCCESS;
 	}
@@ -1332,6 +1349,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 					       iport, proto_itoa(pcp_msg_info->protocol));
 					return;
 				} else {
+					lease_entry_init(&req, 0, NULL);
 					fill_lease_entry(pcp_msg_info, &req, NULL);
 					req.iport = iport2;
 					req.eaddr = *pcp_msg_info->ext_ip;
@@ -1347,8 +1365,8 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
-		struct map_filter filter;
-		fill_lease_entry(pcp_msg_info, &req, &filter);
+		lease_entry_init(&req, 0, NULL);
+		fill_lease_entry(pcp_msg_info, &req, NULL);
 		req.eaddr = req.iaddr;
 		req.eport = req.iport;
 		uid = upnp_find_inboundpinhole(&req, desc, sizeof(desc), NULL /* lifetime */);
@@ -1364,7 +1382,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				       iport, proto_itoa(pcp_msg_info->protocol));
 				return;
 			} else {
-				r = upnp_delete_inboundpinhole(&req);
+				r = upnp_delete_inboundpinhole(&req, (unsigned short)uid);
 			}
 		}
 #else

@@ -31,7 +31,10 @@ void lease_file_rewrite(void);
 /*! \brief add a port mapping.
  * calls OS/fw dependent implementation of the port mapping (redirection).
  * \param[in] req the IPv4 mapping: iaddr, iport, eport, proto, timestamp
- *            (0 for infinite) and at most one filter, the remote host
+ *            (0 for infinite) and at most one filter, the remote host.
+ *            On success the lease table takes a row of lease_table_new()
+ *            (memmap_add(), or memmap_update() for the rule there was): the
+ *            caller frees req only on failure.
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */
@@ -39,7 +42,8 @@ int
 upnp_redirect(struct lease_entry * req);
 
 /*! \brief same as upnp_redirect() without any check
- * \param[in] req the IPv4 mapping, as for upnp_redirect()
+ * \param[in] req the IPv4 mapping, as for upnp_redirect(), which the
+ *            lease table takes on success
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */

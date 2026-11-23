@@ -23,6 +23,7 @@
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "upnpredirect.h"
+#include "lease_table.h"
 #include "commonrdr.h"
 #include "upnputils.h"
 #include "portinuse.h"
@@ -238,13 +239,15 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 	return n;
 }
 
-/* The request of a NAT-PMP mapping: the internal client is the sender
- * (RFC 6886 section 3.3). */
+/* Fill mreq, an empty entry (a row of lease_table_new(), or a request of
+ * lease_entry_init()), as a NAT-PMP mapping: the internal client is the
+ * sender (RFC 6886 section 3.3). The caller sets the external address of a
+ * row it adds, the one the client is told. */
 static void natpmp_request(struct lease_entry * mreq,
                            const struct sockaddr_in * senderaddr, int proto,
                            unsigned short iport, unsigned short eport)
 {
-	lease_entry_init(mreq, MAP_KIND_NATPMP, NULL);
+	lease_entry_set_kind(mreq, MAP_KIND_NATPMP, NULL);
 	mreq->family = AF_INET;
 	mreq->proto = proto;
 	map_addr_v4(&mreq->iaddr, &senderaddr->sin_addr);
@@ -264,7 +267,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	int resplen;
 	int n = len;
 	char senderaddrstr[16];
-	struct lease_entry mreq;
+	struct lease_entry mreq;	/* a delete */
+	struct lease_entry * row;	/* an add */
 
 	if(!inet_ntop(AF_INET, &senderaddr->sin_addr,
 			senderaddrstr, sizeof(senderaddrstr))) {
@@ -354,6 +358,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						/* (iport == 0) => remove all the mappings for this client
 						 * using the requested protocol (RFC 6886 section 3.4) */
 						if((proto == proto2) && ((iport == 0) || (iport == iport2))) {
+							lease_entry_init(&mreq, 0, NULL);
 							natpmp_request(&mreq, senderaddr, proto2, iport2, eport2);
 							r = upnp_delete_redirection(&mreq);
 							if(r < 0) {
@@ -461,6 +466,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
 							/* remove and then add again */
+							lease_entry_init(&mreq, 0, NULL);
 							natpmp_request(&mreq, senderaddr, proto, iport, eport);
 							if(upnp_delete_redirection(&mreq) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");
@@ -475,9 +481,28 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					/* do the redirection */
 					timestamp = upnp_time() + lifetime;
 					/* TODO : check return code */
-					natpmp_request(&mreq, senderaddr, proto, iport, eport);
-					mreq.timestamp = timestamp;
-					if(upnp_redirect_internal(&mreq) < 0) {
+					row = lease_table_new(0);
+					if(row == NULL) {
+						resp[3] = 3;  /* Failure */
+						break;
+					}
+					natpmp_request(row, senderaddr, proto, iport, eport);
+					row->timestamp = timestamp;
+					{
+						/* the external address the client is told: the
+						 * row keeps it */
+						unsigned char pub[12];
+						struct in_addr ext;
+						memset(pub, 0, sizeof(pub));
+						FillPublicAddressResponse(pub, senderaddr->sin_addr.s_addr);
+						if(pub[3] == 0) {
+							memcpy(&ext, pub + 8, sizeof(ext));
+							map_addr_v4(&row->eaddr, &ext);
+						}
+					}
+					if(upnp_redirect_internal(row) < 0) {
+						/* on success the lease table took it */
+						lease_table_free(row);
 						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu",
 						       eport, proto_itoa(proto), senderaddrstr, iport);
 						resp[3] = 3;  /* Failure */

@@ -76,6 +76,7 @@
 #include "options.h"
 #include "minissdp.h"
 #include "upnpredirect.h"
+#include "memmap.h"
 #include "upnppinhole.h"
 #include "upnpstun.h"
 #include "miniupnpdtypes.h"
@@ -200,7 +201,7 @@ tomato_load(void)
 	char iaddr[32];
 	char *a, *b;
 	int family;
-	struct lease_entry req;
+	struct lease_entry * req;
 
 	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
 	{
@@ -225,18 +226,23 @@ tomato_load(void)
 					*b = 0;
 					syslog(LOG_DEBUG, "Read redirection [%s] from file: %s port %hu to %s port %hu, timestamp: %u (%u)",
 						a + 1, proto, eport, iaddr, iport, timestamp, leaseduration);
-					lease_entry_init(&req, MAP_KIND_UPNP, NULL);
-					if (map_pton(iaddr, &family, &req.iaddr) < 0 || family != AF_INET) {
+					req = lease_table_new(0);
+					if (req == NULL)
+						continue;
+					lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
+					if (map_pton(iaddr, &family, &req->iaddr) < 0 || family != AF_INET) {
 						syslog(LOG_ERR, "inet_aton(%s) FAILED", iaddr);
+						lease_table_free(req);
 						continue;
 					}
-					req.family = AF_INET;
-					req.proto = proto_atoi(proto);
-					req.iport = iport;
-					req.eport = eport;
-					req.label = a + 1;
-					req.timestamp = leaseduration > 0 ? upnp_time() + leaseduration : 0;
-					upnp_redirect(&req);
+					req->family = AF_INET;
+					req->proto = proto_atoi(proto);
+					req->iport = iport;
+					req->eport = eport;
+					req->label = a + 1;
+					req->timestamp = leaseduration > 0 ? upnp_time() + leaseduration : 0;
+					if (upnp_redirect(req) != 0)
+						lease_table_free(req);	/* on success the lease table took it */
 				}
 			}
 		}
