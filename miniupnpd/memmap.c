@@ -232,6 +232,21 @@ memmap_eport_used_by_other(int family, const struct in6_addr * eaddr,
 	return e;
 }
 
+struct lease_entry *
+memmap_next_client_map(const struct lease_entry * prev, int proto, int family,
+                       const struct in6_addr * iaddr, unsigned short iport)
+{
+	struct lease_entry * e;
+
+	if(iport != 0)
+		return lease_table_next_internal(prev, proto, family, iaddr, iport);
+	for(e = lease_table_next_port(prev); e != NULL; e = lease_table_next_port(e))
+		if(e->proto == proto && e->family == family &&
+		   memcmp(&e->iaddr, iaddr, sizeof(*iaddr)) == 0)
+			return e;
+	return NULL;
+}
+
 int
 memmap_dump(const char * path)
 {

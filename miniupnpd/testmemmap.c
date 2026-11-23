@@ -392,6 +392,36 @@ test_find(void)
 	lease_table_clear();
 }
 
+/* The mappings of a client: of one internal port, or with iport 0 all of
+ * its IPv4 port mappings of the protocol */
+static void
+test_client_maps(void)
+{
+	struct in6_addr h10 = addr("::ffff:192.0.2.10");
+	struct lease_entry * a, * b, * c, * d, * e;
+	int n;
+
+	lease_table_clear();
+	a = row4(MAP_KIND_NATPMP, 5000, "::ffff:192.0.2.10", 80);
+	memmap_add(a);
+	b = row4(MAP_KIND_PCP, 5001, "::ffff:192.0.2.10", 80);
+	memmap_add(b);
+	c = row4(MAP_KIND_NATPMP, 5002, "::ffff:192.0.2.10", 81);
+	memmap_add(c);
+	d = row4(MAP_KIND_NATPMP, 5003, "::ffff:192.0.2.11", 80);
+	memmap_add(d);
+	for(n = 0, e = memmap_next_client_map(NULL, IPPROTO_TCP, AF_INET, &h10, 80);
+	    e != NULL; e = memmap_next_client_map(e, IPPROTO_TCP, AF_INET, &h10, 80), n++)
+		assert(e == a || e == b);
+	assert(n == 2);
+	for(n = 0, e = memmap_next_client_map(NULL, IPPROTO_TCP, AF_INET, &h10, 0);
+	    e != NULL; e = memmap_next_client_map(e, IPPROTO_TCP, AF_INET, &h10, 0), n++)
+		assert(e == a || e == b || e == c);
+	assert(n == 3);
+	assert(memmap_next_client_map(NULL, IPPROTO_UDP, AF_INET, &h10, 0) == NULL);
+	lease_table_clear();
+}
+
 /* PEER: bindings on the any address, peers removed one by one */
 static void
 test_outgoing(void)
@@ -472,6 +502,7 @@ main(void)
 	test_ipv6_no_filter_and_pinhole();
 	test_stale();
 	test_find();
+	test_client_maps();
 	test_outgoing();
 	test_dump();
 	printf("testmemmap: OK\n");
