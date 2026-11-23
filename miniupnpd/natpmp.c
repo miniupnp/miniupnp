@@ -434,15 +434,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 					any_eport_allowed = 1;	/* at lease one eport is allowed */
-#ifdef CHECK_PORTINUSE
-					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
-						syslog(LOG_INFO, "port %hu protocol %s already in use",
-						       eport, proto_itoa(proto));
-						eport++;
-						if(eport == 0) eport++; /* skip port zero */
-						continue;
-					}
-#endif
 					/* RFC 6886 section 3.3: an external port another
 					 * client maps, on either protocol, is reserved for it
 					 * (the companion port); this client gets the next port.
@@ -453,6 +444,16 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						if(eport == 0) eport++; /* skip port zero */
 						continue;
 					}
+#ifdef CHECK_PORTINUSE
+					/* the firewall last: the tables above are memory */
+					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
+						syslog(LOG_INFO, "port %hu protocol %s already in use",
+						       eport, proto_itoa(proto));
+						eport++;
+						if(eport == 0) eport++; /* skip port zero */
+						continue;
+					}
+#endif
 					old = upnp_check_map(memmap_find_map(proto, AF_INET, &eaddr, eport));
 					if(old != NULL) {
 						if(IN6_ARE_ADDR_EQUAL(&old->iaddr, &mreq.iaddr)

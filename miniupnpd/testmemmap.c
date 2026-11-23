@@ -455,6 +455,13 @@ test_outgoing(void)
 	/* raddr NULL: the binding of the internal side, any peer */
 	assert(memmap_find_peer(IPPROTO_UDP, AF_INET, &h10, 5000, NULL, 0) == b);
 	assert(memmap_find_peer(IPPROTO_UDP, AF_INET, &h10, 5001, NULL, 0) == NULL);
+	/* its external port is taken for other hosts, on any protocol */
+	{
+		struct in6_addr h11 = addr("::ffff:192.0.2.11"), any4 = addr("::ffff:0.0.0.0");
+		assert(memmap_peer_port_used_by_other(AF_INET, &any4, 6000, &h11) == b);
+		assert(memmap_peer_port_used_by_other(AF_INET, &any4, 6000, &h10) == NULL);
+		assert(memmap_peer_port_used_by_other(AF_INET, &any4, 6001, &h11) == NULL);
+	}
 	memset(&key, 0, sizeof(key));
 	key.family = AF_INET;
 	key.proto = IPPROTO_UDP;
