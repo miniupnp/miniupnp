@@ -307,6 +307,8 @@ delete_filter_rule(const char * ifname, unsigned short port, int proto)
 
 /*
  * Clear all rules corresponding eport/proto
+ * returns -1 if the rules could not be read or the delete of the redirect
+ * rule of eport failed, else 0, also when eport has no rule
  */
 int
 delete_redirect_and_filter_rules(unsigned short eport, int proto)
@@ -315,9 +317,11 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 	struct nftnl_rule *r = NULL;
 	in_addr_t iaddr = 0;
 	uint16_t iport = 0;
+	int ret = 0;
 
 	d_printf(("delete_redirect_and_filter_rules(%d %d)\n", eport, proto));
-	refresh_nft_cache_redirect();
+	if (refresh_nft_cache_redirect() < 0)
+		return -1;
 
 	// Delete Redirect Rule  eport => iaddr:iport
 	LIST_FOREACH(p, &head_redirect, entry) {
@@ -333,7 +337,8 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 
 			r = rule_del_handle(p);
 			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT);
+			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
+				ret = -1;
 			break;
 		}
 	}
@@ -360,7 +365,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		       "delete_redirect_and_filter_rules", eport, proto);
 	}
 
-	return 0;
+	return ret;
 }
 
 /* The SNAT rule of each key, from one read of the peer chain, deleted in
