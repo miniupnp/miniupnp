@@ -23,7 +23,7 @@
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "upnpredirect.h"
-#include "lease_table.h"
+#include "memmap.h"
 #include "commonrdr.h"
 #include "upnputils.h"
 #include "portinuse.h"
@@ -289,8 +289,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	int resplen;
 	int n = len;
 	char senderaddrstr[16];
-	struct lease_entry mreq;	/* a delete, or a permission check */
+	struct lease_entry mreq;	/* a delete, or the checks of an eport */
 	struct lease_entry * row;	/* an add */
+	struct lease_entry * old;	/* the mapping on an eport */
 
 	if(!inet_ntop(AF_INET, &senderaddr->sin_addr,
 			senderaddrstr, sizeof(senderaddrstr))) {
@@ -471,30 +472,25 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					 * (the companion port); this client gets the next port.
 					 * A port the client already holds is kept on renewal. */
 					if(eport != eport_own &&
-					   upnp_eport_used_by_other(eport, proto, senderaddrstr)) {
+					   upnp_eport_used_by_other(&mreq)) {
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
 						continue;
 					}
-					r = get_redirect_rule(ext_if_name, eport, proto,
-					                      iaddr_old, sizeof(iaddr_old),
-					                      &iport_old, desc, sizeof(desc), 0, 0,
-					                      &timestamp, 0, 0);
-					if(r==0) {
-						if(strcmp(senderaddrstr, iaddr_old)==0
-						    && iport==iport_old) {
-							if(0 == strncmp(desc, "PCP ", 4)) {
+					old = upnp_check_map(memmap_find_map(proto, AF_INET, &eaddr, eport));
+					if(old != NULL) {
+						if(IN6_ARE_ADDR_EQUAL(&old->iaddr, &mreq.iaddr)
+						    && iport==old->iport) {
+							if(old->kind == MAP_KIND_PCP) {
 								/* Preserve PCP mapping ownership and nonce state. */
 								resp[3] = 2; /* Not Authorized/Refused */
 								break;
 							}
 							/* redirection already existing */
 							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
-							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
+							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", senderaddrstr, old->iport);
 							/* remove and then add again */
-							lease_entry_init(&mreq, 0, NULL);
-							natpmp_request(&mreq, senderaddr, &eaddr, proto, iport, eport);
-							if(upnp_delete_redirection(&mreq) < 0) {
+							if(upnp_delete_map(old) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");
 								break;
 							}
