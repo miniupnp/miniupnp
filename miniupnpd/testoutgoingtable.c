@@ -57,7 +57,13 @@ test_key(void)
 	/* another external port is another binding */
 	x = outgoing_table_link(newbinding(5000, 6001, "::ffff:203.0.113.1", 80, 100, 1));
 	assert(x != b && outgoing_table_count() == 2);
+	/* the walk sees each binding once */
+	assert(outgoing_table_next(NULL) != NULL);
+	assert(outgoing_table_next(outgoing_table_next(NULL)) != NULL);
+	assert(outgoing_table_next(outgoing_table_next(outgoing_table_next(NULL))) == NULL);
+	assert(outgoing_table_next(NULL) != outgoing_table_next(outgoing_table_next(NULL)));
 	outgoing_table_clear();
+	assert(outgoing_table_next(NULL) == NULL);
 	assert(outgoing_table_count() == 0 && outgoing_table_peer_count() == 0);
 }
 

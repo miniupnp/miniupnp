@@ -45,6 +45,10 @@ struct outgoing_entry * outgoing_table_link(struct outgoing_entry * b);
  * NULL if there is none. */
 struct outgoing_entry * outgoing_table_find(const struct outgoing_entry * r);
 
+/* Walk the bindings: call with prev NULL for the first one, then with the
+ * binding it returned, until NULL. */
+struct outgoing_entry * outgoing_table_next(const struct outgoing_entry * prev);
+
 /* The peer raddr:rport of a binding, or NULL. */
 struct outgoing_peer *
 outgoing_table_find_peer(const struct outgoing_entry * b,

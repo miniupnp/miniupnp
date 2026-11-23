@@ -746,105 +746,97 @@ upnp_get_portmapping_number_of_entries(void)
 	return (int)lease_table_port_count();
 }
 
+/* the next expiry, ts if it is sooner */
+static void
+next_to_clean(unsigned int ts)
+{
+	if(nextruletoclean_timestamp == 0 || ts < nextruletoclean_timestamp)
+		nextruletoclean_timestamp = ts;
+}
+
+void
+upnp_expire_mappings(void)
+{
+	struct lease_entry * e, * next;
+	unsigned int now = (unsigned int)upnp_time();
+#ifdef PCP_PEER
+	struct outgoing_entry * b;
+	int i;
+#endif
+
+	nextruletoclean_timestamp = 0;
+	for(e = lease_table_next_port(NULL); e != NULL; e = next) {
+		next = lease_table_next_port(e);
+		if(e->timestamp == 0)
+			continue;
+		if(e->timestamp > now) {
+			next_to_clean(e->timestamp);
+			continue;
+		}
+		syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
+		       e->eport, proto_itoa(e->proto));
+		/* The row goes also if its rules do not: a rule which vanished
+		 * unseen can not be deleted, and the row would expire on every
+		 * pass. */
+		if(_upnp_delete_redir(e->eport, e->proto) < 0)
+			syslog(LOG_WARNING, "port mapping %hu %s expired, its rules were not deleted",
+			       e->eport, proto_itoa(e->proto));
+		memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
+	}
+#ifdef PCP_PEER
+	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b)) {
+		for(i = 0; i < b->npeers; i++) {
+			if(b->peers[i].timestamp == 0)
+				continue;
+			if(b->peers[i].timestamp > now) {
+				next_to_clean(b->peers[i].timestamp);
+				continue;
+			}
+			syslog(LOG_NOTICE, "remove PEER mapping %hu %s because it has expired",
+			       b->eport, proto_itoa(b->proto));
+			_upnp_delete_redir(b->eport, b->proto);
+		}
+	}
+	/* the expired PEER rules went above */
+	memmap_outgoing_expired(now);
+#endif
+}
+
 /* functions used to remove unused rules
  * As a side effect, delete expired rules (based on LeaseDuration) */
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
 {
-	/*char ifname[IFNAMSIZ];*/
-	int proto;
-	unsigned short iport;
-	unsigned int timestamp;
+	const struct lease_entry * e;
 	struct rule_state * tmp;
 	struct rule_state * list = 0;
-	struct rule_state * * p;
-	int i = 0;
-	time_t current_time;
+	unsigned short iport;
+	unsigned int timestamp;
 
-	/*ifname[0] = '\0';*/
-	tmp = malloc(sizeof(struct rule_state));
-	if(!tmp)
-		return 0;
-	current_time = upnp_time();
-	nextruletoclean_timestamp = 0;
-	while(get_redirect_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
-	                              &iport, &proto, 0, 0, 0,0, &timestamp,
-								  &tmp->packets, &tmp->bytes) >= 0)
-	{
-		tmp->to_remove = 0;
-		if(timestamp > 0) {
-			/* need to remove this port mapping ? */
-			if(timestamp <= (unsigned int)current_time)
-				tmp->to_remove = 1;
-			else if((nextruletoclean_timestamp <= (unsigned int)current_time)
-			       || (timestamp < nextruletoclean_timestamp))
-				nextruletoclean_timestamp = timestamp;
-		}
-		tmp->proto = (short)proto;
-		/* add tmp to list */
-		tmp->next = list;
-		list = tmp;
-		/* prepare next iteration */
-		i++;
+	upnp_expire_mappings();
+	if(lease_table_port_count() <= (unsigned int)max_rules_number_target)
+		return NULL;
+	/* the counters of the rules: only the firewall has them. Only UPnP
+	 * mappings are removed when unused: those of PCP and NAT-PMP last the
+	 * lifetime their client asked for. */
+	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e)) {
+		if(e->kind != MAP_KIND_UPNP)
+			continue;
 		tmp = malloc(sizeof(struct rule_state));
 		if(!tmp)
 			break;
-	}
-#ifdef PCP_PEER
-	i=0;
-	while(get_peer_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
-		                              &iport, &proto, 0, 0, 0,0,0, &timestamp,
-									  &tmp->packets, &tmp->bytes) >= 0)
-	{
-		tmp->to_remove = 0;
-		if(timestamp > 0) {
-			/* need to remove this port mapping ? */
-			if(timestamp <= (unsigned int)current_time)
-				tmp->to_remove = 1;
-			else if((nextruletoclean_timestamp <= (unsigned int)current_time)
-				   || (timestamp < nextruletoclean_timestamp))
-				nextruletoclean_timestamp = timestamp;
+		if(get_redirect_rule(ext_if_name, e->eport, e->proto, 0, 0, &iport,
+		                     0, 0, 0, 0, &timestamp,
+		                     &tmp->packets, &tmp->bytes) < 0) {
+			free(tmp);
+			continue;
 		}
-		tmp->proto = (short)proto;
-		/* add tmp to list */
+		tmp->eport = e->eport;
+		tmp->proto = e->proto;
+		tmp->to_remove = 0;
 		tmp->next = list;
 		list = tmp;
-		/* prepare next iteration */
-		i++;
-		tmp = malloc(sizeof(struct rule_state));
-		if(!tmp)
-			break;
 	}
-#endif
-	free(tmp);
-	/* remove the redirections that need to be removed */
-	for(p = &list, tmp = list; tmp; tmp = *p)
-	{
-		if(tmp->to_remove)
-		{
-			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
-			       tmp->eport, proto_itoa(tmp->proto));
-			upnp_delete_port(tmp->eport, tmp->proto);
-			*p = tmp->next;
-			free(tmp);
-			i--;
-		} else {
-			p = &(tmp->next);
-		}
-	}
-#ifdef PCP_PEER
-	/* the expired PEER rules went with the others */
-	memmap_outgoing_expired((unsigned int)current_time);
-#endif
-	/* return empty list if not enough redirections */
-	if(i<=max_rules_number_target)
-		while(list)
-		{
-			tmp = list;
-			list = tmp->next;
-			free(tmp);
-		}
-	/* return list */
 	return list;
 }
 

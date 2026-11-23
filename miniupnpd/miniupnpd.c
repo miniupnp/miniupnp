@@ -2892,7 +2892,7 @@ main(int argc, char * * argv)
 		  && ((unsigned int)timeofday.tv_sec >= nextruletoclean_timestamp))
 		{
 			syslog(LOG_DEBUG, "cleaning expired Port Mappings");
-			get_upnp_rules_state_list(0);
+			upnp_expire_mappings();
 		}
 		if(nextruletoclean_timestamp
 		  && ((unsigned int)timeout.tv_sec >= (nextruletoclean_timestamp - timeofday.tv_sec)))

@@ -53,6 +53,12 @@ outgoing_table_find(const struct outgoing_entry * r)
 	return NULL;
 }
 
+struct outgoing_entry *
+outgoing_table_next(const struct outgoing_entry * prev)
+{
+	return prev == NULL ? head : prev->next;
+}
+
 struct outgoing_peer *
 outgoing_table_find_peer(const struct outgoing_entry * b,
                          const struct in6_addr * raddr, unsigned short rport)
