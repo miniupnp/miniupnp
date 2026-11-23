@@ -38,6 +38,10 @@ add_filter_rule2(const char * ifname,
 int
 delete_redirect_and_filter_rules(unsigned short eport, int proto);
 
+/* only the redirect rule of eport */
+int
+delete_redirect_rule(const char * ifname, unsigned short eport, int proto);
+
 int
 delete_filter_rule(const char * ifname, unsigned short port, int proto);
 

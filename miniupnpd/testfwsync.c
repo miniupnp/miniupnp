@@ -95,13 +95,14 @@ delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 	return 0;
 }
 #endif
+#endif
+
 int
 delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 {
 	(void)ifname; (void)eport; (void)proto;
 	return fake_delete();
 }
-#endif
 
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
@@ -237,8 +238,9 @@ test_update_taken_back(void)
 	CHECK(last_update_iport == 5000);
 }
 
-/* a failed filter rule: the add fails, and on netfilter its redirect rule
- * stays, as a half applied change */
+/* a failed filter rule: the add fails, and its redirect rule goes again. If
+ * that delete fails too, the redirect rule stays, as a half applied
+ * change. */
 static void
 test_filter_fails(void)
 {
@@ -251,12 +253,16 @@ test_filter_fails(void)
 	c.fresh = 1;
 	fail_add_filter = 1;
 	CHECK(fw_sync(&c, 1) < 0);
-#if defined(__linux__)
-	CHECK(c.applied == FW_HALF_APPLIED);
-#else
 	CHECK(c.applied == FW_NOT_APPLIED);
 	CHECK(deletes == 1);
-#endif
+
+	reset();
+	fw_change_init(&c, FW_ADD, &e, NULL);
+	c.fresh = 1;
+	fail_add_filter = 1;
+	fail_delete = 1;
+	CHECK(fw_sync(&c, 1) < 0);
+	CHECK(c.applied == FW_HALF_APPLIED);
 }
 
 /* A delete of a rule the firewall lost succeeds, so the row can go; with a

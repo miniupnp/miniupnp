@@ -152,16 +152,11 @@ add_rules(const struct lease_entry * e, int * half, int fresh)
 		return 0;
 	/* the redirect rule goes again. Only that rule: the filter rule of
 	 * another mapping to the same iaddr:iport, or a PEER rule on eport,
-	 * stays. netfilter cannot delete it alone: it stays, and the row of it
-	 * with it, which the expiry deletes. */
-#if defined(__linux__)
-	*half = 1;
-#else
-	if(delete_redirect_rule(ext_if_name, r.eport, r.proto) < 0)
-		*half = 1;
-#endif
-	if(*half)
+	 * stays. If it stays, so does a row of it, which the expiry deletes. */
+	if(delete_redirect_rule(ext_if_name, r.eport, r.proto) < 0) {
 		syslog(LOG_WARNING, "could not remove the half added rule of port %hu", r.eport);
+		*half = 1;
+	}
 	return -1;
 }
 

@@ -306,6 +306,29 @@ delete_filter_rule(const char * ifname, unsigned short port, int proto)
 }
 
 /*
+ * Delete only the redirect rule of eport, and leave the filter and PEER
+ * rules. 0, or -1 if it is not found or stays.
+ */
+int
+delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
+{
+	rule_t *p;
+	struct nftnl_rule *r;
+	UNUSED(ifname);
+
+	if (refresh_nft_cache_redirect() < 0)
+		return -1;
+	LIST_FOREACH(p, &head_redirect, entry) {
+		if (p->dport == eport && p->proto == proto &&
+		    (p->type == RULE_NAT && p->nat_type == NFT_NAT_DNAT)) {
+			r = rule_del_handle(p);
+			return nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0 ? -1 : 0;
+		}
+	}
+	return -1;
+}
+
+/*
  * Clear all rules corresponding eport/proto
  * returns -1 if the rules could not be read or the delete of the redirect
  * rule of eport failed, else 0, also when eport has no rule

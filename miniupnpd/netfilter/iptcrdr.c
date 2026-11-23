@@ -809,6 +809,141 @@ delete_filter_rule(const char * ifname, unsigned short port, int proto)
 	return r;
 }
 
+#ifdef ENABLE_PORT_TRIGGERING
+/* Delete the MASQUERADE rule add_redirect_rule2() made with the redirect
+ * rule of eport: internal address iaddr (network order) and port iport, to
+ * port eport. A PEER rule is SNAT, so it stays. 0, or -1 if it is not found
+ * or stays. */
+static int
+delete_masquerade_rule(int proto, unsigned short eport,
+                       uint32_t iaddr, unsigned short iport)
+{
+	int r = -1;
+	unsigned i = 0;
+	IPTC_HANDLE h;
+	const struct ipt_entry * e;
+	const struct ipt_entry_match * match;
+	const struct ipt_entry_target * target;
+	const struct ip_nat_multi_range * mr;
+	unsigned short sport;
+
+	h = iptc_init("nat");
+	if(!h) {
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "delete_masquerade_rule", iptc_strerror(errno));
+		return -1;
+	}
+	if(iptc_is_chain(miniupnpd_nat_postrouting_chain, h)) {
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, h);
+		    e;
+		    e = iptc_next_rule(e, h), i++)
+#else
+		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, &h);
+		    e;
+		    e = iptc_next_rule(e, &h), i++)
+#endif
+		{
+			if(proto != e->ip.proto || iaddr != e->ip.src.s_addr)
+				continue;
+			target = (const void *)e + e->target_offset;
+			if(0 != strncmp(target->u.user.name, "MASQUERADE", IPT_FUNCTION_MAXNAMELEN))
+				continue;
+			mr = (const struct ip_nat_multi_range *)&target->data[0];
+			if(eport != ntohs(mr->range[0].min.all))
+				continue;
+			match = (const struct ipt_entry_match *)&e->elems;
+			if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+				sport = ((const struct ipt_tcp *)match->data)->spts[0];
+			else
+				sport = ((const struct ipt_udp *)match->data)->spts[0];
+			if(iport != sport)
+				continue;
+			r = delete_rule_and_commit(i, h, miniupnpd_nat_postrouting_chain,
+			                           "delete_masquerade_rule");
+			h = NULL;
+			break;
+		}
+	}
+	if(h)
+#ifdef IPTABLES_143
+		iptc_free(h);
+#else
+		iptc_free(&h);
+#endif
+	return r;
+}
+#endif /* ENABLE_PORT_TRIGGERING */
+
+/* delete_redirect_rule()
+ * Delete only the redirect rule of eport, and the MASQUERADE rule
+ * add_redirect_rule2() made with it. The filter and PEER rules stay.
+ * 0, or -1 if the redirect rule is not found or stays. */
+int
+delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
+{
+	int r = -1;
+	unsigned i = 0;
+	IPTC_HANDLE h;
+	const struct ipt_entry * e;
+	const struct ipt_entry_match *match;
+	unsigned short dport;
+	uint32_t iaddr = 0;
+	unsigned short iport = 0;
+	UNUSED(ifname);
+
+	h = iptc_init("nat");
+	if(!h)
+	{
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "delete_redirect_rule", iptc_strerror(errno));
+		return -1;
+	}
+	if(iptc_is_chain(miniupnpd_nat_chain, h))
+	{
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_nat_chain, h);
+		    e;
+			e = iptc_next_rule(e, h), i++)
+#else
+		for(e = iptc_first_rule(miniupnpd_nat_chain, &h);
+		    e;
+			e = iptc_next_rule(e, &h), i++)
+#endif
+		{
+			if(proto != e->ip.proto)
+				continue;
+			match = (const struct ipt_entry_match *)&e->elems;
+			if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+				dport = ((const struct ipt_tcp *)match->data)->dpts[0];
+			else
+				dport = ((const struct ipt_udp *)match->data)->dpts[0];
+			if(eport != dport)
+				continue;
+			get_dnat_target_addr_port((const void *)e + e->target_offset,
+			                          &iaddr, &iport);
+			r = delete_rule_and_commit(i, h, miniupnpd_nat_chain, "delete_redirect_rule");
+			h = NULL;
+			break;
+		}
+	}
+	if(h)
+#ifdef IPTABLES_143
+		iptc_free(h);
+#else
+		iptc_free(&h);
+#endif
+	if(r == 0) {
+		del_redirect_desc(eport, proto);
+#ifdef ENABLE_PORT_TRIGGERING
+		if(delete_masquerade_rule(proto, eport, iaddr, iport) < 0)
+			syslog(LOG_WARNING, "%s: no MASQUERADE rule of port %hu to delete",
+			       "delete_redirect_rule", eport);
+#endif /* ENABLE_PORT_TRIGGERING */
+	}
+	return r;
+}
+
 /* delete_redirect_and_filter_rules()
  */
 int
