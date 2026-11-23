@@ -358,6 +358,10 @@ add_redirect_rule2(const char * ifname,
 		r = addmasqueraderule(proto, eport, iaddr, iport, rhost/*, ifname*/);
 		if(r < 0) {
 			syslog(LOG_NOTICE, "add_redirect_rule2(): addmasqueraderule returned %d", r);
+			/* the caller sees a failure and keeps no row: the DNAT
+			 * rule goes again */
+			if(delete_redirect_rule(ifname, eport, proto) < 0)
+				syslog(LOG_WARNING, "add_redirect_rule2(): could not remove the DNAT rule of port %hu", eport);
 		}
 #endif /* ENABLE_PORT_TRIGGERING */
 	}
