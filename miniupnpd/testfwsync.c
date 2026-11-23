@@ -118,6 +118,42 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	return rule_present > 0 ? 0 : rule_present == 0 ? -2 : -1;
 }
 
+/* the firewall has the rules of ports 5000 and 5001, with counters */
+#define FAKE_RULES	2
+
+#if defined(USE_IPTABLES)
+int
+get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
+                                       u_int64_t packets, u_int64_t bytes, void * arg),
+                            void * arg)
+{
+	int i;
+	for(i = 0; i < FAKE_RULES; i++)
+		fn((unsigned short)(5000 + i), IPPROTO_TCP, (u_int64_t)(10 * i), (u_int64_t)(100 * i), arg);
+	return 0;
+}
+#endif
+
+int
+get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
+                           char * iaddr, int iaddrlen, unsigned short * iport,
+                           int * proto, char * desc, int desclen,
+                           char * rhost, int rhostlen, unsigned int * timestamp,
+                           u_int64_t * packets, u_int64_t * bytes)
+{
+	(void)ifname; (void)iaddr; (void)iaddrlen; (void)desc; (void)desclen;
+	(void)rhost; (void)rhostlen;
+	if(index >= FAKE_RULES)
+		return -1;
+	*eport = (unsigned short)(5000 + index);
+	*iport = *eport;
+	*proto = IPPROTO_TCP;
+	*timestamp = 0;
+	*packets = (u_int64_t)(10 * index);
+	*bytes = (u_int64_t)(100 * index);
+	return 0;
+}
+
 int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
                    unsigned short iport, const char * desc, unsigned int timestamp)
@@ -447,6 +483,26 @@ test_peer_taken_back(void)
 }
 #endif
 
+static void
+count_rule(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes, void * arg)
+{
+	int * n = arg;
+	CHECK(proto == IPPROTO_TCP);
+	CHECK(packets == (u_int64_t)(10 * (eport - 5000)));
+	CHECK(bytes == (u_int64_t)(100 * (eport - 5000)));
+	(*n)++;
+}
+
+/* the counters of every rule, once each */
+static void
+test_each_map_counters(void)
+{
+	int n = 0;
+
+	CHECK(fw_each_map_counters(count_rule, &n) == 0);
+	CHECK(n == FAKE_RULES);
+}
+
 int
 main(void)
 {
@@ -457,6 +513,7 @@ main(void)
 	test_filter_fails();
 	test_delete_lost_rule();
 	test_delete_taken_back();
+	test_each_map_counters();
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 	test_peer();
 	test_peer_taken_back();

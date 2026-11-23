@@ -57,6 +57,12 @@ outgoing_rule_delete(struct outgoing_rule_key * keys, int n);
 
 int get_nat_ext_addr(struct sockaddr* src, struct sockaddr *dst, uint8_t proto,
                      struct sockaddr* ret_ext);
+/* fn(eport, proto, packets, bytes, arg) for each redirect rule, in one read
+ * of the nat table. 0, or -1 if the table could not be read. */
+int
+get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
+                                       u_int64_t packets, u_int64_t bytes, void * arg),
+                            void * arg);
 int
 get_peer_rule_by_index(int index,
                            char * ifname, unsigned short * eport,

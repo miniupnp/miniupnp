@@ -85,4 +85,12 @@ int fw_sync_out(struct fw_out_change * changes, int n);
  * packets and bytes may be NULL. */
 int fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes);
 
+/* fn(eport, proto, packets, bytes, arg) for each IPv4 redirect rule of the
+ * firewall, in one pass over the rules where the firewall can: the packet
+ * and byte counters, which only the kernel has. 0, or -1 if the rules
+ * could not be read. */
+typedef void (*fw_counters_fn)(unsigned short eport, int proto,
+                               u_int64_t packets, u_int64_t bytes, void * arg);
+int fw_each_map_counters(fw_counters_fn fn, void * arg);
+
 #endif

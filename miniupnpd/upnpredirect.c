@@ -878,40 +878,112 @@ upnp_expire_mappings(void)
 #endif
 }
 
+/* The rule_state list as an array sorted by protocol and port, so the
+ * counters of each rule of fw_each_map_counters() find their entry. */
+struct state_index {
+	struct rule_state ** v;
+	unsigned int n;
+	int second;	/* the pass of remove_unused_rules() */
+};
+
+static int
+state_cmp(const void * a, const void * b)
+{
+	const struct rule_state * x = *(struct rule_state * const *)a;
+	const struct rule_state * y = *(struct rule_state * const *)b;
+
+	if(x->proto != y->proto)
+		return x->proto < y->proto ? -1 : 1;
+	return x->eport < y->eport ? -1 : x->eport > y->eport;
+}
+
+/* 0, or -1 if there is no memory */
+static int
+state_index_build(struct state_index * ix, struct rule_state * list, int second)
+{
+	struct rule_state * s;
+	unsigned int n = 0;
+
+	ix->n = 0;
+	ix->second = second;
+	for(s = list; s != NULL; s = s->next)
+		n++;
+	ix->v = malloc((n > 0 ? n : 1) * sizeof(*ix->v));
+	if(ix->v == NULL)
+		return -1;
+	for(s = list; s != NULL; s = s->next)
+		ix->v[ix->n++] = s;
+	qsort(ix->v, ix->n, sizeof(*ix->v), state_cmp);
+	return 0;
+}
+
+/* first pass: the counters of the entry, which has a rule (to_remove 1);
+ * second pass: to_remove 1 if they did not move */
+static void
+state_counters(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
+               void * arg)
+{
+	const struct state_index * ix = arg;
+	struct rule_state key, * kp = &key, ** r;
+
+	key.eport = eport;
+	key.proto = (unsigned char)proto;
+	r = bsearch(&kp, ix->v, ix->n, sizeof(*ix->v), state_cmp);
+	if(r == NULL)
+		return;
+	if(!ix->second) {
+		(*r)->packets = packets;
+		(*r)->bytes = bytes;
+		(*r)->to_remove = 1;
+	} else if(packets == (*r)->packets && bytes == (*r)->bytes) {
+		(*r)->to_remove = 1;
+	}
+}
+
 /* functions used to remove unused rules
  * As a side effect, delete expired rules (based on LeaseDuration) */
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
 {
 	const struct lease_entry * e;
-	struct rule_state * tmp;
+	struct rule_state * tmp, ** pp;
 	struct rule_state * list = 0;
-	unsigned short iport;
-	unsigned int timestamp;
+	struct state_index ix;
 
 	upnp_expire_mappings();
 	if(lease_table_port_count() <= (unsigned int)max_rules_number_target)
 		return NULL;
-	/* the counters of the rules: only the firewall has them. Only UPnP
-	 * mappings are removed when unused: those of PCP and NAT-PMP last the
-	 * lifetime their client asked for. */
+	/* Only UPnP mappings are removed when unused: those of PCP and
+	 * NAT-PMP last the lifetime their client asked for. */
 	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e)) {
 		if(e->kind != MAP_KIND_UPNP)
 			continue;
 		tmp = malloc(sizeof(struct rule_state));
 		if(!tmp)
 			break;
-		if(get_redirect_rule(ext_if_name, e->eport, e->proto, 0, 0, &iport,
-		                     0, 0, 0, 0, &timestamp,
-		                     &tmp->packets, &tmp->bytes) < 0) {
-			free(tmp);
-			continue;
-		}
 		tmp->eport = e->eport;
 		tmp->proto = e->proto;
 		tmp->to_remove = 0;
 		tmp->next = list;
 		list = tmp;
+	}
+	/* the counters of the rules: only the firewall has them, in one
+	 * pass over its rules */
+	if(state_index_build(&ix, list, 0) < 0 ||
+	   fw_each_map_counters(state_counters, &ix) < 0) {
+		ix.n = 0;	/* no counters: nothing is listed */
+	}
+	free(ix.v);
+	/* keep the mappings with a rule, to_remove set back to 0 */
+	for(pp = &list; *pp != NULL; ) {
+		tmp = *pp;
+		if(ix.n == 0 || !tmp->to_remove) {
+			*pp = tmp->next;
+			free(tmp);
+		} else {
+			tmp->to_remove = 0;
+			pp = &tmp->next;
+		}
 	}
 	return list;
 }
@@ -919,30 +991,26 @@ get_upnp_rules_state_list(int max_rules_number_target)
 void
 remove_unused_rules(struct rule_state * list)
 {
-	char ifname[IFNAMSIZ];
-	unsigned short iport;
 	struct rule_state * tmp;
-	u_int64_t packets;
-	u_int64_t bytes;
-	unsigned int timestamp;
+	struct state_index ix;
 	int n = 0;
 
+	/* remove the rules no traffic has used since the first pass */
+	if(state_index_build(&ix, list, 1) == 0) {
+		if(fw_each_map_counters(state_counters, &ix) < 0)
+			ix.n = 0;
+		free(ix.v);
+	}
 	while(list)
 	{
-		/* remove the rule if no traffic has used it */
-		if(get_redirect_rule(ifname, list->eport, list->proto,
-	                         0, 0, &iport, 0, 0, 0, 0, &timestamp,
-		                     &packets, &bytes) >= 0)
+		if(list->to_remove)
 		{
-			if(packets == list->packets && bytes == list->bytes)
-			{
-				syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
-				       "%" PRIu64 "packets %" PRIu64 "bytes",
-				       list->eport, proto_itoa(list->proto),
-				       packets, bytes);
-				upnp_delete_port(list->eport, list->proto);
-				n++;
-			}
+			syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
+			       "%" PRIu64 "packets %" PRIu64 "bytes",
+			       list->eport, proto_itoa(list->proto),
+			       list->packets, list->bytes);
+			upnp_delete_port(list->eport, list->proto);
+			n++;
 		}
 		tmp = list;
 		list = tmp->next;

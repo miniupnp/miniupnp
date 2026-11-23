@@ -85,6 +85,27 @@ fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * by
 #endif
 }
 
+int
+fw_each_map_counters(fw_counters_fn fn, void * arg)
+{
+#if defined(USE_IPTABLES)
+	/* one copy of the nat table, where a read by index copies it each time */
+	return get_redirect_rules_counters(fn, arg);
+#else
+	char iaddr[INET6_ADDRSTRLEN];
+	unsigned short eport, iport;
+	unsigned int timestamp;
+	u_int64_t packets, bytes;
+	int i, proto;
+
+	for(i = 0; get_redirect_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr),
+	                                      &iport, &proto, NULL, 0, NULL, 0,
+	                                      &timestamp, &packets, &bytes) >= 0; i++)
+		fn(eport, proto, packets, bytes, arg);
+	return 0;
+#endif
+}
+
 /* 1 if the firewall has the redirect rule of an IPv4 row, 0 if it has not,
  * -1 if it could not be read */
 static int
