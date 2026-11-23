@@ -9,9 +9,12 @@
  * update of a rule there was. memmap does not look in the table to decide
  * that.
  *
- * This is the write side only: nothing reads the tables yet, and a row goes
- * when its rule is deleted, also when the backend removes an expired pinhole
- * (memmap_pinhole_expired()). The table does not expire rows itself.
+ * A row goes when its rule is deleted, also when the backend removes an
+ * expired pinhole (memmap_pinhole_expired()). The table does not expire rows
+ * itself.
+ *
+ * The protocols read the tables instead of the firewall: the find functions
+ * here, and those of lease_table.h and outgoing_table.h for a plain lookup.
  *
  * A row is found by its key, proto + family + iaddr:iport, and its external
  * port: an internal endpoint can have several mappings, one per external
@@ -79,6 +82,19 @@ void memmap_drop_outgoing(const struct outgoing_entry * key,
 /* The expiry pass removed the PEER rules whose expiry is now or before:
  * their peers go, and a binding with its last one. */
 void memmap_outgoing_expired(unsigned int now);
+
+/* The mapping of proto on eaddr:eport, or NULL: the row of eaddr, else the
+ * row on eport whose address is :: (a reloaded row, its address not
+ * stored). eaddr is the address the protocol tells its client. */
+struct lease_entry *
+memmap_find_map(int proto, int family, const struct in6_addr * eaddr,
+                unsigned short eport);
+
+/* A mapping on eaddr:eport, on any protocol, for another internal address
+ * than iaddr, or NULL. eaddr as in memmap_find_map(). */
+struct lease_entry *
+memmap_eport_used_by_other(int family, const struct in6_addr * eaddr,
+                           unsigned short eport, const struct in6_addr * iaddr);
 
 /* For debugging: write the lease table and the outgoing table to path as
  * text. 0, or -1 if the file could not be written. */
