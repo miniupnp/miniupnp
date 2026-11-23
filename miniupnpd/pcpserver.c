@@ -1039,6 +1039,14 @@ static void fill_lease_entry(const pcp_info_t *pcp_msg_info,
 	req->iport = pcp_msg_info->int_port;
 }
 
+/* 1 if row e is the client's own mapping: a PCP mapping with the nonce of
+ * req */
+static int pcp_own_map(const struct lease_entry *e, const struct lease_entry *req)
+{
+	return e->kind == MAP_KIND_PCP &&
+	       memcmp(e->nonce, req->nonce, MAP_NONCE_LEN) == 0;
+}
+
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
@@ -1066,8 +1074,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	     old != NULL;
 	     old = memmap_next_client_map(old, perm.proto, perm.family,
 	                                  &perm.iaddr, perm.iport)) {
-		if (old->kind != MAP_KIND_PCP ||
-		    memcmp(old->nonce, perm.nonce, MAP_NONCE_LEN) != 0) {
+		if (!pcp_own_map(old, &perm)) {
 			if (!foreign)
 				timestamp_foreign = old->timestamp;
 			foreign = 1;
@@ -1208,8 +1215,7 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	int uid;
 	int r;
 	struct lease_entry * req;
-	char desc[64];
-	unsigned int timestamp = 0;
+	const struct lease_entry * old = NULL;
 	/* the request: an IPv6 firewall rule of any remote, on the internal
 	 * side */
 	req = lease_table_new(0);
@@ -1220,16 +1226,16 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	req->eport = req->iport;
 	req->timestamp = upnp_time() + pcp_msg_info->lifetime;
 	/* first check if pinhole already exists */
-	uid = upnp_find_inboundpinhole(req, desc, sizeof(desc), &timestamp);
+	uid = upnp_find_inboundpinhole(req, &old);
 	if(uid >= 0) {
 		/* pinhole already exists, updating */
-		if (0 != strcmp(desc, pcp_msg_info->desc)) {
+		if (!pcp_own_map(old, req)) {
 			/* nonce does not match */
-			syslog(LOG_ERR, "Unauthorized to update pinhole : \"%s\" != \"%s\"",
-			       desc, pcp_msg_info->desc);
+			syslog(LOG_ERR, "Unauthorized to update pinhole %d of %s:%hu",
+			       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port);
 			/* the refusal lasts until the pinhole expires */
-			if (timestamp > upnp_time())
-				pcp_msg_info->error_lifetime = timestamp - upnp_time();
+			if (old->timestamp > upnp_time())
+				pcp_msg_info->error_lifetime = old->timestamp - upnp_time();
 			lease_table_free(req);
 			return PCP_ERR_NOT_AUTHORIZED;
 		}
@@ -1331,8 +1337,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 		     e != NULL && own == NULL;
 		     e = memmap_next_client_map(e, req.proto, req.family,
 		                                &req.iaddr, iport)) {
-			if (e->kind == MAP_KIND_PCP &&
-			    memcmp(e->nonce, req.nonce, MAP_NONCE_LEN) == 0)
+			if (pcp_own_map(e, &req))
 				own = e;
 			else
 				foreign = 1;
@@ -1353,18 +1358,18 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
-		char desc[64];
+		const struct lease_entry * old = NULL;
 		lease_entry_init(&req, 0, NULL);
 		fill_lease_entry(pcp_msg_info, &req);
 		req.eaddr = req.iaddr;
 		req.eport = req.iport;
-		uid = upnp_find_inboundpinhole(&req, desc, sizeof(desc), NULL /* lifetime */);
+		uid = upnp_find_inboundpinhole(&req, &old);
 		if (uid < 0) {
 			syslog(LOG_ERR, "Failed to find mapping to %s:%hu, protocol %s",
 			       pcp_msg_info->mapped_str, iport, proto_itoa(pcp_msg_info->protocol));
 			return;
 		} else {
-			if(0 != strcmp(desc, pcp_msg_info->desc)) {
+			if(!pcp_own_map(old, &req)) {
 				/* nonce does not match */
 				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
 				syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",

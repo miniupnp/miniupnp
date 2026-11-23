@@ -468,6 +468,45 @@ int lease_file6_expire(void)
 	return 0;
 }
 
+/* At startup the table is empty, but the pinhole of a lease file line may
+ * have outlived the daemon. It gets a row first, with the owner its
+ * description gives, so that upnp_add_inboundpinhole() updates it and adds no
+ * second one. One firewall read per line, at startup only. */
+static void
+reload_adopt_pinhole(const struct lease_entry * line)
+{
+#if defined(USE_PF) || defined(USE_NETFILTER)
+	char iaddr[INET6_ADDRSTRLEN];
+	char raddr_buf[INET6_ADDRSTRLEN];
+	const char * raddr = map_rhost(line, raddr_buf, sizeof(raddr_buf));
+	char desc[64];
+	int uid;
+	struct lease_entry * e;
+
+	desc[0] = '\0';
+	map_ntop(AF_INET6, &line->iaddr, iaddr, sizeof(iaddr));
+	uid = find_pinhole(NULL, raddr, line->filters[0].rport, iaddr, line->iport,
+	                   line->proto, desc, sizeof(desc), NULL);
+	if(uid < 0)
+		return;
+	e = lease_table_new(1);
+	if(e == NULL)
+		return;
+	e->family = AF_INET6;
+	e->proto = line->proto;
+	e->iaddr = e->eaddr = line->iaddr;
+	e->iport = e->eport = line->iport;
+	e->filters[0] = line->filters[0];
+	e->filters[0].map = NULL;
+	e->filters[0].uid = (unsigned short)uid;
+	e->timestamp = line->timestamp;
+	lease_entry_from_desc(e, desc);
+	memmap_add(e);	/* the table takes e */
+#else
+	UNUSED(line);
+#endif
+}
+
 /* reload_from_lease_file()
  * read lease_file and add the rules contained
  */
@@ -602,6 +641,7 @@ int reload_from_lease_file6(void)
 		req->eport = int_port;
 		lease_entry_from_desc(req, desc);
 		req->timestamp = current_time + leaseduration;
+		reload_adopt_pinhole(req);
 		r = upnp_add_inboundpinhole(req, NULL);
 		if(r == -1) {
 			syslog(LOG_ERR, "Failed to add %s:%hu -> %s:%hu protocol %s",
@@ -622,25 +662,64 @@ int reload_from_lease_file6(void)
 #endif
 
 int
-upnp_find_inboundpinhole(struct lease_entry * req,
-                         char * desc, int desc_len, unsigned int * leasetime)
+upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** row)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	int uid;
-	char iaddr[INET6_ADDRSTRLEN];
-	char raddr_buf[INET6_ADDRSTRLEN];
-	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
+	/* a request with no filter is the rule of any remote */
+	static const struct map_filter any_remote;
+	const struct map_filter * r = req->nfilters > 0 ? &req->filters[0] : &any_remote;
+	const struct lease_entry * e;
+	const struct map_filter * f = NULL;
 
-	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
-	uid = find_pinhole(NULL, raddr, req->nfilters > 0 ? req->filters[0].rport : 0,
-	                   iaddr, req->iport, req->proto, desc, desc_len, leasetime);
-	if(uid >= 0 && req->nfilters > 0)
-		req->filters[0].uid = (unsigned short)uid;
-	return uid;
-#else
-	UNUSED(req); UNUSED(desc); UNUSED(desc_len); UNUSED(leasetime);
-	return -42;
+	e = lease_table_find_entry(req->proto, AF_INET6, &req->iaddr, req->iport, req->iport);
+	if(e == NULL)
+		return -2;
+	if(e->nfilters > 0) {
+		f = lease_filter_find(e, &r->raddr, r->prefix, r->rport);
+		if(f == NULL)
+			return -2;
+	} else if(r->prefix != 0 || r->rport != 0) {
+		return -2;	/* a map with no filter: its one rule is of any remote */
+	}
+	if(row != NULL)
+		*row = e;
+	if(f != NULL && f->uid != 0) {
+#if defined(USE_PF) || defined(USE_NETFILTER)
+		/* a rule removed behind the daemon's back: its filter goes, as
+		 * upnp_check_map() does for a port mapping */
+		if(get_pinhole_info(f->uid, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0,
+		                    NULL, NULL, NULL) < 0) {
+			syslog(LOG_NOTICE, "pinhole %hu lost its rule, its filter goes", f->uid);
+			if(req->nfilters > 0)
+				req->filters[0].uid = f->uid;
+			memmap_delete_filter(req);
+			if(row != NULL)
+				*row = NULL;
+			return -2;
+		}
 #endif
+		if(req->nfilters > 0)
+			req->filters[0].uid = f->uid;
+		return f->uid;
+	}
+	{
+		/* A PCP map has no uid in the lease table: its rule has one,
+		 * which the backend finds by the key. */
+#if defined(USE_PF) || defined(USE_NETFILTER)
+		int uid;
+		char iaddr[INET6_ADDRSTRLEN];
+		char raddr_buf[INET6_ADDRSTRLEN];
+		const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
+
+		map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
+		uid = find_pinhole(NULL, raddr, r->rport, iaddr, req->iport,
+		                   req->proto, NULL, 0, NULL);
+		if(uid >= 0 && req->nfilters > 0)
+			req->filters[0].uid = (unsigned short)uid;
+		return uid;
+#else
+		return -42;
+#endif
+	}
 }
 
 /* upnp_add_inboundpinhole()
@@ -665,7 +744,7 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
 	r = 0;
 
-	uid = upnp_find_inboundpinhole(req, NULL, 0, NULL);
+	uid = upnp_find_inboundpinhole(req, NULL);
 	if(uid >= 0) {
 		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, uid);
 		r = upnp_update_inboundpinhole(req, (unsigned short)uid);
@@ -788,40 +867,47 @@ upnp_get_pinhole_info(unsigned short uid,
                       unsigned int * leasetime,
                       unsigned int * packets)
 {
-	/* Call Firewall specific code to get IPv6 pinhole infos */
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	int r;
-	unsigned int timestamp;
-	u_int64_t packets_tmp;
-	/*u_int64_t bytes_tmp;*/
+	const struct map_filter * f = lease_table_find_uid(uid);
+	const struct lease_entry * e;
+	char desc_buf[64];
+	unsigned int now;
 
-	r = get_pinhole_info(uid, raddr, raddrlen, rport,
-	                     iaddr, iaddrlen, iport,
-	                     proto, desc, desclen,
-	                     leasetime ? &timestamp : NULL,
-	                     packets ? &packets_tmp : NULL,
-	                     NULL/*&bytes_tmp*/);
-	if(r >= 0) {
-		if(leasetime) {
-			time_t current_time;
-			current_time = upnp_time();
-			if(timestamp > (unsigned int)current_time)
-				*leasetime = timestamp - current_time;
-			else
-				*leasetime = 0;
-		}
-		if(packets)
-			*packets = (unsigned int)packets_tmp;
+	if(f == NULL)
+		return -2;
+	e = f->map;
+	if(raddr && raddrlen > 0) {
+		raddr[0] = '\0';
+		if(f->prefix != 0)
+			map_ntop(AF_INET6, &f->raddr, raddr, (size_t)raddrlen);
 	}
-	return r;
+	if(rport)
+		*rport = f->rport;
+	if(iaddr && iaddrlen > 0 &&
+	   map_ntop(AF_INET6, &e->iaddr, iaddr, (size_t)iaddrlen) == NULL)
+		iaddr[0] = '\0';
+	if(iport)
+		*iport = e->iport;
+	if(proto)
+		*proto = e->proto;
+	if(desc && desclen > 0)
+		snprintf(desc, (size_t)desclen, "%s", map_rule_desc(e, desc_buf, sizeof(desc_buf)));
+	if(leasetime) {
+		now = (unsigned int)upnp_time();
+		*leasetime = e->timestamp > now ? e->timestamp - now : 0;
+	}
+	if(packets) {
+		/* the counter of the rule: only the firewall has it */
+#if defined(USE_PF) || defined(USE_NETFILTER)
+		u_int64_t packets_tmp;
+		if(get_pinhole_info(uid, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0,
+		                    NULL, &packets_tmp, NULL) < 0)
+			return -1;
+		*packets = (unsigned int)packets_tmp;
 #else
-	UNUSED(uid);
-	UNUSED(raddr); UNUSED(raddrlen); UNUSED(rport);
-	UNUSED(iaddr); UNUSED(iaddrlen); UNUSED(iport);
-	UNUSED(proto); UNUSED(desc); UNUSED(desclen);
-	UNUSED(leasetime); UNUSED(packets);
-	return -42;	/* not implemented */
+		return -42;	/* not implemented */
 #endif
+	}
+	return 0;
 }
 
 int

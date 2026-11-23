@@ -211,7 +211,7 @@ test_pcp_no_filter(void)
 	assert(strcmp(rules[0].iaddr, "2001:db8::10") == 0 && rules[0].iport == 4000);
 	/* the renewal of PCP: found by its key, renewed by the uid found */
 	req = pcp_map("2001:db8::10", 4000, 3000);
-	uid = upnp_find_inboundpinhole(req, NULL, 0, NULL);
+	uid = upnp_find_inboundpinhole(req, NULL);
 	assert(uid == rules[0].uid);
 	assert(upnp_update_inboundpinhole(req, (unsigned short)uid) == 0);
 	lease_table_free(req);
@@ -229,7 +229,7 @@ test_pcp_no_filter(void)
 	del.proto = IPPROTO_UDP;
 	del.iaddr = del.eaddr = i;
 	del.iport = del.eport = 4000;
-	uid = upnp_find_inboundpinhole(&del, NULL, 0, NULL);
+	uid = upnp_find_inboundpinhole(&del, NULL);
 	assert(uid >= 0);
 	assert(upnp_delete_inboundpinhole(&del, (unsigned short)uid) == 0);
 	assert(rule_count() == 0 && lease_table_count() == 0);
