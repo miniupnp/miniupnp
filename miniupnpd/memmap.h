@@ -96,6 +96,15 @@ struct lease_entry *
 memmap_eport_used_by_other(int family, const struct in6_addr * eaddr,
                            unsigned short eport, const struct in6_addr * iaddr);
 
+/* Walk the mappings of proto of the internal address iaddr: call with prev
+ * NULL for the first row, then with the row it returned, until NULL. Those
+ * of iaddr:iport, or with iport 0 the IPv4 port mappings of iaddr on any
+ * internal port. A caller may remove the row it got before the next call
+ * only if it took the next row first. */
+struct lease_entry *
+memmap_next_client_map(const struct lease_entry * prev, int proto, int family,
+                       const struct in6_addr * iaddr, unsigned short iport);
+
 /* For debugging: write the lease table and the outgoing table to path as
  * text. 0, or -1 if the file could not be written. */
 int memmap_dump(const char * path);

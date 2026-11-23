@@ -1042,12 +1042,9 @@ static void fill_lease_entry(const pcp_info_t *pcp_msg_info,
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
-	int index, proto_old;
-	char iaddr_old[INET6_ADDRSTRLEN];
-	char desc_old[64];
-	uint16_t iport_old, eport_first = 0;
-	unsigned short eport_old, eport_own = 0;
-	unsigned int timestamp_old, timestamp_foreign = 0;
+	uint16_t eport_first = 0;
+	unsigned short eport_own = 0;
+	unsigned int timestamp_foreign = 0;
 	int foreign = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
@@ -1059,25 +1056,20 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	 * address, protocol and port, not the suggested external port.
 	 * Check ownership before changing any state, even when the client
 	 * suggests a different external port. The client's own mapping wins
-	 * over another owner's rule for the same key, wherever it is listed.
-	 * Some backends leave desc as it was for a rule without one (nft).
-	 * iptables keeps one description per external port and protocol,
-	 * shared with a PEER rule on the same port: a PEER description says
-	 * nothing about the owner of this rule. */
-	for (index = 0, desc_old[0] = '\0', timestamp_old = 0;
-	     get_redirect_rule_by_index(index, NULL, &eport_old,
-	                               iaddr_old, sizeof(iaddr_old), &iport_old,
-	                               &proto_old, desc_old, sizeof(desc_old), NULL, 0,
-	                               &timestamp_old, NULL, NULL) >= 0;
-	     index++, desc_old[0] = '\0', timestamp_old = 0) {
-		if (proto_old != pcp_msg_info->protocol ||
-		    iport_old != pcp_msg_info->int_port ||
-		    strcmp(iaddr_old, pcp_msg_info->mapped_str) != 0)
-			continue;
-		if (strncmp(desc_old, "PCP PEER ", 9) != 0 &&
-		    strcmp(desc_old, pcp_msg_info->desc) != 0) {
+	 * over another owner's mapping of the same key: a row of kind PCP
+	 * with the nonce of the request. */
+	lease_entry_init(&perm, 0, NULL);
+	fill_lease_entry(pcp_msg_info, &perm);
+	perm.eaddr = *pcp_msg_info->ext_ip;
+	for (old = memmap_next_client_map(NULL, perm.proto, perm.family,
+	                                  &perm.iaddr, perm.iport);
+	     old != NULL;
+	     old = memmap_next_client_map(old, perm.proto, perm.family,
+	                                  &perm.iaddr, perm.iport)) {
+		if (old->kind != MAP_KIND_PCP ||
+		    memcmp(old->nonce, perm.nonce, MAP_NONCE_LEN) != 0) {
 			if (!foreign)
-				timestamp_foreign = timestamp_old;
+				timestamp_foreign = old->timestamp;
 			foreign = 1;
 			continue;
 		}
@@ -1085,10 +1077,10 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		 * suggested one */
 		if (pcp_msg_info->pfailure_present &&
 		    pcp_msg_info->ext_port != 0 &&
-		    pcp_msg_info->ext_port != eport_old)
+		    pcp_msg_info->ext_port != old->eport)
 			return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
-		pcp_msg_info->ext_port = eport_old;
-		eport_own = eport_old;
+		pcp_msg_info->ext_port = old->eport;
+		eport_own = old->eport;
 		break;
 	}
 	if (eport_own == 0 && foreign) {
@@ -1106,9 +1098,6 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		return PCP_ERR_MALFORMED_REQUEST;
 	}
 
-	lease_entry_init(&perm, 0, NULL);
-	fill_lease_entry(pcp_msg_info, &perm);
-	perm.eaddr = *pcp_msg_info->ext_ip;
 	do {
 		if (eport_first == 0) { /* first time in loop */
 			eport_first = pcp_msg_info->ext_port;
@@ -1323,56 +1312,48 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	uint16_t iport = pcp_msg_info->int_port;  /* private port */
 	uint8_t  proto = pcp_msg_info->protocol;
 	int r=-1;
-	int found = 0;
 	/* remove the mapping */
 	/* remove all the mappings for this client */
-	unsigned short eport2, iport2;
-	char iaddr2[INET6_ADDRSTRLEN];
-	int proto2;
-	char desc[64];
-	unsigned int timestamp;
+	unsigned short eport2 = 0;
 	struct lease_entry req;
 
 	syslog(LOG_DEBUG, "is_fw=%d addr=%s iport=%hu proto=%d",
 	       pcp_msg_info->is_fw,  pcp_msg_info->mapped_str, iport, (int)proto);
 	if (!pcp_msg_info->is_fw) {
-		int index;
-		/* iterate through all rules and delete the requested ones */
-		for (index = 0;
-		     get_redirect_rule_by_index(index, 0,
-					 &eport2, iaddr2, sizeof(iaddr2),
-					 &iport2, &proto2,
-					 desc, sizeof(desc),
-					 0, 0, &timestamp, 0, 0) >= 0;
-		     index++) {
-			syslog(LOG_DEBUG, "%d: %s %hu %d", index, iaddr2, iport2, proto2);
-			if(0 == strcmp(iaddr2, pcp_msg_info->mapped_str)
-			   && (proto2==proto)
-			   && ((iport2==iport) || (iport==0))) {
-				found = 1;
-				if(0 != strcmp(desc, pcp_msg_info->desc)) {
-					/* nonce does not match */
-					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-					syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
-					       iport, proto_itoa(pcp_msg_info->protocol));
-					return;
-				} else {
-					lease_entry_init(&req, 0, NULL);
-					fill_lease_entry(pcp_msg_info, &req);
-					req.iport = iport2;
-					req.eaddr = *pcp_msg_info->ext_ip;
-					req.eport = eport2;
-					r = upnp_delete_redirection(&req);
-				}
-				break;
-			}
+		struct lease_entry * e, * own = NULL;
+		int foreign = 0;
+		/* the client's mapping of the key: a row of kind PCP with the
+		 * nonce of the request */
+		lease_entry_init(&req, 0, NULL);
+		fill_lease_entry(pcp_msg_info, &req);
+		for (e = memmap_next_client_map(NULL, req.proto, req.family,
+		                                &req.iaddr, iport);
+		     e != NULL && own == NULL;
+		     e = memmap_next_client_map(e, req.proto, req.family,
+		                                &req.iaddr, iport)) {
+			if (e->kind == MAP_KIND_PCP &&
+			    memcmp(e->nonce, req.nonce, MAP_NONCE_LEN) == 0)
+				own = e;
+			else
+				foreign = 1;
 		}
-		/* RFC 6887 section 11.3: deleting an absent mapping succeeds. */
-		if (!found)
+		if (own == NULL) {
+			/* RFC 6887 section 11.3: deleting an absent mapping
+			 * succeeds. */
+			if (!foreign)
+				return;
+			/* nonce does not match */
+			pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
+			syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
+			       iport, proto_itoa(pcp_msg_info->protocol));
 			return;
+		}
+		eport2 = own->eport;
+		r = upnp_delete_map(own);
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
+		char desc[64];
 		lease_entry_init(&req, 0, NULL);
 		fill_lease_entry(pcp_msg_info, &req);
 		req.eaddr = req.iaddr;
