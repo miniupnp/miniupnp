@@ -720,6 +720,28 @@ static const char* inet_satop(struct sockaddr* sa, char* buf, size_t buf_len)
 	}
 }
 
+/* The request of a PCP PEER: its nonce, protocol, internal side, the
+ * suggested external side and peer p, the remote. No label. */
+static void fill_outgoing_entry(const pcp_info_t *pcp_msg_info,
+                                  struct outgoing_entry *req,
+                                  struct outgoing_peer *p)
+{
+	memset(req, 0, sizeof(*req));
+	memcpy(req->nonce, pcp_msg_info->nonce, MAP_NONCE_LEN);
+	req->family = IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) ? AF_INET : AF_INET6;
+	req->proto = pcp_msg_info->protocol;
+	req->iaddr = *pcp_msg_info->mapped_ip;
+	req->iport = pcp_msg_info->int_port;
+	req->eaddr = *pcp_msg_info->ext_ip;
+	req->eport = pcp_msg_info->ext_port;
+	memset(p, 0, sizeof(*p));
+	p->raddr = *pcp_msg_info->peer_ip;
+	p->rport = pcp_msg_info->peer_port;
+	p->timestamp = upnp_time() + pcp_msg_info->lifetime;
+	req->peers = p;
+	req->npeers = 1;
+}
+
 static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 {
 	struct sockaddr_storage intip;
@@ -732,13 +754,20 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
 
 	char peerip_s[INET6_ADDRSTRLEN], extip_s[INET6_ADDRSTRLEN];
-	time_t timestamp = upnp_time() + pcp_msg_info->lifetime;
+	struct outgoing_entry req;
+	struct outgoing_peer peer;
+	char desc[64];
+	unsigned int timestamp;
 	int r;
 	const char * ext_if = ext_if_name;
 	int index, proto_old;
 	unsigned short eport_old, iport_old, rport_old;
 	char iaddr_old[INET6_ADDRSTRLEN], rhost_old[INET6_ADDRSTRLEN];
 	char desc_old[64];
+
+	fill_outgoing_entry(pcp_msg_info, &req, &peer);
+	outgoing_rule_desc(&req, desc, sizeof(desc));
+	timestamp = peer.timestamp;
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
@@ -767,7 +796,7 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		    strcmp(iaddr_old, pcp_msg_info->mapped_str) == 0 &&
 		    strcmp(rhost_old, peerip_s) == 0) {
 			if (strncmp(desc_old, "PCP MAP ", 8) != 0 &&
-			    strcmp(desc_old, pcp_msg_info->desc) != 0)
+			    strcmp(desc_old, desc) != 0)
 				return PCP_ERR_NOT_AUTHORIZED;
 			eport = eport_old;
 			break;
@@ -805,13 +834,13 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 		if (add_peer_dscp_rule2(ext_if, peerip_s,
 					pcp_msg_info->peer_port, pcp_msg_info->dscp_up,
 					pcp_msg_info->mapped_str, pcp_msg_info->int_port,
-					proto, pcp_msg_info->desc, timestamp) < 0 ) {
+					proto, desc, timestamp) < 0 ) {
 			syslog(LOG_ERR, "PCP: failed to add flowp upstream mapping %s:%hu->%s:%hu '%s'",
 			       pcp_msg_info->mapped_str,
 			       pcp_msg_info->int_port,
 			       peerip_s,
 			       pcp_msg_info->peer_port,
-			       pcp_msg_info->desc);
+			       desc);
 			return PCP_ERR_NO_RESOURCES;
 		}
 	}
@@ -819,14 +848,14 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 	if (pcp_msg_info->flowp_present && pcp_msg_info->dscp_down) {
 		if (add_peer_dscp_rule2(ext_if,  pcp_msg_info->mapped_str,
 					pcp_msg_info->int_port, pcp_msg_info->dscp_down,
-					peerip_s, pcp_msg_info->peer_port, proto, pcp_msg_info->desc, timestamp)
+					peerip_s, pcp_msg_info->peer_port, proto, desc, timestamp)
 		    < 0 ) {
 			syslog(LOG_ERR, "PCP: failed to add flowp downstream mapping %s:%hu->%s:%hu '%s'",
 			       pcp_msg_info->mapped_str,
 			       pcp_msg_info->int_port,
 			       peerip_s,
 			       pcp_msg_info->peer_port,
-			       pcp_msg_info->desc);
+			       desc);
 			pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 			return PCP_ERR_NO_RESOURCES;
 		}
@@ -841,10 +870,11 @@ static int CreatePCPPeer_NAT(pcp_info_t *pcp_msg_info)
 				    pcp_msg_info->mapped_str,
 				    pcp_msg_info->int_port,
 				    pcp_msg_info->protocol,
-				    pcp_msg_info->desc,
+				    desc,
 				    timestamp);
 	if (r < 0)
 		return PCP_ERR_NO_RESOURCES;
+	req.eport = eport;
 	pcp_msg_info->ext_port = eport;
 	return PCP_SUCCESS;
 }
@@ -907,6 +937,9 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 	int proto2;
 	char desc[64];
 	unsigned int timestamp;
+	struct outgoing_entry req;
+	struct outgoing_peer peer;
+	char req_desc[64];
 #if 0
 	int uid;
 #endif /* 0 */
@@ -915,6 +948,9 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPCODE;
 		return;
 	}
+
+	fill_outgoing_entry(pcp_msg_info, &req, &peer);
+	outgoing_rule_desc(&req, req_desc, sizeof(req_desc));
 
 	inet_n46top((struct in6_addr*)pcp_msg_info->peer_ip, rhost, sizeof(rhost));
 
@@ -942,7 +978,7 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 		if((0 == strcmp(iaddr2, pcp_msg_info->mapped_str))
 		   && (0 == strcmp(rhost2, rhost))
 		   && (proto2==proto)
-		   && 0 == strcmp(desc, pcp_msg_info->desc)
+		   && 0 == strcmp(desc, req_desc)
 		   && (iport2==iport) && (rport2==rport)) {
 			if (!pcp_msg_info->is_fw)
 				r = _upnp_delete_redir(eport2, proto2);

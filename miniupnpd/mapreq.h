@@ -10,7 +10,10 @@
  *
  * Addresses are struct in6_addr, IPv4 as ::ffff:a.b.c.d. A request names
  * its protocol (kind) and, for PCP, its nonce. The description of the
- * firewall rule is no part of it. */
+ * firewall rule is no part of it.
+ *
+ * A PCP PEER is outgoing, an SNAT rule, and has a shape of its own:
+ * struct outgoing_entry. */
 #ifndef MAPREQ_H_INCLUDED
 #define MAPREQ_H_INCLUDED
 
@@ -69,6 +72,31 @@ struct lease_entry {
 				 * The rule gets map_rule_desc() */
 	unsigned int timestamp;	/* the expiry on the clock of upnp_time(),
 				 * 0 : none */
+};
+
+/* One remote of an outgoing binding, with its own expiry. */
+struct outgoing_peer {
+	struct in6_addr raddr;	/* the destination, one host. IPv4 as ::ffff:a.b.c.d */
+	unsigned short rport;	/* the destination port, never 0 */
+	unsigned int timestamp;	/* the expiry on the clock of upnp_time() */
+};
+
+/* An outgoing binding as a client asks for it, an SNAT rule (PCP PEER,
+ * RFC 6887 section 12): traffic from iaddr:iport to its peers leaves with
+ * the source eaddr:eport, and only the replies come back. Not a DNAT map:
+ * no kind, no flags, no filters. */
+struct outgoing_entry {
+	unsigned char nonce[MAP_NONCE_LEN];	/* the PCP mapping nonce */
+	int family;		/* of the internal side: AF_INET, AF_INET6 */
+	int proto;		/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
+	struct in6_addr iaddr;	/* the source inside. IPv4 as ::ffff:a.b.c.d */
+	unsigned short iport;
+	struct in6_addr eaddr;	/* the source outside, the WAN address */
+	unsigned short eport;	/* asked for, 0 : any; the one used once added */
+	const char * label;	/* NULL: the PCP DESCRIPTION option is not
+				 * read yet */
+	struct outgoing_peer * peers;	/* the caller's array, at least one */
+	int npeers;
 };
 
 /* An empty request of a protocol. nonce NULL : zero. */
@@ -177,6 +205,19 @@ map_rule_desc(const struct lease_entry * r, char * buf, size_t len)
 			return "IGD2 pinhole";
 		return r->label != NULL ? r->label : "";
 	}
+}
+
+/* TEMPORARY, as map_rule_desc(): the description of the firewall rule of
+ * r, "PCP PEER <nonce>", in buf of len bytes. */
+static inline const char *
+outgoing_rule_desc(const struct outgoing_entry * r, char * buf, size_t len)
+{
+	uint32_t w[MAP_NONCE_LEN / 4];
+
+	/* each word of the nonce in host order, as PCP prints it */
+	memcpy(w, r->nonce, sizeof(w));
+	snprintf(buf, len, "PCP PEER %08x%08x%08x", w[0], w[1], w[2]);
+	return buf;
 }
 
 /* For the lease file reloads only. Set the kind, nonce and label of r from
