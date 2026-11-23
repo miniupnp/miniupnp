@@ -971,6 +971,7 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 	char int_ip[32];
 	char desc[MINIUPNPD_DESC_SIZE];
 	unsigned int leaseduration = 0;
+	struct in6_addr eaddr;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	r_host = GetValueFromNameValueList(&data, "NewRemoteHost");
@@ -1010,7 +1011,8 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 	 * We prevent several Port Mapping with same external port
 	 * but different remoteHost to be set up, so that is not
 	 * a priority. */
-	r = upnp_get_redirection_infos(eport, protocol, &iport,
+	upnp_ext_addr(h, &eaddr);
+	r = upnp_get_redirection_infos(&eaddr, eport, protocol, &iport,
 	                               int_ip, sizeof(int_ip),
 	                               desc, sizeof(desc),
 	                               NULL, 0,
@@ -1118,7 +1120,9 @@ DeletePortMapping(struct upnphttp * h, const char * action, const char * ns)
 		struct in_addr int_ip_addr;
 		unsigned short iport;
 		unsigned int leaseduration = 0;
-		r = upnp_get_redirection_infos(eport, protocol, &iport,
+		struct in6_addr eaddr;
+		upnp_ext_addr(h, &eaddr);
+		r = upnp_get_redirection_infos(&eaddr, eport, protocol, &iport,
 		                               int_ip, sizeof(int_ip),
 		                               NULL, 0, NULL, 0,
 		                               &leaseduration);
@@ -1398,6 +1402,7 @@ GetListOfPortMappings(struct upnphttp * h, const char * action, const char * ns)
 	int number;
 	unsigned short * port_list;
 	unsigned int i, list_size = 0;
+	struct in6_addr eaddr;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	startport_s = GetValueFromNameValueList(&data, "NewStartPort");
@@ -1465,6 +1470,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	memcpy(body+bodylen, list_start, sizeof(list_start));
 	bodylen += (sizeof(list_start) - 1);
 
+	upnp_ext_addr(h, &eaddr);
 	port_list = upnp_get_portmappings_in_range(startport, endport,
 	                                           protocol, &list_size);
 	/* loop through port mappings */
@@ -1487,7 +1493,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 			}
 		}
 		rhost[0] = '\0';
-		r = upnp_get_redirection_infos(port_list[i], protocol, &iport,
+		r = upnp_get_redirection_infos(&eaddr, port_list[i], protocol, &iport,
 		                               int_ip, sizeof(int_ip),
 		                               desc, sizeof(desc),
 		                               rhost, sizeof(rhost),

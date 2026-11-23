@@ -49,6 +49,8 @@ int
 upnp_redirect_internal(struct lease_entry * req);
 
 /*! \brief get port mapping from (external port, protocol)
+ * \param[in] eaddr the external address the client is told, as
+ *            memmap_find_map() takes it
  * \param[in] eport external port
  * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
  * \param[out] iport internal port
@@ -61,7 +63,8 @@ upnp_redirect_internal(struct lease_entry * req);
  * \param[out] leaseduration lease duration in seconds (0 for infinite)
  * \return 0 on success, -1 failed to get the port mapping entry or no entry exists */
 int
-upnp_get_redirection_infos(unsigned short eport, const char * protocol,
+upnp_get_redirection_infos(const struct in6_addr * eaddr,
+                           unsigned short eport, const char * protocol,
                            unsigned short * iport, char * iaddr, int iaddrlen,
                            char * desc, int desclen,
                            char * rhost, int rhostlen,

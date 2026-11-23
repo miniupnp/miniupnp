@@ -357,23 +357,18 @@ int reload_from_lease_file(void)
 #ifdef LEASEFILE_USE_REMAINING_TIME
 void lease_file_rewrite(void)
 {
-	int index;
-	unsigned short eport, iport;
-	int proto;
-	char iaddr[32];
+	const struct lease_entry * e;
+	char iaddr[INET_ADDRSTRLEN];
 	char desc[64];
-	char rhost[40];
-	unsigned int timestamp;
+	char rhost[INET6_ADDRSTRLEN];
 
 	if (lease_file == NULL) return;
 	remove(lease_file);
-	for(index = 0; ; index++) {
-		if(get_redirect_rule_by_index(index, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
-		                              &iport, &proto, desc, sizeof(desc),
-		                              rhost, sizeof(rhost), &timestamp,
-		                              0, 0) < 0)
-			break;
-		if(lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp) < 0)
+	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e)) {
+		map_ntop(AF_INET, &e->iaddr, iaddr, sizeof(iaddr));
+		if(lease_file_add(map_rhost(e, rhost, sizeof(rhost)), e->eport, iaddr,
+		                  e->iport, e->proto,
+		                  map_rule_desc(e, desc, sizeof(desc)), e->timestamp) < 0)
 			break;
 	}
 }
@@ -540,35 +535,54 @@ upnp_redirect_internal(struct lease_entry * req)
 
 
 
-/* Firewall independent code which call the FW dependent code. */
+/* The values UPnP gives of the mapping of row e. desc is the description
+ * of its rule, as the firewall gave it before (map_rule_desc()). */
+static void
+row_infos(const struct lease_entry * e, unsigned short * iport,
+          char * iaddr, int iaddrlen, char * desc, int desclen,
+          char * rhost, int rhostlen, unsigned int * leaseduration)
+{
+	char desc_buf[64];
+	char rhost_buf[INET6_ADDRSTRLEN];
+	const char * r;
+	unsigned int now;
+
+	*iport = e->iport;
+	if(map_ntop(e->family, &e->iaddr, iaddr, (size_t)iaddrlen) == NULL && iaddrlen > 0)
+		iaddr[0] = '\0';
+	if(desc && desclen > 0)
+		snprintf(desc, (size_t)desclen, "%s", map_rule_desc(e, desc_buf, sizeof(desc_buf)));
+	if(rhost && rhostlen > 0) {
+		r = map_rhost(e, rhost_buf, sizeof(rhost_buf));
+		snprintf(rhost, (size_t)rhostlen, "%s", r ? r : "");
+	}
+	now = (unsigned int)upnp_time();
+	*leaseduration = e->timestamp > now ? e->timestamp - now : 0;
+}
+
 int
-upnp_get_redirection_infos(unsigned short eport, const char * protocol,
+upnp_get_redirection_infos(const struct in6_addr * eaddr,
+                           unsigned short eport, const char * protocol,
                            unsigned short * iport,
                            char * iaddr, int iaddrlen,
                            char * desc, int desclen,
                            char * rhost, int rhostlen,
                            unsigned int * leaseduration)
 {
-	int r;
-	unsigned int timestamp;
-	time_t current_time;
+	const struct lease_entry * e;
 
-	if(desc && (desclen > 0))
-		desc[0] = '\0';
-	if(rhost && (rhostlen > 0))
-		rhost[0] = '\0';
-	r = get_redirect_rule(ext_if_name, eport, proto_atoi(protocol),
-	                      iaddr, iaddrlen, iport, desc, desclen,
-	                      rhost, rhostlen, &timestamp,
-	                      0, 0);
-	if(r == 0 &&
-	   timestamp > 0 &&
-	   timestamp > (unsigned int)(current_time = upnp_time())) {
-		*leaseduration = timestamp - current_time;
-	} else {
+	e = memmap_find_map(proto_atoi(protocol), AF_INET, eaddr, eport);
+	if(e == NULL) {
+		if(desc && (desclen > 0))
+			desc[0] = '\0';
+		if(rhost && (rhostlen > 0))
+			rhost[0] = '\0';
 		*leaseduration = 0;
+		return -1;
 	}
-	return r;
+	row_infos(e, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen,
+	          leaseduration);
+	return 0;
 }
 
 int
@@ -580,36 +594,16 @@ upnp_get_redirection_infos_by_index(int index,
                                     char * rhost, int rhostlen,
                                     unsigned int * leaseduration)
 {
-	/*char ifname[IFNAMSIZ];*/
-	int proto = 0;
-	unsigned int timestamp;
-	time_t current_time;
+	const struct lease_entry * e;
 
-	if(desc && (desclen > 0))
-		desc[0] = '\0';
-	if(rhost && (rhostlen > 0))
-		rhost[0] = '\0';
-	if(get_redirect_rule_by_index(index, 0/*ifname*/, eport, iaddr, iaddrlen,
-	                              iport, &proto, desc, desclen,
-	                              rhost, rhostlen, &timestamp,
-	                              0, 0) < 0)
+	if(index < 0 || (e = lease_table_port_at((unsigned int)index)) == NULL)
 		return -1;
-	else
-	{
-		current_time = upnp_time();
-		*leaseduration = (timestamp > (unsigned int)current_time)
-		                 ? (timestamp - current_time)
-		                 : 0;
-		if(proto == IPPROTO_TCP)
-			memcpy(protocol, "TCP", 4);
-#ifdef IPPROTO_UDPLITE
-		else if(proto == IPPROTO_UDPLITE)
-			memcpy(protocol, "UDPLITE", 8);
-#endif /* IPPROTO_UDPLITE */
-		else
-			memcpy(protocol, "UDP", 4);
-		return 0;
-	}
+	*eport = e->eport;
+	/* protocol holds 8 bytes */
+	snprintf(protocol, 8, "%s", proto_itoa(e->proto));
+	row_infos(e, iport, iaddr, iaddrlen, desc, desclen, rhost, rhostlen,
+	          leaseduration);
+	return 0;
 }
 
 int
@@ -749,24 +743,7 @@ upnp_delete_redirection(const struct lease_entry * req)
 int
 upnp_get_portmapping_number_of_entries(void)
 {
-#if defined(USE_PF) || defined(USE_NFTABLES)
-	return get_redirect_rule_count(ext_if_name);
-#else
-	int n = 0, r = 0;
-	unsigned short eport, iport;
-	char protocol[8], iaddr[32], desc[64], rhost[32];
-	unsigned int leaseduration;
-	do {
-		protocol[0] = '\0'; iaddr[0] = '\0'; desc[0] = '\0';
-		r = upnp_get_redirection_infos_by_index(n, &eport, protocol, &iport,
-		                                        iaddr, sizeof(iaddr),
-		                                        desc, sizeof(desc),
-		                                        rhost, sizeof(rhost),
-		                                        &leaseduration);
-		n++;
-	} while(r==0);
-	return (n-1);
-#endif
+	return (int)lease_table_port_count();
 }
 
 /* functions used to remove unused rules
@@ -916,11 +893,29 @@ upnp_get_portmappings_in_range(unsigned short startport,
                                const char * protocol,
                                unsigned int * number)
 {
-	int proto;
-	proto = proto_atoi(protocol);
+	const struct lease_entry * e;
+	unsigned short * list = NULL, * tmp;
+	unsigned int alloc = 0;
+	int proto = proto_atoi(protocol);
+
 	if(!number)
 		return NULL;
-	return get_portmappings_in_range(startport, endport, proto, number);
+	*number = 0;
+	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e)) {
+		if(e->proto != proto || e->eport < startport || e->eport > endport)
+			continue;
+		if(*number >= alloc) {
+			alloc = alloc ? 2 * alloc : 16;
+			tmp = realloc(list, alloc * sizeof(*list));
+			if(tmp == NULL) {
+				syslog(LOG_ERR, "upnp_get_portmappings_in_range(): realloc failed");
+				break;
+			}
+			list = tmp;
+		}
+		list[(*number)++] = e->eport;
+	}
+	return list;
 }
 
 /* stuff for miniupnpdctl */
