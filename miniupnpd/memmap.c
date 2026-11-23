@@ -212,6 +212,26 @@ memmap_outgoing_expired(unsigned int now)
 	outgoing_table_expire(now);
 }
 
+struct lease_entry *
+memmap_find_map(int proto, int family, const struct in6_addr * eaddr,
+                unsigned short eport)
+{
+	struct lease_entry * e = lease_table_find_mapping(proto, family, eaddr, eport);
+	if(e == NULL && !IN6_IS_ADDR_UNSPECIFIED(eaddr))
+		e = lease_table_find_mapping(proto, family, &in6addr_any, eport);
+	return e;
+}
+
+struct lease_entry *
+memmap_eport_used_by_other(int family, const struct in6_addr * eaddr,
+                           unsigned short eport, const struct in6_addr * iaddr)
+{
+	struct lease_entry * e = lease_table_port_used_by_other(family, eaddr, eport, iaddr);
+	if(e == NULL && !IN6_IS_ADDR_UNSPECIFIED(eaddr))
+		e = lease_table_port_used_by_other(family, &in6addr_any, eport, iaddr);
+	return e;
+}
+
 int
 memmap_dump(const char * path)
 {

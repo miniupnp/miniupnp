@@ -363,6 +363,35 @@ test_stale(void)
 	lease_table_clear();
 }
 
+/* A lookup by the address the client is told finds the row of that address,
+ * else a reloaded row of :: on the port. A row of another WAN address is
+ * another mapping. */
+static void
+test_find(void)
+{
+	struct in6_addr h10 = addr("::ffff:192.0.2.10"), h11 = addr("::ffff:192.0.2.11");
+	struct in6_addr wan = addr("::ffff:198.51.100.1"), wan2 = addr("::ffff:198.51.100.2");
+	struct lease_entry * a, * b;
+
+	lease_table_clear();
+	a = row4(MAP_KIND_UPNP, 5000, "::ffff:192.0.2.10", 80);	/* reloaded: :: */
+	memmap_add(a);
+	b = row4(MAP_KIND_NATPMP, 6000, "::ffff:192.0.2.11", 81);
+	b->eaddr = wan2;
+	memmap_add(b);
+	assert(memmap_find_map(IPPROTO_TCP, AF_INET, &wan, 5000) == a);
+	assert(memmap_find_map(IPPROTO_TCP, AF_INET, &in6addr_any, 5000) == a);
+	assert(memmap_find_map(IPPROTO_UDP, AF_INET, &wan, 5000) == NULL);
+	assert(memmap_find_map(IPPROTO_TCP, AF_INET, &wan2, 6000) == b);
+	assert(memmap_find_map(IPPROTO_TCP, AF_INET, &wan, 6000) == NULL);
+	/* any protocol, another host */
+	assert(memmap_eport_used_by_other(AF_INET, &wan, 5000, &h11) == a);
+	assert(memmap_eport_used_by_other(AF_INET, &wan, 5000, &h10) == NULL);
+	assert(memmap_eport_used_by_other(AF_INET, &wan2, 6000, &h10) == b);
+	assert(memmap_eport_used_by_other(AF_INET, &wan, 6000, &h10) == NULL);
+	lease_table_clear();
+}
+
 /* PEER: bindings on the any address, peers removed one by one */
 static void
 test_outgoing(void)
@@ -442,6 +471,7 @@ main(void)
 	test_ipv6_no_filter();
 	test_ipv6_no_filter_and_pinhole();
 	test_stale();
+	test_find();
 	test_outgoing();
 	test_dump();
 	printf("testmemmap: OK\n");
