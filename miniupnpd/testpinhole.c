@@ -3,7 +3,7 @@
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
-/* unit test of upnppinhole.c, on a fake backend: the rules each request
+/* unit test of upnppinhole.c, on a fake fwsync: the rules each request
  * puts in the firewall, and the row it leaves in the lease table */
 #include <assert.h>
 #include <stdio.h>
@@ -17,8 +17,10 @@
 #include "config.h"
 #include "upnppinhole.h"
 #include "memmap.h"
+#include "fwsync.h"
+#include "upnpglobalvars.h"
 
-#if defined(ENABLE_UPNPPINHOLE) && (defined(USE_PF) || defined(USE_NETFILTER))
+#if defined(ENABLE_UPNPPINHOLE) && defined(FW_MAP6)
 
 /* what upnppinhole.c takes from the daemon */
 const char * ext_if_name6 = "wan0";
@@ -43,18 +45,18 @@ proto_itoa(int proto)
 	return proto == IPPROTO_TCP ? "TCP" : "UDP";
 }
 
-/* the fake backend: one rule per pinhole */
+int firewall_trust = FW_TRUST_CHECK;
+
+/* the fake fwsync: a map6 row has one rule per filter, and a row with no
+ * filter one rule of any remote */
 static struct rule {
 	int used;
-	unsigned short uid;
 	char rhost[INET6_ADDRSTRLEN];	/* "" : any host */
 	unsigned short rport;
 	char iaddr[INET6_ADDRSTRLEN];
 	unsigned short iport;
 	int proto;
-	unsigned int timestamp;
 } rules[8];
-static unsigned short next_uid = 1;
 
 static int
 rule_count(void)
@@ -65,107 +67,93 @@ rule_count(void)
 	return n;
 }
 
-static struct rule *
-rule_of_uid(unsigned short uid)
+/* the rule of filter i of e, or of any remote if e has no filter */
+static void
+rule_of(const struct lease_entry * e, int i, struct rule * r)
 {
-	int i;
-	for(i = 0; i < 8; i++)
-		if(rules[i].used && rules[i].uid == uid)
-			return &rules[i];
+	memset(r, 0, sizeof(*r));
+	if(e->nfilters > 0 && e->filters[i].prefix != 0)
+		inet_ntop(AF_INET6, &e->filters[i].raddr, r->rhost, sizeof(r->rhost));
+	r->rport = e->nfilters > 0 ? e->filters[i].rport : 0;
+	inet_ntop(AF_INET6, &e->iaddr, r->iaddr, sizeof(r->iaddr));
+	r->iport = e->iport;
+	r->proto = e->proto;
+}
+
+static struct rule *
+find_rule(const struct lease_entry * e, int i)
+{
+	struct rule k;
+	int j;
+
+	rule_of(e, i, &k);
+	for(j = 0; j < 8; j++) {
+		struct rule * r = &rules[j];
+		if(r->used && r->rport == k.rport && r->iport == k.iport &&
+		   r->proto == k.proto && strcmp(r->iaddr, k.iaddr) == 0 &&
+		   strcmp(r->rhost, k.rhost) == 0)
+			return r;
+	}
 	return NULL;
 }
 
-int
-find_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
-             const char * int_client, unsigned short int_port, int proto,
-             char * desc, int desc_len, unsigned int * timestamp)
+static int
+nrules(const struct lease_entry * e)
 {
-	int i;
-	(void)ifname;
-	for(i = 0; i < 8; i++) {
-		struct rule * r = &rules[i];
-		if(r->used && r->rport == rem_port && r->iport == int_port &&
-		   r->proto == proto && strcmp(r->iaddr, int_client) == 0 &&
-		   strcmp(r->rhost, rem_host ? rem_host : "") == 0) {
-			if(desc != NULL)
-				snprintf(desc, desc_len, "%s", "x");
-			if(timestamp != NULL)
-				*timestamp = r->timestamp;
-			return r->uid;
+	return e->nfilters > 0 ? e->nfilters : 1;
+}
+
+void
+fw_change_init(struct fw_change * c, enum fw_op op,
+               const struct lease_entry * row, const struct lease_entry * old)
+{
+	memset(c, 0, sizeof(*c));
+	c->op = op;
+	c->row = row;
+	c->old = old;
+}
+
+int
+fw_sync(struct fw_change * changes, int n)
+{
+	int i, j, k;
+
+	for(i = 0; i < n; i++) {
+		struct fw_change * c = &changes[i];
+		struct rule * r;
+		if(c->old != NULL && c->op != FW_ADD) {
+			for(j = 0; j < nrules(c->old); j++) {
+				if((r = find_rule(c->old, j)) != NULL)
+					r->used = 0;
+			}
 		}
+		if(c->row != NULL && c->op != FW_DELETE) {
+			for(j = 0; j < nrules(c->row); j++) {
+				if(find_rule(c->row, j) != NULL)
+					continue;
+				for(k = 0; k < 8 && rules[k].used; k++)
+					;
+				assert(k < 8);
+				rule_of(c->row, j, &rules[k]);
+				rules[k].used = 1;
+			}
+		}
+		c->applied = FW_APPLIED;
 	}
-	return -2;
-}
-
-int
-add_pinhole(const char * ifname, const char * rem_host, unsigned short rem_port,
-            const char * int_client, unsigned short int_port, int proto,
-            const char * desc, unsigned int timestamp)
-{
-	int i;
-	(void)ifname; (void)desc;
-	for(i = 0; i < 8 && rules[i].used; i++)
-		;
-	assert(i < 8);
-	rules[i].used = 1;
-	rules[i].uid = next_uid++;
-	snprintf(rules[i].rhost, sizeof(rules[i].rhost), "%s", rem_host ? rem_host : "");
-	rules[i].rport = rem_port;
-	snprintf(rules[i].iaddr, sizeof(rules[i].iaddr), "%s", int_client);
-	rules[i].iport = int_port;
-	rules[i].proto = proto;
-	rules[i].timestamp = timestamp;
-	return rules[i].uid;
-}
-
-int
-update_pinhole(unsigned short uid, unsigned int timestamp)
-{
-	struct rule * r = rule_of_uid(uid);
-	if(r == NULL)
-		return -1;
-	r->timestamp = timestamp;
 	return 0;
 }
 
 int
-delete_pinhole(unsigned short uid)
+fw_map6_rule(const struct lease_entry * e, int i)
 {
-	struct rule * r = rule_of_uid(uid);
-	if(r == NULL)
-		return -1;
-	r->used = 0;
-	return 0;
+	return find_rule(e, i) != NULL ? 0 : -2;
 }
 
 int
-get_pinhole_info(unsigned short uid, char * rem_host, int rem_hostlen,
-                 unsigned short * rem_port, char * int_client, int int_clientlen,
-                 unsigned short * int_port, int * proto, char * desc, int desclen,
-                 unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+fw_map6_packets(const struct lease_entry * e, int i, u_int64_t * packets)
 {
-	(void)uid; (void)rem_host; (void)rem_hostlen; (void)rem_port;
-	(void)int_client; (void)int_clientlen; (void)int_port; (void)proto;
-	(void)desc; (void)desclen; (void)timestamp; (void)packets; (void)bytes;
-	return -2;
-}
-
-int
-get_pinhole_uid_by_index(int index)
-{
-	(void)index;
-	return -1;
-}
-
-int
-clean_pinhole_list(unsigned int * next_timestamp,
-                   void (*expired)(int proto, const struct in6_addr * iaddr,
-                                   unsigned short iport,
-                                   const struct in6_addr * raddr,
-                                   unsigned short rport, unsigned short uid))
-{
-	(void)next_timestamp; (void)expired;
-	return 0;
+	*packets = 0;
+	return fw_map6_rule(e, i);
 }
 
 static struct in6_addr
@@ -209,19 +197,19 @@ test_pcp_no_filter(void)
 	assert(row == req && row->nfilters == 0 && lease_table_filter_count() == 0);
 	assert(rule_count() == 1 && rules[0].rhost[0] == '\0' && rules[0].rport == 0);
 	assert(strcmp(rules[0].iaddr, "2001:db8::10") == 0 && rules[0].iport == 4000);
-	/* the renewal of PCP: found by its key, renewed by the uid found */
+	/* the renewal of PCP: found by its key, which has no uid */
 	req = pcp_map("2001:db8::10", 4000, 3000);
 	uid = upnp_find_inboundpinhole(req, NULL);
-	assert(uid == rules[0].uid);
+	assert(uid == 0);
 	assert(upnp_update_inboundpinhole(req, (unsigned short)uid) == 0);
 	lease_table_free(req);
-	assert(rule_count() == 1 && rules[0].timestamp == 3000 && row->timestamp == 3000);
+	assert(rule_count() == 1 && row->timestamp == 3000);
 	assert(row->nfilters == 0);
 	/* the same request again through the add: the rule there is renewed */
 	req = pcp_map("2001:db8::10", 4000, 4000);
 	assert(upnp_add_inboundpinhole(req, NULL) == 1);
 	row = lease_table_find_entry(IPPROTO_UDP, AF_INET6, &i, 4000, 4000);
-	assert(rule_count() == 1 && rules[0].timestamp == 4000);
+	assert(rule_count() == 1);
 	assert(lease_table_count() == 1 && row->nfilters == 0 && row->timestamp == 4000);
 	/* the delete of PCP */
 	lease_entry_init(&del, MAP_KIND_PCP, NULL);

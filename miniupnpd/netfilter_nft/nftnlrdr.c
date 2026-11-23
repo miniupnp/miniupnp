@@ -290,14 +290,12 @@ int
 delete_filter_rule(const char * ifname, unsigned short port, int proto)
 {
 	rule_t *p;
-	struct nftnl_rule *r;
 	UNUSED(ifname);
 
 	refresh_nft_cache_filter();
 	LIST_FOREACH(p, &head_filter, entry) {
 		if (p->dport == port && p->proto == proto && p->type == RULE_FILTER) {
-			r = rule_del_handle(p);
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+			nft_delete_cached(p, &head_filter, RULE_CHAIN_FILTER);
 			break;
 		}
 	}
@@ -313,7 +311,6 @@ int
 delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 {
 	rule_t *p;
-	struct nftnl_rule *r;
 	UNUSED(ifname);
 
 	if (refresh_nft_cache_redirect() < 0)
@@ -321,8 +318,7 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 	LIST_FOREACH(p, &head_redirect, entry) {
 		if (p->dport == eport && p->proto == proto &&
 		    (p->type == RULE_NAT && p->nat_type == NFT_NAT_DNAT)) {
-			r = rule_del_handle(p);
-			return nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0 ? -1 : 0;
+			return nft_delete_cached(p, &head_redirect, RULE_CHAIN_REDIRECT) < 0 ? -1 : 0;
 		}
 	}
 	return -1;
@@ -337,7 +333,6 @@ int
 delete_redirect_and_filter_rules(unsigned short eport, int proto)
 {
 	rule_t *p;
-	struct nftnl_rule *r = NULL;
 	in_addr_t iaddr = 0;
 	uint16_t iport = 0;
 	int ret = 0;
@@ -358,9 +353,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 			syslog(LOG_DEBUG, "%s: found redirect rule %hu => %08x:%hu proto %d",
 			       "delete_redirect_and_filter_rules", eport, iaddr, iport, proto);
 
-			r = rule_del_handle(p);
-			/* Todo: send bulk request */
-			if (nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_REDIRECT) < 0)
+			if (nft_delete_cached(p, &head_redirect, RULE_CHAIN_REDIRECT) < 0)
 				ret = -1;
 			break;
 		}
@@ -377,9 +370,7 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 			    && p->type == RULE_FILTER) {
 				syslog(LOG_DEBUG, "%s: found forward/filter rule %08x:%hu proto %d",
 				       "delete_redirect_and_filter_rules", iaddr, iport, p->proto);
-				r = rule_del_handle(p);
-				/* Todo: send bulk request */
-				nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
+				nft_delete_cached(p, &head_filter, RULE_CHAIN_FILTER);
 				break;
 			}
 		}

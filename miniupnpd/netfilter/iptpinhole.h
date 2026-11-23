@@ -9,6 +9,7 @@
 
 #ifdef ENABLE_UPNPPINHOLE
 #include <sys/types.h>
+#include "../fwmap6.h"
 
 int find_pinhole(const char * ifname,
                  const char * rem_host, unsigned short rem_port,
@@ -36,13 +37,6 @@ get_pinhole_info(unsigned short uid,
 
 int get_pinhole_uid_by_index(int index);
 
-/* Remove the expired pinholes. expired, if not NULL, is called for each one
- * before it goes: its protocol, internal side, remote (:: : any) and uid. */
-int clean_pinhole_list(unsigned int * next_timestamp,
-                       void (*expired)(int proto, const struct in6_addr * iaddr,
-                                       unsigned short iport,
-                                       const struct in6_addr * raddr,
-                                       unsigned short rport, unsigned short uid));
 
 #endif /* ENABLE_UPNPPINHOLE */
 

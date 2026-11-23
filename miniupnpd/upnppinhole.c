@@ -27,6 +27,7 @@
 #include "upnpevents.h"
 #include "upnputils.h"
 #include "upnppinhole.h"
+#include "fwsync.h"
 #ifdef __APPLE__
 /* XXX - Apple version of PF API seems to differ from what
  * pf/pfpinhole.c expects so don't use that at least.. */
@@ -149,9 +150,14 @@ lease_file6_add(const char * rem_client,
 	return 0;
 }
 
+/* The new expiry of the map6 of req: every line of its internal endpoint,
+ * as all the filters of a map share its lease. Each line keeps its own
+ * UniqueID. */
 static int
-lease_file6_update(int uid, unsigned int leaseduration)
+lease_file6_update(const struct lease_entry * req)
 {
+	const unsigned int leaseduration = req->timestamp;
+	char req_client[INET6_ADDRSTRLEN];
 	FILE* fd, *fdt;
 	char * p, * p2;
 	unsigned short int_port, rem_port;
@@ -167,6 +173,8 @@ lease_file6_update(int uid, unsigned int leaseduration)
 	int tmp;
 
 	if (lease_file6 == NULL) return 0;
+	if (map_ntop(AF_INET6, &req->iaddr, req_client, sizeof(req_client)) == NULL)
+		return -1;
 
 	if (strlen(lease_file6) + 7 > sizeof(tmpfilename)) {
 		syslog(LOG_ERR, "Lease filename is too long");
@@ -250,13 +258,15 @@ lease_file6_update(int uid, unsigned int leaseduration)
 		*(desc++) = '\0';
 		timestamp_rule = (unsigned int)strtoul(p2, NULL, 10);
 
-		if (uid == uid_rule) {
+		if (int_port == req->iport && proto_atoi(proto) == req->proto &&
+		    strcmp(int_client, req_client) == 0) {
 			timestamp_rule = timestamp;
 		}
 
+		desc[strcspn(desc, "\r\n")] = '\0';
 		fprintf(fdt, "%s;%s;%hu;%s;%hu;%u;%u;%s\n",
 	        proto, int_client, int_port, rem_client, rem_port,
-	        uid, timestamp_rule, desc);
+	        uid_rule, timestamp_rule, desc);
 	}
 
 	fclose(fdt);
@@ -468,39 +478,21 @@ int lease_file6_expire(void)
 	return 0;
 }
 
-/* At startup the table is empty, but the pinhole of a lease file line may
- * have outlived the daemon. It gets a row first, with the owner its
- * description gives, so that upnp_add_inboundpinhole() updates it and adds no
- * second one. One firewall read per line, at startup only. */
+/* At startup the table is empty, but the rule of a lease file line may
+ * have outlived the daemon. It gets a row first, so that
+ * upnp_add_inboundpinhole() renews it and adds no second rule. One firewall
+ * read by key per line, at startup only. */
 static void
 reload_adopt_pinhole(const struct lease_entry * line)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	char iaddr[INET6_ADDRSTRLEN];
-	char raddr_buf[INET6_ADDRSTRLEN];
-	const char * raddr = map_rhost(line, raddr_buf, sizeof(raddr_buf));
-	char desc[64];
-	int uid;
+#ifdef FW_MAP6
 	struct lease_entry * e;
 
-	desc[0] = '\0';
-	map_ntop(AF_INET6, &line->iaddr, iaddr, sizeof(iaddr));
-	uid = find_pinhole(NULL, raddr, line->filters[0].rport, iaddr, line->iport,
-	                   line->proto, desc, sizeof(desc), NULL);
-	if(uid < 0)
+	if(fw_map6_rule(line, 0) != 0)
 		return;
-	e = lease_table_new(1);
+	e = lease_table_copy(line);
 	if(e == NULL)
 		return;
-	e->family = AF_INET6;
-	e->proto = line->proto;
-	e->iaddr = e->eaddr = line->iaddr;
-	e->iport = e->eport = line->iport;
-	e->filters[0] = line->filters[0];
-	e->filters[0].map = NULL;
-	e->filters[0].uid = (unsigned short)uid;
-	e->timestamp = line->timestamp;
-	lease_entry_from_desc(e, desc);
 	memmap_add(e);	/* the table takes e */
 #else
 	UNUSED(line);
@@ -524,7 +516,7 @@ int reload_from_lease_file6(void)
 	time_t current_time;
 	time_t current_unix_time;
 	char line[128];
-	int r, family;
+	int r, family, line_uid;
 	struct lease_entry * req;
 
 	if(!lease_file6) return -1;
@@ -583,6 +575,7 @@ int reload_from_lease_file6(void)
 			continue;
 		}
 		*(p2++) = '\0';
+		line_uid = atoi(p);	/* the UniqueID of the line */
 		desc = strchr(p2, ';');
 		if(!desc) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
@@ -641,6 +634,17 @@ int reload_from_lease_file6(void)
 		req->eport = int_port;
 		lease_entry_from_desc(req, desc);
 		req->timestamp = current_time + leaseduration;
+		/* a UPnP pinhole keeps the UniqueID of its line, so its client
+		 * can still renew and delete it, if no other has it. Else it
+		 * gets a new one now: an adopted row is renewed, which gives
+		 * none. */
+		if(req->kind == MAP_KIND_UPNP) {
+			if(line_uid > 0 && line_uid < 65535 &&
+			   lease_table_find_uid((unsigned short)line_uid) == NULL)
+				req->filters[0].uid = (unsigned short)line_uid;
+			else
+				req->filters[0].uid = lease_table_new_uid();
+		}
 		reload_adopt_pinhole(req);
 		r = upnp_add_inboundpinhole(req, NULL);
 		if(r == -1) {
@@ -682,44 +686,12 @@ upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** r
 	}
 	if(row != NULL)
 		*row = e;
-	if(f != NULL && f->uid != 0) {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-		/* a rule removed behind the daemon's back: its filter goes, as
-		 * upnp_check_map() does for a port mapping */
-		if(get_pinhole_info(f->uid, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0,
-		                    NULL, NULL, NULL) < 0) {
-			syslog(LOG_NOTICE, "pinhole %hu lost its rule, its filter goes", f->uid);
-			if(req->nfilters > 0)
-				req->filters[0].uid = f->uid;
-			memmap_delete_filter(req);
-			if(row != NULL)
-				*row = NULL;
-			return -2;
-		}
-#endif
-		if(req->nfilters > 0)
-			req->filters[0].uid = f->uid;
-		return f->uid;
-	}
-	{
-		/* A PCP map has no uid in the lease table: its rule has one,
-		 * which the backend finds by the key. */
-#if defined(USE_PF) || defined(USE_NETFILTER)
-		int uid;
-		char iaddr[INET6_ADDRSTRLEN];
-		char raddr_buf[INET6_ADDRSTRLEN];
-		const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
-
-		map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
-		uid = find_pinhole(NULL, raddr, r->rport, iaddr, req->iport,
-		                   req->proto, NULL, 0, NULL);
-		if(uid >= 0 && req->nfilters > 0)
-			req->filters[0].uid = (unsigned short)uid;
-		return uid;
-#else
-		return -42;
-#endif
-	}
+	/* the uid of a UPnP filter; a PCP map has none, 0 */
+	if(f == NULL)
+		return 0;
+	if(req->nfilters > 0)
+		req->filters[0].uid = f->uid;
+	return f->uid;
 }
 
 /* upnp_add_inboundpinhole()
@@ -730,52 +702,74 @@ upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** r
 int
 upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 {
-	int r, uid;
+	int r, i, uid;
+#ifdef ENABLE_LEASEFILE
 	char desc_buf[64];
 	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
 	char iaddr[INET6_ADDRSTRLEN];
 	char raddr_buf[INET6_ADDRSTRLEN];
 	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
 	const unsigned short rport = req->nfilters > 0 ? req->filters[0].rport : 0;
-	const unsigned short iport = req->iport;
-	const int proto = req->proto;
-	const unsigned int timestamp = req->timestamp;
-
-	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
-	r = 0;
+#endif
+	struct fw_change c;
 
 	uid = upnp_find_inboundpinhole(req, NULL);
 	if(uid >= 0) {
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, uid);
+		syslog(LOG_INFO, "pinhole to port %hu %s found uid=%d, renewing it",
+		       req->iport, proto_itoa(req->proto), uid);
 		r = upnp_update_inboundpinhole(req, (unsigned short)uid);
 		if (r < 0)
 			return r;
 #ifdef ENABLE_LEASEFILE
-		lease_file6_remove(iaddr, iport, proto, -1);
-		lease_file6_add(raddr, rport, iaddr, iport, proto, uid, desc, timestamp);
+		/* the line of the filter again: a reload, which unlinked the
+		 * file, renews the rows it adopted this way */
+		map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
+		if (uid != 0)
+			lease_file6_remove("*", 0, 0, uid);
+		else
+			lease_file6_remove(iaddr, req->iport, req->proto, -1);
+		lease_file6_add(raddr, rport, iaddr, req->iport, req->proto,
+		                uid, desc, req->timestamp);
 #endif /* ENABLE_LEASEFILE */
 		if (uid_out != NULL)
 			*uid_out = (unsigned short)uid;
 		memmap_update(req, req->iport);	/* the table takes req */
 		return 1;
 	}
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	uid = add_pinhole (ext_if_name6, raddr, rport,
-	                   iaddr, iport, proto, desc, timestamp);
-	if (uid < 0)
+#ifdef FW_MAP6
+	/* A UPnP filter gets its UniqueID from the table, which knows every
+	 * one in use. A PCP filter takes none, so PCP is not capped by them. */
+	for(i = 0; i < req->nfilters; i++) {
+		struct map_filter * f = &req->filters[i];
+		if(req->kind != MAP_KIND_UPNP) {
+			f->uid = 0;
+			continue;
+		}
+		if(f->uid == 0 || lease_table_find_uid(f->uid) != NULL)
+			f->uid = lease_table_new_uid();
+		if(f->uid == 0) {
+			syslog(LOG_WARNING, "every pinhole UniqueID is in use");
+			return -1;
+		}
+	}
+	fw_change_init(&c, FW_ADD, req, NULL);
+	if (fw_sync(&c, 1) < 0) {
+		if (c.applied != FW_NOT_APPLIED)
+			syslog(LOG_WARNING, "map6 port %hu: a part of its rules stays", req->iport);
 		return -1;
-	if (req->nfilters > 0)
-		req->filters[0].uid = (unsigned short)uid;
+	}
+	uid = req->nfilters > 0 ? req->filters[0].uid : 0;
 #ifdef ENABLE_LEASEFILE
-	lease_file6_remove(iaddr, iport, proto, -1);
-	lease_file6_add(raddr, rport, iaddr, iport, proto, uid, desc, timestamp);
+	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
+	lease_file6_add(raddr, rport, iaddr, req->iport, req->proto,
+	                uid, desc, req->timestamp);
 #endif /* ENABLE_LEASEFILE */
 	if (uid_out != NULL)
 		*uid_out = (unsigned short)uid;
 	memmap_add(req);	/* the table takes req */
 	return 1;
 #else
-	UNUSED(desc);
+	UNUSED(i); UNUSED(c);
 	return -42;	/* not implemented */
 #endif
 }
@@ -897,10 +891,9 @@ upnp_get_pinhole_info(unsigned short uid,
 	}
 	if(packets) {
 		/* the counter of the rule: only the firewall has it */
-#if defined(USE_PF) || defined(USE_NETFILTER)
+#ifdef FW_MAP6
 		u_int64_t packets_tmp;
-		if(get_pinhole_info(uid, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0,
-		                    NULL, &packets_tmp, NULL) < 0)
+		if(fw_map6_packets(e, (int)(f - e->filters), &packets_tmp) < 0)
 			return -1;
 		*packets = (unsigned int)packets_tmp;
 #else
@@ -911,31 +904,47 @@ upnp_get_pinhole_info(unsigned short uid,
 }
 
 int
-upnp_get_pinhole_uid_by_index(int index)
-{
-#if defined (USE_NETFILTER)
-	return get_pinhole_uid_by_index(index);
-#else
-	UNUSED(index);
-	return -42;
-#endif /* defined (USE_NETFILTER) */
-}
-
-int
 upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	const unsigned int timestamp = req->timestamp;
-	int ret;
+#ifdef FW_MAP6
+	const struct lease_entry * e = NULL;
+	const struct map_filter * f;
+	struct fw_change c;
+	int i;
 
-	ret = update_pinhole(uid, timestamp);
+	/* UpdatePinhole names the pinhole by its UniqueID alone; PCP by the
+	 * key of its filter */
+	if(uid != 0) {
+		f = lease_table_find_uid(uid);
+		if(f != NULL)
+			e = f->map;
+	} else if(upnp_find_inboundpinhole((struct lease_entry *)req, &e) < 0) {
+		e = NULL;
+	}
+	if(e == NULL)
+		return -1;
+	/* The rule holds no expiry: a renewal changes the table. Unless the
+	 * firewall is trusted, the rules are looked up by key first, and a
+	 * rule the firewall lost is added back, so its UniqueID stays. */
+	if(firewall_trust != FW_TRUST_TRUST) {
+		for(i = 0; i < e->nfilters; i++) {
+			if(fw_map6_rule(e, i) != -2)
+				continue;
+			syslog(LOG_NOTICE, "map6 port %hu %s lost its rules, adding them back",
+			       e->iport, proto_itoa(e->proto));
+			fw_change_init(&c, FW_DELETE, NULL, e);
+			fw_sync(&c, 1);	/* what is left of them */
+			fw_change_init(&c, FW_ADD, e, NULL);
+			if(fw_sync(&c, 1) < 0)
+				return -2;
+			break;
+		}
+	}
 #ifdef ENABLE_LEASEFILE
-	if (ret == 0)
-		lease_file6_update(uid, timestamp);
+	lease_file6_update(req);
 #endif
-	if (ret == 0)
-		memmap_renew(req);
-	return ret;
+	memmap_renew(req);
+	return 0;
 #else
 	UNUSED(req); UNUSED(uid);
 
@@ -946,9 +955,12 @@ upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 int
 upnp_delete_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 {
-#if defined(USE_PF) || defined(USE_NETFILTER)
+#ifdef FW_MAP6
+	struct fw_change c;
 	int ret;
-	ret = delete_pinhole(uid);
+
+	fw_change_init(&c, FW_DELETE, NULL, req);
+	ret = fw_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
 		lease_file6_remove((const char *)"*", 0, 0, uid);
@@ -1183,13 +1195,67 @@ upnp_check_pinhole_working(const char * uid,
 }
 #endif
 
+#ifdef FW_MAP6
+/* at most this many maps go in one pass, so a large expiry does not hold
+ * up the requests */
+#define MAP6_EXPIRE_MAX	64
+
+struct map6_expiry {
+	unsigned int now;
+	unsigned int next;	/* the next expiry, 0 : none */
+	struct lease_entry * due[MAP6_EXPIRE_MAX];
+	int n;
+};
+
+static void
+map6_due(struct lease_entry * e, void * arg)
+{
+	struct map6_expiry * x = arg;
+	unsigned int ts;
+
+	if(e->family != AF_INET6 || e->timestamp == 0)
+		return;
+	ts = e->retry > e->timestamp ? e->retry : e->timestamp;
+	if(ts > x->now || x->n >= MAP6_EXPIRE_MAX) {
+		if(x->next == 0 || ts < x->next)
+			x->next = ts > x->now ? ts : x->now + 1;
+		return;
+	}
+	x->due[x->n++] = e;
+}
+#endif
+
 int
 upnp_clean_expired_pinholes(unsigned int * next_timestamp)
 {
 	int ret = 0;
-#if defined(USE_PF) || defined(USE_NETFILTER)
-	/* each pinhole which goes leaves the lease table too */
-	ret = clean_pinhole_list(next_timestamp, memmap_pinhole_expired);
+#ifdef FW_MAP6
+	/* the expiry is the table's: the rules of a map due go */
+	struct map6_expiry x;
+	struct fw_change c;
+	struct lease_entry * e;
+	int i;
+
+	memset(&x, 0, sizeof(x));
+	x.now = (unsigned int)upnp_time();
+	lease_table_foreach(map6_due, &x);
+	for(i = 0; i < x.n; i++) {
+		e = x.due[i];
+		syslog(LOG_NOTICE, "remove map6 port %hu %s because it has expired",
+		       e->iport, proto_itoa(e->proto));
+		fw_change_init(&c, FW_DELETE, NULL, e);
+		if(fw_sync(&c, 1) < 0) {
+			/* a rule stays: so does the map, tried again later */
+			e->retry = x.now + 60;
+			if(x.next == 0 || e->retry < x.next)
+				x.next = e->retry;
+			continue;
+		}
+		memmap_delete(e->proto, AF_INET6, &e->iaddr, e->iport, e->eport);
+		ret++;
+	}
+	if(x.next != 0)
+		*next_timestamp = x.next;
 #else
 	UNUSED(next_timestamp);
 #endif

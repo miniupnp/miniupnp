@@ -9,9 +9,8 @@
  * update of a rule there was. memmap does not look in the table to decide
  * that.
  *
- * A row goes when its rule is deleted, also when the backend removes an
- * expired pinhole (memmap_pinhole_expired()). The table does not expire rows
- * itself.
+ * A row goes when its rule is deleted, also when an expired one is. The
+ * table does not expire rows itself.
  *
  * The protocols read the tables instead of the firewall: the find functions
  * here, and those of lease_table.h and outgoing_table.h for a plain lookup.
@@ -59,14 +58,6 @@ void memmap_delete(int proto, int family, const struct in6_addr * iaddr,
  * (UPnP), else that of its remote in the map of r's key. r with no filter
  * is the rule of any remote: it takes a map with no filter. */
 void memmap_delete_filter(const struct lease_entry * r);
-
-/* The backend removed the expired rule without translation of proto
- * iaddr:iport from raddr:rport (raddr :: : any remote), with the UniqueID
- * uid: its filter goes, and the map with its last one. The callback of
- * clean_pinhole_list(). */
-void memmap_pinhole_expired(int proto, const struct in6_addr * iaddr, unsigned short iport,
-                            const struct in6_addr * raddr, unsigned short rport,
-                            unsigned short uid);
 
 /* The firewall took b, a binding of outgoing_table_new(). It goes on the
  * list, or gives its peers to the binding of its key. The table takes b. A

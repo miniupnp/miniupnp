@@ -201,6 +201,31 @@ test_ipv6(void)
 
 /* the pinholes the backend expires: by the uid for UPnP, by the key and
  * remote for PCP, which has no uid in the table */
+/* the filter of a deleted rule without translation goes: memmap_delete_filter()
+ * of a request with that one filter */
+static void
+delete_filter(int proto, const struct in6_addr * iaddr, unsigned short iport,
+                       const struct in6_addr * raddr, unsigned short rport,
+                       unsigned short uid)
+{
+	struct lease_entry r;
+	struct map_filter f;
+
+	lease_entry_init(&r, 0, NULL);
+	r.family = AF_INET6;
+	r.proto = proto;
+	r.iaddr = r.eaddr = *iaddr;
+	r.iport = r.eport = iport;
+	memset(&f, 0, sizeof(f));
+	f.raddr = *raddr;
+	f.prefix = IN6_IS_ADDR_UNSPECIFIED(raddr) ? 0 : 128;
+	f.rport = rport;
+	f.uid = uid;
+	r.filters = &f;
+	r.nfilters = 1;
+	memmap_delete_filter(&r);
+}
+
 static void
 test_expired(void)
 {
@@ -217,12 +242,12 @@ test_expired(void)
 	p->filters[0].prefix = 0;
 	memmap_add(p);
 	assert(lease_table_count() == 2 && m->nfilters == 2);
-	memmap_pinhole_expired(IPPROTO_UDP, &i, 4000, &r1, 0, 5);
+	delete_filter(IPPROTO_UDP, &i, 4000, &r1, 0, 5);
 	assert(lease_table_count() == 2 && m->nfilters == 1 && lease_table_find_uid(5) == NULL);
 	/* PCP: the backend's uid is not in the table, the remote finds it */
-	memmap_pinhole_expired(IPPROTO_UDP, &j, 4100, &any, 0, 9);
+	delete_filter(IPPROTO_UDP, &j, 4100, &any, 0, 9);
 	assert(lease_table_count() == 1);
-	memmap_pinhole_expired(IPPROTO_UDP, &j, 4100, &any, 0, 9);	/* gone: nothing */
+	delete_filter(IPPROTO_UDP, &j, 4100, &any, 0, 9);	/* gone: nothing */
 	assert(lease_table_count() == 1);
 	lease_table_clear();
 }
@@ -244,12 +269,11 @@ map6_any(const char * iaddr, unsigned short iport, unsigned int timestamp)
 }
 
 /* An IPv6 map with no filter: one row of no filter, renewed by its key,
- * deleted by a request of no filter or of any remote, and expired by the
- * backend's any remote. */
+ * deleted by a request of no filter or of any remote. */
 static void
 test_ipv6_no_filter(void)
 {
-	struct in6_addr i = addr("2001:db8::30"), any = addr("::");
+	struct in6_addr i = addr("2001:db8::30");
 	struct lease_entry * p, req;
 	struct map_filter rf;
 
@@ -288,10 +312,6 @@ test_ipv6_no_filter(void)
 	req.filters = &rf;
 	req.nfilters = 1;
 	memmap_delete_filter(&req);
-	assert(lease_table_count() == 0);
-	/* the expiry by the backend */
-	memmap_add(map6_any("2001:db8::30", 4200, 100));
-	memmap_pinhole_expired(IPPROTO_UDP, &i, 4200, &any, 0, 9);
 	assert(lease_table_count() == 0);
 	lease_table_clear();
 }

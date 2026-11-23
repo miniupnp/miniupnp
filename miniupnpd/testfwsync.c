@@ -237,6 +237,59 @@ get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
 }
 #endif
 
+#ifdef FW_MAP6
+static int map6_adds, map6_deletes, fail_map6_add_at, map6_gone;
+
+int
+add_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
+              const char * int_client, unsigned short int_port,
+              int proto, const char * desc, unsigned int timestamp)
+{
+	(void)ifname; (void)rem_host; (void)rem_port; (void)int_client;
+	(void)int_port; (void)proto; (void)desc; (void)timestamp;
+	if(map6_adds + 1 == fail_map6_add_at)
+		return -1;
+	map6_adds++;
+	return 0;
+}
+
+int
+update_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
+                 const char * int_client, unsigned short int_port,
+                 int proto, const char * desc, unsigned int timestamp)
+{
+	(void)ifname; (void)rem_host; (void)rem_port; (void)int_client;
+	(void)int_port; (void)proto; (void)desc; (void)timestamp;
+	return 0;
+}
+
+/* the first map6_gone deletes find no rule (-2) */
+int
+delete_map6_rule(const char * rem_host, unsigned short rem_port,
+                 const char * int_client, unsigned short int_port, int proto)
+{
+	(void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
+	if(map6_gone > 0) {
+		map6_gone--;
+		return -2;
+	}
+	if(fail_delete)
+		return -1;
+	map6_deletes++;
+	return 0;
+}
+
+int
+get_map6_packets(const char * rem_host, unsigned short rem_port,
+                 const char * int_client, unsigned short int_port,
+                 int proto, u_int64_t * packets)
+{
+	(void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
+	*packets = 0;
+	return 0;
+}
+#endif
+
 static void
 reset(void)
 {
@@ -247,6 +300,9 @@ reset(void)
 	rule_present = 1;
 	adds = deletes = updates = 0;
 	last_update_iport = 0;
+#ifdef FW_MAP6
+	map6_adds = map6_deletes = fail_map6_add_at = map6_gone = 0;
+#endif
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 	peer_adds = 0;
 	fail_peer_add = 0;
@@ -503,6 +559,62 @@ test_each_map_counters(void)
 	CHECK(n == FAKE_RULES);
 }
 
+#ifdef FW_MAP6
+#define MAP6_FILTERS	300	/* a PCP MAP can carry hundreds of FILTER options */
+
+/* an IPv6 map [2001:db8::10]:5000 with n filters, one per remote */
+static void
+map6(struct lease_entry * e, struct map_filter * f, int n)
+{
+	char a[64];
+	int i, family;
+
+	lease_entry_init(e, MAP_KIND_PCP, NULL);
+	e->family = AF_INET6;
+	e->proto = IPPROTO_UDP;
+	map_pton("2001:db8::10", &family, &e->iaddr);
+	e->eaddr = e->iaddr;
+	e->iport = e->eport = 5000;
+	for(i = 0; i < n; i++) {
+		memset(&f[i], 0, sizeof(f[i]));
+		snprintf(a, sizeof(a), "2001:db8:1::%x", i + 1);
+		map_pton(a, &family, &f[i].raddr);
+		f[i].prefix = 128;
+	}
+	e->filters = f;
+	e->nfilters = n;
+}
+
+/* The rules of every filter go in one change, all or nothing; a delete
+ * counts a rule which is gone already as deleted. */
+static void
+test_map6_filters(void)
+{
+	static struct map_filter f[MAP6_FILTERS];
+	struct lease_entry e;
+	struct fw_change c;
+
+	reset();
+	map6(&e, f, MAP6_FILTERS);
+	fw_change_init(&c, FW_ADD, &e, NULL);
+	CHECK(fw_sync(&c, 1) == 0);
+	CHECK(map6_adds == MAP6_FILTERS);
+
+	reset();
+	fw_change_init(&c, FW_ADD, &e, NULL);
+	fail_map6_add_at = MAP6_FILTERS;	/* the last one */
+	CHECK(fw_sync(&c, 1) < 0);
+	CHECK(c.applied == FW_NOT_APPLIED);
+	CHECK(map6_deletes == MAP6_FILTERS - 1);
+
+	reset();
+	fw_change_init(&c, FW_DELETE, NULL, &e);
+	map6_gone = 10;
+	CHECK(fw_sync(&c, 1) == 0);
+	CHECK(map6_deletes == MAP6_FILTERS - 10);
+}
+#endif
+
 int
 main(void)
 {
@@ -514,6 +626,9 @@ main(void)
 	test_delete_lost_rule();
 	test_delete_taken_back();
 	test_each_map_counters();
+#ifdef FW_MAP6
+	test_map6_filters();
+#endif
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 	test_peer();
 	test_peer_taken_back();

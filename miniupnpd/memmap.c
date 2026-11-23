@@ -163,29 +163,6 @@ memmap_delete_filter(const struct lease_entry * r)
 }
 
 void
-memmap_pinhole_expired(int proto, const struct in6_addr * iaddr, unsigned short iport,
-                       const struct in6_addr * raddr, unsigned short rport,
-                       unsigned short uid)
-{
-	struct lease_entry r;
-	struct map_filter f;
-
-	lease_entry_init(&r, 0, NULL);
-	r.family = AF_INET6;
-	r.proto = proto;
-	r.iaddr = r.eaddr = *iaddr;
-	r.iport = r.eport = iport;
-	memset(&f, 0, sizeof(f));
-	f.raddr = *raddr;
-	f.prefix = IN6_IS_ADDR_UNSPECIFIED(raddr) ? 0 : 128;
-	f.rport = rport;
-	f.uid = uid;
-	r.filters = &f;
-	r.nfilters = 1;
-	memmap_delete_filter(&r);
-}
-
-void
 memmap_link_outgoing(struct outgoing_entry * b)
 {
 	if(!b->row)

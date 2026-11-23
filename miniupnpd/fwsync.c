@@ -31,6 +31,9 @@
 #if defined(USE_IPFW)
 #include "ipfw/ipfwrdr.h"
 #endif
+#ifdef FW_MAP6
+#include "fwmap6.h"
+#endif
 
 /* a row as the arguments of the backend functions */
 struct fw_rule {
@@ -115,6 +118,118 @@ map_rule_present(const struct lease_entry * e)
 	return r == 0 ? 1 : r == -2 ? 0 : -1;
 }
 
+#ifdef FW_MAP6
+/* The key of the rule of filter i of the IPv6 map e, as the arguments of
+ * the map6 functions. An IPv6 map has one rule per filter, and a map with
+ * no filter one rule of any remote. */
+struct map6_rule {
+	char iaddr[INET6_ADDRSTRLEN];
+	char raddr[INET6_ADDRSTRLEN];
+	const char * rhost;	/* NULL : any remote */
+	unsigned short rport;
+};
+
+static void
+map6_rule_of(const struct lease_entry * e, int i, struct map6_rule * r)
+{
+	static const struct map_filter any_remote;
+	const struct map_filter * f = e->nfilters > 0 ? &e->filters[i] : &any_remote;
+
+	if(map_ntop(AF_INET6, &e->iaddr, r->iaddr, sizeof(r->iaddr)) == NULL)
+		r->iaddr[0] = '\0';
+	r->rhost = NULL;
+	if(f->prefix != 0 &&
+	   map_ntop(AF_INET6, &f->raddr, r->raddr, sizeof(r->raddr)) != NULL)
+		r->rhost = r->raddr;
+	r->rport = f->rport;
+}
+
+/* the number of rules of the IPv6 map e */
+static int
+map6_rules(const struct lease_entry * e)
+{
+	return e->nfilters > 0 ? e->nfilters : 1;
+}
+
+/* Delete the rule of filter i of e. 0 also when the firewall has no such
+ * rule: it went without the daemon. */
+static int
+delete_map6_filter(const struct lease_entry * e, int i)
+{
+	struct map6_rule r;
+	int ret;
+
+	map6_rule_of(e, i, &r);
+	ret = delete_map6_rule(r.rhost, r.rport, r.iaddr, e->iport, e->proto);
+	return ret == -2 ? 0 : ret;
+}
+
+/* Delete the rules of every filter of the IPv6 map e. A rule which is gone
+ * already counts as deleted, so a retry after a part failed finishes the
+ * others. 0, or the first error. */
+static int
+delete_map6_rules(const struct lease_entry * e)
+{
+	int i, r, ret = 0;
+
+	for(i = 0; i < map6_rules(e); i++) {
+		r = delete_map6_filter(e, i);
+		if(r < 0 && ret == 0)
+			ret = r;
+	}
+	return ret;
+}
+
+/* Add the rules of every filter of the IPv6 map e, one per filter, which
+ * may be hundreds for a PCP MAP with FILTER options. When one fails, the
+ * rules before it go again: *half is set if one of them stays. */
+static int
+add_map6_rules(const struct lease_entry * e, int * half)
+{
+	char desc[64];
+	struct map6_rule r;
+	int i, j;
+
+	map_rule_desc(e, desc, sizeof(desc));
+	for(i = 0; i < map6_rules(e); i++) {
+		map6_rule_of(e, i, &r);
+		if(add_map6_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, e->iport,
+		                 e->proto, desc, e->timestamp) < 0)
+			break;
+	}
+	if(i == map6_rules(e))
+		return 0;
+	syslog(LOG_WARNING, "map6 [%s]:%hu: the rule of filter %d of %d failed",
+	       r.iaddr, e->iport, i + 1, map6_rules(e));
+	for(j = 0; j < i; j++) {
+		if(delete_map6_filter(e, j) < 0)
+			*half = 1;
+	}
+	return -1;
+}
+
+int
+fw_map6_rule(const struct lease_entry * e, int i)
+{
+	struct map6_rule r;
+	u_int64_t packets;
+	int ret;
+
+	map6_rule_of(e, i, &r);
+	ret = get_map6_packets(r.rhost, r.rport, r.iaddr, e->iport, e->proto, &packets);
+	return ret == 0 ? 0 : ret == -2 ? -2 : -1;
+}
+
+int
+fw_map6_packets(const struct lease_entry * e, int i, u_int64_t * packets)
+{
+	struct map6_rule r;
+
+	map6_rule_of(e, i, &r);
+	return get_map6_packets(r.rhost, r.rport, r.iaddr, e->iport, e->proto, packets);
+}
+#endif /* FW_MAP6 */
+
 /* Delete the rules of a row. The result of the backend, or 0 if the backend
  * failed on a rule which it does not have: then the row can go. A firewall
  * which cannot be read is not taken for one without the rule: the row
@@ -126,8 +241,13 @@ delete_rules(const struct lease_entry * e)
 {
 	int r;
 
-	if(e->family != AF_INET)
+	if(e->family == AF_INET6) {
+#ifdef FW_MAP6
+		return delete_map6_rules(e);
+#else
 		return -1;
+#endif
+	}
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(e->eport, e->proto);
 #elif defined(USE_PF)
@@ -153,8 +273,14 @@ add_rules(const struct lease_entry * e, int * half, int fresh)
 {
 	struct fw_rule r;
 
-	if(e->family != AF_INET)
+	if(e->family == AF_INET6) {
+#ifdef FW_MAP6
+		UNUSED(fresh);
+		return add_map6_rules(e, half);
+#else
 		return -1;
+#endif
+	}
 	rule_of(e, &r);
 	if(add_redirect_rule2(ext_if_name, r.rhost, r.eport, r.iaddr, r.iport, r.proto,
 	                      r.desc, r.timestamp) < 0) {
@@ -187,8 +313,9 @@ update_rules(const struct lease_entry * from, const struct lease_entry * to)
 {
 	struct fw_rule r;
 
-	if(to->family != AF_INET)
-		return -1;
+	/* a map6 rule holds no expiry nor description: the table has them */
+	if(to->family == AF_INET6)
+		return 0;
 	rule_of(to, &r);
 	if(from->iport != to->iport)
 		return update_portmapping(ext_if_name, r.eport, r.proto, r.iport, r.desc,

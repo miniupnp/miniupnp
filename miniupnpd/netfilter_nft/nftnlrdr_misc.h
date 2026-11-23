@@ -86,6 +86,14 @@ typedef struct rule_t {
 
 LIST_HEAD(rule_list, rule_t);
 extern struct rule_list head_filter;
+
+/* The map6 rules: their list, read if needed, or NULL if the chain could
+ * not be read (a commit of another program can cut a read short); a number
+ * which changes whenever it does; and the delete of one of them, as
+ * nft_delete_cached() */
+struct rule_list * nft_map6_rules(void);
+uint32_t nft_map6_cache_epoch(void);
+int nft_map6_delete(rule_t * p);
 extern struct rule_list head_redirect;
 extern struct rule_list head_peer;
 
@@ -116,6 +124,8 @@ nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type)
 int
 nft_send_rules(struct nftnl_rule ** rules, int n, uint16_t cmd,
                enum rule_chain_type type);
+int
+nft_delete_cached(rule_t * p, struct rule_list * head, enum rule_chain_type type);
 struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,

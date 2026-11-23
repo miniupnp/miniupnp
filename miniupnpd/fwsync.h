@@ -20,6 +20,13 @@
 #include "config.h"
 #include "mapreq.h"
 
+/* the firewalls which have map6 rules (IPv6 maps, UPnP pinholes), found by
+ * their key */
+#if defined(ENABLE_UPNPPINHOLE) && \
+    (defined(USE_NETFILTER) || (defined(USE_PF) && !defined(__APPLE__)))
+#define FW_MAP6
+#endif
+
 enum fw_op {
 	FW_ADD,		/* add the rules of row */
 	FW_UPDATE,	/* change the rules of old into those of row */
@@ -84,6 +91,16 @@ int fw_sync_out(struct fw_out_change * changes, int n);
  * firewall has no such rule, or -1 if the firewall could not be read.
  * packets and bytes may be NULL. */
 int fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes);
+
+#ifdef FW_MAP6
+/* The rule of filter i of the IPv6 map e: 0, -2 if the firewall has no such
+ * rule, or -1 if it could not be read. */
+int fw_map6_rule(const struct lease_entry * e, int i);
+
+/* The packet counter of the rule of filter i of the IPv6 map e: 0, -2 if
+ * there is no such rule, or < 0. */
+int fw_map6_packets(const struct lease_entry * e, int i, u_int64_t * packets);
+#endif
 
 /* fn(eport, proto, packets, bytes, arg) for each IPv4 redirect rule of the
  * firewall, in one pass over the rules where the firewall can: the packet

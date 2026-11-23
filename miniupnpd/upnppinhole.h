@@ -69,15 +69,9 @@ upnp_get_pinhole_info(unsigned short uid,
                       unsigned int * leasetime,
                       unsigned int * packets);
 
-/*
- * return values:
- * -1 = not found
- * 0 .. 65535 = uid of the rule for the index
- */
-int
-upnp_get_pinhole_uid_by_index(int index);
-
-/* renew the pinhole uid of req to req->timestamp */
+/* renew the map6 of req to req->timestamp: the map of uid, or with uid 0
+ * the map of its key. 0, -1 if there is none, -2 if its rules were lost
+ * and could not be added back */
 int
 upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid);
 
