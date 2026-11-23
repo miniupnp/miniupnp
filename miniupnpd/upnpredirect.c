@@ -618,19 +618,11 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
 	return -1;
 }
 
-/* called from natpmp.c too */
 int
 _upnp_delete_redir(unsigned short eport, int proto)
 {
-	int r, family = 0, known;
-	char iaddr_s[INET6_ADDRSTRLEN];
-	unsigned short iport;
-	struct in6_addr iaddr;
+	int r;
 
-	/* the internal side of the rule: the key of its row in the lease table */
-	known = get_redirect_rule(ext_if_name, eport, proto, iaddr_s, sizeof(iaddr_s), &iport,
-	                          0, 0, 0, 0, NULL, 0, 0) == 0 &&
-	        map_pton(iaddr_s, &family, &iaddr) == 0;
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(eport, proto);
 #elif defined(USE_PF)
@@ -642,13 +634,31 @@ _upnp_delete_redir(unsigned short eport, int proto)
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
-	if(r >= 0 && known)
-		memmap_delete(proto, family, &iaddr, iport, eport);
 
 #ifdef ENABLE_EVENTS
 	upnp_event_var_change_notify(EWanIPC);
 #endif
 	return r;
+}
+
+int
+upnp_delete_map(struct lease_entry * e)
+{
+	int r = _upnp_delete_redir(e->eport, e->proto);
+	if(r >= 0)
+		memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
+	return r;
+}
+
+int
+upnp_delete_port(unsigned short eport, int proto)
+{
+	struct lease_entry * e;
+
+	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e))
+		if(e->eport == eport && e->proto == proto)
+			return upnp_delete_map(e);
+	return -1;
 }
 
 /* called from natpmp.c and pcpserver.c */
@@ -679,9 +689,14 @@ upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr)
 int
 upnp_delete_redirection(const struct lease_entry * req)
 {
+	struct lease_entry * e = memmap_find_map(req->proto, req->family, &req->eaddr,
+	                                         req->eport);
+
+	if(e == NULL)
+		return -1;
 	syslog(LOG_INFO, "removing redirect rule port %hu %s", req->eport,
 	       proto_itoa(req->proto));
-	return _upnp_delete_redir(req->eport, req->proto);
+	return upnp_delete_map(e);
 }
 
 /* upnp_get_portmapping_number_of_entries() */
@@ -786,7 +801,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 		{
 			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
 			       tmp->eport, proto_itoa(tmp->proto));
-			_upnp_delete_redir(tmp->eport, tmp->proto);
+			upnp_delete_port(tmp->eport, tmp->proto);
 			*p = tmp->next;
 			free(tmp);
 			i--;
@@ -834,7 +849,7 @@ remove_unused_rules(struct rule_state * list)
 				       "%" PRIu64 "packets %" PRIu64 "bytes",
 				       list->eport, proto_itoa(list->proto),
 				       packets, bytes);
-				_upnp_delete_redir(list->eport, list->proto);
+				upnp_delete_port(list->eport, list->proto);
 				n++;
 			}
 		}

@@ -239,18 +239,40 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 	return n;
 }
 
+/* The public address the sender is told, as a request keeps it: :: if
+ * there is none. */
+static void natpmp_ext_addr(const struct sockaddr_in * senderaddr,
+                            struct in6_addr * eaddr)
+{
+	unsigned char pub[12];
+	struct in_addr ext;
+
+	memset(pub, 0, sizeof(pub));
+	FillPublicAddressResponse(pub, senderaddr->sin_addr.s_addr);
+	memcpy(&ext, pub + 8, sizeof(ext));
+	if(pub[3] == 0 && ext.s_addr != 0)
+		map_addr_v4(eaddr, &ext);
+	else if(getifaddr_in6(ext_if_name, AF_INET, eaddr) < 0)
+		/* None told (a private WAN address): the rows go by the address
+		 * of the interface, as for PCP, so all the protocols see one
+		 * port. */
+		memset(eaddr, 0, sizeof(*eaddr));
+}
+
 /* Fill mreq, an empty entry (a row of lease_table_new(), or a request of
  * lease_entry_init()), as a NAT-PMP mapping: the internal client is the
- * sender (RFC 6886 section 3.3). The caller sets the external address of a
- * row it adds, the one the client is told. */
+ * sender (RFC 6886 section 3.3), on the external address eaddr it is
+ * told. */
 static void natpmp_request(struct lease_entry * mreq,
-                           const struct sockaddr_in * senderaddr, int proto,
+                           const struct sockaddr_in * senderaddr,
+                           const struct in6_addr * eaddr, int proto,
                            unsigned short iport, unsigned short eport)
 {
 	lease_entry_set_kind(mreq, MAP_KIND_NATPMP, NULL);
 	mreq->family = AF_INET;
 	mreq->proto = proto;
 	map_addr_v4(&mreq->iaddr, &senderaddr->sin_addr);
+	mreq->eaddr = *eaddr;
 	mreq->iport = iport;
 	mreq->eport = eport;
 }
@@ -320,7 +342,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			unsigned short iport_old;
 			unsigned int timestamp;
 			char desc[64];
+			struct in6_addr eaddr;	/* the address the client is told */
 
+			natpmp_ext_addr(senderaddr, &eaddr);
 			iport = READNU16(req+4);
 			eport = READNU16(req+6);
 			lifetime = READNU32(req+8);
@@ -359,7 +383,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						 * using the requested protocol (RFC 6886 section 3.4) */
 						if((proto == proto2) && ((iport == 0) || (iport == iport2))) {
 							lease_entry_init(&mreq, 0, NULL);
-							natpmp_request(&mreq, senderaddr, proto2, iport2, eport2);
+							natpmp_request(&mreq, senderaddr, &eaddr, proto2, iport2, eport2);
 							r = upnp_delete_redirection(&mreq);
 							if(r < 0) {
 								syslog(LOG_ERR, "Failed to remove NAT-PMP mapping eport %hu, protocol %s",
@@ -426,7 +450,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						break;
 					}
 					lease_entry_init(&mreq, 0, NULL);
-					natpmp_request(&mreq, senderaddr, proto, iport, eport);
+					natpmp_request(&mreq, senderaddr, &eaddr, proto, iport, eport);
 					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, &mreq)) {
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
@@ -469,7 +493,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
 							/* remove and then add again */
 							lease_entry_init(&mreq, 0, NULL);
-							natpmp_request(&mreq, senderaddr, proto, iport, eport);
+							natpmp_request(&mreq, senderaddr, &eaddr, proto, iport, eport);
 							if(upnp_delete_redirection(&mreq) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");
 								break;
@@ -488,20 +512,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						resp[3] = 3;  /* Failure */
 						break;
 					}
-					natpmp_request(row, senderaddr, proto, iport, eport);
+					natpmp_request(row, senderaddr, &eaddr, proto, iport, eport);
 					row->timestamp = timestamp;
-					{
-						/* the external address the client is told: the
-						 * row keeps it */
-						unsigned char pub[12];
-						struct in_addr ext;
-						memset(pub, 0, sizeof(pub));
-						FillPublicAddressResponse(pub, senderaddr->sin_addr.s_addr);
-						if(pub[3] == 0) {
-							memcpy(&ext, pub + 8, sizeof(ext));
-							map_addr_v4(&row->eaddr, &ext);
-						}
-					}
 					if(upnp_redirect_internal(row) < 0) {
 						/* on success the lease table took it */
 						lease_table_free(row);

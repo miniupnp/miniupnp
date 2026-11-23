@@ -114,15 +114,27 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
                                      unsigned int * leaseduration);
 
 /*! \brief delete the port mapping a client asks to delete
- * \param[in] req the request: the mapping is found by eport and proto
- * \return 0 on success, -1 on failure*/
+ * \param[in] req the request: the mapping is found in the lease table by
+ *            proto, family, eaddr and eport (memmap_find_map())
+ * \return 0 on success, -1 on failure or if there is no such mapping */
 int
 upnp_delete_redirection(const struct lease_entry * req);
 
-/*! \brief delete a port mapping based on (external port, protocol).
- *
- * For the daemon's own deletes, which no client asked for: expiry,
- * unused rules, the Tomato delete file, PCP PEER.
+/*! \brief delete the mapping of a row of the lease table: its rules, then
+ * the row, if the firewall deleted them. e is no longer valid then.
+ * \return 0 on success, -1 on failure */
+int
+upnp_delete_map(struct lease_entry * e);
+
+/*! \brief delete the IPv4 port mapping of proto on eport, on any external
+ * address: for a caller which knows the port only, as the Tomato delete
+ * file. \return 0 on success, -1 on failure or if there is none */
+int
+upnp_delete_port(unsigned short eport, int proto);
+
+/*! \brief delete the rules of (external port, protocol) and their lease
+ * file line, and nothing in the lease table: the firewall part of
+ * upnp_delete_map(), and the delete of a PCP PEER, which has no row there.
  * \param[in] eport external port
  * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
  * \return 0 on success, -1 on failure*/
