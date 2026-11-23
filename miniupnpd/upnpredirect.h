@@ -171,9 +171,16 @@ struct rule_state
 	unsigned char to_remove;
 };
 
-/* return a linked list of all rules
- * or an empty list if there are not enough
- * As a "side effect", delete rules which are expired */
+/* Remove the expired port mappings, and the expired PEER peers, from the
+ * firewall and the tables, and set nextruletoclean_timestamp to the next
+ * expiry, 0 : none. */
+void
+upnp_expire_mappings(void);
+
+/* Expire the mappings, then return a linked list of the UPnP port
+ * mappings with their counters, or NULL if there are not more than
+ * max_rules_number_target mappings. PCP and NAT-PMP mappings are not
+ * listed: they last the lifetime their client asked for. */
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target);
 
