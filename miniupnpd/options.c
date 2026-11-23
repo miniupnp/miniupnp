@@ -95,6 +95,7 @@ static const struct {
 #ifdef PF_ENABLE_FILTER_RULES
 	{ UPNPQUICKRULES, "quickrules" },
 #endif
+	{ UPNPTABLEDUMPFILE, "table_dump_file"},
 #ifdef ENABLE_LEASEFILE
 	{ UPNPLEASEFILE, "lease_file"},
 #ifdef ENABLE_UPNPPINHOLE
