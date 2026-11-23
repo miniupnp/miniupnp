@@ -557,6 +557,14 @@ upnp_renew_map(struct lease_entry * req, struct lease_entry * old)
 {
 	const unsigned short iport_old = old->iport;
 
+	if(disable_port_forwarding) {
+		/* no port forwarding now: the mapping goes and the renewal
+		 * fails, as a new one would */
+		syslog(LOG_INFO, "port forwarding is off, removing port mapping %hu %s",
+		       old->eport, proto_itoa(old->proto));
+		upnp_delete_map(old);
+		return -1;
+	}
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(req->eport, req->proto);
 	lease_file_add_row(req);

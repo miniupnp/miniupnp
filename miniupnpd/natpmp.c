@@ -483,9 +483,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					}
 					natpmp_request(row, senderaddr, &eaddr, proto, iport, eport);
 					row->timestamp = timestamp;
-					if(old != NULL)
-						upnp_renew_map(row, old);	/* the table takes row */
-					else if(upnp_redirect_internal(row) < 0) {
+					if((old != NULL ? upnp_renew_map(row, old)
+					                : upnp_redirect_internal(row)) < 0) {
 						/* on success the lease table took it */
 						lease_table_free(row);
 						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu",

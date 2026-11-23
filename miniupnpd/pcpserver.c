@@ -1116,9 +1116,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	row->eaddr = *pcp_msg_info->ext_ip;
 	row->eport = pcp_msg_info->ext_port;
 	row->timestamp = timestamp;
-	if (old != NULL)
-		return upnp_renew_map(row, old) == 0 ? PCP_SUCCESS : PCP_ERR_NO_RESOURCES;
-	r = upnp_redirect_internal(row);
+	r = old != NULL ? upnp_renew_map(row, old) : upnp_redirect_internal(row);
 	if (r < 0) {
 		lease_table_free(row);	/* on success the lease table took it */
 		return PCP_ERR_NO_RESOURCES;

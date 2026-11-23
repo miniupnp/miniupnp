@@ -51,9 +51,11 @@ upnp_redirect_internal(struct lease_entry * req);
 /*! \brief renew the mapping old with the values of req: the same rule, as
  * req has the internal endpoint of old. The firewall holds nothing which a
  * renewal changes, so only the table and the lease file change.
- * \param[in] req a row of lease_table_new(), which the table takes
+ * While port forwarding is off, the mapping goes and the renewal fails.
+ * \param[in] req a row of lease_table_new(), which the table takes on
+ *            success
  * \param[in] old the row of the mapping, found by the caller
- * \return 0
+ * \return 0, or -1 if port forwarding is off
  */
 int
 upnp_renew_map(struct lease_entry * req, struct lease_entry * old);
