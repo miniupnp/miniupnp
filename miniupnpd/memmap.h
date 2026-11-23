@@ -105,6 +105,15 @@ struct lease_entry *
 memmap_next_client_map(const struct lease_entry * prev, int proto, int family,
                        const struct in6_addr * iaddr, unsigned short iport);
 
+/* The PEER binding of proto from iaddr:iport which has the peer
+ * raddr:rport, on any external address and port, or NULL. raddr NULL: the
+ * binding of iaddr:iport with any peer. A PEER is known by its internal
+ * side and its peer: the external port is the daemon's. */
+struct outgoing_entry *
+memmap_find_peer(int proto, int family, const struct in6_addr * iaddr,
+                 unsigned short iport, const struct in6_addr * raddr,
+                 unsigned short rport);
+
 /* For debugging: write the lease table and the outgoing table to path as
  * text. 0, or -1 if the file could not be written. */
 int memmap_dump(const char * path);

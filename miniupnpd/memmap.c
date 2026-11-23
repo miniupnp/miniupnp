@@ -247,6 +247,21 @@ memmap_next_client_map(const struct lease_entry * prev, int proto, int family,
 	return NULL;
 }
 
+struct outgoing_entry *
+memmap_find_peer(int proto, int family, const struct in6_addr * iaddr,
+                 unsigned short iport, const struct in6_addr * raddr,
+                 unsigned short rport)
+{
+	struct outgoing_entry * b;
+
+	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b))
+		if(b->proto == proto && b->family == family && b->iport == iport &&
+		   memcmp(&b->iaddr, iaddr, sizeof(*iaddr)) == 0 &&
+		   (raddr == NULL || outgoing_table_find_peer(b, raddr, rport) != NULL))
+			return b;
+	return NULL;
+}
+
 int
 memmap_dump(const char * path)
 {

@@ -428,6 +428,7 @@ test_outgoing(void)
 {
 	struct outgoing_entry * b, key;
 	struct in6_addr p1 = addr("::ffff:203.0.113.1"), p2 = addr("::ffff:203.0.113.2");
+	struct in6_addr h10 = addr("::ffff:192.0.2.10");
 	int i;
 
 	outgoing_table_clear();
@@ -445,6 +446,15 @@ test_outgoing(void)
 		memmap_link_outgoing(b);
 	}
 	assert(outgoing_table_count() == 1 && outgoing_table_peer_count() == 2);
+	/* found by its internal side and peer, on any external port */
+	b = memmap_find_peer(IPPROTO_UDP, AF_INET, &h10, 5000, &p2, 80);
+	assert(b != NULL && b->eport == 6000);
+	assert(memmap_find_peer(IPPROTO_UDP, AF_INET, &h10, 5000, &p2, 81) == NULL);
+	assert(memmap_find_peer(IPPROTO_TCP, AF_INET, &h10, 5000, &p2, 80) == NULL);
+	assert(memmap_find_peer(IPPROTO_UDP, AF_INET, &h10, 5001, &p1, 80) == NULL);
+	/* raddr NULL: the binding of the internal side, any peer */
+	assert(memmap_find_peer(IPPROTO_UDP, AF_INET, &h10, 5000, NULL, 0) == b);
+	assert(memmap_find_peer(IPPROTO_UDP, AF_INET, &h10, 5001, NULL, 0) == NULL);
 	memset(&key, 0, sizeof(key));
 	key.family = AF_INET;
 	key.proto = IPPROTO_UDP;
