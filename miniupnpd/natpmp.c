@@ -267,7 +267,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	int resplen;
 	int n = len;
 	char senderaddrstr[16];
-	struct lease_entry mreq;	/* a delete */
+	struct lease_entry mreq;	/* a delete, or a permission check */
 	struct lease_entry * row;	/* an add */
 
 	if(!inet_ntop(AF_INET, &senderaddr->sin_addr,
@@ -425,7 +425,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						}
 						break;
 					}
-					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport, "NAT-PMP")) {
+					lease_entry_init(&mreq, 0, NULL);
+					natpmp_request(&mreq, senderaddr, proto, iport, eport);
+					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, &mreq)) {
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
 						continue;

@@ -362,7 +362,6 @@ upnp_redirect(struct lease_entry * req)
 	char iaddr_old[32];
 	char rhost_old[32];
 	unsigned short iport_old;
-	struct in_addr address;
 	unsigned int timestamp;
 	const unsigned short eport = req->eport;
 	const unsigned short iport = req->iport;
@@ -370,14 +369,9 @@ upnp_redirect(struct lease_entry * req)
 	const char * protocol = proto_itoa(proto);
 
 	map_ntop(AF_INET, &req->iaddr, iaddr, sizeof(iaddr));
-	memcpy(&address, req->iaddr.s6_addr + 12, sizeof(address));
 	rhost = map_rhost(req, rhost_buf, sizeof(rhost_buf));
 
-	/* A UPnP client which gave no description has none: the regex of a
-	 * permission rule then does not apply */
-	if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm,
-	                                        eport, address, iport,
-	                                        req->kind == MAP_KIND_UPNP ? req->label : desc)) {
+	if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, req)) {
 		syslog(LOG_INFO, "redirection permission check failed for "
 		                 "%hu->%s:%hu %s %s", eport, iaddr, iport, protocol, desc);
 		return -3;
