@@ -164,6 +164,22 @@ fw_map6_packets(const struct lease_entry * e, int i, u_int64_t * packets)
 	return fw_map6_rule(e, i);
 }
 
+/* the rules of e are there, or sent again */
+int
+fw_check_row(struct lease_entry * e)
+{
+	struct fw_change c;
+	int i;
+
+	for(i = 0; i < nrules(e); i++) {
+		if(find_rule(e, i) == NULL) {
+			fw_change_init(&c, FW_ADD, e, NULL);
+			return fw_sync(&c, 1) == 0 ? 1 : -2;
+		}
+	}
+	return 0;
+}
+
 static struct in6_addr
 addr(const char * s)
 {

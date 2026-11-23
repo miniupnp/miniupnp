@@ -576,15 +576,57 @@ upnp_find_inboundpinhole(struct lease_entry * req)
 	return e;
 }
 
+#ifdef FW_MAP6
+/* Add the map6 req, which upnp_add_inboundpinhole() checked: its rules,
+ * its lease file line, its row. No decision is made here. 1, or -1 if the
+ * firewall refused it. */
+static int
+upnp_add_inboundpinhole_internal(struct lease_entry * req, unsigned short * uid_out)
+{
+	/* a UPnP filter's uid; a PCP map has none */
+	const unsigned short uid = req->nfilters > 0 ? req->filters[0].uid : 0;
+	struct fw_change c;
+#ifdef ENABLE_LEASEFILE
+	char desc[64];
+	char iaddr[INET6_ADDRSTRLEN];
+	char raddr_buf[INET6_ADDRSTRLEN];
+	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
+#endif
+
+	fw_change_init(&c, FW_ADD, req, NULL);
+	if (fw_sync(&c, 1) < 0) {
+		if (c.applied != FW_NOT_APPLIED)
+			syslog(LOG_WARNING, "map6 port %hu: a part of its rules stays", req->iport);
+		return -1;
+	}
+#ifdef ENABLE_LEASEFILE
+	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
+	lease_file6_add(raddr, req->nfilters > 0 ? req->filters[0].rport : 0, iaddr,
+	                req->iport, req->proto, uid, map_rule_desc(req, desc, sizeof(desc)),
+	                req->timestamp);
+#endif /* ENABLE_LEASEFILE */
+	if (uid_out != NULL)
+		*uid_out = uid;
+	if (req->timestamp > 0)
+		next_to_clean(req->timestamp);
+	memmap_add(req);	/* the table takes req */
+	return 1;
+}
+#endif /* FW_MAP6 */
+
 /* upnp_add_inboundpinhole()
+ * The checks of an IPv6 map, as upnp_redirect() makes them for a port
+ * mapping, then the add, or the renewal of the map there is.
  * returns:  1 on success
  *          -1 Pinhole space exhausted
+ *          -3 the external port asked cannot be given
  *         -42 not implemented
  */
 int
 upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 {
-	int r, i, uid = 0;
+#ifdef FW_MAP6
+	int r, i;
 #ifdef ENABLE_LEASEFILE
 	char desc_buf[64];
 	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
@@ -593,13 +635,24 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
 	const unsigned short rport = req->nfilters > 0 ? req->filters[0].rport : 0;
 #endif
-	struct fw_change c;
 
+	/* An IPv6 map has no translation: its external port is its internal
+	 * port. A request which wants another port or none (PCP
+	 * PREFER_FAILURE, RFC 6887 section 13.2) fails before anything
+	 * changes, also a renewal; any other gets its internal port. */
+	if((req->flags & MAP_PREFER_FAILURE) && req->eport != 0 && req->eport != req->iport) {
+		syslog(LOG_INFO, "map6 port %hu %s: external port %hu asked, an IPv6 map has "
+		       "no translation", req->iport, proto_itoa(req->proto), req->eport);
+		return -3;
+	}
+	req->eport = req->iport;
 	if(upnp_find_inboundpinhole(req) != NULL) {
+		/* a UPnP filter's uid; a PCP map has none */
+		const unsigned short uid = req->nfilters > 0 ? req->filters[0].uid : 0;
+
 		syslog(LOG_INFO, "map6 port %hu %s found, renewing it",
 		       req->iport, proto_itoa(req->proto));
-		uid = req->nfilters > 0 ? req->filters[0].uid : 0;
-		r = upnp_update_inboundpinhole(req, (unsigned short)uid);
+		r = upnp_update_inboundpinhole(req, uid);
 		if (r < 0)
 			return r;
 #ifdef ENABLE_LEASEFILE
@@ -614,11 +667,10 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 		                uid, desc, req->timestamp);
 #endif /* ENABLE_LEASEFILE */
 		if (uid_out != NULL)
-			*uid_out = (unsigned short)uid;
+			*uid_out = uid;
 		memmap_update(req, req->iport);	/* the table takes req */
 		return 1;
 	}
-#ifdef FW_MAP6
 	if (max_filters_per_map >= 0) {
 		/* the filters the map of the endpoint would have */
 		const struct lease_entry * e = lease_table_find_entry(req->proto, AF_INET6,
@@ -646,98 +698,12 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 			return -1;
 		}
 	}
-	fw_change_init(&c, FW_ADD, req, NULL);
-	if (fw_sync(&c, 1) < 0) {
-		if (c.applied != FW_NOT_APPLIED)
-			syslog(LOG_WARNING, "map6 port %hu: a part of its rules stays", req->iport);
-		return -1;
-	}
-	uid = req->nfilters > 0 ? req->filters[0].uid : 0;
-#ifdef ENABLE_LEASEFILE
-	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
-	lease_file6_add(raddr, rport, iaddr, req->iport, req->proto,
-	                uid, desc, req->timestamp);
-#endif /* ENABLE_LEASEFILE */
-	if (uid_out != NULL)
-		*uid_out = (unsigned short)uid;
-	if (req->timestamp > 0)
-		next_to_clean(req->timestamp);
-	memmap_add(req);	/* the table takes req */
-	return 1;
+	return upnp_add_inboundpinhole_internal(req, uid_out);
 #else
-	UNUSED(i); UNUSED(c);
+	UNUSED(req); UNUSED(uid_out);
 	return -42;	/* not implemented */
 #endif
 }
-
-#if 0
-int
-upnp_add_inboundpinhole_internal(const char * raddr, unsigned short rport,
-                       const char * iaddr, unsigned short iport,
-                       const char * proto, int * uid)
-{
-	int c = 9999;
-	char cmd[256], cmd_raw[256], cuid[42];
-#if 0
-	static const char cmdval_full_udptcp[] = "ip6tables -I %s %d -p %s -i %s -s %s --sport %hu -d %s --dport %hu -j ACCEPT";
-	static const char cmdval_udptcp[] = "ip6tables -I %s %d -p %s -i %s --sport %hu -d %s --dport %hu -j ACCEPT";
-	static const char cmdval_full_udplite[] = "ip6tables -I %s %d -p %s -i %s -s %s -d %s -j ACCEPT";
-	static const char cmdval_udplite[] = "ip6tables -I %s %d -p %s -i %s -d %s -j ACCEPT";
-	// raw table command
-	static const char cmdval_full_udptcp_raw[] = "ip6tables -t raw -I PREROUTING %d -p %s -i %s -s %s --sport %hu -d %s --dport %hu -j TRACE";
-	static const char cmdval_udptcp_raw[] = "ip6tables -t raw -I PREROUTING %d -p %s -i %s --sport %hu -d %s --dport %hu -j TRACE";
-	static const char cmdval_full_udplite_raw[] = "ip6tables -t raw -I PREROUTING %d -p %s -i %s -s %s -d %s -j TRACE";
-	static const char cmdval_udplite_raw[] = "ip6tables -t raw -I PREROUTING %d -p %s -i %s -d %s -j TRACE";
-#endif
-	/*printf("%s\n", raddr);*/
-	if(raddr!=NULL)
-	{
-#ifdef IPPROTO_UDPLITE
-		if(atoi(proto) == IPPROTO_UDPLITE)
-		{
-	/*		snprintf(cmd, sizeof(cmd), cmdval_full_udplite, miniupnpd_forward_chain, line_number, proto, ext_if_name, raddr, iaddr);
-			snprintf(cmd_raw, sizeof(cmd_raw), cmdval_full_udplite_raw, line_number, proto, ext_if_name, raddr, iaddr);*/
-		}
-		else
-#endif
-		{
-	/*		snprintf(cmd, sizeof(cmd), cmdval_full_udptcp, miniupnpd_forward_chain, line_number, proto, ext_if_name, raddr, rport, iaddr, iport);
-			snprintf(cmd_raw, sizeof(cmd_raw), cmdval_full_udptcp_raw, line_number, proto, ext_if_name, raddr, rport, iaddr, iport);*/
-		}
-	}
-	else
-	{
-#ifdef IPPROTO_UDPLITE
-		if(atoi(proto) == IPPROTO_UDPLITE)
-		{
-			/*snprintf(cmd, sizeof(cmd), cmdval_udplite, miniupnpd_forward_chain, line_number, proto, ext_if_name, iaddr);
-			snprintf(cmd_raw, sizeof(cmd_raw), cmdval_udplite_raw, line_number, proto, ext_if_name, iaddr);*/
-		}
-		else
-#endif
-		{
-			/*snprintf(cmd, sizeof(cmd), cmdval_udptcp, miniupnpd_forward_chain, line_number, proto, ext_if_name, rport, iaddr, iport);
-			snprintf(cmd_raw, sizeof(cmd_raw), cmdval_udptcp_raw, line_number, proto, ext_if_name, rport, iaddr, iport);
-*/
-		}
-	}
-#ifdef DEBUG
-	syslog(LOG_INFO, "Adding following ip6tables rule:");
-	syslog(LOG_INFO, "  -> %s", cmd);
-	syslog(LOG_INFO, "  -> %s", cmd_raw);
-#endif
-	/* TODO Add a better checking error.*/
-	if(system(cmd) < 0 || system(cmd_raw) < 0)
-	{
-		return 0;
-	}
-	srand(time(NULL));
-	snprintf(cuid, sizeof(cuid), "%.4d", rand()%c);
-	*uid = atoi(cuid);
-	printf("\t_add_ uid: %s\n", cuid);
-	return 1;
-}
-#endif
 
 /* upnp_get_pinhole_info()
  * return values :

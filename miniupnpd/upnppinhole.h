@@ -41,10 +41,13 @@ upnp_find_inboundpinhole(struct lease_entry * req);
  * filter, the remote, or none for any remote. The rule gets map_rule_desc(). On success *uid_out
  * (if not NULL) is the uid of the pinhole, and the lease table takes a row
  * of lease_table_new() (memmap_add(), or memmap_update() for the pinhole
- * there was): the caller frees req only on failure.
+ * there was): the caller frees req only on failure. req->eport is the
+ * external port asked, 0 : any; with MAP_PREFER_FAILURE another than iport
+ * fails, as an IPv6 map has no translation, else it becomes iport.
  * return value :
  *  1 = success
  * -1 = Pinhole space exhausted
+ * -3 = the external port asked cannot be given
  * .. = error */
 int
 upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out);

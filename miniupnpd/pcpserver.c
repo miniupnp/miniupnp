@@ -1071,16 +1071,17 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	int r;
 	struct lease_entry * req;
 	const struct lease_entry * old;
+
 	/* the request: an IPv6 firewall rule of any remote, on the internal
-	 * side */
+	 * side, and the external port the client suggests */
 	req = lease_table_new(0);
 	if (req == NULL)
 		return PCP_ERR_NO_RESOURCES;
 	fill_lease_entry(pcp_msg_info, req);
 	req->eaddr = req->iaddr;
-	req->eport = req->iport;
+	req->eport = pcp_msg_info->ext_port;
 	req->timestamp = upnp_time() + pcp_msg_info->lifetime;
-	/* the IPv6 map of the internal side, if there is one */
+	/* the IPv6 map of the internal side, if there is one, is the client's */
 	old = upnp_find_inboundpinhole(req);
 	if(old != NULL) {
 		if (!pcp_own_map(old, req)) {
@@ -1093,26 +1094,15 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 			lease_table_free(req);
 			return PCP_ERR_NOT_AUTHORIZED;
 		}
-		syslog(LOG_INFO, "renewing the IPv6 map of %s:%hu %s",
-		       pcp_msg_info->mapped_str, pcp_msg_info->int_port,
-		       proto_itoa(pcp_msg_info->protocol));
-		/* a renewal changes the row of the pinhole in place */
-		r = upnp_update_inboundpinhole(req, 0);
-		lease_table_free(req);
-		if (r < 0)
-			return PCP_ERR_NO_RESOURCES;
-		pcp_msg_info->ext_port = pcp_msg_info->int_port;
-		return PCP_SUCCESS;
-	} else {
-		/* create new */
-		r = upnp_add_inboundpinhole(req, NULL);
-		if (r < 0) {
-			lease_table_free(req);	/* on success the lease table took it */
-			return PCP_ERR_NO_RESOURCES;
-		}
-		pcp_msg_info->ext_port = pcp_msg_info->int_port;
-		return PCP_SUCCESS;
 	}
+	/* a new map, or the renewal of the client's in place */
+	r = upnp_add_inboundpinhole(req, NULL);
+	if (r < 0) {
+		lease_table_free(req);	/* on success the lease table took it */
+		return r == -3 ? PCP_ERR_CANNOT_PROVIDE_EXTERNAL : PCP_ERR_NO_RESOURCES;
+	}
+	pcp_msg_info->ext_port = pcp_msg_info->int_port;
+	return PCP_SUCCESS;
 #else
 	UNUSED(pcp_msg_info);
 	return PCP_ERR_NO_RESOURCES;
