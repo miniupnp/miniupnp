@@ -198,8 +198,9 @@ tomato_load(void)
 	time_t current_time;
 	char proto[4];
 	char iaddr[32];
-	char *rhost;
 	char *a, *b;
+	int family;
+	struct lease_entry req;
 
 	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
 	{
@@ -222,10 +223,20 @@ tomato_load(void)
 						leaseduration = 0;	/* default value */
 					}
 					*b = 0;
-					rhost = NULL;
 					syslog(LOG_DEBUG, "Read redirection [%s] from file: %s port %hu to %s port %hu, timestamp: %u (%u)",
 						a + 1, proto, eport, iaddr, iport, timestamp, leaseduration);
-					upnp_redirect(rhost, eport, iaddr, iport, proto, a + 1, leaseduration);
+					lease_entry_init(&req, MAP_KIND_UPNP, NULL);
+					if (map_pton(iaddr, &family, &req.iaddr) < 0 || family != AF_INET) {
+						syslog(LOG_ERR, "inet_aton(%s) FAILED", iaddr);
+						continue;
+					}
+					req.family = AF_INET;
+					req.proto = proto_atoi(proto);
+					req.iport = iport;
+					req.eport = eport;
+					req.label = a + 1;
+					req.timestamp = leaseduration > 0 ? upnp_time() + leaseduration : 0;
+					upnp_redirect(&req);
 				}
 			}
 		}
@@ -267,14 +278,14 @@ tomato_delete(void)
 					{
 						if (upnp_get_redirection_infos_by_index(n, &eport, proto, &iport, iaddr, sizeof(iaddr), desc, sizeof(desc), rhost, sizeof(rhost), &leaseduration) == 0)
 						{
-							upnp_delete_redirection(eport, proto);
+							_upnp_delete_redir(eport, proto_atoi(proto));
 						}
 					}
 					break;
 				}
 				else
 				{
-					upnp_delete_redirection(eport, proto);
+					_upnp_delete_redir(eport, proto_atoi(proto));
 				}
 			}
 		}

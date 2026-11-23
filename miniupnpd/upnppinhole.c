@@ -484,7 +484,9 @@ int reload_from_lease_file6(void)
 	time_t current_time;
 	time_t current_unix_time;
 	char line[128];
-	int r, uid;
+	int r, family;
+	struct lease_entry req;
+	struct map_filter filter;
 
 	if(!lease_file6) return -1;
 	fd = fopen( lease_file6, "r");
@@ -543,7 +545,6 @@ int reload_from_lease_file6(void)
 		}
 		*(p2++) = '\0';
 		desc = strchr(p2, ';');
-		uid = atoi(p);
 		if(!desc) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
 			continue;
@@ -565,12 +566,15 @@ int reload_from_lease_file6(void)
 		    syslog(LOG_WARNING, "ignoring lease file pinhole with privileged port %hu", int_port);
 		    continue;
 		}
-		if (rem_client && rem_client[0] != '\0' && rem_client[0] != '*') {
-			struct in6_addr rem_addr;
-			if (inet_pton(AF_INET6, rem_client, &rem_addr) != 1) {
-				syslog(LOG_WARNING, "ignoring lease file pinhole with invalid RemoteHost: %s", rem_client);
-				continue;
-			}
+		lease_entry_init(&req, MAP_KIND_UPNP, NULL);
+		if (map_filter_set(&filter, rem_client, rem_port) < 0 ||
+		    (filter.prefix != 0 && IN6_IS_ADDR_V4MAPPED(&filter.raddr))) {
+			syslog(LOG_WARNING, "ignoring lease file pinhole with invalid RemoteHost: %s", rem_client);
+			continue;
+		}
+		if (map_pton(int_client, &family, &req.iaddr) < 0 || family != AF_INET6) {
+			syslog(LOG_WARNING, "ignoring lease file pinhole with invalid InternalClient: %s", int_client);
+			continue;
 		}
 
 		if(timestamp > 0) {
@@ -585,15 +589,23 @@ int reload_from_lease_file6(void)
 			leaseduration = 0;	/* default value */
 		}
 
-		r = upnp_add_inboundpinhole(rem_client, rem_port, int_client, int_port, proto_atoi(proto),
-                        		desc, leaseduration, &uid);
+		req.family = AF_INET6;
+		req.proto = proto_atoi(proto);
+		req.iport = int_port;
+		req.eaddr = req.iaddr;
+		req.eport = int_port;
+		req.filters = &filter;
+		req.nfilters = 1;
+		lease_entry_from_desc(&req, desc);
+		req.timestamp = current_time + leaseduration;
+		r = upnp_add_inboundpinhole(&req);
 		if(r == -1) {
 			syslog(LOG_ERR, "Failed to add %s:%hu -> %s:%hu protocol %s",
 			       rem_client, rem_port, int_client, int_port, proto);
 		} else if(r == -2) {
 			/* Add the redirection again to the lease file */
 			lease_file6_add(rem_client, rem_port, int_client, int_port, proto_atoi(proto),
-			               uid, desc, timestamp);
+			               filter.uid, desc, timestamp);
 		}
 	}
 	fclose(fd);
@@ -604,16 +616,23 @@ int reload_from_lease_file6(void)
 #endif
 
 int
-upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
-                         const char * iaddr, unsigned short iport,
-                         int proto, char * desc, int desc_len, unsigned int * leasetime)
+upnp_find_inboundpinhole(struct lease_entry * req,
+                         char * desc, int desc_len, unsigned int * leasetime)
 {
 #if defined(USE_PF) || defined(USE_NETFILTER)
 	int uid;
-	uid = find_pinhole(NULL, raddr, rport, iaddr, iport, proto,
-	                   desc, desc_len, leasetime);
+	char iaddr[INET6_ADDRSTRLEN];
+	char raddr_buf[INET6_ADDRSTRLEN];
+	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
+
+	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
+	uid = find_pinhole(NULL, raddr, req->filters[0].rport, iaddr, req->iport,
+	                   req->proto, desc, desc_len, leasetime);
+	if(uid >= 0)
+		req->filters[0].uid = (unsigned short)uid;
 	return uid;
 #else
+	UNUSED(req); UNUSED(desc); UNUSED(desc_len); UNUSED(leasetime);
 	return -42;
 #endif
 }
@@ -621,58 +640,51 @@ upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
 /* upnp_add_inboundpinhole()
  * returns:  1 on success
  *          -1 Pinhole space exhausted
- *          -4 invalid arguments
  *         -42 not implemented
- * TODO : return uid on success (positive) or error value (negative)
  */
 int
-upnp_add_inboundpinhole(const char * raddr,
-                        unsigned short rport,
-                        const char * iaddr,
-                        unsigned short iport,
-                        int proto,
-                        char * desc,
-                        unsigned int leasetime,
-                        int * uid)
+upnp_add_inboundpinhole(struct lease_entry * req)
 {
-	int r;
-	time_t current;
-	unsigned int timestamp;
-	struct in6_addr address;
+	int r, uid;
+	char desc_buf[64];
+	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
+	char iaddr[INET6_ADDRSTRLEN];
+	char raddr_buf[INET6_ADDRSTRLEN];
+	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
+	struct map_filter * f = &req->filters[0];
+	const unsigned short rport = f->rport;
+	const unsigned short iport = req->iport;
+	const int proto = req->proto;
+	const unsigned int timestamp = req->timestamp;
 
-	r = inet_pton(AF_INET6, iaddr, &address);
-	if(r <= 0) {
-		syslog(LOG_ERR, "inet_pton(%d, %s, %p) FAILED",
-		       AF_INET6, iaddr, &address);
-		return -4;
-	}
-	current = upnp_time();
-	timestamp = current + leasetime;
+	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
 	r = 0;
 
-	*uid = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
-	if(*uid >= 0) {
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, *uid);
-		r = upnp_update_inboundpinhole(*uid, leasetime);
+	uid = upnp_find_inboundpinhole(req, NULL, 0, NULL);
+	if(uid >= 0) {
+		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, uid);
+		r = upnp_update_inboundpinhole(req);
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {
 			lease_file6_remove(iaddr, iport, proto, -1);
-			lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
+			lease_file6_add(raddr, rport, iaddr, iport, proto, uid, desc, timestamp);
 		}
 #endif /* ENABLE_LEASEFILE */
 		return (r >= 0) ? 1 : r;
 	}
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	*uid = add_pinhole (ext_if_name6, raddr, rport,
-	                    iaddr, iport, proto, desc, timestamp);
+	uid = add_pinhole (ext_if_name6, raddr, rport,
+	                   iaddr, iport, proto, desc, timestamp);
+	if (uid < 0)
+		return -1;
+	f->uid = (unsigned short)uid;
 #ifdef ENABLE_LEASEFILE
-	if (*uid >= 0) {
-		lease_file6_remove(iaddr, iport, proto, -1);
-		lease_file6_add(raddr, rport, iaddr, iport, proto, *uid, desc, timestamp);
-	}
+	lease_file6_remove(iaddr, iport, proto, -1);
+	lease_file6_add(raddr, rport, iaddr, iport, proto, uid, desc, timestamp);
 #endif /* ENABLE_LEASEFILE */
-	return *uid >= 0 ? 1 : -1;
+	return 1;
 #else
+	UNUSED(desc);
 	return -42;	/* not implemented */
 #endif
 }
@@ -812,13 +824,13 @@ upnp_get_pinhole_uid_by_index(int index)
 }
 
 int
-upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
+upnp_update_inboundpinhole(const struct lease_entry * req)
 {
 #if defined(USE_PF) || defined(USE_NETFILTER)
-	unsigned int timestamp;
+	const unsigned short uid = req->filters[0].uid;
+	const unsigned int timestamp = req->timestamp;
 	int ret;
 
-	timestamp = upnp_time() + leasetime;
 	ret = update_pinhole(uid, timestamp);
 #ifdef ENABLE_LEASEFILE
 	if (ret == 0)
@@ -826,16 +838,17 @@ upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime)
 #endif
 	return ret;
 #else
-	UNUSED(uid); UNUSED(leasetime);
+	UNUSED(req);
 
 	return -42; /* not implemented */
 #endif
 }
 
 int
-upnp_delete_inboundpinhole(unsigned short uid)
+upnp_delete_inboundpinhole(const struct lease_entry * req)
 {
 #if defined(USE_PF) || defined(USE_NETFILTER)
+	const unsigned short uid = req->filters[0].uid;
 	int ret;
 	ret = delete_pinhole(uid);
 #ifdef ENABLE_LEASEFILE
@@ -845,7 +858,7 @@ upnp_delete_inboundpinhole(unsigned short uid)
 
 	return ret;
 #else
-	UNUSED(uid);
+	UNUSED(req);
 
 	return -1;
 #endif
