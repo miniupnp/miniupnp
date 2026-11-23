@@ -966,6 +966,26 @@ static void DeletePCPPeer(pcp_info_t *pcp_msg_info)
 }
 #endif /* PCP_PEER */
 
+/* The request of a PCP MAP: its nonce, protocol and internal side, and
+ * filter f of any remote if it is not NULL. The caller sets the external
+ * side and the expiry. The DESCRIPTION option is not read: no label. */
+static void fill_lease_entry(const pcp_info_t *pcp_msg_info,
+                             struct lease_entry *req, struct map_filter *f)
+{
+	lease_entry_init(req, MAP_KIND_PCP, pcp_msg_info->nonce);
+	if (pcp_msg_info->pfailure_present)
+		req->flags |= MAP_PREFER_FAILURE;
+	req->family = IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) ? AF_INET : AF_INET6;
+	req->proto = pcp_msg_info->protocol;
+	req->iaddr = *pcp_msg_info->mapped_ip;
+	req->iport = pcp_msg_info->int_port;
+	if (f != NULL) {
+		memset(f, 0, sizeof(*f));
+		req->filters = f;
+		req->nfilters = 1;
+	}
+}
+
 static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 {
 	int r = 0;
@@ -978,6 +998,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	int foreign = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+	struct lease_entry req;
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
 	 * address, protocol and port, not the suggested external port.
@@ -1112,8 +1133,10 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
 				       iaddr_old, iport_old);
 				/* remove and then add again */
-				if (_upnp_delete_redir(pcp_msg_info->ext_port,
-						       pcp_msg_info->protocol)==0) {
+				fill_lease_entry(pcp_msg_info, &req, NULL);
+				req.eaddr = *pcp_msg_info->ext_ip;
+				req.eport = pcp_msg_info->ext_port;
+				if (upnp_delete_redirection(&req)==0) {
 					break;
 				} else if (pcp_msg_info->pfailure_present) {
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
@@ -1126,13 +1149,11 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		}
 	} while (r==0);
 
-	r = upnp_redirect_internal(NULL,
-				   pcp_msg_info->ext_port,
-				   pcp_msg_info->mapped_str,
-				   pcp_msg_info->int_port,
-				   pcp_msg_info->protocol,
-				   pcp_msg_info->desc,
-				   timestamp);
+	fill_lease_entry(pcp_msg_info, &req, NULL);
+	req.eaddr = *pcp_msg_info->ext_ip;
+	req.eport = pcp_msg_info->ext_port;
+	req.timestamp = timestamp;
+	r = upnp_redirect_internal(&req);
 	if (r < 0)
 		return PCP_ERR_NO_RESOURCES;
 	return PCP_SUCCESS;
@@ -1143,15 +1164,18 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 #ifdef ENABLE_UPNPPINHOLE
 	int uid;
 	int r;
+	struct lease_entry req;
+	struct map_filter filter;
 	char desc[64];
 	unsigned int timestamp = 0;
+	/* the request: an IPv6 firewall rule of any remote, on the internal
+	 * side */
+	fill_lease_entry(pcp_msg_info, &req, &filter);
+	req.eaddr = req.iaddr;
+	req.eport = req.iport;
+	req.timestamp = upnp_time() + pcp_msg_info->lifetime;
 	/* first check if pinhole already exists */
-	uid = upnp_find_inboundpinhole(NULL, 0,
-					pcp_msg_info->mapped_str,
-					pcp_msg_info->int_port,
-					pcp_msg_info->protocol,
-					desc, sizeof(desc),
-					&timestamp);
+	uid = upnp_find_inboundpinhole(&req, desc, sizeof(desc), &timestamp);
 	if(uid >= 0) {
 		/* pinhole already exists, updating */
 		if (0 != strcmp(desc, pcp_msg_info->desc)) {
@@ -1166,20 +1190,14 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 		syslog(LOG_INFO, "updating pinhole %d to %s:%hu %s",
 		       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
 		       proto_itoa(pcp_msg_info->protocol));
-		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
+		r = upnp_update_inboundpinhole(&req);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
 		return PCP_SUCCESS;
 	} else {
 		/* create new */
-		r = upnp_add_inboundpinhole(NULL, 0,
-						pcp_msg_info->mapped_str,
-						pcp_msg_info->int_port,
-						pcp_msg_info->protocol,
-						pcp_msg_info->desc,
-						pcp_msg_info->lifetime,
-						&uid);
+		r = upnp_add_inboundpinhole(&req);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -1252,6 +1270,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	int proto2;
 	char desc[64];
 	unsigned int timestamp;
+	struct lease_entry req;
 
 	syslog(LOG_DEBUG, "is_fw=%d addr=%s iport=%hu proto=%d",
 	       pcp_msg_info->is_fw,  pcp_msg_info->mapped_str, iport, (int)proto);
@@ -1277,7 +1296,11 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 					       iport, proto_itoa(pcp_msg_info->protocol));
 					return;
 				} else {
-					r = _upnp_delete_redir(eport2, proto2);
+					fill_lease_entry(pcp_msg_info, &req, NULL);
+					req.iport = iport2;
+					req.eaddr = *pcp_msg_info->ext_ip;
+					req.eport = eport2;
+					r = upnp_delete_redirection(&req);
 				}
 				break;
 			}
@@ -1288,11 +1311,11 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
 		int uid;
-		uid = upnp_find_inboundpinhole(NULL, 0,
-						pcp_msg_info->mapped_str, iport,
-						pcp_msg_info->protocol,
-						desc, sizeof(desc),
-						NULL /* lifetime */);
+		struct map_filter filter;
+		fill_lease_entry(pcp_msg_info, &req, &filter);
+		req.eaddr = req.iaddr;
+		req.eport = req.iport;
+		uid = upnp_find_inboundpinhole(&req, desc, sizeof(desc), NULL /* lifetime */);
 		if (uid < 0) {
 			syslog(LOG_ERR, "Failed to find mapping to %s:%hu, protocol %s",
 			       pcp_msg_info->mapped_str, iport, proto_itoa(pcp_msg_info->protocol));
@@ -1305,7 +1328,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				       iport, proto_itoa(pcp_msg_info->protocol));
 				return;
 			} else {
-				r = upnp_delete_inboundpinhole(uid);
+				r = upnp_delete_inboundpinhole(&req);
 			}
 		}
 #else

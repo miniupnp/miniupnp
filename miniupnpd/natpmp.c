@@ -238,6 +238,20 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 	return n;
 }
 
+/* The request of a NAT-PMP mapping: the internal client is the sender
+ * (RFC 6886 section 3.3). */
+static void natpmp_request(struct lease_entry * mreq,
+                           const struct sockaddr_in * senderaddr, int proto,
+                           unsigned short iport, unsigned short eport)
+{
+	lease_entry_init(mreq, MAP_KIND_NATPMP, NULL);
+	mreq->family = AF_INET;
+	mreq->proto = proto;
+	map_addr_v4(&mreq->iaddr, &senderaddr->sin_addr);
+	mreq->iport = iport;
+	mreq->eport = eport;
+}
+
 /** read the request from the socket, process it and then send the
  * response back.
  */
@@ -250,6 +264,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	int resplen;
 	int n = len;
 	char senderaddrstr[16];
+	struct lease_entry mreq;
 
 	if(!inet_ntop(AF_INET, &senderaddr->sin_addr,
 			senderaddrstr, sizeof(senderaddrstr))) {
@@ -339,7 +354,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						/* (iport == 0) => remove all the mappings for this client
 						 * using the requested protocol (RFC 6886 section 3.4) */
 						if((proto == proto2) && ((iport == 0) || (iport == iport2))) {
-							r = _upnp_delete_redir(eport2, proto2);
+							natpmp_request(&mreq, senderaddr, proto2, iport2, eport2);
+							r = upnp_delete_redirection(&mreq);
 							if(r < 0) {
 								syslog(LOG_ERR, "Failed to remove NAT-PMP mapping eport %hu, protocol %s",
 								       eport2, (proto2==IPPROTO_TCP)?"TCP":"UDP");
@@ -445,7 +461,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
 							/* remove and then add again */
-							if(_upnp_delete_redir(eport, proto) < 0) {
+							natpmp_request(&mreq, senderaddr, proto, iport, eport);
+							if(upnp_delete_redirection(&mreq) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");
 								break;
 							}
@@ -457,14 +474,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					}
 					/* do the redirection */
 					timestamp = upnp_time() + lifetime;
-					snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
-					         eport, proto_itoa(proto));
 					/* TODO : check return code */
-					if(upnp_redirect_internal(NULL, eport, senderaddrstr,
-					                          iport, proto, desc,
-					                          timestamp) < 0) {
-						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
-						       eport, proto_itoa(proto), senderaddrstr, iport, desc);
+					natpmp_request(&mreq, senderaddr, proto, iport, eport);
+					mreq.timestamp = timestamp;
+					if(upnp_redirect_internal(&mreq) < 0) {
+						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu",
+						       eport, proto_itoa(proto), senderaddrstr, iport);
 						resp[3] = 3;  /* Failure */
 					}
 					break;
