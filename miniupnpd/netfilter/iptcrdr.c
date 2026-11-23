@@ -948,6 +948,102 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 	return r;
 }
 
+/* The number of DNAT rules of the nat chain to iaddr:iport, or -1. */
+static int
+count_dnat_rules_to(int proto, uint32_t iaddr, unsigned short iport)
+{
+	int n = 0;
+	IPTC_HANDLE h;
+	const struct ipt_entry * e;
+	uint32_t a;
+	unsigned short p;
+
+	h = iptc_init("nat");
+	if(!h) {
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "count_dnat_rules_to", iptc_strerror(errno));
+		return -1;
+	}
+	if(iptc_is_chain(miniupnpd_nat_chain, h)) {
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_nat_chain, h); e; e = iptc_next_rule(e, h))
+#else
+		for(e = iptc_first_rule(miniupnpd_nat_chain, &h); e; e = iptc_next_rule(e, &h))
+#endif
+		{
+			if(proto != e->ip.proto)
+				continue;
+			get_dnat_target_addr_port((const void *)e + e->target_offset, &a, &p);
+			if(a == iaddr && p == iport)
+				n++;
+		}
+	}
+#ifdef IPTABLES_143
+	iptc_free(h);
+#else
+	iptc_free(&h);
+#endif
+	return n;
+}
+
+/* Delete the filter rule of a port mapping to iaddr:iport. A filter rule has
+ * only iaddr:iport, so the rule of another mapping to the same iaddr:iport
+ * looks the same: ndnat is the number of DNAT rules to iaddr:iport, the one
+ * of this mapping too. With fewer filter rules, the one of this mapping went
+ * already, and none is deleted. This counts on the chains holding only the
+ * rules of miniupnpd, each DNAT rule with its filter rule: a DNAT rule added
+ * by hand leaves the filter rule of a mapping in place on its delete, as
+ * before. 0, or -1 on an error. */
+static int
+delete_filter_rule_to(int proto, uint32_t iaddr, unsigned short iport, int ndnat)
+{
+	int n = 0;
+	unsigned i = 0, index = 0;
+	IPTC_HANDLE h;
+	const struct ipt_entry * e;
+	const struct ipt_entry_match * match;
+	unsigned short dport;
+
+	h = iptc_init("filter");
+	if(!h) {
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "delete_filter_rule_to", iptc_strerror(errno));
+		return -1;
+	}
+	if(iptc_is_chain(miniupnpd_forward_chain, h)) {
+#ifdef IPTABLES_143
+		for(e = iptc_first_rule(miniupnpd_forward_chain, h); e; e = iptc_next_rule(e, h), i++)
+#else
+		for(e = iptc_first_rule(miniupnpd_forward_chain, &h); e; e = iptc_next_rule(e, &h), i++)
+#endif
+		{
+			if(proto != e->ip.proto || iaddr != e->ip.dst.s_addr)
+				continue;
+			match = (const struct ipt_entry_match *)&e->elems;
+			if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
+				dport = ((const struct ipt_tcp *)match->data)->dpts[0];
+			else
+				dport = ((const struct ipt_udp *)match->data)->dpts[0];
+			if(iport != dport)
+				continue;
+			if(n++ == 0)
+				index = i;
+		}
+	}
+	if(n == 0 || n < ndnat) {
+		if(n > 0)
+			syslog(LOG_INFO, "the filter rule to port %hu went already", iport);
+#ifdef IPTABLES_143
+		iptc_free(h);
+#else
+		iptc_free(&h);
+#endif
+		return 0;
+	}
+	syslog(LOG_INFO, "Trying to delete filter rule at index %u", index);
+	return delete_rule_and_commit(index, h, miniupnpd_forward_chain, "delete_filter_rule");
+}
+
 /* delete_redirect_and_filter_rules()
  */
 int
@@ -1022,72 +1118,33 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 #endif
 	if(r == 0)
 	{
-		syslog(LOG_INFO, "Trying to delete nat rule at index %u", index);
-		/* Now delete both rules */
-		/* first delete the nat rule */
-		h = iptc_init("nat");
-		if(h)
+		/* The filter rule goes first. Once the redirect rule is gone, a
+		 * retry cannot find iaddr:iport, and the filter rule would stay */
+		int ndnat = count_dnat_rules_to(proto, iaddr, iport);
+		r = ndnat < 0 ? -1 : delete_filter_rule_to(proto, iaddr, iport, ndnat);
+		if(r == 0)
 		{
-			r = delete_rule_and_commit(index, h, miniupnpd_nat_chain, "delete_redirect_rule");
-		}
-		if((r == 0) && (h = iptc_init("filter")))
-		{
-			i = 0;
-			/* we must find the right index for the filter rule */
-#ifdef IPTABLES_143
-			for(e = iptc_first_rule(miniupnpd_forward_chain, h);
-			    e;
-				e = iptc_next_rule(e, h), i++)
-#else
-			for(e = iptc_first_rule(miniupnpd_forward_chain, &h);
-			    e;
-				e = iptc_next_rule(e, &h), i++)
-#endif
-			{
-				if(proto==e->ip.proto)
-				{
-					match = (const struct ipt_entry_match *)&e->elems;
-					/*syslog(LOG_DEBUG, "filter rule #%u: %s %s",
-					       i, match->u.user.name, inet_ntoa(e->ip.dst));*/
-					if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
-					{
-						const struct ipt_tcp * info;
-						info = (const struct ipt_tcp *)match->data;
-						if(iport != info->dpts[0])
-							continue;
-					}
-					else
-					{
-						const struct ipt_udp * info;
-						info = (const struct ipt_udp *)match->data;
-						if(iport != info->dpts[0])
-							continue;
-					}
-					if(iaddr != e->ip.dst.s_addr)
-						continue;
-					index = i;
-					syslog(LOG_INFO, "Trying to delete filter rule at index %u", index);
-					r = delete_rule_and_commit(index, h, miniupnpd_forward_chain, "delete_filter_rule");
-					h = NULL;
-					break;
-				}
-			}
-			/* in case the filter rule has not been found, delete_rule_and_commit() is not called
-			 * so we neet to free h */
+			syslog(LOG_INFO, "Trying to delete nat rule at index %u", index);
+			h = iptc_init("nat");
 			if(h)
-#ifdef IPTABLES_143
-				iptc_free(h);
-#else
-				iptc_free(&h);
-#endif
+				r = delete_rule_and_commit(index, h, miniupnpd_nat_chain, "delete_redirect_rule");
+			else
+				r = -1;
+		}
+		if(r < 0)
+		{
+			/* the redirect rule stays: so do its other rules and its
+			 * description, and the next delete tries again */
+			return -1;
 		}
 	}
 
 	del_redirect_desc(eport, proto);
-	/* 0, or 1 when the rules were not there or did not go: the callers
-	 * take that as deleted. The PEER rules are not touched: see
-	 * outgoing_rule_delete(). */
-	return r < 0 ? 1 : 0;
+	/* r : the redirect and filter rules. A redirect rule which failed
+	 * returned above. A port with no redirect rule gives -1; the caller asks
+	 * the firewall whether the rule is gone. The PEER rules are not
+	 * touched: see outgoing_rule_delete(). */
+	return r;
 }
 
 /* the source and destination ports of the tcp or udp match of e */
