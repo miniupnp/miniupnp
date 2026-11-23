@@ -120,6 +120,13 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
 int
 upnp_delete_redirection(const struct lease_entry * req);
 
+/*! \brief the row e of a mapping, if the firewall still has its rule.
+ * Else the rule went without the daemon (a flush, another program): the
+ * row goes, and NULL. One firewall read, for a mapping a request is about
+ * to change. e NULL: NULL. */
+struct lease_entry *
+upnp_check_map(struct lease_entry * e);
+
 /*! \brief delete the mapping of a row of the lease table: its rules, then
  * the row, if the firewall deleted them. e is no longer valid then.
  * \return 0 on success, -1 on failure */
@@ -142,14 +149,14 @@ int
 _upnp_delete_redir(unsigned short eport, int proto);
 
 /* upnp_eport_used_by_other()
- * is the external port eport mapped (TCP or UDP, other than proto) to
- * another internal address than iaddr ?  RFC 6886 section 3.3: such a
- * port is reserved for the client which maps it, on both protocols, so
- * another client gets another port.  The client's own mappings do not
- * count.  The caller looks proto up itself.
+ * is the external port req->eport of req->eaddr mapped, on any protocol,
+ * to another internal address than req->iaddr ?  RFC 6886 section 3.3:
+ * such a port is reserved for the client which maps it, on both
+ * protocols, so another client gets another port.  The client's own
+ * mappings do not count.
  * return value : 1 when used by another client, 0 otherwise */
 int
-upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr);
+upnp_eport_used_by_other(const struct lease_entry * req);
 
 /* Periodic cleanup functions
  */

@@ -1051,8 +1051,8 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	int foreign = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
-	struct lease_entry req;		/* the delete of the client's own mapping */
-	struct lease_entry perm;	/* the permission check of each eport */
+	struct lease_entry perm;	/* the checks of each eport */
+	struct lease_entry * old;	/* the mapping on an eport */
 	struct lease_entry * row;	/* the add */
 
 	/* RFC 6887 section 11.3: the mapping key uses the internal
@@ -1108,6 +1108,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 
 	lease_entry_init(&perm, 0, NULL);
 	fill_lease_entry(pcp_msg_info, &perm);
+	perm.eaddr = *pcp_msg_info->ext_ip;
 	do {
 		if (eport_first == 0) { /* first time in loop */
 			eport_first = pcp_msg_info->ext_port;
@@ -1158,9 +1159,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 		 * on either protocol, is reserved for that client.  A port the
 		 * client already holds is kept on renewal. */
 		if (pcp_msg_info->ext_port != eport_own &&
-		    upnp_eport_used_by_other(pcp_msg_info->ext_port,
-					     pcp_msg_info->protocol,
-					     pcp_msg_info->mapped_str)) {
+		    upnp_eport_used_by_other(&perm)) {
 			if (pcp_msg_info->pfailure_present) {
 				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 			}
@@ -1170,16 +1169,13 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			}
 			continue;
 		}
-		r = get_redirect_rule(ext_if_name,
-				      pcp_msg_info->ext_port,
-				      pcp_msg_info->protocol,
-				      iaddr_old, sizeof(iaddr_old),
-				      &iport_old, 0, 0, 0, 0,
-				      NULL/*&timestamp*/, 0, 0);
+		old = upnp_check_map(memmap_find_map(perm.proto, perm.family,
+		                                     &perm.eaddr, perm.eport));
+		r = old != NULL ? 0 : -1;
 
 		if(r==0) {
-			if((strcmp(pcp_msg_info->mapped_str, iaddr_old)!=0)
-			   || (pcp_msg_info->int_port != iport_old)) {
+			if(!IN6_ARE_ADDR_EQUAL(&old->iaddr, pcp_msg_info->mapped_ip)
+			   || (pcp_msg_info->int_port != old->iport)) {
 				/* redirection already existing */
 				if (pcp_msg_info->pfailure_present) {
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
@@ -1187,13 +1183,9 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			} else {
 				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
 				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
-				       iaddr_old, iport_old);
+				       pcp_msg_info->mapped_str, old->iport);
 				/* remove and then add again */
-				lease_entry_init(&req, 0, NULL);
-				fill_lease_entry(pcp_msg_info, &req);
-				req.eaddr = *pcp_msg_info->ext_ip;
-				req.eport = pcp_msg_info->ext_port;
-				if (upnp_delete_redirection(&req)==0) {
+				if (upnp_delete_map(old)==0) {
 					break;
 				} else if (pcp_msg_info->pfailure_present) {
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
