@@ -73,6 +73,12 @@ add_to_pinhole_list(struct in6_addr * saddr, unsigned short sport,
 {
 	struct pinhole_t * p;
 
+	/* with every uid in use, the search below would never end */
+	if(pinhole_count >= 65535) {
+		syslog(LOG_WARNING, "add_to_pinhole_list: all %u pinhole uids are in use",
+		       pinhole_count);
+		return -1;
+	}
 	p = calloc(1, sizeof(struct pinhole_t) + strlen(desc) + 1);
 	if(!p) {
 		syslog(LOG_ERR, "add_to_pinhole_list calloc() error");
@@ -503,14 +509,68 @@ int get_pinhole_uid_by_index(int index)
 }
 
 
+/* 1 if the chain has an ACCEPT rule of the key, 0 if not, -1 if it could
+ * not be read */
+static int
+chain_has_rule(const struct in6_addr * saddr, unsigned short sport,
+               const struct in6_addr * daddr, unsigned short dport, int proto)
+{
+	IP6TC_HANDLE h;
+	const struct ip6t_entry * e;
+	const struct ip6t_entry_match * match;
+	const struct ip6t_tcp * info;
+	int found = 0;
+
+	h = ip6tc_init("filter");
+	if(!h) {
+		syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
+		return -1;
+	}
+	if(!ip6tc_is_chain(miniupnpd_v6_filter_chain, h)) {
+		ip6tc_free(h);
+		return -1;
+	}
+	for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
+	    e && !found;
+	    e = ip6tc_next_rule(e, h)) {
+		if((e->ipv6.proto != proto) ||
+		   (0 != memcmp(&e->ipv6.src, saddr, sizeof(e->ipv6.src))) ||
+		   (0 != memcmp(&e->ipv6.dst, daddr, sizeof(e->ipv6.dst))))
+			continue;
+		match = (const struct ip6t_entry_match *)&e->elems;
+		info = (const struct ip6t_tcp *)&match->data;
+		found = (info->spts[0] == sport) && (info->dpts[0] == dport);
+	}
+	ip6tc_free(h);
+	return found;
+}
+
 /* The key-based API of fwmap6.h, on top of the list of pinholes, which
- * keeps its own uids. */
+ * keeps its own uids. The list lives in memory only: a rule of the key
+ * which is in the chain but not in the list, as after a restart which left
+ * the rules in place, goes into the list, so the rule is found and not
+ * added a second time. */
 static int
 key_uid(const char * rem_host, unsigned short rem_port,
         const char * int_client, unsigned short int_port, int proto)
 {
-	return find_pinhole(NULL, map6_any_remote(rem_host) ? NULL : rem_host, rem_port,
-	                    int_client, int_port, proto, NULL, 0, NULL);
+	struct in6_addr saddr, daddr;
+	int uid;
+
+	if(map6_any_remote(rem_host))
+		rem_host = NULL;
+	uid = find_pinhole(NULL, rem_host, rem_port, int_client, int_port, proto,
+	                   NULL, 0, NULL);
+	if(uid >= 0)
+		return uid;
+	memset(&saddr, 0, sizeof(saddr));
+	if(rem_host != NULL && inet_pton(AF_INET6, rem_host, &saddr) < 1)
+		return -2;
+	if(inet_pton(AF_INET6, int_client, &daddr) < 1)
+		return -2;
+	if(chain_has_rule(&saddr, rem_port, &daddr, int_port, proto) != 1)
+		return -2;
+	return add_to_pinhole_list(&saddr, rem_port, &daddr, int_port, proto, "", 0);
 }
 
 int
