@@ -262,6 +262,30 @@ memmap_find_peer(int proto, int family, const struct in6_addr * iaddr,
 	return NULL;
 }
 
+static struct outgoing_entry *
+peer_port_used_by_other(int family, const struct in6_addr * eaddr,
+                        unsigned short eport, const struct in6_addr * iaddr)
+{
+	struct outgoing_entry * b;
+
+	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b))
+		if(b->family == family && b->eport == eport &&
+		   memcmp(&b->eaddr, eaddr, sizeof(*eaddr)) == 0 &&
+		   memcmp(&b->iaddr, iaddr, sizeof(*iaddr)) != 0)
+			return b;
+	return NULL;
+}
+
+struct outgoing_entry *
+memmap_peer_port_used_by_other(int family, const struct in6_addr * eaddr,
+                               unsigned short eport, const struct in6_addr * iaddr)
+{
+	struct outgoing_entry * b = peer_port_used_by_other(family, eaddr, eport, iaddr);
+	if(b == NULL && !IN6_IS_ADDR_UNSPECIFIED(eaddr))
+		b = peer_port_used_by_other(family, &in6addr_any, eport, iaddr);
+	return b;
+}
+
 int
 memmap_dump(const char * path)
 {

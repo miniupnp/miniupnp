@@ -1090,19 +1090,6 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			continue;
 		}
 		any_eport_allowed = 1;
-#ifdef CHECK_PORTINUSE
-		if (port_in_use(ext_if_name, pcp_msg_info->ext_port, pcp_msg_info->protocol,
-				pcp_msg_info->mapped_str, pcp_msg_info->int_port) > 0) {
-			syslog(LOG_INFO, "port %hu protocol %s already in use",
-			       pcp_msg_info->ext_port,
-			       proto_itoa(pcp_msg_info->protocol));
-			pcp_msg_info->ext_port++;
-			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
-				pcp_msg_info->ext_port++;
-			}
-			continue;
-		}
-#endif
 		/* A NAT mapping shares the external address: as for NAT-PMP
 		 * (RFC 6886 section 3.3), an external port another client maps,
 		 * on either protocol, is reserved for that client.  A port the
@@ -1118,6 +1105,20 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 			}
 			continue;
 		}
+#ifdef CHECK_PORTINUSE
+		/* the firewall last: the tables above are memory */
+		if (port_in_use(ext_if_name, pcp_msg_info->ext_port, pcp_msg_info->protocol,
+				pcp_msg_info->mapped_str, pcp_msg_info->int_port) > 0) {
+			syslog(LOG_INFO, "port %hu protocol %s already in use",
+			       pcp_msg_info->ext_port,
+			       proto_itoa(pcp_msg_info->protocol));
+			pcp_msg_info->ext_port++;
+			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
+				pcp_msg_info->ext_port++;
+			}
+			continue;
+		}
+#endif
 		old = upnp_check_map(memmap_find_map(perm.proto, perm.family,
 		                                     &perm.eaddr, perm.eport));
 		r = old != NULL ? 0 : -1;

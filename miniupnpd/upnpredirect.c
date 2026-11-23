@@ -207,6 +207,9 @@ reload_adopt_rule(const struct lease_entry * line)
 	e->iport = iport;
 	e->eaddr = line->eaddr;
 	e->eport = line->eport;
+	/* the lease of the line, so the rule expires also if the renewal
+	 * below fails */
+	e->timestamp = line->timestamp;
 	lease_entry_from_desc(e, desc);
 	memmap_add(e);	/* the table takes e, with a copy of its label */
 }
@@ -679,13 +682,25 @@ struct lease_entry *
 upnp_check_map(struct lease_entry * e)
 {
 	unsigned short iport;
+	int r;
 
-	if(e == NULL ||
-	   get_redirect_rule(ext_if_name, e->eport, e->proto, 0, 0, &iport,
-	                     0, 0, 0, 0, NULL, 0, 0) == 0)
+	if(e == NULL)
+		return NULL;
+	r = get_redirect_rule(ext_if_name, e->eport, e->proto, 0, 0, &iport,
+	                      0, 0, 0, 0, NULL, 0, 0);
+	if(r == 0)
 		return e;
+#ifdef USE_PF
+	/* pf tells a failed read (-1) from a missing rule (-2): the row of a
+	 * rule which may be there stays */
+	if(r != -2)
+		return e;
+#endif
 	syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, its row goes",
 	       e->eport, proto_itoa(e->proto));
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(e->eport, e->proto);
+#endif
 	memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
 	return NULL;
 }
@@ -716,14 +731,24 @@ upnp_eport_used_by_other(const struct lease_entry * req)
 {
 	char iaddr_old[INET6_ADDRSTRLEN];
 	const struct lease_entry * e;
+	const struct outgoing_entry * b;
 
+	/* the lease table, then the PEER bindings: only memory */
 	e = memmap_eport_used_by_other(req->family, &req->eaddr, req->eport, &req->iaddr);
-	if(e == NULL)
-		return 0;
-	syslog(LOG_INFO, "external port %hu is used by %s (%s)", req->eport,
-	       map_ntop(e->family, &e->iaddr, iaddr_old, sizeof(iaddr_old)) ? iaddr_old : "?",
-	       proto_itoa(e->proto));
-	return 1;
+	if(e != NULL) {
+		syslog(LOG_INFO, "external port %hu is used by %s (%s)", req->eport,
+		       map_ntop(e->family, &e->iaddr, iaddr_old, sizeof(iaddr_old)) ? iaddr_old : "?",
+		       proto_itoa(e->proto));
+		return 1;
+	}
+	b = memmap_peer_port_used_by_other(req->family, &req->eaddr, req->eport, &req->iaddr);
+	if(b != NULL) {
+		syslog(LOG_INFO, "external port %hu is used by a PEER of %s (%s)", req->eport,
+		       map_ntop(b->family, &b->iaddr, iaddr_old, sizeof(iaddr_old)) ? iaddr_old : "?",
+		       proto_itoa(b->proto));
+		return 1;
+	}
+	return 0;
 }
 
 int

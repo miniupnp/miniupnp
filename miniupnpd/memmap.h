@@ -114,6 +114,12 @@ memmap_find_peer(int proto, int family, const struct in6_addr * iaddr,
                  unsigned short iport, const struct in6_addr * raddr,
                  unsigned short rport);
 
+/* A PEER binding on eaddr:eport, on any protocol, for another internal
+ * address than iaddr, or NULL. eaddr as in memmap_find_map(). */
+struct outgoing_entry *
+memmap_peer_port_used_by_other(int family, const struct in6_addr * eaddr,
+                               unsigned short eport, const struct in6_addr * iaddr);
+
 /* For debugging: write the lease table and the outgoing table to path as
  * text. 0, or -1 if the file could not be written. */
 int memmap_dump(const char * path);
