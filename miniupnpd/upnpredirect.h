@@ -134,8 +134,8 @@ upnp_delete_redirection(const struct lease_entry * req);
 /*! \brief the row e of a mapping, if the firewall still has its rule.
  * Else the rule went without the daemon (a flush, another program), and is
  * added back from the row: e. If that fails, the row goes, and NULL. One
- * firewall read, for a mapping a request is about to change. e NULL:
- * NULL. */
+ * firewall read, for a mapping a request is about to change; none with
+ * firewall_trust=trust, which takes e as it is. e NULL: NULL. */
 struct lease_entry *
 upnp_check_map(struct lease_entry * e);
 

@@ -25,6 +25,8 @@ const char * ext_if_name6 = 0;
 const char * ext_stun_host = 0;
 uint16_t ext_stun_port = 0;
 
+int firewall_trust = FW_TRUST_CHECK;
+
 const char * table_dump_file = 0;
 const char * table_stats_file = 0;
 

@@ -715,8 +715,8 @@ upnp_check_map(struct lease_entry * e)
 	struct fw_change c;
 	int r;
 
-	if(e == NULL)
-		return NULL;
+	if(e == NULL || firewall_trust == FW_TRUST_TRUST)
+		return e;
 	/* a failed read (-1) is no missing rule (-2): the row of a rule which
 	 * may be there stays */
 	r = fw_map_rule(e->eport, e->proto, NULL, NULL);

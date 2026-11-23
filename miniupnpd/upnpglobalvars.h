@@ -30,6 +30,13 @@ extern const char * ext_stun_host;
 /*! \brief STUN server port */
 extern uint16_t ext_stun_port;
 
+/* How far the daemon trusts the firewall to keep the rules it was given:
+ * FW_TRUST_CHECK, a renewal looks its rule up and adds it back if it is
+ * gone; FW_TRUST_TRUST, a renewal changes the table only. */
+#define FW_TRUST_CHECK	0
+#define FW_TRUST_TRUST	1
+extern int firewall_trust;
+
 /* file the lease table and the outgoing table are written to on SIGUSR2,
  * for debugging. NULL : none */
 extern const char * table_dump_file;

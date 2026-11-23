@@ -1694,6 +1694,16 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
+			case UPNPFIREWALLTRUST:
+				if (strcmp(ary_options[i].value, "check") == 0)
+					firewall_trust = FW_TRUST_CHECK;
+				else if (strcmp(ary_options[i].value, "trust") == 0)
+					firewall_trust = FW_TRUST_TRUST;
+				else {
+					INIT_PRINT_ERR("firewall_trust can only be check or trust\n");
+					return 1;
+				}
+				break;
 #ifdef IGD_V2
 			case UPNPFORCEIGDDESCV1:
 				if (strcmp(ary_options[i].value, "yes") == 0)
