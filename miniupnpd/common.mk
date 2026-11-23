@@ -29,6 +29,7 @@ testoutgoingtable:	testoutgoingtable.o outgoing_table.o
 testmemmap:	testmemmap.o memmap.o lease_table.o outgoing_table.o
 
 testpinhole:	testpinhole.o upnppinhole.o memmap.o lease_table.o outgoing_table.o
+testfwsync:	testfwsync.o fwsync.o
 
 testupnphttp:	testupnphttp.o upnphttp.o upnputils.o getroute.o \
 	getosversion.o

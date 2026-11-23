@@ -2,7 +2,7 @@
 
 check:	validateupnppermissions validategetifaddr validatessdppktgen \
 	validateupnphttp validateleasetable validateoutgoingtable validatememmap \
-	validatepinhole validateversion
+	validatepinhole validatefwsync validateversion
 
 validateversion:	miniupnpd $(SRCDIR)/VERSION
 	./miniupnpd --version
@@ -30,5 +30,9 @@ validatememmap:	testmemmap
 	touch $@
 
 validatepinhole:	testpinhole
+	./$<
+	touch $@
+
+validatefwsync:	testfwsync
 	./$<
 	touch $@

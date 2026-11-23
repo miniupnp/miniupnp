@@ -117,13 +117,14 @@ TESTOUTGOINGTABLEOBJS = testoutgoingtable.o outgoing_table.o
 TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o outgoing_table.o
 TESTPINHOLEOBJS = testpinhole.o upnppinhole.o memmap.o lease_table.o \
                   outgoing_table.o
+TESTFWSYNCOBJS = testfwsync.o fwsync.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testupnppermissions miniupnpdctl \
               testgetifaddr testgetroute testasyncsendto \
               testportinuse testssdppktgen testminissdp \
               testifacewatcher teststun testupnphttp \
-              testleasetable testoutgoingtable testmemmap testpinhole
+              testleasetable testoutgoingtable testmemmap testpinhole testfwsync
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -159,10 +160,10 @@ clean:
 	$(RM) $(TESTGETROUTEOBJS)
 	$(RM) $(TESTLEASETABLEOBJS)
 	$(RM) $(TESTOUTGOINGTABLEOBJS)
-	$(RM) testmemmap.o testpinhole.o
+	$(RM) testmemmap.o testpinhole.o testfwsync.o
 	$(RM) testssdppktgen.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen validateupnphttp
-	$(RM) validateleasetable validateoutgoingtable validatememmap validatepinhole
+	$(RM) validateleasetable validateoutgoingtable validatememmap validatepinhole validatefwsync
 
 install:	miniupnpd
 	$(STRIP) miniupnpd
@@ -176,7 +177,7 @@ install:	miniupnpd
 
 check:  validateupnppermissions validategetifaddr validatessdppktgen \
         validateupnphttp validateleasetable validateoutgoingtable validatememmap \
-        validatepinhole
+        validatepinhole validatefwsync
 
 validateupnppermissions: $(SRCDIR)/testupnppermissions.sh testupnppermissions
 	$(SRCDIR)/testupnppermissions.sh
@@ -208,6 +209,9 @@ validatememmap:	testmemmap
 
 validatepinhole:	testpinhole
 	./testpinhole
+
+validatefwsync:	testfwsync
+	./testfwsync
 	touch $@
 
 depend:	$(ALLSRCS)
@@ -272,6 +276,9 @@ testmemmap:	config.h $(TESTMEMMAPOBJS)
 
 testpinhole:	config.h $(TESTPINHOLEOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTPINHOLEOBJS)
+
+testfwsync:	config.h $(TESTFWSYNCOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTFWSYNCOBJS)
 
 # gmake :
 #	$(CC) $(CFLAGS) -o $@ $^
