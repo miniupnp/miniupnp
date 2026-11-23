@@ -1247,6 +1247,12 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 	if (!pcp_msg_info->is_fw) {
 		struct lease_entry * e, * own = NULL;
 		int foreign = 0;
+		/* RFC 6887 section 15.1: internal port 0 names an all-ports
+		 * mapping, which this server never makes. Deleting an absent
+		 * mapping succeeds (section 15), and the client keeps its
+		 * mappings of single ports. */
+		if (iport == 0)
+			return;
 		/* the client's mapping of the key: a row of kind PCP with the
 		 * nonce of the request */
 		lease_entry_init(&req, 0, NULL);
