@@ -737,6 +737,22 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 		return 1;
 	}
 #ifdef FW_MAP6
+	if (max_filters_per_map >= 0) {
+		/* the filters the map of the endpoint would have */
+		const struct lease_entry * e = lease_table_find_entry(req->proto, AF_INET6,
+		                                   &req->iaddr, req->iport, req->iport);
+		int n = e != NULL ? e->nfilters : 0;
+		for (i = 0; i < req->nfilters; i++) {
+			const struct map_filter * f = &req->filters[i];
+			if (e == NULL || lease_filter_find(e, &f->raddr, f->prefix, f->rport) == NULL)
+				n++;
+		}
+		if (n > max_filters_per_map) {
+			syslog(LOG_NOTICE, "map6 port %hu %s: %d filters, max_filters_per_map is %d",
+			       req->iport, proto_itoa(req->proto), n, max_filters_per_map);
+			return -1;
+		}
+	}
 	/* A UPnP filter gets its UniqueID from the table, which knows every
 	 * one in use. A PCP filter takes none, so PCP is not capped by them. */
 	for(i = 0; i < req->nfilters; i++) {

@@ -1704,6 +1704,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 					return 1;
 				}
 				break;
+			case UPNPMAXFILTERSPERMAP:
+				max_filters_per_map = atoi(ary_options[i].value);
+				if(max_filters_per_map < -1) {
+					INIT_PRINT_ERR("max_filters_per_map=%s: -1 (no limit) or a number of filters\n",
+					               ary_options[i].value);
+					return 1;
+				}
+				break;
 #ifdef IGD_V2
 			case UPNPFORCEIGDDESCV1:
 				if (strcmp(ary_options[i].value, "yes") == 0)

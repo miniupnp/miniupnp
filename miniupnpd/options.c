@@ -108,6 +108,7 @@ static const struct {
 #endif
 	{ UPNPMINISSDPDSOCKET, "minissdpdsocket"},
 	{ UPNPFIREWALLTRUST, "firewall_trust"},
+	{ UPNPMAXFILTERSPERMAP, "max_filters_per_map"},
 	{ UPNPSECUREMODE, "secure_mode"}
 };
 

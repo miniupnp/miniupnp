@@ -37,6 +37,10 @@ extern uint16_t ext_stun_port;
 #define FW_TRUST_TRUST	1
 extern int firewall_trust;
 
+/* The most filters a map may have, its remotes: a UPnP RemoteHost or a PCP
+ * FILTER each. A request past it is refused. -1 : no limit. */
+extern int max_filters_per_map;
+
 /* file the lease table and the outgoing table are written to on SIGUSR2,
  * for debugging. NULL : none */
 extern const char * table_dump_file;

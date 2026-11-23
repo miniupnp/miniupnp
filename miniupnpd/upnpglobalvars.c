@@ -27,6 +27,8 @@ uint16_t ext_stun_port = 0;
 
 int firewall_trust = FW_TRUST_CHECK;
 
+int max_filters_per_map = -1;
+
 const char * table_dump_file = 0;
 const char * table_stats_file = 0;
 

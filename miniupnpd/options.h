@@ -88,6 +88,7 @@ enum upnpconfigoptions {
 	UPNPTABLESTATSFILE,		/*!< table_stats_file */
 	UPNPMINISSDPDSOCKET,	/*!< minissdpdsocket */
 	UPNPFIREWALLTRUST,		/*!< firewall_trust */
+	UPNPMAXFILTERSPERMAP,		/*!< max_filters_per_map */
 #ifdef IGD_V2
 	UPNPFORCEIGDDESCV1,		/*!< force_igd_desc_v1 */
 #endif
