@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -39,6 +40,8 @@ enum map_kind { MAP_KIND_PCP = 1, MAP_KIND_NATPMP, MAP_KIND_UPNP };
 #define MAP_PREFER_FAILURE	0x01	/* the suggested external port or none:
 					 * PCP PREFER_FAILURE, UPnP AddPortMapping */
 
+struct lease_entry;
+
 /* One remote a mapping lets in. A mapping with no filter lets any remote
  * in. */
 struct map_filter {
@@ -48,30 +51,57 @@ struct map_filter {
 	unsigned short rport;	/* 0 : any port */
 	unsigned short uid;	/* the UniqueID of a UPnP IPv6 rule, 0 : none.
 				 * Set by upnp_add_inboundpinhole() */
+	struct lease_entry * map;	/* the map of the filter in the lease
+					 * table, NULL in a request */
 };
 
+/* A mapping: a request of a protocol, and the row of the lease table
+ * (lease_table.h) once it is linked. A request on the stack leaves the
+ * links of the table zero. */
 struct lease_entry {
+	/* the links of the lease table, see lease_table.h */
+	struct lease_entry * ext_next;	/* the next row in its external bucket */
+	struct lease_entry * int_next;	/* the next row in its internal bucket */
+	/* The port list: the rows UPnP reads by position, which are the IPv4
+	 * port mappings, oldest first. An IPv6 map is not on it. */
+	struct lease_entry * port_next;
+	struct lease_entry * port_prev;
+	/* Names the row for its life: the lease files link their lines by
+	 * it. lease_table_link() gives a row with 0 the next one. */
+	unsigned long long id;
+	unsigned int retry;	/* an expired row whose rules stay: the next try,
+				 * on the clock of upnp_time(). 0 : none */
+	int filters_alloc;	/* the room of filters, in a row of the table */
+	unsigned char row;	/* made by lease_table_new(): the table may link
+				 * it. 0 : a request on the stack */
+	unsigned char linked;	/* in the indexes of the lease table */
+	unsigned char fw_partial;	/* a failed change left a part of its rules:
+					 * not renewed as it is */
+	/* the mapping. The small fields first, then the addresses, so the row
+	 * has no holes. */
 	unsigned char kind;	/* enum map_kind */
-	unsigned char nonce[MAP_NONCE_LEN];	/* PCP, else zero */
 	unsigned char flags;	/* MAP_* bits */
-	int family;		/* of the internal side: AF_INET, AF_INET6 */
-	int proto;		/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
+	unsigned char family;	/* of the internal side: AF_INET, AF_INET6 */
+	unsigned char proto;	/* IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE */
+	unsigned char nonce[MAP_NONCE_LEN];	/* PCP, else zero */
 	struct in6_addr iaddr;
-	unsigned short iport;
 	/* The external side. IPv4: the WAN address, :: for that of
 	 * ext_if_name. IPv6 with no translation: iaddr and iport. eport is the
 	 * port asked for, 0 : any, and the port used once it is mapped. */
 	struct in6_addr eaddr;
+	unsigned short iport;
 	unsigned short eport;
-	struct map_filter * filters;	/* the caller's array. IPv4: NULL : any
-					 * remote. IPv6: always one filter, which
-					 * carries the uid; prefix 0 : any remote */
+	struct map_filter * filters;	/* the caller's array, or the row's
+					 * own. NULL : any remote. A UPnP IPv6
+					 * map: one filter per pinhole, which
+					 * carries its uid, prefix 0 : any
+					 * remote */
 	int nfilters;
+	unsigned int timestamp;	/* the expiry on the clock of upnp_time(),
+				 * 0 : none */
 	const char * label;	/* the text of the client: the UPnP description,
 				 * the PCP DESCRIPTION option. NULL : none.
 				 * The rule gets map_rule_desc() */
-	unsigned int timestamp;	/* the expiry on the clock of upnp_time(),
-				 * 0 : none */
 };
 
 /* One remote of an outgoing binding, with its own expiry. */
@@ -99,7 +129,8 @@ struct outgoing_entry {
 	int npeers;
 };
 
-/* An empty request of a protocol. nonce NULL : zero. */
+/* An empty request of a protocol. nonce NULL : zero. Not for a row of
+ * lease_table_new(): it would lose the filter array of the row. */
 static inline void
 lease_entry_init(struct lease_entry * r, int kind, const void * nonce)
 {
