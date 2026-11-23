@@ -23,18 +23,6 @@ no_translation(const struct lease_entry * e)
 	       memcmp(&e->eaddr, &e->iaddr, sizeof(e->iaddr)) == 0;
 }
 
-/* Only UPnP names its filters by a uid: PCP finds its own by its key and
- * remote. */
-static void
-uids_of_upnp_only(struct lease_entry * e)
-{
-	int i;
-	if(e->kind == MAP_KIND_UPNP)
-		return;
-	for(i = 0; i < e->nfilters; i++)
-		e->filters[i].uid = 0;
-}
-
 /* The remote of the one rule of a map with no filter: any host, any port. */
 static const struct map_filter any_remote;
 
@@ -93,7 +81,6 @@ memmap_add(struct lease_entry * e)
 {
 	if(!e->row)
 		return;
-	uids_of_upnp_only(e);
 	/* A new rule of a mapping has no row; one there is was left by a
 	 * rule the firewall lost, and the new rule takes its place. A new rule
 	 * without translation is a filter of the map of its endpoint. */
@@ -106,7 +93,6 @@ memmap_update(struct lease_entry * e, unsigned short iport_old)
 {
 	if(!e->row)
 		return;
-	uids_of_upnp_only(e);
 	/* the row of the rule as it was: UPnP may have changed its internal
 	 * port. A rule the table did not know becomes a row. */
 	put_row(e, lease_table_find_entry(e->proto, e->family, &e->iaddr, iport_old,

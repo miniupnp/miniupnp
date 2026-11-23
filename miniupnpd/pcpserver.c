@@ -1068,10 +1068,9 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 {
 #ifdef ENABLE_UPNPPINHOLE
-	int uid;
 	int r;
 	struct lease_entry * req;
-	const struct lease_entry * old = NULL;
+	const struct lease_entry * old;
 	/* the request: an IPv6 firewall rule of any remote, on the internal
 	 * side */
 	req = lease_table_new(0);
@@ -1081,25 +1080,24 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	req->eaddr = req->iaddr;
 	req->eport = req->iport;
 	req->timestamp = upnp_time() + pcp_msg_info->lifetime;
-	/* first check if pinhole already exists */
-	uid = upnp_find_inboundpinhole(req, &old);
-	if(uid >= 0) {
-		/* pinhole already exists, updating */
+	/* the IPv6 map of the internal side, if there is one */
+	old = upnp_find_inboundpinhole(req);
+	if(old != NULL) {
 		if (!pcp_own_map(old, req)) {
 			/* nonce does not match */
-			syslog(LOG_ERR, "Unauthorized to update pinhole %d of %s:%hu",
-			       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port);
+			syslog(LOG_ERR, "Unauthorized to update the IPv6 map of %s:%hu",
+			       pcp_msg_info->mapped_str, pcp_msg_info->int_port);
 			/* the refusal lasts until the pinhole expires */
 			if (old->timestamp > upnp_time())
 				pcp_msg_info->error_lifetime = old->timestamp - upnp_time();
 			lease_table_free(req);
 			return PCP_ERR_NOT_AUTHORIZED;
 		}
-		syslog(LOG_INFO, "updating pinhole %d to %s:%hu %s",
-		       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		syslog(LOG_INFO, "renewing the IPv6 map of %s:%hu %s",
+		       pcp_msg_info->mapped_str, pcp_msg_info->int_port,
 		       proto_itoa(pcp_msg_info->protocol));
 		/* a renewal changes the row of the pinhole in place */
-		r = upnp_update_inboundpinhole(req, (unsigned short)uid);
+		r = upnp_update_inboundpinhole(req, 0);
 		lease_table_free(req);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
@@ -1219,14 +1217,13 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 		r = upnp_delete_map(own);
 	} else {
 #ifdef ENABLE_UPNPPINHOLE
-		int uid;
-		const struct lease_entry * old = NULL;
+		const struct lease_entry * old;
 		lease_entry_init(&req, 0, NULL);
 		fill_lease_entry(pcp_msg_info, &req);
 		req.eaddr = req.iaddr;
 		req.eport = req.iport;
-		uid = upnp_find_inboundpinhole(&req, &old);
-		if (uid < 0) {
+		old = upnp_find_inboundpinhole(&req);
+		if (old == NULL) {
 			syslog(LOG_ERR, "Failed to find mapping to %s:%hu, protocol %s",
 			       pcp_msg_info->mapped_str, iport, proto_itoa(pcp_msg_info->protocol));
 			return;
@@ -1238,7 +1235,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				       iport, proto_itoa(pcp_msg_info->protocol));
 				return;
 			} else {
-				r = upnp_delete_inboundpinhole(&req, (unsigned short)uid);
+				r = upnp_delete_inboundpinhole(&req, 0);
 			}
 		}
 #else

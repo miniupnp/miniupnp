@@ -550,8 +550,8 @@ int reload_from_lease_file6(void)
 
 #endif
 
-int
-upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** row)
+const struct lease_entry *
+upnp_find_inboundpinhole(struct lease_entry * req)
 {
 	/* a request with no filter is the rule of any remote */
 	static const struct map_filter any_remote;
@@ -561,22 +561,18 @@ upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** r
 
 	e = lease_table_find_entry(req->proto, AF_INET6, &req->iaddr, req->iport, req->iport);
 	if(e == NULL)
-		return -2;
+		return NULL;
 	if(e->nfilters > 0) {
 		f = lease_filter_find(e, &r->raddr, r->prefix, r->rport);
 		if(f == NULL)
-			return -2;
+			return NULL;
+		/* only UPnP names a filter by a uid */
+		if(req->kind == MAP_KIND_UPNP && req->nfilters > 0)
+			req->filters[0].uid = f->uid;
 	} else if(r->prefix != 0 || r->rport != 0) {
-		return -2;	/* a map with no filter: its one rule is of any remote */
+		return NULL;	/* a map with no filter: its one rule is of any remote */
 	}
-	if(row != NULL)
-		*row = e;
-	/* the uid of a UPnP filter; a PCP map has none, 0 */
-	if(f == NULL)
-		return 0;
-	if(req->nfilters > 0)
-		req->filters[0].uid = f->uid;
-	return f->uid;
+	return e;
 }
 
 /* upnp_add_inboundpinhole()
@@ -587,7 +583,7 @@ upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** r
 int
 upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 {
-	int r, i, uid;
+	int r, i, uid = 0;
 #ifdef ENABLE_LEASEFILE
 	char desc_buf[64];
 	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
@@ -598,10 +594,10 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 #endif
 	struct fw_change c;
 
-	uid = upnp_find_inboundpinhole(req, NULL);
-	if(uid >= 0) {
-		syslog(LOG_INFO, "pinhole to port %hu %s found uid=%d, renewing it",
-		       req->iport, proto_itoa(req->proto), uid);
+	if(upnp_find_inboundpinhole(req) != NULL) {
+		syslog(LOG_INFO, "map6 port %hu %s found, renewing it",
+		       req->iport, proto_itoa(req->proto));
+		uid = req->nfilters > 0 ? req->filters[0].uid : 0;
 		r = upnp_update_inboundpinhole(req, (unsigned short)uid);
 		if (r < 0)
 			return r;
@@ -639,13 +635,9 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 		}
 	}
 	/* A UPnP filter gets its UniqueID from the table, which knows every
-	 * one in use. A PCP filter takes none, so PCP is not capped by them. */
-	for(i = 0; i < req->nfilters; i++) {
+	 * one in use. PCP uses none, so it is not capped by them. */
+	for(i = 0; req->kind == MAP_KIND_UPNP && i < req->nfilters; i++) {
 		struct map_filter * f = &req->filters[i];
-		if(req->kind != MAP_KIND_UPNP) {
-			f->uid = 0;
-			continue;
-		}
 		if(f->uid == 0 || lease_table_find_uid(f->uid) != NULL)
 			f->uid = lease_table_new_uid();
 		if(f->uid == 0) {
@@ -821,8 +813,8 @@ upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 		f = lease_table_find_uid(uid);
 		if(f != NULL)
 			e = f->map;
-	} else if(upnp_find_inboundpinhole((struct lease_entry *)req, &e) < 0) {
-		e = NULL;
+	} else {
+		e = upnp_find_inboundpinhole((struct lease_entry *)req);
 	}
 	if(e == NULL)
 		return -1;
@@ -867,8 +859,15 @@ upnp_delete_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 	fw_change_init(&c, FW_DELETE, NULL, req);
 	ret = fw_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
-	if (ret == 0)
-		lease_file6_remove((const char *)"*", 0, 0, uid);
+	if (ret == 0) {
+		/* a UPnP filter has its uid on its line; a PCP map has none,
+		 * and its line is that of its endpoint */
+		char iaddr[INET6_ADDRSTRLEN];
+		if (uid != 0)
+			lease_file6_remove("*", 0, 0, uid);
+		else if (map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr)) != NULL)
+			lease_file6_remove(iaddr, req->iport, req->proto, -1);
+	}
 #endif
 	if (ret == 0)
 		memmap_delete_filter(req);

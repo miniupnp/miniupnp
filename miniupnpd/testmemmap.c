@@ -178,13 +178,13 @@ test_ipv6(void)
 	req.nfilters = 1;
 	memmap_delete_filter(&req);
 	assert(lease_table_count() == 1 && m->nfilters == 1);
-	/* PCP: no uid in the table; the delete by its remote, the map with its
-	 * last filter */
-	p = row6("2001:db8::20", 4100, "::", 9, 500);
+	/* PCP uses no uid; the delete by its remote, the map with its last
+	 * filter */
+	p = row6("2001:db8::20", 4100, "::", 0, 500);
 	p->kind = MAP_KIND_PCP;
 	p->filters[0].prefix = 0;	/* any remote */
 	memmap_add(p);
-	assert(lease_table_count() == 2 && p->filters[0].uid == 0 && lease_table_find_uid(9) == NULL);
+	assert(lease_table_count() == 2 && p->filters[0].uid == 0);
 	req.iaddr = req.eaddr = addr("2001:db8::20");
 	req.iport = req.eport = 4100;
 	memset(&rf, 0, sizeof(rf));

@@ -46,6 +46,14 @@ proto_itoa(int proto)
 }
 
 int firewall_trust = FW_TRUST_CHECK;
+int max_filters_per_map = -1;	/* no limit */
+
+/* the expiry pass of upnpredirect.c: not run here */
+void
+next_to_clean(unsigned int ts)
+{
+	(void)ts;
+}
 
 /* the fake fwsync: a map6 row has one rule per filter, and a row with no
  * filter one rule of any remote */
@@ -188,7 +196,6 @@ test_pcp_no_filter(void)
 {
 	struct in6_addr i = addr("2001:db8::10");
 	struct lease_entry * req, * row, del;
-	int uid;
 
 	lease_table_clear();
 	req = pcp_map("2001:db8::10", 4000, 2000);
@@ -197,11 +204,10 @@ test_pcp_no_filter(void)
 	assert(row == req && row->nfilters == 0 && lease_table_filter_count() == 0);
 	assert(rule_count() == 1 && rules[0].rhost[0] == '\0' && rules[0].rport == 0);
 	assert(strcmp(rules[0].iaddr, "2001:db8::10") == 0 && rules[0].iport == 4000);
-	/* the renewal of PCP: found by its key, which has no uid */
+	/* the renewal of PCP: found by its key; PCP uses no uid */
 	req = pcp_map("2001:db8::10", 4000, 3000);
-	uid = upnp_find_inboundpinhole(req, NULL);
-	assert(uid == 0);
-	assert(upnp_update_inboundpinhole(req, (unsigned short)uid) == 0);
+	assert(upnp_find_inboundpinhole(req) == row);
+	assert(upnp_update_inboundpinhole(req, 0) == 0);
 	lease_table_free(req);
 	assert(rule_count() == 1 && row->timestamp == 3000);
 	assert(row->nfilters == 0);
@@ -217,9 +223,8 @@ test_pcp_no_filter(void)
 	del.proto = IPPROTO_UDP;
 	del.iaddr = del.eaddr = i;
 	del.iport = del.eport = 4000;
-	uid = upnp_find_inboundpinhole(&del, NULL);
-	assert(uid >= 0);
-	assert(upnp_delete_inboundpinhole(&del, (unsigned short)uid) == 0);
+	assert(upnp_find_inboundpinhole(&del) == row);
+	assert(upnp_delete_inboundpinhole(&del, 0) == 0);
 	assert(rule_count() == 0 && lease_table_count() == 0);
 	lease_table_clear();
 }

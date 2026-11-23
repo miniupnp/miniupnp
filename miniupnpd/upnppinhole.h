@@ -28,14 +28,12 @@ int
 upnp_check_outbound_pinhole(int proto, int * timeout);
 #endif
 
-/* find the inbound pinhole of req in the lease table: the remote of its
- * filter (any remote if it has none), and its internal side. Sets the uid
- * of the filter, and *row to the row of the pinhole (its owner and expiry)
- * if row is not NULL. A PCP map has no uid in the table: the firewall gives
- * that of its rule.
- * return the (positive) uid or a negative value if not found */
-int
-upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** row);
+/* find the IPv6 map of req in the lease table, by the internal side and
+ * the remote of its filter (any remote if it has none): its row (owner,
+ * expiry), or NULL. For a UPnP request, sets the uid of the filter, its
+ * UniqueID; PCP uses none. */
+const struct lease_entry *
+upnp_find_inboundpinhole(struct lease_entry * req);
 
 
 /* add an inbound pinhole, or renew the one of the same remote and
