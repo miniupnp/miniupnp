@@ -2619,6 +2619,9 @@ def cleanup_request(original, port=None):
         return dict(original, action="DeletePortMapping", external_port=port or original["external_port"])
     if family == "NAT-PMP":
         return dict(original, public_port=0, lifetime=0)
+    if original.get("opcode") == "PEER":
+        # RFC 6887 section 11.1: a PEER can not delete a mapping (lifetime 0); it expires
+        return None
     delete = dict(original, lifetime=0)
     for field in PCP_ONLY_FIELDS:
         delete.pop(field, None)

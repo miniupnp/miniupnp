@@ -1417,9 +1417,10 @@ class SecondClientTests(unittest.TestCase):
         with lib_test.client_sockets(SimpleNamespace(second_client=None, family="ipv4")) as clients:
             self.assertEqual(clients, {})
 
-    def test_cleanup_deletes_a_peer_mapping_with_lifetime_zero(self):
+    def test_cleanup_leaves_a_peer_mapping_to_expire(self):
+        # RFC 6887 section 11.1: a PEER with lifetime 0 can not delete
         peer = {"opcode": "PEER", "lifetime": 100, "remote_peer": "allowed-peer", "filter": {}}
-        self.assertEqual(lib_test.cleanup_request(peer), {"opcode": "PEER", "lifetime": 0, "remote_peer": "allowed-peer"})
+        self.assertIsNone(lib_test.cleanup_request(peer))
 
     def case_run(self, send, traffic=None):
         args = SimpleNamespace(client_address="10.0.0.2", family="ipv4", external_address="198.51.100.1")
