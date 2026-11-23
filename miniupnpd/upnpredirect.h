@@ -153,15 +153,6 @@ upnp_delete_map(struct lease_entry * e);
 int
 upnp_delete_port(unsigned short eport, int proto);
 
-/*! \brief delete the rules of (external port, protocol) and their lease
- * file line, and nothing in the lease table: the firewall part of
- * upnp_delete_map(), and the delete of a PCP PEER, which has no row there.
- * \param[in] eport external port
- * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
- * \return 0 on success, -1 on failure*/
-int
-_upnp_delete_redir(unsigned short eport, int proto);
-
 /* upnp_eport_used_by_other()
  * is the external port req->eport of req->eaddr mapped, on any protocol,
  * to another internal address than req->iaddr ?  RFC 6886 section 3.3:

@@ -15,9 +15,11 @@
 #include <netinet/in.h>
 
 #include "config.h"
+#include "commonrdr.h"
 #include "fwsync.h"
 
 const char * ext_if_name = "wan";
+const char * ext_if_name6 = "wan";
 
 static int fail_add_redirect;	/* add_redirect_rule2() call number N fails */
 static int redirect_calls;
@@ -135,6 +137,70 @@ update_portmapping_desc_timestamp(const char * ifname, unsigned short eport, int
 	return 0;
 }
 
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+static int peer_adds, fail_peer_add;
+static int peer_present;	/* get_peer_rule_by_index() lists the PEER rule */
+
+int
+add_peer_redirect_rule2(const char * ifname, const char * rhost, unsigned short rport,
+                        const char * eaddr, unsigned short eport,
+                        const char * iaddr, unsigned short iport, int proto,
+                        const char * desc, unsigned int timestamp)
+{
+	(void)ifname; (void)rhost; (void)rport; (void)eaddr; (void)eport;
+	(void)iaddr; (void)iport; (void)proto; (void)desc; (void)timestamp;
+	if(peer_adds + 1 == fail_peer_add)
+		return -1;
+	peer_adds++;
+	return 0;
+}
+
+/* the PEER rule of each key goes, or is not there (peer_present 0) */
+int
+outgoing_rule_delete(struct outgoing_rule_key * keys, int n)
+{
+	int i;
+
+	if(fail_delete)
+		return -1;
+	for(i = 0; i < n; i++) {
+		keys[i].result = peer_present ? 0 : -2;
+		if(peer_present)
+			deletes++;
+	}
+	peer_present = 0;
+	return 0;
+}
+
+int
+add_peer_dscp_rule2(const char * ifname, const char * rhost, unsigned short rport,
+                    unsigned char dscp, const char * iaddr, unsigned short iport,
+                    int proto, const char * desc, unsigned int timestamp)
+{
+	(void)ifname; (void)rhost; (void)rport; (void)dscp; (void)iaddr;
+	(void)iport; (void)proto; (void)desc; (void)timestamp;
+	return 0;
+}
+
+int
+get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
+                       char * iaddr, int iaddrlen, unsigned short * iport,
+                       int * proto, char * desc, int desclen,
+                       char * rhost, int rhostlen, unsigned short * rport,
+                       unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+{
+	(void)ifname; (void)iaddr; (void)iaddrlen; (void)desc; (void)desclen;
+	(void)rhost; (void)rhostlen; (void)timestamp; (void)packets; (void)bytes;
+	if(index > 0 || !peer_present)
+		return -1;
+	*eport = 6000;
+	*iport = 5000;
+	*proto = IPPROTO_UDP;
+	*rport = 7000;
+	return 0;
+}
+#endif
+
 static void
 reset(void)
 {
@@ -145,6 +211,11 @@ reset(void)
 	rule_present = 1;
 	adds = deletes = updates = 0;
 	last_update_iport = 0;
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	peer_adds = 0;
+	fail_peer_add = 0;
+	peer_present = 1;
+#endif
 }
 
 /* an IPv4 UPnP port mapping 192.168.1.<host>:iport <- eport */
@@ -308,6 +379,74 @@ test_delete_taken_back(void)
 	CHECK(c[0].applied == FW_NOT_APPLIED);
 }
 
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+/* a PEER binding 192.168.1.10:5000 -> 203.0.113.1:6000 to 198.51.100.7:7000 */
+static void
+binding(struct outgoing_entry * b, struct outgoing_peer * p)
+{
+	int family;
+
+	memset(b, 0, sizeof(*b));
+	memset(p, 0, sizeof(*p));
+	b->family = AF_INET;
+	b->proto = IPPROTO_UDP;
+	map_pton("192.168.1.10", &family, &b->iaddr);
+	map_pton("203.0.113.1", &family, &b->eaddr);
+	b->iport = 5000;
+	b->eport = 6000;
+	map_pton("198.51.100.7", &family, &p->raddr);
+	p->rport = 7000;
+	b->peers = p;
+	b->npeers = 1;
+}
+
+/* A PEER add, a delete of a PEER rule the firewall lost, which succeeds,
+ * and a delete the firewall refuses. */
+static void
+test_peer(void)
+{
+	struct outgoing_entry b;
+	struct outgoing_peer p;
+	struct fw_out_change c;
+
+	reset();
+	binding(&b, &p);
+	fw_out_change_init(&c, FW_OUT_ADD, &b, 0);
+	CHECK(fw_sync_out(&c, 1) == 0);
+	CHECK(peer_adds == 1);
+
+	reset();
+	fw_out_change_init(&c, FW_OUT_DELETE, &b, 0);
+	peer_present = 0;
+	CHECK(fw_sync_out(&c, 1) == 0);
+	CHECK(deletes == 0);
+
+	reset();
+	fw_out_change_init(&c, FW_OUT_DELETE, &b, 0);
+	fail_delete = 1;
+	CHECK(fw_sync_out(&c, 1) < 0);
+	CHECK(c.applied == FW_NOT_APPLIED);
+}
+
+/* two PEER adds, the second fails: the first goes again */
+static void
+test_peer_taken_back(void)
+{
+	struct outgoing_entry b;
+	struct outgoing_peer p;
+	struct fw_out_change c[2];
+
+	reset();
+	binding(&b, &p);
+	fw_out_change_init(&c[0], FW_OUT_ADD, &b, 0);
+	fw_out_change_init(&c[1], FW_OUT_ADD, &b, 0);
+	fail_peer_add = 2;
+	CHECK(fw_sync_out(c, 2) < 0);
+	CHECK(peer_adds == 1 && deletes == 1);
+	CHECK(c[0].applied == FW_NOT_APPLIED);
+}
+#endif
+
 int
 main(void)
 {
@@ -318,6 +457,10 @@ main(void)
 	test_filter_fails();
 	test_delete_lost_rule();
 	test_delete_taken_back();
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	test_peer();
+	test_peer_taken_back();
+#endif
 	if(failures) {
 		fprintf(stderr, "testfwsync: %d check(s) failed\n", failures);
 		return 1;

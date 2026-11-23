@@ -694,29 +694,6 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
 	return -1;
 }
 
-int
-_upnp_delete_redir(unsigned short eport, int proto)
-{
-	int r;
-
-#if defined(__linux__)
-	r = delete_redirect_and_filter_rules(eport, proto);
-#elif defined(USE_PF)
-	r = delete_redirect_and_filter_rules(ext_if_name, eport, proto);
-#else
-	r = delete_redirect_rule(ext_if_name, eport, proto);
-	delete_filter_rule(ext_if_name, eport, proto);
-#endif
-#ifdef ENABLE_LEASEFILE
-	lease_file_remove(eport, proto);
-#endif
-
-#ifdef ENABLE_EVENTS
-	upnp_event_var_change_notify(EWanIPC);
-#endif
-	return r;
-}
-
 struct lease_entry *
 upnp_check_map(struct lease_entry * e)
 {
@@ -835,23 +812,6 @@ upnp_get_portmapping_number_of_entries(void)
 /* seconds before an expired mapping whose rules stayed is deleted again */
 #define EXPIRY_RETRY	60
 
-#ifdef PCP_PEER
-/* Delete the PEER rules of the keys of expired peers: one transaction. */
-static void
-expire_peer_rules(struct outgoing_rule_key * keys, int n)
-{
-	int i;
-
-	if(outgoing_rule_delete(keys, n) < 0) {
-		syslog(LOG_WARNING, "%d expired PEER mappings, their rules were not deleted", n);
-		return;
-	}
-	for(i = 0; i < n; i++)
-		if(keys[i].result != 0)
-			syslog(LOG_INFO, "expired PEER mapping %hu %s had no rule",
-			       keys[i].eport, proto_itoa(keys[i].proto));
-}
-#endif
 
 void
 upnp_expire_mappings(void)
@@ -859,9 +819,9 @@ upnp_expire_mappings(void)
 	struct lease_entry * e, * next;
 	unsigned int now = (unsigned int)upnp_time();
 #ifdef PCP_PEER
-	struct outgoing_rule_key keys[OUTGOING_RULE_DELETE_MAX], * k;
 	struct outgoing_entry * b;
-	int i, n = 0;
+	struct fw_out_change c;
+	int i;
 #endif
 
 	nextruletoclean_timestamp = 0;
@@ -902,25 +862,18 @@ upnp_expire_mappings(void)
 			}
 			syslog(LOG_NOTICE, "remove PEER mapping %hu %s because it has expired",
 			       b->eport, proto_itoa(b->proto));
-			if(!IN6_IS_ADDR_V4MAPPED(&b->iaddr) ||
-			   !IN6_IS_ADDR_V4MAPPED(&b->peers[i].raddr))
-				continue;	/* no IPv6 PEER rules */
-			k = &keys[n++];
-			memcpy(&k->iaddr, &b->iaddr.s6_addr[12], sizeof(k->iaddr));
-			memcpy(&k->raddr, &b->peers[i].raddr.s6_addr[12], sizeof(k->raddr));
-			k->iport = b->iport;
-			k->rport = b->peers[i].rport;
-			k->eport = b->eport;
-			k->proto = b->proto;
-			if(n == OUTGOING_RULE_DELETE_MAX) {
-				expire_peer_rules(keys, n);
-				n = 0;
+			fw_out_change_init(&c, FW_OUT_DELETE, b, i);
+			if(fw_sync_out(&c, 1) < 0) {
+				/* the rule stays: so does the peer, which is
+				 * tried again later */
+				b->peers[i].timestamp = now + EXPIRY_RETRY;
+				next_to_clean(b->peers[i].timestamp);
+				syslog(LOG_WARNING, "PEER mapping %hu %s expired, its rule was not deleted, "
+				       "next try in %d s", b->eport, proto_itoa(b->proto), EXPIRY_RETRY);
 			}
 		}
 	}
-	if(n > 0)
-		expire_peer_rules(keys, n);
-	/* the peers go also if their rules do not, as the port mappings do */
+	/* the expired PEER rules went above */
 	memmap_outgoing_expired(now);
 #endif
 }

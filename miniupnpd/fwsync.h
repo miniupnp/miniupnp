@@ -50,10 +50,35 @@ struct fw_change {
 void fw_change_init(struct fw_change * c, enum fw_op op,
                     const struct lease_entry * row, const struct lease_entry * old);
 
+
 /* Send the changes of one request to the firewall. 0: all are applied.
  * < 0: the request failed, and each change says if it is applied all the
  * same. */
 int fw_sync(struct fw_change * changes, int n);
+
+/* The outgoing side, apart from the incoming maps as the outgoing table is
+ * apart from the lease table: the PEER rules (SNAT) of the bindings. They
+ * exist with PCP_PEER on netfilter only; elsewhere a change fails. */
+enum fw_out_op {
+	FW_OUT_ADD,	/* add the rules of binding b to its peer number peer */
+	FW_OUT_DELETE	/* delete the rules of binding b to its peer number peer */
+};
+
+struct fw_out_change {
+	enum fw_out_op op;
+	const struct outgoing_entry * b;	/* the binding, with its external port */
+	int peer;			/* the index of the peer in b */
+	unsigned char dscp_up;		/* FW_OUT_ADD: PCP FLOWDATA, 0 : none */
+	unsigned char dscp_down;
+	enum fw_applied applied;	/* set by fw_sync_out() */
+};
+
+void fw_out_change_init(struct fw_out_change * c, enum fw_out_op op,
+                        const struct outgoing_entry * b, int peer);
+
+/* Send the outgoing changes of one request, as fw_sync() does the
+ * incoming ones: in order, and those before a failure taken back. */
+int fw_sync_out(struct fw_out_change * changes, int n);
 
 /* The redirect rule of an IPv4 port mapping, and its counters: 0, -2 if the
  * firewall has no such rule, or -1 if the firewall could not be read.

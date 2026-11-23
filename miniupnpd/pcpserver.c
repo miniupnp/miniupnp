@@ -80,6 +80,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "pcplearndscp.h"
 #include "upnpredirect.h"
 #include "memmap.h"
+#include "fwsync.h"
 #include "commonrdr.h"
 #include "getifaddr.h"
 #include "asyncsendto.h"
@@ -712,15 +713,6 @@ static void FillSA(struct sockaddr *sa, const struct in6_addr *in6,
 	}
 }
 
-static const char* inet_satop(struct sockaddr* sa, char* buf, size_t buf_len)
-{
-	if (sa->sa_family == AF_INET) {
-		return inet_ntop(AF_INET, &(((struct sockaddr_in*)sa)->sin_addr), buf, buf_len);
-	} else {
-		return inet_ntop(AF_INET6, &(((struct sockaddr_in6*)sa)->sin6_addr), buf, buf_len);
-	}
-}
-
 /* Fill req, an empty entry with one peer (a binding of
  * outgoing_table_new(), or a request on the stack), as a PCP PEER: its
  * nonce, protocol, internal side, the suggested external side and the
@@ -748,32 +740,19 @@ static int add_peer_rules(pcp_info_t *pcp_msg_info, struct outgoing_entry *b)
 {
 	struct sockaddr_storage intip;
 	struct sockaddr_storage peerip;
-	struct sockaddr_storage extip;
 	struct sockaddr_storage ret_extip = {0};
 
 	uint8_t  proto = pcp_msg_info->protocol;
 
 	uint16_t eport = pcp_msg_info->ext_port;  /* public port */
 
-	char peerip_s[INET6_ADDRSTRLEN], extip_s[INET6_ADDRSTRLEN];
-	char desc[64];
-	unsigned int timestamp;
-	int r;
-	const char * ext_if = ext_if_name;
 	const struct outgoing_entry *old;
-
-	outgoing_rule_desc(b, desc, sizeof(desc));
-	timestamp = b->peers[0].timestamp;
+	struct fw_out_change c;
 
 	FillSA((struct sockaddr*)&intip, pcp_msg_info->mapped_ip,
 	       pcp_msg_info->int_port);
 	FillSA((struct sockaddr*)&peerip, pcp_msg_info->peer_ip,
 	       pcp_msg_info->peer_port);
-	FillSA((struct sockaddr*)&extip, pcp_msg_info->ext_ip,
-	       eport);
-
-	inet_satop((struct sockaddr*)&peerip, peerip_s, sizeof(peerip_s));
-	inet_satop((struct sockaddr*)&extip, extip_s, sizeof(extip_s));
 
 	/* RFC 6887 section 12.3: "if the internal port, protocol, and
 	 * internal address match a mapping that already exists, but the
@@ -826,57 +805,19 @@ static int add_peer_rules(pcp_info_t *pcp_msg_info, struct outgoing_entry *b)
 		eport = pcp_msg_info->int_port;
 	}
 
-#ifdef ENABLE_IPV6
-	if (ret_extip.ss_family == AF_INET6) {
-		ext_if = ext_if_name6;
-	}
-#endif
-#ifdef PCP_FLOWP
-	if (pcp_msg_info->flowp_present && pcp_msg_info->dscp_up) {
-		if (add_peer_dscp_rule2(ext_if, peerip_s,
-					pcp_msg_info->peer_port, pcp_msg_info->dscp_up,
-					pcp_msg_info->mapped_str, pcp_msg_info->int_port,
-					proto, desc, timestamp) < 0 ) {
-			syslog(LOG_ERR, "PCP: failed to add flowp upstream mapping %s:%hu->%s:%hu '%s'",
-			       pcp_msg_info->mapped_str,
-			       pcp_msg_info->int_port,
-			       peerip_s,
-			       pcp_msg_info->peer_port,
-			       desc);
-			return PCP_ERR_NO_RESOURCES;
-		}
-	}
-
-	if (pcp_msg_info->flowp_present && pcp_msg_info->dscp_down) {
-		if (add_peer_dscp_rule2(ext_if,  pcp_msg_info->mapped_str,
-					pcp_msg_info->int_port, pcp_msg_info->dscp_down,
-					peerip_s, pcp_msg_info->peer_port, proto, desc, timestamp)
-		    < 0 ) {
-			syslog(LOG_ERR, "PCP: failed to add flowp downstream mapping %s:%hu->%s:%hu '%s'",
-			       pcp_msg_info->mapped_str,
-			       pcp_msg_info->int_port,
-			       peerip_s,
-			       pcp_msg_info->peer_port,
-			       desc);
-			pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
-			return PCP_ERR_NO_RESOURCES;
-		}
-	}
-#endif
-
-	r = add_peer_redirect_rule2(ext_if,
-				    peerip_s,
-				    pcp_msg_info->peer_port,
-				    extip_s,
-				    eport,
-				    pcp_msg_info->mapped_str,
-				    pcp_msg_info->int_port,
-				    pcp_msg_info->protocol,
-				    desc,
-				    timestamp);
-	if (r < 0)
-		return PCP_ERR_NO_RESOURCES;
 	b->eport = eport;
+	fw_out_change_init(&c, FW_OUT_ADD, b, 0);
+#ifdef PCP_FLOWP
+	if (pcp_msg_info->flowp_present) {
+		c.dscp_up = pcp_msg_info->dscp_up;
+		c.dscp_down = pcp_msg_info->dscp_down;
+	}
+#endif
+	if (fw_sync_out(&c, 1) < 0) {
+		if (c.applied != FW_NOT_APPLIED)
+			syslog(LOG_WARNING, "PCP PEER: a DSCP rule of port %hu stays", eport);
+		return PCP_ERR_NO_RESOURCES;
+	}
 	pcp_msg_info->ext_port = eport;
 	return PCP_SUCCESS;
 }

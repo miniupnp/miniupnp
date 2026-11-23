@@ -176,6 +176,91 @@ update_rules(const struct lease_entry * from, const struct lease_entry * to)
 	                                         r.timestamp);
 }
 
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+/* Add the PEER rule of b to its peer p, after its DSCP rules (PCP
+ * FLOWDATA). *half is set when a DSCP rule stays although the add failed:
+ * no function deletes a DSCP rule alone. */
+static int
+add_peer_rules(const struct fw_out_change * c, int * half)
+{
+	const struct outgoing_entry * b = c->b;
+	const struct outgoing_peer * p = &b->peers[c->peer];
+	char iaddr[INET6_ADDRSTRLEN], eaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN];
+	char desc[64];
+	const char * ifname = ext_if_name;
+
+#ifdef ENABLE_IPV6
+	if(b->family == AF_INET6)
+		ifname = ext_if_name6;
+#endif
+	if(map_ntop(b->family, &b->iaddr, iaddr, sizeof(iaddr)) == NULL ||
+	   map_ntop(b->family, &b->eaddr, eaddr, sizeof(eaddr)) == NULL ||
+	   map_ntop(b->family, &p->raddr, raddr, sizeof(raddr)) == NULL)
+		return -1;
+	outgoing_rule_desc(b, desc, sizeof(desc));
+#ifdef PCP_FLOWP
+	if(c->dscp_up &&
+	   add_peer_dscp_rule2(ifname, raddr, p->rport, c->dscp_up, iaddr, b->iport,
+	                       b->proto, desc, p->timestamp) < 0)
+		return -1;
+	if(c->dscp_down &&
+	   add_peer_dscp_rule2(ifname, iaddr, b->iport, c->dscp_down, raddr, p->rport,
+	                       b->proto, desc, p->timestamp) < 0) {
+		*half = c->dscp_up != 0;
+		return -1;
+	}
+#endif
+	if(add_peer_redirect_rule2(ifname, raddr, p->rport, eaddr, b->eport, iaddr,
+	                           b->iport, b->proto, desc, p->timestamp) < 0) {
+		*half = c->dscp_up != 0 || c->dscp_down != 0;
+		return -1;
+	}
+	return 0;
+}
+
+/* Delete the PEER rule of peer c->peer of c->b, with its DSCP rules,
+ * found by its full key: the other peers of the binding and a map on its
+ * port keep theirs. 0 also when the firewall no longer has it. */
+static int
+delete_peer_rules(const struct fw_out_change * c)
+{
+	const struct outgoing_entry * b = c->b;
+	const struct outgoing_peer * p = &b->peers[c->peer];
+	struct outgoing_rule_key k;
+
+	/* no IPv6 PEER rules */
+	if(!IN6_IS_ADDR_V4MAPPED(&b->iaddr) || !IN6_IS_ADDR_V4MAPPED(&p->raddr))
+		return 0;
+	memset(&k, 0, sizeof(k));
+	memcpy(&k.iaddr, &b->iaddr.s6_addr[12], sizeof(k.iaddr));
+	memcpy(&k.raddr, &p->raddr.s6_addr[12], sizeof(k.raddr));
+	k.iport = b->iport;
+	k.rport = p->rport;
+	k.eport = b->eport;
+	k.proto = b->proto;
+	if(outgoing_rule_delete(&k, 1) < 0)
+		return -1;
+	if(k.result != 0)
+		syslog(LOG_INFO, "PEER port %hu %s has no rule in the firewall, its peer goes",
+		       b->eport, proto_itoa(b->proto));
+	return 0;
+}
+#else
+static int
+add_peer_rules(const struct fw_out_change * c, int * half)
+{
+	UNUSED(c); UNUSED(half);
+	return -1;
+}
+
+static int
+delete_peer_rules(const struct fw_out_change * c)
+{
+	UNUSED(c);
+	return -1;
+}
+#endif
+
 /* Send one change. The result of the backend, and *half as for add_rules(). */
 static int
 send_change(const struct fw_change * c, int * half)
@@ -238,6 +323,75 @@ fw_sync(struct fw_change * c, int n)
 			c[i].applied = FW_NOT_APPLIED;
 		else
 			syslog(LOG_WARNING, "fw_sync: change %d of %d stays", i + 1, n);
+	}
+	return r < 0 ? r : -1;
+}
+
+void
+fw_out_change_init(struct fw_out_change * c, enum fw_out_op op,
+                   const struct outgoing_entry * b, int peer)
+{
+	memset(c, 0, sizeof(*c));
+	c->op = op;
+	c->b = b;
+	c->peer = peer;
+}
+
+static int
+send_out_change(const struct fw_out_change * c, int * half)
+{
+	switch(c->op) {
+	case FW_OUT_ADD:
+		return add_peer_rules(c, half);
+	case FW_OUT_DELETE:
+		return delete_peer_rules(c);
+	}
+	return -1;
+}
+
+static int
+undo_out_change(struct fw_out_change * c)
+{
+	int half = 0, r;
+
+	switch(c->op) {
+	case FW_OUT_ADD:
+		return delete_peer_rules(c);
+	case FW_OUT_DELETE:
+		r = add_peer_rules(c, &half);
+		if(half)
+			c->applied = FW_HALF_APPLIED;
+		return r;
+	}
+	return -1;
+}
+
+/* As fw_sync(), for the outgoing changes. */
+int
+fw_sync_out(struct fw_out_change * c, int n)
+{
+	int i, r = 0, half;
+
+	for(i = 0; i < n; i++)
+		c[i].applied = FW_NOT_APPLIED;
+	for(i = 0; i < n; i++) {
+		half = 0;
+		r = send_out_change(&c[i], &half);
+		if(r < 0) {
+			if(half)
+				c[i].applied = FW_HALF_APPLIED;
+			break;
+		}
+		c[i].applied = FW_APPLIED;
+	}
+	if(i == n)
+		return 0;
+	syslog(LOG_WARNING, "fw_sync_out: change %d of %d failed (%d)", i + 1, n, r);
+	while(i-- > 0) {
+		if(undo_out_change(&c[i]) >= 0)
+			c[i].applied = FW_NOT_APPLIED;
+		else
+			syslog(LOG_WARNING, "fw_sync_out: change %d of %d stays", i + 1, n);
 	}
 	return r < 0 ? r : -1;
 }
