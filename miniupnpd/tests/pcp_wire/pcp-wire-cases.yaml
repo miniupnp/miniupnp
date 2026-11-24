@@ -14140,6 +14140,60 @@ sections:
       kind: lease_restart
     description: Restart the daemon with its rules left in the firewall, with a PCP IPv6 MAP; the lease file line
       must be the same afterwards, and the MAP keeps its one rule.
+  - name: lease-restart-peer-ipv4
+    requires: [lease-restart, pcp-peer]
+    protocol: pcp
+    families: [ipv4]
+    mutating: true
+    request:
+      kind: lease_restart
+      phases:
+        create:
+        # one PEER binding (one nonce, one internal port) with two remote peers: .outgoing has its line,
+        # .outgoing.peers one per peer
+        - protocol: pcp
+          request: &peer-restart-a
+            pcp: PEER
+            lifetime: 3000
+            nonce: 0102030405060708090a0b0c
+            protocol: UDP
+            internal_port: 44445
+            external_port: 44445
+            peer: 198.51.100.21
+            peer_port: 6001
+          expect: &peer-restart-ok {version: 2, opcode: PEER_RESPONSE, result: [SUCCESS], length: 80}
+        - protocol: pcp
+          request: &peer-restart-b
+            pcp: PEER
+            lifetime: 3000
+            nonce: 0102030405060708090a0b0c
+            protocol: UDP
+            internal_port: 44445
+            external_port: 44445
+            peer: 198.51.100.22
+            peer_port: 6002
+          expect: *peer-restart-ok
+        - kind: lease_file
+          save: before
+          lines:
+          - {kind: PCP-P, family: IPv4, internal_port: 44445, count: 2}
+        verify:
+        - kind: lease_file
+          same_as: before
+          expiry_tolerance: 1
+          lines:
+          - {kind: PCP-P, family: IPv4, internal_port: 44445, count: 2}
+      cleanup:
+      - protocol: pcp
+        request: {<<: *peer-restart-a, lifetime: 0}
+        expect: *peer-restart-ok
+      - protocol: pcp
+        request: {<<: *peer-restart-b, lifetime: 0}
+        expect: *peer-restart-ok
+    expect:
+      kind: lease_restart
+    description: Restart the daemon with a PCP PEER binding of two peers; the lease file lines (.outgoing and
+      .outgoing.peers) and the rules must be the same afterwards.
   # A lifetime under 120 s needs pcp_min_lifetime_override; min_lifetime alone does not go under 120 s.
   - name: lease-short-lifetime-granted
     profiles: [short-lifetime]

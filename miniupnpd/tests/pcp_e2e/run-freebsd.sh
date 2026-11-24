@@ -607,12 +607,22 @@ EOT
 # rules in the firewall, as a restart of the service does. The daemon has to take each
 # rule back from its lease line: the lease files and the rules are the same afterwards,
 # with no second rule.
+# run_restart_check peer : the lease-restart-peer case, IPv4: a PEER binding of two peers
+# (.outgoing and .outgoing.peers).
 run_restart_check() {
   restart_mode=${1:-cold}
+  restart_families="ipv4 ipv6"
   if [ "$restart_mode" = keep ]; then
     restart_label=restart-keep
     restart_cases=lease-restart-keep
     echo "Restart check of the lease files, with the rules kept"
+  elif [ "$restart_mode" = peer ]; then
+    # a PEER binding only: lease-restart has one too, but stops at its FILTER lines until the table
+    # has PCP FILTER
+    restart_label=restart-peer
+    restart_cases=lease-restart-peer
+    restart_families=ipv4
+    echo "Restart check of the lease files, a PEER binding"
   else
     restart_label=restart
     restart_cases=lease-restart
@@ -624,14 +634,14 @@ run_restart_check() {
     --profile baseline --snapshot-dir $restart_dir
     --state-command '$RSH $VM_USER@127.0.0.1 sh /root/miniupnp/$ROUTER_SCRIPT leases'"
   ports=
-  for family in ipv4 ipv6; do
+  for family in $restart_families; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
     # shellcheck disable=SC2086
     ports="$ports $(eval $lease_runner --host $router --family $family --case $restart_cases-$family \
       --list-lease-ports)"
   done
   ports=$(echo $ports | tr ' ' '|')
-  for family in ipv4 ipv6; do
+  for family in $restart_families; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
     # shellcheck disable=SC2086
     eval $lease_runner --host $router --family $family --case $restart_cases-$family --phase create \
@@ -654,7 +664,7 @@ run_restart_check() {
     cat "$restart_dir/diff.txt"
     restart_ok=0
   fi
-  for family in ipv4 ipv6; do
+  for family in $restart_families; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
     # shellcheck disable=SC2086
     eval $lease_runner --host $router --family $family --case $restart_cases-$family --phase verify \
@@ -693,6 +703,7 @@ fi
 if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
   run_restart_check
   run_restart_check keep
+  run_restart_check peer
 fi
 if [ "${PCP_E2E_ONLY_RESTART:-0}" = 1 ]; then
   exit "$STATUS"

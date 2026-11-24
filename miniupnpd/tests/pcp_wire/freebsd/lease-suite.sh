@@ -111,7 +111,8 @@ status=0
 
 run_lease_restart() {
 	family=$1
-	lease_case=lease-restart-$family
+	# a case of its own as $2, else that of the family
+	lease_case=${2:-lease-restart-$family}
 	lease_args="--snapshot-dir $SNAP --case $lease_case --profile baseline"
 	# shellcheck disable=SC2086
 	ports=$(runner "$family" --list-lease-ports $lease_args | tr ' ' '|')
@@ -160,6 +161,8 @@ start_daemon "" || exit 1
 for family in ipv4 ipv6; do
 	run_lease_restart "$family" || status=1
 done
+# a PEER binding only: lease-restart stops at its FILTER lines until the table has PCP FILTER
+run_lease_restart ipv4 lease-restart-peer-ipv4 || status=1
 run_profile short-lifetime 'pcp_min_lifetime_override=2' lease-short-lifetime-granted map-renewal-extends-expiry lease-expiry || status=1
 run_profile min-lifetime-only 'min_lifetime=2' lease-min-lifetime-without-option || status=1
 exit "$status"

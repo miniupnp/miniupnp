@@ -249,7 +249,8 @@ lease_rules() {
 }
 run_lease_restart() {
 	lease_family=$1
-	lease_case=lease-restart-$lease_family
+	# a case of its own as $2, else that of the family
+	lease_case=${2:-lease-restart-$lease_family}
 	lease_args="--snapshot-dir /pcp-wire-data --case $lease_case --profile baseline"
 	# shellcheck disable=SC2086
 	ports=$(run_tests "$lease_family" --list-lease-ports $lease_args | tr ' ' '|')
@@ -305,6 +306,8 @@ if [ "${PCP_TEST_LEASE_CASES:-1}" = 1 ] && [ "$#" -eq 0 ]; then
 	for lease_family in ipv4 ipv6; do
 		run_lease_restart "$lease_family" || test_status=1
 	done
+	# a PEER binding only: lease-restart stops at its FILTER lines until the table has PCP FILTER
+	run_lease_restart ipv4 lease-restart-peer-ipv4 || test_status=1
 	if [ "$WAN_PEER" = 0 ]; then
 		run_profile short-lifetime 'pcp_min_lifetime_override=2' lease-short-lifetime-granted map-renewal-extends-expiry lease-expiry || test_status=1
 		run_profile min-lifetime-only 'min_lifetime=2' lease-min-lifetime-without-option || test_status=1
