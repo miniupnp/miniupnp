@@ -120,6 +120,11 @@ struct map_filter * lease_table_find_uid(unsigned short uid);
  * wrap. 0 if every uid is in use. */
 unsigned short lease_table_new_uid(void);
 
+/* Give the next new uids after max, up to the wrap: the lease files call
+ * this before a restore waits for the clock, so a filter made meanwhile
+ * takes no uid of the files. */
+void lease_table_reserve_uids(unsigned short max);
+
 /* Give f, a filter of a row, the uid uid, nonzero: it is in the UID index
  * while its row is linked. */
 void lease_filter_set_uid(struct map_filter * f, unsigned short uid);

@@ -39,6 +39,7 @@ static unsigned int port_cursor_index;
 #define UID_PAGE_SIZE	256
 static struct map_filter ** uid_pages[UID_PAGES];
 static unsigned int uid_count;	/* the uids in the index */
+static unsigned short last_uid;	/* the last uid given or reserved */
 
 /* the uids 1 to UID_MAX */
 #define UID_MAX	65534
@@ -301,16 +302,22 @@ lease_table_find_uid(unsigned short uid)
 unsigned short
 lease_table_new_uid(void)
 {
-	static unsigned short last = 0;
 	unsigned int n;
 	if(uid_count >= UID_MAX)
 		return 0;
 	for(n = 0; n < UID_MAX; n++) {
-		last = (unsigned short)(last >= UID_MAX ? 1 : last + 1);
-		if(lease_table_find_uid(last) == NULL)
-			return last;
+		last_uid = (unsigned short)(last_uid >= UID_MAX ? 1 : last_uid + 1);
+		if(lease_table_find_uid(last_uid) == NULL)
+			return last_uid;
 	}
 	return 0;
+}
+
+void
+lease_table_reserve_uids(unsigned short max)
+{
+	if(max > last_uid && max <= UID_MAX)
+		last_uid = max;
 }
 
 void

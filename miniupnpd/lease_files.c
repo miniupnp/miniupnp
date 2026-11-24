@@ -79,9 +79,9 @@ kind_name(int kind)
 	return LEASE_NA;	/* no row of the table has another kind */
 }
 
-/* The clock of the save: unix time minus the time of upnp_time(), so every
- * expiry of a save uses the same */
-static long long unix_offset;
+/* Both clocks at the save, read once: the expiry of every line uses them,
+ * and the header of .mappings has them */
+static long long save_unix, save_mono;
 
 /* An expiry on the clock of upnp_time(), as unix time in an unsigned 32-bit
  * number, the epoch time of PCP. 0 : no expiry. */
@@ -91,7 +91,7 @@ unix_expiry(unsigned int expiry)
 	long long t;
 	if(expiry == 0)
 		return 0;
-	t = (long long)expiry + unix_offset;
+	t = (long long)expiry - save_mono + save_unix;
 	if(t < 1)
 		t = 1;	/* expired: a load skips it */
 	if(t > 0xffffffffLL)
@@ -306,6 +306,52 @@ static time_t backoff;
  * run stay as they are. */
 static int running;
 
+#define BOOT_ID_LEN	64
+const char * lease_files_boot_id_path = "/proc/sys/kernel/random/boot_id";
+
+/* The id of this boot, or NA where the system has none we read. */
+static void
+boot_id(char * id, size_t size)
+{
+	FILE * f = fopen(lease_files_boot_id_path, "r");
+	size_t n;
+	snprintf(id, size, "%s", LEASE_NA);
+	if(f == NULL)
+		return;
+	if(fgets(id, (int)size, f) == NULL)
+		snprintf(id, size, "%s", LEASE_NA);
+	fclose(f);
+	n = strcspn(id, "\r\n");
+	id[n] = '\0';
+	/* a word of the header: no space in it */
+	if(n == 0 || strcspn(id, " \t=") != n)
+		snprintf(id, size, "%s", LEASE_NA);
+}
+
+/* How a load reads an expiry: on the wall clock; on the monotonic clock of
+ * the save (the same boot); or as if the save was just now (the clock never
+ * got set). */
+static struct {
+	enum { CLOCK_UNIX, CLOCK_MONO, CLOCK_SAVE } mode;
+	long long unix_time, mono;		/* of the header of .mappings */
+} load_clock;
+/* The load waits for the clock: it was behind the last save at startup.
+ * No save runs meanwhile, or it would drop the rows of the files. So the
+ * wait is short: after LEASE_FILES_CLOCK_WAIT s the rows come back with
+ * the lease they had left at the save. A row of this run, which has an id
+ * above held_last_id, keeps its key: the row of the file is older. */
+static int held;
+static time_t held_until;	/* upnp_time() */
+static unsigned long long held_last_id;
+static struct lease_files_restore held_restore;
+#define LEASE_FILES_CLOCK_CHECK	5
+#define LEASE_FILES_CLOCK_WAIT	300
+/* how far the wall clock may move apart from the monotonic one in a boot,
+ * by NTP slewing, for the clocks to tell a boot apart */
+#define LEASE_FILES_CLOCK_SLACK	60
+
+static int load_rows(const struct lease_files_restore * r);
+
 static int
 part_changed(enum lease_file_id id)
 {
@@ -426,8 +472,17 @@ write_part(enum lease_file_id id)
 		close(fd);
 		goto fail;
 	}
-	fprintf(f, "%s last_id=%llu\n%s\n", lp->header, lease_table_last_id(),
-	        lp->names);
+	fprintf(f, "%s last_id=%llu", lp->header, lease_table_last_id());
+	if(id == LF_MAPPINGS) {
+		char boot[BOOT_ID_LEN + 1];
+		boot_id(boot, sizeof(boot));
+		fprintf(f, " boot_id=%s", boot);
+	}
+	/* each file its own clocks: a file is saved only when its part
+	 * changed, so the files of a set may be of other saves */
+	if(id != LF_CHECKSUM)
+		fprintf(f, " monotonic=%lld unix=%lld", save_mono, save_unix);
+	fprintf(f, "\n%s\n", lp->names);
 	lp->write(f);
 	/* on the disk before the rename: after a power loss, the name must
 	 * not point to a file whose data never got there */
@@ -456,7 +511,8 @@ save(void)
 	unsigned int i, n;
 	int r = 0;
 
-	unix_offset = (long long)time(NULL) - (long long)upnp_time();
+	save_unix = (long long)time(NULL);
+	save_mono = (long long)upnp_time();
 	for(i = 0; !sums_known && i < LF_DATA; i++) {
 		path = part_name(lease_parts[i].suffix, "");
 		if(path == NULL || file_sum(path, &sums[i]) < 0) {
@@ -517,6 +573,25 @@ lease_files_poll(int idle, struct timeval * timeout)
 	if(lease_file == NULL)
 		return;
 	running = 1;
+	if(held) {
+		if(time(NULL) >= load_clock.unix_time) {
+			syslog(LOG_NOTICE, "lease files: the clock is set, restoring");
+			load_clock.mode = CLOCK_UNIX;
+		} else if(upnp_time() >= held_until) {
+			syslog(LOG_WARNING, "lease files: the clock is still behind the last save, "
+			       "restoring with the leases left at the save");
+			load_clock.mode = CLOCK_SAVE;
+		} else {
+			if(timeout->tv_sec > LEASE_FILES_CLOCK_CHECK) {
+				timeout->tv_sec = LEASE_FILES_CLOCK_CHECK;
+				timeout->tv_usec = 0;
+			}
+			return;
+		}
+		held = 0;
+		(void)load_rows(&held_restore);
+		held_last_id = 0;
+	}
 	if(!any_changed()) {
 		first_change = 0;
 		return;
@@ -565,7 +640,7 @@ lease_files_poll(int idle, struct timeval * timeout)
 int
 lease_files_flush(void)
 {
-	if(lease_file == NULL || !running || !any_changed())
+	if(lease_file == NULL || !running || held || !any_changed())
 		return 0;
 	return save();
 }
@@ -747,6 +822,9 @@ struct lease_in {
 	int col[F_COUNT];	/* the place of each field, -1 : none */
 	int ncols;
 	unsigned long long last_id;	/* of the header, 0 if it lacks it */
+	char boot_id[BOOT_ID_LEN + 1];	/* of .mappings, "" if it lacks it */
+	int has_clock;			/* monotonic and unix are there */
+	long long mono, unix_time;
 	unsigned long line;
 	char * buf;
 	size_t size;
@@ -769,7 +847,8 @@ static int
 get_header(struct lease_in * in, const struct lease_part * lp)
 {
 	size_t n = strlen(lp->header);
-	char * p, * word, * value;
+	char * p, * word, * value, * end;
+	int mono = 0, unix_ok = 0;
 
 	if(strncmp(in->buf, lp->header, n) != 0 || (in->buf[n] != '\0' && in->buf[n] != ' '))
 		return -1;
@@ -786,10 +865,26 @@ get_header(struct lease_in * in, const struct lease_part * lp)
 		if(value == NULL)
 			continue;
 		*value++ = '\0';
-		if(strcmp(word, "last_id") == 0 &&
-		   get_number(value, LEASE_ID_MAX, &in->last_id) < 0)
-			return -1;
+		if(strcmp(word, "last_id") == 0) {
+			if(get_number(value, LEASE_ID_MAX, &in->last_id) < 0)
+				return -1;
+		} else if(strcmp(word, "boot_id") == 0) {
+			if(strlen(value) > BOOT_ID_LEN)
+				return -1;
+			snprintf(in->boot_id, sizeof(in->boot_id), "%s", value);
+		} else if(strcmp(word, "monotonic") == 0) {
+			in->mono = strtoll(value, &end, 10);
+			if(end == value || *end != '\0')
+				return -1;
+			mono = 1;
+		} else if(strcmp(word, "unix") == 0) {
+			in->unix_time = strtoll(value, &end, 10);
+			if(end == value || *end != '\0')
+				return -1;
+			unix_ok = 1;
+		}
 	}
+	in->has_clock = mono && unix_ok;
 	return 0;
 }
 
@@ -896,7 +991,7 @@ get_common(struct lease_in * in, char ** field, unsigned char * family,
            unsigned char * proto, unsigned int * timestamp)
 {
 	unsigned long long v;
-	time_t unix_now;
+	long long t, su, sm;
 	int p;
 
 	if(field[F_FAMILY] != NULL && strcmp(field[F_FAMILY], "IPv4") == 0)
@@ -920,12 +1015,22 @@ get_common(struct lease_in * in, char ** field, unsigned char * family,
 		return bad_line(in, "expiry");
 	if(v == 0)
 		return 1;
-	unix_now = time(NULL);
-	if((time_t)v <= unix_now) {
+	/* the clocks of the save of this file, else those of .mappings */
+	su = in->has_clock ? in->unix_time : load_clock.unix_time;
+	sm = in->has_clock ? in->mono : load_clock.mono;
+	/* the same boot: on the monotonic clock of the save, which a wrong
+	 * wall clock does not move */
+	if(load_clock.mode == CLOCK_MONO)
+		t = sm + ((long long)v - su);
+	else if(load_clock.mode == CLOCK_SAVE)
+		t = (long long)upnp_time() + ((long long)v - su);
+	else
+		t = (long long)upnp_time() + ((long long)v - (long long)time(NULL));
+	if(t <= (long long)upnp_time()) {
 		syslog(LOG_INFO, "lease files: %s:%lu: expired, not restored", in->path, in->line);
 		return 0;
 	}
-	*timestamp = (unsigned int)(upnp_time() + ((time_t)v - unix_now));
+	*timestamp = (unsigned int)t;
 	return 1;
 }
 
@@ -1196,6 +1301,46 @@ lease_files_reserve_ids(void)
 	lease_table_reserve_ids(max);
 }
 
+/* 1 if a row a client made while the restore waited holds the key of r.
+ * A row of the files is older: it does not replace it. IPv4: the external
+ * port, whatever the address (the file may have none, NA); the table then
+ * has the rows of the wait only, which are few. */
+static int
+of_this_run(const struct lease_entry * r)
+{
+	const struct lease_entry * row;
+
+	if(held_last_id == 0)
+		return 0;
+	if(r->family == AF_INET) {
+		for(row = lease_table_next_port(NULL); row != NULL; row = lease_table_next_port(row))
+			if(row->id > held_last_id && row->proto == r->proto && row->eport == r->eport)
+				return 1;
+		return 0;
+	}
+	row = lease_table_find_entry(r->proto, AF_INET6, &r->iaddr, r->iport, r->iport);
+	return row != NULL && row->id > held_last_id;
+}
+
+/* Before a restore waits: the uids of .filters stay theirs, a filter made
+ * meanwhile gets another one */
+static void
+reserve_uids(void)
+{
+	struct lease_in in;
+	struct side_lines fs;
+	unsigned short max = 0;
+	size_t k;
+
+	if(read_filters(&fs, &in) == 0)
+		for(k = 0; k < fs.n; k++)
+			if(fs.v[k].f.uid > max)
+				max = fs.v[k].f.uid;
+	in_close(&in);
+	free(fs.v);
+	lease_table_reserve_uids(max);
+}
+
 /* Give each row of .mappings to map. */
 static void
 load_mappings(struct lease_in * maps, const struct side_lines * fs,
@@ -1221,6 +1366,12 @@ load_mappings(struct lease_in * maps, const struct side_lines * fs,
 		if(nf != nfilters) {
 			syslog(LOG_WARNING, "lease files: %s:%lu: %lu filters, not %lu: of another save, not restored",
 			       maps->path, maps->line, (unsigned long)nf, nfilters);
+			(*skipped)++;
+			continue;
+		}
+		if(of_this_run(&r)) {
+			syslog(LOG_INFO, "lease files: %s:%lu: a mapping of this run holds its port, not restored",
+			       maps->path, maps->line);
 			(*skipped)++;
 			continue;
 		}
@@ -1279,6 +1430,12 @@ load_outgoing(struct lease_in * out, lease_files_peer_fn peer, void * arg,
 			continue;
 		}
 		if(!get_peer(out, field, b)) {
+			outgoing_table_free(b);
+			(*skipped)++;
+			continue;
+		}
+		/* a binding there is was made while the restore waited */
+		if(held_last_id != 0 && outgoing_table_find(b) != NULL) {
 			outgoing_table_free(b);
 			(*skipped)++;
 			continue;
@@ -1351,16 +1508,76 @@ check_sums(void)
 	return 0;
 }
 
+/* 1 if this start is in the boot of the save. The boot ids tell, where the
+ * system has one (Linux). Else the clocks do: in one boot the monotonic
+ * clock has not gone back, and both clocks moved alike since the save. A
+ * step of the wall clock of more than LEASE_FILES_CLOCK_SLACK since, or a
+ * new boot, makes them differ. */
+static int
+same_boot(const struct lease_in * maps)
+{
+	char id[BOOT_ID_LEN + 1];
+	long long mono = (long long)upnp_time(), unix_now = (long long)time(NULL);
+	long long d;
+
+	boot_id(id, sizeof(id));
+	if(strcmp(id, LEASE_NA) != 0 && maps->boot_id[0] != '\0' &&
+	   strcmp(maps->boot_id, LEASE_NA) != 0)
+		return strcmp(id, maps->boot_id) == 0;
+	if(mono < maps->mono)
+		return 0;
+	d = (unix_now - maps->unix_time) - (mono - maps->mono);
+	return d >= -LEASE_FILES_CLOCK_SLACK && d <= LEASE_FILES_CLOCK_SLACK;
+}
+
 int
-lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg)
+lease_files_load(const struct lease_files_restore * r)
+{
+	struct lease_in maps;
+	int ret;
+
+	if(lease_file == NULL)
+		return 0;
+	load_clock.mode = CLOCK_UNIX;
+	/* the header only: load_rows() logs and sets aside a bad set */
+	ret = in_open(&maps, LF_MAPPINGS, 1);
+	if(ret == 0) {
+		in_close(&maps);
+		return 0;
+	}
+	if(ret == 1 && maps.has_clock) {
+		load_clock.unix_time = maps.unix_time;
+		load_clock.mono = maps.mono;
+		if(same_boot(&maps)) {
+			load_clock.mode = CLOCK_MONO;
+		} else if((long long)time(NULL) < load_clock.unix_time) {
+			/* a new boot with the clock behind the save: the expiry
+			 * of each row would be too long. Wait for NTP. */
+			syslog(LOG_NOTICE, "lease files: the clock is %lld s behind the last save, "
+			       "the restore waits until it is set, at most %d s",
+			       load_clock.unix_time - (long long)time(NULL), LEASE_FILES_CLOCK_WAIT);
+			in_close(&maps);
+			reserve_uids();
+			held = 1;
+			held_until = upnp_time() + LEASE_FILES_CLOCK_WAIT;
+			held_last_id = lease_table_last_id();
+			held_restore = *r;
+			return 1;
+		}
+	}
+	in_close(&maps);
+	return load_rows(r);
+}
+
+/* Read the files and give their rows to r, as lease_files_load(). */
+static int
+load_rows(const struct lease_files_restore * r)
 {
 	struct lease_in maps, filters, out;
 	struct side_lines fs;
 	unsigned int done = 0, skipped = 0;
 	int ret, rf, ro;
 
-	if(lease_file == NULL)
-		return 0;
 	memset(&filters, 0, sizeof(filters));
 	memset(&out, 0, sizeof(out));
 	memset(&fs, 0, sizeof(fs));
@@ -1390,10 +1607,12 @@ lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg)
 		ret = -1;
 		goto out;
 	}
-	load_mappings(&maps, &fs, map, arg, &done, &skipped);
+	load_mappings(&maps, &fs, r->map, r->arg, &done, &skipped);
 	if(ro > 0)
-		load_outgoing(&out, peer, arg, &done, &skipped);
+		load_outgoing(&out, r->peer, r->arg, &done, &skipped);
 	syslog(LOG_INFO, "lease files: read %u lines to restore, %u not", done, skipped);
+	if(r->done != NULL)
+		r->done(r->arg);
 	ret = 1;
 out:
 	free(fs.v);
@@ -1426,11 +1645,9 @@ lease_files_reserve_ids(void)
 }
 
 int
-lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg)
+lease_files_load(const struct lease_files_restore * r)
 {
-	(void)map;
-	(void)peer;
-	(void)arg;
+	(void)r;
 	return 0;
 }
 

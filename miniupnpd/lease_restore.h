@@ -11,7 +11,8 @@
  * startup, after lease_files_reserve_ids() and drop_rules_without_row(),
  * so the firewall holds no rule of the daemon and every row is a new add.
  * The rows go to the firewall through fw_sync_each(), FW_BATCH at a time,
- * and into the tables when their rules are there. The files are trusted:
+ * and into the tables when their rules are there. After a boot with the
+ * clock behind the last save, they come later, from lease_files_poll(). The files are trusted:
  * no permission, port or owner check. 0, or -1 if the files could not be
  * read. */
 int lease_restore(void);

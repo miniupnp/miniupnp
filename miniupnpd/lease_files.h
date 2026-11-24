@@ -58,12 +58,32 @@ void lease_files_reserve_ids(void);
 extern int lease_files_ignore_checksum;
 
 /* Read the files at startup: each row of .mappings with its filters to
- * map, each line of .outgoing to peer. The files are trusted: a line is
+ * r->map, each line of .outgoing to r->peer, then call r->done. The files are trusted: a line is
  * only skipped (and logged) when it cannot be read, is expired, or is a
  * row of another save (a crash between the renames). 1 if the files were
  * read, 0 if there are none (no .mappings), or -1 if a file is not one this
  * daemon can read, or does not match the size and CRC-32 of .checksum:
- * every file of the set is renamed to <name>.bad, and nothing is read. */
-int lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg);
+ * every file of the set is renamed to <name>.bad, and nothing is read.
+ *
+ * The expiry of a line is unix time. After a daemon restart in the same
+ * boot it is read on the monotonic clock of the save instead, which the
+ * header of .mappings has. After a new boot with the clock behind the save
+ * (no real-time clock, NTP not done yet) the restore waits: r is kept, and
+ * lease_files_poll() reads the rows once the clock has passed the save, or
+ * after a few minutes with the lease each row had left at the save. No save
+ * runs until then, and a mapping a client made meanwhile keeps its port.
+ * Then 1 is returned at once. */
+struct lease_files_restore {
+	lease_files_map_fn map;
+	lease_files_peer_fn peer;
+	void (*done)(void * arg);	/* after the last row, NULL : none */
+	void * arg;
+};
+
+/* The file which holds the id of this boot. Its own variable for the unit
+ * test. Where it cannot be read, each start is a new boot. */
+extern const char * lease_files_boot_id_path;
+
+int lease_files_load(const struct lease_files_restore * r);
 
 #endif

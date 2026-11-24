@@ -371,8 +371,9 @@ free_got(void)
 static int
 load(void)
 {
+	static const struct lease_files_restore r = { take_map, take_peer, NULL, NULL };
 	free_got();
-	return lease_files_load(take_map, take_peer, NULL);
+	return lease_files_load(&r);
 }
 
 static void
@@ -650,6 +651,181 @@ test_cut_save(void)
 	remove_files();
 }
 
+/* a .mappings by hand, with the clocks of a save in its header when boot
+ * is not NULL */
+static void
+put_mappings(const char * boot, long long mono, long long unix_time, const char * rows)
+{
+	char text[1024];
+	if(boot != NULL)
+		snprintf(text, sizeof(text), "LEASE-MAPPINGS 1 last_id=9 boot_id=%s monotonic=%lld unix=%lld\n"
+		         "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n%s",
+		         boot, mono, unix_time, rows);
+	else
+		snprintf(text, sizeof(text), "LEASE-MAPPINGS 1\n"
+		         "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n%s",
+		         rows);
+	write_file(".mappings", text);
+}
+
+/* a line of .mappings: UPnP IPv4 TCP at eport, to its expiry */
+static const char *
+row_line(unsigned short eport, long long expiry)
+{
+	static char line[4][128];
+	static int i;
+	i = (i + 1) % 4;
+	snprintf(line[i], sizeof(line[i]), "%hu|UPNP|IPv4|TCP|%hu|%hu|192.168.1.20|NA|NA|%lld|0|NA\n",
+	         eport, eport, eport, expiry);
+	return line[i];
+}
+
+/* the row of a load at eport */
+static struct lease_entry *
+got_at(unsigned short eport)
+{
+	int i;
+	for(i = 0; i < ngot; i++)
+		if(got[i]->eport == eport)
+			return got[i];
+	return NULL;
+}
+
+/* the clocks in the header of .mappings: what a save writes, and the ways
+ * a load reads the expiry */
+static void
+test_clock(void)
+{
+	char bootf[300], line[512], rows[512], * c;
+	struct lease_entry * row;
+	struct timeval tv;
+	time_t t;
+
+	snprintf(bootf, sizeof(bootf), "%s/boot_id", dir);
+	lease_files_boot_id_path = bootf;
+	{
+		FILE * f = fopen(bootf, "w");
+		assert(f != NULL);
+		fputs("boot-A\n", f);
+		fclose(f);
+	}
+	remove_files();
+	lease_files_ignore_checksum = 1;
+
+	/* a save writes the boot and both clocks */
+	lease_table_clear();
+	outgoing_table_clear();
+	lease_table_link(add_row(0, MAP_KIND_UPNP, AF_INET, IPPROTO_TCP, 41000, "::ffff:192.168.1.20",
+	                         41000, NULL, now + 3600, NULL, 0));
+	now += LEASE_FILES_MAX_DELAY;
+	t = time(NULL);
+	assert(lease_files_flush() == 0);
+	c = slurp(".mappings");
+	assert(c != NULL);
+	snprintf(line, sizeof(line), "LEASE-MAPPINGS 1 last_id=%llu boot_id=boot-A monotonic=%lld unix=",
+	         lease_table_last_id(), (long long)now);
+	assert(strncmp(c, line, strlen(line)) == 0);
+	assert(atoll(c + strlen(line)) - (long long)t <= 1);
+	free(c);
+	lease_table_clear();
+
+	/* the same boot: the expiry is on the monotonic clock of the save,
+	 * even with the wall clock far behind it */
+	t = time(NULL) + 100000;
+	snprintf(rows, sizeof(rows), "%s%s", row_line(41000, t + 500), row_line(41001, t + 5));
+	put_mappings("boot-A", now - 10, t, rows);
+	assert(load() == 1);
+	assert(ngot == 1);	/* 41001 expired 5 s after a save 10 s ago */
+	assert(got_at(41000)->timestamp == now - 10 + 500);
+	/* .outgoing of an earlier save, before the wall clock stepped 100000 s
+	 * on: its lines are read on its own clocks */
+	snprintf(line, sizeof(line),
+	         "LEASE-OUTGOING 1 last_id=1 monotonic=%lld unix=%lld\n"
+	         "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|expiry|label\n"
+	         "IPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|ab0000000000000000000000|203.0.113.1|80|%lld|NA\n",
+	         (long long)now - 20, (long long)t - 100000, (long long)t - 100000 + 400);
+	write_file(".outgoing", line);
+	assert(load() == 1 && ngot == 1 && ngot_peer == 1);
+	assert(got_peer[0]->peers[0].timestamp == now - 20 + 400);
+	unlink_file(".outgoing");
+
+	/* a new boot with the clock behind the save: the restore waits, and
+	 * no save drops the rows of the files meanwhile. A row a client makes
+	 * meanwhile keeps its port */
+	{
+		FILE * f = fopen(bootf, "w");
+		assert(f != NULL);
+		fputs("boot-B\n", f);
+		fclose(f);
+	}
+	t = time(NULL) + 2;
+	snprintf(rows, sizeof(rows), "%s%s", row_line(41000, t + 600), row_line(41002, t + 600));
+	put_mappings("boot-A", now + 99999, t, rows);
+	/* a filter of the files with uid 9 (of no row here) */
+	write_file(".filters", "LEASE-FILTERS 1\nmap|raddr|uid\n99|NA|9\n");
+	assert(load() == 1);
+	assert(ngot == 0);
+	/* a filter made meanwhile gets no uid of the files */
+	assert(lease_table_new_uid() > 9);
+	unlink_file(".filters");
+	/* on the WAN address; the row of the file has none (NA) */
+	lease_table_link(add_row(0, MAP_KIND_NATPMP, AF_INET, IPPROTO_TCP, 41002, "::ffff:192.168.1.21",
+	                         41002, "::ffff:198.51.100.1", 0, NULL, 0));
+	tv.tv_sec = 60;
+	tv.tv_usec = 0;
+	lease_files_poll(1, &tv);
+	assert(tv.tv_sec == 5);	/* checks the clock again in 5 s */
+	assert(lease_files_flush() == 0);
+	c = slurp(".mappings");
+	assert(strstr(c, "|41000|") != NULL && strstr(c, "|NAT-PMP|") == NULL);
+	free(c);
+	while(time(NULL) < t)
+		usleep(100000);
+	tv.tv_sec = 60;
+	lease_files_poll(1, &tv);
+	assert(ngot == 1 && got_at(41002) == NULL);
+	assert(got_at(41000)->timestamp >= now + 598 && got_at(41000)->timestamp <= now + 600);
+	lease_table_clear();
+
+	/* the clock is never set: after the wait, each row comes back with
+	 * the lease it had left at the save */
+	t = time(NULL) + 100000;
+	put_mappings("boot-A", now + 99999, t, row_line(41000, t + 600));
+	assert(load() == 1 && ngot == 0);
+	now += 299;
+	tv.tv_sec = 60;
+	lease_files_poll(1, &tv);
+	assert(ngot == 0 && tv.tv_sec == 5);
+	now += 1;
+	tv.tv_sec = 60;
+	lease_files_poll(1, &tv);
+	assert(ngot == 1 && got_at(41000)->timestamp == now + 600);
+	/* and the saves go on */
+	row = add_row(0, MAP_KIND_NATPMP, AF_INET, IPPROTO_TCP, 41003, "::ffff:192.168.1.21",
+	              41003, NULL, now + 60, NULL, 0);
+	lease_table_link(row);
+	assert(lease_files_flush() == 0);
+	c = slurp(".mappings");
+	assert(strstr(c, "|NAT-PMP|") != NULL);
+	free(c);
+	lease_table_clear();
+
+	/* no boot id (BSD): the clocks tell. Both moved alike: the same boot,
+	 * read on the monotonic clock */
+	lease_files_boot_id_path = "/nonexistent";
+	put_mappings("NA", now - 100, time(NULL) - 100, row_line(41000, time(NULL) + 1000));
+	assert(load() == 1 && ngot == 1 && got_at(41000)->timestamp == now + 1000);
+
+	/* no clocks in the header: unix time */
+	put_mappings(NULL, 0, 0, row_line(41000, 0));
+	assert(load() == 1 && ngot == 1);
+	free_got();
+	lease_table_clear();
+	unlink(bootf);
+	lease_files_ignore_checksum = 0;
+	remove_files();
+}
+
 /* a temporary file of a save cut short goes at startup; another file
  * stays */
 static void
@@ -684,6 +860,7 @@ main(void)
 	test_bad_files();
 	test_checksum();
 	test_cut_save();
+	test_clock();
 	test_temp_files();
 	remove_files();
 	rmdir(dir);

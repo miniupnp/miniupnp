@@ -130,18 +130,26 @@ restore_peer(struct outgoing_entry * b, void * arg)
 		send_peers(rs);
 }
 
+/* After the last line: the batches which are not full */
+static void
+restore_done(void * arg)
+{
+	struct restore * rs = arg;
+	send_rows(rs);
+	send_peers(rs);
+	syslog(LOG_INFO, "lease files: restored %u mappings and PEER peers, %u not",
+	       rs->done, rs->failed);
+}
+
 int
 lease_restore(void)
 {
+	/* static: after a boot the rows may come later, from the main loop */
 	static struct restore rs;
-	int r;
+	static const struct lease_files_restore r = {
+		restore_map, restore_peer, restore_done, &rs
+	};
 
 	memset(&rs, 0, sizeof(rs));
-	r = lease_files_load(restore_map, restore_peer, &rs);
-	send_rows(&rs);
-	send_peers(&rs);
-	if(r > 0)
-		syslog(LOG_INFO, "lease files: restored %u mappings and PEER peers, %u not",
-		       rs.done, rs.failed);
-	return r < 0 ? -1 : 0;
+	return lease_files_load(&r) < 0 ? -1 : 0;
 }
