@@ -15,6 +15,10 @@ things:
 - a check miniupnpd only compiles with `UPNP_STRICT` (configure `--strict`), a SKIP (`requires: [strict]`)
   on `igd2`; the `igd2-strict` run builds with it and runs those cases.
 
+A `-strict` run (`igd2-strict`, `igd1-strict`) has only the `requires: [strict]` cases and the cases marked `strict_path: true`, whose
+requests take a path `UPNP_STRICT` changes. Every other case gives the same result in both builds, so it runs
+on `igd2` (or `igd1`) only.
+
 ## Running
 
     sh miniupnpd/tests/upnp_wire/run-docker.sh            # the IGDv2 builds: igd2, igd2-strict
@@ -63,7 +67,7 @@ the `openbsd-igd2` column of [status.md](status.md).
 ## The corpus
 
 A case has `name`, `ref`, `description`, optionally `builds` and `families` (default: all), `requires`
-(`restart`, `lease-file`, `strict`), `known_failure` (the case is an XFAIL when it fails: the daemon
+(`restart`, `lease-file`, `strict`), `strict_path` (the case also runs on the `-strict` builds), `known_failure` (the case is an XFAIL when it fails: the daemon
 does not implement the feature), `steps` and `cleanup`. The step kinds and the rules of `expect` are described at
 the top of the corpus; the code is the UPnP block of `common/lib_test.py`. A value `{igd1: .., igd2: ..}`
 or `{ipv4: .., ipv6: ..}` is chosen for the build and family of the run.

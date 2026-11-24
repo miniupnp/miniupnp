@@ -92,7 +92,15 @@ def validate(corpus):
             assert step.get("kind") in ("ssdp", "ssdp-listen", "http", "soap", "subscribe", "notify-wait",
                                         "restart", "upnp-lease", "wait"), f"{where}: unknown step kind {step.get('kind')}"
         assert set(case.get("requires", [])) <= {"restart", "lease-file", "strict", "second-client"}, f"{where}: unknown requires"
+        assert case.get("strict_path", True) is True, f"{where}: strict_path is true or absent"
+        assert not ("strict_path" in case and "strict" in case.get("requires", [])), (
+            f"{where}: requires: [strict] already runs on the strict build")
     return len(cases)
+
+
+def on_strict_build(case):
+    """A case of the --strict run: a check of UPNP_STRICT only, or a request on a path UPNP_STRICT changes."""
+    return "strict" in case.get("requires", []) or case.get("strict_path", False)
 
 
 def build_variables(corpus, args):
@@ -122,13 +130,15 @@ def run_case(case, variables, lease):
 
 
 def selected_cases(corpus, args):
-    """The cases of this build and family (resolved for them), in corpus order."""
+    """The cases of this build and family (resolved for them), in corpus order. A --strict run has only the
+    cases UPNP_STRICT can change: the others give the same result as the run without it."""
     builds = tuple(corpus["builds"])
 
     def resolve(case):
         resolved = resolve_variant(resolve_variant(case, ("ipv4", "ipv6"), args.family), builds, args.build)
         return dict(resolved, protocol="upnp")
-    return select_build_cases(corpus, args, resolve)
+    cases = select_build_cases(corpus, args, resolve)
+    return [case for case in cases if on_strict_build(case)] if args.strict else cases
 
 
 def missing_requirement(args):
@@ -152,6 +162,9 @@ def write_report(corpus, results_path, args):
 def self_test(corpus):
     count = validate(corpus)
     print_build_runs(corpus, count)
+    strict = [case for case in flatten_cases(corpus) if on_strict_build(case)]
+    assert strict, "no case runs on the strict build"
+    print(f"PASS the strict build runs {len(strict)} of {count} cases (requires: [strict] or strict_path)")
     bad = {"specs": ["UDA-1.1"], "builds": {"igd1": {}}, "sections": [{"name": "S", "cases": [
         {"name": "igd9-1-must-x", "ref": "IGD9 §1", "steps": [{"kind": "http"}]}]}]}
     try:
