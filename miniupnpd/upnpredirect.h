@@ -160,17 +160,22 @@ struct rule_state
 void
 expire_mappings(void);
 
-/* At startup, after the lease files are read: delete the rules of an
- * earlier run which have no row, IPv4 redirect, map6 and PEER rules. The
- * table then has a row for each rule of the daemon, so a rule found on a
- * port with no row is that of a failed add. Without a lease file the
- * table is empty, and the chains are flushed. */
+/* Delete the rules which have no row, IPv4 redirect, map6 and PEER rules.
+ * At startup the table is empty, so every rule of an earlier run goes, and
+ * the lease files then send the rules of their rows again: a rule is never
+ * there twice, and the table has a row for each rule of the daemon. */
 void
 drop_rules_without_row(void);
 
 /* The next expiry pass is at ts, if that is sooner. */
 void
 next_to_clean(unsigned int ts);
+
+/* An add which failed left a part of the rules of e in the firewall: the
+ * table keeps a copy of e, which expires at once, so the expiry pass
+ * deletes them again. */
+void
+keep_partial_row(const struct lease_entry * e);
 
 /* Expire the mappings, then return a linked list of the UPnP port
  * mappings with their counters, or NULL if there are not more than

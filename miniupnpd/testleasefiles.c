@@ -47,8 +47,15 @@ upnp_time(void)
 const char *
 proto_itoa(int proto)
 {
-	/* as upnputils.c, for the protocols of the rows here */
-	return proto == IPPROTO_TCP ? "TCP" : proto == IPPROTO_UDP ? "UDP" : "?";
+	/* as upnputils.c: a protocol it has no name for is "*UNKNOWN*" */
+	return proto == IPPROTO_TCP ? "TCP" : proto == IPPROTO_UDP ? "UDP" : "*UNKNOWN*";
+}
+
+int
+proto_atoi(const char * protocol)
+{
+	/* as upnputils.c: TCP for a name it does not know */
+	return strcmp(protocol, "UDP") == 0 ? IPPROTO_UDP : IPPROTO_TCP;
 }
 
 static char dir[] = "/tmp/testleasefilesXXXXXX";
@@ -323,6 +330,252 @@ test_failure(void)
 	lease_table_clear();
 }
 
+/* What a load gave: the rows and bindings, and their labels copied */
+#define MAX_GOT	16
+static struct lease_entry * got[MAX_GOT];
+static char got_label[MAX_GOT][64];
+static int ngot;
+static struct outgoing_entry * got_peer[MAX_GOT];
+static int ngot_peer;
+
+static void
+take_map(struct lease_entry * e, void * arg)
+{
+	(void)arg;
+	assert(ngot < MAX_GOT);
+	snprintf(got_label[ngot], sizeof(got_label[ngot]), "%s", e->label ? e->label : "");
+	e->label = NULL;
+	got[ngot++] = e;
+}
+
+static void
+take_peer(struct outgoing_entry * b, void * arg)
+{
+	(void)arg;
+	assert(ngot_peer < MAX_GOT);
+	b->label = NULL;
+	got_peer[ngot_peer++] = b;
+}
+
+static void
+free_got(void)
+{
+	int i;
+	for(i = 0; i < ngot; i++)
+		lease_table_free(got[i]);
+	for(i = 0; i < ngot_peer; i++)
+		outgoing_table_free(got_peer[i]);
+	ngot = ngot_peer = 0;
+}
+
+static int
+load(void)
+{
+	free_got();
+	return lease_files_load(take_map, take_peer, NULL);
+}
+
+static void
+write_file(const char * suffix, const char * text)
+{
+	char path[300];
+	FILE * f;
+	snprintf(path, sizeof(path), "%s%s", base, suffix);
+	f = fopen(path, "w");
+	assert(f != NULL);
+	fputs(text, f);
+	fclose(f);
+}
+
+static void
+unlink_file(const char * suffix)
+{
+	char path[300];
+	snprintf(path, sizeof(path), "%s%s", base, suffix);
+	unlink(path);
+}
+
+/* the row of id that a load gave, and its label */
+static struct lease_entry *
+got_id(unsigned long long id, const char ** label)
+{
+	int i;
+	for(i = 0; i < ngot; i++)
+		if(got[i]->id == id) {
+			if(label != NULL)
+				*label = got_label[i];
+			return got[i];
+		}
+	return NULL;
+}
+
+static int
+same_addr(const struct in6_addr * a, const char * s)
+{
+	struct in6_addr b = addr(s);
+	return memcmp(a, &b, sizeof(b)) == 0;
+}
+
+/* what a save writes, a load gives back: every field, the filters with
+ * their prefix and uid, the PEER peers; the expiry as time left */
+static void
+test_round_trip(void)
+{
+	struct lease_entry * e, * g;
+	struct outgoing_entry * b;
+	const char * label;
+	int i;
+
+	lease_table_clear();
+	outgoing_table_clear();
+	e = add_row(1, MAP_KIND_UPNP, AF_INET, IPPROTO_TCP, 40001, "::ffff:192.168.1.10", 8080,
+	            "::ffff:198.51.100.1", now + 3600, "cam|era\\1\n", 1);
+	e->filters[0].raddr = addr("::ffff:203.0.113.0");
+	e->filters[0].prefix = 120;
+	e->filters[0].rport = 443;
+	lease_table_link(e);
+	/* SCTP: a protocol with no name, written by its number */
+	e = add_row(2, MAP_KIND_PCP, AF_INET, 132, 40003, "::ffff:192.168.1.12", 7000,
+	            NULL, 0, "NA", 0);
+	for(i = 0; i < MAP_NONCE_LEN; i++)
+		e->nonce[i] = (unsigned char)(0x11 * i);
+	lease_table_link(e);
+	e = add_row(3, MAP_KIND_UPNP, AF_INET6, IPPROTO_UDP, 9000, "2001:db8::10", 9000,
+	            "2001:db8::10", now + 100, NULL, 2);
+	e->filters[0].uid = 7;
+	e->filters[1].raddr = addr("2001:db8:1::");
+	e->filters[1].prefix = 64;
+	e->filters[1].uid = 8;
+	lease_table_link(e);
+	/* a network of ::, written NA: its prefix is read in the family of the
+	 * row */
+	e = add_row(4, MAP_KIND_PCP, AF_INET6, IPPROTO_UDP, 9001, "2001:db8::11", 9001,
+	            "2001:db8::11", 0, NULL, 1);
+	e->filters[0].prefix = 64;
+	lease_table_link(e);
+	b = outgoing_table_new(1);
+	assert(b != NULL);
+	b->family = AF_INET;
+	b->proto = IPPROTO_TCP;
+	b->iaddr = addr("::ffff:192.168.1.13");
+	b->iport = 5000;
+	b->eaddr = addr("::ffff:198.51.100.1");
+	b->eport = 6000;
+	b->nonce[0] = 0xab;
+	b->peers[0].raddr = addr("::ffff:203.0.113.1");
+	b->peers[0].rport = 80;
+	b->peers[0].timestamp = now + 30;
+	outgoing_table_link(b);
+	assert(lease_files_flush() == 0);
+
+	assert(load() == 1 && ngot == 4 && ngot_peer == 1);
+	g = got_id(1, &label);
+	assert(g != NULL && g->kind == MAP_KIND_UPNP && g->family == AF_INET && g->proto == IPPROTO_TCP);
+	assert(g->eport == 40001 && g->iport == 8080 && strcmp(label, "cam|era\\1\n") == 0);
+	assert(same_addr(&g->iaddr, "::ffff:192.168.1.10") && same_addr(&g->eaddr, "::ffff:198.51.100.1"));
+	assert(g->nfilters == 1 && g->filters[0].prefix == 120 && g->filters[0].rport == 443);
+	assert(same_addr(&g->filters[0].raddr, "::ffff:203.0.113.0"));
+	/* the clocks may differ by the rounding of a second */
+	assert(g->timestamp >= now + 3599 && g->timestamp <= now + 3601);
+	g = got_id(2, &label);
+	assert(g != NULL && g->kind == MAP_KIND_PCP && g->proto == 132);
+	assert(g->timestamp == 0 && g->nonce[11] == 0xbb);
+	assert(IN6_IS_ADDR_UNSPECIFIED(&g->eaddr) && strcmp(label, "NA") == 0);
+	g = got_id(3, NULL);
+	assert(g != NULL && g->family == AF_INET6 && g->nfilters == 2);
+	assert(g->filters[0].uid + g->filters[1].uid == 15);
+	assert(g->filters[0].prefix + g->filters[1].prefix == 64);
+	g = got_id(4, NULL);
+	assert(g != NULL && g->nfilters == 1 && g->filters[0].prefix == 64);
+	assert(IN6_IS_ADDR_UNSPECIFIED(&g->filters[0].raddr));
+	b = got_peer[0];
+	assert(b->eport == 6000 && b->iport == 5000 && b->nonce[0] == 0xab);
+	assert(b->peers[0].rport == 80 && b->peers[0].timestamp >= now + 29);
+	free_got();
+	lease_table_clear();
+	outgoing_table_clear();
+}
+
+/* a file written by hand: fields in another order, a field the reader does
+ * not know, a missing field takes its default; bad and expired lines, and
+ * a row whose filter count does not match, are skipped */
+static void
+test_hand_file(void)
+{
+	char text[2048];
+	long long t = (long long)time(NULL) + 600;
+
+	remove_files();
+	snprintf(text, sizeof(text),
+	         "LEASE-MAPPINGS 1 last_id=50 future=yes\n"
+	         "kind|id|color|family|proto|iport|eport|iaddr|nonce|expiry|filters\n"
+	         "NAT-PMP|10|red|IPv4|UDP|5060|40002|192.168.1.11|NA|%lld|0\n"
+	         "PCP-M|11|red|IPv4|TCP|22|40003|192.168.1.12|00112233445566778899aabb|0|1\n"
+	         "UPNP|12|red|IPv4|TCP|80|40004|192.168.1.13|NA|1|0\n"
+	         "UPNP|13|red|IPv9|TCP|80|40005|192.168.1.13|NA|0|0\n"
+	         "UPNP|14|red|IPv4|TCP|80|40006|192.168.1.13|NA|0\n"
+	         "PCP-M|15|red|IPv4|TCP|23|40007|192.168.1.12|00112233445566778899aabb|0|2\n"
+	         "PCP-M|16|red|IPv4|SCTP|0|40008|192.168.1.12|00112233445566778899aabb|0|0\n"
+	         "PCP-M|17|red|IPv4|0|0|40009|192.168.1.12|00112233445566778899aabb|0|0\n",
+	         t);
+	write_file(".mappings", text);
+	write_file(".filters", "LEASE-FILTERS 1\nmap|raddr|rport\n11|203.0.113.7|0\n15|203.0.113.8|0\n");
+	assert(load() == 1);
+	/* 10, 11, 17 (protocol 0: all); 12 expired, 13 bad family, 14 too few
+	 * fields, 15 of another save, 16 a protocol name the daemon does not
+	 * write */
+	assert(ngot == 3 && got_id(10, NULL) != NULL && got_id(11, NULL) != NULL);
+	assert(got_id(17, NULL) != NULL && got_id(17, NULL)->proto == 0);
+	assert(got_id(10, NULL)->timestamp >= now + 599 && got_id(10, NULL)->timestamp <= now + 601);
+	assert(IN6_IS_ADDR_UNSPECIFIED(&got_id(10, NULL)->eaddr));
+	/* no rprefix: one host */
+	assert(got_id(11, NULL)->nfilters == 1 && got_id(11, NULL)->filters[0].prefix == 128);
+	free_got();
+	/* the ids of the files are kept from the rows of this run */
+	lease_files_reserve_ids();
+	assert(lease_table_last_id() >= 50);
+	remove_files();
+}
+
+/* no .mappings: nothing; a file which is not ours: the set goes aside as
+ * .bad, nothing is read, and the next save writes a new set */
+static void
+test_bad_files(void)
+{
+	char * bad;
+
+	remove_files();
+	assert(load() == 0 && ngot == 0);
+	write_file(".mappings", "LEASE-MAPPINGS 1\nid|kind|family|proto|eport|iport|iaddr\n1|UPNP|IPv4|TCP|1|1|192.168.1.1\n");
+	write_file(".filters", "LEASE-FILTERS 9\nmap|raddr\n");
+	assert(load() == -1 && ngot == 0);
+	assert(slurp(".mappings") == NULL && slurp(".filters") == NULL);
+	bad = slurp(".filters.bad");
+	assert(bad != NULL && strncmp(bad, "LEASE-FILTERS 9", 15) == 0);
+	free(bad);
+	bad = slurp(".mappings.bad");
+	assert(bad != NULL);
+	free(bad);
+	unlink_file(".mappings.bad");
+	unlink_file(".filters.bad");
+}
+
+/* a temporary file of a save cut short goes at startup; another file
+ * stays */
+static void
+test_temp_files(void)
+{
+	char * s;
+	write_file(".mappings.tmp.AbC123", "x");
+	write_file(".mappings.tmp.toolong1", "y");
+	lease_files_reserve_ids();
+	assert(slurp(".mappings.tmp.AbC123") == NULL);
+	s = slurp(".mappings.tmp.toolong1");
+	assert(s != NULL);
+	free(s);
+	unlink_file(".mappings.tmp.toolong1");
+}
+
 int
 main(void)
 {
@@ -336,6 +589,10 @@ main(void)
 	test_contents();
 	test_timing();
 	test_failure();
+	test_round_trip();
+	test_hand_file();
+	test_bad_files();
+	test_temp_files();
 	remove_files();
 	rmdir(dir);
 	printf("testleasefiles: OK\n");

@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -23,6 +25,8 @@
 #include "memmap.h"
 #include "fwsync.h"
 #include "testfwfake.h"
+#include "lease_files.h"
+#include "lease_restore.h"
 #ifdef ENABLE_EVENTS
 #include "upnpevents.h"
 #endif
@@ -574,6 +578,125 @@ test_drop_without_row(void)
 #endif
 }
 
+#ifdef ENABLE_LEASEFILE
+/* Save the tables to the lease files under dir, then empty them */
+static void
+save_and_clear(char * dir)
+{
+	static char path[300];
+	struct timeval tv = { 60, 0 };
+
+	snprintf(path, sizeof(path), "%s/leases", dir);
+	lease_file = path;
+	lease_files_poll(1, &tv);	/* the first save writes every file */
+	CHECK(lease_files_flush() == 0);
+	lease_table_clear();
+	outgoing_table_clear();
+}
+
+static void
+remove_lease_files(char * dir)
+{
+	static const char * const suffixes[] = { ".mappings", ".filters", ".outgoing" };
+	char path[300];
+	unsigned int i;
+	for(i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
+		snprintf(path, sizeof(path), "%s%s", lease_file, suffixes[i]);
+		remove(path);
+	}
+	rmdir(dir);
+	lease_file = NULL;
+}
+
+/* The restore at startup: each row of the lease files goes to the firewall
+ * as an add, and into the table with its owner, label, expiry and filters;
+ * a refused batch goes again row by row, so every row comes back */
+static void
+test_restore(void)
+{
+	char dir[] = "/tmp/testcallersXXXXXX";
+	struct lease_entry * e;
+	const struct lease_entry * g;
+	unsigned int ts = (unsigned int)upnp_time() + 600;
+	struct in6_addr ia;
+	int i, family;
+
+	map_pton("192.168.1.10", &family, &ia);
+	CHECK(mkdtemp(dir) != NULL);
+	lease_table_clear();
+	for(i = 0; i < 70; i++) {
+		e = map4(i == 0 ? MAP_KIND_PCP : MAP_KIND_UPNP, (unsigned short)(6000 + i), 80);
+		e->timestamp = ts;
+		e->label = i == 1 ? "web" : NULL;
+		if(i == 0)
+			e->nonce[11] = 0x42;
+		lease_table_link(e);
+	}
+	save_and_clear(dir);
+	CHECK(lease_table_count() == 0);
+
+	reset();
+	CHECK(lease_restore() == 0);
+	CHECK(lease_table_count() == 70);
+	CHECK(adds == 70 && deletes == 0);
+	g = lease_table_find_entry(IPPROTO_TCP, AF_INET, &ia, 80, 6000);
+	CHECK(g != NULL && g->kind == MAP_KIND_PCP && g->nonce[11] == 0x42);
+	CHECK(g != NULL && g->timestamp >= ts - 1 && g->timestamp <= ts + 1);
+	g = lease_table_find_entry(IPPROTO_TCP, AF_INET, &ia, 80, 6001);
+	CHECK(g != NULL && g->kind == MAP_KIND_UPNP && g->label != NULL && strcmp(g->label, "web") == 0);
+
+	/* the third add is refused once: its batch goes again row by row */
+	save_and_clear(dir);
+	reset();
+	fail_add_redirect = 3;
+	CHECK(lease_restore() == 0);
+	CHECK(lease_table_count() == 70);
+	CHECK(deletes == 2);
+
+	remove_lease_files(dir);
+	lease_table_clear();
+}
+
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+/* the PEER peers of the lease files come back, each with its rule */
+static void
+test_restore_peer(void)
+{
+	char dir[] = "/tmp/testcallersXXXXXX";
+	struct outgoing_entry * b = outgoing_table_new(2);
+	unsigned int ts = (unsigned int)upnp_time() + 600;
+	int family;
+
+	CHECK(mkdtemp(dir) != NULL);
+	lease_table_clear();
+	outgoing_table_clear();
+	b->family = AF_INET;
+	b->proto = IPPROTO_UDP;
+	map_pton("192.168.1.10", &family, &b->iaddr);
+	map_pton("203.0.113.1", &family, &b->eaddr);
+	b->iport = 5000;
+	b->eport = 6000;
+	b->nonce[3] = 7;
+	map_pton("198.51.100.7", &family, &b->peers[0].raddr);
+	b->peers[0].rport = 7000;
+	b->peers[0].timestamp = ts;
+	b->peers[1] = b->peers[0];
+	b->peers[1].rport = 7001;
+	memmap_link_outgoing(b);
+	save_and_clear(dir);
+
+	reset();
+	CHECK(lease_restore() == 0);
+	CHECK(peer_adds == 2);
+	CHECK(outgoing_table_count() == 1 && outgoing_table_peer_count() == 2);
+	b = outgoing_table_next(NULL);
+	CHECK(b != NULL && b->eport == 6000 && b->nonce[3] == 7);
+	remove_lease_files(dir);
+	outgoing_table_clear();
+}
+#endif
+#endif /* ENABLE_LEASEFILE */
+
 int
 main(void)
 {
@@ -603,6 +726,12 @@ main(void)
 	test_reload_adopt();
 #endif
 	test_drop_without_row();
+#ifdef ENABLE_LEASEFILE
+	test_restore();
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	test_restore_peer();
+#endif
+#endif
 	lease_table_clear();
 	if(failures) {
 		fprintf(stderr, "testcallers: %d check(s) failed\n", failures);

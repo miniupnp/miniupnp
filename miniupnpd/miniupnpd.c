@@ -78,6 +78,7 @@
 #include "upnpredirect.h"
 #include "memmap.h"
 #include "lease_files.h"
+#include "lease_restore.h"
 #include "upnppinhole.h"
 #include "upnpstun.h"
 #include "miniupnpdtypes.h"
@@ -2281,15 +2282,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	}
 #endif
 
-#ifdef ENABLE_LEASEFILE
-	/*remove(lease_file);*/
-	syslog(LOG_INFO, "Reloading rules from lease file");
-	reload_from_lease_file();
-#ifdef ENABLE_UPNPPINHOLE
-	reload_from_lease_file6();
-#endif
-#endif
+	/* the rules of an earlier run go, then the lease files send those of
+	 * their rows again */
+	lease_files_reserve_ids();
 	drop_rules_without_row();
+	if(lease_restore() < 0)
+		syslog(LOG_WARNING, "the lease files could not be read, nothing restored");
 
 #ifdef TOMATO
 	tomato_load();

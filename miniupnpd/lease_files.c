@@ -27,6 +27,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <syslog.h>
+#include <dirent.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -99,6 +101,18 @@ put_addr(FILE * f, int family, const struct in6_addr * a)
 	fputs(s != NULL ? s : LEASE_NA, f);
 }
 
+/* The protocol by its name where the name reads back as it (TCP, UDP,
+ * UDPLITE), else by its number: PCP maps any protocol, 0 for all. */
+static void
+put_proto(FILE * f, int proto)
+{
+	const char * name = proto_itoa(proto);
+	if(proto_atoi(name) == proto)
+		fputs(name, f);
+	else
+		fprintf(f, "%d", proto);
+}
+
 /* The label as the file has it: \\ for a backslash, \| for the separator,
  * \n, \r and \xHH for the other control characters. NA if there is none,
  * and \x4EA for a label which is really NA, so it is not taken for none. */
@@ -136,8 +150,10 @@ put_mapping(struct lease_entry * e, void * arg)
 	FILE * f = arg;
 	char nonce[2 * MAP_NONCE_LEN + 1];
 
-	fprintf(f, "%llu|%s|%s|%s|%hu|%hu|", e->id, kind_name(e->kind),
-	        map_family_name(e->family), proto_itoa(e->proto), e->eport, e->iport);
+	fprintf(f, "%llu|%s|%s|", e->id, kind_name(e->kind),
+	        map_family_name(e->family));
+	put_proto(f, e->proto);
+	fprintf(f, "|%hu|%hu|", e->eport, e->iport);
 	put_addr(f, e->family, &e->iaddr);
 	fputc(LEASE_SEP, f);
 	put_addr(f, e->family, &e->eaddr);
@@ -191,7 +207,9 @@ write_outgoing(FILE * f)
 		map_nonce_ntop(b->nonce, nonce);
 		for(i = 0; i < b->npeers; i++) {
 			p = &b->peers[i];
-			fprintf(f, "%s|%s|", map_family_name(b->family), proto_itoa(b->proto));
+			fprintf(f, "%s|", map_family_name(b->family));
+			put_proto(f, b->proto);
+			fputc(LEASE_SEP, f);
 			put_addr(f, b->family, &b->iaddr);
 			fprintf(f, "|%hu|", b->iport);
 			put_addr(f, b->family, &b->eaddr);
@@ -433,6 +451,762 @@ lease_files_flush(void)
 	return save();
 }
 
+/* The load. */
+
+/* An id or a map field above this is bad: the table never comes near it,
+ * and a reserve of it could make ++last_id wrap to 0 */
+#define LEASE_ID_MAX	0x7fffffffffffffffULL
+
+/* A line of any length, without its end of line, in *buf of *size bytes.
+ * 1, or 0 at the end of the file or when there is no memory. */
+static int
+read_line(FILE * f, char ** buf, size_t * size)
+{
+	size_t n = 0;
+
+	for(;;) {
+		if(*size - n < 2) {
+			size_t sz = *size ? *size * 2 : 256;
+			char * p = realloc(*buf, sz);
+			if(p == NULL) {
+				syslog(LOG_ERR, "lease files: no memory for a line");
+				return 0;
+			}
+			*buf = p;
+			*size = sz;
+		}
+		if(fgets(*buf + n, (int)(*size - n), f) == NULL)
+			break;
+		n += strlen(*buf + n);
+		if(n > 0 && (*buf)[n - 1] == '\n')
+			break;
+	}
+	if(n == 0)
+		return 0;
+	while(n > 0 && ((*buf)[n - 1] == '\n' || (*buf)[n - 1] == '\r'))
+		(*buf)[--n] = '\0';
+	return 1;
+}
+
+/* Cut a line into its fields at each | which no \ escapes. The number of
+ * fields, or -1 for more than max. */
+static int
+split_fields(char * line, char ** field, int max)
+{
+	int n = 0;
+	char * p = line;
+
+	field[n++] = p;
+	while(*p) {
+		if(*p == '\\' && p[1] != '\0') {
+			p += 2;
+		} else if(*p == LEASE_SEP) {
+			*p++ = '\0';
+			if(n >= max)
+				return -1;
+			field[n++] = p;
+		} else
+			p++;
+	}
+	return n;
+}
+
+static int
+hex_digit(char c)
+{
+	if(c >= '0' && c <= '9')
+		return c - '0';
+	if(c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if(c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+/* Undo put_label() in place. NA is no label: "". -1 for a bad escape. */
+static int
+get_label(char * s)
+{
+	char * d = s;
+	const char * p = s;
+
+	if(strcmp(s, LEASE_NA) == 0) {
+		s[0] = '\0';
+		return 0;
+	}
+	while(*p) {
+		if(*p != '\\') {
+			*d++ = *p++;
+			continue;
+		}
+		p++;
+		switch(*p) {
+		case '\\':
+		case LEASE_SEP:
+			*d++ = *p++;
+			break;
+		case 'n':
+			*d++ = '\n';
+			p++;
+			break;
+		case 'r':
+			*d++ = '\r';
+			p++;
+			break;
+		case 'x':
+			if(hex_digit(p[1]) < 0 || hex_digit(p[2]) < 0)
+				return -1;
+			*d++ = (char)(hex_digit(p[1]) * 16 + hex_digit(p[2]));
+			p += 3;
+			break;
+		default:
+			return -1;
+		}
+	}
+	*d = '\0';
+	return 0;
+}
+
+/* A number of the whole field, at most max. 0, or -1. */
+static int
+get_number(const char * s, unsigned long long max, unsigned long long * v)
+{
+	char * end;
+	if(s == NULL || *s < '0' || *s > '9')
+		return -1;
+	*v = strtoull(s, &end, 10);
+	return (*end != '\0' || *v > max) ? -1 : 0;
+}
+
+/* An address of family, as a row has it. NA : ::. 0, or -1. */
+static int
+get_addr(int family, const char * s, struct in6_addr * a)
+{
+	memset(a, 0, sizeof(*a));
+	if(s == NULL)
+		return -1;
+	if(strcmp(s, LEASE_NA) == 0)
+		return 0;
+	return map_ipv4_to_ipv6_af(s, family, a);
+}
+
+/* A PCP nonce of 24 hex digits. 0, or -1. */
+static int
+get_nonce(const char * h, unsigned char * nonce)
+{
+	int i;
+	if(h == NULL || strlen(h) != 2 * MAP_NONCE_LEN)
+		return -1;
+	for(i = 0; i < MAP_NONCE_LEN; i++) {
+		if(hex_digit(h[2 * i]) < 0 || hex_digit(h[2 * i + 1]) < 0)
+			return -1;
+		nonce[i] = (unsigned char)(hex_digit(h[2 * i]) * 16 + hex_digit(h[2 * i + 1]));
+	}
+	return 0;
+}
+
+/* The fields a reader knows, by name. A file may have more, in any order:
+ * they are skipped. One it lacks has its default. */
+enum {
+	F_ID, F_KIND, F_FAMILY, F_PROTO, F_EPORT, F_IPORT, F_IADDR, F_EADDR,
+	F_NONCE, F_EXPIRY, F_FILTERS, F_LABEL,
+	F_MAP, F_RADDR, F_RPREFIX, F_RPORT, F_UID, F_COUNT
+};
+static const char * const field_names[F_COUNT] = {
+	"id", "kind", "family", "proto", "eport", "iport", "iaddr", "eaddr",
+	"nonce", "expiry", "filters", "label",
+	"map", "raddr", "rprefix", "rport", "uid"
+};
+#define LEASE_MAX_FIELDS	64
+
+/* A file of the set, read up to its first line of data. */
+struct lease_in {
+	FILE * f;
+	char * path;
+	int col[F_COUNT];	/* the place of each field, -1 : none */
+	int ncols;
+	unsigned long long last_id;	/* of the header, 0 if it lacks it */
+	unsigned long line;
+	char * buf;
+	size_t size;
+};
+
+static void
+in_close(struct lease_in * in)
+{
+	if(in->f != NULL)
+		fclose(in->f);
+	free(in->path);
+	free(in->buf);
+	memset(in, 0, sizeof(*in));
+}
+
+/* Read the header line in in->buf: the header of lp, then name=value
+ * words. A word it does not know is skipped. 0, or -1 if it is not the
+ * header of lp or a known word is bad. */
+static int
+get_header(struct lease_in * in, const struct lease_part * lp)
+{
+	size_t n = strlen(lp->header);
+	char * p, * word, * value;
+
+	if(strncmp(in->buf, lp->header, n) != 0 || (in->buf[n] != '\0' && in->buf[n] != ' '))
+		return -1;
+	for(p = in->buf + n; *p != '\0'; ) {
+		while(*p == ' ')
+			p++;
+		if(*p == '\0')
+			break;
+		word = p;
+		p += strcspn(p, " ");
+		if(*p != '\0')
+			*p++ = '\0';
+		value = strchr(word, '=');
+		if(value == NULL)
+			continue;
+		*value++ = '\0';
+		if(strcmp(word, "last_id") == 0 &&
+		   get_number(value, LEASE_ID_MAX, &in->last_id) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+/* Open a file of the set and read its header and its field names. 1, 0 if
+ * there is no such file, or -1 if it is not one of ours, of this version:
+ * logged unless quiet. */
+static int
+in_open(struct lease_in * in, enum lease_file_id id, int quiet)
+{
+	const struct lease_part * lp = &lease_parts[id];
+	char * names[LEASE_MAX_FIELDS];
+	int i, j;
+
+	memset(in, 0, sizeof(*in));
+	for(i = 0; i < F_COUNT; i++)
+		in->col[i] = -1;
+	in->path = part_name(lp->suffix, "");
+	if(in->path == NULL)
+		return -1;
+	in->f = fopen(in->path, "r");
+	if(in->f == NULL)
+		return 0;
+	if(!read_line(in->f, &in->buf, &in->size) || get_header(in, lp) < 0)
+		goto bad;
+	if(!read_line(in->f, &in->buf, &in->size))
+		goto bad;
+	in->line = 2;
+	in->ncols = split_fields(in->buf, names, LEASE_MAX_FIELDS);
+	if(in->ncols < 0)
+		goto bad;
+	for(i = 0; i < in->ncols; i++)
+		for(j = 0; j < F_COUNT; j++)
+			if(strcmp(names[i], field_names[j]) == 0 && in->col[j] < 0)
+				in->col[j] = i;
+	return 1;
+bad:
+	if(!quiet)
+		syslog(LOG_ERR, "lease files: %s has an unknown header", in->path);
+	return -1;
+}
+
+/* Keep a file which is not ours out of the way: the next save would
+ * overwrite it. */
+static void
+in_set_aside(struct lease_in * in)
+{
+	size_t n = strlen(in->path) + sizeof(".bad");
+	char * bad = malloc(n);
+	if(bad != NULL) {
+		snprintf(bad, n, "%s.bad", in->path);
+		if(rename(in->path, bad) == 0)
+			syslog(LOG_WARNING, "lease files: renamed %s to %s", in->path, bad);
+		else
+			syslog(LOG_ERR, "lease files: cannot rename %s: %m", in->path);
+		free(bad);
+	}
+}
+
+/* The next line of data, cut into fields: field[F_*] is NULL for a field the
+ * file lacks. 1, or 0 at the end. A line with another number of fields is
+ * logged and skipped. */
+static int
+in_next(struct lease_in * in, char ** field)
+{
+	char * cols[LEASE_MAX_FIELDS];
+	int i, n;
+
+	while(read_line(in->f, &in->buf, &in->size)) {
+		in->line++;
+		if(in->buf[0] == '\0')
+			continue;
+		n = split_fields(in->buf, cols, LEASE_MAX_FIELDS);
+		if(n != in->ncols) {
+			syslog(LOG_WARNING, "lease files: %s:%lu: %d fields, not %d, skipped",
+			       in->path, in->line, n, in->ncols);
+			continue;
+		}
+		for(i = 0; i < F_COUNT; i++)
+			field[i] = in->col[i] >= 0 ? cols[in->col[i]] : NULL;
+		return 1;
+	}
+	return 0;
+}
+
+/* Log a bad field of the current line. 0: the line is skipped. */
+static int
+bad_line(const struct lease_in * in, const char * what)
+{
+	syslog(LOG_WARNING, "lease files: %s:%lu: bad %s, skipped", in->path, in->line, what);
+	return 0;
+}
+
+/* The family, protocol and expiry of a line, common to .mappings and
+ * .outgoing. The expiry goes on the clock of upnp_time(). 1, or 0 to skip
+ * the line (logged). */
+static int
+get_common(struct lease_in * in, char ** field, unsigned char * family,
+           unsigned char * proto, unsigned int * timestamp)
+{
+	unsigned long long v;
+	time_t unix_now;
+	int p;
+
+	if(field[F_FAMILY] != NULL && strcmp(field[F_FAMILY], "IPv4") == 0)
+		*family = AF_INET;
+	else if(field[F_FAMILY] != NULL && strcmp(field[F_FAMILY], "IPv6") == 0)
+		*family = AF_INET6;
+	else
+		return bad_line(in, "family");
+	/* as put_proto() writes it: a number, or a name which reads back */
+	if(get_number(field[F_PROTO], 255, &v) == 0)
+		*proto = (unsigned char)v;
+	else if(field[F_PROTO] != NULL
+	        && strcmp(proto_itoa(p = proto_atoi(field[F_PROTO])), field[F_PROTO]) == 0)
+		*proto = (unsigned char)p;
+	else
+		return bad_line(in, "proto");
+	*timestamp = 0;
+	if(field[F_EXPIRY] == NULL)
+		return 1;
+	if(get_number(field[F_EXPIRY], 0xffffffffULL, &v) < 0)
+		return bad_line(in, "expiry");
+	if(v == 0)
+		return 1;
+	unix_now = time(NULL);
+	if((time_t)v <= unix_now) {
+		syslog(LOG_INFO, "lease files: %s:%lu: expired, not restored", in->path, in->line);
+		return 0;
+	}
+	*timestamp = (unsigned int)(upnp_time() + ((time_t)v - unix_now));
+	return 1;
+}
+
+/* A line of .filters: the row it belongs to, by its id, and the filter.
+ * rprefix as written, -1 : none; the family of the row tells its range. */
+struct side_line {
+	unsigned long long map;
+	int rprefix;
+	struct map_filter f;
+};
+
+struct side_lines {
+	struct side_line * v;
+	size_t n, size;
+};
+
+static int
+cmp_side(const void * a, const void * b)
+{
+	const struct side_line * x = a, * y = b;
+	return x->map < y->map ? -1 : x->map > y->map;
+}
+
+/* Read the lines of .filters, sorted by the id of their row. A file which
+ * is not there has no lines. 0, or -1 for a bad header or no memory. */
+static int
+read_filters(struct side_lines * s, struct lease_in * in)
+{
+	char * field[F_COUNT];
+	unsigned long long v;
+	struct side_line l;
+	int family, r;
+
+	memset(s, 0, sizeof(*s));
+	r = in_open(in, LF_FILTERS, 0);
+	if(r <= 0)
+		return r;
+	while(in_next(in, field)) {
+		memset(&l, 0, sizeof(l));
+		if(get_number(field[F_MAP], LEASE_ID_MAX, &l.map) < 0 || l.map == 0) {
+			(void)bad_line(in, "map");
+			continue;
+		}
+		/* the family is that of the address; NA is any remote */
+		family = field[F_RADDR] != NULL && strchr(field[F_RADDR], ':') ? AF_INET6 : AF_INET;
+		if(get_addr(family, field[F_RADDR], &l.f.raddr) < 0) {
+			(void)bad_line(in, "raddr");
+			continue;
+		}
+		l.rprefix = -1;
+		if(field[F_RPREFIX] != NULL) {
+			/* NA has no family: the row checks the range */
+			if(get_number(field[F_RPREFIX],
+			              family == AF_INET && !IN6_IS_ADDR_UNSPECIFIED(&l.f.raddr) ? 32 : 128,
+			              &v) < 0) {
+				(void)bad_line(in, "rprefix");
+				continue;
+			}
+			l.rprefix = (int)v;
+		}
+		if(field[F_RPORT] != NULL) {
+			if(get_number(field[F_RPORT], 65535, &v) < 0) {
+				(void)bad_line(in, "rport");
+				continue;
+			}
+			l.f.rport = (unsigned short)v;
+		}
+		if(field[F_UID] != NULL && strcmp(field[F_UID], LEASE_NA) != 0) {
+			if(get_number(field[F_UID], 65535, &v) < 0) {
+				(void)bad_line(in, "uid");
+				continue;
+			}
+			l.f.uid = (unsigned short)v;
+		}
+		if(s->n == s->size) {
+			size_t sz = s->size ? s->size * 2 : 64;
+			struct side_line * p = realloc(s->v, sz * sizeof(*p));
+			if(p == NULL) {
+				syslog(LOG_ERR, "lease files: no memory for %s", in->path);
+				return -1;
+			}
+			s->v = p;
+			s->size = sz;
+		}
+		s->v[s->n++] = l;
+	}
+	if(s->n > 1)
+		qsort(s->v, s->n, sizeof(s->v[0]), cmp_side);
+	return 0;
+}
+
+/* The lines of the row id, and their number. */
+static const struct side_line *
+side_of(const struct side_lines * s, unsigned long long id, size_t * count)
+{
+	struct side_line key;
+	const struct side_line * p, * first, * end = s->v + s->n;
+
+	*count = 0;
+	if(s->n == 0)
+		return NULL;
+	key.map = id;
+	p = bsearch(&key, s->v, s->n, sizeof(s->v[0]), cmp_side);
+	if(p == NULL)
+		return NULL;
+	for(first = p; first > s->v && first[-1].map == id; first--)
+		;
+	for(p = first; p < end && p->map == id; p++)
+		(*count)++;
+	return first;
+}
+
+/* The row of a line of .mappings, into r, a request on the stack, and the
+ * number of its filters. 1, or 0 to skip the line (logged). */
+static int
+get_mapping(struct lease_in * in, char ** field, struct lease_entry * r,
+            unsigned long * nfilters)
+{
+	unsigned long long v;
+	unsigned int i;
+
+	*nfilters = 0;
+	for(i = 0; i < KIND_NAMES; i++)
+		if(field[F_KIND] != NULL && strcmp(field[F_KIND], kind_names[i].name) == 0)
+			break;
+	if(i == KIND_NAMES)
+		return bad_line(in, "kind");
+	lease_entry_init(r, kind_names[i].kind, NULL);
+	if(get_number(field[F_ID], LEASE_ID_MAX, &r->id) < 0 || r->id == 0)
+		return bad_line(in, "id");
+	if(!get_common(in, field, &r->family, &r->proto, &r->timestamp))
+		return 0;
+	if(get_number(field[F_IPORT], 65535, &v) < 0)
+		return bad_line(in, "iport");
+	r->iport = (unsigned short)v;
+	if(get_number(field[F_EPORT], 65535, &v) < 0)
+		return bad_line(in, "eport");
+	r->eport = (unsigned short)v;
+	if(get_addr(r->family, field[F_IADDR], &r->iaddr) < 0 ||
+	   IN6_IS_ADDR_UNSPECIFIED(&r->iaddr))
+		return bad_line(in, "iaddr");
+	if(field[F_EADDR] != NULL && get_addr(r->family, field[F_EADDR], &r->eaddr) < 0)
+		return bad_line(in, "eaddr");
+	if(r->kind == MAP_KIND_PCP && get_nonce(field[F_NONCE], r->nonce) < 0)
+		return bad_line(in, "nonce");
+	if(field[F_FILTERS] != NULL) {
+		if(get_number(field[F_FILTERS], 0xffffUL, &v) < 0)
+			return bad_line(in, "filters");
+		*nfilters = (unsigned long)v;
+	}
+	if(field[F_LABEL] != NULL) {
+		if(get_label(field[F_LABEL]) < 0)
+			return bad_line(in, "label");
+		if(field[F_LABEL][0] != '\0')
+			r->label = field[F_LABEL];
+	}
+	return 1;
+}
+
+/* The binding of one peer of a line of .outgoing, into b, which has room
+ * for one. 1, or 0 to skip the line (logged). */
+static int
+get_peer(struct lease_in * in, char ** field, struct outgoing_entry * b)
+{
+	unsigned long long v;
+
+	if(!get_common(in, field, &b->family, &b->proto, &b->peers[0].timestamp))
+		return 0;
+	if(get_addr(b->family, field[F_IADDR], &b->iaddr) < 0 ||
+	   IN6_IS_ADDR_UNSPECIFIED(&b->iaddr))
+		return bad_line(in, "iaddr");
+	if(get_number(field[F_IPORT], 65535, &v) < 0)
+		return bad_line(in, "iport");
+	b->iport = (unsigned short)v;
+	if(get_addr(b->family, field[F_EADDR], &b->eaddr) < 0)
+		return bad_line(in, "eaddr");
+	if(get_number(field[F_EPORT], 65535, &v) < 0 || v == 0)
+		return bad_line(in, "eport");
+	b->eport = (unsigned short)v;
+	if(get_nonce(field[F_NONCE], b->nonce) < 0)
+		return bad_line(in, "nonce");
+	if(get_addr(b->family, field[F_RADDR], &b->peers[0].raddr) < 0 ||
+	   IN6_IS_ADDR_UNSPECIFIED(&b->peers[0].raddr))
+		return bad_line(in, "raddr");
+	if(get_number(field[F_RPORT], 65535, &v) < 0 || v == 0)
+		return bad_line(in, "rport");
+	b->peers[0].rport = (unsigned short)v;
+	if(field[F_LABEL] != NULL) {
+		if(get_label(field[F_LABEL]) < 0)
+			return bad_line(in, "label");
+		if(field[F_LABEL][0] != '\0')
+			b->label = field[F_LABEL];
+	}
+	return 1;
+}
+
+/* 1 if name is <file><suffix>.tmp.XXXXXX, a temporary file of a save */
+static int
+is_temp_name(const char * name, const char * file, const char * suffix)
+{
+	size_t n = strlen(file), m = strlen(suffix), t = strlen(LEASE_TMP), i;
+	if(strncmp(name, file, n) != 0 || strncmp(name + n, suffix, m) != 0 ||
+	   strncmp(name + n + m, LEASE_TMP, t) != 0)
+		return 0;
+	name += n + m + t;
+	/* the characters mkstemp() puts there */
+	for(i = 0; name[i] != '\0'; i++)
+		if(!((name[i] >= '0' && name[i] <= '9') || (name[i] >= 'a' && name[i] <= 'z') ||
+		     (name[i] >= 'A' && name[i] <= 'Z')))
+			return 0;
+	return i == 6;
+}
+
+/* Remove the temporary files of a save a crash cut short:
+ * <name><suffix>.tmp.XXXXXX beside each file of the set. */
+static void
+remove_temp_files(void)
+{
+	const char * slash = strrchr(lease_file, '/');
+	const char * name = slash != NULL ? slash + 1 : lease_file;
+	size_t dlen = slash != NULL ? (size_t)(slash - lease_file) : 0;
+	char dir[PATH_MAX], path[PATH_MAX];
+	struct dirent * d;
+	DIR * dp;
+	int i;
+
+	if(dlen >= sizeof(dir))
+		return;
+	if(slash == lease_file)
+		snprintf(dir, sizeof(dir), "/");
+	else if(slash != NULL)
+		snprintf(dir, sizeof(dir), "%.*s", (int)dlen, lease_file);
+	else
+		snprintf(dir, sizeof(dir), ".");
+	dp = opendir(dir);
+	if(dp == NULL)
+		return;
+	while((d = readdir(dp)) != NULL) {
+		for(i = 0; i < LF_COUNT; i++) {
+			if(!is_temp_name(d->d_name, name, lease_parts[i].suffix))
+				continue;
+			if(snprintf(path, sizeof(path), "%s/%s", dir, d->d_name) >= (int)sizeof(path))
+				continue;
+			if(unlink(path) == 0)
+				syslog(LOG_INFO, "lease files: removed %s, of a save cut short", path);
+		}
+	}
+	closedir(dp);
+}
+
+void
+lease_files_reserve_ids(void)
+{
+	unsigned long long max = 0;
+	struct lease_in in;
+	int i;
+
+	if(lease_file == NULL)
+		return;
+	remove_temp_files();
+	/* each file names the highest id of its save: a side file newer than
+	 * .mappings has its own. The load logs a bad file */
+	for(i = 0; i < LF_COUNT; i++) {
+		if(in_open(&in, (enum lease_file_id)i, 1) == 1 && in.last_id > max)
+			max = in.last_id;
+		in_close(&in);
+	}
+	lease_table_reserve_ids(max);
+}
+
+/* Give each row of .mappings to map. */
+static void
+load_mappings(struct lease_in * maps, const struct side_lines * fs,
+              lease_files_map_fn map, void * arg, unsigned int * done,
+              unsigned int * skipped)
+{
+	char * field[F_COUNT];
+	struct lease_entry r, * e;
+	const struct side_line * l;
+	unsigned long nfilters;
+	size_t nf, k;
+
+	while(in_next(maps, field)) {
+		if(!get_mapping(maps, field, &r, &nfilters)) {
+			(*skipped)++;
+			continue;
+		}
+		/* .mappings is renamed last: a crash between the renames leaves it
+		 * older than .filters. A row whose filter lines do not match its
+		 * count is of another save: without its filters it would let in
+		 * more than its client asked for */
+		l = side_of(fs, r.id, &nf);
+		if(nf != nfilters) {
+			syslog(LOG_WARNING, "lease files: %s:%lu: %lu filters, not %lu: of another save, not restored",
+			       maps->path, maps->line, (unsigned long)nf, nfilters);
+			(*skipped)++;
+			continue;
+		}
+		e = lease_table_new((int)nf);
+		if(e == NULL) {
+			(*skipped)++;
+			continue;
+		}
+		e->id = r.id;
+		e->kind = r.kind;
+		e->family = r.family;
+		e->proto = r.proto;
+		memcpy(e->nonce, r.nonce, MAP_NONCE_LEN);
+		e->iaddr = r.iaddr;
+		e->iport = r.iport;
+		e->eaddr = r.eaddr;
+		e->eport = r.eport;
+		e->timestamp = r.timestamp;
+		e->label = r.label;
+		for(k = 0; k < nf; k++) {
+			e->filters[k].raddr = l[k].f.raddr;
+			/* on 128 bits in memory, also for IPv4 */
+			if(l[k].rprefix > (r.family == AF_INET ? 32 : 128))
+				break;
+			if(l[k].rprefix >= 0)
+				e->filters[k].prefix = (unsigned char)map_prefix_pton(r.family, l[k].rprefix);
+			else if(!IN6_IS_ADDR_UNSPECIFIED(&l[k].f.raddr))
+				e->filters[k].prefix = 128;
+			e->filters[k].rport = l[k].f.rport;
+			e->filters[k].uid = l[k].f.uid;
+		}
+		if(k < nf) {
+			syslog(LOG_WARNING, "lease files: %s:%lu: rprefix %d of a filter is out of range, not restored",
+			       maps->path, maps->line, l[k].rprefix);
+			lease_table_free(e);
+			(*skipped)++;
+			continue;
+		}
+		map(e, arg);
+		(*done)++;
+	}
+}
+
+/* Give each line of .outgoing to peer, as a binding of one peer. */
+static void
+load_outgoing(struct lease_in * out, lease_files_peer_fn peer, void * arg,
+              unsigned int * done, unsigned int * skipped)
+{
+	char * field[F_COUNT];
+	struct outgoing_entry * b;
+
+	while(in_next(out, field)) {
+		b = outgoing_table_new(1);
+		if(b == NULL) {
+			(*skipped)++;
+			continue;
+		}
+		if(!get_peer(out, field, b)) {
+			outgoing_table_free(b);
+			(*skipped)++;
+			continue;
+		}
+		peer(b, arg);
+		(*done)++;
+	}
+}
+
+int
+lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg)
+{
+	struct lease_in maps, filters, out;
+	struct side_lines fs;
+	unsigned int done = 0, skipped = 0;
+	int ret, rf, ro;
+
+	if(lease_file == NULL)
+		return 0;
+	memset(&filters, 0, sizeof(filters));
+	memset(&out, 0, sizeof(out));
+	memset(&fs, 0, sizeof(fs));
+	ret = in_open(&maps, LF_MAPPINGS, 0);
+	if(ret == 0) {
+		/* .mappings is the record of what exists: without it, nothing */
+		in_close(&maps);
+		return 0;
+	}
+	rf = read_filters(&fs, &filters);
+	ro = in_open(&out, LF_OUTGOING, 0);
+	if(ret < 0 || rf < 0 || ro < 0) {
+		/* not a set this daemon can read: keep the whole set, as the
+		 * next save writes each file, and load nothing */
+		if(maps.f != NULL)
+			in_set_aside(&maps);
+		if(filters.f != NULL)
+			in_set_aside(&filters);
+		if(out.f != NULL)
+			in_set_aside(&out);
+		ret = -1;
+		goto out;
+	}
+	load_mappings(&maps, &fs, map, arg, &done, &skipped);
+	if(ro > 0)
+		load_outgoing(&out, peer, arg, &done, &skipped);
+	syslog(LOG_INFO, "lease files: read %u lines to restore, %u not", done, skipped);
+	ret = 1;
+out:
+	free(fs.v);
+	in_close(&maps);
+	in_close(&filters);
+	in_close(&out);
+	return ret;
+}
+
 #else /* ENABLE_LEASEFILE */
 
 void
@@ -445,6 +1219,20 @@ lease_files_poll(int idle, struct timeval * timeout)
 int
 lease_files_flush(void)
 {
+	return 0;
+}
+
+void
+lease_files_reserve_ids(void)
+{
+}
+
+int
+lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg)
+{
+	(void)map;
+	(void)peer;
+	(void)arg;
 	return 0;
 }
 

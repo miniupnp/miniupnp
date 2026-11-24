@@ -459,7 +459,7 @@ next_to_clean(unsigned int ts)
 /* An add which failed left a part of the rules of e in the firewall: the
  * table keeps a row of them, which expires at once, so the expiry pass
  * deletes them again. */
-static void
+void
 keep_partial_row(const struct lease_entry * e)
 {
 	struct lease_entry * k = lease_table_copy(e);

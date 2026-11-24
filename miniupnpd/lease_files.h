@@ -35,4 +35,30 @@ void lease_files_poll(int idle, struct timeval * timeout);
  * 0, or -1 if a file could not be written. */
 int lease_files_flush(void);
 
+struct lease_entry;
+struct outgoing_entry;
+
+/* A row of the files: e from lease_table_new(), filled, not linked. The
+ * callee takes e. Its label points into the line, valid only during the
+ * call. */
+typedef void (*lease_files_map_fn)(struct lease_entry * e, void * arg);
+
+/* A peer of the files: b from outgoing_table_new(1), filled, not linked.
+ * The callee takes b; its label as above. */
+typedef void (*lease_files_peer_fn)(struct outgoing_entry * b, void * arg);
+
+/* At startup, before any row is linked: remove the temporary files of a
+ * save a crash cut short, and keep the ids the files hold from the rows of
+ * this run (the last_id of each header). */
+void lease_files_reserve_ids(void);
+
+/* Read the files at startup: each row of .mappings with its filters to
+ * map, each line of .outgoing to peer. The files are trusted: a line is
+ * only skipped (and logged) when it cannot be read, is expired, or is a
+ * row of another save (a crash between the renames). 1 if the files were
+ * read, 0 if there are none (no .mappings), or -1 if a file is not one this
+ * daemon can read: every file of the set is renamed to <name>.bad, and
+ * nothing is read. */
+int lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg);
+
 #endif

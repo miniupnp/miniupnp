@@ -60,7 +60,7 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
           upnppinhole.o asyncsendto.o portinuse.o \
-          lease_table.o outgoing_table.o memmap.o fwsync.o lease_files.o
+          lease_table.o outgoing_table.o memmap.o fwsync.o lease_files.o lease_restore.o
 OS_OBJS = getifstats.o ifacewatcher.o getroute.o
 PFOBJS = obsdrdr.o pfpinhole.o
 IPFOBJS = ipfrdr.o
@@ -119,7 +119,7 @@ TESTPINHOLEOBJS = testpinhole.o upnppinhole.o memmap.o lease_table.o \
                   outgoing_table.o
 TESTFWSYNCOBJS = testfwsync.o fwsync.o testfwfake.o
 TESTLEASEFILESOBJS = testleasefiles.o lease_files.o lease_table.o outgoing_table.o
-TESTCALLERSOBJS = testcallers.o testfwfake.o upnpredirect.o upnppinhole.o memmap.o lease_table.o outgoing_table.o fwsync.o upnpglobalvars.o upnputils.o upnppermissions.o \
+TESTCALLERSOBJS = testcallers.o testfwfake.o lease_restore.o lease_files.o upnpredirect.o upnppinhole.o memmap.o lease_table.o outgoing_table.o fwsync.o upnpglobalvars.o upnputils.o upnppermissions.o \
                   natpmp.o asyncsendto.o getifaddr.o
 
 EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
