@@ -85,6 +85,46 @@ test_add_fails_takes_back(void)
 	CHECK(adds == 1 && deletes == 1);
 }
 
+/* many adds go FW_BATCH to a fw_sync(); a refused batch goes again change
+ * by change, so the add the firewall refused once does not keep the others
+ * out */
+static void
+test_each(void)
+{
+	static struct lease_entry e[FW_BATCH + 6];
+	static struct fw_change c[FW_BATCH + 6];
+	const int n = FW_BATCH + 6;
+	int i;
+
+	reset();
+	for(i = 0; i < n; i++) {
+		mapping(&e[i], 10, (unsigned short)(6000 + i), 80);
+		fw_change_init(&c[i], FW_ADD, &e[i], NULL);
+	}
+	CHECK(fw_sync_each(c, n) == 0);
+	CHECK(adds == n && deletes == 0);
+	/* the third add of the first batch fails: the two before it are taken
+	 * back, then the batch goes one by one */
+	reset();
+	for(i = 0; i < n; i++)
+		fw_change_init(&c[i], FW_ADD, &e[i], NULL);
+	fail_add_redirect = 3;
+	CHECK(fw_sync_each(c, n) == 0);
+	for(i = 0; i < n; i++)
+		CHECK(c[i].applied == FW_APPLIED);
+	CHECK(deletes == 2);
+	CHECK(adds == 2 + FW_BATCH + 6);
+	/* a change which stayed after a failed take back is not sent twice */
+	reset();
+	for(i = 0; i < 3; i++)
+		fw_change_init(&c[i], FW_ADD, &e[i], NULL);
+	fail_add_redirect = 2;
+	fail_delete = 1;
+	rule_present = -1;
+	CHECK(fw_sync_each(c, 3) == 0);
+	CHECK(c[0].applied == FW_APPLIED && adds == 3);
+}
+
 /* the first add cannot be taken back: it stays applied */
 static void
 test_take_back_fails(void)
@@ -418,6 +458,7 @@ main(void)
 	test_add();
 	test_add_fails_takes_back();
 	test_take_back_fails();
+	test_each();
 	test_update_taken_back();
 	test_filter_fails();
 	test_delete_lost_rule();

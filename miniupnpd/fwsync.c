@@ -531,6 +531,46 @@ fw_sync_out(struct fw_out_change * c, int n)
 	return r < 0 ? r : -1;
 }
 
+/* A batch was refused: its changes which were taken back go again, each
+ * alone. A change which stayed, in full or in part, is not sent twice. */
+int
+fw_sync_each(struct fw_change * c, int n)
+{
+	int i, j, m, failed = 0;
+
+	for(i = 0; i < n; i += m) {
+		m = n - i < FW_BATCH ? n - i : FW_BATCH;
+		if(fw_sync(c + i, m) == 0)
+			continue;
+		for(j = i; j < i + m; j++) {
+			if(c[j].applied == FW_NOT_APPLIED)
+				(void)fw_sync(&c[j], 1);
+			if(c[j].applied != FW_APPLIED)
+				failed++;
+		}
+	}
+	return failed;
+}
+
+int
+fw_sync_out_each(struct fw_out_change * c, int n)
+{
+	int i, j, m, failed = 0;
+
+	for(i = 0; i < n; i += m) {
+		m = n - i < FW_BATCH ? n - i : FW_BATCH;
+		if(fw_sync_out(c + i, m) == 0)
+			continue;
+		for(j = i; j < i + m; j++) {
+			if(c[j].applied == FW_NOT_APPLIED)
+				(void)fw_sync_out(&c[j], 1);
+			if(c[j].applied != FW_APPLIED)
+				failed++;
+		}
+	}
+	return failed;
+}
+
 /* The internal side and the remote host of an IPv4 redirect rule into e, a
  * row of lease_table_new(1). 0, or -1 if the rule holds no IPv4 address. */
 static int

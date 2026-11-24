@@ -63,6 +63,16 @@ void fw_change_init(struct fw_change * c, enum fw_op op,
  * same. */
 int fw_sync(struct fw_change * changes, int n);
 
+/* The most changes fw_sync_each() sends in one fw_sync() */
+#define FW_BATCH	64
+
+/* Send changes which do not depend on each other, such as the rows of a
+ * startup restore: FW_BATCH to a fw_sync(). A batch the firewall refuses is
+ * sent again change by change, so one change it refuses does not keep the
+ * others out. Each change says what was applied. The number of changes
+ * which are not FW_APPLIED. */
+int fw_sync_each(struct fw_change * changes, int n);
+
 /* The outgoing side, apart from the incoming maps as the outgoing table is
  * apart from the lease table: the PEER rules (SNAT) of the bindings. They
  * exist with PCP_PEER on netfilter only; elsewhere a change fails. */
@@ -86,6 +96,9 @@ void fw_out_change_init(struct fw_out_change * c, enum fw_out_op op,
 /* Send the outgoing changes of one request, as fw_sync() does the
  * incoming ones: in order, and those before a failure taken back. */
 int fw_sync_out(struct fw_out_change * changes, int n);
+
+/* As fw_sync_each(), for the outgoing changes */
+int fw_sync_out_each(struct fw_out_change * changes, int n);
 
 /* The redirect rule of an IPv4 port mapping, and its counters: 0, -2 if the
  * firewall has no such rule, or -1 if the firewall could not be read.
