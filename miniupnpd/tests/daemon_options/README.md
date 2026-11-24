@@ -77,7 +77,9 @@ engine: `run_case`), plus:
   `internal_client: neighbour` asks for the next address on the client's LAN instead of its own.
 
 - request kind `option_steps`: a list of steps (`natpmp_address`, `natpmp_map`, `pcp_map`,
-  `upnp_add`, `upnp_get`, `http_get`, `soap`, `router`, `sleep`, `ssdp`), with `expect: {kind: steps}`.
+  `pcp_flood`, `upnp_add`, `upnp_get`, `http_get`, `soap`, `router`, `sleep`, `ssdp`), with `expect: {kind: steps}`.
+  `pcp_flood` sends one PCP MAP from several sockets without waiting for the replies, so the daemon is never
+  idle, and runs its `checks` (router steps) at their `at` seconds.
   A `router` step asks the driver for `ruleset`, `log`, `cat:PATH`, `restart`, `restart:ARGS` (the next
   start with more daemon arguments), `cp:SRC:DST`, `corrupt:PATH` (a byte added to a file), `firewall-flush`,
   `wan-probe:PORT` or `wan-reserved`; on FreeBSD also `ruleset:ANCHOR`, the rules of one pf anchor. `firewall-flush` removes the rules behind the daemon's back, as

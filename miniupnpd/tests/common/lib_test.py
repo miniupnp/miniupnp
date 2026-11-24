@@ -3939,8 +3939,8 @@ def run_option_case(sock, address, case, call_dir=None, daemon_down=False):
 # `wan-reserved` (daemon_options/README.md).
 
 
-STEP_KINDS = frozenset({"natpmp_address", "natpmp_map", "pcp_map", "upnp_add", "upnp_get", "http_get", "soap",
-                        "router", "sleep", "ssdp"})
+STEP_KINDS = frozenset({"natpmp_address", "natpmp_map", "pcp_map", "pcp_flood", "upnp_add", "upnp_get",
+                        "http_get", "soap", "router", "sleep", "ssdp"})
 
 
 def check_text(where, text, step):
@@ -4001,6 +4001,50 @@ def pcp_map_step(sock, address, spec):
         assert shown == spec["external"], f"external address {shown}"
 
 
+def pcp_flood_step(sock, address, spec, call_dir):
+    """A PCP MAP of `port` (one nonce: the first creates it, the others renew it), sent as fast as
+    `threads` sockets can for `seconds`, without waiting for the replies, so the daemon always has
+    a request to answer; meanwhile each of `checks`, a router step, at its `at` seconds from the
+    start. For the lease file saves of a daemon which is never idle."""
+    client = client_address(sock, address)
+    request = {"pcp": "MAP", "lifetime": spec.get("lifetime", 600), "protocol": spec.get("protocol", "tcp"),
+               "internal_port": spec["port"], "suggested_external_port": spec["port"]}
+    packet = build_map_packet(client, request, {}, nonce_of(spec))[0]
+    stop = threading.Event()
+
+    def flood():
+        with socket.socket(sock.family, socket.SOCK_DGRAM) as out:
+            out.bind((client, 0))
+            out.setblocking(False)
+            while not stop.is_set():
+                try:
+                    out.sendto(packet, address)
+                except BlockingIOError:
+                    pass
+                try:
+                    while out.recv(2048):
+                        pass
+                except BlockingIOError:
+                    pass
+    start = time.monotonic()
+    threads = [threading.Thread(target=flood, daemon=True) for _ in range(spec.get("threads", 4))]
+    for thread in threads:
+        thread.start()
+    try:
+        for check in spec.get("checks", ()):
+            delay = start + check["at"] - time.monotonic()
+            if delay > 0:
+                time.sleep(delay)
+            check_text(f"{check['command']} at {check['at']} s", router_call(call_dir, check["command"]), check)
+        delay = start + spec["seconds"] - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+    finally:
+        stop.set()
+        for thread in threads:
+            thread.join()
+
+
 def daemon_url(address, path, https_port=None):
     """The URL of `path` on the daemon's HTTP port, or on its https_port."""
     host = host_literal(address[0])
@@ -4055,6 +4099,8 @@ def run_option_step(sock, address, step, call_dir, saved):
         natpmp_map_step(sock, address, spec)
     elif kind == "pcp_map":
         pcp_map_step(sock, address, spec)
+    elif kind == "pcp_flood":
+        pcp_flood_step(sock, address, spec, call_dir)
     elif kind == "upnp_add":
         client = client_address(sock, address)
         request = {"action": "AddPortMapping", "protocol": "tcp", "external_port": spec["port"],

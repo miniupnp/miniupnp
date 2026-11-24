@@ -1618,6 +1618,37 @@ sections:
       kind: steps
     description: A save cut short between its renames leaves a .mappings older than .checksum, which lists both, so the
       set is read, with the rows of the older .mappings.
+  - name: lease-file-save-max-delay
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - lease_file=/var/lib/miniupnpd/busy.leases
+    request:
+      kind: option_steps
+      steps:
+      - sleep: 3
+      # never idle: the save comes at the latest 10 s after the first change
+      - pcp_flood:
+          port: 46420
+          nonce_hex: 1a1b1c1d1e1f202122232425
+          seconds: 13
+          threads: 4
+          checks:
+          - at: 5
+            command: cat:/var/lib/miniupnpd/busy.leases.mappings
+            absent:
+            - '|46420|'
+          - at: 11.5
+            command: cat:/var/lib/miniupnpd/busy.leases.mappings
+            contains:
+            - '|46420|'
+    expect:
+      kind: steps
+    description: A daemon which is never idle saves the lease files at the latest 10 seconds after the
+      first change.
   - name: lease-file6-deprecated
     platform: linux
     protocol: daemon
