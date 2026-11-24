@@ -80,6 +80,7 @@ enum upnpconfigoptions {
 	UPNPSECUREMODE,			/*!< secure_mode */
 #ifdef ENABLE_LEASEFILE
 	UPNPLEASEFILE,			/*!< lease_file */
+	UPNPLEASEFILERESTORE,	/*!< lease_file_restore */
 #ifdef ENABLE_UPNPPINHOLE
 	UPNPLEASEFILE6,			/*!< lease_file6: deprecated, not used */
 #endif

@@ -51,6 +51,13 @@ extern const char * table_stats_file;
 /* file to store all leases */
 #ifdef ENABLE_LEASEFILE
 extern const char * lease_file;
+/* lease_file_restore: when a start restores the mappings of the files */
+enum lease_restore_mode {
+	LEASE_RESTORE_YES,	/* after a restart and after a boot */
+	LEASE_RESTORE_BOOT,	/* only after a restart in the same boot */
+	LEASE_RESTORE_NO	/* never: the files only show the mappings */
+};
+extern enum lease_restore_mode lease_file_restore;
 #endif
 
 /* forced ip address to use for this interface

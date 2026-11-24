@@ -61,7 +61,8 @@ extern int lease_files_ignore_checksum;
  * r->map, each line of .outgoing to r->peer, then call r->done. The files are trusted: a line is
  * only skipped (and logged) when it cannot be read, is expired, or is a
  * row of another save (a crash between the renames). 1 if the files were
- * read, 0 if there are none (no .mappings), or -1 if a file is not one this
+ * read, 2 if lease_file_restore keeps them from being restored (no, or boot
+ * after a boot), 0 if there are none (no .mappings), or -1 if a file is not one this
  * daemon can read, or does not match the size and CRC-32 of .checksum:
  * every file of the set is renamed to <name>.bad, and nothing is read.
  *

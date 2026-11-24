@@ -36,6 +36,7 @@ main(void)
 
 /* what lease_files.c takes from the daemon */
 const char * lease_file = NULL;
+enum lease_restore_mode lease_file_restore = LEASE_RESTORE_YES;
 static time_t now = 1000;
 
 time_t
@@ -810,11 +811,37 @@ test_clock(void)
 	free(c);
 	lease_table_clear();
 
+	/* lease_file_restore=boot: the same boot only */
+	lease_file_restore = LEASE_RESTORE_BOOT;
+	{
+		FILE * f = fopen(bootf, "w");
+		assert(f != NULL);
+		fputs("boot-B\n", f);
+		fclose(f);
+	}
+	put_mappings("boot-B", now, time(NULL), row_line(41000, 0));
+	assert(load() == 1 && ngot == 1);
+	put_mappings("boot-A", now, time(NULL), row_line(41000, 0));
+	assert(load() == 2 && ngot == 0);
+	put_mappings(NULL, 0, 0, row_line(41000, 0));
+	assert(load() == 2 && ngot == 0);	/* the boot of the save is not known */
+
 	/* no boot id (BSD): the clocks tell. Both moved alike: the same boot,
 	 * read on the monotonic clock */
 	lease_files_boot_id_path = "/nonexistent";
 	put_mappings("NA", now - 100, time(NULL) - 100, row_line(41000, time(NULL) + 1000));
 	assert(load() == 1 && ngot == 1 && got_at(41000)->timestamp == now + 1000);
+	/* the wall clock moved 1000 s more than the monotonic one */
+	put_mappings("NA", now - 100, time(NULL) - 1100, row_line(41000, 0));
+	assert(load() == 2 && ngot == 0);
+	/* the monotonic clock went back */
+	put_mappings("NA", now + 100, time(NULL) + 100, row_line(41000, 0));
+	assert(load() == 2 && ngot == 0);
+	/* lease_file_restore=no: never */
+	lease_file_restore = LEASE_RESTORE_NO;
+	put_mappings("NA", now - 100, time(NULL) - 100, row_line(41000, 0));
+	assert(load() == 2 && ngot == 0);
+	lease_file_restore = LEASE_RESTORE_YES;
 
 	/* no clocks in the header: unix time */
 	put_mappings(NULL, 0, 0, row_line(41000, 0));

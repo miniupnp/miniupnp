@@ -151,5 +151,7 @@ lease_restore(void)
 	};
 
 	memset(&rs, 0, sizeof(rs));
+	/* 2: lease_file_restore keeps them out. The rules of the earlier run
+	 * are gone already, so the firewall follows the empty tables */
 	return lease_files_load(&r) < 0 ? -1 : 0;
 }

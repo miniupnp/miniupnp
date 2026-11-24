@@ -35,6 +35,7 @@ const char * table_stats_file = 0;
 /* file to store leases */
 #ifdef ENABLE_LEASEFILE
 const char* lease_file = 0;
+enum lease_restore_mode lease_file_restore = LEASE_RESTORE_YES;
 #endif
 
 /* forced ip address to use for this interface

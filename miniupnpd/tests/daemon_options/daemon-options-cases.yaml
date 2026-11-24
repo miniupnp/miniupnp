@@ -1388,6 +1388,55 @@ sections:
     expect:
       kind: steps
     description: Without lease_file the mapping is gone after a restart.
+  - name: lease-file-restore-no
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file_restore=no
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46335
+      - sleep: 1
+      - router:
+          command: restart
+          contains:
+          - restarted
+      - upnp_get:
+          port: 46335
+          present: false
+    expect:
+      kind: steps
+    description: With lease_file_restore=no the lease files only show the mappings; a restart restores none.
+  - name: lease-file-restore-boot
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - enable_upnp=yes
+    - http_port=5000
+    - lease_file_restore=boot
+    request:
+      kind: option_steps
+      steps:
+      - upnp_add:
+          port: 46336
+      - sleep: 1
+      - router:
+          command: restart
+          contains:
+          - restarted
+      - upnp_get:
+          port: 46336
+    expect:
+      kind: steps
+    description: With lease_file_restore=boot a restart of the daemon in the same boot restores the mappings.
   - name: lease-file-path
     protocol: daemon
     families:

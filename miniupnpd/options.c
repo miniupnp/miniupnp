@@ -99,6 +99,7 @@ static const struct {
 	{ UPNPTABLESTATSFILE, "table_stats_file"},
 #ifdef ENABLE_LEASEFILE
 	{ UPNPLEASEFILE, "lease_file"},
+	{ UPNPLEASEFILERESTORE, "lease_file_restore"},
 #ifdef ENABLE_UPNPPINHOLE
 	{ UPNPLEASEFILE6, "lease_file6"},
 #endif

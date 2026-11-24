@@ -1683,6 +1683,18 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPLEASEFILE:
 				lease_file = ary_options[i].value;
 				break;
+			case UPNPLEASEFILERESTORE:
+				if (strcmp(ary_options[i].value, "yes") == 0)
+					lease_file_restore = LEASE_RESTORE_YES;
+				else if (strcmp(ary_options[i].value, "boot") == 0)
+					lease_file_restore = LEASE_RESTORE_BOOT;
+				else if (strcmp(ary_options[i].value, "no") == 0)
+					lease_file_restore = LEASE_RESTORE_NO;
+				else {
+					INIT_PRINT_ERR("lease_file_restore can only be yes, boot or no\n");
+					return 1;
+				}
+				break;
 #ifdef ENABLE_UPNPPINHOLE
 			case UPNPLEASEFILE6:
 				/* deprecated: a configuration of an earlier version

@@ -1538,6 +1538,10 @@ lease_files_load(const struct lease_files_restore * r)
 
 	if(lease_file == NULL)
 		return 0;
+	if(lease_file_restore == LEASE_RESTORE_NO) {
+		syslog(LOG_INFO, "lease files: not restored, lease_file_restore=no");
+		return 2;
+	}
 	load_clock.mode = CLOCK_UNIX;
 	/* the header only: load_rows() logs and sets aside a bad set */
 	ret = in_open(&maps, LF_MAPPINGS, 1);
@@ -1545,11 +1549,22 @@ lease_files_load(const struct lease_files_restore * r)
 		in_close(&maps);
 		return 0;
 	}
+	if(ret == 1 && !maps.has_clock && lease_file_restore == LEASE_RESTORE_BOOT) {
+		/* the boot of the save is not known */
+		syslog(LOG_INFO, "lease files: not restored, %s.mappings has no clocks for "
+		       "lease_file_restore=boot", lease_file);
+		in_close(&maps);
+		return 2;
+	}
 	if(ret == 1 && maps.has_clock) {
 		load_clock.unix_time = maps.unix_time;
 		load_clock.mono = maps.mono;
 		if(same_boot(&maps)) {
 			load_clock.mode = CLOCK_MONO;
+		} else if(lease_file_restore == LEASE_RESTORE_BOOT) {
+			syslog(LOG_INFO, "lease files: not restored after a boot, lease_file_restore=boot");
+			in_close(&maps);
+			return 2;
 		} else if((long long)time(NULL) < load_clock.unix_time) {
 			/* a new boot with the clock behind the save: the expiry
 			 * of each row would be too long. Wait for NTP. */
