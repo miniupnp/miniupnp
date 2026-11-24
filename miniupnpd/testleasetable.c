@@ -160,10 +160,10 @@ static void
 test_changes(void)
 {
 	struct lease_entry * a;
-	unsigned long m, rem;
+	unsigned long m, flt;
 	lease_table_clear();
 	m = lease_table_changes(LEASE_T_MAPPINGS);
-	rem = lease_table_changes(LEASE_T_REMOTES);
+	flt = lease_table_changes(LEASE_T_FILTERS);
 	a = newrow(MAP_KIND_UPNP, 6, 6000, "::ffff:192.0.2.1", 80, 0, 0);
 	/* an unlinked row counts nothing */
 	a->label = "x";	/* the caller's until the link */
@@ -171,22 +171,25 @@ test_changes(void)
 	assert(lease_table_changes(LEASE_T_MAPPINGS) == m);
 	lease_table_link(a);
 	assert(lease_table_changes(LEASE_T_MAPPINGS) == m + 1);
-	assert(lease_table_changes(LEASE_T_REMOTES) == rem);
+	assert(lease_table_changes(LEASE_T_FILTERS) == flt);
 	lease_table_set_expiry(a, 100);
 	assert(a->timestamp == 100 && lease_table_changes(LEASE_T_MAPPINGS) == m + 2);
 	assert(lease_table_set_label(a, "y") == 0);
 	assert(lease_table_changes(LEASE_T_MAPPINGS) == m + 3);
 	lease_table_remove(a);
 	assert(lease_table_changes(LEASE_T_MAPPINGS) == m + 4);
-	/* a row with a remote has a line in Remotes too */
+	/* a row with a filter has a line in Filters too */
 	a = newrow(MAP_KIND_UPNP, 6, 6000, "::ffff:192.0.2.1", 80, 0, 1);
 	a->filters[0].raddr = addr("::ffff:203.0.113.9");
 	a->filters[0].prefix = 128;
 	lease_table_link(a);
-	assert(lease_table_changes(LEASE_T_REMOTES) == rem + 1);
+	assert(lease_table_changes(LEASE_T_FILTERS) == flt + 1);
+	/* a renewal or a label changes no filter line */
+	lease_table_set_expiry(a, 200);
+	assert(lease_table_set_label(a, "z") == 0);
+	assert(lease_table_changes(LEASE_T_FILTERS) == flt + 1);
 	lease_table_remove(a);
-	assert(lease_table_changes(LEASE_T_REMOTES) == rem + 2);
-	assert(lease_table_changes(LEASE_T_FILTERS) == 0);
+	assert(lease_table_changes(LEASE_T_FILTERS) == flt + 2);
 	lease_table_clear();
 }
 

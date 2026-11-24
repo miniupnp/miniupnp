@@ -650,7 +650,7 @@ lease_table_set_label(struct lease_entry * e, const char * label)
 	free((char *)e->label);
 	e->label = copy;
 	if(e->linked)
-		lease_table_touch(e);
+		changes[LEASE_T_MAPPINGS]++;	/* no filter line holds it */
 	return 0;
 }
 
@@ -659,7 +659,7 @@ lease_table_set_expiry(struct lease_entry * e, unsigned int timestamp)
 {
 	e->timestamp = timestamp;
 	if(e->linked)
-		lease_table_touch(e);
+		changes[LEASE_T_MAPPINGS]++;	/* no filter line holds it */
 }
 
 unsigned long
@@ -674,7 +674,7 @@ lease_table_touch(const struct lease_entry * e)
 {
 	changes[LEASE_T_MAPPINGS]++;
 	if(e->nfilters > 0)
-		changes[LEASE_T_REMOTES]++;
+		changes[LEASE_T_FILTERS]++;
 }
 
 int

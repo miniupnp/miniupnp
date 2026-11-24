@@ -155,10 +155,10 @@ struct lease_entry * lease_table_next_port(const struct lease_entry * prev);
  * no other. It may not add a row. */
 void lease_table_foreach(void (*cb)(struct lease_entry *, void *), void * arg);
 
-/* The tables of the map, as the lease files keep them: the rows, the
- * remotes of their filters, and the FILTER peers of a PCP MAP (none yet). */
-enum lease_table_part { LEASE_T_MAPPINGS, LEASE_T_REMOTES, LEASE_T_FILTERS,
-                        LEASE_T_PARTS };
+/* The parts of the table, as the lease files keep them: the rows, and the
+ * filters of the rows. The PEER bindings are in the outgoing table, which
+ * counts its own changes (outgoing_table_changes()). */
+enum lease_table_part { LEASE_T_MAPPINGS, LEASE_T_FILTERS, LEASE_T_PARTS };
 
 /* The number of changes of a table so far. It only grows, so a reader which
  * kept the number of its last look knows if the table changed since. */

@@ -61,6 +61,10 @@ void outgoing_table_remove_peer(struct outgoing_entry * b, struct outgoing_peer 
 /* Remove a linked binding with all its peers. b is no longer valid. */
 void outgoing_table_remove(struct outgoing_entry * b);
 
+/* The number of changes of the table so far: a binding or a peer added,
+ * renewed or removed. It only grows, as lease_table_changes(). */
+unsigned long outgoing_table_changes(void);
+
 /* the number of bindings */
 unsigned int outgoing_table_count(void);
 

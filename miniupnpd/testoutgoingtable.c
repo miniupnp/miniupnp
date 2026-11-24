@@ -147,6 +147,27 @@ test_expire(void)
 	outgoing_table_clear();
 }
 
+/* the change counter: a new binding, a merged peer, a removed peer and a
+ * removed binding each count one; a lookup counts nothing */
+static void
+test_changes(void)
+{
+	struct outgoing_entry * b;
+	unsigned long n;
+
+	outgoing_table_clear();
+	n = outgoing_table_changes();
+	b = outgoing_table_link(newbinding(5000, 6000, "::ffff:203.0.113.1", 80, 100, 1));
+	assert(outgoing_table_changes() == n + 1);
+	outgoing_table_link(newbinding(5000, 6000, "::ffff:203.0.113.2", 80, 200, 1));
+	assert(outgoing_table_changes() == n + 2);
+	assert(outgoing_table_next(NULL) == b && outgoing_table_changes() == n + 2);
+	outgoing_table_remove_peer(b, &b->peers[0]);
+	assert(outgoing_table_changes() == n + 3);
+	outgoing_table_remove(b);
+	assert(outgoing_table_changes() == n + 4);
+}
+
 /* the dump: a header, a line per binding, a line per peer */
 static void
 test_dump(void)
@@ -196,6 +217,7 @@ main(void)
 	test_merge();
 	test_remove();
 	test_expire();
+	test_changes();
 	test_dump();
 	printf("testoutgoingtable: OK\n");
 	return 0;

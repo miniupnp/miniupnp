@@ -10,6 +10,7 @@
 static struct outgoing_entry * head;
 static unsigned int count;	/* the bindings */
 static unsigned int peer_count;	/* the peers of all bindings */
+static unsigned long changes;	/* see outgoing_table_changes() */
 
 struct outgoing_entry *
 outgoing_table_new(int npeers)
@@ -98,6 +99,7 @@ outgoing_table_link(struct outgoing_entry * b)
 	struct outgoing_peer * p;
 	int i, r = 0;
 
+	changes++;
 	if(o == NULL) {
 		/* the label was the caller's: the binding keeps a copy */
 		if(b->label != NULL && (b->label = strdup(b->label)) == NULL)
@@ -137,6 +139,7 @@ unlink_binding(struct outgoing_entry * b)
 	*pb = b->next;
 	count--;
 	peer_count -= (unsigned int)b->npeers;
+	changes++;
 	free((char *)b->label);
 	outgoing_table_free(b);
 }
@@ -152,6 +155,7 @@ outgoing_table_remove_peer(struct outgoing_entry * b, struct outgoing_peer * p)
 	memmove(p, p + 1, (size_t)(b->npeers - i - 1) * sizeof(*p));
 	b->npeers--;
 	peer_count--;
+	changes++;
 }
 
 void
@@ -181,6 +185,12 @@ outgoing_table_expire(unsigned int now)
 		}
 	}
 	return n;
+}
+
+unsigned long
+outgoing_table_changes(void)
+{
+	return changes;
 }
 
 unsigned int
