@@ -16,7 +16,7 @@
 #   kind: subscribe    GENA SUBSCRIBE (mode: subscribe | renew | unsubscribe | raw)
 #   kind: notify-wait  the next NOTIFY of a SID (and SEQ) on the case's event listener
 #   kind: restart      the driver restarts the daemon
-#   kind: upnp-lease   the lines of the daemon's lease_file that match `match`
+#   kind: upnp-lease   the lease records (lease_records) of the daemon's lease files that match `match`
 #
 # `expect` checks the step's values ({field: rules}: a bare value is `equals`; rules: equals, not_equals,
 # min, max, nonzero, present, matches, contains, not_contains, one_of, remember); `capture` keeps a value
@@ -3838,20 +3838,20 @@ sections:
         ref: {igd1: "WANIPC1 §2.4.16", igd2: "WANIPC2 §2.5.16"}
         families: [ipv4]
         requires: [lease-file]
-        description: An AddPortMapping writes one lease_file line with its protocol, ports, client and description.
+        description: An AddPortMapping writes one lease line with its protocol, ports, client and description.
         steps:
           - {kind: soap, action: AddPortMapping, args: {<<: *add_args, NewExternalPort: 43100, NewInternalPort: 43100}, expect: {status: 200}}
-          - {kind: upnp-lease, match: "^UDP:43100:", wait_seconds: 3,
-             expect: {count: 1, line: {matches: "^UDP:43100::@LAN4_RE@\\.2:43100:[0-9]+:upnp-wire$"}}}
+          - {kind: upnp-lease, match: "^UPNP\\|UDP\\|43100\\|", wait_seconds: 12,
+             expect: {count: 1, line: {matches: "^UPNP\\|UDP\\|43100\\|IPv4\\|@LAN4_RE@\\.2\\|43100\\|.*\\|upnp-wire$"}}}
         cleanup:
           - {kind: soap, action: DeletePortMapping, args: {NewRemoteHost: "", NewExternalPort: 43100, NewProtocol: UDP}}
       - name: wanipc1-2.4.17-impl-lease-line-removed
         ref: {igd1: "WANIPC1 §2.4.17", igd2: "WANIPC2 §2.5.18"}
         families: [ipv4]
         requires: [lease-file]
-        description: DeletePortMapping removes the mapping's lease_file line.
+        description: DeletePortMapping removes the mapping's lease line.
         steps:
           - {kind: soap, action: AddPortMapping, args: {<<: *add_args, NewExternalPort: 43101, NewInternalPort: 43101}, expect: {status: 200}}
-          - {kind: upnp-lease, match: "^UDP:43101:", wait_seconds: 3, expect: {count: 1}}
+          - {kind: upnp-lease, match: "^UPNP\\|UDP\\|43101\\|", wait_seconds: 12, expect: {count: 1}}
           - {kind: soap, action: DeletePortMapping, args: {NewRemoteHost: "", NewExternalPort: 43101, NewProtocol: UDP}, expect: {status: 200}}
-          - {kind: upnp-lease, match: "^UDP:43101:", wait_seconds: 3, expect: {count: 0}}
+          - {kind: upnp-lease, match: "^UPNP\\|UDP\\|43101\\|", wait_seconds: 12, expect: {count: 0}}

@@ -301,9 +301,8 @@ map_rhost(const struct lease_entry * r, char * buf, size_t len)
 /* TEMPORARY: only until the backends find their rules by key and hold no
  * description. Remove it then.
  *
- * The description of the firewall rule and of the lease file line of r,
- * from its kind: buf of len bytes holds it, or the label is returned as it
- * is. lease_entry_from_desc() reads it back. */
+ * The description of the firewall rule of r, from its kind: buf of len
+ * bytes holds it, or the label is returned as it is. */
 static inline const char *
 map_rule_desc(const struct lease_entry * r, char * buf, size_t len)
 {
@@ -325,40 +324,6 @@ map_rule_desc(const struct lease_entry * r, char * buf, size_t len)
 			return "IGD2 pinhole";
 		return r->label != NULL ? r->label : "";
 	}
-}
-
-/* For the lease file reloads only. Set the kind, nonce and label of r from
- * a description map_rule_desc() wrote, as a lease file keeps it. family, proto and eport must be set.
- * A description of no other kind is that of a UPnP client. */
-static inline void
-lease_entry_from_desc(struct lease_entry * r, const char * desc)
-{
-	static const char pcp[] = "PCP MAP ";
-	const size_t n = sizeof(pcp) - 1;
-	uint32_t w[MAP_NONCE_LEN / 4];
-	char word[9], natpmp[32];
-	int i;
-
-	r->label = NULL;
-	memset(r->nonce, 0, sizeof(r->nonce));
-	if(strncmp(desc, pcp, n) == 0 && strlen(desc) == n + 24 &&
-	   strspn(desc + n, "0123456789abcdefABCDEF") == 24) {
-		word[8] = '\0';
-		for(i = 0; i < MAP_NONCE_LEN / 4; i++) {
-			memcpy(word, desc + n + 8 * i, 8);
-			w[i] = (uint32_t)strtoul(word, NULL, 16);
-		}
-		memcpy(r->nonce, w, sizeof(w));
-		r->kind = MAP_KIND_PCP;
-		return;
-	}
-	r->kind = MAP_KIND_NATPMP;
-	if(r->family == AF_INET &&
-	   strcmp(desc, map_rule_desc(r, natpmp, sizeof(natpmp))) == 0)
-		return;
-	r->kind = MAP_KIND_UPNP;
-	if(r->family == AF_INET)
-		r->label = desc;
 }
 
 #endif

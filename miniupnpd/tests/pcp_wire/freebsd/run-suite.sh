@@ -31,8 +31,15 @@ trap 'exit 143' TERM
 # the lease files, read by the runner (--state-file) as in the Docker harness
 LEASE_BASE=$WORK/suite.leases
 LEASE6=${LEASE_BASE}6
-rm -f "$LEASE_BASE" "$LEASE6"
-{ cat "$WORK/miniupnpd.conf"; echo "lease_file=$LEASE_BASE"; echo "lease_file6=$LEASE6"; } >"$WORK/suite.conf"
+# lease_file6: only a daemon from before the files beside lease_file has it (a base run of the
+# comparisons); a newer one refuses it. Drop this once master writes those files.
+if miniupnpd/miniupnpd --help 2>&1 | grep -q -- --lease-file-ignore-checksum; then
+	LEASE6_LINE=
+else
+	LEASE6_LINE="lease_file6=$LEASE6"
+fi
+rm -f "$LEASE_BASE" "$LEASE6" "$LEASE_BASE".*
+{ cat "$WORK/miniupnpd.conf"; echo "lease_file=$LEASE_BASE"; echo "$LEASE6_LINE"; } >"$WORK/suite.conf"
 miniupnpd/miniupnpd -d -f "$WORK/suite.conf" >"$RESULTS/suite-miniupnpd.log" 2>&1 &
 daemon=$!
 

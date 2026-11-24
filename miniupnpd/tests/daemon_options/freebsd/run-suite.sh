@@ -178,8 +178,8 @@ CALL_LOOP=$!
 start_daemon() {
 	anchor=miniupnpd
 	pkill -x miniupnpd 2>/dev/null || true
-	# a daemon with PCP lease records keeps them in FILE.pcp beside each lease file
-	for lease in $LEASES; do rm -f "$lease" "$lease.pcp"; done
+	# the files a daemon writes beside each lease file
+	for lease in $LEASES; do rm -f "$lease" "$lease".*; done
 	: >"$LOG"
 	: >"$WORK/extra.conf"
 	for word in "$@"; do

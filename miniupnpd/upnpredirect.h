@@ -19,13 +19,6 @@
  * \brief backend independent functions for redirection
  */
 
-#ifdef ENABLE_LEASEFILE
-int reload_from_lease_file(void);
-#ifdef LEASEFILE_USE_REMAINING_TIME
-void lease_file_rewrite(void);
-#endif
-#endif
-
 /*! \brief add a port mapping.
  * calls OS/fw dependent implementation of the port mapping (redirection).
  * \param[in] req the IPv4 mapping: iaddr, iport, eport, proto, timestamp

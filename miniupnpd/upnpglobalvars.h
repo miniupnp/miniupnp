@@ -51,9 +51,6 @@ extern const char * table_stats_file;
 /* file to store all leases */
 #ifdef ENABLE_LEASEFILE
 extern const char * lease_file;
-#ifdef ENABLE_UPNPPINHOLE
-extern const char * lease_file6;
-#endif
 #endif
 
 /* forced ip address to use for this interface

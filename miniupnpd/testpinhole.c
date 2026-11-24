@@ -240,7 +240,7 @@ test_pcp_no_filter(void)
 	del.iaddr = del.eaddr = i;
 	del.iport = del.eport = 4000;
 	assert(upnp_find_inboundpinhole(&del) == row);
-	assert(upnp_delete_inboundpinhole(&del, 0) == 0);
+	assert(upnp_delete_inboundpinhole(&del) == 0);
 	assert(rule_count() == 0 && lease_table_count() == 0);
 	lease_table_clear();
 }
@@ -278,7 +278,7 @@ test_upnp_pinhole(void)
 	f.uid = uid;
 	del.filters = &f;
 	del.nfilters = 1;
-	assert(upnp_delete_inboundpinhole(&del, uid) == 0);
+	assert(upnp_delete_inboundpinhole(&del) == 0);
 	assert(rule_count() == 0 && lease_table_count() == 0);
 	lease_table_clear();
 }

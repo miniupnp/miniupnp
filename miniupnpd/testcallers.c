@@ -375,85 +375,7 @@ test_max_filters(void)
 	lease_table_clear();
 }
 
-#ifdef ENABLE_LEASEFILE
-/* Two lease_file6 lines of one UniqueID, whose rules outlived the daemon:
- * the second line gets a new UniqueID, so its client can reach it. */
-static void
-test_reload_uid(void)
-{
-	const char * path = "testcallers.leases6";
-	FILE * f;
-	unsigned long ts = (unsigned long)time(NULL) + 3600;
-	struct lease_entry * e;
-	int family;
-	struct in6_addr iaddr;
-
-	lease_table_clear();
-	f = fopen(path, "w");
-	CHECK(f != NULL);
-	if(f == NULL)
-		return;
-	fprintf(f, "UDP;2001:db8::10;5000;2001:db8:7::1;6000;7;%lu;test\n", ts);
-	fprintf(f, "UDP;2001:db8::10;5000;2001:db8:7::1;6001;7;%lu;test\n", ts);
-	fclose(f);
-	lease_file6 = path;
-	reset();
-	CHECK(reload_from_lease_file6() == 0);
-	lease_file6 = NULL;
-	remove(path);
-	CHECK(map6_adds == 0);	/* the rules were there */
-
-	map_pton("2001:db8::10", &family, &iaddr);
-	e = lease_table_find_entry(IPPROTO_UDP, AF_INET6, &iaddr, 5000, 5000);
-	CHECK(e != NULL && e->nfilters == 2);
-	if(e == NULL || e->nfilters != 2)
-		return;
-	CHECK(e->filters[0].uid != 0 && e->filters[1].uid != 0);
-	CHECK(e->filters[0].uid != e->filters[1].uid);
-	CHECK(lease_table_find_uid(7) != NULL);
-}
-#endif
-#endif
-
-#ifdef ENABLE_LEASEFILE
-/* A lease file line whose rule outlived the daemon takes that rule, found
- * in the one walk of the rules at startup: no second rule. A line with no
- * rule gets one. The fake lists the TCP rules of ports 5000 and 5001. */
-static void
-test_reload_adopt(void)
-{
-	const char * path = "testcallers.leases";
-	FILE * f;
-	unsigned long ts = (unsigned long)time(NULL) + 3600;
-	struct in6_addr iaddr;
-	int family;
-
-	lease_table_clear();
-	f = fopen(path, "w");
-	CHECK(f != NULL);
-	if(f == NULL)
-		return;
-#ifdef SUPPORT_REMOTEHOST
-	fprintf(f, "TCP:5001::192.168.1.10:5001:%lu:test\n", ts);
-	fprintf(f, "TCP:5002::192.168.1.10:5002:%lu:test\n", ts);
-#else
-	fprintf(f, "TCP:5001:192.168.1.10:5001:%lu:test\n", ts);
-	fprintf(f, "TCP:5002:192.168.1.10:5002:%lu:test\n", ts);
-#endif
-	fclose(f);
-	reset();
-	rule_iport = 5001;	/* the renewal of 5001 finds its rule by key */
-	lease_file = path;
-	CHECK(reload_from_lease_file() == 0);
-	lease_file = NULL;
-	remove(path);
-	CHECK(adds == 1);	/* 5002 only */
-	map_pton("192.168.1.10", &family, &iaddr);
-	CHECK(lease_table_find_entry(IPPROTO_TCP, AF_INET, &iaddr, 5001, 5001) != NULL);
-	CHECK(lease_table_find_entry(IPPROTO_TCP, AF_INET, &iaddr, 5002, 5002) != NULL);
-	lease_table_clear();
-}
-#endif
+#endif /* FW_MAP6 */
 
 #ifdef ENABLE_NATPMP
 /* A NAT-PMP request of a client for the internal port of its UPnP or PCP
@@ -720,12 +642,6 @@ main(void)
 #ifdef FW_MAP6
 	test_map6();
 	test_max_filters();
-#ifdef ENABLE_LEASEFILE
-	test_reload_uid();
-#endif
-#endif
-#ifdef ENABLE_LEASEFILE
-	test_reload_adopt();
 #endif
 	test_drop_without_row();
 #ifdef ENABLE_LEASEFILE

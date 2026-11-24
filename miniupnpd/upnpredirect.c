@@ -47,405 +47,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #endif
-#ifdef ENABLE_LEASEFILE
-#include <sys/stat.h>
-#endif
 
 /* from <inttypes.h> */
 #ifndef PRIu64
 #define PRIu64 "llu"
-#endif
-
-#ifdef ENABLE_LEASEFILE
-static int
-lease_file_add(const char * rhost,
-               unsigned short eport,
-               const char * iaddr,
-               unsigned short iport,
-               int proto,
-               const char * desc,
-               unsigned int timestamp)
-{
-	FILE * fd;
-
-	if (lease_file == NULL) return 0;
-
-	fd = fopen( lease_file, "a");
-	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
-		return -1;
-	}
-
-	/* convert our time to unix time
-     * if LEASEFILE_USE_REMAINING_TIME is defined, only the remaining time is stored */
-	if (timestamp != 0) {
-		timestamp -= upnp_time();
-#ifndef LEASEFILE_USE_REMAINING_TIME
-		timestamp += time(NULL);
-#endif
-	}
-
-#ifdef SUPPORT_REMOTEHOST
-	/* PROTO:eport:rhost:iaddr:iport:timestamp:desc */
-	fprintf(fd, "%s:%hu:",
-	        proto_itoa(proto), eport);
-	if(rhost != NULL) {
-		while(*rhost) {
-			if(*rhost >= ' ' && *rhost != ':')
-				fputc(*rhost, fd);
-			rhost++;
-		}
-	}
-	fprintf(fd, ":%s:%hu:%u:",
-	        iaddr, iport,
-	        timestamp);
-#else
-	/* PROTO:eport:iaddr:iport:timestamp:desc */
-	fprintf(fd, "%s:%hu:%s:%hu:%u:",
-	        proto_itoa(proto), eport, iaddr, iport,
-	        timestamp);
-#endif /* SUPPORT_REMOTEHOST */
-	while(*desc) {
-		/* skip non-printable characters, including CR and LF */
-		if (*desc >= ' ')
-			fputc(*desc, fd);
-		desc++;
-	}
-	fputc('\n', fd);
-	fclose(fd);
-
-	return 0;
-}
-
-static int
-lease_file_remove(unsigned short eport, int proto)
-{
-	FILE* fd, *fdt;
-	int tmp;
-	char buf[512];
-	char str[32];
-	char tmpfilename[128];
-	int str_size, buf_size;
-
-
-	if (lease_file == NULL) return 0;
-
-	if (strlen( lease_file) + 7 > sizeof(tmpfilename)) {
-		syslog(LOG_ERR, "Lease filename is too long");
-		return -1;
-	}
-
-	snprintf( tmpfilename, sizeof(tmpfilename), "%sXXXXXX", lease_file);
-
-	fd = fopen( lease_file, "r");
-	if (fd==NULL) {
-		return 0;
-	}
-
-	str_size = snprintf(str, sizeof(str), "%s:%u:", proto_itoa(proto), eport);
-	if (str_size >= sizeof(str)) {
-		str_size = sizeof(str) - 1;
-		syslog(LOG_WARNING, "%s:%u: truncated to %s", proto_itoa(proto), eport, str);
-	}
-
-	tmp = mkstemp(tmpfilename);
-	if (tmp==-1) {
-		fclose(fd);
-		syslog(LOG_ERR, "could not open temporary lease file");
-		return -1;
-	}
-	fchmod(tmp, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	fdt = fdopen(tmp, "a");
-
-	buf[sizeof(buf)-1] = 0;
-	while( fgets(buf, sizeof(buf)-1, fd) != NULL) {
-		buf_size = strlen(buf);
-
-		if (buf_size < str_size || strncmp(str, buf, str_size)!=0) {
-			fwrite(buf, buf_size, 1, fdt);
-		}
-	}
-	fclose(fdt);
-	fclose(fd);
-
-	if (rename(tmpfilename, lease_file) < 0) {
-		syslog(LOG_ERR, "could not rename temporary lease file to %s", lease_file);
-		remove(tmpfilename);
-	}
-
-	return 0;
-
-}
-
-/* A rule of the firewall at startup, as reload_adopt_rule() needs it */
-struct start_rule {
-	unsigned short eport;
-	unsigned short iport;
-	int proto;
-	struct in6_addr iaddr;
-	struct map_filter filter;
-	int nfilters;
-};
-
-static int
-start_rule_cmp(const void * a, const void * b)
-{
-	const struct start_rule * x = a, * y = b;
-
-	if(x->proto != y->proto)
-		return x->proto - y->proto;
-	return (int)x->eport - (int)y->eport;
-}
-
-/* The IPv4 port mappings of the firewall, sorted by protocol and eport, in
- * one walk of its rules: a lookup per lease file line would read the rules
- * once per line. *n is their number. NULL if there are none. */
-static struct start_rule *
-read_start_rules(int * n)
-{
-	struct lease_entry * e = lease_table_new(1);
-	struct start_rule * rules = NULL, * tmp;
-	int i, r, room = 0;
-
-	*n = 0;
-	if(e == NULL)
-		return NULL;
-	for(i = 0; (r = fw_map_rule_at(i, e)) >= 0; i++) {
-		if(r > 0)
-			continue;	/* no row can hold it */
-		if(*n == room) {
-			room = room ? 2 * room : 64;
-			tmp = realloc(rules, room * sizeof(*rules));
-			if(tmp == NULL)
-				break;
-			rules = tmp;
-		}
-		rules[*n].eport = e->eport;
-		rules[*n].iport = e->iport;
-		rules[*n].proto = e->proto;
-		rules[*n].iaddr = e->iaddr;
-		rules[*n].filter = e->filters[0];
-		rules[*n].nfilters = e->nfilters;
-		(*n)++;
-	}
-	lease_table_free(e);
-	if(rules != NULL)
-		qsort(rules, *n, sizeof(*rules), start_rule_cmp);
-	return rules;
-}
-
-/* At startup the table is empty, but the rule of a lease file line may have
- * outlived the daemon. It gets a row first, with the owner its description
- * gives, so that upnp_redirect() updates the rule and adds no second one.
- * rules: the n rules read_start_rules() found. */
-static void
-reload_adopt_rule(const struct lease_entry * line,
-                  const struct start_rule * rules, int n)
-{
-	struct start_rule key;
-	const struct start_rule * rule;
-	struct lease_entry * e;
-
-	key.proto = line->proto;
-	key.eport = line->eport;
-	rule = n > 0 ? bsearch(&key, rules, n, sizeof(*rules), start_rule_cmp) : NULL;
-	if(rule == NULL)
-		return;
-	e = lease_table_new(1);
-	if(e == NULL)
-		return;
-	e->family = AF_INET;
-	e->proto = rule->proto;
-	e->eport = rule->eport;
-	e->iport = rule->iport;
-	e->iaddr = rule->iaddr;
-	e->filters[0] = rule->filter;
-	e->nfilters = rule->nfilters;
-	e->eaddr = line->eaddr;
-	/* The owner and lease are those of the line: a backend may not keep
-	 * the description of its rules over a restart (iptables keeps them
-	 * in memory). The lease, so the rule expires also if the renewal
-	 * below fails. */
-	lease_entry_set_kind(e, line->kind, line->nonce);
-	e->label = line->label;
-	e->timestamp = line->timestamp;
-	memmap_add(e);	/* the table takes e, with a copy of its label */
-}
-
-/* reload_from_lease_file()
- * read lease_file and add the rules contained
- */
-int reload_from_lease_file(void)
-{
-	FILE * fd;
-	char * p;
-	unsigned short eport, iport;
-	char * proto;
-	char * iaddr;
-	char * desc;
-	char * rhost = NULL;
-	unsigned int leaseduration;
-	unsigned int timestamp;
-	time_t current_time;
-#ifndef LEASEFILE_USE_REMAINING_TIME
-	time_t current_unix_time;
-#endif
-	char line[320];
-	int r;
-	struct lease_entry * req;
-	struct start_rule * rules;
-	int nrules;
-
-	if(!lease_file) return -1;
-	fd = fopen( lease_file, "r");
-	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
-		return -1;
-	}
-	if(unlink(lease_file) < 0) {
-		syslog(LOG_WARNING, "could not unlink file %s : %m", lease_file);
-	}
-
-	current_time = upnp_time();
-#ifndef LEASEFILE_USE_REMAINING_TIME
-	current_unix_time = time(NULL);
-#endif
-	rules = read_start_rules(&nrules);
-	while(fgets(line, sizeof(line), fd)) {
-		syslog(LOG_DEBUG, "parsing lease file line '%s'", line);
-		proto = line;
-		p = strchr(line, ':');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		eport = (unsigned short)atoi(p);
-#ifdef SUPPORT_REMOTEHOST
-		p = strchr(p, ':');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		rhost = ++p;
-#endif /* SUPPORT_REMOTEHOST */
-		iaddr = strchr(p, ':');
-		if(!iaddr) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(iaddr++) = '\0';
-		p = strchr(iaddr, ':');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		iport = (unsigned short)atoi(p);
-		p = strchr(p, ':');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		timestamp = (unsigned int)strtoul(p, NULL, 10);
-		desc = strchr(p, ':');
-		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(desc++) = '\0';
-		/* trim description */
-		while(isspace(*desc))
-			desc++;
-		p = desc;
-		while(*(p+1))
-			p++;
-		while(isspace(*p) && (p > desc))
-			*(p--) = '\0';
-
-		if(timestamp > 0) {
-#ifdef LEASEFILE_USE_REMAINING_TIME
-			leaseduration = timestamp;
-			timestamp += current_time;	/* convert to our time */
-#else
-			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file (%hu=>%s:%hu %s)",
-				       eport, iaddr, iport, proto);
-				continue;
-			} else {
-				leaseduration = timestamp - current_unix_time;
-				timestamp = leaseduration + current_time; /* convert to our time */
-			}
-#endif
-		} else {
-			leaseduration = 0;	/* default value */
-		}
-		req = lease_table_new(1);
-		if(req == NULL)
-			continue;
-		lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
-		if(map_ipv4_to_ipv6_af(iaddr, AF_INET, &req->iaddr) < 0 ||
-		   map_filter_set(&req->filters[0], rhost, 0) < 0) {
-			syslog(LOG_WARNING, "ignoring lease file line with an invalid address (%hu=>%s:%hu %s)",
-			       eport, iaddr, iport, proto);
-			lease_table_free(req);
-			continue;
-		}
-		req->family = AF_INET;
-		req->proto = proto_atoi(proto);
-		req->iport = iport;
-		req->eport = eport;
-		/* any remote host: no filter */
-		req->nfilters = req->filters[0].prefix != 0 ? 1 : 0;
-		lease_entry_from_desc(req, desc);
-		req->timestamp = leaseduration > 0 ? timestamp : 0;
-		reload_adopt_rule(req, rules, nrules);
-		r = upnp_redirect(req);
-		if(r != 0)
-			lease_table_free(req);	/* on success the lease table took it */
-		if(r == -1) {
-			syslog(LOG_ERR, "Failed to redirect %hu -> %s:%hu protocol %s",
-			       eport, iaddr, iport, proto);
-		} else if(r == -2) {
-			/* Add the redirection again to the lease file */
-			lease_file_add(rhost, eport, iaddr, iport, proto_atoi(proto),
-			               desc, timestamp);
-		}
-	}
-	free(rules);
-	fclose(fd);
-
-	return 0;
-}
-
-/* the lease file line of the IPv4 port mapping e */
-static int
-lease_file_add_row(const struct lease_entry * e)
-{
-	char iaddr[INET_ADDRSTRLEN];
-	char desc[64];
-	char rhost[INET6_ADDRSTRLEN];
-
-	map_ntop(AF_INET, &e->iaddr, iaddr, sizeof(iaddr));
-	return lease_file_add(map_rhost(e, rhost, sizeof(rhost)), e->eport, iaddr,
-	                      e->iport, e->proto, map_rule_desc(e, desc, sizeof(desc)),
-	                      e->timestamp);
-}
-
-#ifdef LEASEFILE_USE_REMAINING_TIME
-void lease_file_rewrite(void)
-{
-	const struct lease_entry * e;
-
-	if (lease_file == NULL) return;
-	remove(lease_file);
-	for(e = lease_table_next_port(NULL); e != NULL; e = lease_table_next_port(e)) {
-		if(lease_file_add_row(e) < 0)
-			break;
-	}
-}
-#endif
 #endif
 
 /* the next expiry, ts if it is sooner */
@@ -565,12 +170,6 @@ upnp_redirect(struct lease_entry * req)
 				return upnp_renew_map(req, old);
 			fw_change_init(&c, FW_UPDATE, req, old);
 			r = fw_sync(&c, 1);
-#ifdef ENABLE_LEASEFILE
-			if(r == 0) {
-				lease_file_remove(eport, proto);
-				lease_file_add_row(req);
-			}
-#endif /* ENABLE_LEASEFILE */
 			if(r == 0)
 				memmap_update(req, iport_old);	/* the table takes req */
 			return r;
@@ -608,9 +207,6 @@ upnp_redirect_internal(struct lease_entry * req)
 			keep_partial_row(req);
 		return -1;
 	}
-#ifdef ENABLE_LEASEFILE
-	lease_file_add_row(req);
-#endif
 	if(req->timestamp > 0)
 		next_to_clean(req->timestamp);
 #ifdef ENABLE_EVENTS
@@ -639,10 +235,6 @@ upnp_renew_map(struct lease_entry * req, struct lease_entry * old)
 		upnp_delete_map(old);
 		return -1;
 	}
-#ifdef ENABLE_LEASEFILE
-	lease_file_remove(req->eport, req->proto);
-	lease_file_add_row(req);
-#endif
 	if(req->timestamp > 0)
 		next_to_clean(req->timestamp);
 	memmap_update(req, iport_old);	/* the table takes req; old goes */
@@ -740,9 +332,6 @@ upnp_check_map(struct lease_entry * e)
 	}
 	syslog(LOG_NOTICE, "port mapping %hu %s lost its rule, which could not be added "
 	       "back: its row goes", e->eport, proto_itoa(e->proto));
-#ifdef ENABLE_LEASEFILE
-	lease_file_remove(e->eport, e->proto);
-#endif
 	memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
 	return NULL;
 }
@@ -757,9 +346,6 @@ upnp_delete_map(struct lease_entry * e)
 	r = fw_sync(&c, 1);
 	if(r < 0)
 		return r;
-#ifdef ENABLE_LEASEFILE
-	lease_file_remove(e->eport, e->proto);
-#endif
 #ifdef ENABLE_EVENTS
 	upnp_event_var_change_notify(EWanIPC);
 #endif

@@ -259,7 +259,7 @@ run_lease_restart() {
 	rules_before=$(lease_rules "$ports")
 	if [ "${PCP_TEST_BREAK:-0}" = 1 ]; then
 		# to check the test itself: lose the lease file, the verify phase has to fail
-		"$DOCKER_BIN" exec "$CONTAINER" rm -f /var/lib/miniupnpd/miniupnpd.leases /var/lib/miniupnpd/miniupnpd.leases6
+		"$DOCKER_BIN" exec "$CONTAINER" sh -c 'rm -f /var/lib/miniupnpd/miniupnpd.leases*'
 	fi
 	"$DOCKER_BIN" restart "$CONTAINER" >/dev/null
 	wait_for_daemon || return 1

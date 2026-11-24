@@ -452,6 +452,74 @@ class LeaseRecordTests(unittest.TestCase):
                          [lib_test.lease_record(LEASE_MAP4)])
 
 
+# the same kinds of mappings in the files lease_files.c writes beside lease_file
+LEASE_SET = {
+    ".mappings": ["LEASE-MAPPINGS 1 last_id=4",
+                  "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label",
+                  "1|PCP-M|IPv4|UDP|43333|43333|10.0.0.2|198.51.100.1|aabbccddeeff001122334455|200|2|NA",
+                  "2|NAT-PMP|IPv4|UDP|42222|42222|10.0.0.2|198.51.100.1|NA|200|0|NA",
+                  "3|UPNP|IPv4|TCP|41000|41000|10.0.0.2|NA|NA|0|1|my\\|app",
+                  "4|UPNP|IPv6|UDP|9000|9000|2001:db8::10|2001:db8::10|NA|200|2|NA"],
+    ".filters": ["LEASE-FILTERS 1 last_id=4",
+                 "map|raddr|rprefix|rport|uid",
+                 "1|198.51.100.0|24|0|NA",
+                 "1|NA|0|0|NA",
+                 "3|198.51.100.7|32|0|NA",
+                 "4|NA|0|0|7",
+                 "4|2001:db8:1::|64|53|8"],
+    ".outgoing": ["LEASE-OUTGOING 1 last_id=4",
+                  "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|expiry|label",
+                  "IPv4|TCP|10.0.0.2|44444|198.51.100.1|6000|aabbccddeeff001122334455|203.0.113.1|80|200|NA"],
+}
+
+
+class LeaseFileSetTests(unittest.TestCase):
+    """The records of the files .mappings, .filters and .outgoing, as the old files gave them."""
+
+    def records(self):
+        return lib_test.lease_records(sum(LEASE_SET.values(), []))
+
+    def find(self, kind, port):
+        return [r.split("|") for r in self.records() if r.split("|")[0] == kind and r.split("|")[5] == str(port)]
+
+    def test_kinds_and_fields(self):
+        pcp = self.find("PCP-M", 43333)
+        self.assertEqual(len(pcp), 1)
+        self.assertEqual(pcp[0][:6], ["PCP-M", "UDP", "43333", "IPv4", "10.0.0.2", "43333"])
+        self.assertEqual(pcp[0][lib_test.LEASE_EXPIRY_FIELD], "200")
+        self.assertTrue(lib_test.lease_line_matches("|".join(pcp[0]),
+                                                    {"kind": "PCP-M", "nonce": "aabbccddeeff001122334455"}))
+        self.assertEqual(len(self.find("NAT-PMP", 42222)), 1)
+        for record in self.records():
+            self.assertEqual(len(record.split("|")), lib_test.LEASE_FIELDS)
+
+    def test_filters(self):
+        # a FILTER peer of a PCP map is a PCP-F record; its "any host" filter is none
+        self.assertEqual([f[12] for f in self.find("PCP-F", 43333)], ["198.51.100.0/24"])
+        upnp = self.find("UPNP", 41000)
+        self.assertEqual((upnp[0][12], upnp[0][-1]), ("198.51.100.7", "my\\x7capp"))
+        # a UPnP IPv6 map: one record per pinhole, as lease_file6 had
+        self.assertEqual(sorted(f[12] for f in self.find("UPNP", 9000)), ["2001:db8:1::/64", "NA"])
+
+    def test_peer(self):
+        peer = self.find("PCP-P", 44444)
+        self.assertEqual(len(peer), 1)
+        self.assertEqual((peer[0][2], peer[0][12], peer[0][13]), ("6000", "203.0.113.1", "80"))
+
+    def test_source_reads_the_files_beside_lease_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = os.path.join(directory, "miniupnpd.leases")
+            for suffix, lines in LEASE_SET.items():
+                with open(base + suffix, "w", encoding="utf-8") as handle:
+                    handle.write("\n".join(lines) + "\n")
+            source = lib_test.LeaseSource([base, base + "6"])
+            self.assertEqual(sorted(source.lines()), sorted(self.records()))
+
+    def test_old_and_new_files_together(self):
+        records = lib_test.lease_records([LEASE_MAP4] + LEASE_SET[".mappings"][:3])
+        self.assertEqual(sorted(r.split("|")[0] for r in records), ["PCP-M", "PCP-M"])
+
+
 class OptionStepReplyTests(unittest.TestCase):
     """A short or wrong reply of the daemon fails the step: it must not stop the run."""
 
@@ -2327,10 +2395,10 @@ class UpnpStepTests(unittest.TestCase):
             with open(leases, "w", encoding="utf-8") as handle:
                 handle.write("UDP:41000:172.28.41.2:41000:1700000000:upnp-wire\n")
             lease = lib_test.LeaseSource(files=leases)
-            lib_test.run_upnp_step({"kind": "upnp-lease", "match": "^UDP:41000:", "expect": {"count": 1}},
+            lib_test.run_upnp_step({"kind": "upnp-lease", "match": r"^UPNP\|UDP\|41000\|", "expect": {"count": 1}},
                                    self.variables, lease)
             with self.assertRaises(AssertionError):
-                lib_test.run_upnp_step({"kind": "upnp-lease", "match": "^TCP:", "expect": {"count": 1}},
+                lib_test.run_upnp_step({"kind": "upnp-lease", "match": r"^UPNP\|TCP\|", "expect": {"count": 1}},
                                        self.variables, lease)
 
 

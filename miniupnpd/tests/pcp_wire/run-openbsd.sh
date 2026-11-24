@@ -66,7 +66,7 @@ runner() {
 	# shellcheck disable=SC2086
 	python3 -I "$SCRIPT_DIR/run_pcp_wire_cases.py" --port 5351 --platform openbsd \
 		--unsupported pcp-peer \
-		--state-command "$VM_SSH doas cat /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6" \
+		--state-command "$VM_SSH doas sh /root/miniupnp/miniupnpd/tests/pcp_e2e/freebsd/pf-router.sh leases" \
 		--status-file "$RESULTS_DIR/status.md" --status-data-file "$DATA_DIR/status-data.json" \
 		$CASES "$@"
 }

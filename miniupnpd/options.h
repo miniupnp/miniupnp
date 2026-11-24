@@ -81,7 +81,7 @@ enum upnpconfigoptions {
 #ifdef ENABLE_LEASEFILE
 	UPNPLEASEFILE,			/*!< lease_file */
 #ifdef ENABLE_UPNPPINHOLE
-	UPNPLEASEFILE6,			/*!< lease_file v6 */
+	UPNPLEASEFILE6,			/*!< lease_file6: deprecated, not used */
 #endif
 #endif
 	UPNPTABLEDUMPFILE,		/*!< table_dump_file */

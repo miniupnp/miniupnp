@@ -135,9 +135,6 @@ int get_udp_dst_port(const unsigned char *payload);
 /* variables used by signals */
 static volatile sig_atomic_t quitting = 0;
 volatile sig_atomic_t should_send_public_address_change_notif = 0;
-#if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
-volatile sig_atomic_t should_rewrite_leasefile = 0;
-#endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
 #ifndef TOMATO
 static volatile sig_atomic_t should_dump_tables = 0;
 static volatile sig_atomic_t should_save_leases = 0;
@@ -847,9 +844,6 @@ sigusr2(int sig)
 	UNUSED(sig);
 	should_dump_tables = 1;
 	should_save_leases = 1;
-#if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
-	should_rewrite_leasefile = 1;
-#endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
 }
 #endif /* !TOMATO */
 
@@ -1691,7 +1685,10 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 #ifdef ENABLE_UPNPPINHOLE
 			case UPNPLEASEFILE6:
-				lease_file6 = ary_options[i].value;
+				/* deprecated: a configuration of an earlier version
+				 * still starts */
+				syslog(LOG_WARNING, "lease_file6 is deprecated and not used: "
+				       "the IPv6 mappings are in the files of lease_file");
 				break;
 #endif	/* ENABLE_UPNPPINHOLE */
 #endif	/* ENABLE_LEASEFILE */
@@ -2807,13 +2804,6 @@ main(int argc, char * * argv)
 			upnp_bootid = time(NULL);
 		}
 #endif
-#if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
-		if(should_rewrite_leasefile)
-		{
-			lease_file_rewrite();
-			should_rewrite_leasefile = 0;
-		}
-#endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
 #ifndef TOMATO
 		if(should_dump_tables)
 		{
@@ -3420,9 +3410,6 @@ shutdown:
 	tomato_save("/etc/upnp/data");
 #endif	/* TOMATO */
 	lease_files_flush();
-#if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
-	lease_file_rewrite();
-#endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
 	/* close out open sockets */
 	while(upnphttphead.lh_first != NULL)
 	{

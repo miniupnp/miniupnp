@@ -1226,7 +1226,7 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				       iport, proto_itoa(pcp_msg_info->protocol));
 				return;
 			} else {
-				r = upnp_delete_inboundpinhole(&req, 0);
+				r = upnp_delete_inboundpinhole(&req);
 			}
 		}
 #else

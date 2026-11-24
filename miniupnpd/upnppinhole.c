@@ -45,9 +45,6 @@
 #endif
 #if defined(USE_IPFW)
 #endif
-#ifdef ENABLE_LEASEFILE
-#include <sys/stat.h>
-#endif
 
 #ifdef ENABLE_UPNPPINHOLE
 
@@ -94,463 +91,6 @@ upnp_check_outbound_pinhole(int proto, int * timeout)
 }
 #endif
 
-#ifdef ENABLE_LEASEFILE
-static int
-lease_file6_add(const char * rem_client,
-			   unsigned short rem_port,
-               const char * int_client,
-               unsigned short int_port,
-               int proto,
-			   int uid,
-               const char * desc,
-               unsigned int leaseduration)
-{
-	unsigned int timestamp;
-	FILE * fd;
-
-	if (lease_file6 == NULL) return 0;
-
-	fd = fopen( lease_file6, "a");
-	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
-		return -1;
-	}
-
-	timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
-
-	/* convert our time to unix time */
-	if (timestamp != 0) {
-		timestamp -= upnp_time();
-	}
-
-	fprintf(fd, "%s;%s;%hu;",
-	        proto_itoa(proto), int_client, int_port);
-
-	if (rem_client != NULL) {
-		while (*rem_client) {
-			if (*rem_client >= ' ' && *rem_client != ';')
-				fputc(*rem_client, fd);
-			rem_client++;
-		}
-	}
-
-	fprintf(fd, ";%hu;%u;%u;",
-	        rem_port, uid, timestamp);
-
-	if (desc != NULL) {
-		while (*desc) {
-			if (*desc >= ' ')
-				fputc(*desc, fd);
-			desc++;
-		}
-	}
-	fputc('\n', fd);
-	fclose(fd);
-
-	return 0;
-}
-
-/* The new expiry of the map6 of req: every line of its internal endpoint,
- * as all the filters of a map share its lease. Each line keeps its own
- * UniqueID. */
-static int
-lease_file6_update(const struct lease_entry * req)
-{
-	const unsigned int leaseduration = req->timestamp;
-	char req_client[INET6_ADDRSTRLEN];
-	FILE* fd, *fdt;
-	char * p, * p2;
-	unsigned short int_port, rem_port;
-	char * proto;
-	char * int_client;
-	char * desc;
-	char * rem_client;
-	unsigned int timestamp_rule;
-	unsigned int timestamp;
-	char line[128];
-	char tmpfilename[128];
-	int uid_rule;
-	int tmp;
-
-	if (lease_file6 == NULL) return 0;
-	if (map_ntop(AF_INET6, &req->iaddr, req_client, sizeof(req_client)) == NULL)
-		return -1;
-
-	if (strlen(lease_file6) + 7 > sizeof(tmpfilename)) {
-		syslog(LOG_ERR, "Lease filename is too long");
-		return -1;
-	}
-
-	snprintf( tmpfilename, sizeof(tmpfilename), "%sXXXXXX", lease_file6);
-
-	fd = fopen( lease_file6, "r");
-	if (fd==NULL) {
-		return 0;
-	}
-
-	tmp = mkstemp(tmpfilename);
-	if (tmp==-1) {
-		fclose(fd);
-		syslog(LOG_ERR, "could not open temporary lease file");
-		return -1;
-	}
-
-	fchmod(tmp, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	fdt = fdopen(tmp, "a");
-
-	timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
-
-	/* convert our time to unix time */
-	if (timestamp != 0) {
-		timestamp -= upnp_time();
-	}
-
-	while(fgets(line, sizeof(line), fd)) {
-
-		syslog(LOG_DEBUG, "parsing lease file line '%s'", line);
-		proto = line;
-		p = strchr(line, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		int_port = (unsigned short)atoi(p2);
-		int_client = p;
-		p = strchr(p2, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		rem_port = (unsigned short)atoi(p2);
-		rem_client = p;
-		p = strchr(p2, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		desc = strchr(p2, ';');
-		uid_rule = atoi(p);
-		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(desc++) = '\0';
-		timestamp_rule = (unsigned int)strtoul(p2, NULL, 10);
-
-		if (int_port == req->iport && proto_atoi(proto) == req->proto &&
-		    strcmp(int_client, req_client) == 0) {
-			timestamp_rule = timestamp;
-		}
-
-		desc[strcspn(desc, "\r\n")] = '\0';
-		fprintf(fdt, "%s;%s;%hu;%s;%hu;%u;%u;%s\n",
-	        proto, int_client, int_port, rem_client, rem_port,
-	        uid_rule, timestamp_rule, desc);
-	}
-
-	fclose(fdt);
-	fclose(fd);
-
-	if (rename(tmpfilename, lease_file6) < 0) {
-		syslog(LOG_ERR, "could not rename temporary lease file to %s", lease_file6);
-		remove(tmpfilename);
-	}
-
-	return 0;
-}
-
-static int
-lease_file6_remove(const char * int_client, unsigned short int_port, int proto, int uid)
-{
-	FILE* fd, *fdt;
-	int tmp, uid_tmp;
-	char buf[512], buf2[512];
-	char str[32];
-	char tmpfilename[128];
-	char *p, *p2;
-	int str_size, buf_size;
-
-
-	if (lease_file6 == NULL) return 0;
-
-	if (strlen(lease_file6) + 7 > sizeof(tmpfilename)) {
-		syslog(LOG_ERR, "Lease filename is too long");
-		return -1;
-	}
-
-	snprintf( tmpfilename, sizeof(tmpfilename), "%sXXXXXX", lease_file6);
-
-	fd = fopen( lease_file6, "r");
-	if (fd==NULL) {
-		return 0;
-	}
-
-	snprintf( str, sizeof(str), "%s;%s;%u", proto_itoa(proto), int_client, int_port);
-	str_size = strlen(str);
-
-	tmp = mkstemp(tmpfilename);
-	if (tmp==-1) {
-		fclose(fd);
-		syslog(LOG_ERR, "could not open temporary lease file");
-		return -1;
-	}
-	fchmod(tmp, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	fdt = fdopen(tmp, "a");
-
-	buf[sizeof(buf)-1] = 0;
-	while( fgets(buf, sizeof(buf)-1, fd) != NULL) {
-		buf_size = strlen(buf);
-
-		if (uid > 0) {
-			strncpy(buf2, buf, buf_size);
-			// Internal Host
-			p = strchr(buf2, ';');
-			*(p++) = '\0';
-			// Internal Port
-			p = strchr(p, ';');
-			*(p++) = '\0';
-			// External Host
-			p = strchr(p, ';');
-			*(p++) = '\0';
-			// External Port
-			p = strchr(p, ';');
-			*(p++) = '\0';
-			// uid
-			p = strchr(p, ';');
-			*(p++) = '\0';
-			p2 = strchr(p, ';');
-			*(p2++) = '\0';
-			uid_tmp = atoi(p);
-			if (uid != uid_tmp) {
-				fwrite(buf, buf_size, 1, fdt);
-			}
-
-		} else if (buf_size < str_size || strncmp(str, buf, str_size)!=0) {
-			fwrite(buf, buf_size, 1, fdt);
-		}
-	}
-
-	fclose(fdt);
-	fclose(fd);
-
-	if (rename(tmpfilename, lease_file6) < 0) {
-		syslog(LOG_ERR, "could not rename temporary lease file to %s", lease_file6);
-		remove(tmpfilename);
-	}
-
-	return 0;
-
-}
-
-/* At startup the table is empty, but the rule of a lease file line may
- * have outlived the daemon. It gets a row first, so that
- * upnp_add_inboundpinhole() renews it and adds no second rule. One firewall
- * read by key per line, at startup only. */
-static void
-reload_adopt_pinhole(const struct lease_entry * line)
-{
-#ifdef FW_MAP6
-	struct lease_entry * e;
-	u_int64_t packets;
-
-	if(fw_map6_packets(line, 0, &packets) != 0)
-		return;
-	e = lease_table_copy(line);
-	if(e == NULL)
-		return;
-	memmap_add(e);	/* the table takes e */
-#else
-	UNUSED(line);
-#endif
-}
-
-/* reload_from_lease_file()
- * read lease_file and add the rules contained
- */
-int reload_from_lease_file6(void)
-{
-	FILE * fd;
-	char * p, * p2;
-	unsigned short int_port, rem_port;
-	char * proto;
-	char * int_client;
-	char * desc;
-	char * rem_client;
-	unsigned int leaseduration;
-	unsigned int timestamp;
-	time_t current_time;
-	time_t current_unix_time;
-	char line[128];
-	int r, line_uid;
-	struct lease_entry * req;
-
-	if(!lease_file6) return -1;
-	fd = fopen( lease_file6, "r");
-	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file6);
-		return -1;
-	}
-	if(unlink(lease_file6) < 0) {
-		syslog(LOG_WARNING, "could not unlink file %s : %m", lease_file6);
-	}
-
-	current_time = upnp_time();
-	current_unix_time = time(NULL);
-
-	while(fgets(line, sizeof(line), fd)) {
-		syslog(LOG_DEBUG, "parsing lease file line '%s'", line);
-		proto = line;
-		p = strchr(line, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		int_port = (unsigned short)atoi(p2);
-		int_client = p;
-		p = strchr(p2, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		rem_port = (unsigned short)atoi(p2);
-		rem_client = p;
-		p = strchr(p2, ';');
-		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p++) = '\0';
-		p2 = strchr(p, ';');
-		if(!p2) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(p2++) = '\0';
-		line_uid = atoi(p);	/* the UniqueID of the line */
-		desc = strchr(p2, ';');
-		if(!desc) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
-			continue;
-		}
-		*(desc++) = '\0';
-		/*timestamp = (unsigned int)atoi(p2);*/
-		timestamp = (unsigned int)strtoul(p2, NULL, 10);
-		/* trim description */
-		while(isspace(*desc))
-			desc++;
-		p = desc;
-		while(*(p+1))
-			p++;
-		while(isspace(*p) && (p > desc))
-			*(p--) = '\0';
-
-		/* Ensure port is non-privileged and RemoteHost is valid */
-		if (int_port < 1024) {
-		    syslog(LOG_WARNING, "ignoring lease file pinhole with privileged port %hu", int_port);
-		    continue;
-		}
-		req = lease_table_new(1);
-		if (req == NULL)
-			continue;
-		lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
-		if (map_filter_set(&req->filters[0], rem_client, rem_port) < 0 ||
-		    (req->filters[0].prefix != 0 && IN6_IS_ADDR_V4MAPPED(&req->filters[0].raddr))) {
-			syslog(LOG_WARNING, "ignoring lease file pinhole with invalid RemoteHost: %s", rem_client);
-			lease_table_free(req);
-			continue;
-		}
-		if (map_ipv4_to_ipv6_af(int_client, AF_INET6, &req->iaddr) < 0) {
-			syslog(LOG_WARNING, "ignoring lease file pinhole with invalid InternalClient: %s", int_client);
-			lease_table_free(req);
-			continue;
-		}
-
-		if(timestamp > 0) {
-			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file");
-				lease_table_free(req);
-				continue;
-			} else {
-				leaseduration = timestamp - current_unix_time;
-				timestamp = leaseduration + current_time; /* convert to our time */
-			}
-		} else {
-			leaseduration = 0;	/* default value */
-		}
-
-		req->family = AF_INET6;
-		req->proto = proto_atoi(proto);
-		req->iport = int_port;
-		req->eaddr = req->iaddr;
-		req->eport = int_port;
-		lease_entry_from_desc(req, desc);
-		req->timestamp = current_time + leaseduration;
-		/* a UPnP pinhole keeps the UniqueID of its line, so its client
-		 * can still renew and delete it, if no other has it. Else it
-		 * gets a new one now: an adopted row is renewed, which gives
-		 * none. */
-		if(req->kind == MAP_KIND_UPNP) {
-			if(line_uid > 0 && line_uid < 65535 &&
-			   lease_table_find_uid((unsigned short)line_uid) == NULL)
-				req->filters[0].uid = (unsigned short)line_uid;
-			else
-				req->filters[0].uid = lease_table_new_uid();
-		}
-		reload_adopt_pinhole(req);
-		r = upnp_add_inboundpinhole(req, NULL);
-		if(r == -1) {
-			syslog(LOG_ERR, "Failed to add %s:%hu -> %s:%hu protocol %s",
-			       rem_client, rem_port, int_client, int_port, proto);
-		} else if(r == -2) {
-			/* Add the redirection again to the lease file */
-			lease_file6_add(rem_client, rem_port, int_client, int_port, proto_atoi(proto),
-			               req->filters[0].uid, desc, timestamp);
-		}
-		if(r != 1)
-			lease_table_free(req);	/* on success the lease table took it */
-	}
-	fclose(fd);
-
-	return 0;
-}
-
-#endif
-
 const struct lease_entry *
 upnp_find_inboundpinhole(struct lease_entry * req)
 {
@@ -586,12 +126,6 @@ upnp_add_inboundpinhole_internal(struct lease_entry * req, unsigned short * uid_
 	/* a UPnP filter's uid; a PCP map has none */
 	const unsigned short uid = req->nfilters > 0 ? req->filters[0].uid : 0;
 	struct fw_change c;
-#ifdef ENABLE_LEASEFILE
-	char desc[64];
-	char iaddr[INET6_ADDRSTRLEN];
-	char raddr_buf[INET6_ADDRSTRLEN];
-	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
-#endif
 
 	fw_change_init(&c, FW_ADD, req, NULL);
 	if (fw_sync(&c, 1) < 0) {
@@ -599,12 +133,6 @@ upnp_add_inboundpinhole_internal(struct lease_entry * req, unsigned short * uid_
 			syslog(LOG_WARNING, "map6 port %hu: a part of its rules stays", req->iport);
 		return -1;
 	}
-#ifdef ENABLE_LEASEFILE
-	map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
-	lease_file6_add(raddr, req->nfilters > 0 ? req->filters[0].rport : 0, iaddr,
-	                req->iport, req->proto, uid, map_rule_desc(req, desc, sizeof(desc)),
-	                req->timestamp);
-#endif /* ENABLE_LEASEFILE */
 	if (uid_out != NULL)
 		*uid_out = uid;
 	if (req->timestamp > 0)
@@ -629,14 +157,6 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 #ifdef FW_MAP6
 	int r, i;
 	const struct lease_entry * old;
-#ifdef ENABLE_LEASEFILE
-	char desc_buf[64];
-	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
-	char iaddr[INET6_ADDRSTRLEN];
-	char raddr_buf[INET6_ADDRSTRLEN];
-	const char * raddr = map_rhost(req, raddr_buf, sizeof(raddr_buf));
-	const unsigned short rport = req->nfilters > 0 ? req->filters[0].rport : 0;
-#endif
 
 	/* An IPv6 map has no translation: its external port is its internal
 	 * port. A request which wants another port or none (PCP
@@ -666,17 +186,6 @@ upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out)
 		r = upnp_update_inboundpinhole(req, uid);
 		if (r < 0)
 			return r;
-#ifdef ENABLE_LEASEFILE
-		/* the line of the filter again: a reload, which unlinked the
-		 * file, renews the rows it adopted this way */
-		map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr));
-		if (uid != 0)
-			lease_file6_remove("*", 0, 0, uid);
-		else
-			lease_file6_remove(iaddr, req->iport, req->proto, -1);
-		lease_file6_add(raddr, rport, iaddr, req->iport, req->proto,
-		                uid, desc, req->timestamp);
-#endif /* ENABLE_LEASEFILE */
 		if (uid_out != NULL)
 			*uid_out = uid;
 		memmap_update(req, req->iport);	/* the table takes req */
@@ -814,9 +323,6 @@ upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 	if((firewall_trust != FW_TRUST_TRUST || e->fw_partial) &&
 	   fw_check_row((struct lease_entry *)e) == -2)
 		return -2;
-#ifdef ENABLE_LEASEFILE
-	lease_file6_update(req);
-#endif
 	if(req->timestamp > 0)
 		next_to_clean(req->timestamp);
 	memmap_renew(req);
@@ -829,7 +335,7 @@ upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 }
 
 int
-upnp_delete_inboundpinhole(const struct lease_entry * req, unsigned short uid)
+upnp_delete_inboundpinhole(const struct lease_entry * req)
 {
 #ifdef FW_MAP6
 	struct fw_change c;
@@ -837,23 +343,12 @@ upnp_delete_inboundpinhole(const struct lease_entry * req, unsigned short uid)
 
 	fw_change_init(&c, FW_DELETE, NULL, req);
 	ret = fw_sync(&c, 1);
-#ifdef ENABLE_LEASEFILE
-	if (ret == 0) {
-		/* a UPnP filter has its uid on its line; a PCP map has none,
-		 * and its line is that of its endpoint */
-		char iaddr[INET6_ADDRSTRLEN];
-		if (uid != 0)
-			lease_file6_remove("*", 0, 0, uid);
-		else if (map_ntop(AF_INET6, &req->iaddr, iaddr, sizeof(iaddr)) != NULL)
-			lease_file6_remove(iaddr, req->iport, req->proto, -1);
-	}
-#endif
 	if (ret == 0)
 		memmap_delete_filter(req);
 
 	return ret;
 #else
-	UNUSED(req); UNUSED(uid);
+	UNUSED(req);
 
 	return -1;
 #endif
@@ -1083,18 +578,10 @@ upnp_delete_map6(struct lease_entry * e)
 {
 #ifdef FW_MAP6
 	struct fw_change c;
-#ifdef ENABLE_LEASEFILE
-	char iaddr[INET6_ADDRSTRLEN];
-#endif
 
 	fw_change_init(&c, FW_DELETE, NULL, e);
 	if(fw_sync(&c, 1) < 0)
 		return -1;
-#ifdef ENABLE_LEASEFILE
-	/* the lines of every filter of the map */
-	if(map_ntop(AF_INET6, &e->iaddr, iaddr, sizeof(iaddr)) != NULL)
-		lease_file6_remove(iaddr, e->iport, e->proto, -1);
-#endif
 	memmap_delete(e->proto, AF_INET6, &e->iaddr, e->iport, e->eport);
 	return 0;
 #else

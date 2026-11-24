@@ -19,6 +19,13 @@ WORK=/tmp/pcp-fixture
 JAIL=pcpclient
 LEASE_BASE=$WORK/miniupnpd.leases
 LEASE6=${LEASE_BASE}6
+# lease_file6: only a daemon from before the files beside lease_file has it (a base run of the
+# comparisons); a newer one refuses it. Drop this once master writes those files.
+if miniupnpd/miniupnpd --help 2>&1 | grep -q -- --lease-file-ignore-checksum; then
+	LEASE6_LINE=
+else
+	LEASE6_LINE="lease_file6=$LEASE6"
+fi
 SNAP=$WORK/lease-snapshots
 LOG=$RESULTS/lease-miniupnpd.log
 
@@ -67,7 +74,7 @@ runner() {
 # start_daemon EXTRA_CONF : cold start, waits until it answers
 start_daemon() {
 	grep -v '^max_lifetime' "$WORK/miniupnpd.conf" >"$WORK/lease.conf"
-	{ echo "max_lifetime=7200"; echo "lease_file=$LEASE_BASE"; echo "lease_file6=$LEASE6"; printf '%s\n' "$1"; } >>"$WORK/lease.conf"
+	{ echo "max_lifetime=7200"; echo "lease_file=$LEASE_BASE"; echo "$LEASE6_LINE"; printf '%s\n' "$1"; } >>"$WORK/lease.conf"
 	miniupnpd/miniupnpd -d -f "$WORK/lease.conf" >>"$LOG" 2>&1 &
 	daemon=$!
 	attempt=0
@@ -131,7 +138,7 @@ run_profile() {
 	extra=$2
 	shift 2
 	stop_daemon
-	rm -f "$LEASE_BASE" "$LEASE6"
+	rm -f "$LEASE_BASE" "$LEASE6" "$LEASE_BASE".*
 	start_daemon "$extra" || return 1
 	case_args=
 	for profile_case in "$@"; do case_args="$case_args --case $profile_case"; done
@@ -147,7 +154,7 @@ run_profile() {
 	done
 }
 
-rm -rf "$SNAP" "$LEASE_BASE" "$LEASE6"
+rm -rf "$SNAP" "$LEASE_BASE" "$LEASE6" "$LEASE_BASE".*
 mkdir -p "$SNAP"
 start_daemon "" || exit 1
 for family in ipv4 ipv6; do

@@ -507,9 +507,79 @@ def lease_record(line):
                   label=desc if kind == "UPNP" else "NA")
 
 
+LEASE_HEADERS = {"LEASE-MAPPINGS": "mappings", "LEASE-FILTERS": "filters", "LEASE-OUTGOING": "outgoing",
+                 "LEASE-CHECKSUM": "checksum"}
+
+
+def lease_file_sections(lines):
+    """The lines of the lease files the daemon writes beside lease_file (lease_files.c), cut at their headers:
+    {"mappings": [{field: value}], "filters": [...], "outgoing": [...]}, by the field names of line 2 of each
+    file; and the lines of no such file (the old lease_file / lease_file6)."""
+    sections = {"mappings": [], "filters": [], "outgoing": [], "checksum": []}
+    other = []
+    section = names = None
+    for line in lines:
+        head = line.split(" ", 1)[0]
+        if head in LEASE_HEADERS:
+            section, names = LEASE_HEADERS[head], None
+            continue
+        if section is None:
+            other.append(line)
+        elif names is None:
+            names = line.split("|")
+        elif line:
+            values = re.split(r"(?<!\\)\|", line)
+            if len(values) == len(names):
+                sections[section].append(dict(zip(names, values)))
+            else:
+                other.append(line)	# a line of the old files after a section
+    return sections, other
+
+
+def lease_prefix_addr(raddr, prefix):
+    """raddr of a filter line as a record has it: the address, a/prefix for a network, NA for any host."""
+    if raddr == "NA" or prefix == "0":
+        return "NA"
+    full = "128" if ":" in raddr else "32"
+    return raddr if prefix in (None, full) else f"{raddr}/{prefix}"
+
+
+def lease_file_records(sections):
+    """The lease records of the three files: a row of .mappings with no filter is one record; a UPnP row gives one
+    per filter (a RemoteHost, a pinhole of an IPv6 map), with its remote; a PCP row gives its record and one PCP-F
+    record per filter which is no "any host" (a FILTER peer); a line of .outgoing is a PCP-P record. A label keeps
+    its escapes, with \\| as \\x7c, so a record has LEASE_FIELDS fields."""
+    filters = {}
+    for line in sections["filters"]:
+        filters.setdefault(line.get("map"), []).append(line)
+    records = []
+
+    def record(kind, row, raddr="NA", rport="NA", expiry=None):
+        return "|".join((kind, row.get("proto", "NA"), row.get("eport", "NA"), row.get("family", "NA"),
+                         row.get("iaddr", "NA"), row.get("iport", "NA"), "NA", row.get("nonce", "NA"), "NA", "NA",
+                         row.get("expiry", "NA") if expiry is None else expiry, row.get("eaddr", "NA"),
+                         raddr, rport, row.get("label", "NA").replace("\\|", "\\x7c")))
+    for row in sections["mappings"]:
+        kind = row.get("kind", "NA")
+        lines = filters.get(row.get("id"), [])
+        remotes = [(lease_prefix_addr(f.get("raddr", "NA"), f.get("rprefix")), f.get("rport", "0")) for f in lines]
+        if kind == "PCP-M":
+            records.append(record(kind, row))
+            records += [record("PCP-F", row, raddr, rport, "NA") for raddr, rport in remotes if raddr != "NA"]
+        elif remotes:
+            records += [record(kind, row, raddr, rport if rport != "0" else "NA") for raddr, rport in remotes]
+        else:
+            records.append(record(kind, row))
+    for peer in sections["outgoing"]:
+        records.append(record("PCP-P", peer, peer.get("raddr", "NA"), peer.get("rport", "NA")))
+    return records
+
+
 def lease_records(lines):
-    """The lease records of the lines of lease_file and lease_file6 (in any order, also mixed)."""
-    return [record for record in map(lease_record, lines) if record is not None]
+    """The lease records of the lines of the lease files: the files lease_files.c writes (.mappings, .filters,
+    .outgoing, cut at their headers), and the old lease_file and lease_file6 (in any order, also mixed)."""
+    sections, other = lease_file_sections(lines)
+    return lease_file_records(sections) + [record for record in map(lease_record, other) if record is not None]
 
 
 def lease_nonces(nonce):
@@ -782,6 +852,10 @@ def stop_packet_capture(capture):
 # The daemon's lease files: where to read them, and the lease_file / state checks of the corpora
 
 
+# the files the daemon writes beside lease_file (lease_files.c)
+LEASE_FILE_SUFFIXES = (".mappings", ".filters", ".outgoing")
+
+
 class LeaseSource:
     """Where the lease_file steps and the state checks read the daemon's lease files, as lease records.
 
@@ -804,14 +878,16 @@ class LeaseSource:
         return " ".join(self.files) or None
 
     def read_raw(self):
-        """The lines of the files as written (a missing file has none)."""
+        """The lines of the files as written (a missing file has none): each path, and the files lease_files.c
+        writes beside it (<path>.mappings, .filters, .outgoing)."""
         lines = []
         for path in self.files:
-            try:
-                with open(path, encoding="utf-8") as handle:
-                    lines += handle.read().splitlines()
-            except FileNotFoundError:
-                pass
+            for name in [path] + [path + suffix for suffix in LEASE_FILE_SUFFIXES]:
+                try:
+                    with open(name, encoding="utf-8") as handle:
+                        lines += handle.read().splitlines()
+                except FileNotFoundError:
+                    pass
         return lines
 
     def read_file(self):
@@ -3549,12 +3625,12 @@ def run_notify_wait_step(step, variables):
 
 
 def run_upnp_lease_step(step, variables, lease):
-    """The lines of the daemon's UPnP lease file (PROTO:eport:iaddr:iport:timestamp:description) that
-    match `match` (a regular expression after resolving variables); wait_seconds as for lease_file."""
+    """The lease records (lease_records: kind|proto|eport|family|iaddr|iport|...|label) of the daemon's lease
+    files that match `match` (a regular expression after resolving variables); wait_seconds as for lease_file."""
     pattern = resolve_value(step.get("match", ""), variables)
     deadline = time.monotonic() + step.get("wait_seconds", 0)
     while True:
-        lines = [line for line in (lease.raw_lines() if lease.file or lease.command else []) if line.strip()]
+        lines = lease.lines() if lease.file or lease.command else []
         matched = [line for line in lines if re.search(pattern, line)]
         values = {"count": len(matched), "lines": matched, "all": len(lines)}
         if matched:

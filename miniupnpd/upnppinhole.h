@@ -14,10 +14,6 @@
 
 #ifdef ENABLE_UPNPPINHOLE
 
-#ifdef ENABLE_LEASEFILE
-int reload_from_lease_file6(void);
-#endif
-
 /* functions to be used by WANIPv6_FirewallControl implementation
  * and PCP (IPv6). A UPnP req has one filter, filters[0]: the remote, and the
  * uid of the pinhole. A PCP req has none: its one rule lets any remote in. */
@@ -76,9 +72,10 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid);
 
-/* remove the inbound pinhole uid of req, which a client asks to delete */
+/* remove the inbound pinhole of req, which a client asks to delete: its
+ * rule by its key, its filter by its uid (UPnP) or its remote */
 int
-upnp_delete_inboundpinhole(const struct lease_entry * req, unsigned short uid);
+upnp_delete_inboundpinhole(const struct lease_entry * req);
 
 /* ... */
 #if 0

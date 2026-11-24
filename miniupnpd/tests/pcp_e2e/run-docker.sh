@@ -91,7 +91,7 @@ snapshot_daemon_state() {
         cat "$state_file"
       done
       echo "=== lease files ==="
-      for lease_file in /var/lib/miniupnpd/*.leases /var/lib/miniupnpd/*.leases6 /var/log/upnp.leases; do
+      for lease_file in /var/lib/miniupnpd/*.leases /var/lib/miniupnpd/*.leases6 /var/lib/miniupnpd/*.leases.* /var/log/upnp.leases; do
         [ -f "$lease_file" ] || continue
         echo "--- $lease_file ---"
         cat "$lease_file"

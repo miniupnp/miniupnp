@@ -16,6 +16,7 @@
 #   pf-router.sh rules PORTS   the rules of the miniupnpd anchor for the internal ports PORTS (an
 #                              extended regular expression, 43333|44444), without the creation
 #                              time and the pinhole number in their labels (ts-N, pinhole-N); what the restart check compares
+#   pf-router.sh leases        print the lease files, those there are
 #   pf-router.sh snapshot      print the router state, for the per-case snapshots
 #   pf-router.sh capture start|stop   tcpdump on the LAN and WAN NICs into /tmp/pcp-e2e/cap-*.pcap
 #   pf-router.sh pf-make       build the development test programs of miniupnpd/pf
@@ -145,8 +146,15 @@ cmd_snapshot() {
 	echo "=== pf main rules ==="; pfctl -vsn 2>&1; pfctl -vsr 2>&1
 	echo "=== pf miniupnpd anchor ==="; pfctl -a 'miniupnpd/*' -vsn 2>&1; pfctl -a 'miniupnpd/*' -vsr 2>&1
 	echo "=== pf states ==="; pfctl -ss 2>&1
-	echo "=== lease file ==="; cat /var/tmp/miniupnpd.leases 2>/dev/null || echo "(none)"
-	echo "=== lease file6 ==="; cat /var/tmp/miniupnpd.leases6 2>/dev/null || echo "(none)"
+	echo "=== lease files ==="; cmd_leases
+}
+
+# The lease files of the daemon, those there are: the files beside lease_file (.mappings,
+# .filters, .outgoing), or lease_file and lease_file6 of a daemon from before them. What
+# the runners read with --state-command.
+cmd_leases() {
+	cat /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6 /var/tmp/miniupnpd.leases.mappings \
+	    /var/tmp/miniupnpd.leases.filters /var/tmp/miniupnpd.leases.outgoing 2>/dev/null || true
 }
 
 cmd_capture() {
@@ -268,7 +276,7 @@ cmd_start() {
 	flush_anchor
 	pfctl -F states >/dev/null 2>&1 || true
 	write_pf off
-	rm -f /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6 "$WORK"/cap-*
+	rm -f /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6 /var/tmp/miniupnpd.leases.* "$WORK"/cap-*
 	cat >"$WORK/miniupnpd.conf" <<'CONF'
 ext_ifname=WAN_IF
 tag=miniupnpd
@@ -278,13 +286,17 @@ enable_upnp=yes
 http_port=5000
 enable_pcp_pmp=yes
 lease_file=/var/tmp/miniupnpd.leases
-lease_file6=/var/tmp/miniupnpd.leases6
 max_lifetime=600
 secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
 	sed -i.bak "s/=WAN_IF\$/=$WAN_IF/; s/=LAN_IF\$/=$LAN_IF/" "$WORK/miniupnpd.conf" && rm -f "$WORK/miniupnpd.conf.bak"
+	# lease_file6: only a daemon from before the files beside lease_file has it (a base run
+	# of the comparisons); a newer one refuses it. Drop this once master writes those files.
+	if ! miniupnpd/miniupnpd --help 2>&1 | grep -q -- --lease-file-ignore-checksum; then
+		echo "lease_file6=/var/tmp/miniupnpd.leases6" >>"$WORK/miniupnpd.conf"
+	fi
 	# extra configuration lines, separated by commas (a suite on this fixture)
 	printf '%s\n' "${1:-}" | tr ',' '\n' >>"$WORK/miniupnpd.conf"
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >"$WORK/miniupnpd.log" 2>&1 &
@@ -319,6 +331,7 @@ lose-rules) cmd_lose_rules ;;
 host) cmd_host "$@" ;;
 rules) cmd_rules "$@" ;;
 snapshot) cmd_snapshot ;;
+leases) cmd_leases ;;
 capture) cmd_capture "$@" ;;
 pf-make) cmd_pf_make ;;
 *) echo "usage: $0 setup | build | net | start | stop | nat66 on|off | restart [keep] | rules PORTS | snapshot | capture start|stop | pf-make" >&2; exit 2 ;;

@@ -51,12 +51,16 @@ listening_ip=eth0
 enable_upnp=no
 enable_pcp_pmp=yes
 lease_file=/var/lib/miniupnpd/miniupnpd.leases
-lease_file6=/var/lib/miniupnpd/miniupnpd.leases6
 max_lifetime=600
 secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 EOF
+# lease_file6: only a daemon from before the files beside lease_file has it (a base run of the
+# comparisons); a newer one refuses it. Drop this once master writes those files.
+if ! /usr/sbin/miniupnpd --help 2>&1 | grep -q -- --lease-file-ignore-checksum; then
+	echo "lease_file6=/var/lib/miniupnpd/miniupnpd.leases6" >> /etc/miniupnpd.conf
+fi
 
 # PCP_TEST_CONF_REPLACE=1: the lines of PCP_TEST_EXTRA_CONF replace the default ones of the same
 # option instead of following them (conf_replace.awk).

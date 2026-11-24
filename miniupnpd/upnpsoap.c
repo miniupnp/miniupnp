@@ -2447,7 +2447,7 @@ DeletePinhole(struct upnphttp * h, const char * action, const char * ns)
 	filter.uid = (unsigned short)uid;
 	req.filters = &filter;
 	req.nfilters = 1;
-	n = upnp_delete_inboundpinhole(&req, (unsigned short)uid);
+	n = upnp_delete_inboundpinhole(&req);
 	if(n < 0)
 	{
 		syslog(LOG_INFO, "%s: (inbound) failed to remove pinhole with ID: %d",

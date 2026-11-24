@@ -622,7 +622,7 @@ run_restart_check() {
   mkdir -p "$restart_dir"
   lease_runner="python3 -I $PMP/run_pcp_wire_cases.py --port 5351 --platform $E2E_PLATFORM --mutating
     --profile baseline --snapshot-dir $restart_dir
-    --state-command '$RSH $VM_USER@127.0.0.1 cat /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6'"
+    --state-command '$RSH $VM_USER@127.0.0.1 sh /root/miniupnp/$ROUTER_SCRIPT leases'"
   ports=
   for family in ipv4 ipv6; do
     [ "$family" = ipv4 ] && router=$LAN4.1 || router=${LAN6}1
@@ -640,7 +640,7 @@ run_restart_check() {
   vm sh $ROUTER_SCRIPT rules "'$ports'" >"$restart_dir/before.txt" 2>&1 || true
   if [ "${PCP_E2E_BREAK_RESTART:-0}" = 1 ]; then
     # to check the test itself : lose the lease files, this has to fail
-    $SSH "$PRIV rm -f /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6"
+    $SSH "$PRIV rm -f /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6 /var/tmp/miniupnpd.leases.*"
   fi
   restart_arg=
   [ "$restart_mode" = keep ] && restart_arg=keep

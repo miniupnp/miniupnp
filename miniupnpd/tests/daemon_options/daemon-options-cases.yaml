@@ -1402,35 +1402,62 @@ sections:
       steps:
       - upnp_add:
           port: 46333
-      - sleep: 1
+      - sleep: 3
       - router:
-          command: cat:/var/lib/miniupnpd/other.leases
+          command: cat:/var/lib/miniupnpd/other.leases.mappings
           contains:
-          - '46333'
+          - '|46333|'
     expect:
       kind: steps
-    description: lease_file sets the path of the file.
-  - name: lease-file6-path
+    description: lease_file sets the path of the lease files; the mappings are in <lease_file>.mappings, saved
+      when the daemon is idle, at most every 2 seconds.
+  - name: lease-file-ipv6-path
     platform: linux
     protocol: daemon
     families:
     - ipv6
     mutating: true
     config:
-    - lease_file6=/var/lib/miniupnpd/pinholes.leases
+    - lease_file=/var/lib/miniupnpd/pinholes.leases
     request:
       kind: option_steps
       steps:
       - pcp_map:
           port: 46334
-      - sleep: 1
+      - sleep: 3
       - router:
-          command: cat:/var/lib/miniupnpd/pinholes.leases
+          command: cat:/var/lib/miniupnpd/pinholes.leases.mappings
           contains:
-          - '46334'
+          - '|PCP-M|IPv6|'
+          - '|46334|'
     expect:
       kind: steps
-    description: lease_file6 sets the path of the IPv6 lease file, where a PCP IPv6 mapping is written too.
+    description: An IPv6 mapping is in <lease_file>.mappings too.
+  - name: lease-file6-deprecated
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv6
+    mutating: true
+    config:
+    - lease_file=/var/lib/miniupnpd/pinholes.leases
+    - lease_file6=/var/lib/miniupnpd/pinholes.leases6
+    request:
+      kind: option_steps
+      steps:
+      - router: {command: log, contains: ['lease_file6 is deprecated and not used']}
+      - pcp_map:
+          port: 46335
+      - sleep: 3
+      - router:
+          command: cat:/var/lib/miniupnpd/pinholes.leases.mappings
+          contains:
+          - '|PCP-M|IPv6|'
+          - '|46335|'
+    expect:
+      kind: steps
+    description: lease_file6 is deprecated. A configuration with it starts, with a warning, and the IPv6
+      mapping is in <lease_file>.mappings; nothing reads or writes lease_file6.
 - title: Firewall names (nftables)
   description: The table and chain options, created by nft_init.sh -f and used by the daemon.
   cases:

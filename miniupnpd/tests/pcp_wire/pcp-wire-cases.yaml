@@ -13887,18 +13887,19 @@ sections:
     description: "RFC 6886 \xA73.4: a deletion finds the mapping by its private port; with a public port other than the\
       \ private port the mapping is removed and its public port can be used again."
 - title: Lease files across a daemon restart and expiry
-  description: 'The daemon records its PCP and NAT-PMP mappings in lease_file (IPv4) and lease_file6 (IPv6) and
-    creates them again after a restart. The driver runs each lease-restart case in two phases,
+  description: 'The daemon records its mappings in the files beside lease_file (<lease_file>.mappings, .filters,
+    .outgoing) and creates them again after a restart. The driver runs each lease-restart case in two phases,
     restarting the daemon in between: "create" makes the mappings and checks the lease file lines (and keeps them),
     "verify" checks that the same lines are back, then deletes the mappings. The lease-expiry cases need the
     short-lifetime profile (pcp_min_lifetime_override=2).'
   cases:
-  # The runner reads each line of lease_file (PROTO:eport:iaddr:iport:timestamp:desc) and lease_file6
-  # (PROTO;iaddr;iport;rhost;rport;uid;timestamp;desc) as a record of 15 fields, NA for one the line has not:
+  # The runner reads the lines of <lease_file>.mappings, .filters and .outgoing (lib_test.lease_records; for a
+  # daemon from before them, lease_file and lease_file6) as records of 15 fields, NA for one a line has not:
   #   kind|proto|eport|family|iaddr|iport|ifname|nonce|prefer_failure|since|expiry|eaddr|raddr|rport|label
-  # kind comes from the description: PCP-M ("PCP MAP <nonce>"), PCP-P ("PCP PEER <nonce>"), NAT-PMP, or UPNP.
-  # The cases select records by kind, family (field 3), internal port (5) and nonce. The generic lease files
-  # have no FILTER peers (PCP-F), PEER mappings or DESCRIPTION labels, so selectors of those find nothing.
+  # kind is that of the row: PCP-M, NAT-PMP or UPNP; a filter of a PCP row which is no "any host" is a PCP-F
+  # record, a line of .outgoing a PCP-P record. The cases select records by kind, family (field 3), internal
+  # port (5) and nonce. PCP FILTER peers are not kept before PCP FILTER is in the table, so PCP-F finds nothing
+  # yet.
   # FILTER payloads: reserved 00, prefix length (96 + IPv4 prefix length for IPv4), remote port, 16-byte address.
   - name: lease-restart-ipv4
     requires: [lease-restart, pcp-peer]
