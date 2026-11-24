@@ -227,7 +227,7 @@ fi
 
 # The cases which require lease-restart (pcp-wire-cases.yaml) run in two phases, the
 # daemon is restarted in between: "create" makes the mappings, "verify" checks that the
-# lease files (lease_file, lease_file6) have the same lines again and the daemon has created the
+# lease files have the same lines again and the daemon has created the
 # firewall rules again. PCP_TEST_LEASE_CASES=0 skips them, as do selected cases.
 wait_for_daemon() {
 	attempt=0
@@ -247,10 +247,15 @@ wait_for_daemon() {
 lease_rules() {
 	"$DOCKER_BIN" exec "$CONTAINER" sh -c "nft list ruleset | grep -E '$1' | sort" || true
 }
+# run_lease_restart FAMILY [CASE] [keep]: keep restarts the daemon in its container
+# (SIGHUP to the entrypoint), with its rules left in the firewall, as a restart of the
+# service does: the daemon has to take each rule back, with no second one. Else the
+# container restarts, with an empty firewall.
 run_lease_restart() {
 	lease_family=$1
 	# a case of its own as $2, else that of the family
 	lease_case=${2:-lease-restart-$lease_family}
+	lease_mode=${3:-}
 	lease_args="--snapshot-dir /pcp-wire-data --case $lease_case --profile baseline"
 	# shellcheck disable=SC2086
 	ports=$(run_tests "$lease_family" --list-lease-ports $lease_args | tr ' ' '|')
@@ -262,7 +267,12 @@ run_lease_restart() {
 		# to check the test itself: lose the lease file, the verify phase has to fail
 		"$DOCKER_BIN" exec "$CONTAINER" sh -c 'rm -f /var/lib/miniupnpd/miniupnpd.leases*'
 	fi
-	"$DOCKER_BIN" restart "$CONTAINER" >/dev/null
+	if [ "$lease_mode" = keep ]; then
+		"$DOCKER_BIN" kill -s HUP "$CONTAINER" >/dev/null
+		sleep 2	# the old daemon has stopped, the new one starts
+	else
+		"$DOCKER_BIN" restart "$CONTAINER" >/dev/null
+	fi
 	wait_for_daemon || return 1
 	# the daemon creates the rules again from the lease file; compare them before the
 	# verify phase deletes the mappings
@@ -305,6 +315,7 @@ run_profile() {
 if [ "${PCP_TEST_LEASE_CASES:-1}" = 1 ] && [ "$#" -eq 0 ]; then
 	for lease_family in ipv4 ipv6; do
 		run_lease_restart "$lease_family" || test_status=1
+		run_lease_restart "$lease_family" "lease-restart-keep-$lease_family" keep || test_status=1
 	done
 	# a PEER binding only: lease-restart stops at its FILTER lines until the table has PCP FILTER
 	run_lease_restart ipv4 lease-restart-peer-ipv4 || test_status=1

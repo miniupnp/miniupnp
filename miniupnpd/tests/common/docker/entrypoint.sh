@@ -149,16 +149,32 @@ if [ -n "${PCP_TEST_CAPTURE_DIR:-}" ]; then
 fi
 mkdir -p /var/lib/miniupnpd
 # PCP_TEST_QUIET=1: without -d (the log mask is then LOG_NOTICE, no debug lines), for
-# long runs. The daemon goes to the background: wait for it, and stop it with the
-# container (it then writes its pending PCP lease file save).
-if [ "${PCP_TEST_QUIET:-0}" = 1 ]; then
-	rm -f /var/run/miniupnpd.pid
-	/usr/sbin/miniupnpd -f /etc/miniupnpd.conf "$@" || exit 1
-	sleep 1
-	pid=$(cat /var/run/miniupnpd.pid 2>/dev/null)
-	[ -n "$pid" ] || { echo "miniupnpd did not start" >&2; exit 1; }
-	trap 'kill "$pid" 2>/dev/null; while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done; exit 0' TERM INT
-	while kill -0 "$pid" 2>/dev/null; do sleep 1 & wait $!; done
-	exit 1
-fi
-exec /usr/sbin/miniupnpd -d -f /etc/miniupnpd.conf "$@"
+# long runs; else with -d, the log on the output of the container. Either way the daemon
+# runs under this shell: stop the container to stop it (it then writes its pending lease
+# file save), or send the container SIGHUP to restart it with its rules left in the
+# firewall, as a restart of the service does (the lease-restart-keep cases).
+start_daemon() {
+	if [ "${PCP_TEST_QUIET:-0}" = 1 ]; then
+		rm -f /var/run/miniupnpd.pid
+		/usr/sbin/miniupnpd -f /etc/miniupnpd.conf "$@" || exit 1
+		sleep 1
+		pid=$(cat /var/run/miniupnpd.pid 2>/dev/null)
+		[ -n "$pid" ] || { echo "miniupnpd did not start" >&2; exit 1; }
+	else
+		/usr/sbin/miniupnpd -d -f /etc/miniupnpd.conf "$@" &
+		pid=$!
+	fi
+}
+restart=0
+trap 'kill "$pid" 2>/dev/null; while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done; exit 0' TERM INT
+trap 'restart=1; kill "$pid" 2>/dev/null' HUP
+# SIGUSR1 (the WAN address changed) is the daemon's: the driver sends it to the container
+trap 'kill -USR1 "$pid" 2>/dev/null' USR1
+start_daemon "$@"
+while :; do
+	# a signal ends the wait with 128 + its number: not an error under set -e
+	while kill -0 "$pid" 2>/dev/null; do sleep 1 & wait $! || :; done
+	[ "$restart" = 1 ] || exit 1
+	restart=0
+	start_daemon "$@"
+done
