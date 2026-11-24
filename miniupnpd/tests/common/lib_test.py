@@ -4005,7 +4005,12 @@ def pcp_flood_step(sock, address, spec, call_dir):
     """A PCP MAP of `port` (one nonce: the first creates it, the others renew it), sent as fast as
     `threads` sockets can for `seconds`, without waiting for the replies, so the daemon always has
     a request to answer; meanwhile each of `checks`, a router step, at its `at` seconds from the
-    start. For the lease file saves of a daemon which is never idle."""
+    start. For the lease file saves of a daemon which is never idle.
+
+    save_interval {command, first, min, max, count}: instead of checks, read the file of `command`
+    (a router cat: of a .mappings) every half second for the whole flood and note each new save
+    time of its header (unix=). The first save of the flood comes `first` seconds or more after
+    its start, the next ones `min` to `max` seconds apart, `count` of them at least."""
     client = client_address(sock, address)
     request = {"pcp": "MAP", "lifetime": spec.get("lifetime", 600), "protocol": spec.get("protocol", "tcp"),
                "internal_port": spec["port"], "suggested_external_port": spec["port"]}
@@ -4031,6 +4036,8 @@ def pcp_flood_step(sock, address, spec, call_dir):
     for thread in threads:
         thread.start()
     try:
+        if "save_interval" in spec:
+            check_save_interval(start, spec["seconds"], spec["save_interval"], call_dir)
         for check in spec.get("checks", ()):
             delay = start + check["at"] - time.monotonic()
             if delay > 0:
@@ -4043,6 +4050,30 @@ def pcp_flood_step(sock, address, spec, call_dir):
         stop.set()
         for thread in threads:
             thread.join()
+
+
+def lease_save_time(text):
+    """The save time (unix=) in the header of a lease file, or None."""
+    match = re.search(r"\bunix=(\d+)", text.split("\n", 1)[0])
+    return int(match.group(1)) if match else None
+
+
+def check_save_interval(start, seconds, spec, call_dir):
+    """The saves of a lease file during a flood: see pcp_flood_step. The router has the clock of
+    the client (Docker: one kernel)."""
+    start_unix = time.time() - (time.monotonic() - start)
+    before = lease_save_time(router_call(call_dir, spec["command"]))
+    saves = []     # unix= of each new save of the flood
+    while time.monotonic() < start + seconds:
+        save = lease_save_time(router_call(call_dir, spec["command"]))
+        if save is not None and save != before and (not saves or save != saves[-1]):
+            saves.append(save)
+        time.sleep(0.5)
+    assert len(saves) >= spec.get("count", 1), f"{len(saves)} saves in {seconds} s: {saves}"
+    assert saves[0] - start_unix >= spec["first"], \
+        f"the first save {saves[0] - start_unix:.1f} s after the start of the flood"
+    gaps = [later - earlier for earlier, later in zip(saves, saves[1:])]
+    assert all(spec["min"] <= gap <= spec["max"] for gap in gaps), f"saves {gaps} s apart"
 
 
 def daemon_url(address, path, https_port=None):

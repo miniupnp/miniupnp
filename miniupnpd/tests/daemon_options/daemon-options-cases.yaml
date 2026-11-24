@@ -1649,6 +1649,35 @@ sections:
       kind: steps
     description: A daemon which is never idle saves the lease files at the latest 10 seconds after the
       first change.
+  - name: lease-file-save-interval
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - lease_file=/var/lib/miniupnpd/flood.leases
+    request:
+      kind: option_steps
+      steps:
+      - sleep: 3
+      # never idle for 32 s: a save every 10 s, none in between
+      - pcp_flood:
+          port: 46421
+          nonce_hex: 2a2b2c2d2e2f303132333435
+          seconds: 32
+          threads: 4
+          save_interval:
+            command: cat:/var/lib/miniupnpd/flood.leases.mappings
+            # unix= is a whole second, and the daemon counts the 10 s in whole seconds
+            first: 7
+            min: 9
+            max: 11
+            count: 2
+    expect:
+      kind: steps
+    description: A daemon which is never idle saves the lease files every 10 seconds, and not in between
+      (the save time in the header of .mappings).
   - name: lease-file6-deprecated
     platform: linux
     protocol: daemon
