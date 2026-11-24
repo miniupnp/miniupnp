@@ -60,7 +60,7 @@ STDOBJS = miniupnpd.o upnphttp.o upnpdescgen.o upnpsoap.o \
           upnpevents.o upnputils.o getconnstatus.o \
           upnpstun.o getosversion.o \
           upnppinhole.o asyncsendto.o portinuse.o \
-          lease_table.o outgoing_table.o memmap.o fwsync.o
+          lease_table.o outgoing_table.o memmap.o fwsync.o lease_files.o
 OS_OBJS = getifstats.o ifacewatcher.o getroute.o
 PFOBJS = obsdrdr.o pfpinhole.o
 IPFOBJS = ipfrdr.o
@@ -118,6 +118,7 @@ TESTMEMMAPOBJS = testmemmap.o memmap.o lease_table.o outgoing_table.o
 TESTPINHOLEOBJS = testpinhole.o upnppinhole.o memmap.o lease_table.o \
                   outgoing_table.o
 TESTFWSYNCOBJS = testfwsync.o fwsync.o testfwfake.o
+TESTLEASEFILESOBJS = testleasefiles.o lease_files.o lease_table.o outgoing_table.o
 TESTCALLERSOBJS = testcallers.o testfwfake.o upnpredirect.o upnppinhole.o memmap.o lease_table.o outgoing_table.o fwsync.o upnpglobalvars.o upnputils.o upnppermissions.o \
                   natpmp.o asyncsendto.o getifaddr.o
 
@@ -127,7 +128,7 @@ EXECUTABLES = miniupnpd testupnpdescgen testgetifstats \
               testportinuse testssdppktgen testminissdp \
               testifacewatcher teststun testupnphttp \
               testleasetable testoutgoingtable testmemmap testpinhole testfwsync \
-              testcallers
+              testcallers testleasefiles
 
 .if $(OSNAME) != "Darwin"
 LIBS += -lkvm
@@ -164,10 +165,11 @@ clean:
 	$(RM) $(TESTLEASETABLEOBJS)
 	$(RM) $(TESTOUTGOINGTABLEOBJS)
 	$(RM) testmemmap.o testpinhole.o testfwsync.o testfwfake.o testcallers.o
+	$(RM) $(TESTLEASEFILESOBJS) $(TESTCALLERSOBJS)
 	$(RM) testssdppktgen.o
 	$(RM) validateupnppermissions validategetifaddr validatessdppktgen validateupnphttp
 	$(RM) validateleasetable validateoutgoingtable validatememmap validatepinhole validatefwsync \
-	      validatecallers
+	      validatecallers validateleasefiles
 
 install:	miniupnpd
 	$(STRIP) miniupnpd
@@ -181,7 +183,7 @@ install:	miniupnpd
 
 check:  validateupnppermissions validategetifaddr validatessdppktgen \
         validateupnphttp validateleasetable validateoutgoingtable validatememmap \
-        validatepinhole validatefwsync validatecallers
+        validatepinhole validatefwsync validatecallers validateleasefiles
 
 validateupnppermissions: $(SRCDIR)/testupnppermissions.sh testupnppermissions
 	$(SRCDIR)/testupnppermissions.sh
@@ -216,6 +218,10 @@ validatepinhole:	testpinhole
 
 validatefwsync:	testfwsync
 	./testfwsync
+	touch $@
+
+validateleasefiles:	testleasefiles
+	./testleasefiles
 	touch $@
 
 validatecallers:	testcallers
@@ -287,6 +293,9 @@ testpinhole:	config.h $(TESTPINHOLEOBJS)
 
 testfwsync:	config.h $(TESTFWSYNCOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTFWSYNCOBJS)
+
+testleasefiles:	config.h $(TESTLEASEFILESOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(TESTLEASEFILESOBJS) $(LIBS)
 
 testcallers:	config.h $(TESTCALLERSOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(TESTCALLERSOBJS) $(LIBS)

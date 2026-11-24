@@ -41,7 +41,9 @@ validatememmap
 testfwsync
 validatefwsync
 testcallers
+testleasefiles
 validatecallers
+validateleasefiles
 dox/
 bsdmake.inc
 upnpstun

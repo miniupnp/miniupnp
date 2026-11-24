@@ -232,6 +232,7 @@ outgoing_table_dump(FILE * f)
 {
 	const struct outgoing_entry * b;
 	char iaddr[INET6_ADDRSTRLEN], eaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN];
+	char nonce[2 * MAP_NONCE_LEN + 1];
 	int i;
 
 	fprintf(f, "# outgoing table: %u bindings, %u peers\n", count, peer_count);
@@ -240,11 +241,9 @@ outgoing_table_dump(FILE * f)
 			iaddr[0] = '\0';
 		if(map_ntop(b->family, &b->eaddr, eaddr, sizeof(eaddr)) == NULL)
 			eaddr[0] = '\0';
-		fprintf(f, "PEER %s %s [%s]:%hu -> [%s]:%hu nonce=",
-		        b->family == AF_INET ? "IPv4" : "IPv6", proto_name(b->proto),
-		        iaddr, b->iport, eaddr, b->eport);
-		for(i = 0; i < MAP_NONCE_LEN; i++)
-			fprintf(f, "%02x", b->nonce[i]);
+		fprintf(f, "PEER %s %s [%s]:%hu -> [%s]:%hu nonce=%s",
+		        map_family_name(b->family), proto_name(b->proto),
+		        iaddr, b->iport, eaddr, b->eport, map_nonce_ntop(b->nonce, nonce));
 		if(b->label != NULL)
 			fprintf(f, " label=\"%s\"", b->label);
 		fputc('\n', f);

@@ -48,6 +48,43 @@ map_kind_name(int kind)
 /* the size of a PCP mapping nonce (RFC 6887 section 11.1) */
 #define MAP_NONCE_LEN	12
 
+/* the name of a family, for the logs and the lease files */
+static inline const char *
+map_family_name(int family)
+{
+	return family == AF_INET ? "IPv4" : "IPv6";
+}
+
+/* A PCP nonce as the 24 hex digits of the wire, in buf of 2 * MAP_NONCE_LEN
+ * + 1 bytes. buf. */
+static inline const char *
+map_nonce_ntop(const unsigned char * nonce, char * buf)
+{
+	static const char hex[] = "0123456789abcdef";
+	int i;
+	for(i = 0; i < MAP_NONCE_LEN; i++) {
+		buf[2 * i] = hex[nonce[i] >> 4];
+		buf[2 * i + 1] = hex[nonce[i] & 15];
+	}
+	buf[2 * MAP_NONCE_LEN] = '\0';
+	return buf;
+}
+
+/* A prefix length of a remote on the 128 bits of a request (IPv4 as
+ * ::ffff:a.b.c.d) as the family counts it, and back. 0 is any host in
+ * both. */
+static inline int
+map_prefix_ntop(int family, int prefix)
+{
+	return family == AF_INET ? (prefix >= 96 ? prefix - 96 : 0) : prefix;
+}
+
+static inline int
+map_prefix_pton(int family, int prefix)
+{
+	return family == AF_INET && prefix > 0 ? prefix + 96 : prefix;
+}
+
 /* bits of lease_entry.flags */
 #define MAP_PREFER_FAILURE	0x01	/* the suggested external port or none:
 					 * PCP PREFER_FAILURE, UPnP AddPortMapping */

@@ -34,6 +34,8 @@ testfwsync:	testfwsync.o fwsync.o testfwfake.o
 testcallers:	testcallers.o testfwfake.o upnpredirect.o upnppinhole.o memmap.o lease_table.o outgoing_table.o fwsync.o upnpglobalvars.o upnputils.o upnppermissions.o \
 		natpmp.o asyncsendto.o getifaddr.o
 
+testleasefiles:	testleasefiles.o lease_files.o lease_table.o outgoing_table.o
+
 testupnphttp:	testupnphttp.o upnphttp.o upnputils.o getroute.o \
 	getosversion.o
 

@@ -77,6 +77,7 @@
 #include "minissdp.h"
 #include "upnpredirect.h"
 #include "memmap.h"
+#include "lease_files.h"
 #include "upnppinhole.h"
 #include "upnpstun.h"
 #include "miniupnpdtypes.h"
@@ -138,6 +139,7 @@ volatile sig_atomic_t should_rewrite_leasefile = 0;
 #endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
 #ifndef TOMATO
 static volatile sig_atomic_t should_dump_tables = 0;
+static volatile sig_atomic_t should_save_leases = 0;
 #endif /* !TOMATO */
 
 #ifdef TOMATO
@@ -837,12 +839,13 @@ sigusr1(int sig)
 
 #ifndef TOMATO
 /* Handler for the SIGUSR2 signal: write the tables to table_dump_file, their
- * sizes to table_stats_file, and rewrite lease_file */
+ * sizes to table_stats_file, and the lease files */
 static void
 sigusr2(int sig)
 {
 	UNUSED(sig);
 	should_dump_tables = 1;
+	should_save_leases = 1;
 #if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 	should_rewrite_leasefile = 1;
 #endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
@@ -2341,6 +2344,8 @@ main(int argc, char * * argv)
 	fd_set readset;	/* for select() */
 	fd_set writeset;
 	struct timeval timeout, timeofday, lasttimeofday = {0, 0};
+	int nready;
+	int idle = 0;	/* the last select() had nothing to answer */
 	int current_notify_interval;	/* with random variation */
 	int max_fd = -1;
 #ifdef USE_MINIUPNPDCTL
@@ -2812,6 +2817,11 @@ main(int argc, char * * argv)
 				             nextruletoclean_timestamp);
 			should_dump_tables = 0;
 		}
+		if(should_save_leases)
+		{
+			lease_files_flush();
+			should_save_leases = 0;
+		}
 #endif /* !TOMATO */
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
@@ -3080,7 +3090,12 @@ main(int argc, char * * argv)
 			}
 		}
 
-		if(select(max_fd+1, &readset, &writeset, 0, &timeout) < 0)
+		/* the lease files are written when the daemon is idle */
+		lease_files_poll(idle, &timeout);
+
+		nready = select(max_fd+1, &readset, &writeset, 0, &timeout);
+		idle = (nready == 0);
+		if(nready < 0)
 		{
 			if(quitting) goto shutdown;
 #ifdef TOMATO
@@ -3397,6 +3412,7 @@ shutdown:
 #ifdef TOMATO
 	tomato_save("/etc/upnp/data");
 #endif	/* TOMATO */
+	lease_files_flush();
 #if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 	lease_file_rewrite();
 #endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */

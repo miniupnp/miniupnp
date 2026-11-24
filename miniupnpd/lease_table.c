@@ -757,6 +757,7 @@ dump_row(struct lease_entry * e, void * arg)
 {
 	FILE * f = arg;
 	char iaddr[INET6_ADDRSTRLEN], eaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN];
+	char nonce[2 * MAP_NONCE_LEN + 1];
 	int i;
 
 	if(map_ntop(e->family, &e->iaddr, iaddr, sizeof(iaddr)) == NULL)
@@ -764,14 +765,11 @@ dump_row(struct lease_entry * e, void * arg)
 	if(map_ntop(e->family, &e->eaddr, eaddr, sizeof(eaddr)) == NULL)
 		eaddr[0] = '\0';
 	fprintf(f, "id=%llu %s %s %s [%s]:%hu <- [%s]:%hu expiry=%u",
-	        e->id, map_kind_name(e->kind), e->family == AF_INET ? "IPv4" : "IPv6",
+	        e->id, map_kind_name(e->kind), map_family_name(e->family),
 	        proto_name(e->proto), iaddr, e->iport, eaddr, e->eport,
 	        e->timestamp);
-	if(e->kind == MAP_KIND_PCP) {
-		fprintf(f, " nonce=");
-		for(i = 0; i < MAP_NONCE_LEN; i++)
-			fprintf(f, "%02x", e->nonce[i]);
-	}
+	if(e->kind == MAP_KIND_PCP)
+		fprintf(f, " nonce=%s", map_nonce_ntop(e->nonce, nonce));
 	if(e->fw_partial)
 		fprintf(f, " fw_partial");
 	if(e->retry != 0)
