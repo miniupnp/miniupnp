@@ -1,10 +1,10 @@
 # Daemon options Test Status
 
-One column per platform; a run updates only its own platform's column (raw results: `/tmp/pcp-results/status-data.json`).
+One column per platform; a run updates only its own platform's column (raw results: `.tmp/tests/daemon_options/status-data.json`).
 
 ## Platforms
 
-- **linux**: **88 PASS**, **1 XFAIL**, **3 FAIL**, **0 SKIP** (updated 2026-11-12T08:51:05+00:00; ipv4: daemon `dev/daemon-options-tests`, router `Linux nftables (Docker)`; ipv6: daemon `dev/daemon-options-tests`, router `Linux nftables (Docker)`)
+- **linux**: **90 PASS**, **1 XFAIL**, **1 FAIL**, **0 SKIP** (updated 2026-11-24T11:46:11+00:00; ipv4: daemon `pr/memmap-sync`, router `Linux nftables (Docker)`; ipv6: daemon `pr/memmap-sync`, router `Linux nftables (Docker)`)
 - **freebsd**: **82 PASS**, **1 XFAIL**, **8 FAIL**, **0 SKIP** (updated 2026-11-12T09:44:33+00:00; ipv4: daemon `dev/daemon-options-tests`, router `FreeBSD pf`; ipv6: daemon `dev/daemon-options-tests`, router `FreeBSD pf`)
 - **openbsd**: **82 PASS**, **1 XFAIL**, **8 FAIL**, **0 SKIP** (updated 2026-11-13T08:53:58+00:00; ipv4: daemon `test/openbsd-pf`, router `OpenBSD pf`; ipv6: daemon `test/openbsd-pf`, router `OpenBSD pf`)
 
@@ -155,7 +155,7 @@ notify_interval, system_uptime, and the clean_ruleset pair.
 | ssdp-off-with-upnp-off | daemon | ipv4 | PASS | PASS | PASS | [enable_upnp=no; from lan] With UPnP off there are no NOTIFYs. |
 | system-uptime-off | daemon | ipv4 | PASS | PASS | PASS | [system_uptime=no; from lan] The NAT-PMP epoch counts from the start of the daemon. |
 | system-uptime-on | daemon | ipv4 | PASS | — | — | [system_uptime=yes; from lan] system_uptime=yes makes the epoch the uptime of the system. |
-| clean-ruleset-removes-idle | daemon | ipv4 | FAIL | PASS | PASS | linux: step 8: mapping 46321 is not absent: {'_element': 'GetSpecificPortMappingEntryResponse', 'NewInternalPort': '46321', 'NewInternalClient': '172.28.77.2', 'NewEnabled': '1', 'NewPortMappingDescription': 'pcp-e2e upnp', 'NewLeaseDuration': '3591'} |
+| clean-ruleset-removes-idle | daemon | ipv4 | PASS | PASS | PASS | [enable_upnp=yes; http_port=5000; clean_ruleset_interval=2; clean_ruleset_threshold=0; from lan] clean_ruleset_interval removes a mapping without traffic. |
 | clean-ruleset-threshold-keeps | daemon | ipv4 | PASS | PASS | PASS | [enable_upnp=yes; http_port=5000; clean_ruleset_interval=2; clean_ruleset_threshold=10; from lan] Below clean_ruleset_threshold rules, nothing is removed. |
 | clean-ruleset-off-keeps | daemon | ipv4 | PASS | PASS | PASS | [enable_upnp=yes; http_port=5000; clean_ruleset_interval=0; from lan] clean_ruleset_interval=0 removes nothing. |
 
@@ -169,7 +169,7 @@ A reload of the firewall removes the rules and the daemon is not told. A renewal
 | firewall-lost-pcp-renew | daemon | ipv4 | PASS | PASS | PASS | [enable_upnp=yes; http_port=5000; lease_file=/var/lib/miniupnpd/firewall.leases; from lan] A PCP renewal adds rules which were lost. |
 | firewall-lost-natpmp-renew | daemon | ipv4 | PASS | PASS | PASS | [enable_upnp=yes; http_port=5000; lease_file=/var/lib/miniupnpd/firewall.leases; from lan] A NAT-PMP renewal adds rules which were lost. |
 | firewall-lost-after-restart | daemon | ipv4 | PASS | PASS | PASS | [enable_upnp=yes; http_port=5000; lease_file=/var/lib/miniupnpd/firewall.leases; from lan] A rule restored at startup is checked like one added by a request. |
-| firewall-lost-pinhole-update | daemon | ipv6 | FAIL | FAIL | FAIL | linux: step 3: UpdatePinhole: HTTP 500, SoapFault(code=704, description='NoSuchEntry'); freebsd: step 3: UpdatePinhole: HTTP 500, SoapFault(code=704, description='NoSuchEntry'); openbsd: step 3: UpdatePinhole: HTTP 500, SoapFault(code=704, description='NoSuchEntry') |
+| firewall-lost-pinhole-update | daemon | ipv6 | PASS | FAIL | FAIL | freebsd: step 3: UpdatePinhole: HTTP 500, SoapFault(code=704, description='NoSuchEntry'); openbsd: step 3: UpdatePinhole: HTTP 500, SoapFault(code=704, description='NoSuchEntry') |
 | firewall-lost-no-request | daemon | ipv4 | XFAIL | XFAIL | XFAIL | linux: step 5: ruleset: '46346' not found in: 'iniupnpd {\n\t}\n\n\tchain prerouting {\n\t\tcomment "created by miniupnpd init script"\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tjump prerouting_miniupnpd\n\t}\n\n\tchain postrouting {\n\t\tcomment "created by miniupnpd init script"\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tjump postrouting_miniupnpd\n\t}\n\n\tchain prerouting_miniupnpd {\n\t}\n\n\tchain postrouting_miniupnpd {\n\t}\n}\n'; expected: miniupnpd re-adds a lost rule only when a client renews or updates the mapping; freebsd: step 5: ruleset: '46346' not found in: ''; expected: miniupnpd re-adds a lost rule only when a client renews or updates the mapping; openbsd: step 5: ruleset: '46346' not found in: ''; expected: miniupnpd re-adds a lost rule only when a client renews or updates the mapping |
 
 ### Lease files
