@@ -14,6 +14,36 @@
  *				binding (PCP PEER)
  *   <lease_file>.checksum	the size and CRC-32 of each of them
  *
+ * Each file starts with its header and the names of its fields, then has
+ * one line per row, the fields separated by |:
+ *   LEASE-MAPPINGS 1 last_id=3 boot_id=b64c... monotonic=124683 unix=1795546350
+ *   id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label
+ *   1|PCP-M|IPv4|UDP|43333|43333|172.28.12.2|6.18.12.1|a1a2...|1795546343|1795546943|wan0|0|NA
+ * The header is the kind of file and its version, then name=value words:
+ * last_id, the highest id of the table at the save; monotonic and unix,
+ * the two clocks of the save; in .mappings also boot_id. A reader finds a
+ * field by its name and skips the fields and words it does not know, so a
+ * later version can add fields. NA is "does not apply".
+ *
+ *   .mappings	id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|
+ *		expiry|ifname|filters|label
+ *	kind UPNP, NAT-PMP or PCP-M; proto TCP, UDP, UDPLITE or its number;
+ *	nonce the PCP nonce, 24 hex digits as on the wire; since and expiry
+ *	unix time, expiry 0 for none; eaddr the external address the client
+ *	was told; ifname the external interface (for tools, not read back);
+ *	filters the number of its lines in .filters; label the text of the
+ *	client, with \\, \|, \n, \r and \xHH escaped (a label NA is \x4EA).
+ *   .filters	map|raddr|rprefix|rport|uid
+ *	a remote a row lets in: a UPnP RemoteHost, a pinhole of an IPv6 map
+ *	with its UniqueID. map is the id of the row; rprefix is in its family.
+ *   .outgoing	id|family|proto|iaddr|iport|eaddr|eport|nonce|ifname|peers|label
+ *	peers is the number of its lines in .outgoing.peers.
+ *   .outgoing.peers	binding|raddr|rport|since|expiry
+ *	binding is the id of its line in .outgoing.
+ *   .checksum	file|bytes|crc32
+ *	the size and CRC-32 (that of zlib and cksum -a crc32b) of each file,
+ *	0|00000000 for none; see lease_files.c for its two lines per file.
+ *
  * They are written from the tables only, never from the firewall, and no
  * request writes them. The main loop calls lease_files_poll(), which writes
  * the changed parts when the daemon is idle, at most every
@@ -63,19 +93,51 @@ extern int lease_files_ignore_checksum;
  * r->map, each peer of .outgoing.peers with its binding of .outgoing to r->peer (a
  * binding of one peer each), then call r->done. The files are trusted: a line is
  * only skipped (and logged) when it cannot be read, is expired, or is a
- * row of another save (a crash between the renames). 1 if the files were
+ * row of another save (a crash between the renames: its count of filters
+ * or peers does not match). An expired peer is left out, and its binding
+ * comes back with the others. 1 if the files were
  * read, 2 if lease_file_restore keeps them from being restored (no, or boot
  * after a boot), 0 if there are none (no .mappings), or -1 if a file is not one this
  * daemon can read, or does not match the size and CRC-32 of .checksum:
- * every file of the set is renamed to <name>.bad, and nothing is read.
+ * every file of the set is renamed to <name>.bad, and nothing is read
+ * (--lease-file-ignore-checksum reads it, see lease_files_ignore_checksum).
  *
- * The expiry of a line is unix time. After a daemon restart in the same
- * boot it is read on the monotonic clock of the save instead, which the
- * header of .mappings has. After a new boot with the clock behind the save
- * (no real-time clock, NTP not done yet) the restore waits: r is kept, and
- * lease_files_poll() reads the rows once the clock has passed the save, or
- * after a few minutes with the lease each row had left at the save. No save
- * runs until then, and a mapping a client made meanwhile keeps its port.
+ * Two clocks: the table keeps each expiry on upnp_time(), the time since
+ * boot, which starts over at each boot. The files keep unix time:
+ * - a time since boot means nothing after the next boot;
+ * - the files are saved only when something changes: a time since boot
+ *   becomes a date through the clocks of the last save, and that date
+ *   drifts once NTP steps or slews the wall clock after it;
+ * - a tool which reads the files sees dates as they are, with no sum on
+ *   the clocks of the header;
+ * - since and expiry of a row are on one clock: expiry - since is the
+ *   length of the lease.
+ * A row gets its expiry on upnp_time() back by one of:
+ *
+ *   restart    expiry on upnp_time()                         wall clock
+ *   same boot  monotonic of the save                         not needed
+ *              + (line expiry - unix of the save)
+ *   new boot   upnp_time() + (line expiry - wall clock now)  needed
+ *
+ * monotonic and unix of the save are in the header of .mappings.
+ *
+ * After a new boot a router with no real-time clock has its wall clock in
+ * the past (1970, or its firmware date) until NTP sets it. A lease of 600 s
+ * saved on 2026-11-24 and read with the clock at 2024-01-01 has about 2.9
+ * years left. The rows cannot be added at once and fixed later: the daemon
+ * is not told when NTP steps the clock, and a lease which ended while the
+ * router was off would get its port opened again.
+ *
+ * So after a new boot with the clock behind the save the restore waits:
+ * - r is kept, and lease_files_poll() reads the rows once the wall clock
+ *   has passed the save; it checks the clock at least every
+ *   LEASE_FILES_CLOCK_CHECK (5) seconds;
+ * - if the clock is still behind after LEASE_FILES_CLOCK_WAIT (300)
+ *   seconds, the rows are restored anyway, each with the lease it had left
+ *   when the files were last saved: the time the router was off is not
+ *   counted;
+ * - no save runs until then, and a mapping a client made meanwhile keeps
+ *   its port.
  * Then 1 is returned at once. */
 struct lease_files_restore {
 	lease_files_map_fn map;

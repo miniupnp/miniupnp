@@ -5,13 +5,7 @@
 
 /* The lease files: the tables of the daemon, kept on disk. See lease_files.h.
  *
- * Each file starts with its header and the names of its fields:
- *   LEASE-MAPPINGS 1 last_id=42
- *   id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label
- * then one line per row. A reader finds a field by its name, so a later
- * version can add fields. A field which does not apply is NA. The header
- * goes on with name=value words; a reader skips those it does not know.
- * last_id is the highest id the table of the file had given at the save.
+ * The format of the files is in lease_files.h.
  *
  * A line of .filters names its row by the id of the row, and the filters
  * field of .mappings counts its lines. In the same way a line of
