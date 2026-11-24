@@ -4,9 +4,10 @@
 # container for IPv4 and IPv6. The results go into status.md (columns linux-igd2, linux-igd2-strict); the raw
 # data, the logs and the daemon's state files of each run into .tmp/tests/upnp_wire/ of the repository.
 #
-#   run-docker.sh [igd1|igd2|igd1-strict|igd2-strict|all] [--case NAME]...
+#   run-docker.sh [--base|--strict] [--igd1] [--case NAME]...
 #
-# Without a build it runs igd2 and igd2-strict. The IGDv1 builds run only when named (or with all).
+# One call runs both builds: every case on igd2, then the strict-path cases on igd2-strict. --base runs
+# only igd2, --strict only igd2-strict. --igd1 runs the IGDv1 builds (igd1, igd1-strict) instead.
 #
 # A case that needs a daemon restart asks this script for it (router_call restart). UPNP_WIRE_SLOT=N picks a
 # slot of e2e_address_plan for the LAN; by default the first free one, so runs go side by side.
@@ -28,18 +29,22 @@ EXECUTED=0
 . "$ROOT/miniupnpd/tests/common/e2e_lib.sh"
 e2e_timestamp_output "$@"
 
-BUILDS=
+phases='' version=igd2
 args=$#
 while [ "$args" -gt 0 ]; do
   argument=$1; shift; args=$((args - 1))
   case "$argument" in
-    igd1|igd2|igd1-strict|igd2-strict) BUILDS="$BUILDS $argument" ;;
-    all) BUILDS="igd1 igd2 igd1-strict igd2-strict" ;;
+    --base) phases="$phases base" ;;
+    --strict) phases="$phases strict" ;;
+    --igd1) version=igd1 ;;
     *) set -- "$@" "$argument" ;;
   esac
 done
 e2e_parse_args "$@"
-[ -n "$BUILDS" ] || BUILDS="igd2 igd2-strict"
+BUILDS=
+for phase in ${phases:-base strict}; do
+  case "$phase" in base) BUILDS="$BUILDS $version" ;; strict) BUILDS="$BUILDS $version-strict" ;; esac
+done
 command -v "$DOCKER" >/dev/null 2>&1 || { echo "Docker is required." >&2; exit 2; }
 e2e_self_test
 E2E_RUNNER=run_upnp_wire_cases.py

@@ -17,15 +17,15 @@ things:
 
 A `-strict` run (`igd2-strict`, `igd1-strict`) has only the `requires: [strict]` cases and the cases marked `strict_path: true`, whose
 requests take a path `UPNP_STRICT` changes. Every other case gives the same result in both builds, so it runs
-on `igd2` (or `igd1`) only.
+on `igd2` (or `igd1`) only, and the `-strict` columns list only the strict-build cases.
 
 ## Running
 
-    sh miniupnpd/tests/upnp_wire/run-docker.sh            # the IGDv2 builds: igd2, igd2-strict
-    sh miniupnpd/tests/upnp_wire/run-docker.sh igd2 --case uda11-4.1.3-must-renew
-    sh miniupnpd/tests/upnp_wire/run-docker.sh all        # also the IGDv1 builds: igd1, igd1-strict
+    sh miniupnpd/tests/upnp_wire/run-docker.sh            # both builds: igd2, then igd2-strict
+    sh miniupnpd/tests/upnp_wire/run-docker.sh --base --case uda11-4.1.3-must-renew   # igd2 only (--strict: igd2-strict only)
+    sh miniupnpd/tests/upnp_wire/run-docker.sh --igd1     # the IGDv1 builds instead: igd1, then igd1-strict
 
-The IGDv1 builds (`igd1`, `igd1-strict`) run only when named, or with `all`.
+The IGDv1 builds (`igd1`, `igd1-strict`) run only with `--igd1`, on Docker.
 
 `run-docker.sh` compiles one daemon per build in the shared tools image (`e2e_build_daemon`,
 `.tmp/tests/daemon`): `igd1` is the default build, `igd2` adds `--igd2`, and both have `--ipv6 --leasefile`. For each
@@ -48,21 +48,23 @@ them are skipped.
 
 ## On FreeBSD
 
-    sh miniupnpd/tests/upnp_wire/run-freebsd.sh [--slot N] [--case NAME]...
+    sh miniupnpd/tests/upnp_wire/run-freebsd.sh [--base|--strict] [--slot N] [--case NAME]...
 
 `run-freebsd.sh` runs the suite on the FreeBSD pf router of `pcp_e2e/run-freebsd.sh` (its QEMU VM, slots,
-`--reuse`, `up`, `down`), with a daemon built with `--igd2`, and fills the `freebsd-igd2` column of
-[status.md](status.md). That driver sources `freebsd-hooks.sh` (`PCP_E2E_SUITE_HOOKS`), whose functions
-replace its PCP ones: this suite's settings, `restart_daemon` in the VM, and `run_family`, which runs
-`e2e_run_family` as the Docker driver does. The cases of the lease file SKIP, as the file is in the VM.
+`--reuse`, `up`, `down`) in the same two phases as `run-docker.sh`, and fills the `freebsd-igd2` and
+`freebsd-igd2-strict` columns of [status.md](status.md). That driver sources `freebsd-hooks.sh`
+(`PCP_E2E_SUITE_HOOKS`), whose functions replace its PCP ones: this suite's settings, `enter_phase`,
+which builds the daemon again with `--strict` in the VM and starts it from a clean state for the
+igd2-strict phase, `restart_daemon` in the VM, and `run_family`, which runs `e2e_run_family` as the
+Docker driver does. The cases of the lease file SKIP, as the file is in the VM.
 
 ## On OpenBSD
 
-    sh miniupnpd/tests/upnp_wire/run-openbsd.sh [--slot N] [--case NAME]...
+    sh miniupnpd/tests/upnp_wire/run-openbsd.sh [--base|--strict] [--slot N] [--case NAME]...
 
 `run-openbsd.sh` is `run-freebsd.sh` with the OpenBSD pf router of `pcp_e2e/run-openbsd.sh` (the same
 `pf-router.sh`, slots and options; `PCP_TEST_OPENBSD_VERSION` picks the release, default 8.0). It fills
-the `openbsd-igd2` column of [status.md](status.md).
+the `openbsd-igd2` and `openbsd-igd2-strict` columns of [status.md](status.md).
 
 ## The corpus
 

@@ -528,9 +528,6 @@ if [ "$COMMAND" = up ]; then
   exit 0
 fi
 
-RESULTS_FILE=$RUN_DIR/results.tsv
-: > "$RESULTS_FILE"
-
 snapshot_daemon_state() {
   {
     echo "Snapshot time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -654,6 +651,12 @@ run_restart_check() {
   fi
 }
 
+# The phases of the run, one daemon build and one status column each. A suite with more builds
+# sets E2E_PHASES in its hooks and replaces enter_phase PHASE, which builds and starts the daemon
+# of the phase and sets its E2E_PLATFORM and RUN_DIR (upnp_wire: igd2, then igd2-strict).
+E2E_PHASES=default
+enter_phase() { :; }
+
 # Another suite on this fixture (upnp_e2e/run-freebsd.sh): a file that replaces the functions above.
 if [ -n "${PCP_E2E_SUITE_HOOKS:-}" ]; then
   # shellcheck disable=SC1090
@@ -673,15 +676,25 @@ if [ "${PCP_E2E_PF_MAKE:-0}" = 1 ]; then
   fi
 fi
 
-if [ "${PCP_E2E_ONLY_RESTART:-0}" != 1 ] && stage_on cases; then
-  run_family ipv4
-  run_family ipv6
-fi
-if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
-  run_restart_check
-fi
-if [ "${PCP_E2E_ONLY_RESTART:-0}" = 1 ]; then
-  exit "$STATUS"
-fi
-e2e_write_status "${RUN_DIR#"$ROOT"/}" "router=$ROUTER_NAME" "peers=Linux Docker"
+ALL_RESULTS=$RUN_DIR/results-all.tsv
+mkdir -p "$RUN_DIR"
+: > "$ALL_RESULTS"
+for phase in $E2E_PHASES; do
+  enter_phase "$phase"
+  RESULTS_FILE=$RUN_DIR/results.tsv
+  : > "$RESULTS_FILE"
+  if [ "${PCP_E2E_ONLY_RESTART:-0}" != 1 ] && stage_on cases; then
+    run_family ipv4
+    run_family ipv6
+  fi
+  if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
+    run_restart_check
+  fi
+  if [ "${PCP_E2E_ONLY_RESTART:-0}" = 1 ]; then
+    exit "$STATUS"
+  fi
+  e2e_write_report "${RUN_DIR#"$ROOT"/}" "router=$ROUTER_NAME" "peers=Linux Docker"
+  cat "$RESULTS_FILE" >> "$ALL_RESULTS"
+done
+e2e_check_selection "$ALL_RESULTS"
 exit "$STATUS"
