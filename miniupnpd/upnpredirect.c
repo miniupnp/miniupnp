@@ -291,7 +291,7 @@ int reload_from_lease_file(void)
 	time_t current_unix_time;
 #endif
 	char line[320];
-	int r, family;
+	int r;
 	struct lease_entry * req;
 	struct start_rule * rules;
 	int nrules;
@@ -385,7 +385,7 @@ int reload_from_lease_file(void)
 		if(req == NULL)
 			continue;
 		lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
-		if(map_pton(iaddr, &family, &req->iaddr) < 0 || family != AF_INET ||
+		if(map_ipv4_to_ipv6_af(iaddr, AF_INET, &req->iaddr) < 0 ||
 		   map_filter_set(&req->filters[0], rhost, 0) < 0) {
 			syslog(LOG_WARNING, "ignoring lease file line with an invalid address (%hu=>%s:%hu %s)",
 			       eport, iaddr, iport, proto);

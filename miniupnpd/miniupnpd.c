@@ -203,7 +203,6 @@ tomato_load(void)
 	char proto[4];
 	char iaddr[32];
 	char *a, *b;
-	int family;
 	struct lease_entry * req;
 
 	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
@@ -233,7 +232,7 @@ tomato_load(void)
 					if (req == NULL)
 						continue;
 					lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
-					if (map_pton(iaddr, &family, &req->iaddr) < 0 || family != AF_INET) {
+					if (map_ipv4_to_ipv6_af(iaddr, AF_INET, &req->iaddr) < 0) {
 						syslog(LOG_ERR, "inet_aton(%s) FAILED", iaddr);
 						lease_table_free(req);
 						continue;

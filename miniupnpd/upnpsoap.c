@@ -507,8 +507,6 @@ fill_port_request(struct lease_entry * req,
                   unsigned short eport, const char * protocol,
                   const char * desc, unsigned int leaseduration)
 {
-	int family;
-
 	lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
 	if(!map_any_host(r_host)) {
 		if(map_filter_set(&req->filters[0], r_host, 0) < 0)
@@ -518,7 +516,7 @@ fill_port_request(struct lease_entry * req,
 	/* int_ip as text, as upnp_redirect() took it: the empty
 	 * NewInternalClient of AddPortMapping gives clientaddr_str, which holds
 	 * the port too and is refused here */
-	if(map_pton(int_ip, &family, &req->iaddr) < 0 || family != AF_INET) {
+	if(map_ipv4_to_ipv6_af(int_ip, AF_INET, &req->iaddr) < 0) {
 		syslog(LOG_ERR, "inet_aton(%s) FAILED", int_ip);
 		return -1;
 	}
@@ -2005,7 +2003,6 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	struct NameValueParserData data;
 	char * rem_host, * rem_port, * int_ip, * int_port, * protocol, * leaseTime;
 	char int_ip_resolved[INET6_ADDRSTRLEN];
-	int family;
 	unsigned short iport, rport;
 	int ltime;
 	long proto;
@@ -2148,7 +2145,7 @@ AddPinhole(struct upnphttp * h, const char * action, const char * ns)
 	lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
 	if(map_filter_set(&req->filters[0], rem_host, rport) < 0 ||
 	   (req->filters[0].prefix != 0 && IN6_IS_ADDR_V4MAPPED(&req->filters[0].raddr)) ||
-	   map_pton(int_ip_resolved, &family, &req->iaddr) < 0 || family != AF_INET6)
+	   map_ipv4_to_ipv6_af(int_ip_resolved, AF_INET6, &req->iaddr) < 0)
 	{
 		lease_table_free(req);
 		SoapError(h, 402, "Invalid Args");

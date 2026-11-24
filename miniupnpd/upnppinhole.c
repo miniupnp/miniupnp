@@ -402,7 +402,7 @@ int reload_from_lease_file6(void)
 	time_t current_time;
 	time_t current_unix_time;
 	char line[128];
-	int r, family, line_uid;
+	int r, line_uid;
 	struct lease_entry * req;
 
 	if(!lease_file6) return -1;
@@ -494,7 +494,7 @@ int reload_from_lease_file6(void)
 			lease_table_free(req);
 			continue;
 		}
-		if (map_pton(int_client, &family, &req->iaddr) < 0 || family != AF_INET6) {
+		if (map_ipv4_to_ipv6_af(int_client, AF_INET6, &req->iaddr) < 0) {
 			syslog(LOG_WARNING, "ignoring lease file pinhole with invalid InternalClient: %s", int_client);
 			lease_table_free(req);
 			continue;
