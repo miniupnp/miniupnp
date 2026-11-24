@@ -958,13 +958,14 @@ def load_status_data(path):
     return {"version": 1, "platforms": {}}
 
 
-def merge_status(data, platform, family, run, results, known, keep_if_skipped=()):
+def merge_status(data, platform, family, run, results, known, keep_if_skipped=(), platform_cases=None):
     """Put the results of one run in the data of its platform.
 
     results: {case key: (status, detail)}; run: what the run was, shown in the platform's line;
     known: every case key of the corpus (the others are forgotten); keep_if_skipped: a SKIP whose
     detail starts like this does not replace an earlier result (a run without the fixture must not
-    wipe the result of one that had it)."""
+    wipe the result of one that had it); platform_cases: the case keys this platform runs (default:
+    every one), its results of other cases are forgotten."""
     entry = data["platforms"].setdefault(platform, {"results": {}})
     entry["updated"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
     entry.setdefault("runs", {})[family] = run
@@ -973,6 +974,10 @@ def merge_status(data, platform, family, run, results, known, keep_if_skipped=()
         if status == "SKIP" and key in family_results and detail.startswith(tuple(keep_if_skipped)):
             continue
         family_results[key] = [status, detail]
+    if platform_cases is not None:
+        for results_of_family in entry["results"].values():
+            for key in [key for key in results_of_family if key not in platform_cases]:
+                del results_of_family[key]
     for other in data["platforms"].values():
         for results_of_family in other["results"].values():
             for key in [key for key in results_of_family if key not in known]:
@@ -1040,7 +1045,7 @@ def render_status(title, data, data_path, sections, extra_lines=()):
 
 
 def write_status(path, title, suite, platform, family, run, results, sections, data_path=None, extra_lines=(),
-                 keep_if_skipped=()):
+                 keep_if_skipped=(), platform_cases=None):
     """Merge one run into the data of the suite (data_path, default status_data_path(suite)) and
     rewrite the report at `path` and the data."""
     data_path = data_path or status_data_path(suite)
@@ -1052,7 +1057,7 @@ def write_status(path, title, suite, platform, family, run, results, sections, d
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = load_status_data(data_path)
         known = {case_key(case) for section in sections for case in section["cases"]}
-        merge_status(data, platform, family, run, results, known, keep_if_skipped)
+        merge_status(data, platform, family, run, results, known, keep_if_skipped, platform_cases)
         report = render_status(title, data, data_path, sections, extra_lines)
         with open(data_path, "w", encoding="utf-8") as data_file:
             json.dump(data, data_file, indent=1)
@@ -1078,7 +1083,7 @@ def is_filtered_skip(status, detail):
 
 
 def write_status_report(path, title, suite, platform, family, run, sections, outcomes, data_path=None,
-                        extra_lines=(), keep_if_skipped=()):
+                        extra_lines=(), keep_if_skipped=(), platform_cases=None):
     """Merge the outcomes of one run of one address family into the per-platform results and rewrite the
     combined report (the format all the PCP tests share, write_status). outcomes: {(protocol, name):
     (status, detail)}; a case left out, or skipped only because the selection left it out, keeps its
@@ -1086,7 +1091,7 @@ def write_status_report(path, title, suite, platform, family, run, sections, out
     results = {f"{protocol}/{name}": outcome for (protocol, name), outcome in outcomes.items()
                if not is_filtered_skip(*outcome)}
     write_status(path, title, suite, platform, family, run, results, sections, data_path=data_path,
-                 extra_lines=extra_lines, keep_if_skipped=keep_if_skipped)
+                 extra_lines=extra_lines, keep_if_skipped=keep_if_skipped, platform_cases=platform_cases)
 
 
 def write_suite_report(args, title, suite, family, sections, outcomes, run=None, **options):
@@ -1109,9 +1114,10 @@ def write_results_tsv(path, family, cases, outcomes):
                 handle.write("\t".join((family, case["section"], case["name"], outcome[0], note, "")) + "\n")
 
 
-def write_driver_status(results_path, args, title, suite, sections):
+def write_driver_status(results_path, args, title, suite, sections, platform_cases=None):
     """Merge a results file (write_results_tsv) into the report, one address family at a time. Every
-    section is given, also the ones this run did not run, or their results would be forgotten."""
+    section is given, also the ones this run did not run, or their results would be forgotten.
+    platform_cases: merge_status's."""
     protocols = {case["name"]: case["protocol"] for section in sections for case in section["cases"]}
     outcomes = {}
     with open(results_path, encoding="utf-8") as handle:
@@ -1123,7 +1129,8 @@ def write_driver_status(results_path, args, title, suite, sections):
             outcomes.setdefault(family, {})[(protocols[name], name)] = (result, note)
     for family in sorted(outcomes):
         run = dict(key_value_pairs(args.run_info), cases=str(len(outcomes[family])))
-        write_suite_report(args, title, suite, family, sections, outcomes[family], run=run)
+        write_suite_report(args, title, suite, family, sections, outcomes[family], run=run,
+                           platform_cases=platform_cases)
 
 
 def check_report_columns(write_report, case, protocol, platforms=("linux", "freebsd")):

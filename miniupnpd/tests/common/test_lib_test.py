@@ -1115,6 +1115,13 @@ class StatusReportTests(unittest.TestCase):
         for name in names:
             self.assertIn(f'"{name}"', data)
 
+    def test_platform_cases_drop_the_other_results_of_that_platform_only(self):
+        for platform in ("linux", "linux-strict"):
+            self.write(platform, "ipv4", {"pcp/a": ("PASS", ""), "natpmp/b": ("FAIL", "old")})
+        report = self.write("linux-strict", "ipv4", {"pcp/a": ("PASS", "")}, platform_cases={"pcp/a"})
+        self.assertIn("| a | pcp | ipv4 | PASS | PASS |", report)
+        self.assertIn("| b | natpmp | ipv4 | FAIL | — |", report)
+
     def test_a_lock_file_of_another_user_does_not_stop_the_report(self):
         os.makedirs(os.path.dirname(self.data))
         with open(self.data + ".lock", "w", encoding="utf-8"):

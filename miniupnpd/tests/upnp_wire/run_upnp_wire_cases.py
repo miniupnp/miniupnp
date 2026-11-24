@@ -157,7 +157,11 @@ def missing_requirement(args):
 
 
 def write_report(corpus, results_path, args):
-    write_driver_status(results_path, args, TITLE, SUITE, report_sections(corpus))
+    """The -strict columns have only the cases of the strict build: a result an older run left for
+    another case is dropped."""
+    strict = ({f"upnp/{case['name']}" for case in flatten_cases(corpus) if on_strict_build(case)}
+              if args.platform.endswith("-strict") else None)
+    write_driver_status(results_path, args, TITLE, SUITE, report_sections(corpus), platform_cases=strict)
 
 
 def self_test(corpus):
