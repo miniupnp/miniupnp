@@ -35,8 +35,6 @@ get_pinhole_info(unsigned short uid,
                  unsigned int * timestamp,
                  u_int64_t * packets, u_int64_t * bytes);
 
-int get_pinhole_uid_by_index(int index);
-
 
 #endif /* ENABLE_UPNPPINHOLE */
 

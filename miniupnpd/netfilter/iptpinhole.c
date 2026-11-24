@@ -498,17 +498,6 @@ get_pinhole_info(unsigned short uid,
 	return 0;
 }
 
-int get_pinhole_uid_by_index(int index)
-{
-	struct pinhole_t * p;
-
-	for(p = pinhole_list.lh_first; p != NULL; p = p->entries.le_next)
-		if (!index--)
-			return p->uid;
-	return -1;
-}
-
-
 /* 1 if the chain has an ACCEPT rule of the key, 0 if not, -1 if it could
  * not be read */
 static int
@@ -624,21 +613,55 @@ get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * int_port, int * proto,
                     char * desc, int desclen)
 {
-	int uid = get_pinhole_uid_by_index(index);
-	if(uid < 0)
+	/* the chain, not the list: the list in memory does not have the
+	 * rules of an earlier run */
+	IP6TC_HANDLE h;
+	const struct ip6t_entry * e;
+	const struct ip6t_entry_match * match;
+	const struct ip6t_tcp * info;
+	int r = -1;
+
+	h = ip6tc_init("filter");
+	if(!h) {
+		syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
 		return -1;
-	/* get_pinhole_info() writes the remote only into a buffer which is not empty */
-	if(rem_host && rem_hostlen > 1) {
-		rem_host[0] = '?';
-		rem_host[1] = '\0';
 	}
-	if(get_pinhole_info((unsigned short)uid, rem_host, rem_hostlen, rem_port,
-	                    int_client, int_clientlen, int_port, proto, desc, desclen,
-	                    NULL, NULL, NULL) < 0)
+	if(!ip6tc_is_chain(miniupnpd_v6_filter_chain, h)) {
+		ip6tc_free(h);
 		return -1;
-	if(rem_host && strcmp(rem_host, "::") == 0)
-		rem_host[0] = '\0';
-	return 0;
+	}
+	for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
+	    e;
+	    e = ip6tc_next_rule(e, h)) {
+		/* a map6 rule matches a protocol and its ports */
+		if(e->ipv6.proto == 0 || e->target_offset <= sizeof(struct ip6t_entry))
+			continue;
+		if(index-- > 0)
+			continue;
+		match = (const struct ip6t_entry_match *)&e->elems;
+		info = (const struct ip6t_tcp *)&match->data;
+		if(rem_host && rem_hostlen > 0) {
+			if(IN6_IS_ADDR_UNSPECIFIED(&e->ipv6.src))
+				rem_host[0] = '\0';
+			else if(inet_ntop(AF_INET6, &e->ipv6.src, rem_host, rem_hostlen) == NULL)
+				break;
+		}
+		if(int_client &&
+		   inet_ntop(AF_INET6, &e->ipv6.dst, int_client, int_clientlen) == NULL)
+			break;
+		if(rem_port)
+			*rem_port = info->spts[0];
+		if(int_port)
+			*int_port = info->dpts[0];
+		if(proto)
+			*proto = e->ipv6.proto;
+		if(desc && desclen > 0)
+			desc[0] = '\0';	/* the rule holds none */
+		r = 0;
+		break;
+	}
+	ip6tc_free(h);
+	return r;
 }
 
 #endif /* ENABLE_UPNPPINHOLE */
