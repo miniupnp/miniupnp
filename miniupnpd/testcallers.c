@@ -411,6 +411,46 @@ test_reload_uid(void)
 #endif
 #endif
 
+#ifdef ENABLE_LEASEFILE
+/* A lease file line whose rule outlived the daemon takes that rule, found
+ * in the one walk of the rules at startup: no second rule. A line with no
+ * rule gets one. The fake lists the TCP rules of ports 5000 and 5001. */
+static void
+test_reload_adopt(void)
+{
+	const char * path = "testcallers.leases";
+	FILE * f;
+	unsigned long ts = (unsigned long)time(NULL) + 3600;
+	struct in6_addr iaddr;
+	int family;
+
+	lease_table_clear();
+	f = fopen(path, "w");
+	CHECK(f != NULL);
+	if(f == NULL)
+		return;
+#ifdef SUPPORT_REMOTEHOST
+	fprintf(f, "TCP:5001::192.168.1.10:5001:%lu:test\n", ts);
+	fprintf(f, "TCP:5002::192.168.1.10:5002:%lu:test\n", ts);
+#else
+	fprintf(f, "TCP:5001:192.168.1.10:5001:%lu:test\n", ts);
+	fprintf(f, "TCP:5002:192.168.1.10:5002:%lu:test\n", ts);
+#endif
+	fclose(f);
+	reset();
+	rule_iport = 5001;	/* the renewal of 5001 finds its rule by key */
+	lease_file = path;
+	CHECK(reload_from_lease_file() == 0);
+	lease_file = NULL;
+	remove(path);
+	CHECK(adds == 1);	/* 5002 only */
+	map_pton("192.168.1.10", &family, &iaddr);
+	CHECK(lease_table_find_entry(IPPROTO_TCP, AF_INET, &iaddr, 5001, 5001) != NULL);
+	CHECK(lease_table_find_entry(IPPROTO_TCP, AF_INET, &iaddr, 5002, 5002) != NULL);
+	lease_table_clear();
+}
+#endif
+
 #ifdef ENABLE_NATPMP
 /* A NAT-PMP request of a client for the internal port of its UPnP or PCP
  * mapping is refused (2, Not Authorized/Refused), and the mapping stays as
@@ -558,6 +598,9 @@ main(void)
 #ifdef ENABLE_LEASEFILE
 	test_reload_uid();
 #endif
+#endif
+#ifdef ENABLE_LEASEFILE
+	test_reload_adopt();
 #endif
 	test_drop_without_row();
 	lease_table_clear();

@@ -177,23 +177,90 @@ lease_file_remove(unsigned short eport, int proto)
 
 }
 
+/* A rule of the firewall at startup, as reload_adopt_rule() needs it */
+struct start_rule {
+	unsigned short eport;
+	unsigned short iport;
+	int proto;
+	struct in6_addr iaddr;
+	struct map_filter filter;
+	int nfilters;
+};
+
+static int
+start_rule_cmp(const void * a, const void * b)
+{
+	const struct start_rule * x = a, * y = b;
+
+	if(x->proto != y->proto)
+		return x->proto - y->proto;
+	return (int)x->eport - (int)y->eport;
+}
+
+/* The IPv4 port mappings of the firewall, sorted by protocol and eport, in
+ * one walk of its rules: a lookup per lease file line would read the rules
+ * once per line. *n is their number. NULL if there are none. */
+static struct start_rule *
+read_start_rules(int * n)
+{
+	struct lease_entry * e = lease_table_new(1);
+	struct start_rule * rules = NULL, * tmp;
+	int i, r, room = 0;
+
+	*n = 0;
+	if(e == NULL)
+		return NULL;
+	for(i = 0; (r = fw_map_rule_at(i, e)) >= 0; i++) {
+		if(r > 0)
+			continue;	/* no row can hold it */
+		if(*n == room) {
+			room = room ? 2 * room : 64;
+			tmp = realloc(rules, room * sizeof(*rules));
+			if(tmp == NULL)
+				break;
+			rules = tmp;
+		}
+		rules[*n].eport = e->eport;
+		rules[*n].iport = e->iport;
+		rules[*n].proto = e->proto;
+		rules[*n].iaddr = e->iaddr;
+		rules[*n].filter = e->filters[0];
+		rules[*n].nfilters = e->nfilters;
+		(*n)++;
+	}
+	lease_table_free(e);
+	if(rules != NULL)
+		qsort(rules, *n, sizeof(*rules), start_rule_cmp);
+	return rules;
+}
+
 /* At startup the table is empty, but the rule of a lease file line may have
  * outlived the daemon. It gets a row first, with the owner its description
  * gives, so that upnp_redirect() updates the rule and adds no second one.
- * One firewall read per line, at startup only. */
+ * rules: the n rules read_start_rules() found. */
 static void
-reload_adopt_rule(const struct lease_entry * line)
+reload_adopt_rule(const struct lease_entry * line,
+                  const struct start_rule * rules, int n)
 {
-	struct lease_entry * e = lease_table_new(1);
+	struct start_rule key;
+	const struct start_rule * rule;
+	struct lease_entry * e;
 
+	key.proto = line->proto;
+	key.eport = line->eport;
+	rule = n > 0 ? bsearch(&key, rules, n, sizeof(*rules), start_rule_cmp) : NULL;
+	if(rule == NULL)
+		return;
+	e = lease_table_new(1);
 	if(e == NULL)
 		return;
-	e->proto = line->proto;
-	e->eport = line->eport;
-	if(fw_read_map(e, NULL, 0) != 0) {
-		lease_table_free(e);
-		return;
-	}
+	e->family = AF_INET;
+	e->proto = rule->proto;
+	e->eport = rule->eport;
+	e->iport = rule->iport;
+	e->iaddr = rule->iaddr;
+	e->filters[0] = rule->filter;
+	e->nfilters = rule->nfilters;
 	e->eaddr = line->eaddr;
 	/* The owner and lease are those of the line: a backend may not keep
 	 * the description of its rules over a restart (iptables keeps them
@@ -226,6 +293,8 @@ int reload_from_lease_file(void)
 	char line[320];
 	int r, family;
 	struct lease_entry * req;
+	struct start_rule * rules;
+	int nrules;
 
 	if(!lease_file) return -1;
 	fd = fopen( lease_file, "r");
@@ -241,6 +310,7 @@ int reload_from_lease_file(void)
 #ifndef LEASEFILE_USE_REMAINING_TIME
 	current_unix_time = time(NULL);
 #endif
+	rules = read_start_rules(&nrules);
 	while(fgets(line, sizeof(line), fd)) {
 		syslog(LOG_DEBUG, "parsing lease file line '%s'", line);
 		proto = line;
@@ -330,7 +400,7 @@ int reload_from_lease_file(void)
 		req->nfilters = req->filters[0].prefix != 0 ? 1 : 0;
 		lease_entry_from_desc(req, desc);
 		req->timestamp = leaseduration > 0 ? timestamp : 0;
-		reload_adopt_rule(req);
+		reload_adopt_rule(req, rules, nrules);
 		r = upnp_redirect(req);
 		if(r != 0)
 			lease_table_free(req);	/* on success the lease table took it */
@@ -343,6 +413,7 @@ int reload_from_lease_file(void)
 			               desc, timestamp);
 		}
 	}
+	free(rules);
 	fclose(fd);
 
 	return 0;
