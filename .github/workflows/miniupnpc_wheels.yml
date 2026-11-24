@@ -154,12 +154,6 @@ jobs:
               matrix: arm
             python:
               matrix: '3.8'
-          - os:
-              matrix: macos
-            arch:
-              matrix: arm
-            python:
-              matrix: '3.9'
 
     env:
       FILE_NAME: ${{ matrix.os.file-name }}-${{ matrix.arch.file-name }}-${{ matrix.python.major-dot-minor }}
@@ -202,7 +196,7 @@ jobs:
       - name: Build and test
         if: matrix.os.matrix != 'windows'
         run: |
-          pip install cibuildwheel==2.23.0
+          pip install cibuildwheel==2.23.3
           cibuildwheel source --output-dir dist
 
       - name: Build (Windows)
@@ -229,12 +223,12 @@ jobs:
           directories: ${{ steps.create-test-venv.outputs.activate-venv-directories }}
 
       - name: Install
-        if: matrix.arch.matrix != 'arm'
+        if: ${{ !(matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm') }}
         run: |
           pip install --no-index --only-binary :all: --find-links dist miniupnpc
 
       - name: Import
-        if: matrix.arch.matrix != 'arm'
+        if: ${{ !(matrix.os.matrix == 'linux' && matrix.arch.matrix == 'arm') }}
         run: |
           python -c 'import miniupnpc; print(miniupnpc)'
 
