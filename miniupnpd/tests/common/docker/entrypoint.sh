@@ -70,7 +70,7 @@ fi
 # UDN when the cases expect one. The first enable_upnp=no of a file wins, so it is replaced.
 if [ "${PCP_TEST_ENABLE_UPNP:-no}" = yes ]; then
 	sed -i 's/^enable_upnp=no$/enable_upnp=yes/' /etc/miniupnpd.conf
-	printf '%s\n' http_port=5000 notify_interval=30 >> /etc/miniupnpd.conf
+	printf '%s\n' http_port=5000 notify_interval=10 >> /etc/miniupnpd.conf
 	if [ -n "${PCP_TEST_UPNP_UUID:-}" ]; then
 		echo "uuid=$PCP_TEST_UPNP_UUID" >> /etc/miniupnpd.conf
 	fi

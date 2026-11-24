@@ -2011,6 +2011,36 @@ class SsdpTests(unittest.TestCase):
         self.assertEqual(values["count"], 2)
         self.assertEqual(values["header.st"], "upnp:rootdevice")
 
+    def test_ssdp_enough_from_the_counts(self):
+        alive, byebye = ({"headers": {"nts": nts}} for nts in ("ssdp:alive", "ssdp:byebye"))
+        for expect in ({}, {"count": 0}, {"count": {"max": 2}}, {"count": "$n"}, {"count": 1, "count.x": 0}):
+            self.assertIsNone(lib_test.ssdp_enough(expect), expect)
+        enough = lib_test.ssdp_enough({"count": 2, "header.st": "x"})
+        self.assertEqual([enough([alive] * n) for n in (1, 2, 3)], [False, True, True])
+        self.assertIsNone(lib_test.ssdp_enough({"count": 2}, exact=False))
+        self.assertTrue(lib_test.ssdp_enough({"count": {"min": 2}}, exact=False)([alive, alive]))
+        enough = lib_test.ssdp_enough({"count.ssdp:alive": {"min": 2}, "count.ssdp:byebye": {"min": 1}})
+        self.assertFalse(enough([alive, alive]))
+        self.assertTrue(enough([alive, byebye, alive]))
+
+    def test_receive_ssdp_stops_after_enough_and_quiet(self):
+        """Once enough: a message within the quiet time still counts, and the wait ends well before
+        `seconds`."""
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server, \
+                socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
+            server.bind(("127.0.0.1", 0))
+            client.bind(("127.0.0.1", 0))
+            reply = b"HTTP/1.1 200 OK\r\nST: upnp:rootdevice\r\n\r\n"
+            server.sendto(reply, client.getsockname())
+            timer = threading.Timer(lib_test.SSDP_QUIET / 2, server.sendto, (reply, client.getsockname()))
+            timer.start()
+            started = time.monotonic()
+            messages = lib_test.receive_ssdp(client, 10, enough=lambda found: len(found) >= 1)
+            elapsed = time.monotonic() - started
+            timer.join()
+        self.assertEqual(len(messages), 2)
+        self.assertLess(elapsed, 3 * lib_test.SSDP_QUIET)
+
 
 class CannedTcpServer:
     """Accepts one connection, reads a request, sends the canned bytes (None: closes without answering)."""

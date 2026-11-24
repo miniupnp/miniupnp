@@ -13,5 +13,5 @@ export PCP_E2E_ARTIFACT_DIR="${PCP_E2E_ARTIFACT_DIR:-$HERE/../../../.tmp/tests/u
 export E2E_STATUS_FILE="${UPNP_WIRE_STATUS_FILE:-$HERE/status.md}"
 export E2E_STATUS_DATA_FILE="${UPNP_WIRE_STATUS_DATA_FILE:-$HERE/../../../.tmp/tests/upnp_wire/status-data.json}"
 export E2E_CONFIGURE_OPTIONS=--igd2
-export E2E_EXTRA_CONF="uuid=$(sed -n 's/^uuid: //p' "$HERE/upnp-wire-cases.yaml"),notify_interval=30"
+export E2E_EXTRA_CONF="uuid=$(sed -n 's/^uuid: //p' "$HERE/upnp-wire-cases.yaml"),notify_interval=10"
 exec sh "$HERE/../pcp_e2e/run-freebsd.sh" "$@"

@@ -30,7 +30,7 @@ The IGDv1 builds (`igd1`, `igd1-strict`) run only when named, or with `all`.
 `run-docker.sh` compiles one daemon per build in the shared tools image (`e2e_build_daemon`,
 `.tmp/tests/daemon`): `igd1` is the default build, `igd2` adds `--igd2`, and both have `--ipv6 --leasefile`. For each
 build it starts the daemon in UPnP mode (`PCP_TEST_ENABLE_UPNP=yes`: `enable_upnp=yes`, `http_port=5000`, the uuid
-of the corpus, `notify_interval=30`) on a LAN network (of a fixture slot: `UPNP_WIRE_SLOT`, by default the first free one), and runs
+of the corpus, `notify_interval=10`) on a LAN network (of a fixture slot: `UPNP_WIRE_SLOT`, by default the first free one), and runs
 `run_upnp_wire_cases.py` in a LAN client container once per address family. The results are merged into
 [status.md](status.md), one column per platform and build (`linux-igd2`, `linux-igd2-strict`). The raw results,
 the runner and daemon logs and the daemon's state directory of each run go to `.tmp/tests/upnp_wire/` in

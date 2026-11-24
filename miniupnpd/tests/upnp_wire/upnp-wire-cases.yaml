@@ -126,9 +126,9 @@ sections:
       - name: uda11-1.2.2-must-alive-repeats
         ref: "UDA-1.1 §1.2.2"
         families: [ipv4]
-        description: The device repeats ssdp:alive within its advertisement interval (notify_interval=30).
+        description: The device repeats ssdp:alive within its advertisement interval (notify_interval=10).
         steps:
-          - {kind: ssdp-listen, seconds: 32, nts: ["ssdp:alive"], expect: {"count.ssdp:alive": {min: 1}}}
+          - {kind: ssdp-listen, seconds: 12, nts: ["ssdp:alive"], expect: {"count.ssdp:alive": {min: 1}}}
       - name: uda11-1.2.3-should-notify-on-restart
         strict_path: true
         ref: "UDA-1.1 §1.2.3"

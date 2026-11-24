@@ -2851,12 +2851,19 @@ def msearch_wait(mx):
         return 1
 
 
-def receive_ssdp(sock, seconds, accept=None):
-    """The SSDP messages received within `seconds`: [{start, headers, source}] (accept filters them)."""
+SSDP_QUIET = 0.5  # seconds without a message that end a wait once it has enough (receive_ssdp)
+
+
+def receive_ssdp(sock, seconds, accept=None, enough=None):
+    """The SSDP messages received within `seconds`: [{start, headers, source}] (accept filters them).
+    Once enough(messages) is true, the wait ends after SSDP_QUIET s without another message: the daemon
+    sends the messages of one search or one announcement close together, so a late extra one still shows."""
     deadline = time.monotonic() + seconds
     messages = []
     while True:
         remaining = deadline - time.monotonic()
+        if enough is not None and enough(messages):
+            remaining = min(remaining, SSDP_QUIET)
         if remaining <= 0:
             return messages
         readable, _, _ = select.select([sock], [], [], remaining)
@@ -2871,13 +2878,14 @@ def receive_ssdp(sock, seconds, accept=None):
             messages.append({"start": start, "headers": headers, "source": source[0]})
 
 
-def ssdp_msearch(sock, target, st, mx=1, extra_headers=(), man='"ssdp:discover"', host=None, raw=None, wait=None):
+def ssdp_msearch(sock, target, st, mx=1, extra_headers=(), man='"ssdp:discover"', host=None, raw=None, wait=None,
+                 enough=None):
     """Send an M-SEARCH to `target` and return the responses received within MX+1 s (msearch_wait)."""
     family = "ipv6" if sock.family == socket.AF_INET6 else "ipv4"
     message = raw if raw is not None else msearch_message(st, mx, man, host, family, extra_headers)
     sock.sendto(message.encode() if isinstance(message, str) else message, target)
     return receive_ssdp(sock, msearch_wait(mx) if wait is None else wait,
-                        lambda start, _headers: start.upper().startswith("HTTP/"))
+                        lambda start, _headers: start.upper().startswith("HTTP/"), enough)
 
 
 def ssdp_notify_listener(iface_addr, family="ipv4", ifindex=0):
@@ -3301,6 +3309,24 @@ def ssdp_values(messages):
     return values
 
 
+def ssdp_enough(expect, exact=True):
+    """The enough test of receive_ssdp for a step's expect: every count it asks for (count, or count.NTS
+    of one NTS) is met, as N or {min: N}. None, so the full window, when a count is 0 or has no minimum,
+    when the step asks no count, or for an exact count N when `exact` is false."""
+    needs = {}
+    for field, rule in expect.items():
+        if field == "count" or field.startswith("count."):
+            least = rule.get("min") if isinstance(rule, dict) else rule if exact else None
+            if not isinstance(least, int) or least <= 0:
+                return None
+            needs[field.partition(".")[2]] = least
+    if not needs:
+        return None
+    return lambda messages: all(
+        sum(1 for message in messages if not nts or message["headers"].get("nts") == nts) >= least
+        for nts, least in needs.items())
+
+
 def check_each(messages, rules, variables):
     """`each`: the rules every message (its headers by lower-case name, and start) has to meet."""
     for index, message in enumerate(messages):
@@ -3336,7 +3362,11 @@ def run_ssdp_step(step, variables):
             host = f"{host_literal(variables['router'])}:{SSDP_PORT}"
         messages = ssdp_msearch(sock, target, request.get("st"), request.get("mx", 1),
                                 [tuple(item) for item in request.get("headers", [])],
-                                request.get("man", '"ssdp:discover"'), host, request.get("raw"), request.get("wait"))
+                                request.get("man", '"ssdp:discover"'), host, request.get("raw"), request.get("wait"),
+                                # the strict build delays each reply by a random time up to MX
+                                # (DELAY_MSEARCH_RESPONSE): an extra reply can come after the quiet
+                                # time, so an exact count waits the whole window there
+                                ssdp_enough(step.get("expect", {}), exact=not variables.get("strict")))
     check_each(messages, step.get("each", {}), variables)
     return ssdp_values(messages)
 
@@ -3356,7 +3386,8 @@ def run_ssdp_listen_step(step, variables):
             run_restart(variables)
         messages = receive_ssdp(sock, step.get("seconds", 5),
                                 lambda start, headers: start.upper().startswith("NOTIFY")
-                                and headers.get("nts") in step.get("nts", ["ssdp:alive", "ssdp:byebye"]))
+                                and headers.get("nts") in step.get("nts", ["ssdp:alive", "ssdp:byebye"]),
+                                ssdp_enough(step.get("expect", {})))
     check_each(messages, step.get("each", {}), variables)
     values = ssdp_values(messages)
     for nts in ("ssdp:alive", "ssdp:byebye"):

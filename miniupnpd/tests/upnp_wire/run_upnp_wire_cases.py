@@ -107,6 +107,7 @@ def build_variables(corpus, args):
     build = corpus["builds"][args.build]
     uuid = corpus["uuid"]
     variables = {"router": args.router, "client": args.client_address, "family": args.family, "build": args.build,
+                 "strict": args.strict,
                  "http_port": UPNP_HTTP_PORT, "uuid": uuid, "udn": f"uuid:{uuid}", "services": build["services"],
                  "router_call_dir": args.router_call_dir,
                  "location": f"http://{host_literal(args.router)}:{UPNP_HTTP_PORT}/rootDesc.xml"}
