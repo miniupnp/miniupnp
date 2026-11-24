@@ -1482,6 +1482,40 @@ sections:
     expect:
       kind: steps
     description: An IPv6 mapping is in <lease_file>.mappings too.
+  - name: lease-file-save-gap
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - lease_file=/var/lib/miniupnpd/gap.leases
+    request:
+      kind: option_steps
+      steps:
+      # the save at the start is more than 2 s old: the next change is saved at once
+      - sleep: 3
+      - pcp_map:
+          port: 46401
+      - pcp_map:
+          port: 46402
+      # 46401 is saved, 46402 waits for the 2 s after that save
+      - router:
+          command: cat:/var/lib/miniupnpd/gap.leases.mappings
+          contains:
+          - '|46401|'
+          absent:
+          - '|46402|'
+      - sleep: 2.5
+      - router:
+          command: cat:/var/lib/miniupnpd/gap.leases.mappings
+          contains:
+          - '|46401|'
+          - '|46402|'
+    expect:
+      kind: steps
+    description: The lease files are saved when the daemon is idle, at most every 2 seconds. A change right
+      after a save waits for the 2 s gap, then is saved.
   - name: lease-file6-deprecated
     platform: linux
     protocol: daemon
