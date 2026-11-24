@@ -3800,9 +3800,8 @@ sections:
           - {kind: subscribe, mode: unsubscribe, sid: $sid}
 
   - name: Lease file and restart
-    description: The UPnP lease_file (PROTO:eport:remote host:iaddr:iport:expiry:description lines, the remote
-      host field of a build with SUPPORT_REMOTEHOST) and the mappings
-      the daemon restores from it after a restart.
+    description: The lease files beside lease_file (a .mappings row per mapping, a .filters line per RemoteHost
+      or pinhole) and the mappings the daemon restores from them after a restart.
     cases:
       - name: wanipc1-2.2.14-impl-lease-restored-after-restart
         ref: {igd1: "WANIPC1 §2.2.14", igd2: "WANIPC2 §2.5.15"}
@@ -3834,6 +3833,36 @@ sections:
              expect: {status: 200, out.NewLeaseDuration: "0"}}
         cleanup:
           - {kind: soap, action: DeletePortMapping, args: {NewRemoteHost: "", NewExternalPort: 43103, NewProtocol: UDP}}
+      - name: wanipc1-2.2.14-impl-lease-remotehost-restored-after-restart
+        ref: {igd1: "WANIPC1 §2.2.14", igd2: "WANIPC2 §2.5.15"}
+        families: [ipv4]
+        requires: [restart, lease-file]
+        description: A mapping with a RemoteHost is written with its remote and restored with it after a
+          daemon restart.
+        steps:
+          - {kind: soap, action: AddPortMapping, args: {<<: *add_args, NewRemoteHost: 198.51.100.7, NewExternalPort: 43104, NewInternalPort: 43104},
+             expect: {status: 200}}
+          - {kind: upnp-lease, match: "^UPNP\\|UDP\\|43104\\|", wait_seconds: 12,
+             expect: {count: 1, line: {matches: "\\|198\\.51\\.100\\.7\\|NA\\|upnp-wire$"}}}
+          - {kind: restart}
+          - {kind: soap, action: GetSpecificPortMappingEntry, args: {NewRemoteHost: 198.51.100.7, NewExternalPort: 43104, NewProtocol: UDP},
+             expect: {status: 200, out.NewInternalClient: $client}}
+        cleanup:
+          - {kind: soap, action: DeletePortMapping, args: {NewRemoteHost: 198.51.100.7, NewExternalPort: 43104, NewProtocol: UDP}}
+      - name: 6fc1-2.4.9-impl-pinhole-uniqueid-restored-after-restart
+        ref: "6FC1 §2.4.9"
+        builds: [igd2]
+        families: [ipv6]
+        requires: [restart, lease-file]
+        description: A pinhole keeps its UniqueID over a daemon restart, so its client can still update it.
+        steps:
+          - {kind: soap, service: WANIPv6FirewallControl, action: AddPinhole, args: {<<: *pinhole_args, InternalPort: 44110},
+             capture: {id: out.UniqueID}, expect: {status: 200}}
+          - {kind: restart}
+          - {kind: soap, service: WANIPv6FirewallControl, action: UpdatePinhole, args: {UniqueID: $id, NewLeaseTime: 7200},
+             expect: {status: 200}}
+        cleanup:
+          - {kind: soap, service: WANIPv6FirewallControl, action: DeletePinhole, args: {UniqueID: $id}}
       - name: wanipc1-2.4.16-impl-lease-line-written
         ref: {igd1: "WANIPC1 §2.4.16", igd2: "WANIPC2 §2.5.16"}
         families: [ipv4]
