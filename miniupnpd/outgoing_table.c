@@ -12,6 +12,7 @@ static struct outgoing_entry * head;
 static unsigned int count;	/* the bindings */
 static unsigned int peer_count;	/* the peers of all bindings */
 static unsigned long changes;	/* see outgoing_table_changes() */
+static unsigned long long last_id;	/* the last binding id given or reserved */
 
 struct outgoing_entry *
 outgoing_table_new(int npeers)
@@ -112,6 +113,10 @@ outgoing_table_link(struct outgoing_entry * b)
 		for(i = 0; i < b->npeers; i++)
 			if(b->peers[i].since == 0)
 				b->peers[i].since = (unsigned int)time(NULL);
+		if(b->id == 0)
+			b->id = ++last_id;
+		else if(b->id > last_id)
+			last_id = b->id;
 		b->next = head;
 		head = b;
 		count++;
@@ -198,6 +203,19 @@ unsigned long
 outgoing_table_changes(void)
 {
 	return changes;
+}
+
+void
+outgoing_table_reserve_ids(unsigned long long max)
+{
+	if(max > last_id)
+		last_id = max;
+}
+
+unsigned long long
+outgoing_table_last_id(void)
+{
+	return last_id;
 }
 
 unsigned int

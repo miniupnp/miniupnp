@@ -68,6 +68,13 @@ unsigned long outgoing_table_changes(void);
 /* the number of bindings */
 unsigned int outgoing_table_count(void);
 
+/* Give no id up to max, as lease_table_reserve_ids(): the lease files call
+ * this at startup with the highest binding id they hold. */
+void outgoing_table_reserve_ids(unsigned long long max);
+
+/* The highest binding id given or reserved. */
+unsigned long long outgoing_table_last_id(void);
+
 /* the number of peers, all bindings together */
 unsigned int outgoing_table_peer_count(void);
 

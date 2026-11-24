@@ -7,21 +7,22 @@
  *
  * Each file starts with its header and the names of its fields:
  *   LEASE-MAPPINGS 1 last_id=42
- *   id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label
+ *   id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label
  * then one line per row. A reader finds a field by its name, so a later
  * version can add fields. A field which does not apply is NA. The header
  * goes on with name=value words; a reader skips those it does not know.
- * last_id is the highest id the table had given at the save.
+ * last_id is the highest id the table of the file had given at the save.
  *
  * A line of .filters names its row by the id of the row, and the filters
- * field of .mappings counts its lines. A line of .outgoing is one peer of a
- * PEER binding; the lines of one binding share its key.
+ * field of .mappings counts its lines. In the same way a line of
+ * .outgoing.peers names its outgoing SNAT binding (PCP PEER) of .outgoing by
+ * the id of the binding, and the peers field of .outgoing counts its lines.
  *
  * A save writes each changed part to a temporary file, then renames them:
- * .checksum first, then .filters and .outgoing, then .mappings. .checksum
- * has the size and CRC-32 of each of them, both as it is on the disk and
- * as the save writes it, so each file matches it whatever the rename a
- * crash cut the save at (0|00000000 : no file):
+ * .checksum first, then .filters, .outgoing.peers, .outgoing and .mappings.
+ * .checksum has the size and CRC-32 of each of them, both as it is on the
+ * disk and as the save writes it, so each file matches it whatever the
+ * rename a crash cut the save at (0|00000000 : no file):
  *   LEASE-CHECKSUM 1 last_id=42
  *   file|bytes|crc32
  *   mappings|1234|89abcdef
@@ -221,31 +222,41 @@ write_filters(FILE * f)
 	lease_table_foreach(put_filters, f);
 }
 
-/* One line per peer of each binding */
+/* One line per outgoing SNAT binding (PCP PEER); the peers field counts its
+ * lines in .outgoing.peers */
 static void
 write_outgoing(FILE * f)
 {
 	const struct outgoing_entry * b;
-	const struct outgoing_peer * p;
 	char nonce[2 * MAP_NONCE_LEN + 1];
+	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b)) {
+		fprintf(f, "%llu|%s|", b->id, map_family_name(b->family));
+		put_proto(f, b->proto);
+		fputc(LEASE_SEP, f);
+		put_addr(f, b->family, &b->iaddr);
+		fprintf(f, "|%hu|", b->iport);
+		put_addr(f, b->family, &b->eaddr);
+		fprintf(f, "|%hu|%s|", b->eport, map_nonce_ntop(b->nonce, nonce));
+		put_ifname(f, b->family);
+		fprintf(f, "|%d|", b->npeers);
+		put_label(f, b->label);
+		fputc('\n', f);
+	}
+}
+
+/* One line per remote peer of each binding, by the id of its binding */
+static void
+write_peers(FILE * f)
+{
+	const struct outgoing_entry * b;
+	const struct outgoing_peer * p;
 	int i;
 	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b)) {
-		map_nonce_ntop(b->nonce, nonce);
 		for(i = 0; i < b->npeers; i++) {
 			p = &b->peers[i];
-			fprintf(f, "%s|", map_family_name(b->family));
-			put_proto(f, b->proto);
-			fputc(LEASE_SEP, f);
-			put_addr(f, b->family, &b->iaddr);
-			fprintf(f, "|%hu|", b->iport);
-			put_addr(f, b->family, &b->eaddr);
-			fprintf(f, "|%hu|%s|", b->eport, nonce);
+			fprintf(f, "%llu|", b->id);
 			put_addr(f, b->family, &p->raddr);
-			fprintf(f, "|%hu|%u|%u|", p->rport, p->since, unix_expiry(p->timestamp));
-			put_ifname(f, b->family);
-			fputc(LEASE_SEP, f);
-			put_label(f, b->label);
-			fputc('\n', f);
+			fprintf(f, "|%hu|%u|%u\n", p->rport, p->since, unix_expiry(p->timestamp));
 		}
 	}
 }
@@ -271,11 +282,13 @@ struct file_sum {
 
 static void write_checksum(FILE * f);
 
-/* The data files in the order of their rename: .mappings after its side
- * files, so they are never older than it. .checksum is renamed before them.
- * Each data file with the change count of the table part it holds, and its
- * writer. */
-enum lease_file_id { LF_FILTERS, LF_OUTGOING, LF_MAPPINGS, LF_CHECKSUM, LF_COUNT };
+/* The data files in the order of their rename: each side file before the
+ * file of the rows it names (.filters before .mappings, .outgoing.peers before
+ * .outgoing), so it is never older than them. .checksum is renamed before
+ * them all. Each data file with the change count of the table part it
+ * holds, its writer, and the ids of its table: the highest one given goes
+ * in its header, and is reserved again at startup. */
+enum lease_file_id { LF_FILTERS, LF_PEERS, LF_OUTGOING, LF_MAPPINGS, LF_CHECKSUM, LF_COUNT };
 #define LF_DATA	LF_CHECKSUM	/* the files before it hold the tables */
 
 static const struct lease_part {
@@ -284,17 +297,21 @@ static const struct lease_part {
 	const char * names;
 	unsigned long (*changes)(void);
 	void (*write)(FILE * f);
+	unsigned long long (*last_id)(void);
+	void (*reserve_ids)(unsigned long long max);
 } lease_parts[LF_COUNT] = {
 	{ ".filters", "LEASE-FILTERS 1", "map|raddr|rprefix|rport|uid",
-	  filters_changes, write_filters },
+	  filters_changes, write_filters, lease_table_last_id, lease_table_reserve_ids },
+	{ ".outgoing.peers", "LEASE-OUTGOING-PEERS 1", "binding|raddr|rport|since|expiry",
+	  outgoing_table_changes, write_peers, outgoing_table_last_id, outgoing_table_reserve_ids },
 	{ ".outgoing", "LEASE-OUTGOING 1",
-	  "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|since|expiry|ifname|label",
-	  outgoing_table_changes, write_outgoing },
+	  "id|family|proto|iaddr|iport|eaddr|eport|nonce|ifname|peers|label",
+	  outgoing_table_changes, write_outgoing, outgoing_table_last_id, outgoing_table_reserve_ids },
 	{ ".mappings", "LEASE-MAPPINGS 1",
 	  "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label",
-	  mappings_changes, write_mappings },
+	  mappings_changes, write_mappings, lease_table_last_id, lease_table_reserve_ids },
 	{ ".checksum", "LEASE-CHECKSUM 1", "file|bytes|crc32",
-	  NULL, write_checksum },
+	  NULL, write_checksum, lease_table_last_id, NULL },
 };
 
 int lease_files_ignore_checksum = 0;
@@ -309,7 +326,7 @@ static const struct file_sum * sums_to_write;
 /* The change counts of each part at the last save. They start unlike any
  * count, so the first save writes every file. */
 static unsigned long saved[LF_DATA] = {
-	(unsigned long)-1, (unsigned long)-1, (unsigned long)-1
+	(unsigned long)-1, (unsigned long)-1, (unsigned long)-1, (unsigned long)-1
 };
 static time_t last_save;	/* upnp_time() at the end of the last save */
 static time_t first_change;	/* of the first change since, 0 : none */
@@ -491,7 +508,7 @@ write_part(enum lease_file_id id)
 		close(fd);
 		goto fail;
 	}
-	fprintf(f, "%s last_id=%llu", lp->header, lease_table_last_id());
+	fprintf(f, "%s last_id=%llu", lp->header, lp->last_id());
 	if(id == LF_MAPPINGS) {
 		char boot[BOOT_ID_LEN + 1];
 		boot_id(boot, sizeof(boot));
@@ -822,14 +839,14 @@ get_nonce(const char * h, unsigned char * nonce)
  * they are skipped. One it lacks has its default. */
 enum {
 	F_ID, F_KIND, F_FAMILY, F_PROTO, F_EPORT, F_IPORT, F_IADDR, F_EADDR,
-	F_NONCE, F_SINCE, F_EXPIRY, F_FILTERS, F_LABEL,
-	F_MAP, F_RADDR, F_RPREFIX, F_RPORT, F_UID,
+	F_NONCE, F_SINCE, F_EXPIRY, F_FILTERS, F_PEERS, F_LABEL,
+	F_MAP, F_BINDING, F_RADDR, F_RPREFIX, F_RPORT, F_UID,
 	F_FILE, F_BYTES, F_CRC32, F_COUNT
 };
 static const char * const field_names[F_COUNT] = {
 	"id", "kind", "family", "proto", "eport", "iport", "iaddr", "eaddr",
-	"nonce", "since", "expiry", "filters", "label",
-	"map", "raddr", "rprefix", "rport", "uid",
+	"nonce", "since", "expiry", "filters", "peers", "label",
+	"map", "binding", "raddr", "rprefix", "rport", "uid",
 	"file", "bytes", "crc32"
 };
 #define LEASE_MAX_FIELDS	64
@@ -1002,15 +1019,13 @@ bad_line(const struct lease_in * in, const char * what)
 	return 0;
 }
 
-/* The family, protocol, since and expiry of a line, common to .mappings
- * and .outgoing. The expiry goes on the clock of upnp_time(); since stays
- * unix time, NA : 0, now. 1, or 0 to skip the line (logged). */
+/* The family and protocol of a line of .mappings or .outgoing. 1, or 0 to
+ * skip the line (logged). */
 static int
-get_common(struct lease_in * in, char ** field, unsigned char * family,
-           unsigned char * proto, unsigned int * since, unsigned int * timestamp)
+get_family_proto(struct lease_in * in, char ** field, unsigned char * family,
+                 unsigned char * proto)
 {
 	unsigned long long v;
-	long long t, su, sm;
 	int p;
 
 	if(field[F_FAMILY] != NULL && strcmp(field[F_FAMILY], "IPv4") == 0)
@@ -1027,17 +1042,30 @@ get_common(struct lease_in * in, char ** field, unsigned char * family,
 		*proto = (unsigned char)p;
 	else
 		return bad_line(in, "proto");
+	return 1;
+}
+
+/* The since and expiry of a line of .mappings or .outgoing.peers. The expiry goes on
+ * the clock of upnp_time(); since stays unix time, NA : 0, now. 1; 0 if it
+ * expired, or -1 if it cannot be read (both logged). */
+static int
+get_times(struct lease_in * in, char ** field, unsigned int * since,
+          unsigned int * timestamp)
+{
+	unsigned long long v;
+	long long t, su, sm;
+
 	*since = 0;
 	if(field[F_SINCE] != NULL && strcmp(field[F_SINCE], LEASE_NA) != 0) {
 		if(get_number(field[F_SINCE], 0xffffffffULL, &v) < 0)
-			return bad_line(in, "since");
+			return bad_line(in, "since") - 1;
 		*since = (unsigned int)v;
 	}
 	*timestamp = 0;
 	if(field[F_EXPIRY] == NULL)
 		return 1;
 	if(get_number(field[F_EXPIRY], 0xffffffffULL, &v) < 0)
-		return bad_line(in, "expiry");
+		return bad_line(in, "expiry") - 1;
 	if(v == 0)
 		return 1;
 	/* the clocks of the save of this file, else those of .mappings */
@@ -1059,12 +1087,16 @@ get_common(struct lease_in * in, char ** field, unsigned char * family,
 	return 1;
 }
 
-/* A line of .filters: the row it belongs to, by its id, and the filter.
- * rprefix as written, -1 : none; the family of the row tells its range. */
+/* A line of a side file: the row or binding it belongs to, by its id.
+ * .filters: the filter, with rprefix as written, -1 : none; the family of
+ * the row tells its range. .outgoing.peers: the peer, expired or not: the binding
+ * counts its expired peers too. */
 struct side_line {
 	unsigned long long map;
 	int rprefix;
 	struct map_filter f;
+	struct outgoing_peer p;
+	int expired;
 };
 
 struct side_lines {
@@ -1077,6 +1109,24 @@ cmp_side(const void * a, const void * b)
 {
 	const struct side_line * x = a, * y = b;
 	return x->map < y->map ? -1 : x->map > y->map;
+}
+
+/* Add a copy of l to s. 0, or -1 if there is no memory (logged). */
+static int
+add_side(struct side_lines * s, const struct side_line * l, const struct lease_in * in)
+{
+	if(s->n == s->size) {
+		size_t sz = s->size ? s->size * 2 : 64;
+		struct side_line * p = realloc(s->v, sz * sizeof(*p));
+		if(p == NULL) {
+			syslog(LOG_ERR, "lease files: no memory for %s", in->path);
+			return -1;
+		}
+		s->v = p;
+		s->size = sz;
+	}
+	s->v[s->n++] = *l;
+	return 0;
 }
 
 /* Read the lines of .filters, sorted by the id of their row. A file which
@@ -1130,17 +1180,52 @@ read_filters(struct side_lines * s, struct lease_in * in)
 			}
 			l.f.uid = (unsigned short)v;
 		}
-		if(s->n == s->size) {
-			size_t sz = s->size ? s->size * 2 : 64;
-			struct side_line * p = realloc(s->v, sz * sizeof(*p));
-			if(p == NULL) {
-				syslog(LOG_ERR, "lease files: no memory for %s", in->path);
-				return -1;
-			}
-			s->v = p;
-			s->size = sz;
+		if(add_side(s, &l, in) < 0)
+			return -1;
+	}
+	if(s->n > 1)
+		qsort(s->v, s->n, sizeof(s->v[0]), cmp_side);
+	return 0;
+}
+
+/* Read the lines of .outgoing.peers, sorted by the id of their binding, as
+ * read_filters(). The family of a peer is that of its address: it always
+ * has one. */
+static int
+read_peers(struct side_lines * s, struct lease_in * in)
+{
+	char * field[F_COUNT];
+	unsigned long long v;
+	struct side_line l;
+	int family, r;
+
+	memset(s, 0, sizeof(*s));
+	r = in_open(in, LF_PEERS, 0);
+	if(r <= 0)
+		return r;
+	while(in_next(in, field)) {
+		memset(&l, 0, sizeof(l));
+		if(get_number(field[F_BINDING], LEASE_ID_MAX, &l.map) < 0 || l.map == 0) {
+			(void)bad_line(in, "binding");
+			continue;
 		}
-		s->v[s->n++] = l;
+		family = field[F_RADDR] != NULL && strchr(field[F_RADDR], ':') ? AF_INET6 : AF_INET;
+		if(get_addr(family, field[F_RADDR], &l.p.raddr) < 0 ||
+		   IN6_IS_ADDR_UNSPECIFIED(&l.p.raddr)) {
+			(void)bad_line(in, "raddr");
+			continue;
+		}
+		if(get_number(field[F_RPORT], 65535, &v) < 0 || v == 0) {
+			(void)bad_line(in, "rport");
+			continue;
+		}
+		l.p.rport = (unsigned short)v;
+		r = get_times(in, field, &l.p.since, &l.p.timestamp);
+		if(r < 0)
+			continue;
+		l.expired = (r == 0);
+		if(add_side(s, &l, in) < 0)
+			return -1;
 	}
 	if(s->n > 1)
 		qsort(s->v, s->n, sizeof(s->v[0]), cmp_side);
@@ -1186,7 +1271,8 @@ get_mapping(struct lease_in * in, char ** field, struct lease_entry * r,
 	lease_entry_init(r, kind_names[i].kind, NULL);
 	if(get_number(field[F_ID], LEASE_ID_MAX, &r->id) < 0 || r->id == 0)
 		return bad_line(in, "id");
-	if(!get_common(in, field, &r->family, &r->proto, &r->since, &r->timestamp))
+	if(!get_family_proto(in, field, &r->family, &r->proto) ||
+	   get_times(in, field, &r->since, &r->timestamp) <= 0)
 		return 0;
 	if(get_number(field[F_IPORT], 65535, &v) < 0)
 		return bad_line(in, "iport");
@@ -1215,15 +1301,17 @@ get_mapping(struct lease_in * in, char ** field, struct lease_entry * r,
 	return 1;
 }
 
-/* The binding of one peer of a line of .outgoing, into b, which has room
- * for one. 1, or 0 to skip the line (logged). */
+/* A line of .outgoing into b, a binding with no peers, and the number of
+ * its peers in .outgoing.peers. 1, or 0 to skip the line (logged). */
 static int
-get_peer(struct lease_in * in, char ** field, struct outgoing_entry * b)
+get_binding(struct lease_in * in, char ** field, struct outgoing_entry * b,
+            unsigned long * npeers)
 {
 	unsigned long long v;
 
-	if(!get_common(in, field, &b->family, &b->proto, &b->peers[0].since,
-	               &b->peers[0].timestamp))
+	if(get_number(field[F_ID], LEASE_ID_MAX, &b->id) < 0 || b->id == 0)
+		return bad_line(in, "id");
+	if(!get_family_proto(in, field, &b->family, &b->proto))
 		return 0;
 	if(get_addr(b->family, field[F_IADDR], &b->iaddr) < 0 ||
 	   IN6_IS_ADDR_UNSPECIFIED(&b->iaddr))
@@ -1238,12 +1326,9 @@ get_peer(struct lease_in * in, char ** field, struct outgoing_entry * b)
 	b->eport = (unsigned short)v;
 	if(get_nonce(field[F_NONCE], b->nonce) < 0)
 		return bad_line(in, "nonce");
-	if(get_addr(b->family, field[F_RADDR], &b->peers[0].raddr) < 0 ||
-	   IN6_IS_ADDR_UNSPECIFIED(&b->peers[0].raddr))
-		return bad_line(in, "raddr");
-	if(get_number(field[F_RPORT], 65535, &v) < 0 || v == 0)
-		return bad_line(in, "rport");
-	b->peers[0].rport = (unsigned short)v;
+	if(get_number(field[F_PEERS], 0xffffUL, &v) < 0 || v == 0)
+		return bad_line(in, "peers");
+	*npeers = (unsigned long)v;
 	if(field[F_LABEL] != NULL) {
 		if(get_label(field[F_LABEL]) < 0)
 			return bad_line(in, "label");
@@ -1310,21 +1395,19 @@ remove_temp_files(void)
 void
 lease_files_reserve_ids(void)
 {
-	unsigned long long max = 0;
 	struct lease_in in;
 	int i;
 
 	if(lease_file == NULL)
 		return;
 	remove_temp_files();
-	/* each file names the highest id of its save: a side file newer than
-	 * .mappings has its own. The load logs a bad file */
-	for(i = 0; i < LF_COUNT; i++) {
-		if(in_open(&in, (enum lease_file_id)i, 1) == 1 && in.last_id > max)
-			max = in.last_id;
+	/* each file names the highest id of its table at its save: a side
+	 * file newer than its main file has its own. The load logs a bad file */
+	for(i = 0; i < LF_DATA; i++) {
+		if(in_open(&in, (enum lease_file_id)i, 1) == 1)
+			lease_parts[i].reserve_ids(in.last_id);
 		in_close(&in);
 	}
-	lease_table_reserve_ids(max);
 }
 
 /* 1 if a row a client made while the restore waited holds the key of r.
@@ -1442,33 +1525,62 @@ load_mappings(struct lease_in * maps, const struct side_lines * fs,
 	}
 }
 
-/* Give each line of .outgoing to peer, as a binding of one peer. */
+/* Give each binding of .outgoing to peer, with its peers of .outgoing.peers: a
+ * binding of one peer per peer, as the restore sends them, which the
+ * outgoing table puts together again by their key. */
 static void
-load_outgoing(struct lease_in * out, lease_files_peer_fn peer, void * arg,
+load_outgoing(struct lease_in * out, const struct side_lines * ps,
+              lease_files_peer_fn peer, void * arg,
               unsigned int * done, unsigned int * skipped)
 {
 	char * field[F_COUNT];
-	struct outgoing_entry * b;
+	struct outgoing_entry key, * b;
+	const struct side_line * l;
+	unsigned long npeers;
+	size_t np, k;
 
 	while(in_next(out, field)) {
-		b = outgoing_table_new(1);
-		if(b == NULL) {
+		memset(&key, 0, sizeof(key));
+		if(!get_binding(out, field, &key, &npeers)) {
 			(*skipped)++;
 			continue;
 		}
-		if(!get_peer(out, field, b)) {
-			outgoing_table_free(b);
+		/* .outgoing is renamed after .outgoing.peers: as for .filters */
+		l = side_of(ps, key.id, &np);
+		if(np != npeers) {
+			syslog(LOG_WARNING, "lease files: %s:%lu: %lu peers, not %lu: of another save, not restored",
+			       out->path, out->line, (unsigned long)np, npeers);
 			(*skipped)++;
 			continue;
 		}
 		/* a binding there is was made while the restore waited */
-		if(held_last_id != 0 && outgoing_table_find(b) != NULL) {
-			outgoing_table_free(b);
+		if(held_last_id != 0 && outgoing_table_find(&key) != NULL) {
 			(*skipped)++;
 			continue;
 		}
-		peer(b, arg);
-		(*done)++;
+		for(k = 0; k < np; k++) {
+			if(l[k].expired) {
+				(*skipped)++;	/* logged when read */
+				continue;
+			}
+			b = outgoing_table_new(1);
+			if(b == NULL) {
+				(*skipped)++;
+				continue;
+			}
+			b->id = key.id;
+			b->family = key.family;
+			b->proto = key.proto;
+			memcpy(b->nonce, key.nonce, MAP_NONCE_LEN);
+			b->iaddr = key.iaddr;
+			b->iport = key.iport;
+			b->eaddr = key.eaddr;
+			b->eport = key.eport;
+			b->label = key.label;
+			b->peers[0] = l[k].p;
+			peer(b, arg);
+			(*done)++;
+		}
 	}
 }
 
@@ -1615,14 +1727,16 @@ lease_files_load(const struct lease_files_restore * r)
 static int
 load_rows(const struct lease_files_restore * r)
 {
-	struct lease_in maps, filters, out;
-	struct side_lines fs;
+	struct lease_in maps, filters, out, peers;
+	struct side_lines fs, ps;
 	unsigned int done = 0, skipped = 0;
-	int ret, rf, ro;
+	int ret, rf, rp, ro;
 
 	memset(&filters, 0, sizeof(filters));
 	memset(&out, 0, sizeof(out));
+	memset(&peers, 0, sizeof(peers));
 	memset(&fs, 0, sizeof(fs));
+	memset(&ps, 0, sizeof(ps));
 	ret = in_open(&maps, LF_MAPPINGS, 0);
 	if(ret == 0) {
 		/* .mappings is the record of what exists: without it, nothing */
@@ -1633,17 +1747,19 @@ load_rows(const struct lease_files_restore * r)
 		syslog(LOG_NOTICE, "lease files: the checksums are not checked");
 	else if(ret > 0 && check_sums() < 0)
 		ret = -1;
-	rf = ro = 0;
+	rf = rp = ro = 0;
 	if(ret > 0) {
 		rf = read_filters(&fs, &filters);
+		rp = read_peers(&ps, &peers);
 		ro = in_open(&out, LF_OUTGOING, 0);
 	}
-	if(ret < 0 || rf < 0 || ro < 0) {
+	if(ret < 0 || rf < 0 || rp < 0 || ro < 0) {
 		/* not a set this daemon can read, or not as it was written:
 		 * keep the whole set, as the next save writes each file, and
 		 * load nothing */
 		in_close(&maps);
 		in_close(&filters);
+		in_close(&peers);
 		in_close(&out);
 		set_aside_all();
 		ret = -1;
@@ -1651,15 +1767,17 @@ load_rows(const struct lease_files_restore * r)
 	}
 	load_mappings(&maps, &fs, r->map, r->arg, &done, &skipped);
 	if(ro > 0)
-		load_outgoing(&out, r->peer, r->arg, &done, &skipped);
+		load_outgoing(&out, &ps, r->peer, r->arg, &done, &skipped);
 	syslog(LOG_INFO, "lease files: read %u lines to restore, %u not", done, skipped);
 	if(r->done != NULL)
 		r->done(r->arg);
 	ret = 1;
 out:
 	free(fs.v);
+	free(ps.v);
 	in_close(&maps);
 	in_close(&filters);
+	in_close(&peers);
 	in_close(&out);
 	return ret;
 }

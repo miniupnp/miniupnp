@@ -114,7 +114,7 @@ expect(const char * suffix, const char * want)
 static void
 remove_files(void)
 {
-	static const char * const suffixes[] = { ".mappings", ".filters", ".outgoing", ".checksum" };
+	static const char * const suffixes[] = { ".mappings", ".filters", ".outgoing", ".outgoing.peers", ".checksum" };
 	char path[300];
 	unsigned int i;
 	for(i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
@@ -205,7 +205,8 @@ test_contents(void)
 	b->peers[1].raddr = addr("::ffff:203.0.113.2");
 	b->peers[1].rport = 443;
 	b->peers[1].timestamp = now + 40;
-	outgoing_table_link(b);
+	b = outgoing_table_link(b);
+	assert(b != NULL && b->id != 0);
 
 	poll_now(1);
 	{
@@ -244,12 +245,24 @@ test_contents(void)
 		free(f);
 	}
 	{
-		char * o = slurp(".outgoing");
+		char * o = slurp(".outgoing"), * ps = slurp(".outgoing.peers");
+		char want[160];
 		assert(o != NULL && strncmp(o, "LEASE-OUTGOING 1 last_id=", 25) == 0);
-		assert(strstr(o, "\nfamily|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|since|expiry|ifname|label\n") != NULL);
-		assert(strstr(o, "\nIPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|0000000000000000000000ab|203.0.113.1|80|") != NULL);
-		assert(strstr(o, "\nIPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|0000000000000000000000ab|203.0.113.2|443|") != NULL);
+		assert(strstr(o, "\nid|family|proto|iaddr|iport|eaddr|eport|nonce|ifname|peers|label\n") != NULL);
+		/* one line per binding, its peers counted */
+		snprintf(want, sizeof(want),
+		         "\n%llu|IPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|0000000000000000000000ab|wan0|2|NA\n",
+		         b->id);
+		assert(strstr(o, want) != NULL);
+		/* one line per peer, by the id of its binding */
+		assert(ps != NULL && strncmp(ps, "LEASE-OUTGOING-PEERS 1 last_id=", 31) == 0);
+		assert(strstr(ps, "\nbinding|raddr|rport|since|expiry\n") != NULL);
+		snprintf(want, sizeof(want), "\n%llu|203.0.113.1|80|", b->id);
+		assert(strstr(ps, want) != NULL);
+		snprintf(want, sizeof(want), "\n%llu|203.0.113.2|443|", b->id);
+		assert(strstr(ps, want) != NULL);
 		free(o);
+		free(ps);
 	}
 	lease_table_clear();
 	outgoing_table_clear();
@@ -257,7 +270,8 @@ test_contents(void)
 	poll_now(1);
 	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n");
 	expect(".filters", "map|raddr|rprefix|rport|uid\n");
-	expect(".outgoing", "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|since|expiry|ifname|label\n");
+	expect(".outgoing", "id|family|proto|iaddr|iport|eaddr|eport|nonce|ifname|peers|label\n");
+	expect(".outgoing.peers", "binding|raddr|rport|since|expiry\n");
 }
 
 /* when a save runs: idle after LEASE_FILES_MIN_GAP, or after
@@ -295,7 +309,7 @@ test_timing(void)
 	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n"
 	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|1700000000|0|wan0|0|a\n");
 	/* only .mappings changed: the others are not written */
-	assert(slurp(".filters") == NULL && slurp(".outgoing") == NULL);
+	assert(slurp(".filters") == NULL && slurp(".outgoing") == NULL && slurp(".outgoing.peers") == NULL);
 	/* idle, but within the gap of the last save: no save */
 	assert(lease_table_set_label(e, "b") == 0);
 	lease_files_poll(1, &tv);
@@ -439,6 +453,7 @@ test_round_trip(void)
 {
 	struct lease_entry * e, * g;
 	struct outgoing_entry * b;
+	unsigned long long bid;
 	const char * label;
 	int i;
 
@@ -469,7 +484,8 @@ test_round_trip(void)
 	            "2001:db8::11", 0, NULL, 1);
 	e->filters[0].prefix = 64;
 	lease_table_link(e);
-	b = outgoing_table_new(1);
+	/* a binding of two peers; the second expires before the load */
+	b = outgoing_table_new(2);
 	assert(b != NULL);
 	b->family = AF_INET;
 	b->proto = IPPROTO_TCP;
@@ -481,8 +497,14 @@ test_round_trip(void)
 	b->peers[0].raddr = addr("::ffff:203.0.113.1");
 	b->peers[0].rport = 80;
 	b->peers[0].timestamp = now + 30;
-	outgoing_table_link(b);
+	b->peers[1].raddr = addr("::ffff:203.0.113.2");
+	b->peers[1].rport = 81;
+	b->peers[1].timestamp = now + 1;
+	b = outgoing_table_link(b);
+	assert(b != NULL);
+	bid = b->id;
 	assert(lease_files_flush() == 0);
+	now += 1;
 
 	assert(load() == 1 && ngot == 4 && ngot_peer == 1);
 	g = got_id(1, &label);
@@ -506,7 +528,7 @@ test_round_trip(void)
 	assert(g != NULL && g->nfilters == 1 && g->filters[0].prefix == 64);
 	assert(IN6_IS_ADDR_UNSPECIFIED(&g->filters[0].raddr));
 	b = got_peer[0];
-	assert(b->eport == 6000 && b->iport == 5000 && b->nonce[0] == 0xab);
+	assert(b->id == bid && b->eport == 6000 && b->iport == 5000 && b->nonce[0] == 0xab);
 	assert(b->peers[0].rport == 80 && b->peers[0].timestamp >= now + 29);
 	free_got();
 	lease_table_clear();
@@ -625,6 +647,7 @@ test_checksum(void)
 	unlink_file(".mappings.bad");
 	unlink_file(".filters.bad");
 	unlink_file(".outgoing.bad");
+	unlink_file(".outgoing.peers.bad");
 	unlink_file(".checksum.bad");
 	free_got();
 	lease_table_clear();
@@ -753,17 +776,25 @@ test_clock(void)
 	assert(load() == 1);
 	assert(ngot == 1);	/* 41001 expired 5 s after a save 10 s ago */
 	assert(got_at(41000)->timestamp == now - 10 + 500);
-	/* .outgoing of an earlier save, before the wall clock stepped 100000 s
+	/* .outgoing.peers of an earlier save, before the wall clock stepped 100000 s
 	 * on: its lines are read on its own clocks */
+	write_file(".outgoing", "LEASE-OUTGOING 1 last_id=7\n"
+	           "id|family|proto|iaddr|iport|eaddr|eport|nonce|peers|label\n"
+	           "7|IPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|ab0000000000000000000000|1|NA\n"
+	           "8|IPv4|TCP|192.168.1.14|5000|198.51.100.1|6001|ab0000000000000000000000|2|NA\n");
 	snprintf(line, sizeof(line),
-	         "LEASE-OUTGOING 1 last_id=1 monotonic=%lld unix=%lld\n"
-	         "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|expiry|label\n"
-	         "IPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|ab0000000000000000000000|203.0.113.1|80|%lld|NA\n",
-	         (long long)now - 20, (long long)t - 100000, (long long)t - 100000 + 400);
-	write_file(".outgoing", line);
+	         "LEASE-OUTGOING-PEERS 1 last_id=8 monotonic=%lld unix=%lld\n"
+	         "binding|raddr|rport|expiry\n"
+	         "7|203.0.113.1|80|%lld\n"
+	         "8|203.0.113.2|80|%lld\n",
+	         (long long)now - 20, (long long)t - 100000, (long long)t - 100000 + 400,
+	         (long long)t - 100000 + 400);
+	write_file(".outgoing.peers", line);
+	/* 8 counts 2 peers, .outgoing.peers has 1: of another save */
 	assert(load() == 1 && ngot == 1 && ngot_peer == 1);
-	assert(got_peer[0]->peers[0].timestamp == now - 20 + 400);
+	assert(got_peer[0]->id == 7 && got_peer[0]->peers[0].timestamp == now - 20 + 400);
 	unlink_file(".outgoing");
+	unlink_file(".outgoing.peers");
 
 	/* a new boot with the clock behind the save: the restore waits, and
 	 * no save drops the rows of the files meanwhile. A row a client makes

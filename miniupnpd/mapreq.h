@@ -175,6 +175,9 @@ struct outgoing_peer {
 struct outgoing_entry {
 	/* the links of the outgoing table, see outgoing_table.h */
 	struct outgoing_entry * next;	/* the next binding */
+	/* Names the binding for its life: the lines of .peers name theirs by
+	 * it. outgoing_table_link() gives a binding with 0 the next one. */
+	unsigned long long id;
 	int peers_alloc;	/* the room of peers, in a binding of the table */
 	unsigned char row;	/* made by outgoing_table_new(): the table may
 				 * link it. 0 : a request on the stack */

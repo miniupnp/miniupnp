@@ -9,7 +9,9 @@
  * configuration:
  *   <lease_file>.mappings	one line per row of the lease table
  *   <lease_file>.filters	one line per filter of a row: a remote it lets in
- *   <lease_file>.outgoing	one line per peer of a PCP PEER binding
+ *   <lease_file>.outgoing	one line per outgoing SNAT binding (PCP PEER)
+ *   <lease_file>.outgoing.peers	one line per remote peer of an outgoing SNAT
+ *				binding (PCP PEER)
  *   <lease_file>.checksum	the size and CRC-32 of each of them
  *
  * They are written from the tables only, never from the firewall, and no
@@ -58,7 +60,8 @@ void lease_files_reserve_ids(void);
 extern int lease_files_ignore_checksum;
 
 /* Read the files at startup: each row of .mappings with its filters to
- * r->map, each line of .outgoing to r->peer, then call r->done. The files are trusted: a line is
+ * r->map, each peer of .outgoing.peers with its binding of .outgoing to r->peer (a
+ * binding of one peer each), then call r->done. The files are trusted: a line is
  * only skipped (and logged) when it cannot be read, is expired, or is a
  * row of another save (a crash between the renames). 1 if the files were
  * read, 2 if lease_file_restore keeps them from being restored (no, or boot

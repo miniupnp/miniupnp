@@ -455,11 +455,11 @@ class LeaseRecordTests(unittest.TestCase):
 # the same kinds of mappings in the files lease_files.c writes beside lease_file
 LEASE_SET = {
     ".mappings": ["LEASE-MAPPINGS 1 last_id=4",
-                  "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label",
-                  "1|PCP-M|IPv4|UDP|43333|43333|10.0.0.2|198.51.100.1|aabbccddeeff001122334455|200|2|NA",
-                  "2|NAT-PMP|IPv4|UDP|42222|42222|10.0.0.2|198.51.100.1|NA|200|0|NA",
-                  "3|UPNP|IPv4|TCP|41000|41000|10.0.0.2|NA|NA|0|1|my\\|app",
-                  "4|UPNP|IPv6|UDP|9000|9000|2001:db8::10|2001:db8::10|NA|200|2|NA"],
+                  "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label",
+                  "1|PCP-M|IPv4|UDP|43333|43333|10.0.0.2|198.51.100.1|aabbccddeeff001122334455|100|200|eth0|2|NA",
+                  "2|NAT-PMP|IPv4|UDP|42222|42222|10.0.0.2|198.51.100.1|NA|100|200|eth0|0|NA",
+                  "3|UPNP|IPv4|TCP|41000|41000|10.0.0.2|NA|NA|100|0|eth0|1|my\\|app",
+                  "4|UPNP|IPv6|UDP|9000|9000|2001:db8::10|2001:db8::10|NA|100|200|eth0|2|NA"],
     ".filters": ["LEASE-FILTERS 1 last_id=4",
                  "map|raddr|rprefix|rport|uid",
                  "1|198.51.100.0|24|0|NA",
@@ -467,14 +467,18 @@ LEASE_SET = {
                  "3|198.51.100.7|32|0|NA",
                  "4|NA|0|0|7",
                  "4|2001:db8:1::|64|53|8"],
-    ".outgoing": ["LEASE-OUTGOING 1 last_id=4",
-                  "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|expiry|label",
-                  "IPv4|TCP|10.0.0.2|44444|198.51.100.1|6000|aabbccddeeff001122334455|203.0.113.1|80|200|NA"],
+    ".outgoing": ["LEASE-OUTGOING 1 last_id=5",
+                  "id|family|proto|iaddr|iport|eaddr|eport|nonce|ifname|peers|label",
+                  "5|IPv4|TCP|10.0.0.2|44444|198.51.100.1|6000|aabbccddeeff001122334455|eth0|2|NA"],
+    ".outgoing.peers": ["LEASE-OUTGOING-PEERS 1 last_id=5",
+               "binding|raddr|rport|since|expiry",
+               "5|203.0.113.1|80|100|200",
+               "5|203.0.113.2|443|150|250"],
 }
 
 
 class LeaseFileSetTests(unittest.TestCase):
-    """The records of the files .mappings, .filters and .outgoing, as the old files gave them."""
+    """The records of the files .mappings, .filters, .outgoing and .outgoing.peers, as the old files gave them."""
 
     def records(self):
         return lib_test.lease_records(sum(LEASE_SET.values(), []))
@@ -502,9 +506,11 @@ class LeaseFileSetTests(unittest.TestCase):
         self.assertEqual(sorted(f[12] for f in self.find("UPNP", 9000)), ["2001:db8:1::/64", "NA"])
 
     def test_peer(self):
-        peer = self.find("PCP-P", 44444)
-        self.assertEqual(len(peer), 1)
-        self.assertEqual((peer[0][2], peer[0][12], peer[0][13]), ("6000", "203.0.113.1", "80"))
+        # one record per peer of .outgoing.peers, with the fields of its binding in .outgoing
+        peers = sorted(self.find("PCP-P", 44444), key=lambda r: r[13])
+        self.assertEqual([(p[2], p[12], p[13], p[9], p[10]) for p in peers],
+                         [("6000", "203.0.113.2", "443", "150", "250"), ("6000", "203.0.113.1", "80", "100", "200")])
+        self.assertEqual(peers[0][6], "eth0")
 
     def test_source_reads_the_files_beside_lease_file(self):
         with tempfile.TemporaryDirectory() as directory:

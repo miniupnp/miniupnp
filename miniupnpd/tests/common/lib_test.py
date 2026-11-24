@@ -508,14 +508,14 @@ def lease_record(line):
 
 
 LEASE_HEADERS = {"LEASE-MAPPINGS": "mappings", "LEASE-FILTERS": "filters", "LEASE-OUTGOING": "outgoing",
-                 "LEASE-CHECKSUM": "checksum"}
+                 "LEASE-OUTGOING-PEERS": "peers", "LEASE-CHECKSUM": "checksum"}
 
 
 def lease_file_sections(lines):
     """The lines of the lease files the daemon writes beside lease_file (lease_files.c), cut at their headers:
     {"mappings": [{field: value}], "filters": [...], "outgoing": [...]}, by the field names of line 2 of each
     file; and the lines of no such file (the old lease_file / lease_file6)."""
-    sections = {"mappings": [], "filters": [], "outgoing": [], "checksum": []}
+    sections = {"mappings": [], "filters": [], "outgoing": [], "peers": [], "checksum": []}
     other = []
     section = names = None
     for line in lines:
@@ -547,7 +547,8 @@ def lease_prefix_addr(raddr, prefix):
 def lease_file_records(sections):
     """The lease records of the three files: a row of .mappings with no filter is one record; a UPnP row gives one
     per filter (a RemoteHost, a pinhole of an IPv6 map), with its remote; a PCP row gives its record and one PCP-F
-    record per filter which is no "any host" (a FILTER peer); a line of .outgoing is a PCP-P record. A label keeps
+    record per filter which is no "any host" (a FILTER peer); a line of .outgoing.peers is a PCP-P record, with the fields of
+    its binding in .outgoing (the line of the same id). A label keeps
     its escapes, with \\| as \\x7c, so a record has LEASE_FIELDS fields."""
     filters = {}
     for line in sections["filters"]:
@@ -571,14 +572,19 @@ def lease_file_records(sections):
             records += [record(kind, row, raddr, rport if rport != "0" else "NA") for raddr, rport in remotes]
         else:
             records.append(record(kind, row))
-    for peer in sections["outgoing"]:
-        records.append(record("PCP-P", peer, peer.get("raddr", "NA"), peer.get("rport", "NA")))
+    peers = {}
+    for line in sections["peers"]:
+        peers.setdefault(line.get("binding"), []).append(line)
+    for binding in sections["outgoing"]:
+        for peer in peers.get(binding.get("id"), []):
+            row = dict(binding, since=peer.get("since", "NA"), expiry=peer.get("expiry", "NA"))
+            records.append(record("PCP-P", row, peer.get("raddr", "NA"), peer.get("rport", "NA")))
     return records
 
 
 def lease_records(lines):
     """The lease records of the lines of the lease files: the files lease_files.c writes (.mappings, .filters,
-    .outgoing, cut at their headers), and the old lease_file and lease_file6 (in any order, also mixed)."""
+    .outgoing, .outgoing.peers, cut at their headers), and the old lease_file and lease_file6 (in any order, also mixed)."""
     sections, other = lease_file_sections(lines)
     return lease_file_records(sections) + [record for record in map(lease_record, other) if record is not None]
 
@@ -854,7 +860,7 @@ def stop_packet_capture(capture):
 
 
 # the files the daemon writes beside lease_file (lease_files.c)
-LEASE_FILE_SUFFIXES = (".mappings", ".filters", ".outgoing")
+LEASE_FILE_SUFFIXES = (".mappings", ".filters", ".outgoing", ".outgoing.peers")
 
 
 class LeaseSource:
@@ -880,7 +886,7 @@ class LeaseSource:
 
     def read_raw(self):
         """The lines of the files as written (a missing file has none): each path, and the files lease_files.c
-        writes beside it (<path>.mappings, .filters, .outgoing)."""
+        writes beside it (<path>.mappings, .filters, .outgoing, .outgoing.peers)."""
         lines = []
         for path in self.files:
             for name in [path] + [path + suffix for suffix in LEASE_FILE_SUFFIXES]:

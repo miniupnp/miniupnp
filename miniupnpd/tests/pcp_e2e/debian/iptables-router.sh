@@ -159,11 +159,12 @@ cmd_snapshot() {
 }
 
 # The lease files of the daemon, those there are: the files beside lease_file (.mappings,
-# .filters, .outgoing), or lease_file and lease_file6 of a daemon from before them. What
+# .filters, .outgoing, .outgoing.peers), or lease_file and lease_file6 of a daemon from before them. What
 # the runners read with --state-command.
 cmd_leases() {
 	cat /var/tmp/miniupnpd.leases /var/tmp/miniupnpd.leases6 /var/tmp/miniupnpd.leases.mappings \
-	    /var/tmp/miniupnpd.leases.filters /var/tmp/miniupnpd.leases.outgoing 2>/dev/null || true
+	    /var/tmp/miniupnpd.leases.filters /var/tmp/miniupnpd.leases.outgoing \
+	    /var/tmp/miniupnpd.leases.outgoing.peers 2>/dev/null || true
 }
 
 cmd_capture() {
