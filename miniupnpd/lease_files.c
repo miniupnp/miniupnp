@@ -122,6 +122,21 @@ put_proto(FILE * f, int proto)
 		fprintf(f, "%d", proto);
 }
 
+/* The external interface of the family: written for the tools which show
+ * the leases, not read back */
+static void
+put_ifname(FILE * f, int family)
+{
+	const char * name = ext_if_name;
+#ifdef ENABLE_IPV6
+	if(family == AF_INET6 && ext_if_name6 != NULL)
+		name = ext_if_name6;
+#else
+	(void)family;
+#endif
+	fputs(name != NULL ? name : LEASE_NA, f);
+}
+
 /* The label as the file has it: \\ for a backslash, \| for the separator,
  * \n, \r and \xHH for the other control characters. NA if there is none,
  * and \x4EA for a label which is really NA, so it is not taken for none. */
@@ -166,8 +181,10 @@ put_mapping(struct lease_entry * e, void * arg)
 	put_addr(f, e->family, &e->iaddr);
 	fputc(LEASE_SEP, f);
 	put_addr(f, e->family, &e->eaddr);
-	fprintf(f, "|%s|%u|%d|", e->kind == MAP_KIND_PCP ? map_nonce_ntop(e->nonce, nonce) : LEASE_NA,
-	        unix_expiry(e->timestamp), e->nfilters);
+	fprintf(f, "|%s|%u|%u|", e->kind == MAP_KIND_PCP ? map_nonce_ntop(e->nonce, nonce) : LEASE_NA,
+	        e->since, unix_expiry(e->timestamp));
+	put_ifname(f, e->family);
+	fprintf(f, "|%d|", e->nfilters);
 	put_label(f, e->label);
 	fputc('\n', f);
 }
@@ -224,7 +241,9 @@ write_outgoing(FILE * f)
 			put_addr(f, b->family, &b->eaddr);
 			fprintf(f, "|%hu|%s|", b->eport, nonce);
 			put_addr(f, b->family, &p->raddr);
-			fprintf(f, "|%hu|%u|", p->rport, unix_expiry(p->timestamp));
+			fprintf(f, "|%hu|%u|%u|", p->rport, p->since, unix_expiry(p->timestamp));
+			put_ifname(f, b->family);
+			fputc(LEASE_SEP, f);
 			put_label(f, b->label);
 			fputc('\n', f);
 		}
@@ -269,10 +288,10 @@ static const struct lease_part {
 	{ ".filters", "LEASE-FILTERS 1", "map|raddr|rprefix|rport|uid",
 	  filters_changes, write_filters },
 	{ ".outgoing", "LEASE-OUTGOING 1",
-	  "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|expiry|label",
+	  "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|since|expiry|ifname|label",
 	  outgoing_table_changes, write_outgoing },
 	{ ".mappings", "LEASE-MAPPINGS 1",
-	  "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label",
+	  "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label",
 	  mappings_changes, write_mappings },
 	{ ".checksum", "LEASE-CHECKSUM 1", "file|bytes|crc32",
 	  NULL, write_checksum },
@@ -803,13 +822,13 @@ get_nonce(const char * h, unsigned char * nonce)
  * they are skipped. One it lacks has its default. */
 enum {
 	F_ID, F_KIND, F_FAMILY, F_PROTO, F_EPORT, F_IPORT, F_IADDR, F_EADDR,
-	F_NONCE, F_EXPIRY, F_FILTERS, F_LABEL,
+	F_NONCE, F_SINCE, F_EXPIRY, F_FILTERS, F_LABEL,
 	F_MAP, F_RADDR, F_RPREFIX, F_RPORT, F_UID,
 	F_FILE, F_BYTES, F_CRC32, F_COUNT
 };
 static const char * const field_names[F_COUNT] = {
 	"id", "kind", "family", "proto", "eport", "iport", "iaddr", "eaddr",
-	"nonce", "expiry", "filters", "label",
+	"nonce", "since", "expiry", "filters", "label",
 	"map", "raddr", "rprefix", "rport", "uid",
 	"file", "bytes", "crc32"
 };
@@ -983,12 +1002,12 @@ bad_line(const struct lease_in * in, const char * what)
 	return 0;
 }
 
-/* The family, protocol and expiry of a line, common to .mappings and
- * .outgoing. The expiry goes on the clock of upnp_time(). 1, or 0 to skip
- * the line (logged). */
+/* The family, protocol, since and expiry of a line, common to .mappings
+ * and .outgoing. The expiry goes on the clock of upnp_time(); since stays
+ * unix time, NA : 0, now. 1, or 0 to skip the line (logged). */
 static int
 get_common(struct lease_in * in, char ** field, unsigned char * family,
-           unsigned char * proto, unsigned int * timestamp)
+           unsigned char * proto, unsigned int * since, unsigned int * timestamp)
 {
 	unsigned long long v;
 	long long t, su, sm;
@@ -1008,6 +1027,12 @@ get_common(struct lease_in * in, char ** field, unsigned char * family,
 		*proto = (unsigned char)p;
 	else
 		return bad_line(in, "proto");
+	*since = 0;
+	if(field[F_SINCE] != NULL && strcmp(field[F_SINCE], LEASE_NA) != 0) {
+		if(get_number(field[F_SINCE], 0xffffffffULL, &v) < 0)
+			return bad_line(in, "since");
+		*since = (unsigned int)v;
+	}
 	*timestamp = 0;
 	if(field[F_EXPIRY] == NULL)
 		return 1;
@@ -1161,7 +1186,7 @@ get_mapping(struct lease_in * in, char ** field, struct lease_entry * r,
 	lease_entry_init(r, kind_names[i].kind, NULL);
 	if(get_number(field[F_ID], LEASE_ID_MAX, &r->id) < 0 || r->id == 0)
 		return bad_line(in, "id");
-	if(!get_common(in, field, &r->family, &r->proto, &r->timestamp))
+	if(!get_common(in, field, &r->family, &r->proto, &r->since, &r->timestamp))
 		return 0;
 	if(get_number(field[F_IPORT], 65535, &v) < 0)
 		return bad_line(in, "iport");
@@ -1197,7 +1222,8 @@ get_peer(struct lease_in * in, char ** field, struct outgoing_entry * b)
 {
 	unsigned long long v;
 
-	if(!get_common(in, field, &b->family, &b->proto, &b->peers[0].timestamp))
+	if(!get_common(in, field, &b->family, &b->proto, &b->peers[0].since,
+	               &b->peers[0].timestamp))
 		return 0;
 	if(get_addr(b->family, field[F_IADDR], &b->iaddr) < 0 ||
 	   IN6_IS_ADDR_UNSPECIFIED(&b->iaddr))
@@ -1390,6 +1416,7 @@ load_mappings(struct lease_in * maps, const struct side_lines * fs,
 		e->eaddr = r.eaddr;
 		e->eport = r.eport;
 		e->timestamp = r.timestamp;
+		e->since = r.since;
 		e->label = r.label;
 		for(k = 0; k < nf; k++) {
 			e->filters[k].raddr = l[k].f.raddr;

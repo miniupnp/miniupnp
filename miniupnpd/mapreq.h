@@ -149,6 +149,9 @@ struct lease_entry {
 	int nfilters;
 	unsigned int timestamp;	/* the expiry on the clock of upnp_time(),
 				 * 0 : none */
+	unsigned int since;	/* unix time the mapping was made: kept on a
+				 * renewal and over a restart. 0 : set when
+				 * the row is linked */
 	const char * label;	/* the text of the client: the UPnP description,
 				 * the PCP DESCRIPTION option. NULL : none */
 };
@@ -158,6 +161,8 @@ struct outgoing_peer {
 	struct in6_addr raddr;	/* the destination, one host. IPv4 as ::ffff:a.b.c.d */
 	unsigned short rport;	/* the destination port, never 0 */
 	unsigned int timestamp;	/* the expiry on the clock of upnp_time() */
+	unsigned int since;	/* unix time the peer was made, as
+				 * lease_entry.since */
 	unsigned int retry;	/* an expired peer whose rule stays: the next try,
 				 * on the clock of upnp_time(). 0 : none */
 };

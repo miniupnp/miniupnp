@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <syslog.h>
+#include <time.h>
 
 #include "lease_table.h"
 
@@ -534,6 +535,7 @@ lease_table_copy(const struct lease_entry * r)
 		return NULL;
 	e->kind = r->kind;
 	e->flags = r->flags;
+	e->since = r->since;
 	e->family = r->family;
 	e->proto = r->proto;
 	memcpy(e->nonce, r->nonce, sizeof(e->nonce));
@@ -564,6 +566,8 @@ lease_table_link(struct lease_entry * e)
 	b = int_hash(e) & (int_index.size - 1);
 	e->int_next = int_index.buckets[b];
 	int_index.buckets[b] = e;
+	if(e->since == 0)
+		e->since = (unsigned int)time(NULL);
 	/* the label was the caller's: the row keeps a copy */
 	if(e->label != NULL && (e->label = strdup(e->label)) == NULL)
 		syslog(LOG_INFO, "lease table: no memory for the label of port %hu", e->eport);
@@ -619,6 +623,8 @@ lease_table_link_in_place(struct lease_entry * e, struct lease_entry * old)
 
 	if(e->id == 0)
 		e->id = old->id;
+	if(e->since == 0)
+		e->since = old->since;
 	lease_table_remove(old);
 	lease_table_link(e);
 	if(keep) {

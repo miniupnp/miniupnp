@@ -556,7 +556,8 @@ def lease_file_records(sections):
 
     def record(kind, row, raddr="NA", rport="NA", expiry=None):
         return "|".join((kind, row.get("proto", "NA"), row.get("eport", "NA"), row.get("family", "NA"),
-                         row.get("iaddr", "NA"), row.get("iport", "NA"), "NA", row.get("nonce", "NA"), "NA", "NA",
+                         row.get("iaddr", "NA"), row.get("iport", "NA"), row.get("ifname", "NA"),
+                         row.get("nonce", "NA"), "NA", row.get("since", "NA"),
                          row.get("expiry", "NA") if expiry is None else expiry, row.get("eaddr", "NA"),
                          raddr, rport, row.get("label", "NA").replace("\\|", "\\x7c")))
     for row in sections["mappings"]:

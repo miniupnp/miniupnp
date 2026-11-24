@@ -36,6 +36,10 @@ main(void)
 
 /* what lease_files.c takes from the daemon */
 const char * lease_file = NULL;
+const char * ext_if_name = "wan0";
+#ifdef ENABLE_IPV6
+const char * ext_if_name6 = "wan6";
+#endif
 enum lease_restore_mode lease_file_restore = LEASE_RESTORE_YES;
 static time_t now = 1000;
 
@@ -165,9 +169,11 @@ test_contents(void)
 	e->filters[0].raddr = addr("::ffff:203.0.113.7");
 	e->filters[0].prefix = 128;
 	lease_table_link(e);
-	/* NAT-PMP, no expiry, no label */
-	lease_table_link(add_row(2, MAP_KIND_NATPMP, AF_INET, IPPROTO_UDP, 40002, "::ffff:192.168.1.11",
-	                         5060, NULL, 0, NULL, 0));
+	/* NAT-PMP, no expiry, no label; made before (since kept) */
+	e = add_row(2, MAP_KIND_NATPMP, AF_INET, IPPROTO_UDP, 40002, "::ffff:192.168.1.11",
+	            5060, NULL, 0, NULL, 0);
+	e->since = 1700000000;
+	lease_table_link(e);
 	/* PCP with its nonce and a label of NA */
 	e = add_row(3, MAP_KIND_PCP, AF_INET, IPPROTO_UDP, 40003, "::ffff:192.168.1.12", 7000,
 	            "::ffff:198.51.100.1", now + 60, "NA", 0);
@@ -207,18 +213,25 @@ test_contents(void)
 		long long t0 = (long long)time(NULL);
 		char * m = slurp(".mappings");
 		unsigned long long id;
-		unsigned int exp;
+		unsigned int exp, since;
 		assert(m != NULL);
 		assert(strncmp(m, "LEASE-MAPPINGS 1 last_id=", 25) == 0);
-		assert(strstr(m, "\nid|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n") != NULL);
-		assert(sscanf(strstr(m, "\n1|"), "\n%llu|UPNP|IPv4|TCP|40001|8080|192.168.1.10|198.51.100.1|NA|%u|1|",
-		              &id, &exp) == 2);
+		assert(strstr(m, "\nid|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n") != NULL);
+		assert(sscanf(strstr(m, "\n1|"), "\n%llu|UPNP|IPv4|TCP|40001|8080|192.168.1.10|198.51.100.1|NA|%u|%u|wan0|1|",
+		              &id, &since, &exp) == 3);
 		assert(id == 1 && (long long)exp >= t0 + 3599 && (long long)exp <= t0 + 3601);
+		/* set when the row was linked */
+		assert((long long)since >= t0 - 5 && (long long)since <= t0);
 		assert(strstr(m, "|cam\\|era\\\\1\\n\n") != NULL);
-		assert(strstr(m, "\n2|NAT-PMP|IPv4|UDP|40002|5060|192.168.1.11|NA|NA|0|0|NA\n") != NULL);
+		assert(strstr(m, "\n2|NAT-PMP|IPv4|UDP|40002|5060|192.168.1.11|NA|NA|1700000000|0|wan0|0|NA\n") != NULL);
 		assert(strstr(m, "\n3|PCP-M|IPv4|UDP|40003|7000|192.168.1.12|198.51.100.1|00112233445566778899aabb|") != NULL);
 		assert(strstr(m, "|0|\\x4EA\n") != NULL);
 		assert(strstr(m, "\n4|UPNP|IPv6|UDP|9000|9000|2001:db8::10|2001:db8::10|NA|") != NULL);
+#ifdef ENABLE_IPV6
+		assert(strstr(m, "|wan6|2|NA\n") != NULL);	/* ext_ifname6 */
+#else
+		assert(strstr(m, "|wan0|2|NA\n") != NULL);
+#endif
 		free(m);
 	}
 	{
@@ -233,7 +246,7 @@ test_contents(void)
 	{
 		char * o = slurp(".outgoing");
 		assert(o != NULL && strncmp(o, "LEASE-OUTGOING 1 last_id=", 25) == 0);
-		assert(strstr(o, "\nfamily|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|expiry|label\n") != NULL);
+		assert(strstr(o, "\nfamily|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|since|expiry|ifname|label\n") != NULL);
 		assert(strstr(o, "\nIPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|0000000000000000000000ab|203.0.113.1|80|") != NULL);
 		assert(strstr(o, "\nIPv4|TCP|192.168.1.13|5000|198.51.100.1|6000|0000000000000000000000ab|203.0.113.2|443|") != NULL);
 		free(o);
@@ -242,9 +255,9 @@ test_contents(void)
 	outgoing_table_clear();
 	now += LEASE_FILES_MIN_GAP;
 	poll_now(1);
-	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n");
+	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n");
 	expect(".filters", "map|raddr|rprefix|rport|uid\n");
-	expect(".outgoing", "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|expiry|label\n");
+	expect(".outgoing", "family|proto|iaddr|iport|eaddr|eport|nonce|raddr|rport|since|expiry|ifname|label\n");
 }
 
 /* when a save runs: idle after LEASE_FILES_MIN_GAP, or after
@@ -266,6 +279,7 @@ test_timing(void)
 	now += 100;
 	e = add_row(10, MAP_KIND_UPNP, AF_INET, IPPROTO_TCP, 41000, "::ffff:192.168.1.10", 80,
 	            NULL, 0, "a", 0);
+	e->since = 1700000000;
 	lease_table_link(e);
 	/* busy: no save before the delay; the timeout says when to come back */
 	tv.tv_sec = 60;
@@ -278,19 +292,19 @@ test_timing(void)
 	assert(slurp(".mappings") == NULL);
 	now += 1;
 	lease_files_poll(0, &tv);
-	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n"
-	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|0|0|a\n");
+	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n"
+	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|1700000000|0|wan0|0|a\n");
 	/* only .mappings changed: the others are not written */
 	assert(slurp(".filters") == NULL && slurp(".outgoing") == NULL);
 	/* idle, but within the gap of the last save: no save */
 	assert(lease_table_set_label(e, "b") == 0);
 	lease_files_poll(1, &tv);
-	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n"
-	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|0|0|a\n");
+	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n"
+	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|1700000000|0|wan0|0|a\n");
 	now += LEASE_FILES_MIN_GAP;
 	lease_files_poll(1, &tv);
-	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n"
-	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|0|0|b\n");
+	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n"
+	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|1700000000|0|wan0|0|b\n");
 	/* nothing changed: the file is left alone */
 	snprintf(path, sizeof(path), "%s.mappings", base);
 	assert(stat(path, &st) == 0);
@@ -301,8 +315,8 @@ test_timing(void)
 	/* flush writes at once */
 	assert(lease_table_set_label(e, "c") == 0);
 	assert(lease_files_flush() == 0);
-	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label\n"
-	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|0|0|c\n");
+	expect(".mappings", "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|since|expiry|ifname|filters|label\n"
+	       "10|UPNP|IPv4|TCP|41000|80|192.168.1.10|NA|NA|1700000000|0|wan0|0|c\n");
 	lease_table_clear();
 }
 
@@ -474,6 +488,7 @@ test_round_trip(void)
 	g = got_id(1, &label);
 	assert(g != NULL && g->kind == MAP_KIND_UPNP && g->family == AF_INET && g->proto == IPPROTO_TCP);
 	assert(g->eport == 40001 && g->iport == 8080 && strcmp(label, "cam|era\\1\n") == 0);
+	assert(g->since != 0 && g->since <= (unsigned int)time(NULL));
 	assert(same_addr(&g->iaddr, "::ffff:192.168.1.10") && same_addr(&g->eaddr, "::ffff:198.51.100.1"));
 	assert(g->nfilters == 1 && g->filters[0].prefix == 120 && g->filters[0].rport == 443);
 	assert(same_addr(&g->filters[0].raddr, "::ffff:203.0.113.0"));

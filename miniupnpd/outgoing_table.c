@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <syslog.h>
+#include <time.h>
 
 #include "outgoing_table.h"
 
@@ -87,7 +88,10 @@ add_peer(struct outgoing_entry * b, const struct outgoing_peer * p)
 		b->peers = a;
 		b->peers_alloc = n;
 	}
-	b->peers[b->npeers++] = *p;
+	b->peers[b->npeers] = *p;
+	if(b->peers[b->npeers].since == 0)
+		b->peers[b->npeers].since = (unsigned int)time(NULL);
+	b->npeers++;
 	peer_count++;
 	return 0;
 }
@@ -105,6 +109,9 @@ outgoing_table_link(struct outgoing_entry * b)
 		if(b->label != NULL && (b->label = strdup(b->label)) == NULL)
 			syslog(LOG_WARNING, "outgoing table: no memory for the label of port %hu",
 			       b->eport);
+		for(i = 0; i < b->npeers; i++)
+			if(b->peers[i].since == 0)
+				b->peers[i].since = (unsigned int)time(NULL);
 		b->next = head;
 		head = b;
 		count++;
