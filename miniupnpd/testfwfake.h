@@ -22,6 +22,10 @@ extern const char * rule_iaddr;	/* the target of that rule */
 extern unsigned short rule_iport;
 extern int adds, deletes, updates;
 extern unsigned short last_update_iport;
+/* get_redirect_rule_by_index() lists this many rules, of ports 5000 on to
+ * rule_iaddr, and a delete takes the first one away; -1: FAKE_RULES,
+ * which stay */
+extern int rules_listed;
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 extern int peer_adds, fail_peer_add;
 extern int peer_present;	/* get_peer_rule_by_index() lists the PEER rule */
@@ -29,6 +33,9 @@ extern int peer_present;	/* get_peer_rule_by_index() lists the PEER rule */
 #ifdef FW_MAP6
 extern int map6_adds, map6_deletes, fail_map6_add_at, map6_gone;
 extern int map6_lost;	/* get_map6_packets() finds no rule */
+/* get_map6_rule_at() lists this many rules, of [2001:db8::10]:6000 on, and
+ * a delete takes the first one away */
+extern int map6_listed;
 #endif
 
 /* the firewall has the rules of ports 5000 and 5001, with counters */

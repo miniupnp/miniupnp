@@ -529,7 +529,9 @@ upnp_redirect_internal(struct lease_entry * req)
 	if(disable_port_forwarding)
 		return -1;
 	fw_change_init(&c, FW_ADD, req, NULL);
-	c.fresh = 1;	/* the callers found no row on the port */
+	/* the callers found no row on the port, and since
+	 * drop_rules_without_row() no rule is without a row */
+	c.fresh = 1;
 	if(fw_sync(&c, 1) < 0) {
 		if(c.applied != FW_NOT_APPLIED)
 			keep_partial_row(req);
@@ -899,6 +901,90 @@ expire_mappings(void)
 		}
 	}
 #endif
+}
+
+/* Delete the rule at the place *i if it has no row, else go to the next
+ * place. 1 while there are rules. */
+static int
+drop_if_no_row(int * i, int r, int known, struct fw_change * c, int * n)
+{
+	if(r < 0)
+		return 0;
+	if(r == 0 && !known) {
+		if(fw_sync(c, 1) == 0) {
+			(*n)++;
+			return 1;	/* the rules after it moved down to *i */
+		}
+		syslog(LOG_WARNING, "a rule of an earlier run has no row, and could not be deleted");
+	}
+	(*i)++;
+	return 1;
+}
+
+void
+drop_rules_without_row(void)
+{
+	struct lease_entry * e = lease_table_new(1);
+	struct fw_change c;
+	int i, r, n = 0;
+#ifdef FW_MAP6
+	const struct lease_entry * row;
+#endif
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	struct outgoing_entry b;
+	struct outgoing_peer q;
+	struct fw_out_change oc;
+#endif
+
+	if(e == NULL)
+		return;
+	fw_change_init(&c, FW_DELETE, NULL, e);
+	i = 0;
+	do {
+		r = fw_map_rule_at(i, e);
+	} while(drop_if_no_row(&i, r,
+	        r == 0 && lease_table_find_entry(e->proto, AF_INET, &e->iaddr,
+	                                         e->iport, e->eport) != NULL,
+	        &c, &n));
+#ifdef FW_MAP6
+	i = 0;
+	do {
+		r = fw_map6_rule_at(i, e);
+		row = r == 0 ? lease_table_find_entry(e->proto, AF_INET6, &e->iaddr,
+		                                      e->iport, e->iport) : NULL;
+	} while(drop_if_no_row(&i, r,
+	        row != NULL && (row->nfilters > 0 ?
+	                        lease_filter_find(row, &e->filters[0].raddr,
+	                                          e->filters[0].prefix,
+	                                          e->filters[0].rport) != NULL :
+	                        e->nfilters == 0),	/* the rule of any remote */
+	        &c, &n));
+#endif
+	lease_table_free(e);
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	/* a PEER rule goes by its external port, with the redirect rule on
+	 * it: one which shares the port of a row stays. At startup a row of
+	 * the lease file has the address ::, which memmap_find_map() takes
+	 * for any. */
+	memset(&b, 0, sizeof(b));
+	memset(&q, 0, sizeof(q));
+	b.peers = &q;
+	for(i = 0; (r = fw_peer_rule_at(i, &b)) >= 0; ) {
+		if(r == 0 &&
+		   memmap_find_peer(b.proto, AF_INET, &b.iaddr, b.iport, &q.raddr, q.rport) == NULL &&
+		   memmap_find_map(b.proto, AF_INET, &b.eaddr, b.eport) == NULL) {
+			fw_out_change_init(&oc, FW_OUT_DELETE, &b, 0);
+			if(fw_sync_out(&oc, 1) == 0) {
+				n++;
+				continue;
+			}
+			syslog(LOG_WARNING, "a PEER rule of an earlier run has no row, and could not be deleted");
+		}
+		i++;
+	}
+#endif
+	if(n > 0)
+		syslog(LOG_NOTICE, "%d rules of an earlier run had no row: deleted", n);
 }
 
 /* The rule_state list as an array sorted by protocol and port, so the

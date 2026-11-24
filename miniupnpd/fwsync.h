@@ -99,6 +99,27 @@ int fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t 
  * rules of an earlier run, at startup. */
 int fw_read_map(struct lease_entry * e, char * desc, int desclen);
 
+/* Walk the rules of the daemon's chains or anchors, to find those of an
+ * earlier run at startup. Each takes the place i, from 0, and gives the
+ * rule there as a row: 0, 1 for a rule which is no row (no address of its
+ * family), or -1 past the end or when the rules cannot be read. A delete
+ * moves the rules after it down by one. */
+
+/* The IPv4 redirect rule at i, into e, a row of lease_table_new(1). */
+int fw_map_rule_at(int i, struct lease_entry * e);
+
+#ifdef FW_MAP6
+/* The map6 rule at i, as an IPv6 map of one filter, into e, a row of
+ * lease_table_new(1). A rule of any remote is a map with no filter. */
+int fw_map6_rule_at(int i, struct lease_entry * e);
+#endif
+
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+/* The PEER rule at i, as a binding of one peer, into b, which has room
+ * for one. */
+int fw_peer_rule_at(int i, struct outgoing_entry * b);
+#endif
+
 /* The renewal check of a row of the table: is its firewall side as the row
  * says? An IPv4 mapping is read by its external port, an IPv6 map by the
  * key of each filter.

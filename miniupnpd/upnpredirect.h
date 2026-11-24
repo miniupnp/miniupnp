@@ -160,6 +160,14 @@ struct rule_state
 void
 expire_mappings(void);
 
+/* At startup, after the lease files are read: delete the rules of an
+ * earlier run which have no row, IPv4 redirect, map6 and PEER rules. The
+ * table then has a row for each rule of the daemon, so a rule found on a
+ * port with no row is that of a failed add. Without a lease file the
+ * table is empty, and the chains are flushed. */
+void
+drop_rules_without_row(void);
+
 /* The next expiry pass is at ts, if that is sooner. */
 void
 next_to_clean(unsigned int ts);

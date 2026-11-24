@@ -207,6 +207,16 @@ map_pton(const char * s, int * family, struct in6_addr * a)
 	return -1;
 }
 
+/* map_pton() of an address of the family af only. 0, or -1 if s is no
+ * address of af. */
+static inline int
+map_ipv4_to_ipv6_af(const char * s, int af, struct in6_addr * a)
+{
+	int family;
+
+	return map_pton(s, &family, a) < 0 || family != af ? -1 : 0;
+}
+
 /* The text of an address of a request, in buf of len bytes. buf, or NULL if
  * it does not fit. */
 static inline const char *

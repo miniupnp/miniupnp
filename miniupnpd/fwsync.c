@@ -545,28 +545,13 @@ fw_sync_out(struct fw_out_change * c, int n)
 	return r < 0 ? r : -1;
 }
 
-int
-fw_read_map(struct lease_entry * e, char * desc, int desclen)
+/* The internal side and the remote host of an IPv4 redirect rule into e, a
+ * row of lease_table_new(1). 0, or -1 if the rule holds no IPv4 address. */
+static int
+map_row_of_rule(struct lease_entry * e, const char * iaddr, unsigned short iport,
+                const char * rhost)
 {
-	char iaddr[INET6_ADDRSTRLEN];
-	char rhost[INET6_ADDRSTRLEN];
-	unsigned short iport;
-	int family, r;
-
-	iaddr[0] = rhost[0] = '\0';
-	if(desc != NULL && desclen > 0)
-		desc[0] = '\0';
-	r = get_redirect_rule(ext_if_name, e->eport, e->proto, iaddr, sizeof(iaddr),
-	                      &iport, desc, desclen, rhost, sizeof(rhost),
-	                      NULL, 0, 0);
-	if(r != 0) {
-#if defined(USE_IPFW) || defined(USE_IPF)
-		return -2;	/* they cannot tell an error from no rule */
-#else
-		return r == -2 ? -2 : -1;
-#endif
-	}
-	if(map_pton(iaddr, &family, &e->iaddr) < 0 || family != AF_INET ||
+	if(map_ipv4_to_ipv6_af(iaddr, AF_INET, &e->iaddr) < 0 ||
 	   e->filters_alloc < 1 || map_filter_set(&e->filters[0], rhost, 0) < 0)
 		return -1;
 	e->family = AF_INET;
@@ -574,6 +559,99 @@ fw_read_map(struct lease_entry * e, char * desc, int desclen)
 	e->nfilters = e->filters[0].prefix != 0 ? 1 : 0;
 	return 0;
 }
+
+int
+fw_read_map(struct lease_entry * e, char * desc, int desclen)
+{
+	char iaddr[INET6_ADDRSTRLEN];
+	char rhost[INET6_ADDRSTRLEN];
+	unsigned short iport;
+	int r;
+
+	iaddr[0] = rhost[0] = '\0';
+	if(desc != NULL && desclen > 0)
+		desc[0] = '\0';
+	r = redirect_result(get_redirect_rule(ext_if_name, e->eport, e->proto,
+	                                      iaddr, sizeof(iaddr), &iport,
+	                                      desc, desclen, rhost, sizeof(rhost),
+	                                      NULL, 0, 0));
+	if(r != 0)
+		return r;
+	return map_row_of_rule(e, iaddr, iport, rhost);
+}
+
+int
+fw_map_rule_at(int i, struct lease_entry * e)
+{
+	char iaddr[INET6_ADDRSTRLEN];
+	char rhost[INET6_ADDRSTRLEN];
+	unsigned short eport, iport;
+	unsigned int timestamp;
+	u_int64_t packets, bytes;
+	int proto;
+
+	iaddr[0] = rhost[0] = '\0';
+	if(get_redirect_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr), &iport,
+	                              &proto, NULL, 0, rhost, sizeof(rhost),
+	                              &timestamp, &packets, &bytes) < 0)
+		return -1;
+	e->eport = eport;
+	e->proto = proto;
+	return map_row_of_rule(e, iaddr, iport, rhost) < 0 ? 1 : 0;
+}
+
+#ifdef FW_MAP6
+int
+fw_map6_rule_at(int i, struct lease_entry * e)
+{
+	char rhost[INET6_ADDRSTRLEN];
+	char iaddr[INET6_ADDRSTRLEN];
+	unsigned short rport, iport;
+	int proto;
+
+	rhost[0] = iaddr[0] = '\0';
+	if(get_map6_rule_at(i, rhost, sizeof(rhost), &rport, iaddr, sizeof(iaddr),
+	                    &iport, &proto, NULL, 0) < 0)
+		return -1;
+	if(map_ipv4_to_ipv6_af(iaddr, AF_INET6, &e->iaddr) < 0 ||
+	   e->filters_alloc < 1 || map_filter_set(&e->filters[0], rhost, rport) < 0)
+		return 1;
+	e->family = AF_INET6;
+	e->proto = proto;
+	e->iport = e->eport = iport;	/* a map6 has no translation */
+	/* the rule of any remote is that of a map with no filter */
+	e->nfilters = e->filters[0].prefix != 0 || e->filters[0].rport != 0 ? 1 : 0;
+	return 0;
+}
+#endif
+
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+int
+fw_peer_rule_at(int i, struct outgoing_entry * b)
+{
+	char iaddr[INET6_ADDRSTRLEN];
+	char rhost[INET6_ADDRSTRLEN];
+	unsigned short eport, iport, rport;
+	unsigned int timestamp;
+	int proto;
+
+	iaddr[0] = rhost[0] = '\0';
+	if(get_peer_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr), &iport, &proto,
+	                          NULL, 0, rhost, sizeof(rhost), &rport, &timestamp,
+	                          NULL, NULL) < 0)
+		return -1;
+	if(map_ipv4_to_ipv6_af(iaddr, AF_INET, &b->iaddr) < 0 ||
+	   map_ipv4_to_ipv6_af(rhost, AF_INET, &b->peers[0].raddr) < 0)
+		return 1;
+	b->family = AF_INET;
+	b->proto = proto;
+	b->eport = eport;
+	b->iport = iport;
+	b->peers[0].rport = rport;
+	b->npeers = 1;
+	return 0;
+}
+#endif
 
 /* the IPv4 mapping e: 0, 1, -1 or -2 as fw_check_row() */
 static int

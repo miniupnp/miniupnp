@@ -23,6 +23,7 @@ const char * rule_iaddr = "192.168.1.10";	/* the target of that rule */
 unsigned short rule_iport = 5000;
 int adds, deletes, updates;
 unsigned short last_update_iport;
+int rules_listed = -1;	/* get_redirect_rule_by_index(): -1 FAKE_RULES */
 
 int
 add_redirect_rule2(const char * ifname, const char * rhost, unsigned short eport,
@@ -53,6 +54,12 @@ fake_delete(void)
 	if(fail_delete)
 		return -1;
 	deletes++;
+	if(rules_listed > 0)
+		rules_listed--;	/* the first rule listed went */
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	else if(rules_listed == 0)
+		peer_present = 0;	/* the PEER rule went, by its port */
+#endif
 	return 0;
 }
 
@@ -129,12 +136,15 @@ get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
                            char * rhost, int rhostlen, unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes)
 {
-	(void)ifname; (void)iaddr; (void)iaddrlen; (void)desc; (void)desclen;
-	(void)rhost; (void)rhostlen;
-	if(index >= FAKE_RULES)
+	(void)ifname; (void)desc; (void)desclen;
+	if(index >= (rules_listed >= 0 ? rules_listed : FAKE_RULES))
 		return -1;
 	*eport = (unsigned short)(5000 + index);
 	*iport = *eport;
+	if(iaddr != NULL && iaddrlen > 0)
+		snprintf(iaddr, (size_t)iaddrlen, "%s", rule_iaddr);
+	if(rhost != NULL && rhostlen > 0)
+		rhost[0] = '\0';
 	*proto = IPPROTO_TCP;
 	*timestamp = 0;
 	*packets = (u_int64_t)(10 * index);
@@ -213,10 +223,14 @@ get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
                        char * rhost, int rhostlen, unsigned short * rport,
                        unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
 {
-	(void)ifname; (void)iaddr; (void)iaddrlen; (void)desc; (void)desclen;
-	(void)rhost; (void)rhostlen; (void)timestamp; (void)packets; (void)bytes;
+	(void)ifname; (void)desc; (void)desclen;
+	(void)timestamp; (void)packets; (void)bytes;
 	if(index > 0 || !peer_present)
 		return -1;
+	if(iaddr != NULL && iaddrlen > 0)
+		snprintf(iaddr, (size_t)iaddrlen, "%s", rule_iaddr);
+	if(rhost != NULL && rhostlen > 0)
+		snprintf(rhost, (size_t)rhostlen, "203.0.113.7");
 	*eport = 6000;
 	*iport = 5000;
 	*proto = IPPROTO_UDP;
@@ -228,6 +242,7 @@ get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
 #ifdef FW_MAP6
 int map6_adds, map6_deletes, fail_map6_add_at, map6_gone;
 int map6_lost;	/* get_map6_packets() finds no rule */
+int map6_listed;	/* get_map6_rule_at() lists this many rules */
 
 int
 add_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
@@ -265,6 +280,8 @@ delete_map6_rule(const char * rem_host, unsigned short rem_port,
 	if(fail_delete)
 		return -1;
 	map6_deletes++;
+	if(map6_listed > 0)
+		map6_listed--;	/* the first rule listed went */
 	return 0;
 }
 
@@ -276,6 +293,26 @@ get_map6_packets(const char * rem_host, unsigned short rem_port,
 	(void)rem_host; (void)rem_port; (void)int_client; (void)int_port; (void)proto;
 	*packets = 0;
 	return map6_lost ? -2 : 0;
+}
+
+/* [2001:db8::10]:6000 + index from any remote */
+int
+get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
+                 unsigned short * rem_port,
+                 char * int_client, int int_clientlen,
+                 unsigned short * int_port, int * proto,
+                 char * desc, int desclen)
+{
+	(void)desc; (void)desclen;
+	if(index >= map6_listed)
+		return -1;
+	if(rem_host != NULL && rem_hostlen > 0)
+		rem_host[0] = '\0';
+	*rem_port = 0;
+	snprintf(int_client, (size_t)int_clientlen, "2001:db8::10");
+	*int_port = (unsigned short)(6000 + index);
+	*proto = IPPROTO_TCP;
+	return 0;
 }
 #endif
 
@@ -291,8 +328,10 @@ reset(void)
 	rule_iport = 5000;
 	adds = deletes = updates = 0;
 	last_update_iport = 0;
+	rules_listed = -1;
 #ifdef FW_MAP6
 	map6_adds = map6_deletes = fail_map6_add_at = map6_gone = map6_lost = 0;
+	map6_listed = 0;
 #endif
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 	peer_adds = 0;

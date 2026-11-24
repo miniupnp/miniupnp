@@ -464,6 +464,76 @@ test_natpmp_foreign(void)
 }
 #endif
 
+/* At startup the rules with no row go, those of a row stay. The fake
+ * lists the rules of ports 5000 and 5001, and the map6 rules of
+ * [2001:db8::10]:6000 and 6001 from any remote. */
+static void
+test_drop_without_row(void)
+{
+#if defined(FW_MAP6) || (defined(PCP_PEER) && defined(USE_NETFILTER))
+	struct lease_entry * e;
+#endif
+
+	lease_table_clear();
+	memmap_add(map4(MAP_KIND_UPNP, 5000, 5000));
+#ifdef FW_MAP6
+	e = map6(MAP_KIND_PCP);
+	e->proto = IPPROTO_TCP;
+	e->iport = e->eport = 6000;
+	e->nfilters = 0;	/* no filter: its one rule is of any remote */
+	memmap_add(e);
+#endif
+	reset();
+	rules_listed = 2;
+#ifdef FW_MAP6
+	map6_listed = 2;
+#endif
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	peer_present = 0;
+#endif
+	drop_rules_without_row();
+	CHECK(deletes == 1 && rules_listed == 1);
+	CHECK(find4(5000) != NULL);
+#ifdef FW_MAP6
+	CHECK(map6_deletes == 1 && map6_listed == 1);
+#endif
+
+	/* no lease file: no row, every rule goes */
+	lease_table_clear();
+	reset();
+	rules_listed = 2;
+#ifdef FW_MAP6
+	map6_listed = 2;
+#endif
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	peer_present = 0;
+#endif
+	drop_rules_without_row();
+	CHECK(deletes == 2 && rules_listed == 0);
+#ifdef FW_MAP6
+	CHECK(map6_deletes == 2 && map6_listed == 0);
+#endif
+
+#if defined(PCP_PEER) && defined(USE_NETFILTER)
+	/* a PEER rule with no binding goes */
+	reset();
+	rules_listed = 0;
+	drop_rules_without_row();
+	CHECK(deletes == 1 && peer_present == 0);
+
+	/* one on the port of a row stays: its delete takes the redirect
+	 * rule on the port with it */
+	reset();
+	rules_listed = 0;
+	e = map4(MAP_KIND_PCP, 6000, 5000);
+	e->proto = IPPROTO_UDP;
+	memmap_add(e);
+	drop_rules_without_row();
+	CHECK(deletes == 0 && peer_present == 1);
+	lease_table_clear();
+#endif
+}
+
 int
 main(void)
 {
@@ -489,6 +559,7 @@ main(void)
 	test_reload_uid();
 #endif
 #endif
+	test_drop_without_row();
 	lease_table_clear();
 	if(failures) {
 		fprintf(stderr, "testcallers: %d check(s) failed\n", failures);

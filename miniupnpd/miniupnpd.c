@@ -2287,6 +2287,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	reload_from_lease_file6();
 #endif
 #endif
+	drop_rules_without_row();
 
 #ifdef TOMATO
 	tomato_load();
