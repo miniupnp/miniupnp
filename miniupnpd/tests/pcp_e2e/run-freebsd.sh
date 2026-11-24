@@ -677,6 +677,65 @@ run_restart_check() {
   fi
 }
 
+# Clock check (pf only): a start after a boot with the clock behind the last save, as on a router
+# with no real-time clock before NTP. FreeBSD has no boot id: the daemon takes a step of the wall
+# clock since the save as a new boot. The daemon is stopped (its last save has the real time), the
+# clock goes back an hour, and the daemon starts: its restore has to wait, with no rule of the
+# mapping. With the clock set again it restores within a few seconds: the lease file lines and the
+# rules are those of before.
+run_clock_check() {
+  if [ "$ROUTER" = debian-iptables ]; then
+    echo "SKIP restart-clock: Linux has a boot id, the start is in the same boot"
+    return 0
+  fi
+  echo "Restart check of the lease files, the clock behind the save"
+  restart_dir=$RUN_DIR/restart-clock
+  mkdir -p "$restart_dir"
+  lease_runner="python3 -I $PMP/run_pcp_wire_cases.py --port 5351 --platform $E2E_PLATFORM --mutating
+    --profile baseline --snapshot-dir $restart_dir
+    --state-command '$RSH $VM_USER@127.0.0.1 sh /root/miniupnp/$ROUTER_SCRIPT leases'"
+  clock_case="--host $LAN4.1 --family ipv4 --case lease-restart-keep-ipv4"
+  # shellcheck disable=SC2086
+  ports=$(eval $lease_runner $clock_case --list-lease-ports | tr ' ' '|')
+  # shellcheck disable=SC2086
+  eval $lease_runner $clock_case --phase create \
+    || { echo "FAIL restart-clock: the create phase failed"; STATUS=1; return 0; }
+  vm sh $ROUTER_SCRIPT rules "'$ports'" >"$restart_dir/before.txt" 2>&1 || true
+  # stop the daemon at the real time, then put the clock an hour back and start it again
+  $SSH "$PRIV sh -c 'kill \$(cat /tmp/pcp-e2e/miniupnpd.pid)'" >/dev/null 2>&1 || true
+  sleep 2
+  $SSH "$PRIV date -u $(date -u -d '-1 hour' +%Y%m%d%H%M.%S)" >"$restart_dir/clock.log" 2>&1
+  vm sh $ROUTER_SCRIPT restart >"$restart_dir/restart.log" 2>&1 || \
+    { echo "FAIL restart-clock: the daemon did not start again"; set_vm_clock; STATUS=1; return 0; }
+  clock_ok=1
+  $SSH "$PRIV grep -c 'the restore waits' /tmp/pcp-e2e/miniupnpd.log" >"$restart_dir/held.txt" 2>&1 || true
+  [ "$(cat "$restart_dir/held.txt")" -ge 1 ] 2>/dev/null || { echo "FAIL restart-clock: the restore did not wait"; clock_ok=0; }
+  vm sh $ROUTER_SCRIPT rules "'$ports'" >"$restart_dir/held-rules.txt" 2>&1 || true
+  [ -s "$restart_dir/held-rules.txt" ] && { echo "FAIL restart-clock: rules restored while the clock was behind"; clock_ok=0; }
+  set_vm_clock
+  i=0
+  until $SSH "$PRIV grep -q 'the clock is set, restoring' /tmp/pcp-e2e/miniupnpd.log" >/dev/null 2>&1; do
+    i=$((i + 1))
+    [ "$i" -lt 20 ] || { echo "FAIL restart-clock: no restore after the clock was set"; clock_ok=0; break; }
+    sleep 1
+  done
+  sleep 1
+  vm sh $ROUTER_SCRIPT rules "'$ports'" >"$restart_dir/after.txt" 2>&1 || true
+  if ! diff "$restart_dir/before.txt" "$restart_dir/after.txt" >"$restart_dir/diff.txt"; then
+    echo "FAIL restart-clock: the rules of the anchor changed over the restart:"
+    cat "$restart_dir/diff.txt"
+    clock_ok=0
+  fi
+  # shellcheck disable=SC2086
+  eval $lease_runner $clock_case --phase verify \
+    || { echo "FAIL restart-clock: the verify phase failed"; clock_ok=0; }
+  if [ "$clock_ok" = 1 ]; then
+    echo "PASS restart-clock: the restore waited for the clock, then the lease file and the rules are the same"
+  else
+    STATUS=1
+  fi
+}
+
 # Another suite on this fixture (upnp_e2e/run-freebsd.sh): a file that replaces the functions above.
 if [ -n "${PCP_E2E_SUITE_HOOKS:-}" ]; then
   # shellcheck disable=SC1090
@@ -704,6 +763,7 @@ if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
   run_restart_check
   run_restart_check keep
   run_restart_check peer
+  run_clock_check
 fi
 if [ "${PCP_E2E_ONLY_RESTART:-0}" = 1 ]; then
   exit "$STATUS"
