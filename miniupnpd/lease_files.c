@@ -18,9 +18,18 @@
  * PEER binding; the lines of one binding share its key.
  *
  * A save writes each changed part to a temporary file, then renames them:
- * .filters and .outgoing first, .mappings last. */
+ * .checksum first, then .filters and .outgoing, then .mappings. .checksum
+ * has the size and CRC-32 of each of them, both as it is on the disk and
+ * as the save writes it, so each file matches it whatever the rename a
+ * crash cut the save at (0|00000000 : no file):
+ *   LEASE-CHECKSUM 1 last_id=42
+ *   file|bytes|crc32
+ *   mappings|1234|89abcdef
+ *   mappings|1250|01234567
+ * A load reads no file which does not match it. */
 #include "config.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -234,10 +243,21 @@ filters_changes(void)
 	return lease_table_changes(LEASE_T_FILTERS);
 }
 
-/* The files, in the order of their rename: .mappings last, so its side files
- * are never older than it. Each with the change count of the table part it
- * holds, and its writer. */
-enum lease_file_id { LF_FILTERS, LF_OUTGOING, LF_MAPPINGS, LF_COUNT };
+/* The size and CRC-32 of a file of the set, as .checksum has them. A file
+ * which is not there has 0 and 0: a file of the set is never empty. */
+struct file_sum {
+	unsigned long long bytes;
+	unsigned long crc;
+};
+
+static void write_checksum(FILE * f);
+
+/* The data files in the order of their rename: .mappings after its side
+ * files, so they are never older than it. .checksum is renamed before them.
+ * Each data file with the change count of the table part it holds, and its
+ * writer. */
+enum lease_file_id { LF_FILTERS, LF_OUTGOING, LF_MAPPINGS, LF_CHECKSUM, LF_COUNT };
+#define LF_DATA	LF_CHECKSUM	/* the files before it hold the tables */
 
 static const struct lease_part {
 	const char * suffix;
@@ -254,11 +274,22 @@ static const struct lease_part {
 	{ ".mappings", "LEASE-MAPPINGS 1",
 	  "id|kind|family|proto|eport|iport|iaddr|eaddr|nonce|expiry|filters|label",
 	  mappings_changes, write_mappings },
+	{ ".checksum", "LEASE-CHECKSUM 1", "file|bytes|crc32",
+	  NULL, write_checksum },
 };
+
+int lease_files_ignore_checksum = 0;
+
+/* The sums of the data files as they are on disk (read once, at the first
+ * save), and those a save is about to rename; write_checksum() writes
+ * both */
+static struct file_sum sums[LF_DATA];
+static int sums_known;
+static const struct file_sum * sums_to_write;
 
 /* The change counts of each part at the last save. They start unlike any
  * count, so the first save writes every file. */
-static unsigned long saved[LF_COUNT] = {
+static unsigned long saved[LF_DATA] = {
 	(unsigned long)-1, (unsigned long)-1, (unsigned long)-1
 };
 static time_t last_save;	/* upnp_time() at the end of the last save */
@@ -286,10 +317,75 @@ static int
 any_changed(void)
 {
 	int i;
-	for(i = 0; i < LF_COUNT; i++)
+	for(i = 0; i < LF_DATA; i++)
 		if(part_changed((enum lease_file_id)i))
 			return 1;
 	return 0;
+}
+
+/* CRC-32 (IEEE 802.3, the one of zlib and cksum -a crc32b) of n bytes,
+ * going on from crc */
+static unsigned long
+crc32_update(unsigned long crc, const unsigned char * p, size_t n)
+{
+	static unsigned long table[256];
+	unsigned long c;
+	int i, k;
+
+	if(table[1] == 0) {
+		for(i = 0; i < 256; i++) {
+			c = (unsigned long)i;
+			for(k = 0; k < 8; k++)
+				c = (c & 1) ? 0xedb88320UL ^ (c >> 1) : c >> 1;
+			table[i] = c;
+		}
+	}
+	crc = ~crc & 0xffffffffUL;
+	while(n-- > 0)
+		crc = table[(crc ^ *p++) & 0xff] ^ (crc >> 8);
+	return ~crc & 0xffffffffUL;
+}
+
+/* The size and CRC-32 of the file path. 0, or -1 if it cannot be read: a
+ * file which is not there has 0 and 0. */
+static int
+file_sum(const char * path, struct file_sum * sum)
+{
+	unsigned char buf[16384];
+	FILE * f = fopen(path, "rb");
+	size_t n;
+
+	memset(sum, 0, sizeof(*sum));
+	if(f == NULL)
+		return errno == ENOENT ? 0 : -1;
+	while((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+		sum->crc = crc32_update(sum->crc, buf, n);
+		sum->bytes += n;
+	}
+	n = (size_t)ferror(f);
+	fclose(f);
+	return n ? -1 : 0;
+}
+
+/* The lines of .checksum: per data file, by its name without the dot, the
+ * file on the disk and the one the save renames over it, once if they are
+ * the same */
+static int
+same_sum(const struct file_sum * a, const struct file_sum * b)
+{
+	return a->bytes == b->bytes && a->crc == b->crc;
+}
+
+static void
+write_checksum(FILE * f)
+{
+	int i;
+	for(i = 0; i < LF_DATA; i++) {
+		fprintf(f, "%s|%llu|%08lx\n", lease_parts[i].suffix + 1, sums[i].bytes, sums[i].crc);
+		if(!same_sum(&sums_to_write[i], &sums[i]))
+			fprintf(f, "%s|%llu|%08lx\n", lease_parts[i].suffix + 1,
+			        sums_to_write[i].bytes, sums_to_write[i].crc);
+	}
 }
 
 /* lease_file + suffix + extra. NULL if there is no memory. */
@@ -348,25 +444,46 @@ fail:
 }
 
 /* Write the changed parts: all to temporary files first, then the renames,
- * .mappings last. A walk cannot change a count, so the count after the
- * rename is that of the file. 0, or -1 and the files are as they were. */
+ * .checksum first and .mappings last. A walk cannot change a count, so the
+ * count after the rename is that of the file. 0, or -1 and each file is
+ * either as it was or as written, as .checksum says. */
 static int
 save(void)
 {
-	char * tmp[LF_COUNT] = { NULL, NULL, NULL };
+	char * tmp[LF_COUNT] = { NULL, NULL, NULL, NULL };
+	struct file_sum next[LF_DATA];
 	char * path;
-	unsigned int i;
+	unsigned int i, n;
 	int r = 0;
 
 	unix_offset = (long long)time(NULL) - (long long)upnp_time();
-	for(i = 0; r == 0 && i < LF_COUNT; i++) {
+	for(i = 0; !sums_known && i < LF_DATA; i++) {
+		path = part_name(lease_parts[i].suffix, "");
+		if(path == NULL || file_sum(path, &sums[i]) < 0) {
+			syslog(SAVE_ERR, "lease files: cannot read %s%s", lease_file, lease_parts[i].suffix);
+			free(path);
+			return -1;
+		}
+		free(path);
+	}
+	sums_known = 1;
+	memcpy(next, sums, sizeof(next));
+	for(i = 0; r == 0 && i < LF_DATA; i++) {
 		if(!part_changed((enum lease_file_id)i))
 			continue;
 		tmp[i] = write_part((enum lease_file_id)i);
-		if(tmp[i] == NULL)
+		if(tmp[i] == NULL || file_sum(tmp[i], &next[i]) < 0)
 			r = -1;
 	}
-	for(i = 0; i < LF_COUNT; i++) {
+	/* the sums of the files as they will be once renamed */
+	if(r == 0) {
+		sums_to_write = next;
+		tmp[LF_CHECKSUM] = write_part(LF_CHECKSUM);
+		if(tmp[LF_CHECKSUM] == NULL)
+			r = -1;
+	}
+	for(n = 0; n < LF_COUNT; n++) {
+		i = (n + LF_CHECKSUM) % LF_COUNT;	/* .checksum, then the data */
 		if(tmp[i] == NULL)
 			continue;
 		if(r == 0) {
@@ -376,8 +493,10 @@ save(void)
 			else if(rename(tmp[i], path) < 0) {
 				syslog(SAVE_ERR, "lease files: cannot rename %s: %m", tmp[i]);
 				r = -1;
-			} else
+			} else if(i != LF_CHECKSUM) {
 				saved[i] = lease_parts[i].changes();
+				sums[i] = next[i];
+			}
 			free(path);
 		}
 		if(r < 0)
@@ -610,12 +729,14 @@ get_nonce(const char * h, unsigned char * nonce)
 enum {
 	F_ID, F_KIND, F_FAMILY, F_PROTO, F_EPORT, F_IPORT, F_IADDR, F_EADDR,
 	F_NONCE, F_EXPIRY, F_FILTERS, F_LABEL,
-	F_MAP, F_RADDR, F_RPREFIX, F_RPORT, F_UID, F_COUNT
+	F_MAP, F_RADDR, F_RPREFIX, F_RPORT, F_UID,
+	F_FILE, F_BYTES, F_CRC32, F_COUNT
 };
 static const char * const field_names[F_COUNT] = {
 	"id", "kind", "family", "proto", "eport", "iport", "iaddr", "eaddr",
 	"nonce", "expiry", "filters", "label",
-	"map", "raddr", "rprefix", "rport", "uid"
+	"map", "raddr", "rprefix", "rport", "uid",
+	"file", "bytes", "crc32"
 };
 #define LEASE_MAX_FIELDS	64
 
@@ -710,19 +831,25 @@ bad:
 	return -1;
 }
 
-/* Keep a file which is not ours out of the way: the next save would
- * overwrite it. */
+/* Keep a set which is not ours, or does not match its checksums, out of
+ * the way: the next save would overwrite it. Each file of the set there is
+ * becomes <name>.bad. */
 static void
-in_set_aside(struct lease_in * in)
+set_aside_all(void)
 {
-	size_t n = strlen(in->path) + sizeof(".bad");
-	char * bad = malloc(n);
-	if(bad != NULL) {
-		snprintf(bad, n, "%s.bad", in->path);
-		if(rename(in->path, bad) == 0)
-			syslog(LOG_WARNING, "lease files: renamed %s to %s", in->path, bad);
-		else
-			syslog(LOG_ERR, "lease files: cannot rename %s: %m", in->path);
+	char * path, * bad;
+	int i;
+	sums_known = 0;		/* the files are gone: read the sums again */
+	for(i = 0; i < LF_COUNT; i++) {
+		path = part_name(lease_parts[i].suffix, "");
+		bad = part_name(lease_parts[i].suffix, ".bad");
+		if(path != NULL && bad != NULL && access(path, F_OK) == 0) {
+			if(rename(path, bad) == 0)
+				syslog(LOG_WARNING, "lease files: renamed %s to %s", path, bad);
+			else
+				syslog(LOG_ERR, "lease files: cannot rename %s: %m", path);
+		}
+		free(path);
 		free(bad);
 	}
 }
@@ -1161,6 +1288,69 @@ load_outgoing(struct lease_in * out, lease_files_peer_fn peer, void * arg,
 	}
 }
 
+/* 0 if each data file is as one of its lines of .checksum says (the file
+ * before or after the save, see save()), -1 if not, or if .checksum is
+ * missing or bad (logged). A file .checksum has no line for is not there. */
+static int
+check_sums(void)
+{
+	struct lease_in in;
+	char * field[F_COUNT];
+	struct file_sum want[LF_DATA][2], got;
+	int nwant[LF_DATA];
+	unsigned long long v;
+	char * path, * end;
+	int i, k, r;
+
+	memset(want, 0, sizeof(want));
+	memset(nwant, 0, sizeof(nwant));
+	r = in_open(&in, LF_CHECKSUM, 0);
+	if(r <= 0) {
+		in_close(&in);
+		if(r == 0)
+			syslog(LOG_ERR, "lease files: %s.checksum is missing", lease_file);
+		return -1;
+	}
+	while(in_next(&in, field)) {
+		for(i = 0; i < LF_DATA; i++)
+			if(field[F_FILE] != NULL && strcmp(field[F_FILE], lease_parts[i].suffix + 1) == 0)
+				break;
+		if(i == LF_DATA)
+			continue;	/* a file this version does not know */
+		if(nwant[i] == 2 || get_number(field[F_BYTES], ~0ULL, &v) < 0 ||
+		   field[F_CRC32] == NULL || strlen(field[F_CRC32]) != 8) {
+			(void)bad_line(&in, "sum");
+			in_close(&in);
+			return -1;
+		}
+		want[i][nwant[i]].bytes = v;
+		want[i][nwant[i]].crc = strtoul(field[F_CRC32], &end, 16);
+		if(*end != '\0') {
+			(void)bad_line(&in, "crc32");
+			in_close(&in);
+			return -1;
+		}
+		nwant[i]++;
+	}
+	in_close(&in);
+	for(i = 0; i < LF_DATA; i++) {
+		path = part_name(lease_parts[i].suffix, "");
+		r = path != NULL ? file_sum(path, &got) : -1;
+		if(nwant[i] == 0)
+			nwant[i] = 1;	/* 0 and 0: not there */
+		for(k = 0; r == 0 && k < nwant[i] && !same_sum(&got, &want[i][k]); k++)
+			;
+		if(r == 0 && k == nwant[i]) {
+			syslog(LOG_ERR, "lease files: %s does not match %s.checksum", path, lease_file);
+			r = -1;
+		}
+		free(path);
+		if(r < 0)
+			return -1;
+	}
+	return 0;
+}
+
 int
 lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg)
 {
@@ -1180,17 +1370,23 @@ lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg)
 		in_close(&maps);
 		return 0;
 	}
-	rf = read_filters(&fs, &filters);
-	ro = in_open(&out, LF_OUTGOING, 0);
+	if(lease_files_ignore_checksum)
+		syslog(LOG_NOTICE, "lease files: the checksums are not checked");
+	else if(ret > 0 && check_sums() < 0)
+		ret = -1;
+	rf = ro = 0;
+	if(ret > 0) {
+		rf = read_filters(&fs, &filters);
+		ro = in_open(&out, LF_OUTGOING, 0);
+	}
 	if(ret < 0 || rf < 0 || ro < 0) {
-		/* not a set this daemon can read: keep the whole set, as the
-		 * next save writes each file, and load nothing */
-		if(maps.f != NULL)
-			in_set_aside(&maps);
-		if(filters.f != NULL)
-			in_set_aside(&filters);
-		if(out.f != NULL)
-			in_set_aside(&out);
+		/* not a set this daemon can read, or not as it was written:
+		 * keep the whole set, as the next save writes each file, and
+		 * load nothing */
+		in_close(&maps);
+		in_close(&filters);
+		in_close(&out);
+		set_aside_all();
 		ret = -1;
 		goto out;
 	}
@@ -1208,6 +1404,8 @@ out:
 }
 
 #else /* ENABLE_LEASEFILE */
+
+int lease_files_ignore_checksum = 0;
 
 void
 lease_files_poll(int idle, struct timeval * timeout)

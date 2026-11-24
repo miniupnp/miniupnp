@@ -109,7 +109,7 @@ expect(const char * suffix, const char * want)
 static void
 remove_files(void)
 {
-	static const char * const suffixes[] = { ".mappings", ".filters", ".outgoing" };
+	static const char * const suffixes[] = { ".mappings", ".filters", ".outgoing", ".checksum" };
 	char path[300];
 	unsigned int i;
 	for(i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
@@ -520,7 +520,15 @@ test_hand_file(void)
 	         t);
 	write_file(".mappings", text);
 	write_file(".filters", "LEASE-FILTERS 1\nmap|raddr|rport\n11|203.0.113.7|0\n15|203.0.113.8|0\n");
+	/* written by hand: no .checksum */
+	assert(load() == -1);
+	unlink_file(".mappings.bad");
+	unlink_file(".filters.bad");
+	write_file(".mappings", text);
+	write_file(".filters", "LEASE-FILTERS 1\nmap|raddr|rport\n11|203.0.113.7|0\n15|203.0.113.8|0\n");
+	lease_files_ignore_checksum = 1;
 	assert(load() == 1);
+	lease_files_ignore_checksum = 0;
 	/* 10, 11, 17 (protocol 0: all); 12 expired, 13 bad family, 14 too few
 	 * fields, 15 of another save, 16 a protocol name the daemon does not
 	 * write */
@@ -548,7 +556,9 @@ test_bad_files(void)
 	assert(load() == 0 && ngot == 0);
 	write_file(".mappings", "LEASE-MAPPINGS 1\nid|kind|family|proto|eport|iport|iaddr\n1|UPNP|IPv4|TCP|1|1|192.168.1.1\n");
 	write_file(".filters", "LEASE-FILTERS 9\nmap|raddr\n");
+	lease_files_ignore_checksum = 1;
 	assert(load() == -1 && ngot == 0);
+	lease_files_ignore_checksum = 0;
 	assert(slurp(".mappings") == NULL && slurp(".filters") == NULL);
 	bad = slurp(".filters.bad");
 	assert(bad != NULL && strncmp(bad, "LEASE-FILTERS 9", 15) == 0);
@@ -558,6 +568,86 @@ test_bad_files(void)
 	free(bad);
 	unlink_file(".mappings.bad");
 	unlink_file(".filters.bad");
+}
+
+/* .checksum has the size and CRC-32 of each file a save wrote; a file
+ * changed after the save is not read, and the set goes aside */
+static void
+test_checksum(void)
+{
+	char * sum, * m;
+	char line[64];
+
+	lease_table_clear();
+	outgoing_table_clear();
+	remove_files();
+	lease_table_link(add_row(30, MAP_KIND_NATPMP, AF_INET, IPPROTO_UDP, 43000,
+	                         "::ffff:192.168.1.10", 80, NULL, 0, NULL, 0));
+	now += LEASE_FILES_MAX_DELAY;
+	poll_now(1);
+	assert(lease_files_flush() == 0);
+	sum = slurp(".checksum");
+	m = slurp(".mappings");
+	assert(sum != NULL && m != NULL);
+	assert(strncmp(sum, "LEASE-CHECKSUM 1", 16) == 0);
+	assert(strstr(sum, "\nfile|bytes|crc32\n") != NULL);
+	snprintf(line, sizeof(line), "\nmappings|%lu|", (unsigned long)strlen(m));
+	assert(strstr(sum, line) != NULL);
+	assert(strstr(sum, "\nfilters|") != NULL && strstr(sum, "\noutgoing|") != NULL);
+	free(sum);
+	assert(load() == 1 && ngot == 1);
+	/* one byte changed: the set goes aside, nothing is read */
+	m[strlen(m) - 2] ^= 1;
+	write_file(".mappings", m);
+	free(m);
+	assert(load() == -1 && ngot == 0);
+	assert(slurp(".mappings") == NULL && slurp(".checksum") == NULL);
+	m = slurp(".checksum.bad");
+	assert(m != NULL);
+	free(m);
+	unlink_file(".mappings.bad");
+	unlink_file(".filters.bad");
+	unlink_file(".outgoing.bad");
+	unlink_file(".checksum.bad");
+	free_got();
+	lease_table_clear();
+}
+
+/* a crash after the rename of .checksum, before that of .mappings: the old
+ * .mappings matches its line of .checksum too, and is read */
+static void
+test_cut_save(void)
+{
+	char * old, * sum, * p;
+	int n = 0;
+
+	lease_table_clear();
+	outgoing_table_clear();
+	remove_files();
+	lease_table_link(add_row(31, MAP_KIND_NATPMP, AF_INET, IPPROTO_UDP, 43001,
+	                         "::ffff:192.168.1.10", 81, NULL, 0, NULL, 0));
+	now += LEASE_FILES_MAX_DELAY;
+	poll_now(1);
+	assert(lease_files_flush() == 0);
+	old = slurp(".mappings");
+	assert(old != NULL);
+	lease_table_link(add_row(32, MAP_KIND_NATPMP, AF_INET, IPPROTO_UDP, 43002,
+	                         "::ffff:192.168.1.10", 82, NULL, 0, NULL, 0));
+	now += LEASE_FILES_MAX_DELAY;
+	assert(lease_files_flush() == 0);
+	/* the .mappings before and after the save */
+	sum = slurp(".checksum");
+	assert(sum != NULL);
+	for(p = sum; (p = strstr(p, "\nmappings|")) != NULL; p++)
+		n++;
+	assert(n == 2);
+	free(sum);
+	write_file(".mappings", old);
+	free(old);
+	assert(load() == 1 && ngot == 1 && got_id(31, NULL) != NULL);
+	free_got();
+	lease_table_clear();
+	remove_files();
 }
 
 /* a temporary file of a save cut short goes at startup; another file
@@ -592,6 +682,8 @@ main(void)
 	test_round_trip();
 	test_hand_file();
 	test_bad_files();
+	test_checksum();
+	test_cut_save();
 	test_temp_files();
 	remove_files();
 	rmdir(dir);

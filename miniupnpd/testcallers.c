@@ -579,32 +579,41 @@ test_drop_without_row(void)
 }
 
 #ifdef ENABLE_LEASEFILE
-/* Save the tables to the lease files under dir, then empty them */
+/* The lease files of the restore tests, in one directory for all: a save
+ * writes only the files whose table part changed */
+static char lease_dir[] = "/tmp/testcallersXXXXXX";
+static char lease_path[300];
+
+/* Save the tables to the lease files, then empty them */
 static void
-save_and_clear(char * dir)
+save_and_clear(void)
 {
-	static char path[300];
 	struct timeval tv = { 60, 0 };
 
-	snprintf(path, sizeof(path), "%s/leases", dir);
-	lease_file = path;
-	lease_files_poll(1, &tv);	/* the first save writes every file */
+	if(lease_file == NULL) {
+		CHECK(mkdtemp(lease_dir) != NULL);
+		snprintf(lease_path, sizeof(lease_path), "%s/leases", lease_dir);
+		lease_file = lease_path;
+	}
+	lease_files_poll(1, &tv);	/* the main loop runs */
 	CHECK(lease_files_flush() == 0);
 	lease_table_clear();
 	outgoing_table_clear();
 }
 
 static void
-remove_lease_files(char * dir)
+remove_lease_files(void)
 {
-	static const char * const suffixes[] = { ".mappings", ".filters", ".outgoing" };
+	static const char * const suffixes[] = { ".mappings", ".filters", ".outgoing", ".checksum" };
 	char path[300];
 	unsigned int i;
+	if(lease_file == NULL)
+		return;
 	for(i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
 		snprintf(path, sizeof(path), "%s%s", lease_file, suffixes[i]);
 		remove(path);
 	}
-	rmdir(dir);
+	rmdir(lease_dir);
 	lease_file = NULL;
 }
 
@@ -614,7 +623,6 @@ remove_lease_files(char * dir)
 static void
 test_restore(void)
 {
-	char dir[] = "/tmp/testcallersXXXXXX";
 	struct lease_entry * e;
 	const struct lease_entry * g;
 	unsigned int ts = (unsigned int)upnp_time() + 600;
@@ -622,7 +630,6 @@ test_restore(void)
 	int i, family;
 
 	map_pton("192.168.1.10", &family, &ia);
-	CHECK(mkdtemp(dir) != NULL);
 	lease_table_clear();
 	for(i = 0; i < 70; i++) {
 		e = map4(i == 0 ? MAP_KIND_PCP : MAP_KIND_UPNP, (unsigned short)(6000 + i), 80);
@@ -632,7 +639,7 @@ test_restore(void)
 			e->nonce[11] = 0x42;
 		lease_table_link(e);
 	}
-	save_and_clear(dir);
+	save_and_clear();
 	CHECK(lease_table_count() == 0);
 
 	reset();
@@ -646,14 +653,12 @@ test_restore(void)
 	CHECK(g != NULL && g->kind == MAP_KIND_UPNP && g->label != NULL && strcmp(g->label, "web") == 0);
 
 	/* the third add is refused once: its batch goes again row by row */
-	save_and_clear(dir);
+	save_and_clear();
 	reset();
 	fail_add_redirect = 3;
 	CHECK(lease_restore() == 0);
 	CHECK(lease_table_count() == 70);
 	CHECK(deletes == 2);
-
-	remove_lease_files(dir);
 	lease_table_clear();
 }
 
@@ -662,12 +667,10 @@ test_restore(void)
 static void
 test_restore_peer(void)
 {
-	char dir[] = "/tmp/testcallersXXXXXX";
 	struct outgoing_entry * b = outgoing_table_new(2);
 	unsigned int ts = (unsigned int)upnp_time() + 600;
 	int family;
 
-	CHECK(mkdtemp(dir) != NULL);
 	lease_table_clear();
 	outgoing_table_clear();
 	b->family = AF_INET;
@@ -683,7 +686,7 @@ test_restore_peer(void)
 	b->peers[1] = b->peers[0];
 	b->peers[1].rport = 7001;
 	memmap_link_outgoing(b);
-	save_and_clear(dir);
+	save_and_clear();
 
 	reset();
 	CHECK(lease_restore() == 0);
@@ -691,7 +694,6 @@ test_restore_peer(void)
 	CHECK(outgoing_table_count() == 1 && outgoing_table_peer_count() == 2);
 	b = outgoing_table_next(NULL);
 	CHECK(b != NULL && b->eport == 6000 && b->nonce[3] == 7);
-	remove_lease_files(dir);
 	outgoing_table_clear();
 }
 #endif
@@ -731,6 +733,7 @@ main(void)
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
 	test_restore_peer();
 #endif
+	remove_lease_files();
 #endif
 	lease_table_clear();
 	if(failures) {

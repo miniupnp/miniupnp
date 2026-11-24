@@ -10,6 +10,7 @@
  *   <lease_file>.mappings	one line per row of the lease table
  *   <lease_file>.filters	one line per filter of a row: a remote it lets in
  *   <lease_file>.outgoing	one line per peer of a PCP PEER binding
+ *   <lease_file>.checksum	the size and CRC-32 of each of them
  *
  * They are written from the tables only, never from the firewall, and no
  * request writes them. The main loop calls lease_files_poll(), which writes
@@ -52,13 +53,17 @@ typedef void (*lease_files_peer_fn)(struct outgoing_entry * b, void * arg);
  * this run (the last_id of each header). */
 void lease_files_reserve_ids(void);
 
+/* Set by --lease-file-ignore-checksum: a load reads files whose sums do
+ * not match .checksum, or which have none, as files edited by hand */
+extern int lease_files_ignore_checksum;
+
 /* Read the files at startup: each row of .mappings with its filters to
  * map, each line of .outgoing to peer. The files are trusted: a line is
  * only skipped (and logged) when it cannot be read, is expired, or is a
  * row of another save (a crash between the renames). 1 if the files were
  * read, 0 if there are none (no .mappings), or -1 if a file is not one this
- * daemon can read: every file of the set is renamed to <name>.bad, and
- * nothing is read. */
+ * daemon can read, or does not match the size and CRC-32 of .checksum:
+ * every file of the set is renamed to <name>.bad, and nothing is read. */
 int lease_files_load(lease_files_map_fn map, lease_files_peer_fn peer, void * arg);
 
 #endif

@@ -1311,6 +1311,9 @@ void print_usage(FILE * out, const char * argv0) {
 #ifdef IGD_V2
 			" [-1]"
 #endif
+#ifdef ENABLE_LEASEFILE
+			"\n\t\t[--lease-file-ignore-checksum]"
+#endif
 			"\n"
 	        "\nNotes:\n\tThere can be one or several listening_ips.\n"
 	        "\tNotify interval is in seconds. Default is 900 seconds.\n"
@@ -1319,6 +1322,10 @@ void print_usage(FILE * out, const char * argv0) {
 #endif
 			"\tDefault config file is '%s'.\n"
 			"\t-d starts miniupnpd in foreground in debug mode.\n"
+#ifdef ENABLE_LEASEFILE
+			"\t--lease-file-ignore-checksum restores lease files which do not match\n"
+			"\t  <lease_file>.checksum, such as files edited by hand.\n"
+#endif
 #ifdef USE_SYSTEMD
 	                "\t-D starts miniupnpd in foreground as a systemd service.\n"
 #endif
@@ -1753,6 +1760,8 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			INIT_PRINT_ERR("Unknown option: %s\n", argv[i]);
 			goto print_usage;
 		}
+		else if(strcmp(argv[i], "--lease-file-ignore-checksum") == 0)
+			lease_files_ignore_checksum = 1;
 		else switch(argv[i][1])
 		{
 		case 'v':
