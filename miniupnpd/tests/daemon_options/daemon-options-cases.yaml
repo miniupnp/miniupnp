@@ -1516,6 +1516,108 @@ sections:
       kind: steps
     description: The lease files are saved when the daemon is idle, at most every 2 seconds. A change right
       after a save waits for the 2 s gap, then is saved.
+  - name: lease-file-checksum-bad
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - lease_file=/var/lib/miniupnpd/sum.leases
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46410
+      - sleep: 3
+      - router:
+          command: corrupt:/var/lib/miniupnpd/sum.leases.mappings
+      - router:
+          command: restart
+      # a file which does not match .checksum: the set goes aside, nothing is restored
+      - router:
+          command: cat:/var/lib/miniupnpd/sum.leases.mappings.bad
+          contains:
+          - '|46410|'
+      - router:
+          command: log
+          contains:
+          - sum.leases.mappings does not match
+      - router:
+          command: ruleset
+          absent:
+          - '46410'
+    expect:
+      kind: steps
+    description: A lease file changed behind the daemon does not match .checksum. At the next start the set is renamed
+      to .bad and nothing is restored.
+  - name: lease-file-checksum-ignore
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - lease_file=/var/lib/miniupnpd/ign.leases
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46411
+      - sleep: 3
+      - router:
+          command: corrupt:/var/lib/miniupnpd/ign.leases.mappings
+      - router:
+          command: restart:--lease-file-ignore-checksum
+      - router:
+          command: log
+          contains:
+          - the checksums are not checked
+      - router:
+          command: ruleset
+          contains:
+          - '46411'
+    expect:
+      kind: steps
+    description: With --lease-file-ignore-checksum a lease file edited by hand is restored all the same.
+  - name: lease-file-cut-save
+    platform: linux
+    protocol: daemon
+    families:
+    - ipv4
+    mutating: true
+    config:
+    - lease_file=/var/lib/miniupnpd/cut.leases
+    request:
+      kind: option_steps
+      steps:
+      - pcp_map:
+          port: 46412
+      - sleep: 3
+      - router:
+          command: cp:/var/lib/miniupnpd/cut.leases.mappings:/var/lib/miniupnpd/cut-old.mappings
+      - pcp_map:
+          port: 46413
+      - sleep: 3
+      # a crash after .checksum was renamed, before .mappings: the old .mappings is still listed
+      - router:
+          command: cp:/var/lib/miniupnpd/cut-old.mappings:/var/lib/miniupnpd/cut.leases.mappings
+      - router:
+          command: restart
+      - router:
+          command: log
+          absent:
+          - does not match
+      - router:
+          command: ruleset
+          contains:
+          - '46412'
+          absent:
+          - '46413'
+    expect:
+      kind: steps
+    description: A save cut short between its renames leaves a .mappings older than .checksum, which lists both, so the
+      set is read, with the rows of the older .mappings.
   - name: lease-file6-deprecated
     platform: linux
     protocol: daemon

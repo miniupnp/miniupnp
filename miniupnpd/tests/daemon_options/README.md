@@ -78,7 +78,8 @@ engine: `run_case`), plus:
 
 - request kind `option_steps`: a list of steps (`natpmp_address`, `natpmp_map`, `pcp_map`,
   `upnp_add`, `upnp_get`, `http_get`, `soap`, `router`, `sleep`, `ssdp`), with `expect: {kind: steps}`.
-  A `router` step asks the driver for `ruleset`, `log`, `cat:PATH`, `restart`, `firewall-flush`,
+  A `router` step asks the driver for `ruleset`, `log`, `cat:PATH`, `restart`, `restart:ARGS` (the next
+  start with more daemon arguments), `cp:SRC:DST`, `corrupt:PATH` (a byte added to a file), `firewall-flush`,
   `wan-probe:PORT` or `wan-reserved`; on FreeBSD also `ruleset:ANCHOR`, the rules of one pf anchor. `firewall-flush` removes the rules behind the daemon's back, as
   a reload does. `wan-reserved` gives the WAN a reserved address and sends the daemon SIGUSR1 (the
   FreeBSD fixture's WAN is reserved already). `wan-probe:PORT` fetches `http://WAN:PORT/` from the

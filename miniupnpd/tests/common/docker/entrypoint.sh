@@ -165,6 +165,11 @@ start_daemon() {
 		pid=$!
 	fi
 }
+# more arguments of the daemon for this start: a daemon_options driver writes them (restart:ARGS)
+if [ -s /etc/miniupnpd-test-args ]; then
+	# shellcheck disable=SC2046
+	set -- "$@" $(cat /etc/miniupnpd-test-args)
+fi
 restart=0
 trap 'kill "$pid" 2>/dev/null; while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done; exit 0' TERM INT
 trap 'restart=1; kill "$pid" 2>/dev/null' HUP

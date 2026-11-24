@@ -99,7 +99,13 @@ router_call() {
     ruleset) "$DOCKER" exec "$ROUTER" nft list ruleset ;;
     log) "$DOCKER" logs "$ROUTER" ;;
     cat:*) "$DOCKER" exec "$ROUTER" cat "${1#cat:}" ;;
-    restart) restart_router ;;
+    # restart:ARGS: the next start of the daemon gets ARGS too (the entrypoint reads them)
+    restart) "$DOCKER" exec "$ROUTER" rm -f /etc/miniupnpd-test-args && restart_router ;;
+    restart:*) printf '%s\n' "${1#restart:}" | "$DOCKER" exec -i "$ROUTER" sh -c 'cat > /etc/miniupnpd-test-args' &&
+      restart_router ;;
+    # the lease file cases: keep a copy of a file, and change a byte of one behind the daemon
+    cp:*) src=${1#cp:}; "$DOCKER" exec "$ROUTER" cp "${src%%:*}" "${src#*:}" && echo copied ;;
+    corrupt:*) "$DOCKER" exec "$ROUTER" sh -c "printf x >> '${1#corrupt:}'" && echo corrupted ;;
     # a reload of the firewall: the chains stay, their rules are gone, and the daemon is not told
     firewall-flush)
       "$DOCKER" exec "$ROUTER" sh -c "nft list ruleset | awk '/^table/ { t = \$2 \" \" \$3 } /^[[:space:]]chain (miniupnpd|.*_miniupnpd|pcp-filter)/ { print t, \$2 }' |
