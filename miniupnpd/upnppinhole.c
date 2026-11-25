@@ -39,10 +39,6 @@
 #if defined(USE_PF)
 #include "pf/pfpinhole.h"
 #endif
-#if defined(USE_IPF)
-#endif
-#if defined(USE_IPFW)
-#endif
 #ifdef ENABLE_LEASEFILE
 #include <sys/stat.h>
 #endif

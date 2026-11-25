@@ -82,9 +82,7 @@ get_src_for_route_to(const struct sockaddr * dst,
 	rtm.rtm_addrs = RTA_DST | RTA_IFA | RTA_IFP;	/* pass destination address, request source address & interface */
 #endif
 	memcpy(m_rtmsg.m_space, dst, l);
-#if !defined(__sun)
 	((struct sockaddr *)m_rtmsg.m_space)->sa_len = l;
-#endif
 	rtm.rtm_msglen = sizeof(struct rt_msghdr) + l;
 	if(write(s, &m_rtmsg, rtm.rtm_msglen) < 0) {
 		syslog(LOG_ERR, "write: %m");
