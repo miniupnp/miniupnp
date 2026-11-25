@@ -188,6 +188,7 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           path: cloned
 
       - uses: ./cloned/.github/actions/create-venv

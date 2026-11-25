@@ -35,6 +35,8 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: install packages
         run: "sudo apt-get install libiptc-dev libxtables-dev libnfnetlink-dev
