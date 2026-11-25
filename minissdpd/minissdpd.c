@@ -1412,7 +1412,7 @@ int main(int argc, char * * argv)
 		syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages, exiting");
 		ret = 1;
 		goto quit;
-	} else {
+	} else if(s_ssdp >= FD_SETSIZE) {
 		syslog(LOG_ERR, "file descriptor %d >= FD_SETSIZE. Exiting", s_ssdp);
 		ret = 1;
 		goto quit;
@@ -1424,7 +1424,7 @@ int main(int argc, char * * argv)
 			syslog(LOG_ERR, "Cannot open socket for receiving SSDP messages (IPv6), exiting");
 			ret = 1;
 			goto quit;
-		} else {
+		} else if(s_ssdp6 >= FD_SETSIZE) {
 			syslog(LOG_ERR, "file descriptor %d >= FD_SETSIZE. Exiting", s_ssdp6);
 			ret = 1;
 			goto quit;
