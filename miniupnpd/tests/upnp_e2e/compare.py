@@ -1,5 +1,5 @@
-"""upnp-e2e: the UPnP IGD end-to-end suite on Docker (run-docker.sh), every build (igd1,
-igd2), for ../common/tools/compare_daemon_branches.py (the interface is in
+"""upnp-e2e: the UPnP IGD end-to-end suite on Docker (run-docker.sh), the default build
+(igd2), for ../common/tools/compare_daemon_branches.py (the interface is in
 ../common/tools/suite_compare.py)."""
 
 import sys

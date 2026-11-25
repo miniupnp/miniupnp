@@ -34,6 +34,8 @@ WAN=pcp-e2e-wan-$SLOT
 ROUTER=pcp-e2e-router-$SLOT
 STUN=daemon-options-stun-$SLOT
 NEIGHBOUR=daemon-options-neighbour-$SLOT
+RUNNER_LAN=daemon-options-lan-$SLOT
+RUNNER_WAN=daemon-options-wan-$SLOT
 export PCP_TEST_CONF_REPLACE=1
 ROUTER_LAN4=$LAN4.1 ROUTER_LAN6=${LAN6}1 ROUTER_WAN4=$WAN4.1 ROUTER_WAN6=${WAN6}1
 CALL_DIR=$DATA_DIR/router-calls-$SLOT
@@ -47,7 +49,7 @@ cleanup() {
   if [ "$KEEP" = 1 ]; then
     echo "Keeping the fixture: $ROUTER $LAN $WAN" >&2
   else
-    "$DOCKER" rm -f "$STUN" "$NEIGHBOUR" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$STUN" "$NEIGHBOUR" "$RUNNER_LAN" "$RUNNER_WAN" >/dev/null 2>&1 || true
     e2e_compose down --timeout 1 >/dev/null 2>&1 || true
   fi
   exit "$result"
@@ -68,6 +70,19 @@ e2e_compose up --no-start --quiet-pull router >/dev/null
   --entrypoint sh "$IMAGE" -c "ip route replace default via $ROUTER_LAN4; \
     mkdir -p /srv && echo neighbour-served > /srv/index.html && cd /srv && exec python3 -m http.server 45300" >/dev/null
 
+# start_runner_host NAME NETWORK IP4 IP6: a host the runner runs in (docker exec) for the whole run, as
+# the LAN client or as a host on the WAN link. A container per run costs 1.5 s, 64 times.
+start_runner_host() {
+  "$DOCKER" run -d --name "$1" --network "$2" --ip "$3" --ip6 "$4" --cap-add NET_ADMIN \
+    --env PYTHONDONTWRITEBYTECODE=1 \
+    --volume "$ROOT/miniupnpd/tests:$ROOT/miniupnpd/tests:ro" \
+    --volume "$ROOT/miniupnpd/options.c:$ROOT/miniupnpd/options.c:ro" \
+    --volume "$DIR:$DIR:rw" --volume "$DATA_DIR:$DATA_DIR:rw" \
+    --entrypoint sleep "$IMAGE" infinity >/dev/null
+}
+start_runner_host "$RUNNER_LAN" "$LAN" "$LAN4.2" "${LAN6}2"
+start_runner_host "$RUNNER_WAN" "$WAN" "$WAN4.2" "${WAN6}2"
+daemon_lines() { "$DOCKER" logs "$ROUTER" 2>&1 | wc -l; }
 daemon_listening() {
   "$DOCKER" logs "$ROUTER" 2>&1 | grep -Ec 'Listening for NAT-PMP|HTTP listening on port' || true
 }
@@ -133,7 +148,18 @@ start_router() {
     { echo "FAIL: the router container did not start" >&2; exit 1; }
   for _attempt in $(seq 1 50); do
     if "$DOCKER" logs "$ROUTER" 2>&1 | grep -Eq 'Listening for NAT-PMP|HTTP listening on port'; then
-      sleep 1     # the other protocol's sockets open right after
+      # the other protocols' sockets open right after: until the log is quiet for 0.2 s, at most 1 s
+      lines=$(daemon_lines)
+      for _quiet in 1 2 3 4 5; do
+        sleep 0.2
+        now=$(daemon_lines)
+        [ "$now" != "$lines" ] || break
+        lines=$now
+      done
+      # a new router container has a new MAC address: the runner hosts forget the old one
+      for runner_host in "$RUNNER_LAN" "$RUNNER_WAN"; do
+        "$DOCKER" exec "$runner_host" ip neigh flush all >/dev/null 2>&1 || true
+      done
       "$DOCKER" exec "$ROUTER" cat /etc/miniupnpd.conf > "$router_log.conf" 2>&1 || true
       return 0
     fi
@@ -151,9 +177,9 @@ run_cases() {
   down=$3
   shift 3
   if [ "$side" = lan ]; then
-    network=$LAN source4=$LAN4.2 source6=${LAN6}2 router4=$ROUTER_LAN4 router6=$ROUTER_LAN6
+    runner_host=$RUNNER_LAN router4=$ROUTER_LAN4 router6=$ROUTER_LAN6
   else
-    network=$WAN source4=$WAN4.2 source6=${WAN6}2 router4=$ROUTER_WAN4 router6=$ROUTER_WAN6
+    runner_host=$RUNNER_WAN router4=$ROUTER_WAN4 router6=$ROUTER_WAN6
   fi
   host=$router4
   [ "$family" = ipv4 ] || host=$router6
@@ -161,12 +187,7 @@ run_cases() {
   for selected in $SELECTED_CASES; do set -- "$@" --case "$selected"; done
   [ "$down" = 0 ] || set -- "$@" --daemon-down
   # the host's paths, so that the report names the data file relative to the repository
-  "$DOCKER" run --rm --network "$network" --ip "$source4" --ip6 "$source6" \
-    --user "$(id -u):$(id -g)" --env PYTHONDONTWRITEBYTECODE=1 \
-    --volume "$ROOT/miniupnpd/tests:$ROOT/miniupnpd/tests:ro" \
-    --volume "$ROOT/miniupnpd/options.c:$ROOT/miniupnpd/options.c:ro" \
-    --volume "$DIR:$DIR:rw" --volume "$DATA_DIR:$DATA_DIR:rw" \
-    --entrypoint python3 "$IMAGE" "$DIR/run_daemon_options_cases.py" \
+  "$DOCKER" exec --user "$(id -u):$(id -g)" "$runner_host" python3 "$DIR/run_daemon_options_cases.py" \
     --router-call-dir "$CALL_DIR" --host "$host" --family "$family" --side "$side" --platform linux \
     --status-file "$DIR/status.md" --status-data-file "$DATA_DIR/status-data.json" \
     --run-info "daemon=${DAEMON_OPTIONS_DAEMON:-$(git -C "$ROOT" branch --show-current 2>/dev/null || echo unknown)}" \

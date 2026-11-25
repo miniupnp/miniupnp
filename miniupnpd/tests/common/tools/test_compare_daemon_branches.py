@@ -223,6 +223,38 @@ class SuiteTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 self.parse(suites, '--one-only')
 
+    def test_outcomes_kept_for_one_identity(self):
+        identity = {'commit': 'abc', 'harness_sha256': 'h', 'suite': 'one', 'platform': 'linux', 'cases': [],
+                    'options': {}}
+        run = ({('ipv4', 'pcp', 'a'): {'status': 'PASS', 'detail': ''},
+                ('linux-igd2 ipv6', 'upnp', 'b'): {'status': 'FAIL', 'detail': 'gap'}}, 'corpus')
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'master.json'
+            self.assertIsNone(compare.read_outcomes(path, identity))
+            compare.write_outcomes(path, identity, run)
+            self.assertEqual(compare.read_outcomes(path, identity), run)
+            # another master commit, harness or case selection: not reused
+            for name, value in (('commit', 'def'), ('harness_sha256', 'x'), ('cases', ['a'])):
+                self.assertIsNone(compare.read_outcomes(path, dict(identity, **{name: value})), name)
+
+    def test_the_harness_digest_covers_paths_and_contents(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'a').mkdir()
+            (root / 'a' / 'x.py').write_text('1')
+            first = compare.harness_digest(root)
+            (root / 'a' / 'x.py').write_text('2')
+            second = compare.harness_digest(root)
+            (root / 'a' / 'x.py').rename(root / 'a' / 'y.py')
+            third = compare.harness_digest(root)
+        self.assertEqual(len({first, second, third}), 3)
+
+    def test_ended_runs_keep_no_outcomes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            suites = compare.load_suites(suites_dir(Path(temporary), ('a', 'one')))
+            with self.assertRaises(SystemExit):
+                self.parse(suites, '--suite', 'one', '--results', 'a', 'b', '--master-outcomes', 'm.json')
+
     def test_a_platform_the_suite_does_not_run_on(self):
         with tempfile.TemporaryDirectory() as temporary:
             suites = compare.load_suites(suites_dir(Path(temporary), ('a', 'one')))

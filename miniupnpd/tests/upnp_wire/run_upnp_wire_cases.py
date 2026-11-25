@@ -92,13 +92,22 @@ def validate(corpus):
             assert step.get("kind") in ("ssdp", "ssdp-listen", "http", "soap", "subscribe", "notify-wait",
                                         "restart", "upnp-lease", "wait"), f"{where}: unknown step kind {step.get('kind')}"
         assert set(case.get("requires", [])) <= {"restart", "lease-file", "strict", "second-client"}, f"{where}: unknown requires"
+        assert case.get("strict_path", True) is True, f"{where}: strict_path is true or absent"
+        assert not ("strict_path" in case and "strict" in case.get("requires", [])), (
+            f"{where}: requires: [strict] already runs on the strict build")
     return len(cases)
+
+
+def on_strict_build(case):
+    """A case of the --strict run: a check of UPNP_STRICT only, or a request on a path UPNP_STRICT changes."""
+    return "strict" in case.get("requires", []) or case.get("strict_path", False)
 
 
 def build_variables(corpus, args):
     build = corpus["builds"][args.build]
     uuid = corpus["uuid"]
     variables = {"router": args.router, "client": args.client_address, "family": args.family, "build": args.build,
+                 "strict": args.strict,
                  "http_port": UPNP_HTTP_PORT, "uuid": uuid, "udn": f"uuid:{uuid}", "services": build["services"],
                  "router_call_dir": args.router_call_dir,
                  "location": f"http://{host_literal(args.router)}:{UPNP_HTTP_PORT}/rootDesc.xml"}
@@ -122,13 +131,21 @@ def run_case(case, variables, lease):
 
 
 def selected_cases(corpus, args):
-    """The cases of this build and family (resolved for them), in corpus order."""
+    """The cases of this build and family (resolved for them), in corpus order. A --strict run has only the
+    cases UPNP_STRICT can change: the others give the same result as the run without it. --restart-cases
+    keeps the cases that restart the daemon (only) or the others (skip)."""
     builds = tuple(corpus["builds"])
 
     def resolve(case):
         resolved = resolve_variant(resolve_variant(case, ("ipv4", "ipv6"), args.family), builds, args.build)
         return dict(resolved, protocol="upnp")
-    return select_build_cases(corpus, args, resolve)
+    cases = select_build_cases(corpus, args, resolve)
+    if args.strict:
+        cases = [case for case in cases if on_strict_build(case)]
+    if args.restart_cases:
+        restarts = args.restart_cases == "only"
+        cases = [case for case in cases if ("restart" in case.get("requires", [])) == restarts]
+    return cases
 
 
 def missing_requirement(args):
@@ -146,12 +163,19 @@ def missing_requirement(args):
 
 
 def write_report(corpus, results_path, args):
-    write_driver_status(results_path, args, TITLE, SUITE, report_sections(corpus))
+    """The -strict columns have only the cases of the strict build: a result an older run left for
+    another case is dropped."""
+    strict = ({f"upnp/{case['name']}" for case in flatten_cases(corpus) if on_strict_build(case)}
+              if args.platform.endswith("-strict") else None)
+    write_driver_status(results_path, args, TITLE, SUITE, report_sections(corpus), platform_cases=strict)
 
 
 def self_test(corpus):
     count = validate(corpus)
     print_build_runs(corpus, count)
+    strict = [case for case in flatten_cases(corpus) if on_strict_build(case)]
+    assert strict, "no case runs on the strict build"
+    print(f"PASS the strict build runs {len(strict)} of {count} cases (requires: [strict] or strict_path)")
     bad = {"specs": ["UDA-1.1"], "builds": {"igd1": {}}, "sections": [{"name": "S", "cases": [
         {"name": "igd9-1-must-x", "ref": "IGD9 §1", "steps": [{"kind": "http"}]}]}]}
     try:
@@ -196,12 +220,15 @@ def main():
     parser.add_argument("--second-client", help="a second LAN address of --interface, added by this runner")
     parser.add_argument("--interface", help="the LAN interface (the IPv6 multicast scope)")
     parser.add_argument("--family", choices=("ipv4", "ipv6"), default="ipv4")
-    parser.add_argument("--build", default="igd1", help="the daemon build: igd1 or igd2")
+    parser.add_argument("--build", default="igd2", help="the daemon build: igd2 or igd1")
     parser.add_argument("--strict", action="store_true", help="the daemon was built with configure --strict")
     parser.add_argument("--lan4", default=DEFAULT_LAN4, help="the first three octets of the LAN of this fixture")
     parser.add_argument("--lan6", default=DEFAULT_LAN6, help='the LAN /64 of this fixture, ending in "::"')
     parser.add_argument("--case", action="append")
     parser.add_argument("--router-call-dir", help="the directory the driver watches, for a daemon restart")
+    parser.add_argument("--restart-cases", choices=("only", "skip"),
+                        help="only the cases that restart the daemon (requires: [restart]), or only the others: "
+                             "the driver runs the others of both families at once")
     parser.add_argument("--lease-file", help="the daemon's lease_file, shared by the driver")
     parser.add_argument("--results", help="write the outcomes of the run to this file, for --write-status")
     add_status_arguments(parser, os.path.dirname(os.path.abspath(__file__)), SUITE, platform=None)

@@ -1,0 +1,30 @@
+name: Restore master's outcomes
+description: >-
+  The outcomes of master's daemon from an earlier run of the same comparison, master commit and
+  harness, into outcomes/master.json. compare_daemon_branches.py --master-outcomes checks them again
+  and runs master when they do not match. A workflow_dispatch run takes none: it runs master afresh.
+inputs:
+  comparison:
+    description: The comparison (the job, with its matrix values)
+    required: true
+outputs:
+  hit:
+    description: true when the outcomes came from the cache
+    value: ${{ steps.restore.outputs.cache-hit }}
+  harness:
+    description: >-
+      The hash of the harness in the key, for outcomes-save: a run writes into the tests tree, so a
+      hash taken after the run differs
+    value: ${{ steps.harness.outputs.sha }}
+runs:
+  using: composite
+  steps:
+    - id: harness
+      shell: bash
+      run: echo "sha=${{ hashFiles('candidate/miniupnpd/tests/**', '!candidate/miniupnpd/tests/**/status.md') }}" >> "$GITHUB_OUTPUT"
+    - id: restore
+      if: github.event_name != 'workflow_dispatch'
+      uses: actions/cache/restore@v6
+      with:
+        path: outcomes/master.json
+        key: outcomes-${{ inputs.comparison }}-${{ github.event.pull_request.base.sha || github.event.before }}-${{ steps.harness.outputs.sha }}

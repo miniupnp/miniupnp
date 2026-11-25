@@ -2,7 +2,9 @@
 """Execute YAML PCP mapping scenarios and verify real forwarding behavior."""
 
 import argparse
+import contextlib
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -25,8 +27,8 @@ from lib_test import (  # noqa: E402
     flatten_cases,
     load_yaml,
     prepare_e2e_run,
-    run_cases,
     run_driver_suite,
+    run_e2e_cases,
     select_family_cases,
     status_sections,
     validate_corpus,
@@ -90,15 +92,32 @@ def nat66_flag(corpus):
     return lambda case: nat66[case["section"]]
 
 
-def run_selected(_corpus, args, cases):
+def nat66_options(args, cases, nat66):
+    """The options of the IPv6 cases of a NAT66 section: the client is the LAN ULA (--nat66-client, which
+    the runner adds to --interface), the router its ULA (--nat66-router). None when no such case runs."""
+    if args.family != "ipv6" or not args.nat66_client or not any(nat66(case) for case in cases):
+        return None
+    subprocess.run(["ip", "-6", "address", "replace", args.nat66_client + "/64", "dev", args.interface, "nodad"],
+                   check=True)
+    return argparse.Namespace(**dict(vars(args), client_address=args.nat66_client, router=args.nat66_router))
+
+
+def run_selected(corpus, args, cases):
     agents = prepare_e2e_run(args)
     needed = {traffic["from"] for case in cases for traffic in case_traffic(case)}
     if needed - agents.keys():
         raise CorpusError("missing agents for: " + ", ".join(sorted(needed - agents.keys())))
-    with e2e_socket(args) as pcp_sock:
-        # any error fails the case (a harness error too), the run goes on with the next one
-        return run_cases(cases, lambda case: CaseRun(case, args, agents, pcp_sock).run(),
-                         failures=(Exception,), timestamps=True)
+    nat66 = nat66_flag(corpus)
+    nat66_args = nat66_options(args, cases, nat66)
+    with e2e_socket(args) as pcp_sock, \
+            (e2e_socket(nat66_args) if nat66_args else contextlib.nullcontext()) as nat66_sock:
+
+        def run(case):
+            if nat66_args and nat66(case):
+                CaseRun(case, nat66_args, agents, nat66_sock).run()
+            else:
+                CaseRun(case, args, agents, pcp_sock).run()
+        return run_e2e_cases(args, cases, run, nat66)
 
 
 def main():
@@ -108,9 +127,12 @@ def main():
     add_e2e_arguments(parser)
     parser.add_argument("--enable-upnp", action="store_true",
                         help="also run sections marked requires: upnp (the daemon must have enable_upnp=yes)")
+    parser.add_argument("--nat66-client", help="the client address of the IPv6 cases of a NAT66 section")
+    parser.add_argument("--nat66-router", help="the router address of the IPv6 cases of a NAT66 section")
+    parser.add_argument("--interface", default="eth0", help="the LAN interface, for --nat66-client")
     add_status_arguments(parser, os.path.dirname(os.path.abspath(__file__)), SUITE)
     return run_driver_suite(parser, load, write_report, self_test, selected_cases, validate_corpus, run_selected,
-                            nat66_flag)
+                            nat66_flag, empty_case_ok=True)
 
 
 if __name__ == "__main__":

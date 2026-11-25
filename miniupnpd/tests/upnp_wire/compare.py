@@ -1,5 +1,5 @@
-"""upnp-wire: the UPnP IGD protocol suite on Docker (run-docker.sh), every build (igd1,
-igd2, each also with --strict), for ../common/tools/compare_daemon_branches.py (the interface is in
+"""upnp-wire: the UPnP IGD protocol suite on Docker (run-docker.sh), the default builds (igd2,
+and igd2 with --strict), for ../common/tools/compare_daemon_branches.py (the interface is in
 ../common/tools/suite_compare.py)."""
 
 import sys

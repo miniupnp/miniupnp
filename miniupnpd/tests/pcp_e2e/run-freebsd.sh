@@ -19,9 +19,9 @@
 # PCP_TEST_FREEBSD_CACHE, PCP_TEST_FREEBSD_MEMORY, PCP_TEST_FREEBSD_SSH_PORT (as for
 # ../common/freebsd_vm.sh, whose cached prepared image is shared; the VM steps are those of
 # ../common/vm_lib.sh),
-# PCP_E2E_KEEP=1, PCP_E2E_ARTIFACT_DIR, E2E_STATUS_FILE (default status.md
-# beside this script: the freebsd column of the report run-docker.sh fills the linux
-# column of), DOCKER.
+# PCP_E2E_KEEP=1, PCAP_CAPTURE=1 (a packet capture per case), PCP_E2E_ARTIFACT_DIR,
+# E2E_STATUS_FILE (default status.md beside this script: the freebsd column of the report
+# run-docker.sh fills the linux column of), DOCKER.
 #
 # Keeping the fixture between runs (the VM, the Docker networks, the relay and the
 # peers, and the build tree in the VM), so a later run copies in only what changed:
@@ -63,6 +63,8 @@ RUNNER=pcp-e2e-fbsd-runner-$SUFFIX
 KEEP=${PCP_E2E_KEEP:-0}
 # the router daemon runs with enable_upnp=yes, so the UPnP cases can run
 E2E_UPNP=1
+# the client and router addresses of the IPv6 cases of a NAT66 section (the pcp_e2e runner's options)
+E2E_NAT66="--nat66-client fd42:1::2 --nat66-router fd42:1::1"
 ARTIFACTS=${PCP_E2E_ARTIFACT_DIR:-$ROOT/.tmp/pcp-e2e}
 STATUS_FILE=${E2E_STATUS_FILE:-$DIR/status.md}
 E2E_PLATFORM=freebsd
@@ -209,7 +211,7 @@ QEMU_PID=
 # Remove the whole fixture: the VM, the Docker side and the state directory.
 teardown_all() {
   [ -n "$QEMU_PID" ] && kill "$QEMU_PID" 2>/dev/null || true
-  "$DOCKER" rm -f "$RUNNER" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
+  "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
   "$DOCKER" network rm "$LAN" "$WAN" >/dev/null 2>&1 || true
   if [ "$KEEP_MODE" = 1 ]; then
     rm -f "$STATE/state.env" "$STATE/mon.sock" "$STATE/disk.qcow2" "$STATE/seed.iso" "$STATE/console.log" "$STATE/qemu.log"
@@ -222,14 +224,14 @@ cleanup() {
   result=$?
   trap - EXIT HUP INT TERM
   if [ "$KEEP_MODE" = 1 ]; then
-    "$DOCKER" rm -f "$RUNNER" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" >/dev/null 2>&1 || true
     # a fixture which did not get ready is not worth keeping
     if [ "$FIXTURE_READY" != 1 ] && [ "$COMMAND" != down ] && [ "$COMMAND" != status ] && [ "$COMMAND" != ssh ]; then
       teardown_all
     fi
   elif [ "$KEEP" != 1 ]; then
     [ -n "$QEMU_PID" ] && kill "$QEMU_PID" 2>/dev/null || true
-    "$DOCKER" rm -f "$RUNNER" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
     "$DOCKER" network rm "$LAN" "$WAN" >/dev/null 2>&1 || true
     rm -rf "${WORK:?}"
   else
@@ -245,7 +247,7 @@ published_port() { "$DOCKER" port "$RELAY" "$1/tcp" | head -n 1 | sed 's/.*://';
 
 # ---- Docker side: peers and relay ---------------------------------------
 docker_up() {
-  "$DOCKER" rm -f "$RUNNER" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
+  "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
   "$DOCKER" network rm "$LAN" "$WAN" >/dev/null 2>&1 || true
   "$DOCKER" network create --driver bridge --ipv6 \
     --subnet "$LAN4.0/24" --gateway "$LAN4.254" \
@@ -528,9 +530,6 @@ if [ "$COMMAND" = up ]; then
   exit 0
 fi
 
-RESULTS_FILE=$RUN_DIR/results.tsv
-: > "$RESULTS_FILE"
-
 snapshot_daemon_state() {
   {
     echo "Snapshot time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -561,40 +560,30 @@ run_family() {
   deny_url=http://$LAN4.13:18080
   third_url=http://$LAN4.14:18080
 
-  family_dir=$RUN_DIR/$family
-  mkdir -p "$family_dir"
-  case_rows=$(e2e_case_rows "$family")
   active_section=
   active_section_nat66=0
-  while IFS="$(printf '\t')" read -r section_name case_name section_nat66 <&3; do
-    [ -n "$case_name" ] || continue
-    e2e_case_selected "$case_name" || continue
-    if [ "$section_name" != "$active_section" ]; then
-      [ "$active_section_nat66" = 1 ] && set_nat66 off
-      active_section=$section_name
-      active_section_nat66=0
-      if [ "$section_nat66" = true ]; then set_nat66 on; active_section_nat66=1; fi
-    fi
-    case_client=$lanip; case_router=$router; runner_ula=skip
-    if [ "$family" = ipv6 ] && [ "$section_nat66" = true ]; then
-      case_client=fd42:1::2; case_router=fd42:1::1; runner_ula=add
-    fi
-    EXECUTED=$((EXECUTED + 1))
-    case_dir=$family_dir/$section_name/$case_name
-    mkdir -p "$case_dir"
-    snapshot_daemon_state "$case_dir/daemon-before.txt"
-    start_packet_capture
-    e2e_start_runner
-    e2e_wait_runner
-    stop_packet_capture "$case_dir"
-    snapshot_daemon_state "$case_dir/daemon-after.txt"
-    $SSH "$PRIV cat /tmp/pcp-e2e/miniupnpd.log" >"$case_dir/daemon.log" 2>&1 || true
-    e2e_record_result "$family/$section_name/$case_name"
-  done 3<<EOT
-$case_rows
-EOT
+  # shellcheck disable=SC2086 # E2E_NAT66 is a list of options
+  e2e_run_family "$family" $E2E_NAT66
   if [ "$active_section_nat66" = 1 ]; then set_nat66 off; fi
   return 0
+}
+
+# e2e_case_start / e2e_case_end (router_call case-start, case-end): the NAT66 rule of the case's section,
+# the daemon snapshots before and after it, its capture and the daemon log.
+e2e_case_start() {
+  if [ "$section_name" != "$active_section" ]; then
+    if [ "$active_section_nat66" = 1 ]; then set_nat66 off; fi
+    active_section=$section_name
+    active_section_nat66=0
+    if [ "$case_flag" = true ]; then set_nat66 on; active_section_nat66=1; fi
+  fi
+  snapshot_daemon_state "$case_dir/daemon-before.txt"
+  [ "${PCAP_CAPTURE:-0}" != 1 ] || start_packet_capture
+}
+e2e_case_end() {
+  [ "${PCAP_CAPTURE:-0}" != 1 ] || stop_packet_capture "$case_dir"
+  snapshot_daemon_state "$case_dir/daemon-after.txt"
+  $SSH "$PRIV cat /tmp/pcp-e2e/miniupnpd.log" >"$case_dir/daemon.log" 2>&1 || true
 }
 
 # Restart check : the lease-restart cases of the pcp_wire corpus (lease-restart-ipv4 and
@@ -654,6 +643,18 @@ run_restart_check() {
   fi
 }
 
+# The cases of both families; a suite's hooks may replace it (upnp_wire runs the families at once).
+run_families() {
+  run_family ipv4
+  run_family ipv6
+}
+
+# The phases of the run, one daemon build and one status column each. A suite with more builds
+# sets E2E_PHASES in its hooks and replaces enter_phase PHASE, which builds and starts the daemon
+# of the phase and sets its E2E_PLATFORM and RUN_DIR (upnp_wire: igd2, then igd2-strict).
+E2E_PHASES=default
+enter_phase() { :; }
+
 # Another suite on this fixture (upnp_e2e/run-freebsd.sh): a file that replaces the functions above.
 if [ -n "${PCP_E2E_SUITE_HOOKS:-}" ]; then
   # shellcheck disable=SC1090
@@ -673,15 +674,24 @@ if [ "${PCP_E2E_PF_MAKE:-0}" = 1 ]; then
   fi
 fi
 
-if [ "${PCP_E2E_ONLY_RESTART:-0}" != 1 ] && stage_on cases; then
-  run_family ipv4
-  run_family ipv6
-fi
-if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
-  run_restart_check
-fi
-if [ "${PCP_E2E_ONLY_RESTART:-0}" = 1 ]; then
-  exit "$STATUS"
-fi
-e2e_write_status "${RUN_DIR#"$ROOT"/}" "router=$ROUTER_NAME" "peers=Linux Docker"
+ALL_RESULTS=$RUN_DIR/results-all.tsv
+mkdir -p "$RUN_DIR"
+: > "$ALL_RESULTS"
+for phase in $E2E_PHASES; do
+  enter_phase "$phase"
+  RESULTS_FILE=$RUN_DIR/results.tsv
+  : > "$RESULTS_FILE"
+  if [ "${PCP_E2E_ONLY_RESTART:-0}" != 1 ] && stage_on cases; then
+    run_families
+  fi
+  if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
+    run_restart_check
+  fi
+  if [ "${PCP_E2E_ONLY_RESTART:-0}" = 1 ]; then
+    exit "$STATUS"
+  fi
+  e2e_write_report "${RUN_DIR#"$ROOT"/}" "router=$ROUTER_NAME" "peers=Linux Docker"
+  cat "$RESULTS_FILE" >> "$ALL_RESULTS"
+done
+e2e_check_selection "$ALL_RESULTS"
 exit "$STATUS"

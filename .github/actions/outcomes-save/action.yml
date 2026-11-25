@@ -1,0 +1,33 @@
+name: Save the outcomes for later runs
+description: >-
+  Save master's outcomes (outcomes/master.json) when outcomes-restore found none, for the next run
+  of the same comparison. On a push to master, also save the pushed commit's outcomes
+  (outcomes/candidate.json): they are the master side of the comparisons based on that commit.
+  The cache of a pull request is its own; the cache of master is read by every pull request.
+inputs:
+  comparison:
+    description: The comparison (the job, with its matrix values), as given to outcomes-restore
+    required: true
+  hit:
+    description: The hit output of outcomes-restore
+    required: true
+  harness:
+    description: The harness output of outcomes-restore
+    required: true
+runs:
+  using: composite
+  steps:
+    - if: github.event_name != 'workflow_dispatch' && inputs.hit != 'true' && hashFiles('outcomes/master.json') != ''
+      uses: actions/cache/save@v6
+      with:
+        path: outcomes/master.json
+        key: outcomes-${{ inputs.comparison }}-${{ github.event.pull_request.base.sha || github.event.before }}-${{ inputs.harness }}
+    # the cache entry has to be of the same path to be restored as outcomes/master.json
+    - if: github.event_name == 'push' && hashFiles('outcomes/candidate.json') != ''
+      shell: bash
+      run: cp outcomes/candidate.json outcomes/master.json
+    - if: github.event_name == 'push' && hashFiles('outcomes/candidate.json') != ''
+      uses: actions/cache/save@v6
+      with:
+        path: outcomes/master.json
+        key: outcomes-${{ inputs.comparison }}-${{ github.sha }}-${{ inputs.harness }}

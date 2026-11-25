@@ -94,13 +94,17 @@ vmlib_openbsd_image() {
 	IMAGE_NAME=openbsd-$VERSION-base.qcow2
 }
 
-# vmlib_ssh: the key (fixed, in CACHE, so a prepared image keeps accepting it), RSH and SSH
+# vmlib_ssh: the key (fixed, in CACHE, so a prepared image keeps accepting it), RSH and SSH. The
+# calls share one connection (ControlMaster): a run makes several per case, and a call takes 0.1 s
+# with its own handshake, 0.01 s on the shared connection. The connection ends 30 s after the last
+# call, or with the VM.
 vmlib_ssh() {
 	KEY="$CACHE/id_ed25519"
 	vmlib_lock
 	[ -f "$KEY" ] || ssh-keygen -q -t ed25519 -N '' -f "$KEY"
 	vmlib_unlock
 	RSH="ssh -p $SSH_PORT -i $KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+	RSH="$RSH -o ControlMaster=auto -o ControlPath=${TMPDIR:-/tmp}/pcp-vm-ssh-%C -o ControlPersist=30"
 	SSH="$RSH $VM_USER@127.0.0.1"
 }
 

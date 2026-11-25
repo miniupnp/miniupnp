@@ -1,10 +1,10 @@
 #!/bin/sh
 # The UPnP end-to-end suite on Linux (Docker): the pcp_e2e topology (a LAN with the runner, a router
 # running miniupnpd in UPnP mode with a real WAN, three WAN peers with traffic agents), once per build
-# (igd1: the default build, igd2: --igd2). Each case runs in its own runner container; the results go
-# into status.md (columns linux-igd1, linux-igd2), the raw data and the logs into .tmp/tests/upnp_e2e/.
+# (igd2: --igd2, igd1: the default build). Each case runs in its own runner container; the results go
+# into status.md (column linux-igd2), the raw data and the logs into .tmp/tests/upnp_e2e/.
 #
-#   run-docker.sh [--case NAME]...        UPNP_E2E_BUILDS="igd1 igd2" (default) selects the builds
+#   run-docker.sh [--case NAME]...        UPNP_E2E_BUILDS="igd2" (default) selects the builds; "igd1 igd2" adds IGDv1
 #
 # The fixture is common/compose.yaml. UPNP_E2E_SLOT=N picks a slot of e2e_address_plan; by default the
 # first free one, so it runs beside the other suites.
@@ -15,7 +15,7 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../../.." && pwd)
 DIR=$ROOT/miniupnpd/tests/upnp_e2e
 DOCKER=${DOCKER:-docker}
 KEEP=${UPNP_E2E_KEEP:-0}
-BUILDS=${UPNP_E2E_BUILDS:-igd1 igd2}
+BUILDS=${UPNP_E2E_BUILDS:-igd2}
 DATA_DIR=$ROOT/.tmp/tests/upnp_e2e
 STATUS_FILE=${UPNP_E2E_STATUS_FILE:-$DIR/status.md}
 E2E_STATUS_DATA_FILE=${UPNP_E2E_STATUS_DATA_FILE:-$DATA_DIR/status-data.json}
@@ -41,7 +41,7 @@ RUN_DIR=$RUN_ROOT
 export COMPOSE_PROFILES=agents PCP_TEST_ENABLE_UPNP=yes
 
 cleanup_fixture() {
-  "$DOCKER" rm -f "$RUNNER" >/dev/null 2>&1 || true
+  "$DOCKER" rm -f "$RUNNER-ipv4" "$RUNNER-ipv6" >/dev/null 2>&1 || true
   e2e_compose down --timeout 1 >/dev/null 2>&1 || true
 }
 cleanup() {
@@ -62,6 +62,12 @@ snapshot_daemon_state() {
 
 # restart_daemon (router_call restart, which a requires: [restart] case sends after its first request):
 # the same container, so the lease file stays; its entrypoint rebuilds the ruleset.
+# e2e_case_start / e2e_case_end (router_call case-start, case-end): the daemon log of each case.
+e2e_case_start() { case_start=$(date -u +%Y-%m-%dT%H:%M:%SZ); }
+e2e_case_end() {
+  "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" > "$case_dir/daemon.log" 2>&1 || true
+}
+
 restart_daemon() {
   "$DOCKER" restart "$ROUTER" >/dev/null
   e2e_wait_upnp "$ROUTER" "$LAN4.1"
@@ -92,22 +98,7 @@ run_build() {
       allow_ip=${WAN6}2 deny_ip=${WAN6}130 third_ip=${WAN6}200
     fi
     allow_url=http://$LAN4.12:18080 deny_url=http://$LAN4.13:18080 third_url=http://$LAN4.14:18080 unowned_ip=$external
-    rows=$(e2e_case_rows "$family")
-    while IFS="$(printf '\t')" read -r section_name case_name _flag; do
-      [ -n "$case_name" ] || continue
-      e2e_case_selected "$case_name" || continue
-      EXECUTED=$((EXECUTED + 1))
-      case_client=$lanip case_router=$router runner_ula=skip
-      case_dir=$RUN_DIR/$family/$section_name/$case_name
-      mkdir -p "$case_dir"
-      case_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-      e2e_start_runner
-      e2e_wait_runner
-      "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" > "$case_dir/daemon.log" 2>&1 || true
-      e2e_record_result "$family/$section_name/$case_name/runner.log; daemon.log; daemon-expect-*.txt"
-    done <<EOF
-$rows
-EOF
+    e2e_run_family "$family"
   done
   "$DOCKER" logs --timestamps "$ROUTER" > "$RUN_DIR/daemon-final.log" 2>&1 || true
   e2e_write_report "${RUN_DIR#"$ROOT"/}" "router=Linux nftables"

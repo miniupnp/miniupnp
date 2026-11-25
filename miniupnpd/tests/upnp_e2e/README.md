@@ -14,15 +14,16 @@ PCP.
 ## Running
 
     sh miniupnpd/tests/upnp_e2e/run-docker.sh
-    UPNP_E2E_BUILDS=igd2 sh miniupnpd/tests/upnp_e2e/run-docker.sh --case upnp-e2e-pinhole-remote-host
+    sh miniupnpd/tests/upnp_e2e/run-docker.sh --case upnp-e2e-pinhole-remote-host
+    UPNP_E2E_BUILDS="igd1 igd2" sh miniupnpd/tests/upnp_e2e/run-docker.sh   # also the IGDv1 build
 
 The topology is that of `pcp_e2e/run-docker.sh` (`common/compose.yaml`, on a fixture slot: `UPNP_E2E_SLOT`,
 by default the first free one, so it runs beside the other suites): a LAN with the runner, the router
 (miniupnpd in UPnP mode, `PCP_TEST_ENABLE_UPNP=yes`, with PCP on), and a WAN with three traffic agents
-(allowed-peer, denied-peer, third-peer). The driver compiles the `igd1` and `igd2` daemons in the
-shared tools image (`e2e_build_daemon`) and runs each case of each build and address family in its own runner container.
-The results go into [status.md](status.md), one column per platform and build (`linux-igd1`,
-`linux-igd2`); the raw results and the logs (runner, daemon, ruleset and lease file after each request)
+(allowed-peer, denied-peer, third-peer). The driver compiles the `igd2` daemon (and the `igd1` one when
+`UPNP_E2E_BUILDS` names it) in the
+shared tools image (`e2e_build_daemon`) and runs the cases of each build and address family in one runner container.
+The results go into [status.md](status.md), one column per platform and build (`linux-igd2`); the raw results and the logs (runner, daemon per case, ruleset and lease file after each request)
 into `.tmp/tests/upnp_e2e/` of the repository.
 
 ## On FreeBSD
@@ -45,9 +46,9 @@ agent's probe ends with an error (no answer, no connection).
 `python3 run_upnp_e2e_cases.py --self-test` checks the corpus of each build with `validate_corpus` and
 the status report; it is part of `common/run_self_tests.sh`.
 
-The driver runs the cases with the functions of `common/e2e_lib.sh` (`e2e_case_rows`, `e2e_start_runner`,
-`e2e_record_result`, `e2e_write_report`), with `E2E_RUNNER` set to this suite's runner and
-`E2E_RUNNER_ARGS` to its build.
+The driver runs the cases with the functions of `common/e2e_lib.sh` (`e2e_run_family`,
+`e2e_write_report`), with `E2E_RUNNER` set to this suite's runner and `E2E_RUNNER_ARGS` to its build;
+its `e2e_case_start` and `e2e_case_end` keep the daemon log of each case.
 
 ## On OpenBSD
 

@@ -7,5 +7,6 @@ E2E_RUNNER=run_upnp_e2e_cases.py
 E2E_RUNNER_ARGS="--build igd2"
 E2E_PLATFORM=freebsd-igd2; [ "$ROUTER" = openbsd-pf ] && E2E_PLATFORM=openbsd-igd2
 E2E_UPNP=    # the driver sets it for the pcp_e2e runner
+E2E_NAT66=   # the same
 
 restart_daemon() { vm sh $ROUTER_SCRIPT restart; }

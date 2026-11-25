@@ -1,10 +1,14 @@
 #!/bin/sh
-# The UPnP wire suite on Linux (Docker): builds miniupnpd (igd1: the default build, igd2: --igd2, and each with --strict), starts
+# The UPnP wire suite on Linux (Docker): builds miniupnpd (igd2: --igd2, igd1: the default build, and each with --strict), starts
 # it in UPnP mode (PCP_TEST_ENABLE_UPNP=yes) on a LAN network, and runs run_upnp_wire_cases.py in a LAN client
-# container for IPv4 and IPv6. The results go into status.md (columns linux-igd1, linux-igd2); the raw
-# data, the logs and the daemon's state files of each run into .tmp/tests/upnp_wire/ of the repository.
+# container for IPv4 and IPv6 (both at once, after the cases that restart the daemon: e2e_run_families).
+# The results go into status.md (columns linux-igd2, linux-igd2-strict); the raw data, the logs and the
+# daemon's state files of each run into .tmp/tests/upnp_wire/ of the repository.
 #
-#   run-docker.sh [igd1|igd2|all] [--case NAME]...
+#   run-docker.sh [--base|--strict] [--igd1] [--case NAME]...
+#
+# One call runs both builds: every case on igd2, then the strict-path cases on igd2-strict. --base runs
+# only igd2, --strict only igd2-strict. --igd1 runs the IGDv1 builds (igd1, igd1-strict) instead.
 #
 # A case that needs a daemon restart asks this script for it (router_call restart). UPNP_WIRE_SLOT=N picks a
 # slot of e2e_address_plan for the LAN; by default the first free one, so runs go side by side.
@@ -26,18 +30,22 @@ EXECUTED=0
 . "$ROOT/miniupnpd/tests/common/e2e_lib.sh"
 e2e_timestamp_output "$@"
 
-BUILDS=
+phases='' version=igd2
 args=$#
 while [ "$args" -gt 0 ]; do
   argument=$1; shift; args=$((args - 1))
   case "$argument" in
-    igd1|igd2|igd1-strict|igd2-strict) BUILDS="$BUILDS $argument" ;;
-    all) BUILDS="igd1 igd2 igd1-strict igd2-strict" ;;
+    --base) phases="$phases base" ;;
+    --strict) phases="$phases strict" ;;
+    --igd1) version=igd1 ;;
     *) set -- "$@" "$argument" ;;
   esac
 done
 e2e_parse_args "$@"
-[ -n "$BUILDS" ] || BUILDS="igd1 igd2 igd1-strict igd2-strict"
+BUILDS=
+for phase in ${phases:-base strict}; do
+  case "$phase" in base) BUILDS="$BUILDS $version" ;; strict) BUILDS="$BUILDS $version-strict" ;; esac
+done
 command -v "$DOCKER" >/dev/null 2>&1 || { echo "Docker is required." >&2; exit 2; }
 e2e_self_test
 E2E_RUNNER=run_upnp_wire_cases.py
@@ -55,10 +63,10 @@ cleanup() {
   result=$?
   trap - EXIT INT TERM
   if [ "$KEEP" != 1 ]; then
-    "$DOCKER" rm -f "$RUNNER" "$ROUTER" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$RUNNER-ipv4" "$RUNNER-ipv6" "$ROUTER" >/dev/null 2>&1 || true
     "$DOCKER" network rm "$LAN" >/dev/null 2>&1 || true
   else
-    echo "Keeping $ROUTER $RUNNER $LAN" >&2
+    echo "Keeping $ROUTER $RUNNER-ipv4 $RUNNER-ipv6 $LAN" >&2
   fi
   exit "$result"
 }
@@ -94,9 +102,7 @@ for build in $BUILDS; do
     --volume "$RUN_DIR/state:/var/lib/miniupnpd" --volume "$DAEMON_DIR:/opt/miniupnpd:ro" "$IMAGE" >/dev/null
   e2e_wait_upnp "$ROUTER" "$LAN4.1"
   echo "=== $build ==="
-  for family in ipv4 ipv6; do
-    e2e_run_family "$family" --lease-file /out/state/miniupnpd.leases
-  done
+  e2e_run_families --lease-file /out/state/miniupnpd.leases
   "$DOCKER" logs --timestamps "$ROUTER" > "$RUN_DIR/daemon.log" 2>&1 || true
   "$DOCKER" rm -f "$ROUTER" >/dev/null
   e2e_write_report "${RUN_DIR#"$ROOT"/}" "router=Linux nftables"

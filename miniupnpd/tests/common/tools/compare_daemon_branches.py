@@ -4,10 +4,13 @@
 Both daemons run with the candidate's harness. --suite picks the suite: each suite directory with a
 compare.py (miniupnpd/tests/SUITE/compare.py, see suite_compare.py) is one, and says how it runs on
 which --platform. --results MASTER CANDIDATE: run nothing, compare the status-data.json of two runs
-which ended (a suite run in the FreeBSD VM of the workflow). --suite NAME --help lists the options of
-that suite."""
+which ended (a suite run in the FreeBSD VM of the workflow). --master-outcomes FILE: reuse master's
+outcomes of an earlier comparison (the workflow caches them), if they are of the same master commit,
+harness, suite, platform, cases and options; else run master and write them there. --suite NAME --help
+lists the options of that suite."""
 
 import argparse
+import hashlib
 import importlib.util
 import io
 import json
@@ -26,7 +29,9 @@ from suite_compare import TESTS, cell, digest, is_filtered_skip, read_status_res
 
 UNTRACKED = shutil.ignore_patterns('__pycache__', 'status.md', 'status-data.json')
 # the options of the tool, not of a suite (the manifest lists a suite's options apart)
-GENERIC_OPTIONS = {'master_source', 'candidate_source', 'output', 'suite', 'platform', 'results', 'case'}
+GENERIC_OPTIONS = {'master_source', 'candidate_source', 'output', 'suite', 'platform', 'results', 'case',
+                   'master_outcomes', 'candidate_outcomes'}
+OUTCOMES_VERSION = 1
 
 
 def load_suites(tests=HERE.parent):
@@ -66,6 +71,35 @@ def prepare_tree(source, destination, harness_source=HERE.parent):
     return command_output(['git', '-C', str(source), 'rev-parse', 'HEAD'])
 
 
+def harness_digest(harness):
+    """SHA-256 of a harness snapshot: every file's path and content, in path order."""
+    sha = hashlib.sha256()
+    for path in sorted(p for p in harness.rglob('*') if p.is_file()):
+        sha.update(str(path.relative_to(harness)).encode() + b'\0' + path.read_bytes() + b'\0')
+    return sha.hexdigest()
+
+
+def write_outcomes(path, identity, run):
+    """Keep the outcomes of one side with what they are of (identity: commit, harness, suite, ...)."""
+    outcomes, corpus_digest = run
+    rows = [[*key, result['status'], result['detail']] for key, result in outcomes.items()]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(dict(identity, version=OUTCOMES_VERSION, corpus_sha256=corpus_digest,
+                                    outcomes=rows), indent=1) + '\n')
+
+
+def read_outcomes(path, identity):
+    """The outcomes of write_outcomes, or None when the file is missing or of another identity."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    if data.get('version') != OUTCOMES_VERSION or any(data.get(name) != value for name, value in identity.items()):
+        return None
+    outcomes = {tuple(row[:3]): {'status': row[3], 'detail': row[4]} for row in data['outcomes']}
+    return outcomes, data['corpus_sha256']
+
+
 def transition(before, after):
     if before == after:
         return 'unchanged'
@@ -84,7 +118,7 @@ def compare_results(before, after):
     return [(key, transition(before[key]['status'], after[key]['status'])) for key in before]
 
 
-def make_report(output, commits, runs, errors, title, suite=None, args=None):
+def make_report(output, commits, runs, errors, title, suite=None, args=None, reused=False):
     """summary.md; the exit code: 0 no regression, 1 regressions, 2 an incomplete comparison. The suite
     adds its header lines and how to reproduce the comparison (not for --results), its notes and a
     column of per-case links."""
@@ -96,7 +130,9 @@ def make_report(output, commits, runs, errors, title, suite=None, args=None):
              f"- Candidate commit: `{commits.get('candidate', 'unavailable')}`", '',
              *header,
              'Both daemon builds use the same candidate test harness and YAML corpus. '
-             'The candidate is the PR head, without a synthetic merge with master.', '']
+             'The candidate is the PR head, without a synthetic merge with master.', '',
+             *(['Master results: reused from an earlier run of the same master commit and harness.', '']
+               if reused else [])]
     if errors:
         lines += ['## Infrastructure errors', '']
         lines += [f'- {cell(label)}: {cell(error)}' for label, error in errors]
@@ -169,12 +205,19 @@ def parse_args(suites, argv=None):
     parser.add_argument('--results', nargs=2, type=Path, metavar=('MASTER', 'CANDIDATE'),
                         help='run nothing: compare the status-data.json of two ended runs of --platform')
     parser.add_argument('--case', action='append', default=[], help='select one YAML case; repeatable')
+    parser.add_argument('--master-outcomes', type=Path, metavar='FILE',
+                        help="reuse master's outcomes in FILE if they match this comparison; else run master "
+                             'and write them to FILE')
+    parser.add_argument('--candidate-outcomes', type=Path, metavar='FILE',
+                        help="write the candidate's outcomes to FILE (on master: the next comparisons' master)")
     if chosen is not None and hasattr(chosen, 'add_arguments'):
         chosen.add_arguments(parser.add_argument_group(f'{chosen.SUITE} options'))
     args = parser.parse_args(argv)
     suite = suites[args.suite]
     if args.results and args.case:
         parser.error('--results compares whole runs which ended: no --case')
+    if args.results and (args.master_outcomes or args.candidate_outcomes):
+        parser.error('--results runs nothing: no --master-outcomes or --candidate-outcomes')
     if not args.results and args.platform not in suite.PLATFORMS:
         parser.error(f'the {suite.SUITE} suite runs on {", ".join(suite.PLATFORMS)}, not {args.platform}')
     if hasattr(suite, 'check'):
@@ -189,31 +232,47 @@ def main(argv=None):
     output = args.output.resolve()
     output.mkdir(parents=True)
     commits, runs, errors = {}, {}, []
+    options = {name: value for name, value in vars(args).items() if name not in GENERIC_OPTIONS}
+    saved = {'master': args.master_outcomes, 'candidate': args.candidate_outcomes}
+    reused = False
     with tempfile.TemporaryDirectory(prefix='pcp-branch-comparison-') as temporary:
         harness_snapshot = Path(temporary) / 'tests'
         shutil.copytree(HERE.parent, harness_snapshot, ignore=UNTRACKED)
         corpus_digest = digest(harness_snapshot / suite.DIR / suite.CORPUS)
+        harness = harness_digest(harness_snapshot)
         for index, (label, source) in enumerate((('master', args.master_source), ('candidate', args.candidate_source))):
             try:
+                commits[label] = command_output(['git', '-C', str(source), 'rev-parse', 'HEAD'])
                 if args.results:
-                    commits[label] = command_output(['git', '-C', str(source), 'rev-parse', 'HEAD'])
                     runs[label] = read_status_results(args.results[index] / 'status-data.json', args.platform,
                                                       corpus_digest)
                     continue
+                # what a side's outcomes are of; json.loads gives lists, so the cases are a list too
+                identity = {'commit': commits[label], 'harness_sha256': harness, 'suite': args.suite,
+                            'platform': args.platform, 'cases': list(args.case),
+                            'options': json.loads(json.dumps(options, default=str))}
+                if label == 'master' and saved['master']:
+                    runs[label] = read_outcomes(saved['master'], identity)
+                    if runs[label] is not None and runs[label][1] == corpus_digest:
+                        reused = True
+                        print(f'Reusing master outcomes: {saved["master"]}', flush=True)
+                        continue
                 tree = Path(temporary) / label
-                commits[label] = prepare_tree(source.resolve(), tree, harness_snapshot)
+                prepare_tree(source.resolve(), tree, harness_snapshot)
                 runs[label] = suite.run(label, tree, output, args)
                 if runs[label][1] != corpus_digest:
                     raise ValueError('run did not use the selected candidate corpus')
+                if saved[label]:
+                    write_outcomes(saved[label], identity, runs[label])
             except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
                 errors.append((label, str(error)))
-    options = {name: value for name, value in vars(args).items() if name not in GENERIC_OPTIONS}
     manifest = {'version': 2, 'suite': args.suite, 'platform': args.platform, 'commits': commits,
-                'corpus_sha256': corpus_digest, 'cases': args.case, 'options': options, 'errors': errors}
+                'corpus_sha256': corpus_digest, 'cases': args.case, 'options': options, 'errors': errors,
+                'master_reused': reused}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2, default=str) + '\n')
     title = f'{suite.TITLE} ({args.platform})'
     try:
-        code = make_report(output, commits, runs, errors, title, suite, args)
+        code = make_report(output, commits, runs, errors, title, suite, args, reused)
     except (OSError, ValueError, KeyError) as error:
         code = make_report(output, commits, runs, [('comparison', str(error))], title, suite, args)
     print(f'Comparison report: {output / "summary.md"}', flush=True)

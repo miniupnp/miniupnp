@@ -32,8 +32,8 @@ from lib_test import (  # noqa: E402
     print_build_runs,
     resolve_family,
     resolve_variant,
-    run_cases,
     run_driver_suite,
+    run_e2e_cases,
     select_build_cases,
     status_sections,
     validate_corpus,
@@ -125,16 +125,17 @@ def run_selected(_corpus, args, cases):
                 run_exposure(case, args, agents)
             else:
                 CaseRun(case, args, agents, pcp_sock).run()
-        return run_cases(cases, run, failures=(Exception,), timestamps=True)
+        return run_e2e_cases(args, cases, run)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     add_corpus_arguments(parser, CORPUS, "print section and case of the cases of --build and --family")
     add_e2e_arguments(parser)
-    parser.add_argument("--build", default="igd1")
+    parser.add_argument("--build", default="igd2")
     add_status_arguments(parser, os.path.dirname(os.path.abspath(__file__)), SUITE, platform=None)
-    return run_driver_suite(parser, load, write_report, self_test, selected_cases, validate, run_selected)
+    return run_driver_suite(parser, load, write_report, self_test, selected_cases, validate, run_selected,
+                            empty_case_ok=True)
 
 
 if __name__ == "__main__":

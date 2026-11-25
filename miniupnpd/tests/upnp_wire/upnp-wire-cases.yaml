@@ -9,6 +9,8 @@
 # both), and runs `steps` (then `cleanup`, also after a failure) with lib_test.run_upnp_step:
 #
 #   kind: ssdp         an M-SEARCH (st, mx, man, host; null leaves a header out; target: multicast | unicast)
+#                      collects replies for `wait` s (default MX+1); a step expecting none (count: 0) waits
+#                      0.5 s without --strict, which answers within 50 ms or never
 #   kind: ssdp-listen  the NOTIFY messages on the group within `seconds` (restart: around a daemon restart)
 #   kind: http         a request: raw bytes ({host} is the router's host:port) or method/path/headers/body;
 #                      parse: description | scpd adds desc.* / scpd.* values
@@ -22,7 +24,11 @@
 # min, max, nonzero, present, matches, contains, not_contains, one_of, remember); `capture` keeps a value
 # as a variable ("$name" in later steps). A value {igd1: .., igd2: ..} or {ipv4: .., ipv6: ..} is resolved
 # for the build and family. A check the daemon only builds with UPNP_STRICT has `requires: [strict]`, a
-# SKIP unless the daemon was built with --strict (the igd1-strict, igd2-strict runs). A feature the daemon does not implement has `known_failure:
+# SKIP unless the daemon was built with --strict (the igd1-strict, igd2-strict runs). A case whose request takes a path
+# UPNP_STRICT changes (SSDP MAN/MX/ST checks, the delayed M-SEARCH replies, the IPv6 and start-up NOTIFY,
+# the HTTP Date header, GENA headers, SOAP argument checks)
+# has `strict_path: true`. The -strict runs have only these and the `requires: [strict]` cases: the others
+# give the same result with and without --strict. A feature the daemon does not implement has `known_failure:
 # <note>` (an XFAIL). Any other result that differs from the spec is a spec gap: a FAIL, with a `# spec
 # gap:` comment naming the cause, never a changed expectation. The variables of every case: router, client, family, build,
 # uuid, udn, location, the device and service types of the build (igd, wandevice, wancd, wanipc, wancic,
@@ -90,6 +96,7 @@ sections:
       (which a device discards silently), the response headers, and the NOTIFY messages around a restart.
     cases:
       - name: uda11-1.2.2-must-alive-headers
+        strict_path: true
         ref: "UDA-1.1 §1.2.2"
         requires: [restart]
         description: The ssdp:alive messages after a start have HOST of the group, CACHE-CONTROL, LOCATION,
@@ -121,10 +128,11 @@ sections:
       - name: uda11-1.2.2-must-alive-repeats
         ref: "UDA-1.1 §1.2.2"
         families: [ipv4]
-        description: The device repeats ssdp:alive within its advertisement interval (notify_interval=30).
+        description: The device repeats ssdp:alive within its advertisement interval (notify_interval=10).
         steps:
-          - {kind: ssdp-listen, seconds: 32, nts: ["ssdp:alive"], expect: {"count.ssdp:alive": {min: 1}}}
+          - {kind: ssdp-listen, seconds: 12, nts: ["ssdp:alive"], expect: {"count.ssdp:alive": {min: 1}}}
       - name: uda11-1.2.3-should-notify-on-restart
+        strict_path: true
         ref: "UDA-1.1 §1.2.3"
         requires: [restart]
         description: A daemon restart sends ssdp:byebye when it stops and ssdp:alive when it starts.
@@ -132,12 +140,14 @@ sections:
           - {kind: ssdp-listen, restart: true, seconds: 5,
              expect: {"count.ssdp:byebye": {min: 1}, "count.ssdp:alive": {min: 1}}}
       - name: uda11-1.3.2-must-unicast-search
+        strict_path: true
         # spec gap: count was 0, expected 1
         ref: "UDA-1.1 §1.3.2"
         description: A unicast M-SEARCH to the device's address and port 1900 is answered (within 1 second).
         steps:
           - {kind: ssdp, target: unicast, st: "upnp:rootdevice", mx: null, wait: 1.5, expect: {count: 1}}
       - name: uda11-1.3.2-must-igd-v1-to-igdv2
+        strict_path: true
         ref: "UDA-1.1 §1.3.2"
         builds: [igd2]
         description: An IGDv2 answers a search for InternetGatewayDevice:1, with the version of the request in ST.
@@ -146,6 +156,7 @@ sections:
             st: "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
             expect: {count: 1, header.st: "urn:schemas-upnp-org:device:InternetGatewayDevice:1"}
       - name: uda11-1.3.2-must-wanipconnection-v1-to-igdv2
+        strict_path: true
         ref: "UDA-1.1 §1.3.2"
         builds: [igd2]
         description: An IGDv2 answers a search for WANIPConnection:1, with the version of the request in ST.
@@ -179,6 +190,7 @@ sections:
         steps:
           - {kind: ssdp, st: "upnp:rootdevice", mx: abc, wait: 2, expect: {count: 0}}
       - name: uda11-1.3.3-must-missing-st
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: An M-SEARCH without the REQUIRED ST is discarded silently.
         steps:
@@ -198,6 +210,7 @@ sections:
         steps:
           - {kind: ssdp, st: "urn:schemas-upnp-org:service:WANIPConnection:2", expect: {count: 0}}
       - name: uda11-1.3.3-must-all-every-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: ssdp:all is answered for the root device, every device and service type and every UUID.
         steps:
@@ -206,12 +219,14 @@ sections:
             expect:
               sts: {contains: ["upnp:rootdevice", $udn, $igd, $wandevice, $wancd, $wanipc, $wancic, $l3f]}
       - name: uda11-1.3.3-must-all-fc6
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         builds: [igd2]
         description: ssdp:all includes WANIPv6FirewallControl:1 on an IGDv2.
         steps:
           - {kind: ssdp, st: "ssdp:all", expect: {sts: {contains: $fc6}}}
       - name: uda11-1.3.3-must-all-only-described-types
+        strict_path: true
         # spec gap: sts ['upnp:rootdevice', 'urn:schemas-upnp-org:device:InternetGatewayDevice:1', 'urn:schemas-upnp-org:device:WA
         ref: "UDA-1.1 §1.3.3"
         description: ssdp:all is answered 3+2d+k times (d embedded devices, k service types), and only for
@@ -224,6 +239,7 @@ sections:
               sts: {not_contains: "urn:schemas-upnp-org:service:WANPPPConnection:1"}
               count: {igd1: 10, igd2: 11}
       - name: uda11-1.3.3-must-rootdevice
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: upnp:rootdevice is answered once, with ST upnp:rootdevice and USN uuid:<udn>::upnp:rootdevice.
         steps:
@@ -234,16 +250,19 @@ sections:
               header.st: "upnp:rootdevice"
               header.usn: "uuid:3d3cec3a-8cf0-11e0-98ee-001a6bd2d07b::upnp:rootdevice"
       - name: uda11-1.3.3-must-root-uuid
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: The root device's uuid is answered once, with ST and USN equal to it.
         steps:
           - {kind: ssdp, st: $udn, expect: {count: 1, header.st: $udn, header.usn: $udn}}
       - name: uda11-1.3.3-must-unknown-uuid
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: A uuid that is not the device's gets no answer.
         steps:
           - {kind: ssdp, st: "uuid:00000000-0000-0000-0000-000000000000", expect: {count: 0}}
       - name: uda11-1.3.3-must-igd-device-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: The InternetGatewayDevice type of the build is answered once.
         steps:
@@ -251,37 +270,44 @@ sections:
             st: $igd
             expect: {count: 1, header.st: $igd, header.usn: {matches: "^uuid:3d3cec3a-8cf0-11e0-98ee-001a6bd2d07b::urn:schemas-upnp-org:device:InternetGatewayDevice:[12]$"}}
       - name: uda11-1.3.3-must-wandevice-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: The embedded WANDevice type is answered once.
         steps:
           - {kind: ssdp, st: $wandevice, expect: {count: 1, header.st: $wandevice}}
       - name: uda11-1.3.3-must-wanconnectiondevice-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: The embedded WANConnectionDevice type is answered once.
         steps:
           - {kind: ssdp, st: $wancd, expect: {count: 1, header.st: $wancd}}
       - name: uda11-1.3.3-must-wanipconnection-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: The WANIPConnection service type of the build is answered once.
         steps:
           - {kind: ssdp, st: $wanipc, expect: {count: 1, header.st: $wanipc}}
       - name: uda11-1.3.3-must-wancommoninterfaceconfig-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: WANCommonInterfaceConfig:1 is answered once.
         steps:
           - {kind: ssdp, st: $wancic, expect: {count: 1, header.st: $wancic}}
       - name: uda11-1.3.3-must-layer3forwarding-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: Layer3Forwarding:1 is answered once.
         steps:
           - {kind: ssdp, st: $l3f, expect: {count: 1, header.st: $l3f}}
       - name: uda11-1.3.3-must-wanipv6firewallcontrol-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         builds: [igd2]
         description: WANIPv6FirewallControl:1 is answered once on an IGDv2.
         steps:
           - {kind: ssdp, st: $fc6, expect: {count: 1, header.st: $fc6}}
       - name: uda11-1.3.3-must-unknown-type
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: A service type the device does not have gets no answer.
         steps:
@@ -293,11 +319,13 @@ sections:
         steps:
           - {kind: ssdp, st: "upnp:rootdevice", mx: null, wait: 2, expect: {count: 0}}
       - name: uda11-1.3.3-should-mx-over-five
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: An MX over 5 is taken as 5 or less, so the answer comes within 5 seconds.
         steps:
           - {kind: ssdp, st: "upnp:rootdevice", mx: 120, wait: 6, expect: {count: 1}}
       - name: uda11-1.3.3-must-response-headers
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: The response has CACHE-CONTROL max-age, EXT, LOCATION of the description, SERVER with
           UPnP/1.1, ST, USN and BOOTID.UPNP.ORG.
@@ -314,6 +342,7 @@ sections:
               header.usn: {matches: "^uuid:[^:]+::upnp:rootdevice$"}
               header.bootid.upnp.org: {matches: "^[0-9]+$"}
       - name: uda11-1.3.3-must-every-response-well-formed
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         description: Every answer to ssdp:all has a USN starting with the device's UUID prefix and the LOCATION
           of the description.
@@ -470,6 +499,7 @@ sections:
           - {"kind": "ssdp", "raw": "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: uuid:\r\n\r\n", "wait": 1.5, "expect": {"count": 0}}
           - {"kind": "ssdp", "st": "upnp:rootdevice", "expect": {"count": 1}}
       - name: uda11-1.3.3-must-st-urn-no-version
+        strict_path: true
         ref: "UDA-1.1 §1.3.3"
         families: ["ipv4"]
         description: "A device URN without a version gets no answer."
@@ -511,6 +541,7 @@ sections:
           - {"kind": "ssdp", "raw": "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 99999999999999999999\r\nST: upnp:rootdevice\r\n\r\n", "wait": 6, "expect": {"count": 0}}
           - {"kind": "ssdp", "st": "upnp:rootdevice", "expect": {"count": 1}}
       - name: uda11-1.3.3-must-man-value-ssdp-discover
+        strict_path: true
         # spec gap: count was 1, expected 0
         ref: "UDA-1.1 §1.3.3"
         families: ["ipv4"]
@@ -519,6 +550,7 @@ sections:
           - {"kind": "ssdp", "raw": "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: ssdp:discover\r\nMX: 1\r\nST: upnp:rootdevice\r\n\r\n", "wait": 1.5, "expect": {"count": 0}}
           - {"kind": "ssdp", "st": "upnp:rootdevice", "expect": {"count": 1}}
       - name: uda11-1.3.3-must-man-value-ssdp-other
+        strict_path: true
         # spec gap: count was 1, expected 0
         ref: "UDA-1.1 §1.3.3"
         families: ["ipv4"]
@@ -527,6 +559,7 @@ sections:
           - {"kind": "ssdp", "raw": "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:other\"\r\nMX: 1\r\nST: upnp:rootdevice\r\n\r\n", "wait": 1.5, "expect": {"count": 0}}
           - {"kind": "ssdp", "st": "upnp:rootdevice", "expect": {"count": 1}}
       - name: uda11-1.3.3-must-man-value-empty
+        strict_path: true
         # spec gap: count was 1, expected 0
         ref: "UDA-1.1 §1.3.3"
         families: ["ipv4"]
@@ -611,6 +644,7 @@ sections:
         steps:
           - {"kind": "http", "raw": "GET /rootDesc.xml HTTP/1.0\r\n\r\n", "timeout": 2, "expect": {"version": {"matches": "^HTTP/1\\.[01]$"}, "status": 200}}
       - name: uda11-2.11-must-get-description
+        strict_path: true
         ref: "UDA-1.1 §2.11"
         description: GET of the description returns 200 with a text/xml body.
         steps:
@@ -618,6 +652,7 @@ sections:
             path: /rootDesc.xml
             expect: {status: 200, header.content-type: {matches: "^text/xml"}, body: {contains: "<root"}}
       - name: uda11-2.11-may-description-headers
+        strict_path: true
         ref: "UDA-1.1 §2.11"
         description: The description response has CONTENT-LENGTH and a SERVER with UPnP/1.1.
         steps:
@@ -626,6 +661,7 @@ sections:
             expect: {status: 200, header.content-length: {matches: "^[0-9]+$"},
                      header.server: {matches: " UPnP/1\\.1 "}}
       - name: uda11-2.11-must-get-scpd-wanipconnection
+        strict_path: true
         ref: "UDA-1.1 §2.11"
         description: GET of the WANIPConnection SCPD returns 200 with a text/xml body.
         steps:
@@ -917,6 +953,7 @@ sections:
           - {"kind": "http", "raw": "POST /ctl/IPConn HTTP/1.1\r\nHost: {host}\r\nContent-Type: text/xml\r\nSOAPAction: \"urn:schemas-upnp-org:service:WANIPConnection:1#GetExternalIPAddress\"\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\nx\r\n0\r\n\r\n", "timeout": 2, "expect": {"status": {"not_equals": 200}}}
           - {"kind": "http", "path": "/rootDesc.xml", "expect": {"status": 200}}
       - name: rfc9112-9.3-must-two-requests-one-connection
+        strict_path: true
         ref: "RFC9112 §9.3"
         description: A server that does not keep the connection sends Connection close, and closes it.
         steps:
@@ -1328,6 +1365,7 @@ sections:
           - {"kind": "soap", "action": "GetExternalIPAddress", "soapaction": "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#GetExternalIPAddress\"", "expect": {"status": {"not_equals": 200}}}
           - {"kind": "soap", "action": "GetExternalIPAddress", "expect": {"status": 200}}
       - name: uda11-3.2.2-must-response-headers
+        strict_path: true
         ref: "UDA-1.1 §3.2.2"
         families: [ipv4]
         description: An action response has CONTENT-TYPE text/xml; charset="utf-8", EXT and SERVER.
@@ -1386,6 +1424,7 @@ sections:
         steps:
           - {kind: soap, service: WANCommonInterfaceConfig, action: GetExternalIPAddress, expect: {status: 500, fault: 401}}
       - name: uda11-3.2.5-must-missing-argument
+        strict_path: true
         # spec gap: answers 501 Action Failed
         ref: "UDA-1.1 §3.2.5"
         families: [ipv4]
@@ -1407,6 +1446,7 @@ sections:
           - {kind: soap, action: AddPortMapping, args: {<<: *add_args, NewExternalPort: abc, NewInternalPort: 43061},
              expect: {status: 500, fault: 402}}
       - name: uda11-3.2.5-must-fault-format
+        strict_path: true
         ref: "UDA-1.1 §3.2.5"
         families: [ipv4]
         description: A fault is HTTP 500 with faultcode Client, faultstring UPnPError and a UPnPError detail.
@@ -1954,6 +1994,7 @@ sections:
           - {kind: soap, action: AddPortMapping, args: {<<: *add_args, NewExternalPort: 0, NewInternalPort: 43008},
              expect: {status: 500, fault: 716}}
       - name: wanipc1-2.4.16-may-addportmapping-remote-host
+        strict_path: true
         ref: {igd1: "WANIPC1 §2.4.16", igd2: "WANIPC2 §2.5.16"}
         families: [ipv4]
         description: A specific NewRemoteHost is accepted (a must on v2), or on v1 refused with 726 RemoteHostOnlySupportsWildcard.
@@ -2304,6 +2345,7 @@ sections:
         cleanup:
           - {"kind": "soap", "action": "DeletePortMapping", "args": {"NewRemoteHost": "", "NewExternalPort": 43229, "NewProtocol": "UDP"}}
       - name: wanipc1-2.4.16-impl-remote-host-bad
+        strict_path: true
         # spec gap: status was 200, expected 500
         ref: "WANIPC1 §2.4.16"
         families: ["ipv4"]
@@ -2314,6 +2356,7 @@ sections:
         cleanup:
           - {"kind": "soap", "action": "DeletePortMapping", "args": {"NewRemoteHost": "", "NewExternalPort": 43234, "NewProtocol": "UDP"}}
       - name: wanipc1-2.4.16-impl-remote-host-long
+        strict_path: true
         # spec gap: status was 200, expected 500
         ref: "WANIPC1 §2.4.16"
         families: ["ipv4"]
@@ -2400,6 +2443,7 @@ sections:
           - {"kind": "soap", "action": "DeletePortMapping", "args": {"NewRemoteHost": "", "NewExternalPort": 43122, "NewProtocol": "UDP"}}
           - {"kind": "subscribe", "mode": "unsubscribe", "sid": "$sid"}
       - name: wanipc2-2.5.1-must-setconnectiontype-connected
+        strict_path: true
         ref: "WANIPC2 §2.5.1"
         families: ["ipv4"]
         builds: ["igd2"]
@@ -2437,6 +2481,7 @@ sections:
         cleanup:
           - {kind: soap, action: DeletePortMapping, args: {NewRemoteHost: "", NewExternalPort: 43012, NewProtocol: UDP}}
       - name: wanipc2-2.5.16-must-empty-internal-client
+        strict_path: true
         # spec gap: fault was 501, expected 715
         ref: "WANIPC2 §2.5.16"
         families: ["ipv4"]
@@ -2491,6 +2536,7 @@ sections:
         cleanup:
           - {"kind": "soap", "action": "DeletePortMapping", "args": {"NewRemoteHost": "", "NewExternalPort": 43117, "NewProtocol": "UDP"}}
       - name: wanipc2-2.5.17-must-empty-internal-client
+        strict_path: true
         # spec gap: fault was 402, expected 715
         ref: "WANIPC2 §2.5.17"
         families: ["ipv4"]
@@ -2825,6 +2871,7 @@ sections:
         steps:
           - {"kind": "http", "path": "/WANCfg.xml", "parse": "scpd", "expect": {"scpd.args.GetCommonLinkProperties": ["NewWANAccessType", "NewLayer1UpstreamMaxBitRate", "NewLayer1DownstreamMaxBitRate", "NewPhysicalLinkStatus"], "scpd.directions.GetCommonLinkProperties": ["out", "out", "out", "out"]}}
       - name: wancic1-2.4.6-may-gettotalbytessent
+        strict_path: true
         ref: "WANCIC1 §2.4.6"
         families: [ipv4]
         description: GetTotalBytesSent returns a ui4 counter.
@@ -2832,6 +2879,7 @@ sections:
           - {kind: soap, service: WANCommonInterfaceConfig, action: GetTotalBytesSent,
              expect: {status: 200, out.NewTotalBytesSent: {matches: "^[0-9]+$"}}}
       - name: wancic1-2.4.7-may-gettotalbytesreceived
+        strict_path: true
         ref: "WANCIC1 §2.4.7"
         families: [ipv4]
         description: GetTotalBytesReceived returns a ui4 counter.
@@ -2839,6 +2887,7 @@ sections:
           - {kind: soap, service: WANCommonInterfaceConfig, action: GetTotalBytesReceived,
              expect: {status: 200, out.NewTotalBytesReceived: {matches: "^[0-9]+$"}}}
       - name: wancic1-2.4.8-may-gettotalpacketssent
+        strict_path: true
         ref: "WANCIC1 §2.4.8"
         families: [ipv4]
         description: GetTotalPacketsSent returns a ui4 counter.
@@ -2846,6 +2895,7 @@ sections:
           - {kind: soap, service: WANCommonInterfaceConfig, action: GetTotalPacketsSent,
              expect: {status: 200, out.NewTotalPacketsSent: {matches: "^[0-9]+$"}}}
       - name: wancic1-2.4.9-may-gettotalpacketsreceived
+        strict_path: true
         ref: "WANCIC1 §2.4.9"
         families: [ipv4]
         description: GetTotalPacketsReceived returns a ui4 counter.
@@ -2865,6 +2915,7 @@ sections:
             args: {NewDefaultConnectionService: "uuid:00000000-0000-0000-0000-000000000000:WANConnectionDevice:1,urn:upnp-org:serviceId:WANIPConn1"}
             expect: {status: 500, fault: 720}
       - name: l3f1-2.4.1-must-set-then-get
+        strict_path: true
         ref: "L3F1 §2.4.1"
         families: ["ipv4"]
         description: "A Set with the current value succeeds and Get returns it."
@@ -2873,18 +2924,21 @@ sections:
           - {"kind": "soap", "service": "Layer3Forwarding", "action": "SetDefaultConnectionService", "args": {"NewDefaultConnectionService": "$cur"}, "expect": {"status": 200}}
           - {"kind": "soap", "service": "Layer3Forwarding", "action": "GetDefaultConnectionService", "capture": {}, "expect": {"status": 200, "out.NewDefaultConnectionService": "$cur"}}
       - name: l3f1-2.4.1-must-set-missing-argument
+        strict_path: true
         ref: "L3F1 §2.4.1"
         families: ["ipv4"]
         description: "A Set without an argument gets 402."
         steps:
           - {"kind": "soap", "service": "Layer3Forwarding", "action": "SetDefaultConnectionService", "args": {}, "expect": {"status": 500, "fault": 402}}
       - name: l3f1-2.4.1-must-set-wrong-argument-name
+        strict_path: true
         ref: "L3F1 §2.4.1"
         families: ["ipv4"]
         description: "A Set with another argument name gets 402."
         steps:
           - {"kind": "soap", "service": "Layer3Forwarding", "action": "SetDefaultConnectionService", "args": {"Other": "x"}, "expect": {"status": 500, "fault": 402}}
       - name: l3f1-2.4.1-must-set-too-many-arguments
+        strict_path: true
         # spec gap: status was 200, expected 500
         ref: "L3F1 §2.4.1"
         families: ["ipv4"]
@@ -3151,6 +3205,7 @@ sections:
           - {"kind": "soap", "service": "WANIPv6FirewallControl", "action": "AddPinhole", "args": {"RemoteHost": "", "RemotePort": "abc", "InternalClient": "$client", "Protocol": 17, "LeaseTime": 3600, "InternalPort": 44200}, "expect": {"status": 500}}
           - {"kind": "soap", "action": "GetExternalIPAddress", "expect": {"status": 200}}
       - name: 6fc1-2.6.3-must-internal-port-value-empty
+        strict_path: true
         ref: "6FC1 §2.6.3"
         families: ["ipv6"]
         builds: ["igd2"]
@@ -3159,6 +3214,7 @@ sections:
           - {"kind": "soap", "service": "WANIPv6FirewallControl", "action": "AddPinhole", "args": {"RemoteHost": "", "RemotePort": 0, "InternalClient": "$client", "Protocol": 17, "LeaseTime": 3600, "InternalPort": ""}, "expect": {"status": 500}}
           - {"kind": "soap", "action": "GetExternalIPAddress", "expect": {"status": 200}}
       - name: 6fc1-2.6.3-must-remote-port-value-empty
+        strict_path: true
         # spec gap: status was 200, expected 500
         ref: "6FC1 §2.6.3"
         families: ["ipv6"]
@@ -3405,6 +3461,7 @@ sections:
         cleanup:
           - {"kind": "subscribe", "mode": "unsubscribe", "sid": "$a"}
       - name: uda11-4.1.2-must-subscribe
+        strict_path: true
         ref: "UDA-1.1 §4.1.2"
         description: SUBSCRIBE to WANIPConnection returns 200 with a SID uuid:... and TIMEOUT Second-N.
         steps:
@@ -3616,6 +3673,7 @@ sections:
           - {"kind": "subscribe", "mode": "unsubscribe", "sid": "$s28"}
           - {"kind": "subscribe", "mode": "unsubscribe", "sid": "$s29"}
       - name: uda11-4.1.3-must-renew
+        strict_path: true
         ref: "UDA-1.1 §4.1.3"
         description: SUBSCRIBE with the SID renews the subscription (200, the same SID).
         steps:
@@ -3647,6 +3705,7 @@ sections:
         cleanup:
           - {kind: subscribe, mode: unsubscribe, sid: $sid}
       - name: uda11-4.1.3-must-renew-empty-sid
+        strict_path: true
         ref: "UDA-1.1 §4.1.3"
         families: ["ipv4"]
         description: "A renewal with an empty SID gets 412."
@@ -3674,6 +3733,7 @@ sections:
           - {"kind": "subscribe", "mode": "raw", "headers": [["SID", "uuid:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]], "expect": {"status": 412}}
           - {"kind": "soap", "action": "GetExternalIPAddress", "expect": {"status": 200}}
       - name: uda11-4.1.4-must-unsubscribe
+        strict_path: true
         ref: "UDA-1.1 §4.1.4"
         description: UNSUBSCRIBE ends the subscription; renewing it afterwards gets 412.
         steps:
@@ -3702,6 +3762,7 @@ sections:
         steps:
           - {"kind": "subscribe", "mode": "raw", "method": "UNSUBSCRIBE", "headers": [["SID", "uuid:00000000-0000-0000-0000-000000000000"], ["CALLBACK", "<{callback}>"]], "expect": {"status": 400}}
       - name: uda11-4.1.4-must-unsubscribe-missing-sid
+        strict_path: true
         ref: "UDA-1.1 §4.1.4"
         families: ["ipv4"]
         description: "UNSUBSCRIBE without a SID gets 412."

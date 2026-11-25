@@ -111,11 +111,27 @@ class LanEcho:
 TIMEOUT = 2.0
 
 
+def drop_waiting(sock):
+    """Drop the datagrams already waiting on `sock`; the timeout of the socket is put back."""
+    timeout = sock.gettimeout()
+    sock.setblocking(False)
+    try:
+        while True:
+            sock.recv(2048)
+    except BlockingIOError:
+        pass
+    finally:
+        sock.settimeout(timeout)
+
+
 def exchange(sock, address, request):
     """Send `request` and return the first datagram back; the socket needs a timeout (a silent daemon
-    would block the run otherwise)."""
+    would block the run otherwise). A reply that came after its request timed out is dropped first,
+    or it would be read as the reply to this request, and every later request would read the reply
+    of the one before."""
     if sock.gettimeout() is None:
         raise ValueError("exchange needs a socket with a timeout (sock.settimeout)")
+    drop_waiting(sock)
     sock.sendto(request, address)
     response, _ = sock.recvfrom(2048)
     return response
@@ -958,13 +974,14 @@ def load_status_data(path):
     return {"version": 1, "platforms": {}}
 
 
-def merge_status(data, platform, family, run, results, known, keep_if_skipped=()):
+def merge_status(data, platform, family, run, results, known, keep_if_skipped=(), platform_cases=None):
     """Put the results of one run in the data of its platform.
 
     results: {case key: (status, detail)}; run: what the run was, shown in the platform's line;
     known: every case key of the corpus (the others are forgotten); keep_if_skipped: a SKIP whose
     detail starts like this does not replace an earlier result (a run without the fixture must not
-    wipe the result of one that had it)."""
+    wipe the result of one that had it); platform_cases: the case keys this platform runs (default:
+    every one), its results of other cases are forgotten."""
     entry = data["platforms"].setdefault(platform, {"results": {}})
     entry["updated"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
     entry.setdefault("runs", {})[family] = run
@@ -973,6 +990,10 @@ def merge_status(data, platform, family, run, results, known, keep_if_skipped=()
         if status == "SKIP" and key in family_results and detail.startswith(tuple(keep_if_skipped)):
             continue
         family_results[key] = [status, detail]
+    if platform_cases is not None:
+        for results_of_family in entry["results"].values():
+            for key in [key for key in results_of_family if key not in platform_cases]:
+                del results_of_family[key]
     for other in data["platforms"].values():
         for results_of_family in other["results"].values():
             for key in [key for key in results_of_family if key not in known]:
@@ -1040,7 +1061,7 @@ def render_status(title, data, data_path, sections, extra_lines=()):
 
 
 def write_status(path, title, suite, platform, family, run, results, sections, data_path=None, extra_lines=(),
-                 keep_if_skipped=()):
+                 keep_if_skipped=(), platform_cases=None):
     """Merge one run into the data of the suite (data_path, default status_data_path(suite)) and
     rewrite the report at `path` and the data."""
     data_path = data_path or status_data_path(suite)
@@ -1052,7 +1073,7 @@ def write_status(path, title, suite, platform, family, run, results, sections, d
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = load_status_data(data_path)
         known = {case_key(case) for section in sections for case in section["cases"]}
-        merge_status(data, platform, family, run, results, known, keep_if_skipped)
+        merge_status(data, platform, family, run, results, known, keep_if_skipped, platform_cases)
         report = render_status(title, data, data_path, sections, extra_lines)
         with open(data_path, "w", encoding="utf-8") as data_file:
             json.dump(data, data_file, indent=1)
@@ -1078,7 +1099,7 @@ def is_filtered_skip(status, detail):
 
 
 def write_status_report(path, title, suite, platform, family, run, sections, outcomes, data_path=None,
-                        extra_lines=(), keep_if_skipped=()):
+                        extra_lines=(), keep_if_skipped=(), platform_cases=None):
     """Merge the outcomes of one run of one address family into the per-platform results and rewrite the
     combined report (the format all the PCP tests share, write_status). outcomes: {(protocol, name):
     (status, detail)}; a case left out, or skipped only because the selection left it out, keeps its
@@ -1086,7 +1107,7 @@ def write_status_report(path, title, suite, platform, family, run, sections, out
     results = {f"{protocol}/{name}": outcome for (protocol, name), outcome in outcomes.items()
                if not is_filtered_skip(*outcome)}
     write_status(path, title, suite, platform, family, run, results, sections, data_path=data_path,
-                 extra_lines=extra_lines, keep_if_skipped=keep_if_skipped)
+                 extra_lines=extra_lines, keep_if_skipped=keep_if_skipped, platform_cases=platform_cases)
 
 
 def write_suite_report(args, title, suite, family, sections, outcomes, run=None, **options):
@@ -1109,9 +1130,10 @@ def write_results_tsv(path, family, cases, outcomes):
                 handle.write("\t".join((family, case["section"], case["name"], outcome[0], note, "")) + "\n")
 
 
-def write_driver_status(results_path, args, title, suite, sections):
+def write_driver_status(results_path, args, title, suite, sections, platform_cases=None):
     """Merge a results file (write_results_tsv) into the report, one address family at a time. Every
-    section is given, also the ones this run did not run, or their results would be forgotten."""
+    section is given, also the ones this run did not run, or their results would be forgotten.
+    platform_cases: merge_status's."""
     protocols = {case["name"]: case["protocol"] for section in sections for case in section["cases"]}
     outcomes = {}
     with open(results_path, encoding="utf-8") as handle:
@@ -1123,7 +1145,8 @@ def write_driver_status(results_path, args, title, suite, sections):
             outcomes.setdefault(family, {})[(protocols[name], name)] = (result, note)
     for family in sorted(outcomes):
         run = dict(key_value_pairs(args.run_info), cases=str(len(outcomes[family])))
-        write_suite_report(args, title, suite, family, sections, outcomes[family], run=run)
+        write_suite_report(args, title, suite, family, sections, outcomes[family], run=run,
+                           platform_cases=platform_cases)
 
 
 def check_report_columns(write_report, case, protocol, platforms=("linux", "freebsd")):
@@ -2430,6 +2453,7 @@ def add_e2e_arguments(parser):
                              "(lib_test.router_call)")
     parser.add_argument("--route-through-router", action="store_true",
                         help="route the WAN subnet through the router (replies of the LAN echo service)")
+    parser.add_argument("--results", help="write the outcomes of the run to this file, for --write-status")
 
 
 def prepare_e2e_run(args):
@@ -2452,6 +2476,28 @@ def e2e_socket(args):
     sock.settimeout(2)
     sock.bind((args.client_address, 0))
     return sock
+
+
+def run_e2e_cases(args, cases, run, flag=None):
+    """Run the cases of an e2e runner the driver starts once per family: any error fails the case (a
+    harness error too), the run goes on with the next one. With --router-call-dir, the router calls
+    case-start:SECTION<TAB>CASE<TAB>FLAG (flag(case), else false) before a case and case-end after it
+    let the driver take its snapshots and logs of each case. With --results, the outcomes go there."""
+
+    @contextlib.contextmanager
+    def driver_steps(case):
+        mark = str(flag(case)).lower() if flag else "false"
+        router_call(args.router_call_dir, "case-start:" + "\t".join((case["section"], case["name"], mark)))
+        try:
+            yield
+        finally:
+            router_call(args.router_call_dir, "case-end")
+
+    outcomes = run_cases(cases, run, failures=(Exception,), timestamps=True,
+                         around=driver_steps if args.router_call_dir else None)
+    if args.results:
+        write_results_tsv(args.results, args.family, cases, outcomes)
+    return outcomes
 
 
 ROUTER_CALL_TIMEOUT = 60
@@ -2851,12 +2897,19 @@ def msearch_wait(mx):
         return 1
 
 
-def receive_ssdp(sock, seconds, accept=None):
-    """The SSDP messages received within `seconds`: [{start, headers, source}] (accept filters them)."""
+SSDP_QUIET = 0.5  # seconds without a message that end a wait once it has enough (receive_ssdp)
+
+
+def receive_ssdp(sock, seconds, accept=None, enough=None):
+    """The SSDP messages received within `seconds`: [{start, headers, source}] (accept filters them).
+    Once enough(messages) is true, the wait ends after SSDP_QUIET s without another message: the daemon
+    sends the messages of one search or one announcement close together, so a late extra one still shows."""
     deadline = time.monotonic() + seconds
     messages = []
     while True:
         remaining = deadline - time.monotonic()
+        if enough is not None and enough(messages):
+            remaining = min(remaining, SSDP_QUIET)
         if remaining <= 0:
             return messages
         readable, _, _ = select.select([sock], [], [], remaining)
@@ -2871,13 +2924,27 @@ def receive_ssdp(sock, seconds, accept=None):
             messages.append({"start": start, "headers": headers, "source": source[0]})
 
 
-def ssdp_msearch(sock, target, st, mx=1, extra_headers=(), man='"ssdp:discover"', host=None, raw=None, wait=None):
+def ssdp_wait(request, expect, strict):
+    """How long an M-SEARCH step collects replies: its `wait`, or MX+1 s (msearch_wait). A step that
+    expects no reply (count: 0) waits only SSDP_QUIET s on a build without --strict: that build answers
+    a search after 50 ms or not at all. The strict build delays each reply by up to MX
+    (DELAY_MSEARCH_RESPONSE), so there the step keeps its full window."""
+    wait = request.get("wait")
+    if wait is None:
+        wait = msearch_wait(request.get("mx", 1))
+    if not strict and expect.get("count") == 0:
+        wait = min(wait, SSDP_QUIET)
+    return wait
+
+
+def ssdp_msearch(sock, target, st, mx=1, extra_headers=(), man='"ssdp:discover"', host=None, raw=None, wait=None,
+                 enough=None):
     """Send an M-SEARCH to `target` and return the responses received within MX+1 s (msearch_wait)."""
     family = "ipv6" if sock.family == socket.AF_INET6 else "ipv4"
     message = raw if raw is not None else msearch_message(st, mx, man, host, family, extra_headers)
     sock.sendto(message.encode() if isinstance(message, str) else message, target)
     return receive_ssdp(sock, msearch_wait(mx) if wait is None else wait,
-                        lambda start, _headers: start.upper().startswith("HTTP/"))
+                        lambda start, _headers: start.upper().startswith("HTTP/"), enough)
 
 
 def ssdp_notify_listener(iface_addr, family="ipv4", ifindex=0):
@@ -3301,6 +3368,24 @@ def ssdp_values(messages):
     return values
 
 
+def ssdp_enough(expect, exact=True):
+    """The enough test of receive_ssdp for a step's expect: every count it asks for (count, or count.NTS
+    of one NTS) is met, as N or {min: N}. None, so the full window, when a count is 0 or has no minimum,
+    when the step asks no count, or for an exact count N when `exact` is false."""
+    needs = {}
+    for field, rule in expect.items():
+        if field == "count" or field.startswith("count."):
+            least = rule.get("min") if isinstance(rule, dict) else rule if exact else None
+            if not isinstance(least, int) or least <= 0:
+                return None
+            needs[field.partition(".")[2]] = least
+    if not needs:
+        return None
+    return lambda messages: all(
+        sum(1 for message in messages if not nts or message["headers"].get("nts") == nts) >= least
+        for nts, least in needs.items())
+
+
 def check_each(messages, rules, variables):
     """`each`: the rules every message (its headers by lower-case name, and start) has to meet."""
     for index, message in enumerate(messages):
@@ -3336,7 +3421,12 @@ def run_ssdp_step(step, variables):
             host = f"{host_literal(variables['router'])}:{SSDP_PORT}"
         messages = ssdp_msearch(sock, target, request.get("st"), request.get("mx", 1),
                                 [tuple(item) for item in request.get("headers", [])],
-                                request.get("man", '"ssdp:discover"'), host, request.get("raw"), request.get("wait"))
+                                request.get("man", '"ssdp:discover"'), host, request.get("raw"),
+                                ssdp_wait(request, step.get("expect", {}), variables.get("strict")),
+                                # the strict build delays each reply by a random time up to MX
+                                # (DELAY_MSEARCH_RESPONSE): an extra reply can come after the quiet
+                                # time, so an exact count waits the whole window there
+                                ssdp_enough(step.get("expect", {}), exact=not variables.get("strict")))
     check_each(messages, step.get("each", {}), variables)
     return ssdp_values(messages)
 
@@ -3356,7 +3446,8 @@ def run_ssdp_listen_step(step, variables):
             run_restart(variables)
         messages = receive_ssdp(sock, step.get("seconds", 5),
                                 lambda start, headers: start.upper().startswith("NOTIFY")
-                                and headers.get("nts") in step.get("nts", ["ssdp:alive", "ssdp:byebye"]))
+                                and headers.get("nts") in step.get("nts", ["ssdp:alive", "ssdp:byebye"]),
+                                ssdp_enough(step.get("expect", {})))
     check_each(messages, step.get("each", {}), variables)
     values = ssdp_values(messages)
     for nts in ("ssdp:alive", "ssdp:byebye"):

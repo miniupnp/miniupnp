@@ -8,6 +8,7 @@ import json
 import multiprocessing
 import os
 import re
+import select
 import socket
 import struct
 import subprocess
@@ -166,6 +167,16 @@ class WireTests(unittest.TestCase):
     def test_exchange_returns_the_response(self):
         address = self.server(b"answer")
         self.assertEqual(lib_test.exchange(self.client(), address, b"question"), b"answer")
+
+    def test_exchange_drops_a_late_reply_to_an_earlier_request(self):
+        address = self.server(b"answer")
+        client = self.client()
+        client.bind(("127.0.0.1", 0))
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as late:
+            late.sendto(b"late reply", client.getsockname())
+        select.select([client], [], [], lib_test.TIMEOUT)
+        self.assertEqual(lib_test.exchange(client, address, b"question"), b"answer")
+        self.assertIsNone(lib_test.receive_within(client, 0.1))
 
     def test_exchange_needs_a_timeout(self):
         sock = self.client()
@@ -884,6 +895,27 @@ class RunCasesTests(unittest.TestCase):
         self.assertRegex(text, r"CASE END \S+ a\n")
         self.assertEqual(entered, ["a"])
 
+    def test_an_e2e_runner_frames_each_case_with_router_calls_and_writes_its_results(self):
+        calls = []
+        cases = [{"protocol": "pcp", "name": "a", "section": "MAP"},
+                 {"protocol": "pcp", "name": "b", "section": "NAT66"}]
+
+        def run(case):
+            calls.append("run " + case["name"])
+            if case["name"] == "b":
+                raise RuntimeError("boom")
+        with tempfile.TemporaryDirectory() as directory:
+            args = argparse.Namespace(router_call_dir=directory, family="ipv6",
+                                      results=os.path.join(directory, "results.tsv"))
+            with patch.object(lib_test, "router_call", lambda _directory, command: calls.append(command)), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                lib_test.run_e2e_cases(args, cases, run, lambda case: case["section"] == "NAT66")
+            with open(args.results, encoding="utf-8") as handle:
+                rows = [line.split("\t")[:5] for line in handle.read().splitlines()]
+        self.assertEqual(calls, ["case-start:MAP\ta\tfalse", "run a", "case-end",
+                                 "case-start:NAT66\tb\ttrue", "run b", "case-end"])
+        self.assertEqual(rows, [["ipv6", "MAP", "a", "PASS", ""], ["ipv6", "NAT66", "b", "FAIL", "boom"]])
+
 
 class RunnerOptionsTests(unittest.TestCase):
     def test_a_runner_gets_its_corpus_options(self):
@@ -1114,6 +1146,13 @@ class StatusReportTests(unittest.TestCase):
             data = handle.read()
         for name in names:
             self.assertIn(f'"{name}"', data)
+
+    def test_platform_cases_drop_the_other_results_of_that_platform_only(self):
+        for platform in ("linux", "linux-strict"):
+            self.write(platform, "ipv4", {"pcp/a": ("PASS", ""), "natpmp/b": ("FAIL", "old")})
+        report = self.write("linux-strict", "ipv4", {"pcp/a": ("PASS", "")}, platform_cases={"pcp/a"})
+        self.assertIn("| a | pcp | ipv4 | PASS | PASS |", report)
+        self.assertIn("| b | natpmp | ipv4 | FAIL | — |", report)
 
     def test_a_lock_file_of_another_user_does_not_stop_the_report(self):
         os.makedirs(os.path.dirname(self.data))
@@ -2010,6 +2049,48 @@ class SsdpTests(unittest.TestCase):
         values = lib_test.ssdp_values(responses)
         self.assertEqual(values["count"], 2)
         self.assertEqual(values["header.st"], "upnp:rootdevice")
+
+    def test_ssdp_enough_from_the_counts(self):
+        alive, byebye = ({"headers": {"nts": nts}} for nts in ("ssdp:alive", "ssdp:byebye"))
+        for expect in ({}, {"count": 0}, {"count": {"max": 2}}, {"count": "$n"}, {"count": 1, "count.x": 0}):
+            self.assertIsNone(lib_test.ssdp_enough(expect), expect)
+        enough = lib_test.ssdp_enough({"count": 2, "header.st": "x"})
+        self.assertEqual([enough([alive] * n) for n in (1, 2, 3)], [False, True, True])
+        self.assertIsNone(lib_test.ssdp_enough({"count": 2}, exact=False))
+        self.assertTrue(lib_test.ssdp_enough({"count": {"min": 2}}, exact=False)([alive, alive]))
+        enough = lib_test.ssdp_enough({"count.ssdp:alive": {"min": 2}, "count.ssdp:byebye": {"min": 1}})
+        self.assertFalse(enough([alive, alive]))
+        self.assertTrue(enough([alive, byebye, alive]))
+
+    def test_ssdp_wait_short_for_no_reply_without_strict(self):
+        quiet = lib_test.SSDP_QUIET
+        self.assertEqual(lib_test.ssdp_wait({}, {"count": 0}, strict=False), quiet)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 1.5}, {"count": 0}, strict=False), quiet)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 0.2}, {"count": 0}, strict=False), 0.2)
+        # the strict build delays its replies up to MX: the full window stays
+        self.assertEqual(lib_test.ssdp_wait({"mx": 3}, {"count": 0}, strict=True), 4)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 1.5}, {"count": 0}, strict=True), 1.5)
+        # a step that expects replies keeps its window (enough ends it early)
+        self.assertEqual(lib_test.ssdp_wait({}, {"count": 1}, strict=False), 2)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 1.5}, {}, strict=False), 1.5)
+
+    def test_receive_ssdp_stops_after_enough_and_quiet(self):
+        """Once enough: a message within the quiet time still counts, and the wait ends well before
+        `seconds`."""
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server, \
+                socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
+            server.bind(("127.0.0.1", 0))
+            client.bind(("127.0.0.1", 0))
+            reply = b"HTTP/1.1 200 OK\r\nST: upnp:rootdevice\r\n\r\n"
+            server.sendto(reply, client.getsockname())
+            timer = threading.Timer(lib_test.SSDP_QUIET / 2, server.sendto, (reply, client.getsockname()))
+            timer.start()
+            started = time.monotonic()
+            messages = lib_test.receive_ssdp(client, 10, enough=lambda found: len(found) >= 1)
+            elapsed = time.monotonic() - started
+            timer.join()
+        self.assertEqual(len(messages), 2)
+        self.assertLess(elapsed, 3 * lib_test.SSDP_QUIET)
 
 
 class CannedTcpServer:

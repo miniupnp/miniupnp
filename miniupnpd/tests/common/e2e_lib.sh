@@ -200,13 +200,6 @@ e2e_parse_args() {
   done
 }
 
-# e2e_case_selected NAME: true when no --case was given or NAME was selected.
-e2e_case_selected() {
-  [ -z "$SELECTED_CASES" ] && return 0
-  case " $SELECTED_CASES " in *" $1 "*) return 0 ;; esac
-  return 1
-}
-
 # The suite of the functions below: E2E_RUNNER (default the pcp_e2e runner) in DIR, and
 # E2E_RUNNER_ARGS, a list of options for it (upnp_e2e: --build).
 E2E_RUNNER=${E2E_RUNNER:-run_pcp_e2e_cases.py}
@@ -253,47 +246,24 @@ e2e_router_policy() {
   "$DOCKER" exec "$1" nft add rule inet filter postrouting meta nfproto ipv4 oifname wan0 masquerade
 }
 
-# e2e_case_rows FAMILY: "section<TAB>case<TAB>flag" for every case that runs on FAMILY (the flag of
-# pcp_e2e is nat66; upnp_e2e has none).
-e2e_case_rows() {
-  # shellcheck disable=SC2086 # E2E_RUNNER_ARGS is a list of options
-  "$DOCKER" run --rm --volume "$ROOT/miniupnpd/tests:/pcp-tests:ro" --entrypoint python3 "$IMAGE" \
-    "/pcp-tests/${DIR##*/}/$E2E_RUNNER" --list-cases --family "$1" ${E2E_UPNP:+--enable-upnp} ${E2E_RUNNER_ARGS:-}
-}
-
-# e2e_start_runner: start the detached runner container for one case.  Uses family,
-# section_name, case_name, case_client, case_router, runner_ula, lanip,
-# external, unowned_ip (a WAN address the router does not own), the *_url and *_ip peer
-# variables. The runner has a fixed address in both families: a free one from Docker
-# is the first of the subnet, which on FreeBSD is the address of the router, and
-# the host then sends its requests to the MAC of the runner, which is gone.
-e2e_start_runner() {
-  mkdir -p "$RUN_DIR/calls"
-  chmod 777 "$RUN_DIR/calls"   # the runner may be another user
-  # shellcheck disable=SC2086 # E2E_RUNNER_ARGS is a list of options
-  "$DOCKER" run -d --name "$RUNNER" --network "$LAN" --ip "$LAN4.2" --ip6 "${LAN6}2" \
-    --cap-add NET_ADMIN --entrypoint sh \
-    --volume "$ROOT/miniupnpd/tests:/pcp-tests:ro" --volume "$RUN_DIR:/pcp-e2e-artifacts" \
-    "$IMAGE" -c 'if [ "$1" = add ]; then ip -6 address replace fd42:1::2/64 dev eth0 nodad; fi; shift; exec python3 "$@"' \
-    pcp-e2e-runner "$runner_ula" "/pcp-tests/${DIR##*/}/$E2E_RUNNER" ${E2E_RUNNER_ARGS:-} \
-    --route-through-router --family "$family" --case "$case_name" ${E2E_UPNP:+--enable-upnp} \
-    --router "$case_router" --client-address "$case_client" --external-address "$external" \
-    --agent "allowed-peer=$allow_url" --agent "denied-peer=$deny_url" \
-    --agent "third-peer=$third_url" \
-    --peer-address "allowed-peer=$allow_ip" --peer-address "denied-peer=$deny_ip" \
-    --peer-address "third-peer=$third_ip" \
-    --peer-address "client=$lanip" --peer-address "router-wan=$external" \
-    --peer-address "unowned-wan=$unowned_ip" \
-    --router-call-dir /pcp-e2e-artifacts/calls >/dev/null
-}
-
 # router_call COMMAND: what a runner asks of the driver (lib_test.router_call); the output is the answer.
-# A driver replaces it to add commands. snapshot:N, after request N of a case, needs snapshot_daemon_state.
+# A driver replaces it to add commands. case-start:SECTION<TAB>CASE<TAB>FLAG, before a case of an e2e
+# runner (lib_test.run_e2e_cases), sets section_name, case_name, case_flag (pcp_e2e: the section has NAT66)
+# and case_dir (made here) and calls the driver's e2e_case_start; case-end, after it, its e2e_case_end.
+# snapshot:N, after request N of a case, needs snapshot_daemon_state.
 # lose-rules needs lose_rules, which removes the rules of the daemon and prints their number before and after.
 # restart needs restart_daemon, which restarts the daemon with its state (the lease file) and returns once
 # it answers again.
 router_call() {
   case $1 in
+    case-start:*)
+      IFS="$(printf '\t')" read -r section_name case_name case_flag <<EOF
+${1#case-start:}
+EOF
+      case_dir=$RUN_DIR/$family/$section_name/$case_name
+      mkdir -p "$case_dir"
+      e2e_case_start ;;
+    case-end) e2e_case_end ;;
     snapshot:*) snapshot_daemon_state "$case_dir/daemon-expect-${1#snapshot:}.txt" ;;
     lose-rules) lose_rules ;;
     restart)
@@ -317,73 +287,102 @@ e2e_serve_router_calls() {
   return "$calls_served"
 }
 
-# e2e_serve_runner DIRECTORY: answer the router calls of the runner container while it runs.
+# e2e_serve_runner DIRECTORY [CONTAINER ...]: answer the router calls of the runner containers (default
+# RUNNER) while one of them runs.
 e2e_serve_runner() {
-  while [ "$("$DOCKER" inspect -f '{{.State.Running}}' "$RUNNER" 2>/dev/null || echo false)" = true ]; do
-    e2e_serve_router_calls "$1" || sleep 0.05
+  calls=$1; shift
+  [ "$#" -gt 0 ] || set -- "$RUNNER"
+  while "$DOCKER" inspect -f '{{.State.Running}}' "$@" 2>/dev/null | grep -q true; do
+    e2e_serve_router_calls "$calls" || sleep 0.05
   done
 }
 
-# e2e_collect_runner LOG: the end of the runner container: its exit status in runner_exit, its log in LOG.
+# e2e_collect_runner LOG [CONTAINER]: the end of the runner container (default RUNNER): its exit status in
+# runner_exit, its log in LOG.
 e2e_collect_runner() {
-  runner_exit=$("$DOCKER" wait "$RUNNER")
-  "$DOCKER" logs "$RUNNER" > "$1" 2>&1 || true
-  "$DOCKER" rm "$RUNNER" >/dev/null
+  container=${2:-$RUNNER}
+  runner_exit=$("$DOCKER" wait "$container")
+  "$DOCKER" logs "$container" > "$1" 2>&1 || true
+  "$DOCKER" rm "$container" >/dev/null
 }
 
-# e2e_wait_runner: answer the runner's router calls until it ends, then collect its result into
-# case_result / case_note (and STATUS=1 on failure).
-e2e_wait_runner() {
-  e2e_serve_runner "$RUN_DIR/calls"
-  e2e_collect_runner "$case_dir/runner.log"
-  sed '/^Summary: /d' "$case_dir/runner.log"
-  # a known_failure that still fails exits 0, but is an XFAIL in the report, not a PASS
-  case_note=$(sed -n 's/^XFAIL [^:]*: //p' "$case_dir/runner.log" | head -n 1)
-  if [ "$runner_exit" = 0 ] && [ -n "$case_note" ]; then
-    case_result=XFAIL
-  elif [ "$runner_exit" = 0 ]; then
-    case_result=PASS
-    case_note="all configured assertions passed"
-  else
-    STATUS=1
-    case_result=FAIL
-    case_note=$(sed -n 's/^FAIL [^:]*: //p' "$case_dir/runner.log" | head -n 1)
-  fi
-}
-
-# e2e_run_family FAMILY [RUNNER OPTION ...]: a runner that takes all the selected cases of FAMILY in one
-# LAN container (upnp_wire), as the client .2 with a second address .3 it adds itself. Its router calls are
-# answered, its log goes to RUN_DIR/runner-FAMILY.log and its rows to RESULTS_FILE. Uses DIR, E2E_RUNNER,
-# E2E_RUNNER_ARGS, LAN, RUNNER; RUN_DIR is /out in the container.
-e2e_run_family() {
-  family=$1; shift
-  if [ "$family" = ipv4 ]; then router=$LAN4.1 client=$LAN4.2 second=$LAN4.3
-  else router=${LAN6}1 client=${LAN6}2 second=${LAN6}3; fi
+# e2e_start_family FAMILY PART [RUNNER OPTION ...]: start the runner of FAMILY in the LAN container
+# RUNNER-FAMILY. It takes the selected cases of FAMILY, as the client .2 (::2); the container's address of
+# the other family is .4 (::4), so the runners of both families can run at once. Its log goes to
+# RUN_DIR/runner-FAMILYPART.log and its rows to results-FAMILYPART.tsv (e2e_end_family). Uses DIR,
+# E2E_RUNNER, E2E_RUNNER_ARGS, LAN, RUNNER; RUN_DIR is /out in the container.
+e2e_start_family() {
+  family=$1 part=$2; shift 2
+  if [ "$family" = ipv4 ]; then router=$LAN4.1 client=$LAN4.2 ip4=$LAN4.2 ip6=${LAN6}4
+  else router=${LAN6}1 client=${LAN6}2 ip4=$LAN4.4 ip6=${LAN6}2; fi
   mkdir -p "$RUN_DIR/calls"
   chmod 777 "$RUN_DIR" "$RUN_DIR/calls"   # the runner may be another user
   for selected in $SELECTED_CASES; do set -- "$@" --case "$selected"; done
   # shellcheck disable=SC2086 # E2E_RUNNER_ARGS is a list of options
-  "$DOCKER" run -d --name "$RUNNER" --network "$LAN" --ip "$LAN4.2" --ip6 "${LAN6}2" --cap-add NET_ADMIN \
+  "$DOCKER" run -d --name "$RUNNER-$family" --network "$LAN" --ip "$ip4" --ip6 "$ip6" --cap-add NET_ADMIN \
     --volume "$ROOT/miniupnpd/tests:/pcp-tests:ro" --volume "$RUN_DIR:/out" --entrypoint python3 "$IMAGE" \
     "/pcp-tests/${DIR##*/}/$E2E_RUNNER" ${E2E_RUNNER_ARGS:-} --family "$family" --router "$router" \
-    --client-address "$client" --second-client "$second" --interface eth0 --router-call-dir /out/calls \
-    --lan4 "$LAN4" --lan6 "$LAN6" --results "/out/results-$family.tsv" "$@" >/dev/null
-  e2e_serve_runner "$RUN_DIR/calls"
-  e2e_collect_runner "$RUN_DIR/runner-$family.log"
-  grep -E '^(PASS|XFAIL|FAIL|SKIP|Summary)' "$RUN_DIR/runner-$family.log" || true
+    --client-address "$client" --router-call-dir /out/calls --results "/out/results-$family$part.tsv" \
+    "$@" >/dev/null
+}
+
+# e2e_end_family FAMILY PART: wait for the runner of e2e_start_family FAMILY PART, keep its log and put its
+# rows into RESULTS_FILE.
+e2e_end_family() {
+  family=$1 part=$2
+  e2e_collect_runner "$RUN_DIR/runner-$family$part.log" "$RUNNER-$family"
+  grep -E '^(PASS|XFAIL|FAIL|SKIP|Summary)' "$RUN_DIR/runner-$family$part.log" || true
   [ "$runner_exit" = 0 ] || STATUS=1
-  if [ -f "$RUN_DIR/results-$family.tsv" ]; then
+  if [ -f "$RUN_DIR/results-$family$part.tsv" ]; then
     EXECUTED=$((EXECUTED + 1))
-    cat "$RUN_DIR/results-$family.tsv" >> "$RESULTS_FILE"
+    cat "$RUN_DIR/results-$family$part.tsv" >> "$RESULTS_FILE"
   else
-    echo "The runner wrote no results ($family); see $RUN_DIR/runner-$family.log" >&2
+    echo "The runner wrote no results ($family$part); see $RUN_DIR/runner-$family$part.log" >&2
     STATUS=1
   fi
 }
 
-# e2e_record_result ARTIFACTS: append this case's row to RESULTS_FILE.
-e2e_record_result() {
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$family" "$section_name" "$case_name" "$case_result" "$case_note" "$1" >> "$RESULTS_FILE"
+# e2e_run_family FAMILY [RUNNER OPTION ...]: the selected cases of FAMILY of an e2e corpus (pcp_e2e,
+# upnp_e2e) in one runner, with its router calls answered: the router's external address, the traffic
+# agents and the peer addresses come from the driver's external, unowned_ip, lanip, *_url and *_ip. The
+# driver's e2e_case_start and e2e_case_end take its steps around each case (router_call).
+e2e_run_family() {
+  family=$1; shift
+  e2e_start_family "$family" "" --route-through-router ${E2E_UPNP:+--enable-upnp} \
+    --external-address "$external" \
+    --agent "allowed-peer=$allow_url" --agent "denied-peer=$deny_url" --agent "third-peer=$third_url" \
+    --peer-address "allowed-peer=$allow_ip" --peer-address "denied-peer=$deny_ip" \
+    --peer-address "third-peer=$third_ip" --peer-address "client=$lanip" \
+    --peer-address "router-wan=$external" --peer-address "unowned-wan=$unowned_ip" "$@"
+  e2e_serve_runner "$RUN_DIR/calls" "$RUNNER-$family"
+  e2e_end_family "$family" ""
+}
+
+# e2e_wire_options FAMILY: the options of the upnp_wire runner: a second client address .3 (::3), which it
+# adds itself, and the LAN prefixes.
+e2e_wire_options() {
+  if [ "$1" = ipv4 ]; then second=$LAN4.3; else second=${LAN6}3; fi
+  echo "--second-client $second --interface eth0 --lan4 $LAN4 --lan6 $LAN6"
+}
+
+# e2e_run_families [RUNNER OPTION ...]: the selected cases of both families, with their router calls
+# answered. A case that restarts the daemon (requires: [restart]) would break the case the other family
+# runs at that moment, so these run first, one family after the other (--restart-cases only); then the
+# other cases of both families at once (--restart-cases skip).
+e2e_run_families() {
+  for family in ipv4 ipv6; do
+    # shellcheck disable=SC2046 # e2e_wire_options is a list of options
+    e2e_start_family "$family" -restart --restart-cases only $(e2e_wire_options "$family") "$@"
+    e2e_serve_runner "$RUN_DIR/calls" "$RUNNER-$family"
+    e2e_end_family "$family" -restart
+  done
+  # shellcheck disable=SC2046 # e2e_wire_options is a list of options
+  e2e_start_family ipv4 "" --restart-cases skip $(e2e_wire_options ipv4) "$@"
+  # shellcheck disable=SC2046
+  e2e_start_family ipv6 "" --restart-cases skip $(e2e_wire_options ipv6) "$@"
+  e2e_serve_runner "$RUN_DIR/calls" "$RUNNER-ipv4" "$RUNNER-ipv6"
+  e2e_end_family ipv4 ""
+  e2e_end_family ipv6 ""
 }
 
 # e2e_check_selection RESULTS: a run that ran no case, or not a selected one, failed.
