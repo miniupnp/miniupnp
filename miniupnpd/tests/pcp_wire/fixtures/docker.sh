@@ -100,6 +100,7 @@ start_router() {
 		--network-alias pcp-router --env "PCP_TEST_WAN4=$WAN4" --env "PCP_TEST_WAN6_PREFIX=$WAN6_PREFIX" --cap-add NET_ADMIN --cap-add NET_RAW \
 		--env PCP_TEST_REAL_WAN=1 --env PCP_TEST_WAN_DEFAULT_ROUTE=1 \
 		--env PCP_TEST_IPV6_LISTENING_IP=1 --env PCP_TEST_CAPTURE_DIR=/capture \
+		--env "PCP_TEST_EXTRA_CONF=${PCP_TEST_EXTRA_CONF:-}" \
 		--volume "${PCP_TEST_DAEMON_DIR:?}:/opt/miniupnpd:ro" \
 		--sysctl net.ipv4.ip_forward=1 --sysctl net.ipv6.conf.all.forwarding=1 \
 		"$IMAGE" >/dev/null
