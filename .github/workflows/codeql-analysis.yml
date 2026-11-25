@@ -11,7 +11,7 @@
 # ******** NOTE ********
 
 ---
-name: "CodeQL"
+name: "CodeQL C/C++"
 
 'on':
   push:
@@ -20,10 +20,10 @@ name: "CodeQL"
     # The branches below must be a subset of the branches above
     branches: [master]
     # push and schedule stay unfiltered: code scanning wants full runs of master
+    # only the C code the build step compiles; Python is in codeql-python.yml
     paths:
       - 'miniupnpc/**'
       - 'minissdpd/**'
-      - 'miniupnpd/**'
       - '.github/workflows/codeql-analysis.yml'
   schedule:
     - cron: '15 5 * * 1'
@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['cpp', 'python']
+        language: ['cpp']
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python' ]
         # Learn more...
         # https://docs.github.com/en/github/finding-security-vulnerabilities-and-errors-in-your-code/configuring-code-scanning#overriding-automatic-language-detection
