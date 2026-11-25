@@ -13,6 +13,14 @@ name: x86_64-w64-mingw32
       - 'miniupnpc/**'
       - '.github/workflows/x86_64-w64-mingw32.yml'
 
+permissions:
+  contents: read
+
+# A newer run of the same pull request or branch cancels the one still running.
+concurrency:
+  group: x86_64-w64-mingw32-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest

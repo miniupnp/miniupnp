@@ -28,6 +28,17 @@ name: "CodeQL"
   schedule:
     - cron: '15 5 * * 1'
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+# A newer run of the same pull request cancels the one still running;
+# runs on master always finish.
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze
