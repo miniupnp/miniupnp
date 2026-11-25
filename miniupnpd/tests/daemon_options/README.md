@@ -53,7 +53,8 @@ the first free one, so it runs beside the other suites.
    line per configuration, side and family that has cases, the configurations in corpus order.
 2. For each configuration, the driver starts a fresh router container on a LAN and a WAN bridge
    (`PCP_TEST_REAL_WAN=1`), with the configuration lines in `PCP_TEST_EXTRA_CONF` and
-   `PCP_TEST_CONF_REPLACE=1`. It is ready when its log says it listens (NAT-PMP/PCP or HTTP).
+   `PCP_TEST_CONF_REPLACE=1`. It is ready when its log says it listens (NAT-PMP/PCP or HTTP)
+   and then stays quiet for 0.2 s (the other sockets open right after).
 3. For each side and family of that configuration, it runs the runner (`docker exec`) in one of
    two containers that stay for the whole run: the LAN client (`.2` of the slot's LAN), which
    sends to the router's LAN address, or a host on the WAN link (`.2` of its WAN), which sends
