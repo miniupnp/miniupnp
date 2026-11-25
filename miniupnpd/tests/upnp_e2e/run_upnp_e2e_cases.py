@@ -132,7 +132,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     add_corpus_arguments(parser, CORPUS, "print section and case of the cases of --build and --family")
     add_e2e_arguments(parser)
-    parser.add_argument("--build", default="igd1")
+    parser.add_argument("--build", default="igd2")
     add_status_arguments(parser, os.path.dirname(os.path.abspath(__file__)), SUITE, platform=None)
     return run_driver_suite(parser, load, write_report, self_test, selected_cases, validate, run_selected)
 

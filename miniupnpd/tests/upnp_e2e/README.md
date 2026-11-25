@@ -14,15 +14,16 @@ PCP.
 ## Running
 
     sh miniupnpd/tests/upnp_e2e/run-docker.sh
-    UPNP_E2E_BUILDS=igd2 sh miniupnpd/tests/upnp_e2e/run-docker.sh --case upnp-e2e-pinhole-remote-host
+    sh miniupnpd/tests/upnp_e2e/run-docker.sh --case upnp-e2e-pinhole-remote-host
+    UPNP_E2E_BUILDS="igd1 igd2" sh miniupnpd/tests/upnp_e2e/run-docker.sh   # also the IGDv1 build
 
 The topology is that of `pcp_e2e/run-docker.sh` (`common/compose.yaml`, on a fixture slot: `UPNP_E2E_SLOT`,
 by default the first free one, so it runs beside the other suites): a LAN with the runner, the router
 (miniupnpd in UPnP mode, `PCP_TEST_ENABLE_UPNP=yes`, with PCP on), and a WAN with three traffic agents
-(allowed-peer, denied-peer, third-peer). The driver compiles the `igd1` and `igd2` daemons in the
+(allowed-peer, denied-peer, third-peer). The driver compiles the `igd2` daemon (and the `igd1` one when
+`UPNP_E2E_BUILDS` names it) in the
 shared tools image (`e2e_build_daemon`) and runs each case of each build and address family in its own runner container.
-The results go into [status.md](status.md), one column per platform and build (`linux-igd1`,
-`linux-igd2`); the raw results and the logs (runner, daemon, ruleset and lease file after each request)
+The results go into [status.md](status.md), one column per platform and build (`linux-igd2`); the raw results and the logs (runner, daemon, ruleset and lease file after each request)
 into `.tmp/tests/upnp_e2e/` of the repository.
 
 ## On FreeBSD

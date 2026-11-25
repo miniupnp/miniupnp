@@ -13,19 +13,22 @@ things:
 - a spec gap: a FAIL, with a `# spec gap:` comment in the corpus naming the cause;
 - a feature miniupnpd does not implement: an XFAIL, with a `known_failure` note;
 - a check miniupnpd only compiles with `UPNP_STRICT` (configure `--strict`), a SKIP (`requires: [strict]`)
-  on `igd1` and `igd2`; the `igd1-strict` and `igd2-strict` runs build with it and run those cases.
+  on `igd2`; the `igd2-strict` run builds with it and runs those cases.
 
 ## Running
 
-    sh miniupnpd/tests/upnp_wire/run-docker.sh            # every build: igd1, igd2, igd1-strict, igd2-strict
+    sh miniupnpd/tests/upnp_wire/run-docker.sh            # the IGDv2 builds: igd2, igd2-strict
     sh miniupnpd/tests/upnp_wire/run-docker.sh igd2 --case uda11-4.1.3-must-renew
+    sh miniupnpd/tests/upnp_wire/run-docker.sh all        # also the IGDv1 builds: igd1, igd1-strict
+
+The IGDv1 builds (`igd1`, `igd1-strict`) run only when named, or with `all`.
 
 `run-docker.sh` compiles one daemon per build in the shared tools image (`e2e_build_daemon`,
 `.tmp/tests/daemon`): `igd1` is the default build, `igd2` adds `--igd2`, and both have `--ipv6 --leasefile`. For each
 build it starts the daemon in UPnP mode (`PCP_TEST_ENABLE_UPNP=yes`: `enable_upnp=yes`, `http_port=5000`, the uuid
 of the corpus, `notify_interval=30`) on a LAN network (of a fixture slot: `UPNP_WIRE_SLOT`, by default the first free one), and runs
 `run_upnp_wire_cases.py` in a LAN client container once per address family. The results are merged into
-[status.md](status.md), one column per platform and build (`linux-igd1`, `linux-igd2`). The raw results,
+[status.md](status.md), one column per platform and build (`linux-igd2`, `linux-igd2-strict`). The raw results,
 the runner and daemon logs and the daemon's state directory of each run go to `.tmp/tests/upnp_wire/` in
 the repository (`status-data.json`, `runs/<time>/<build>/`).
 

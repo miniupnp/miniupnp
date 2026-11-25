@@ -196,7 +196,7 @@ def main():
     parser.add_argument("--second-client", help="a second LAN address of --interface, added by this runner")
     parser.add_argument("--interface", help="the LAN interface (the IPv6 multicast scope)")
     parser.add_argument("--family", choices=("ipv4", "ipv6"), default="ipv4")
-    parser.add_argument("--build", default="igd1", help="the daemon build: igd1 or igd2")
+    parser.add_argument("--build", default="igd2", help="the daemon build: igd2 or igd1")
     parser.add_argument("--strict", action="store_true", help="the daemon was built with configure --strict")
     parser.add_argument("--lan4", default=DEFAULT_LAN4, help="the first three octets of the LAN of this fixture")
     parser.add_argument("--lan6", default=DEFAULT_LAN6, help='the LAN /64 of this fixture, ending in "::"')

@@ -1,10 +1,12 @@
 #!/bin/sh
-# The UPnP wire suite on Linux (Docker): builds miniupnpd (igd1: the default build, igd2: --igd2, and each with --strict), starts
+# The UPnP wire suite on Linux (Docker): builds miniupnpd (igd2: --igd2, igd1: the default build, and each with --strict), starts
 # it in UPnP mode (PCP_TEST_ENABLE_UPNP=yes) on a LAN network, and runs run_upnp_wire_cases.py in a LAN client
-# container for IPv4 and IPv6. The results go into status.md (columns linux-igd1, linux-igd2); the raw
+# container for IPv4 and IPv6. The results go into status.md (columns linux-igd2, linux-igd2-strict); the raw
 # data, the logs and the daemon's state files of each run into .tmp/tests/upnp_wire/ of the repository.
 #
-#   run-docker.sh [igd1|igd2|all] [--case NAME]...
+#   run-docker.sh [igd1|igd2|igd1-strict|igd2-strict|all] [--case NAME]...
+#
+# Without a build it runs igd2 and igd2-strict. The IGDv1 builds run only when named (or with all).
 #
 # A case that needs a daemon restart asks this script for it (router_call restart). UPNP_WIRE_SLOT=N picks a
 # slot of e2e_address_plan for the LAN; by default the first free one, so runs go side by side.
@@ -37,7 +39,7 @@ while [ "$args" -gt 0 ]; do
   esac
 done
 e2e_parse_args "$@"
-[ -n "$BUILDS" ] || BUILDS="igd1 igd2 igd1-strict igd2-strict"
+[ -n "$BUILDS" ] || BUILDS="igd2 igd2-strict"
 command -v "$DOCKER" >/dev/null 2>&1 || { echo "Docker is required." >&2; exit 2; }
 e2e_self_test
 E2E_RUNNER=run_upnp_wire_cases.py

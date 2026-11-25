@@ -1,10 +1,10 @@
 #!/bin/sh
 # The UPnP end-to-end suite on Linux (Docker): the pcp_e2e topology (a LAN with the runner, a router
 # running miniupnpd in UPnP mode with a real WAN, three WAN peers with traffic agents), once per build
-# (igd1: the default build, igd2: --igd2). Each case runs in its own runner container; the results go
-# into status.md (columns linux-igd1, linux-igd2), the raw data and the logs into .tmp/tests/upnp_e2e/.
+# (igd2: --igd2, igd1: the default build). Each case runs in its own runner container; the results go
+# into status.md (column linux-igd2), the raw data and the logs into .tmp/tests/upnp_e2e/.
 #
-#   run-docker.sh [--case NAME]...        UPNP_E2E_BUILDS="igd1 igd2" (default) selects the builds
+#   run-docker.sh [--case NAME]...        UPNP_E2E_BUILDS="igd2" (default) selects the builds; "igd1 igd2" adds IGDv1
 #
 # The fixture is common/compose.yaml. UPNP_E2E_SLOT=N picks a slot of e2e_address_plan; by default the
 # first free one, so it runs beside the other suites.
@@ -15,7 +15,7 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../../.." && pwd)
 DIR=$ROOT/miniupnpd/tests/upnp_e2e
 DOCKER=${DOCKER:-docker}
 KEEP=${UPNP_E2E_KEEP:-0}
-BUILDS=${UPNP_E2E_BUILDS:-igd1 igd2}
+BUILDS=${UPNP_E2E_BUILDS:-igd2}
 DATA_DIR=$ROOT/.tmp/tests/upnp_e2e
 STATUS_FILE=${UPNP_E2E_STATUS_FILE:-$DIR/status.md}
 E2E_STATUS_DATA_FILE=${UPNP_E2E_STATUS_DATA_FILE:-$DATA_DIR/status-data.json}
