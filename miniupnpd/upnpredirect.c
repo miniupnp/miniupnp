@@ -26,18 +26,7 @@
 #include "upnpevents.h"
 #include "portinuse.h"
 #include "upnputils.h"
-#if defined(USE_NETFILTER)
-#include "netfilter/iptcrdr.h"
-#endif
-#if defined(USE_PF)
-#include "pf/obsdrdr.h"
-#endif
-#if defined(USE_IPF)
-#include "ipf/ipfrdr.h"
-#endif
-#if defined(USE_IPFW)
-#include "ipfw/ipfwrdr.h"
-#endif
+#include "memmap.h"
 #ifdef USE_MINIUPNPDCTL
 #include <stdio.h>
 #include <unistd.h>
@@ -202,6 +191,8 @@ int reload_from_lease_file(void)
 	if(unlink(lease_file) < 0) {
 		syslog(LOG_WARNING, "could not unlink file %s : %m", lease_file);
 	}
+	/* upnp_redirect() must see the rules which survived, not add them again */
+	memmap_adopt_rules();
 
 	current_time = upnp_time();
 #ifndef LEASEFILE_USE_REMAINING_TIME
@@ -306,10 +297,9 @@ void lease_file_rewrite(void)
 	if (lease_file == NULL) return;
 	remove(lease_file);
 	for(index = 0; ; index++) {
-		if(get_redirect_rule_by_index(index, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
-		                              &iport, &proto, desc, sizeof(desc),
-		                              rhost, sizeof(rhost), &timestamp,
-		                              0, 0) < 0)
+		if(memmap_get_map_at((unsigned int)index, &eport, &proto, &iport,
+		                     iaddr, sizeof(iaddr), desc, sizeof(desc),
+		                     rhost, sizeof(rhost), &timestamp) < 0)
 			break;
 		if(lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp) < 0)
 			break;
@@ -317,6 +307,17 @@ void lease_file_rewrite(void)
 }
 #endif
 #endif
+
+int
+upnp_map_in_firewall(unsigned short eport, int proto)
+{
+	if(memmap_map_in_firewall(eport, proto))
+		return 1;
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(eport, proto);
+#endif
+	return 0;
+}
 
 /* upnp_redirect()
  * calls OS/fw dependent implementation of the redirection.
@@ -327,6 +328,15 @@ void lease_file_rewrite(void)
  *          -3 permission check failed
  *          -4 already redirected (other mechanism)
  */
+/* One change of a port mapping, for memmap_sync() */
+static void
+map_change(struct memmap_change * c, enum memmap_op op, const char * rhost,
+           unsigned short eport, const char * iaddr, unsigned short iport,
+           int proto, const char * desc, unsigned int timestamp)
+{
+	memmap_change_init(c, op, 0, rhost, 0, eport, iaddr, iport, proto, desc, timestamp);
+}
+
 int
 upnp_redirect(const char * rhost, unsigned short eport,
               const char * iaddr, unsigned short iport,
@@ -339,6 +349,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	unsigned short iport_old;
 	struct in_addr address;
 	unsigned int timestamp;
+	struct memmap_change c;
 
 	proto = proto_atoi(protocol);
 	if(inet_aton(iaddr, &address) <= 0) {
@@ -388,10 +399,10 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	 *     =         =           =           =         Success (overwrite)
 	 */
 	rhost_old[0] = '\0';
-	r = get_redirect_rule(ext_if_name, eport, proto,
-	                      iaddr_old, sizeof(iaddr_old), &iport_old, 0, 0,
-	                      rhost_old, sizeof(rhost_old),
-	                      &timestamp, 0, 0);
+	r = memmap_get_map(eport, proto, &iport_old, iaddr_old, sizeof(iaddr_old),
+	                        NULL, 0, rhost_old, sizeof(rhost_old), NULL);
+	if(r == 0 && !upnp_map_in_firewall(eport, proto))
+		r = -1;
 	if(r == 0) {
 		if(strcmp(iaddr, iaddr_old)==0 &&
 		   ((rhost == NULL && rhost_old[0]=='\0') ||
@@ -400,11 +411,13 @@ upnp_redirect(const char * rhost, unsigned short eport,
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old, iaddr_old, iport_old);
 			timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
-			if(iport != iport_old) {
-				r = update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
-			} else {
-				r = update_portmapping_desc_timestamp(ext_if_name, eport, proto, desc, timestamp);
-			}
+			/* the same rule: a renewal, in the table only */
+			if(iport == iport_old)
+				return upnp_renew_redirect_internal(rhost, eport, iaddr, iport,
+				                                    proto, desc, timestamp);
+			map_change(&c, MEMMAP_UPDATE, rhost, eport, iaddr, iport, proto, desc,
+			           timestamp);
+			r = memmap_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
 			if(r == 0) {
 				lease_file_remove(eport, proto);
@@ -438,27 +451,16 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp)
 {
-	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-		eport, iaddr, iport, protocol, desc);			*/
+	struct memmap_change c;
+
 	if(disable_port_forwarding)
 		return -1;
-	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
-	                      desc, timestamp) < 0) {
+	map_change(&c, MEMMAP_ADD, rhost, eport, iaddr, iport, proto, desc, timestamp);
+	if(memmap_sync(&c, 1) < 0)
 		return -1;
-	}
-
 #ifdef ENABLE_LEASEFILE
 	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
 #endif
-/*	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %s for: %s",
-		iaddr, iport, protocol, desc);*/
-	if(add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc) < 0) {
-		/* clean up the redirect rule */
-#if !defined(__linux__)
-		delete_redirect_rule(ext_if_name, eport, proto);
-#endif
-		return -1;
-	}
 	if(timestamp > 0) {
 		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
 			nextruletoclean_timestamp = timestamp;
@@ -468,6 +470,27 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 	 * inform the subscribers */
 	upnp_event_var_change_notify(EWanIPC);
 #endif
+	return 0;
+}
+
+int
+upnp_renew_redirect_internal(const char * rhost, unsigned short eport,
+                             const char * iaddr, unsigned short iport,
+                             int proto, const char * desc,
+                             unsigned int timestamp)
+{
+	if(memmap_renew_map(eport, proto, desc, timestamp) < 0)
+		return -1;
+#ifdef ENABLE_LEASEFILE
+	lease_file_remove(eport, proto);
+	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
+#else
+	UNUSED(rhost); UNUSED(iaddr); UNUSED(iport);
+#endif
+	if(timestamp > 0) {
+		if(!nextruletoclean_timestamp || (timestamp < nextruletoclean_timestamp))
+			nextruletoclean_timestamp = timestamp;
+	}
 	return 0;
 }
 
@@ -490,10 +513,8 @@ upnp_get_redirection_infos(unsigned short eport, const char * protocol,
 		desc[0] = '\0';
 	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
-	r = get_redirect_rule(ext_if_name, eport, proto_atoi(protocol),
-	                      iaddr, iaddrlen, iport, desc, desclen,
-	                      rhost, rhostlen, &timestamp,
-	                      0, 0);
+	r = memmap_get_map(eport, proto_atoi(protocol), iport, iaddr, iaddrlen,
+	                        desc, desclen, rhost, rhostlen, &timestamp);
 	if(r == 0 &&
 	   timestamp > 0 &&
 	   timestamp > (unsigned int)(current_time = upnp_time())) {
@@ -522,10 +543,9 @@ upnp_get_redirection_infos_by_index(int index,
 		desc[0] = '\0';
 	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
-	if(get_redirect_rule_by_index(index, 0/*ifname*/, eport, iaddr, iaddrlen,
-	                              iport, &proto, desc, desclen,
-	                              rhost, rhostlen, &timestamp,
-	                              0, 0) < 0)
+	if(index < 0 ||
+	   memmap_get_map_at((unsigned int)index, eport, &proto, iport, iaddr, iaddrlen,
+	                          desc, desclen, rhost, rhostlen, &timestamp) < 0)
 		return -1;
 	else
 	{
@@ -553,42 +573,27 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
                                      char * rhost, int rhostlen,
                                      unsigned int * leaseduration)
 {
-	/* that is a default implementation, iterating all rules */
-	int index;
+	unsigned int timestamp;
 
-	for(index = 0; ; index++) {
-		unsigned short other_iport = 0;
-		int other_proto = 0;
-		char other_iaddr[16] = "";
-		unsigned int timestamp;
-
-		if(get_redirect_rule_by_index(index, 0/*ifname*/, eport,
-		                              other_iaddr, sizeof(other_iaddr),
-		                              &other_iport, &other_proto,
-		                              desc, desclen,
-		                              rhost, rhostlen, &timestamp,
-		                              0, 0) < 0)
-			break;
-		if(other_proto == proto && other_iport == iport &&
-		   strcmp(other_iaddr, iaddr) == 0) {
-			/* found it ! */
-			if(leaseduration) {
-				time_t current_time = upnp_time();
-				*leaseduration = (timestamp > (unsigned int)current_time)
-				                 ? (timestamp - current_time)
-				                 : 0;
-			}
-			return 0;
-		}
-	}
-	/* not found */
-	if(index > 0) {
-		/* clean the mess */
-		*eport = 0;
+	if(desc && (desclen > 0))
 		desc[0] = '\0';
+	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
+	/* the first row of any protocol, as the walk of the rules found */
+	if(memmap_find_map(iaddr, iport, proto, -1, eport,
+	                   desc, desclen, &timestamp) < 0 ||
+	   memmap_get_map(*eport, proto, NULL, NULL, 0, NULL, 0,
+	                  rhost, rhostlen, NULL) < 0) {
+		*eport = 0;
+		return -1;
 	}
-	return -1;
+	if(leaseduration) {
+		time_t current_time = upnp_time();
+		*leaseduration = (timestamp > (unsigned int)current_time)
+		                 ? (timestamp - current_time)
+		                 : 0;
+	}
+	return 0;
 }
 
 /* called from natpmp.c too */
@@ -596,14 +601,10 @@ int
 _upnp_delete_redir(unsigned short eport, int proto)
 {
 	int r;
-#if defined(__linux__)
-	r = delete_redirect_and_filter_rules(eport, proto);
-#elif defined(USE_PF)
-	r = delete_redirect_and_filter_rules(ext_if_name, eport, proto);
-#else
-	r = delete_redirect_rule(ext_if_name, eport, proto);
-	delete_filter_rule(ext_if_name, eport, proto);
-#endif
+	struct memmap_change c;
+
+	map_change(&c, MEMMAP_DELETE, NULL, eport, NULL, 0, proto, NULL, 0);
+	r = memmap_sync(&c, 1);
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
@@ -614,167 +615,248 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	return r;
 }
 
+static int
+desc_has_pcp_nonce(const char * desc, const char * prefix)
+{
+	size_t n = strlen(prefix);
+	return strncmp(desc, prefix, n) == 0 && strlen(desc) == n + 24 &&
+	       strspn(desc + n, "0123456789abcdefABCDEF") == 24;
+}
+
+enum mapping_owner
+mapping_owner_of(const char * desc, unsigned short eport, int proto)
+{
+	if(desc == NULL)
+		return MAPPING_UPNP;
+	if(desc_has_pcp_nonce(desc, "PCP MAP "))
+		return MAPPING_PCP;
+	if(strncmp(desc, "NAT-PMP ", 8) == 0) {
+		char expected[64];
+		snprintf(expected, sizeof(expected), "NAT-PMP %hu %s",
+		         eport, proto_itoa(proto));
+		if(strcmp(desc, expected) == 0)
+			return MAPPING_NATPMP;
+	}
+	return MAPPING_UPNP;
+}
+
+/* called from natpmp.c and pcpserver.c */
+int
+upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr)
+{
+	(void)proto;	/* the table answers for both protocols at once */
+	return memmap_eport_used_by_other(eport, iaddr);
+}
+
 int
 upnp_delete_redirection(unsigned short eport, const char * protocol)
 {
+	int proto = proto_atoi(protocol);
+
 	syslog(LOG_INFO, "removing redirect rule port %hu %s", eport, protocol);
-	return _upnp_delete_redir(eport, proto_atoi(protocol));
+	/* The table has every mapping, those of an earlier run too. Without a
+	 * row there is no such entry, whatever a delete in the firewall answers:
+	 * nftables answers success for a rule it does not have. */
+	if(memmap_get_map(eport, proto, NULL, NULL, 0, NULL, 0, NULL, 0, NULL) < 0) {
+		syslog(LOG_INFO, "port %hu %s has no mapping", eport, protocol);
+		return -1;
+	}
+	return _upnp_delete_redir(eport, proto);
 }
 
 /* upnp_get_portmapping_number_of_entries() */
 int
 upnp_get_portmapping_number_of_entries(void)
 {
-#if defined(USE_PF) || defined(USE_NFTABLES)
-	return get_redirect_rule_count(ext_if_name);
-#else
-	int n = 0, r = 0;
-	unsigned short eport, iport;
-	char protocol[8], iaddr[32], desc[64], rhost[32];
-	unsigned int leaseduration;
-	do {
-		protocol[0] = '\0'; iaddr[0] = '\0'; desc[0] = '\0';
-		r = upnp_get_redirection_infos_by_index(n, &eport, protocol, &iport,
-		                                        iaddr, sizeof(iaddr),
-		                                        desc, sizeof(desc),
-		                                        rhost, sizeof(rhost),
-		                                        &leaseduration);
-		n++;
-	} while(r==0);
-	return (n-1);
-#endif
+	return memmap_map_count();
 }
 
-/* functions used to remove unused rules
- * As a side effect, delete expired rules (based on LeaseDuration) */
+/* Remove at most EXPIRE_MAX_PER_PASS port mappings past their lifetime, which
+ * the table knows with no read of the firewall, and set when the next pass is
+ * due. */
+static void
+expire_maps(void)
+{
+	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int next;
+	int n, i, failed = 0, removed = 0;
+
+	n = memmap_expired_maps(now, expired, EXPIRE_MAX_PER_PASS, &next);
+	for (i = 0; i < n; i++) {
+		syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
+		       expired[i].eport, proto_itoa(expired[i].proto));
+		if (_upnp_delete_redir(expired[i].eport, expired[i].proto) < 0)
+			failed = 1;
+		else
+			removed++;
+	}
+	/* What could not be removed still has its row: try it again in a
+	 * minute. A full pass (next is now) which removed nothing would pick
+	 * the same rows at once, so it waits too. */
+	if (failed && (next == 0 || now + 60 < next || (next == now && removed == 0)))
+		next = now + 60;
+	nextruletoclean_timestamp = next;
+}
+
+#ifdef PCP_PEER
+/* Remove at most EXPIRE_MAX_PER_PASS PEER rules past their lifetime. They have
+ * no row, so they are read from the firewall, by index. The next pass comes no
+ * later than the soonest expiry of the rest. */
+static void
+expire_peers(void)
+{
+	struct expired_redirect expired[EXPIRE_MAX_PER_PASS];
+	unsigned int now = (unsigned int)upnp_time();
+	unsigned int timestamp;
+	unsigned short iport;
+	u_int64_t packets, bytes;
+	int index, n = 0, proto, i;
+
+	for (index = 0;
+	     memmap_get_peer_at(index, &expired[n].eport, NULL, 0, &iport, &proto,
+	                        NULL, 0, NULL, 0, NULL, &timestamp,
+	                        &packets, &bytes) >= 0;
+	     index++) {
+		if (timestamp == 0)
+			continue;
+		if (timestamp > now) {
+			if (nextruletoclean_timestamp == 0 || timestamp < nextruletoclean_timestamp)
+				nextruletoclean_timestamp = timestamp;
+		} else if (n == EXPIRE_MAX_PER_PASS - 1) {
+			nextruletoclean_timestamp = now;	/* the next pass goes on */
+			break;
+		} else {
+			expired[n++].proto = proto;
+		}
+	}
+	for (i = 0; i < n; i++) {
+		syslog(LOG_NOTICE, "remove peer mapping %hu %s because it has expired",
+		       expired[i].eport, proto_itoa(expired[i].proto));
+		_upnp_delete_redir(expired[i].eport, expired[i].proto);
+	}
+}
+#endif /* PCP_PEER */
+
+/* Put the counters of a mapping on the list arg points to. */
+static void
+add_rule_state(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
+               void * arg)
+{
+	struct rule_state ** list = arg;
+	struct rule_state * tmp = malloc(sizeof(*tmp));
+	if(tmp == NULL)
+		return;	/* the mapping is left out of this check */
+	tmp->packets = packets;
+	tmp->bytes = bytes;
+	tmp->eport = eport;
+	tmp->proto = (unsigned char)proto;
+	tmp->to_remove = 0;
+	tmp->next = *list;
+	*list = tmp;
+}
+
+static void
+free_rule_states(struct rule_state * list)
+{
+	struct rule_state * tmp;
+	while(list) {
+		tmp = list;
+		list = tmp->next;
+		free(tmp);
+	}
+}
+
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target)
 {
-	/*char ifname[IFNAMSIZ];*/
-	int proto;
-	unsigned short iport;
-	unsigned int timestamp;
-	struct rule_state * tmp;
-	struct rule_state * list = 0;
-	struct rule_state * * p;
-	int i = 0;
-	time_t current_time;
+	struct rule_state * list = NULL;
 
-	/*ifname[0] = '\0';*/
-	tmp = malloc(sizeof(struct rule_state));
-	if(!tmp)
-		return 0;
-	current_time = upnp_time();
-	nextruletoclean_timestamp = 0;
-	while(get_redirect_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
-	                              &iport, &proto, 0, 0, 0,0, &timestamp,
-								  &tmp->packets, &tmp->bytes) >= 0)
-	{
-		tmp->to_remove = 0;
-		if(timestamp > 0) {
-			/* need to remove this port mapping ? */
-			if(timestamp <= (unsigned int)current_time)
-				tmp->to_remove = 1;
-			else if((nextruletoclean_timestamp <= (unsigned int)current_time)
-			       || (timestamp < nextruletoclean_timestamp))
-				nextruletoclean_timestamp = timestamp;
-		}
-		tmp->proto = (short)proto;
-		/* add tmp to list */
-		tmp->next = list;
-		list = tmp;
-		/* prepare next iteration */
-		i++;
-		tmp = malloc(sizeof(struct rule_state));
-		if(!tmp)
-			break;
+	/* not enough mappings: the firewall is not read */
+	if(memmap_map_count() <= max_rules_number_target)
+		return NULL;
+	if(memmap_each_map_counters(add_rule_state, &list) < 0) {
+		free_rule_states(list);
+		return NULL;
 	}
-#ifdef PCP_PEER
-	i=0;
-	while(get_peer_rule_by_index(i, /*ifname*/0, &tmp->eport, 0, 0,
-		                              &iport, &proto, 0, 0, 0,0,0, &timestamp,
-									  &tmp->packets, &tmp->bytes) >= 0)
-	{
-		tmp->to_remove = 0;
-		if(timestamp > 0) {
-			/* need to remove this port mapping ? */
-			if(timestamp <= (unsigned int)current_time)
-				tmp->to_remove = 1;
-			else if((nextruletoclean_timestamp <= (unsigned int)current_time)
-				   || (timestamp < nextruletoclean_timestamp))
-				nextruletoclean_timestamp = timestamp;
-		}
-		tmp->proto = (short)proto;
-		/* add tmp to list */
-		tmp->next = list;
-		list = tmp;
-		/* prepare next iteration */
-		i++;
-		tmp = malloc(sizeof(struct rule_state));
-		if(!tmp)
-			break;
-	}
-#endif
-	free(tmp);
-	/* remove the redirections that need to be removed */
-	for(p = &list, tmp = list; tmp; tmp = *p)
-	{
-		if(tmp->to_remove)
-		{
-			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
-			       tmp->eport, proto_itoa(tmp->proto));
-			_upnp_delete_redir(tmp->eport, tmp->proto);
-			*p = tmp->next;
-			free(tmp);
-			i--;
-		} else {
-			p = &(tmp->next);
-		}
-	}
-	/* return empty list if not enough redirections */
-	if(i<=max_rules_number_target)
-		while(list)
-		{
-			tmp = list;
-			list = tmp->next;
-			free(tmp);
-		}
-	/* return list */
 	return list;
+}
+
+void
+expire_upnp_rules(void)
+{
+	expire_maps();
+#ifdef PCP_PEER
+	expire_peers();
+#endif
+}
+
+/* the list of get_upnp_rules_state_list(), sorted by protocol and port */
+struct rule_states {
+	struct rule_state ** v;
+	size_t n;
+};
+
+static int
+cmp_rule_state(const void * a, const void * b)
+{
+	const struct rule_state * x = *(const struct rule_state * const *)a;
+	const struct rule_state * y = *(const struct rule_state * const *)b;
+	if(x->proto != y->proto)
+		return x->proto < y->proto ? -1 : 1;
+	if(x->eport != y->eport)
+		return x->eport < y->eport ? -1 : 1;
+	return 0;
+}
+
+/* Mark a mapping whose counters have not moved since the list was made. */
+static void
+mark_unused_rule(unsigned short eport, int proto, u_int64_t packets, u_int64_t bytes,
+                 void * arg)
+{
+	struct rule_states * s = arg;
+	struct rule_state key;
+	struct rule_state * k = &key;
+	struct rule_state ** found;
+
+	key.eport = eport;
+	key.proto = (unsigned char)proto;
+	found = bsearch(&k, s->v, s->n, sizeof(*s->v), cmp_rule_state);
+	if(found != NULL && (*found)->packets == packets && (*found)->bytes == bytes)
+		(*found)->to_remove = 1;
 }
 
 void
 remove_unused_rules(struct rule_state * list)
 {
-	char ifname[IFNAMSIZ];
-	unsigned short iport;
+	struct rule_states s;
 	struct rule_state * tmp;
-	u_int64_t packets;
-	u_int64_t bytes;
-	unsigned int timestamp;
+	size_t i;
 	int n = 0;
 
-	while(list)
-	{
-		/* remove the rule if no traffic has used it */
-		if(get_redirect_rule(ifname, list->eport, list->proto,
-	                         0, 0, &iport, 0, 0, 0, 0, &timestamp,
-		                     &packets, &bytes) >= 0)
-		{
-			if(packets == list->packets && bytes == list->bytes)
-			{
-				syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
-				       "%" PRIu64 "packets %" PRIu64 "bytes",
-				       list->eport, proto_itoa(list->proto),
-				       packets, bytes);
-				_upnp_delete_redir(list->eport, list->proto);
-				n++;
-			}
-		}
-		tmp = list;
-		list = tmp->next;
-		free(tmp);
+	s.n = 0;
+	for(tmp = list; tmp; tmp = tmp->next)
+		s.n++;
+	s.v = s.n > 0 ? malloc(s.n * sizeof(*s.v)) : NULL;
+	if(s.v != NULL) {
+		for(i = 0, tmp = list; tmp; tmp = tmp->next)
+			s.v[i++] = tmp;
+		qsort(s.v, s.n, sizeof(*s.v), cmp_rule_state);
+		/* one read of the counters of all mappings */
+		memmap_each_map_counters(mark_unused_rule, &s);
+		free(s.v);
 	}
+	for(tmp = list; tmp; tmp = tmp->next) {
+		/* remove the rule if no traffic has used it */
+		if(!tmp->to_remove)
+			continue;
+		syslog(LOG_DEBUG, "removing unused mapping %hu %s : still "
+		       "%" PRIu64 "packets %" PRIu64 "bytes",
+		       tmp->eport, proto_itoa(tmp->proto), tmp->packets, tmp->bytes);
+		_upnp_delete_redir(tmp->eport, tmp->proto);
+		n++;
+	}
+	free_rule_states(list);
 	if(n>0)
 		syslog(LOG_NOTICE, "removed %d unused rules", n);
 }
@@ -792,7 +874,7 @@ upnp_get_portmappings_in_range(unsigned short startport,
 	proto = proto_atoi(protocol);
 	if(!number)
 		return NULL;
-	return get_portmappings_in_range(startport, endport, proto, number);
+	return memmap_ports_in_range(startport, endport, proto, number);
 }
 
 /* stuff for miniupnpdctl */
@@ -813,12 +895,12 @@ write_ruleset_details(int s)
 	int n;
 
 	write(s, "Ruleset :\n", 10);
-	while(get_redirect_rule_by_index(i, 0/*ifname*/, &eport, iaddr, sizeof(iaddr),
-	                                 &iport, &proto, desc, sizeof(desc),
-	                                 rhost, sizeof(rhost),
-	                                 &timestamp,
-	                                 &packets, &bytes) >= 0)
+	while(memmap_get_map_at((unsigned int)i, &eport, &proto, &iport,
+	                        iaddr, sizeof(iaddr), desc, sizeof(desc),
+	                        rhost, sizeof(rhost), &timestamp) >= 0)
 	{
+		if(memmap_map_counters(eport, proto, &packets, &bytes) < 0)
+			packets = bytes = 0;
 		n = snprintf(buffer, sizeof(buffer),
 		             "%2d %s %s:%hu->%s:%hu "
 		             "'%s' %u %" PRIu64 " %" PRIu64 "\n",

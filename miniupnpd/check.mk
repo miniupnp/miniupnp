@@ -1,7 +1,7 @@
 # (c) 2020-2026 Thomas BERNARD
 
 check:	validateupnppermissions validategetifaddr validatessdppktgen \
-	validateupnphttp \
+	validateupnphttp validateleasetable validatememmap validatememmapsync validatefwsync \
 	validateversion
 
 validateversion:	miniupnpd $(SRCDIR)/VERSION
@@ -14,5 +14,21 @@ validate%:	$(SRCDIR)/test%.sh test%
 	touch $@
 
 validatessdppktgen:	testssdppktgen
+	./$<
+	touch $@
+
+validateleasetable:	testleasetable
+	./$<
+	touch $@
+
+validatememmap:	testmemmap
+	./$<
+	touch $@
+
+validatememmapsync:	testmemmapsync
+	./$<
+	touch $@
+
+validatefwsync:	testfwsync
 	./$<
 	touch $@

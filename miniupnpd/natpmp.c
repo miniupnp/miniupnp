@@ -23,8 +23,8 @@
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "upnpredirect.h"
-#include "commonrdr.h"
 #include "upnputils.h"
+#include "memmap.h"
 #include "portinuse.h"
 #include "asyncsendto.h"
 
@@ -64,6 +64,18 @@ int OpenAndConfNATPMPSocket(in_addr_t addr)
 			       "OpenAndConfNATPMPSocket");
 			close(snatpmp);
 			return -1;
+		}
+	}
+	/* multicast (PCP ANNOUNCE, NAT-PMP address change) goes out
+	 * through this LAN interface, never through the external one */
+	if(addr != INADDR_ANY) {
+		struct in_addr mc_if;
+		mc_if.s_addr = addr;
+		if(setsockopt(snatpmp, IPPROTO_IP, IP_MULTICAST_IF,
+		              &mc_if, sizeof(mc_if)) < 0)
+		{
+			syslog(LOG_WARNING, "%s: setsockopt(IP_MULTICAST_IF): %m",
+			       "OpenAndConfNATPMPSocket");
 		}
 	}
 	return snatpmp;
@@ -222,6 +234,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 {
 	unsigned char *req=msg_buff;	/* request udp packet */
 	unsigned char resp[32];	/* response udp packet */
+	unsigned char *response = resp;
 	int resplen;
 	int n = len;
 	char senderaddrstr[16];
@@ -302,11 +315,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 				int proto2;
 				char desc[64];
 				eport = 0; /* to indicate correct removing of port mapping */
-				while(get_redirect_rule_by_index(index, 0,
-				          &eport2, iaddr2, sizeof(iaddr2),
-						  &iport2, &proto2,
-						  desc, sizeof(desc),
-				          0, 0, &timestamp, 0, 0) >= 0) {
+				while(memmap_get_map_at(index, &eport2, &proto2, &iport2,
+				          iaddr2, sizeof(iaddr2), desc, sizeof(desc),
+				          NULL, 0, &timestamp) >= 0) {
 					syslog(LOG_DEBUG, "%d %d %hu->'%s':%hu '%s'",
 					       index, proto2, eport2, iaddr2, iport2, desc);
 					if(0 == strcmp(iaddr2, senderaddrstr)
@@ -334,6 +345,19 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
+				unsigned short eport_old, eport_own = 0;
+				/* RFC 6886 section 3.3: a retry is identified by its
+				 * internal tuple, regardless of the suggested port. A
+				 * tuple which another owner maps is refused, whatever
+				 * the order of the rows. */
+				if (memmap_find_map(senderaddrstr, iport, proto, MAPPING_NATPMP,
+				                    &eport_old, NULL, 0, NULL) == 0) {
+					eport = eport_old;
+					eport_own = eport_old;
+				} else if (memmap_find_map(senderaddrstr, iport, proto, -1,
+				                           &eport_old, NULL, 0, NULL) == 0) {
+					resp[3] = 2; /* Not Authorized/Refused */
+				}
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {
@@ -357,6 +381,17 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 					any_eport_allowed = 1;	/* at lease one eport is allowed */
+					/* RFC 6886 section 3.3: an external port another
+					 * client maps, on either protocol, is reserved for it
+					 * (the companion port); this client gets the next port.
+					 * A port the client already holds is kept on renewal. */
+					if(eport != eport_own &&
+					   upnp_eport_used_by_other(eport, proto, senderaddrstr)) {
+						eport++;
+						if(eport == 0) eport++; /* skip port zero */
+						continue;
+					}
+					/* after the table: port_in_use() reads the sockets of the kernel */
 #ifdef CHECK_PORTINUSE
 					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
 						syslog(LOG_INFO, "port %hu protocol %s already in use",
@@ -366,10 +401,11 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 #endif
-					r = get_redirect_rule(ext_if_name, eport, proto,
-					                      iaddr_old, sizeof(iaddr_old),
-					                      &iport_old, desc, sizeof(desc), 0, 0,
-					                      &timestamp, 0, 0);
+					r = memmap_get_map(eport, proto, &iport_old,
+					                   iaddr_old, sizeof(iaddr_old),
+					                   desc, sizeof(desc), NULL, 0, &timestamp);
+					if(r == 0 && !upnp_map_in_firewall(eport, proto))
+						r = -1;
 					if(r==0) {
 						if(strcmp(senderaddrstr, iaddr_old)==0
 						    && iport==iport_old) {
@@ -379,13 +415,27 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								break;
 							}
 							/* redirection already existing */
-							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
+							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, renewing",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
-							/* remove and then add again */
-							if(_upnp_delete_redir(eport, proto) < 0) {
-								syslog(LOG_ERR, "failed to remove port mapping");
-								break;
+							/* the same rule, with a new expiry */
+							timestamp = upnp_time() + lifetime;
+							snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
+							         eport, proto_itoa(proto));
+							if(disable_port_forwarding) {
+								/* no port forwarding now: the mapping goes and
+								 * the renewal fails, as a new one would */
+								syslog(LOG_INFO, "port forwarding is off, removing NAT-PMP %hu %s",
+								       eport, proto_itoa(proto));
+								_upnp_delete_redir(eport, proto);
+								resp[3] = 3;  /* Failure */
+							} else if(upnp_renew_redirect_internal(NULL, eport, senderaddrstr,
+							                                iport, proto, desc,
+							                                timestamp) < 0) {
+								syslog(LOG_ERR, "Failed to renew NAT-PMP %hu %s->%s:%hu",
+								       eport, proto_itoa(proto), senderaddrstr, iport);
+								resp[3] = 3;  /* Failure */
 							}
+							break;
 						} else {
 							eport++;
 							if(eport == 0) eport++; /* skip port zero */
@@ -407,6 +457,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					break;
 				}
 			}
+			/* RFC 6886 section 3.3: no external port or lifetime was
+			 * assigned when the request failed. */
+			if (resp[3] != 0) {
+				eport = 0;
+				lifetime = 0;
+			}
 			WRITENU16(resp+8, iport);	/* private port */
 			WRITENU16(resp+10, eport);	/* public port */
 			WRITENU32(resp+12, lifetime);	/* Port Mapping lifetime */
@@ -415,8 +471,15 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		break;
 	default:
 		resp[3] = 5;	/* Unsupported OPCODE */
+		/* RFC 6886 section 3.5: return the entire request, with only
+		 * the response bit of the opcode and the result code set. */
+		if (n > 8) {
+			memcpy(msg_buff, resp, 4);
+			response = msg_buff;
+			resplen = n;
+		}
 	}
-	n = sendto_or_schedule(s, resp, resplen, 0,
+	n = sendto_or_schedule(s, response, resplen, 0,
 	           (struct sockaddr *)senderaddr, sizeof(*senderaddr));
 	if(n<0) {
 		syslog(LOG_ERR, "sendto(natpmp): %m");
