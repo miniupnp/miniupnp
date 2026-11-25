@@ -1,8 +1,9 @@
 #!/bin/sh
 # The UPnP wire suite on Linux (Docker): builds miniupnpd (igd2: --igd2, igd1: the default build, and each with --strict), starts
 # it in UPnP mode (PCP_TEST_ENABLE_UPNP=yes) on a LAN network, and runs run_upnp_wire_cases.py in a LAN client
-# container for IPv4 and IPv6. The results go into status.md (columns linux-igd2, linux-igd2-strict); the raw
-# data, the logs and the daemon's state files of each run into .tmp/tests/upnp_wire/ of the repository.
+# container for IPv4 and IPv6 (both at once, after the cases that restart the daemon: e2e_run_families).
+# The results go into status.md (columns linux-igd2, linux-igd2-strict); the raw data, the logs and the
+# daemon's state files of each run into .tmp/tests/upnp_wire/ of the repository.
 #
 #   run-docker.sh [--base|--strict] [--igd1] [--case NAME]...
 #
@@ -62,10 +63,10 @@ cleanup() {
   result=$?
   trap - EXIT INT TERM
   if [ "$KEEP" != 1 ]; then
-    "$DOCKER" rm -f "$RUNNER" "$ROUTER" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$RUNNER-ipv4" "$RUNNER-ipv6" "$ROUTER" >/dev/null 2>&1 || true
     "$DOCKER" network rm "$LAN" >/dev/null 2>&1 || true
   else
-    echo "Keeping $ROUTER $RUNNER $LAN" >&2
+    echo "Keeping $ROUTER $RUNNER-ipv4 $RUNNER-ipv6 $LAN" >&2
   fi
   exit "$result"
 }
@@ -101,9 +102,7 @@ for build in $BUILDS; do
     --volume "$RUN_DIR/state:/var/lib/miniupnpd" --volume "$DAEMON_DIR:/opt/miniupnpd:ro" "$IMAGE" >/dev/null
   e2e_wait_upnp "$ROUTER" "$LAN4.1"
   echo "=== $build ==="
-  for family in ipv4 ipv6; do
-    e2e_run_family "$family" --lease-file /out/state/miniupnpd.leases
-  done
+  e2e_run_families --lease-file /out/state/miniupnpd.leases
   "$DOCKER" logs --timestamps "$ROUTER" > "$RUN_DIR/daemon.log" 2>&1 || true
   "$DOCKER" rm -f "$ROUTER" >/dev/null
   e2e_write_report "${RUN_DIR#"$ROOT"/}" "router=Linux nftables"

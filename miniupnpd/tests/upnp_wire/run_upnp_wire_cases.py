@@ -132,14 +132,20 @@ def run_case(case, variables, lease):
 
 def selected_cases(corpus, args):
     """The cases of this build and family (resolved for them), in corpus order. A --strict run has only the
-    cases UPNP_STRICT can change: the others give the same result as the run without it."""
+    cases UPNP_STRICT can change: the others give the same result as the run without it. --restart-cases
+    keeps the cases that restart the daemon (only) or the others (skip)."""
     builds = tuple(corpus["builds"])
 
     def resolve(case):
         resolved = resolve_variant(resolve_variant(case, ("ipv4", "ipv6"), args.family), builds, args.build)
         return dict(resolved, protocol="upnp")
     cases = select_build_cases(corpus, args, resolve)
-    return [case for case in cases if on_strict_build(case)] if args.strict else cases
+    if args.strict:
+        cases = [case for case in cases if on_strict_build(case)]
+    if args.restart_cases:
+        restarts = args.restart_cases == "only"
+        cases = [case for case in cases if ("restart" in case.get("requires", [])) == restarts]
+    return cases
 
 
 def missing_requirement(args):
@@ -220,6 +226,9 @@ def main():
     parser.add_argument("--lan6", default=DEFAULT_LAN6, help='the LAN /64 of this fixture, ending in "::"')
     parser.add_argument("--case", action="append")
     parser.add_argument("--router-call-dir", help="the directory the driver watches, for a daemon restart")
+    parser.add_argument("--restart-cases", choices=("only", "skip"),
+                        help="only the cases that restart the daemon (requires: [restart]), or only the others: "
+                             "the driver runs the others of both families at once")
     parser.add_argument("--lease-file", help="the daemon's lease_file, shared by the driver")
     parser.add_argument("--results", help="write the outcomes of the run to this file, for --write-status")
     add_status_arguments(parser, os.path.dirname(os.path.abspath(__file__)), SUITE, platform=None)

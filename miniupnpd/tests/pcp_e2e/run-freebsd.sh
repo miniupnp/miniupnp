@@ -209,7 +209,7 @@ QEMU_PID=
 # Remove the whole fixture: the VM, the Docker side and the state directory.
 teardown_all() {
   [ -n "$QEMU_PID" ] && kill "$QEMU_PID" 2>/dev/null || true
-  "$DOCKER" rm -f "$RUNNER" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
+  "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
   "$DOCKER" network rm "$LAN" "$WAN" >/dev/null 2>&1 || true
   if [ "$KEEP_MODE" = 1 ]; then
     rm -f "$STATE/state.env" "$STATE/mon.sock" "$STATE/disk.qcow2" "$STATE/seed.iso" "$STATE/console.log" "$STATE/qemu.log"
@@ -222,14 +222,14 @@ cleanup() {
   result=$?
   trap - EXIT HUP INT TERM
   if [ "$KEEP_MODE" = 1 ]; then
-    "$DOCKER" rm -f "$RUNNER" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" >/dev/null 2>&1 || true
     # a fixture which did not get ready is not worth keeping
     if [ "$FIXTURE_READY" != 1 ] && [ "$COMMAND" != down ] && [ "$COMMAND" != status ] && [ "$COMMAND" != ssh ]; then
       teardown_all
     fi
   elif [ "$KEEP" != 1 ]; then
     [ -n "$QEMU_PID" ] && kill "$QEMU_PID" 2>/dev/null || true
-    "$DOCKER" rm -f "$RUNNER" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
     "$DOCKER" network rm "$LAN" "$WAN" >/dev/null 2>&1 || true
     rm -rf "${WORK:?}"
   else
@@ -245,7 +245,7 @@ published_port() { "$DOCKER" port "$RELAY" "$1/tcp" | head -n 1 | sed 's/.*://';
 
 # ---- Docker side: peers and relay ---------------------------------------
 docker_up() {
-  "$DOCKER" rm -f "$RUNNER" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
+  "$DOCKER" rm -f "$RUNNER" "$RUNNER-ipv4" "$RUNNER-ipv6" "$ALLOW" "$DENY" "$THIRD" "$RELAY" >/dev/null 2>&1 || true
   "$DOCKER" network rm "$LAN" "$WAN" >/dev/null 2>&1 || true
   "$DOCKER" network create --driver bridge --ipv6 \
     --subnet "$LAN4.0/24" --gateway "$LAN4.254" \
@@ -651,6 +651,12 @@ run_restart_check() {
   fi
 }
 
+# The cases of both families; a suite's hooks may replace it (upnp_wire runs the families at once).
+run_families() {
+  run_family ipv4
+  run_family ipv6
+}
+
 # The phases of the run, one daemon build and one status column each. A suite with more builds
 # sets E2E_PHASES in its hooks and replaces enter_phase PHASE, which builds and starts the daemon
 # of the phase and sets its E2E_PLATFORM and RUN_DIR (upnp_wire: igd2, then igd2-strict).
@@ -684,8 +690,7 @@ for phase in $E2E_PHASES; do
   RESULTS_FILE=$RUN_DIR/results.tsv
   : > "$RESULTS_FILE"
   if [ "${PCP_E2E_ONLY_RESTART:-0}" != 1 ] && stage_on cases; then
-    run_family ipv4
-    run_family ipv6
+    run_families
   fi
   if [ "${PCP_E2E_RESTART:-1}" = 1 ] && stage_on restart; then
     run_restart_check
