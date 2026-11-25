@@ -4,8 +4,14 @@ name: i586-mingw32msvc
 'on':
   push:
     branches: [master]
+    paths:
+      - 'miniupnpc/**'
+      - '.github/workflows/i586-mingw32msvc.yml'
   pull_request:
     branches: [master]
+    paths:
+      - 'miniupnpc/**'
+      - '.github/workflows/i586-mingw32msvc.yml'
 
 jobs:
   build:

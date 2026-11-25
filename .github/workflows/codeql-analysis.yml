@@ -19,6 +19,12 @@ name: "CodeQL"
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [master]
+    # push and schedule stay unfiltered: code scanning wants full runs of master
+    paths:
+      - 'miniupnpc/**'
+      - 'minissdpd/**'
+      - 'miniupnpd/**'
+      - '.github/workflows/codeql-analysis.yml'
   schedule:
     - cron: '15 5 * * 1'
 

@@ -8,8 +8,14 @@ name: i686-w64-mingw32
 'on':
   push:
     branches: [master]
+    paths:
+      - 'miniupnpc/**'
+      - '.github/workflows/i686-w64-mingw32.yml'
   pull_request:
     branches: [master]
+    paths:
+      - 'miniupnpc/**'
+      - '.github/workflows/i686-w64-mingw32.yml'
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:

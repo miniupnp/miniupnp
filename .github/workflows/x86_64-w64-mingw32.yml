@@ -4,8 +4,14 @@ name: x86_64-w64-mingw32
 'on':
   push:
     branches: [master]
+    paths:
+      - 'miniupnpc/**'
+      - '.github/workflows/x86_64-w64-mingw32.yml'
   pull_request:
     branches: [master]
+    paths:
+      - 'miniupnpc/**'
+      - '.github/workflows/x86_64-w64-mingw32.yml'
 
 jobs:
   build:

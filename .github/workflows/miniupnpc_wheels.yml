@@ -23,9 +23,18 @@ name: "build miniupnpc wheels"
       - master
     tags:
       - '**'
+    # not evaluated for tag pushes: a release tag always builds
+    paths:
+      - 'miniupnpc/**'
+      - '.github/actions/**'
+      - '.github/workflows/miniupnpc_wheels.yml'
   pull_request:
     branches:
       - '**'
+    paths:
+      - 'miniupnpc/**'
+      - '.github/actions/**'
+      - '.github/workflows/miniupnpc_wheels.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || format('{0}-{1}-{2}', github.ref, github.event_name, github.ref == 'refs/heads/main' && github.sha || '') }}
