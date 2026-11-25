@@ -9,7 +9,7 @@ name: miniupnpd
   push:
     paths:
       - 'miniupnpd/**'
-      - '.githib/workflows/miniupnpd.yml'
+      - '.github/workflows/miniupnpd.yml'
   pull_request:
     branches: [master]
 
