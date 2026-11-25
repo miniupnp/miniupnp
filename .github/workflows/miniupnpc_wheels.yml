@@ -52,6 +52,7 @@ jobs:
   build:
     name: ${{ matrix.os.emoji }} 📦 Build ${{ matrix.arch.name }} ${{ matrix.python.major-dot-minor }}
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -258,6 +259,7 @@ jobs:
   upload:
     name: 🚀 Upload
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: pypi
     needs: build
 
