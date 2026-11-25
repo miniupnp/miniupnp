@@ -34,6 +34,9 @@ extern uint16_t ext_stun_port;
  * for debugging. NULL : none */
 extern const char * table_dump_file;
 
+/* file the sizes of those tables are written to on SIGUSR2. NULL : none */
+extern const char * table_stats_file;
+
 /* file to store all leases */
 #ifdef ENABLE_LEASEFILE
 extern const char * lease_file;

@@ -837,8 +837,8 @@ sigusr1(int sig)
 }
 
 #ifndef TOMATO
-/* Handler for the SIGUSR2 signal: write the tables to table_dump_file, and
- * rewrite lease_file */
+/* Handler for the SIGUSR2 signal: write the tables to table_dump_file, their
+ * sizes to table_stats_file, and rewrite lease_file */
 static void
 sigusr2(int sig)
 {
@@ -1687,6 +1687,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #endif	/* ENABLE_LEASEFILE */
 			case UPNPTABLEDUMPFILE:
 				table_dump_file = ary_options[i].value;
+				break;
+			case UPNPTABLESTATSFILE:
+				table_stats_file = ary_options[i].value;
 				break;
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
@@ -2789,6 +2792,9 @@ main(int argc, char * * argv)
 		{
 			if(table_dump_file != NULL)
 				memmap_dump(table_dump_file);
+			if(table_stats_file != NULL)
+				memmap_stats(table_stats_file, (unsigned int)upnp_time(),
+				             nextruletoclean_timestamp);
 			should_dump_tables = 0;
 		}
 #endif /* !TOMATO */

@@ -5,10 +5,12 @@
 
 /* The lease table and the outgoing table, written as the firewall changes.
  * See memmap.h. */
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "memmap.h"
 
@@ -284,6 +286,77 @@ memmap_peer_port_used_by_other(int family, const struct in6_addr * eaddr,
 	if(b == NULL && !IN6_IS_ADDR_UNSPECIFIED(eaddr))
 		b = peer_port_used_by_other(family, &in6addr_any, eport, iaddr);
 	return b;
+}
+
+/* the rows of each kind, and those past their expiry */
+struct map_stats {
+	unsigned int now;
+	unsigned int kind[MAP_KIND_UPNP + 1];
+	unsigned int ipv4, ipv6;
+	unsigned int expired;
+};
+
+static void
+count_row(struct lease_entry * e, void * arg)
+{
+	struct map_stats * s = arg;
+
+	if(e->kind <= MAP_KIND_UPNP)
+		s->kind[e->kind]++;
+	if(e->family == AF_INET)
+		s->ipv4++;
+	else
+		s->ipv6++;
+	if(e->timestamp != 0 && e->timestamp <= s->now)
+		s->expired++;
+}
+
+int
+memmap_stats(const char * path, unsigned int now, unsigned int next_expiry)
+{
+	char tmp[PATH_MAX];
+	struct map_stats s;
+	const struct outgoing_entry * b;
+	unsigned int out4 = 0, out6 = 0;
+	FILE * f;
+	int r;
+
+	if(snprintf(tmp, sizeof(tmp), "%s.tmp", path) >= (int)sizeof(tmp))
+		return -1;
+	f = fopen(tmp, "w");
+	if(f == NULL) {
+		syslog(LOG_WARNING, "memmap: cannot write %s: %m", tmp);
+		return -1;
+	}
+	memset(&s, 0, sizeof(s));
+	s.now = now;
+	lease_table_foreach(count_row, &s);
+	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b)) {
+		if(b->family == AF_INET)
+			out4++;
+		else
+			out6++;
+	}
+	fprintf(f, "map %u\nmap_pcp %u\nmap_natpmp %u\nmap_upnp %u\n"
+	        "map_ipv4 %u\nmap_ipv6 %u\nmap_expired %u\nmap_filters %u\n"
+	        "outgoing_bindings %u\noutgoing_bindings_ipv4 %u\n"
+	        "outgoing_bindings_ipv6 %u\noutgoing %u\n",
+	        lease_table_count(), s.kind[MAP_KIND_PCP], s.kind[MAP_KIND_NATPMP],
+	        s.kind[MAP_KIND_UPNP], s.ipv4, s.ipv6, s.expired,
+	        lease_table_filter_count(), outgoing_table_count(), out4, out6,
+	        outgoing_table_peer_count());
+	if(next_expiry != 0)
+		fprintf(f, "next_expiry %ld\n", (long)next_expiry - (long)now);
+	r = ferror(f) ? -1 : 0;
+	if(fclose(f) != 0)
+		r = -1;
+	if(r == 0 && rename(tmp, path) < 0)
+		r = -1;
+	if(r < 0) {
+		syslog(LOG_WARNING, "memmap: cannot write %s", path);
+		unlink(tmp);
+	}
+	return r;
 }
 
 int

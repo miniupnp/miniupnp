@@ -26,6 +26,7 @@ const char * ext_stun_host = 0;
 uint16_t ext_stun_port = 0;
 
 const char * table_dump_file = 0;
+const char * table_stats_file = 0;
 
 /* file to store leases */
 #ifdef ENABLE_LEASEFILE
