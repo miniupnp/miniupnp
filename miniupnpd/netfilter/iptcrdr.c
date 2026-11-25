@@ -249,91 +249,14 @@ static int snprintip(char * dst, size_t size, uint32_t ip)
 	       (ip >> 8) & 0xff, ip & 0xff);
 }
 
-/* netfilter cannot store redirection descriptions, so we use our
- * own structure to store them */
-struct rdr_desc {
-	struct rdr_desc * next;
-	unsigned int timestamp;
-	unsigned short eport;
-	short proto;
-	char str[];
-};
-
-/* pointer to the chained list where descriptions are stored */
-static struct rdr_desc * rdr_desc_list = 0;
-
-/* add a description to the list of redirection descriptions */
+/* The lease table has the description and the expiry of a mapping: a
+ * read gives none */
 static void
-add_redirect_desc(unsigned short eport, int proto,
-                  const char * desc, unsigned int timestamp)
+no_desc(char * desc, int desclen, unsigned int * timestamp)
 {
-	struct rdr_desc * p;
-	size_t l;
-	/* set a default description if none given */
-	if(!desc)
-		desc = "miniupnpd";
-	l = strlen(desc) + 1;
-	p = malloc(sizeof(struct rdr_desc) + l);
-	if(p)
-	{
-		p->next = rdr_desc_list;
-		p->timestamp = timestamp;
-		p->eport = eport;
-		p->proto = (short)proto;
-		memcpy(p->str, desc, l);
-		rdr_desc_list = p;
-	}
-}
-
-/* delete a description from the list */
-static void
-del_redirect_desc(unsigned short eport, int proto)
-{
-	struct rdr_desc * p, * last;
-	p = rdr_desc_list;
-	last = 0;
-	while(p)
-	{
-		if(p->eport == eport && p->proto == proto)
-		{
-			if(!last)
-				rdr_desc_list = p->next;
-			else
-				last->next = p->next;
-			free(p);
-			return;
-		}
-		last = p;
-		p = p->next;
-	}
-}
-
-/* go through the list to find the description */
-static void
-get_redirect_desc(unsigned short eport, int proto,
-                  char * desc, int desclen,
-                  unsigned int * timestamp)
-{
-	struct rdr_desc * p;
-	for(p = rdr_desc_list; p; p = p->next)
-	{
-		if(p->eport == eport && p->proto == (short)proto)
-		{
-			if(desc) {
-				strncpy(desc, p->str, desclen);
-				desc[desclen-1] = '\0';
-			}
-			if(timestamp)
-				*timestamp = p->timestamp;
-			return;
-		}
-	}
-	/* if no description was found, return miniupnpd as default */
-	if(desc) {
-		strncpy(desc, "miniupnpd", desclen);
-		desc[desclen-1] = '\0';
-	}
-	if(timestamp)
+	if(desc != NULL && desclen > 0)
+		desc[0] = '\0';
+	if(timestamp != NULL)
 		*timestamp = 0;
 }
 
@@ -345,11 +268,10 @@ add_redirect_rule2(const char * ifname,
 				   const char * desc, unsigned int timestamp)
 {
 	int r;
-	UNUSED(ifname);
+	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
 
 	r = addnatrule(proto, eport, iaddr, iport, rhost);
 	if(r >= 0) {
-		add_redirect_desc(eport, proto, desc, timestamp);
 #ifdef ENABLE_PORT_TRIGGERING
 		/* we now always setup SNAT to support bidirectional mapping
 		 * we cannot expect that iport == eport on all the firewall.
@@ -376,13 +298,9 @@ add_peer_redirect_rule2(const char * ifname,
                    const char * iaddr, unsigned short iport, int proto,
                    const char * desc, unsigned int timestamp)
 {
-	int r;
-	UNUSED(ifname);
+	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
 
-	r = addpeernatrule(proto, eaddr, eport, iaddr, iport, rhost, rport);
-	if(r >= 0)
-		add_redirect_desc(eport, proto, desc, timestamp);
-	return r;
+	return addpeernatrule(proto, eaddr, eport, iaddr, iport, rhost, rport);
 }
 
 int
@@ -398,8 +316,6 @@ add_peer_dscp_rule2(const char * ifname,
 	UNUSED(timestamp);
 
 	r = addpeerdscprule(proto, dscp, iaddr, iport, rhost, rport);
-/*	if(r >= 0)
-		add_redirect_desc(dscp, proto, desc, timestamp); */
 	return r;
 }
 
@@ -496,7 +412,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned
 				/* target = ipt_get_target(e); */
 				get_dnat_target_addr_port(target, &daddr, iport);
 				snprintip(iaddr, iaddrlen, ntohl(daddr));
-				get_redirect_desc(eport, proto, desc, desclen, timestamp);
+				no_desc(desc, desclen, timestamp);
 				if(packets)
 					*packets = e->counters.pcnt;
 				if(bytes)
@@ -581,7 +497,7 @@ get_redirect_rule_by_index(int index,
 				target = (void *)e + e->target_offset;
 				get_dnat_target_addr_port(target, &daddr, iport);
 				snprintip(iaddr, iaddrlen, ntohl(daddr));
-				get_redirect_desc(*eport, *proto, desc, desclen, timestamp);
+				no_desc(desc, desclen, timestamp);
 				if(packets)
 					*packets = e->counters.pcnt;
 				if(bytes)
@@ -731,7 +647,7 @@ get_peer_rule_by_index(int index,
 				target = (void *)e + e->target_offset;
 				mr = (const struct ip_nat_multi_range *)&target->data[0];
 				*eport = ntohs(mr->range[0].min.all);
-				get_redirect_desc(*eport, *proto, desc, desclen, timestamp);
+				no_desc(desc, desclen, timestamp);
 				if(packets)
 					*packets = e->counters.pcnt;
 				if(bytes)
@@ -992,7 +908,6 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 		iptc_free(&h);
 #endif
 	if(r == 0) {
-		del_redirect_desc(eport, proto);
 #ifdef ENABLE_PORT_TRIGGERING
 		if(delete_masquerade_rule(proto, eport, iaddr, iport) < 0)
 			syslog(LOG_WARNING, "%s: no MASQUERADE rule of port %hu to delete",
@@ -1193,7 +1108,6 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		}
 	}
 
-	del_redirect_desc(eport, proto);
 	/* r : the redirect and filter rules. A redirect rule which failed
 	 * returned above. A port with no redirect rule gives -1; the caller asks
 	 * the firewall whether the rule is gone. The PEER rules are not
@@ -1253,40 +1167,6 @@ find_flow_rule(IPTC_HANDLE h, const char * chain, int proto,
 	return -1;
 }
 
-/* 1 if a rule of the nat table still uses eport: a PEER rule SNATs to it,
- * or a redirect rule takes it. Both keep their description under it. */
-static int
-nat_port_used(IPTC_HANDLE h, unsigned short eport, int proto)
-{
-	const struct ipt_entry * e;
-	const struct ipt_entry_target * target;
-	const struct ip_nat_multi_range * mr;
-	unsigned short s, d;
-
-#ifdef IPTABLES_143
-	for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, h); e; e = iptc_next_rule(e, h))
-#else
-	for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, &h); e; e = iptc_next_rule(e, &h))
-#endif
-	{
-		target = (void *)e + e->target_offset;
-		mr = (const struct ip_nat_multi_range *)&target->data[0];
-		if(e->ip.proto == proto && ntohs(mr->range[0].min.all) == eport)
-			return 1;
-	}
-#ifdef IPTABLES_143
-	for(e = iptc_first_rule(miniupnpd_nat_chain, h); e; e = iptc_next_rule(e, h))
-#else
-	for(e = iptc_first_rule(miniupnpd_nat_chain, &h); e; e = iptc_next_rule(e, &h))
-#endif
-	{
-		entry_ports(e, &s, &d);
-		if(e->ip.proto == proto && d == eport)
-			return 1;
-	}
-	return 0;
-}
-
 #ifdef IPTABLES_143
 #define IPTC_DELETE(chain, i, h)	iptc_delete_num_entry(chain, i, h)
 #define IPTC_COMMIT(h)			iptc_commit(h)
@@ -1340,7 +1220,6 @@ outgoing_rule_delete(struct outgoing_rule_key * keys, int n)
 {
 	IPTC_HANDLE h;
 	int i, idx, found = 0;
-	unsigned char drop_desc[OUTGOING_RULE_DELETE_MAX];
 
 	if(n > OUTGOING_RULE_DELETE_MAX)
 		return -1;
@@ -1370,10 +1249,6 @@ outgoing_rule_delete(struct outgoing_rule_key * keys, int n)
 		IPTC_FREE(h);
 		return 0;
 	}
-	/* the description of a port goes with the last rule on it */
-	for(i = 0; i < n; i++)
-		drop_desc[i] = keys[i].result == 0 &&
-		               !nat_port_used(h, keys[i].eport, keys[i].proto);
 	if(!IPTC_COMMIT(h)) {
 		syslog(LOG_ERR, "%s() : iptc_commit(): %s",
 		       "outgoing_rule_delete", iptc_strerror(errno));
@@ -1381,9 +1256,6 @@ outgoing_rule_delete(struct outgoing_rule_key * keys, int n)
 		return -1;
 	}
 	IPTC_FREE(h);
-	for(i = 0; i < n; i++)
-		if(drop_desc[i])
-			del_redirect_desc(keys[i].eport, keys[i].proto);
 #ifdef PCP_FLOWP
 	delete_peer_dscp_rules(keys, n);
 #endif
@@ -2190,9 +2062,8 @@ update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,
                    const char * desc, unsigned int timestamp)
 {
-	UNUSED(ifname);
-	del_redirect_desc(eport, proto);
-	add_redirect_desc(eport, proto, desc, timestamp);
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(desc); UNUSED(timestamp);
 	return 0;
 }
 

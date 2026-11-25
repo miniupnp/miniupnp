@@ -87,77 +87,15 @@ void shutdown_redirect(void) {
 	ipfw_exec(IP_FW_TERM, NULL, 0);
 }
 
-/* ipfw cannot store descriptions and timestamp for port mappings so we keep
- * our own list in memory */
-struct mapping_desc_time {
-	struct mapping_desc_time * next;
-	unsigned int timestamp;
-	unsigned short eport;
-	short proto;
-	char desc[];
-};
-
-static struct mapping_desc_time * mappings_list = NULL;
-
-/* add an element to the port mappings descriptions & timestamp list */
+/* The lease table has the description and the expiry of a mapping: a
+ * read gives none */
 static void
-add_desc_time(unsigned short eport, int proto,
-              const char * desc, unsigned int timestamp)
+no_desc(char * desc, int desclen, unsigned int * timestamp)
 {
-	struct mapping_desc_time * tmp;
-	size_t l;
-	if(!desc)
-		desc = "miniupnpd";
-	l = strlen(desc) + 1;
-	tmp = malloc(sizeof(struct mapping_desc_time) + l);
-	if(tmp) {
-		/* fill the element and insert it as head of the list */
-		tmp->next = mappings_list;
-		tmp->timestamp = timestamp;
-		tmp->eport = eport;
-		tmp->proto = (short)proto;
-		memcpy(tmp->desc, desc, l);
-		mappings_list = tmp;
-	}
-}
-
-/* remove an element to the port mappings descriptions & timestamp list */
-static void
-del_desc_time(unsigned short eport, int proto)
-{
-	struct mapping_desc_time * e;
-	struct mapping_desc_time * * p;
-	p = &mappings_list;
-	e = *p;
-	while(e) {
-		if(e->eport == eport && e->proto == (short)proto) {
-			*p = e->next;
-			free(e);
-			return;
-		} else {
-			p = &e->next;
-			e = *p;
-		}
-	}
-}
-
-/* go through the list and find the description and timestamp */
-static void
-get_desc_time(unsigned short eport, int proto,
-              char * desc, int desclen,
-              unsigned int * timestamp)
-{
-	struct mapping_desc_time * e;
-
-	for(e = mappings_list; e; e = e->next) {
-		if(e->eport == eport && e->proto == (short)proto) {
-			if(desc)
-				strlcpy(desc, e->desc, desclen);
-			if(timestamp)
-				*timestamp = e->timestamp;
-			return;
-		}
-	}
+	if(desc != NULL && desclen > 0)
+		desc[0] = '\0';
+	if(timestamp != NULL)
+		*timestamp = 0;
 }
 
 /* --- */
@@ -172,8 +110,8 @@ int add_redirect_rule2(
 	unsigned int timestamp)
 {
 	struct ip_fw rule;
-	int r;
 
+	UNUSED(desc); UNUSED(timestamp);
 	if (ipfw_validate_protocol(proto) < 0)
 		return -1;
 	if (ipfw_validate_ifname(ifname) < 0)
@@ -211,10 +149,7 @@ int add_redirect_rule2(
 		rule.fw_smsk.s_addr = htonl(INADDR_NONE);
 	}
 
-	r = ipfw_exec(IP_FW_ADD, &rule, sizeof(rule));
-	if(r >= 0)
-		add_desc_time(eport, proto, desc, timestamp);
-	return r;
+	return ipfw_exec(IP_FW_ADD, &rule, sizeof(rule));
 }
 
 /* get_redirect_rule()
@@ -278,7 +213,7 @@ int get_redirect_rule(
 			}
 			/* And what if we found more than 1 matching rule? */
 			ipfw_free_ruleset(&rules);
-			get_desc_time(eport, proto, desc, desclen, timestamp);
+			no_desc(desc, desclen, timestamp);
 			return 0;
 		}
 	}
@@ -315,7 +250,6 @@ int delete_redirect_rule(
 				goto error;
 			/* And what if we found more than 1 matching rule? */
 			ipfw_free_ruleset(&rules);
-			del_desc_time(eport, proto);
 			return 0;
 		}
 	}
@@ -418,7 +352,7 @@ int get_redirect_rule_by_index(
 			}
 		}
 		ipfw_free_ruleset(&rules);
-		get_desc_time(*eport, *proto, desc, desclen, timestamp);
+		no_desc(desc, desclen, timestamp);
 		return 0;
 	}
 
@@ -490,9 +424,8 @@ update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,
                    const char * desc, unsigned int timestamp)
 {
-	UNUSED(ifname);
-	del_desc_time(eport, proto);
-	add_desc_time(eport, proto, desc, timestamp);
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(desc); UNUSED(timestamp);
 	return 0;
 }
 
@@ -538,7 +471,6 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 			found = 1;
 			if (ipfw_exec(IP_FW_DEL, (struct ip_fw *)ptr, sizeof(*ptr)) < 0)
 				goto error;
-			del_desc_time(eport, proto);
 			break;
 		}
 	}

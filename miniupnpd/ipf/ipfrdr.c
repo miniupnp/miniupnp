@@ -126,74 +126,15 @@ static const char group_name[] = "miniupnpd";
 static int dev = -1;
 static int dev_ipl = -1;
 
-/* IPFilter cannot store redirection descriptions, so we use our
- * own structure to store them */
-struct rdr_desc {
-	struct rdr_desc * next;
-	unsigned short eport;
-	int proto;
-	unsigned int timestamp;
-	char str[];
-};
-
-/* pointer to the chained list where descriptions are stored */
-static struct rdr_desc * rdr_desc_list;
-
+/* The lease table has the description and the expiry of a mapping: a
+ * read gives none */
 static void
-add_redirect_desc(unsigned short eport, int proto,
-                  unsigned int timestamp, const char * desc)
+no_desc(char * desc, int desclen, unsigned int * timestamp)
 {
-	struct rdr_desc * p;
-	size_t l;
-
-	if (desc != NULL) {
-		l = strlen(desc) + 1;
-		p = malloc(sizeof(struct rdr_desc) + l);
-		if (p) {
-			p->next = rdr_desc_list;
-			p->eport = eport;
-			p->proto = proto;
-			p->timestamp = timestamp;
-			memcpy(p->str, desc, l);
-			rdr_desc_list = p;
-		}
-	}
-}
-
-static void
-del_redirect_desc(unsigned short eport, int proto)
-{
-	struct rdr_desc * p, * last;
-
-	last = NULL;
-	for (p = rdr_desc_list; p; p = p->next) {
-		if(p->eport == eport && p->proto == proto) {
-			if (last == NULL)
-				rdr_desc_list = p->next;
-			else
-				last->next = p->next;
-			free(p);
-			return;
-		}
-	}
-}
-
-static void
-get_redirect_desc(unsigned short eport, int proto, char * desc, int desclen, unsigned int * timestamp)
-{
-	struct rdr_desc * p;
-
-	if (desc == NULL || desclen == 0)
-		return;
-	for (p = rdr_desc_list; p; p = p->next) {
-		if (p->eport == eport && p->proto == proto)
-		{
-			strncpy(desc, p->str, desclen);
-			*timestamp = p->timestamp;
-			return;
-		}
-	}
-	return;
+	if (desc != NULL && desclen > 0)
+		desc[0] = '\0';
+	if (timestamp != NULL)
+		*timestamp = 0;
 }
 
 int init_redirect(void)
@@ -235,6 +176,7 @@ add_redirect_rule2(const char * ifname, const char * rhost,
 	struct ipfobj obj;
 	int r;
 
+	UNUSED(desc); UNUSED(timestamp);
 	if (dev < 0) {
 		syslog(LOG_ERR, "%s not open", IPNAT_NAME);
 		return -1;
@@ -311,8 +253,6 @@ add_redirect_rule2(const char * ifname, const char * rhost,
 	r = ioctl(dev, SIOCADNAT, &obj);
 	if (r == -1)
 		syslog(LOG_ERR, "ioctl(SIOCADNAT): %m");
-	else
-		add_redirect_desc(eport, proto, timestamp, desc);
 	return r;
 }
 
@@ -379,8 +319,7 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 #else
 				*iport = ntohs(ipn.in_pnext);
 #endif
-			if ((desc != NULL) && (timestamp != NULL))
-				get_redirect_desc(eport, proto, desc, desclen, timestamp);
+			no_desc(desc, desclen, timestamp);
 			if ((rhost != NULL) && (rhostlen > 0))
 #if IPFILTER_VERSION >= 5000000
 				inet_ntop(AF_INET, &ipn.in_nsrc.na_addr[0].in4, rhost, rhostlen);	/* in_nsrcip */
@@ -466,8 +405,7 @@ get_redirect_rule_by_index(int index,
 				*packets = 0;
 			if (bytes != NULL)
 				*bytes = 0;
-			if ((desc != NULL) && (timestamp != NULL))
-				get_redirect_desc(*eport, *proto, desc, desclen, timestamp);
+			no_desc(desc, desclen, timestamp);
 			if ((rhost != NULL) && (rhostlen > 0))
 #if IPFILTER_VERSION >= 5000000
 				inet_ntop(AF_INET, &ipn.in_nsrc.na_addr[0].in4, rhost, rhostlen);	/* in_nsrcip */
@@ -538,8 +476,6 @@ real_delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 			if (r == -1)
 				syslog(LOG_ERR, "%s:ioctl(SIOCRMNAT): %m",
 				    "delete_redirect_rule");
-			/* Delete the desc even if the above failed */
-			del_redirect_desc(eport, proto);
 			break;
 		}
 	} while (ipn.in_next != NULL);
@@ -823,9 +759,8 @@ update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,
                    const char * desc, unsigned int timestamp)
 {
-	UNUSED(ifname);
-	del_redirect_desc(eport, proto);
-	add_redirect_desc(eport,proto, timestamp, desc);
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(desc); UNUSED(timestamp);
 	return 0;
 }
 
