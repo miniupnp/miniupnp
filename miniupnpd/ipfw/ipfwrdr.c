@@ -435,6 +435,7 @@ unsigned short *
 get_portmappings_in_range(unsigned short startport,
                           unsigned short endport,
                           int proto,
+                          in_addr_t iaddr,
                           unsigned int * number)
 {
 	unsigned short *array = NULL, *array2 = NULL;
@@ -464,6 +465,7 @@ get_portmappings_in_range(unsigned short startport,
 		if (proto == ptr->fw_prot
 		    && startport <= eport
 		    && eport <= endport) {
+			/* TODO : filter if iaddr != 0 */
 			if(*number >= capacity) {
 				capacity += 128;
 				array2 = realloc(array, sizeof(unsigned short)*capacity);
