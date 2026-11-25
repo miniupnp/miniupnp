@@ -232,7 +232,7 @@ add_map6_rule(const char * ifname,
 	}
 	r = rule_set_filter6(nft_ipv6_family, ifname, proto,
 	                     rhost_addr_p, &ihost_addr,
-	                     0, int_port, rem_port, NULL, 0);
+	                     0, int_port, rem_port, 0);
 	return nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_FILTER) < 0 ? -1 : 0;
 }
 

@@ -80,8 +80,6 @@ typedef struct rule_t {
 	uint32_t reg2_val;
 	uint64_t packets;
 	uint64_t bytes;
-	char * desc;
-	uint32_t desc_len;
 } rule_t;
 
 LIST_HEAD(rule_list, rule_t);
@@ -130,29 +128,27 @@ struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
 	      in_addr_t ihost, unsigned short iport,
-	      const char *descr,
 	      const char *handle);
 struct nftnl_rule *
 rule_set_snat(uint8_t family, uint8_t proto,
 	      in_addr_t rhost, unsigned short rport,
 	      in_addr_t ehost, unsigned short eport,
 	      in_addr_t ihost, unsigned short iport,
-	      const char *descr,
 	      const char *handle);
 struct nftnl_rule *
 rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		in_addr_t rhost, in_addr_t iaddr,
 		unsigned short eport, unsigned short iport,
-		unsigned short rport, const char * descr, const char *handle);
+		unsigned short rport, const char *handle);
 struct nftnl_rule *
 rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		struct in6_addr *rhost6, struct in6_addr *iaddr6,
 		unsigned short eport, unsigned short iport, 
-		unsigned short rport, const char *descr, const char *handle);
+		unsigned short rport, const char *handle);
 struct nftnl_rule *
 rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname,
 		uint8_t proto, unsigned short eport, unsigned short iport, 
-		unsigned short rport, const char *descr, const char *handle);
+		unsigned short rport, const char *handle);
 struct nftnl_rule *rule_del_handle(rule_t *r);
 int refresh_nft_cache_filter(void);
 int refresh_nft_cache_redirect(void);

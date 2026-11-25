@@ -257,8 +257,7 @@ error:
  * for symetric NAT / UPnP IGD NAT Port Triggering */
 int add_nat_rule(const char * ifname,
                  const char * rhost, unsigned short eport,
-                 const char * iaddr, unsigned short iport, int proto,
-                 const char * desc)
+                 const char * iaddr, unsigned short iport, int proto)
 {
 	int r;
 	struct pfioc_rule pcr;
@@ -339,7 +338,6 @@ int add_nat_rule(const char * ifname,
 		pcr.rule.keep_state = PF_STATE_NORMAL;
 		if(tag)
 			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
-		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);
 #ifdef PFVAR_NEW_STYLE
 		inet_pton(AF_INET, iaddr, &pcr.rule.src.addr.v.a.addr.v4addr.s_addr);
 		pcr.rule.src.addr.v.a.mask.v4addr.s_addr = htonl(INADDR_NONE);
@@ -586,7 +584,7 @@ add_redirect_rule2(const char * ifname,
 	struct pf_pooladdr *a;
 #endif
 
-	UNUSED(timestamp);	/* the lease table has the expiry */
+	UNUSED(desc); UNUSED(timestamp);	/* the lease table has them */
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -657,7 +655,6 @@ add_redirect_rule2(const char * ifname,
 		pcr.rule.keep_state = PF_STATE_NORMAL;
 		if(tag)
 			strlcpy(pcr.rule.tagname, tag, PF_TAG_NAME_SIZE);
-		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);
 		if(rhost && rhost[0] != '\0' && rhost[0] != '*')
 		{
 #ifdef PFVAR_NEW_STYLE
@@ -736,7 +733,7 @@ add_redirect_rule2(const char * ifname,
 #ifdef ENABLE_PORT_TRIGGERING
 	if(r == 0 && proto == IPPROTO_UDP)
 	{
-		add_nat_rule(ifname, rhost, eport, iaddr, iport, proto, desc);
+		add_nat_rule(ifname, rhost, eport, iaddr, iport, proto);
 		/* TODO check error */
 	}
 #endif
@@ -765,7 +762,7 @@ add_filter_rule2(const char * ifname,
 #ifndef USE_IFNAME_IN_RULES
 	UNUSED(ifname);
 #endif
-	UNUSED(eport);
+	UNUSED(eport); UNUSED(desc);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -812,7 +809,6 @@ add_filter_rule2(const char * ifname,
 		pcr.rule.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		pcr.rule.keep_state = 1;
-		strlcpy(pcr.rule.label, desc, PF_RULE_LABEL_SIZE);
 		if(queue)
 			strlcpy(pcr.rule.qname, queue, PF_QNAME_SIZE);
 		if(tag)
@@ -946,12 +942,8 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 #else
 			*iport = RULE.rdr.proxy_port[0];
 #endif
-			if(desc)
-#ifdef USE_LIBPFCTL
-				strlcpy(desc, RULE.label[0], desclen);
-#else /* USE_LIBPFCTL */
-				strlcpy(desc, RULE.label, desclen);
-#endif /* USE_LIBPFCTL */
+			if(desc && desclen > 0)
+				desc[0] = '\0';	/* the rule holds none */
 #ifdef PFRULE_INOUT_COUNTS
 			if(packets)
 				*packets = RULE.packets[0] + RULE.packets[1];
@@ -1034,21 +1026,14 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	return r;
 }
 
-#define priv_delete_redirect_rule(ifname, eport, proto, iport, \
-                                  iaddr, rhost, rhostlen) \
-        priv_delete_redirect_rule_check_desc(ifname, eport, proto, iport, \
-                                             iaddr, rhost, rhostlen, 0, NULL)
-/* if check_desc is true, only delete the rule if the description differs.
- * returns : -2 : rule not found
+/* returns : -2 : rule not found
  *           -1 : error
  *            0 : rule deleted
- *            1 : rule untouched
  */
 static int
-priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
+priv_delete_redirect_rule(const char * ifname, unsigned short eport,
                           int proto, unsigned short * iport,
-                          in_addr_t * iaddr, char * rhost, int rhostlen,
-                          int check_desc, const char * desc)
+                          in_addr_t * iaddr, char * rhost, int rhostlen)
 {
 	int i, n, r;
 	unsigned int tnum;
@@ -1180,18 +1165,6 @@ priv_delete_redirect_rule_check_desc(const char * ifname, unsigned short eport,
 					inet_ntop(AF_INET, &RULE.src.addr.v.a.addr.v4.s_addr,
 					          rhost, rhostlen);
 #endif
-			}
-			if(check_desc) {
-#ifdef USE_LIBPFCTL
-				if((desc == NULL && RULE.label[0][0] == '\0') ||
-				   (desc && 0 == strcmp(desc, RULE.label[0]))) {
-#else /* USE_LIBPFCTL */
-				if((desc == NULL && RULE.label[0] == '\0') ||
-				   (desc && 0 == strcmp(desc, RULE.label))) {
-#endif /* USE_LIBPFCTL */
-					r = 1;
-					break;
-				}
 			}
 			pr.action = PF_CHANGE_GET_TICKET;
         	if(ioctl(dev, DIOCCHANGERULE, &pr) < 0)
@@ -1434,12 +1407,8 @@ get_redirect_rule_by_index(int index,
 #endif
 	if(ifname)
 		strlcpy(ifname, RULE.ifname, IFNAMSIZ);
-	if(desc)
-#ifdef USE_LIBPFCTL
-		strlcpy(desc, RULE.label[0], desclen);
-#else /* USE_LIBPFCTL */
-		strlcpy(desc, RULE.label, desclen);
-#endif /* USE_LIBPFCTL */
+	if(desc && desclen > 0)
+		desc[0] = '\0';	/* the rule holds none */
 #ifdef PFRULE_INOUT_COUNTS
 	if(packets)
 		*packets = RULE.packets[0] + RULE.packets[1];
@@ -1549,39 +1518,14 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 	return 0;
 }
 
-/* update the port mapping description and timestamp */
+/* the rules hold neither the description nor the expiry: nothing to change */
 int
 update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,
                    const char * desc, unsigned int timestamp)
 {
-	unsigned short iport;
-	in_addr_t iaddr;
-	char iaddr_str[16];
-	char rhost[32];
-	int r;
-
-	r = priv_delete_redirect_rule_check_desc(ifname, eport, proto, &iport, &iaddr, rhost, sizeof(rhost), 1, desc);
-	if(r < 0)
-		return -1;
-	if(r == 1) {
-		/* the same description: nothing to change */
-		return 0;
-	}
-	if (priv_delete_filter_rule(ifname, iport, proto, iaddr) < 0)
-		return -1;
-
-	if (inet_ntop(AF_INET, &iaddr, iaddr_str, sizeof(iaddr_str)) == NULL) {
-		syslog(LOG_ERR, "inet_ntop(AF_INET, ...): %m");
-		return -1;
-	}
-
-	if(add_redirect_rule2(ifname, rhost, eport, iaddr_str, iport, proto,
-	                      desc, timestamp) < 0)
-		return -1;
-	if(add_filter_rule2(ifname, rhost, iaddr_str, eport, iport, proto, desc) < 0)
-		return -1;
-
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(desc); UNUSED(timestamp);
 	return 0;
 }
 

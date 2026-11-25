@@ -127,7 +127,7 @@ add_redirect_rule2(const char * ifname,
 	struct nftnl_rule *r;
 	in_addr_t rhost_addr = 0;
 
-	UNUSED(timestamp);	/* the lease table has the expiry */
+	UNUSED(desc); UNUSED(timestamp);	/* the lease table has them */
 	d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
 	          ifname, rhost, eport, iaddr, iport, proto, desc));
 
@@ -136,7 +136,7 @@ add_redirect_rule2(const char * ifname,
 	}
 	r = rule_set_dnat(nft_nat_family, ifname, proto,
 	                  rhost_addr, eport,
-	                  inet_addr(iaddr), iport,  desc, NULL);
+	                  inet_addr(iaddr), iport, NULL);
 
 	return nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
 }
@@ -155,14 +155,14 @@ add_peer_redirect_rule2(const char * ifname,
 			const char * desc, unsigned int timestamp)
 {
 	struct nftnl_rule *r;
-	UNUSED(ifname); UNUSED(timestamp);
+	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
 
 	d_printf(("add peer redirect rule2()!\n"));
 
 	r = rule_set_snat(nft_nat_family, proto,
 	                  inet_addr(rhost), rport,
 	                  inet_addr(eaddr), eport,
-	                  inet_addr(iaddr), iport, desc, NULL);
+	                  inet_addr(iaddr), iport, NULL);
 
 	return nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_PEER);
 }
@@ -182,6 +182,7 @@ add_filter_rule2(const char * ifname,
 	struct nftnl_rule *r = NULL;
 	in_addr_t rhost_addr = 0;
 
+	UNUSED(desc);	/* the lease table has it */
 	d_printf(("add_filter_rule2(%s, %s, %s, %d, %d, %d, %s)\n",
 	          ifname, rhost, iaddr, eport, iport, proto, desc));
 
@@ -190,8 +191,7 @@ add_filter_rule2(const char * ifname,
 	}
 	r = rule_set_filter(nft_nat_family, ifname, proto,
 	                    rhost_addr, inet_addr(iaddr),
-	                    eport, iport, 0,
-	                    desc, 0);
+	                    eport, iport, 0, 0);
 
 	return nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_FILTER);
 }
@@ -407,8 +407,8 @@ get_peer_rule_by_index(int index,
 				*rport = r->sport;
 			}
 
-			if (desc != NULL) {
-				strncpy(desc, r->desc, desclen);
+			if (desc != NULL && desclen > 0) {
+				desc[0] = '\0';	/* the rule holds none */
 			}
 
 			if (packets) {
@@ -505,8 +505,8 @@ get_redirect_rule_by_index(int index,
 				}
 			}
 
-			if (desc != NULL && r->desc) {
-				strncpy(desc, r->desc, desclen);
+			if (desc != NULL && desclen > 0) {
+				desc[0] = '\0';	/* the rule holds none */
 			}
 
 			if (timestamp != NULL) {
@@ -571,8 +571,8 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 				}
 			}
 
-			if (desc != NULL && p->desc) {
-				strncpy(desc, p->desc, desclen);
+			if (desc != NULL && desclen > 0) {
+				desc[0] = '\0';	/* the rule holds none */
 			}
 
 			if (iport)

@@ -60,13 +60,6 @@
 #define log_debug(args...)	syslog(LOG_DEBUG, args)
 #endif
 
-#ifndef MIN
-#define MIN(x,y) (((x)<(y))?(x):(y))
-#endif
-
-/* maximum length of USERDATA, used for description */
-#define NFTNL_RULE_USERDATA_MAX_LEN 256
-
 #define RULE_CACHE_INVALID  0
 #define RULE_CACHE_VALID    1
 
@@ -606,21 +599,6 @@ table_cb(const struct nlmsghdr *nlh, void *data)
 					return MNL_CB_OK;
 				}
 				r->family = nftnl_rule_get_u32(rule, NFTNL_RULE_FAMILY);
-				if (nftnl_rule_is_set(rule, NFTNL_RULE_USERDATA)) {
-					const char *descr;
-					descr = (const char *) nftnl_rule_get_data(rule, NFTNL_RULE_USERDATA,
-															 &r->desc_len);
-					if (r->desc_len > 0) {
-						r->desc = malloc(r->desc_len + 1);
-						if (r->desc != NULL) {
-							memcpy(r->desc, descr, r->desc_len);
-							r->desc[r->desc_len] = '\0';
-						} else {
-							syslog(LOG_ERR, "failed to allocate %u bytes for desc", r->desc_len);
-						}
-					}
-				}
-
 				r->handle = nftnl_rule_get_u64(rule, NFTNL_RULE_HANDLE);
 				r->type = CB_DATA(type);
 
@@ -846,7 +824,6 @@ nft_delete_cached(rule_t *p, struct rule_list *head, enum rule_chain_type chain_
 	if (!was_valid || !commit_gen_known || commit_gen != before + 1)
 		return 0;
 	LIST_REMOVE(p, entry);
-	free(p->desc);
 	free(p->table);
 	free(p->chain);
 	free(p);
@@ -893,9 +870,6 @@ flush_nft_cache(struct rule_list *head)
 	p1 = LIST_FIRST(head);
 	while (p1 != NULL) {
 		p2 = (rule_t *)LIST_NEXT(p1, entry);
-		if (p1->desc != NULL) {
-			free(p1->desc);
-		}
 		if (p1->table != NULL) {
 			free(p1->table);
 		}
@@ -1151,7 +1125,6 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	      in_addr_t rhost, unsigned short rport,
 	      in_addr_t ehost, unsigned short eport,
 	      in_addr_t ihost, unsigned short iport,
-	      const char *descr,
 	      const char *handle)
 {
 	struct nftnl_rule *r = NULL;
@@ -1167,12 +1140,6 @@ rule_set_snat(uint8_t family, uint8_t proto,
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 	nftnl_rule_set_str(r, NFTNL_RULE_TABLE, nft_nat_table);
 	nftnl_rule_set_str(r, NFTNL_RULE_CHAIN, nft_postrouting_chain);
-
-	if (descr != NULL && *descr != '\0') {
-		uint32_t len = strlen(descr);
-		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
-							descr, MIN(len, NFTNL_RULE_USERDATA_MAX_LEN));
-	}
 
 	/* Family: these IPv4 offsets must not be evaluated against IPv6 packets
 	 * when the rule lives in an inet table. */
@@ -1231,7 +1198,6 @@ struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
 	      in_addr_t ihost, unsigned short iport,
-	      const char *descr,
 	      const char *handle)
 {
 	struct nftnl_rule *r = NULL;
@@ -1247,12 +1213,6 @@ rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 	nftnl_rule_set_str(r, NFTNL_RULE_TABLE, nft_nat_table);
 	nftnl_rule_set_str(r, NFTNL_RULE_CHAIN, nft_prerouting_chain);
-
-	if (descr != NULL && *descr != '\0') {
-		uint32_t len = strlen(descr);
-		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
-							descr, MIN(len, NFTNL_RULE_USERDATA_MAX_LEN));
-	}
 
 	if (handle != NULL) {
 		handle_num = atoll(handle);
@@ -1313,7 +1273,7 @@ struct nftnl_rule *
 rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		in_addr_t rhost, in_addr_t iaddr,
 		unsigned short eport, unsigned short iport,
-		unsigned short rport, const char *descr, const char *handle)
+		unsigned short rport, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
 
@@ -1323,7 +1283,7 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 		return NULL;
 	}
 
-	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, descr, handle);
+	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, handle);
 
 	/* Family: in an inet table the IPv4 payload offsets below would also be
 	 * evaluated against IPv6 packets, so constrain to IPv4 first. */
@@ -1356,7 +1316,7 @@ rule_set_filter(uint8_t family, const char * ifname, uint8_t proto,
 
 /*
  * Create the IP6 filter rule
- * called by add_pinhole() and update_pinhole()
+ * called by add_map6_rule()
  * eport is always 0
  * iport is the destination port of the filter rule
  * rport is the (optional) source port of the rule
@@ -1365,7 +1325,7 @@ struct nftnl_rule *
 rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		struct in6_addr *rhost6, struct in6_addr *iaddr6,
 		unsigned short eport, unsigned short iport,
-		unsigned short rport, const char *descr, const char *handle)
+		unsigned short rport, const char *handle)
 {
 	struct nftnl_rule *r = NULL;
 
@@ -1375,7 +1335,7 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 		return NULL;
 	}
 
-	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, descr, handle);
+	r = rule_set_filter_common(r, family, ifname, proto, eport, iport, rport, handle);
 
 	/* Family: mirror of the IPv4 case. In an inet table, constrain to IPv6
 	 * so these offsets are not evaluated against IPv4 packets. */
@@ -1414,7 +1374,7 @@ rule_set_filter6(uint8_t family, const char * ifname, uint8_t proto,
 struct nftnl_rule *
 rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname,
 		uint8_t proto, unsigned short eport, unsigned short iport,
-		unsigned short rport, const char *descr, const char *handle)
+		unsigned short rport, const char *handle)
 {
 	uint16_t dport, sport;
 	uint64_t handle_num;
@@ -1423,12 +1383,6 @@ rule_set_filter_common(struct nftnl_rule *r, uint8_t family, const char * ifname
 	nftnl_rule_set_u32(r, NFTNL_RULE_FAMILY, family);
 	nftnl_rule_set_str(r, NFTNL_RULE_TABLE, nft_table);
 	nftnl_rule_set_str(r, NFTNL_RULE_CHAIN, nft_forward_chain);
-
-	if (descr != NULL && *descr != '\0') {
-		uint32_t len = strlen(descr);
-		nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
-							descr, MIN(len, NFTNL_RULE_USERDATA_MAX_LEN));
-	}
 
 	if (handle != NULL) {
 		handle_num = atoll(handle);
