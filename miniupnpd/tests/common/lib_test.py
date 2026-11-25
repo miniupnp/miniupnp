@@ -111,11 +111,27 @@ class LanEcho:
 TIMEOUT = 2.0
 
 
+def drop_waiting(sock):
+    """Drop the datagrams already waiting on `sock`; the timeout of the socket is put back."""
+    timeout = sock.gettimeout()
+    sock.setblocking(False)
+    try:
+        while True:
+            sock.recv(2048)
+    except BlockingIOError:
+        pass
+    finally:
+        sock.settimeout(timeout)
+
+
 def exchange(sock, address, request):
     """Send `request` and return the first datagram back; the socket needs a timeout (a silent daemon
-    would block the run otherwise)."""
+    would block the run otherwise). A reply that came after its request timed out is dropped first,
+    or it would be read as the reply to this request, and every later request would read the reply
+    of the one before."""
     if sock.gettimeout() is None:
         raise ValueError("exchange needs a socket with a timeout (sock.settimeout)")
+    drop_waiting(sock)
     sock.sendto(request, address)
     response, _ = sock.recvfrom(2048)
     return response

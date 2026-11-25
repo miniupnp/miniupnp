@@ -8,6 +8,7 @@ import json
 import multiprocessing
 import os
 import re
+import select
 import socket
 import struct
 import subprocess
@@ -166,6 +167,16 @@ class WireTests(unittest.TestCase):
     def test_exchange_returns_the_response(self):
         address = self.server(b"answer")
         self.assertEqual(lib_test.exchange(self.client(), address, b"question"), b"answer")
+
+    def test_exchange_drops_a_late_reply_to_an_earlier_request(self):
+        address = self.server(b"answer")
+        client = self.client()
+        client.bind(("127.0.0.1", 0))
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as late:
+            late.sendto(b"late reply", client.getsockname())
+        select.select([client], [], [], lib_test.TIMEOUT)
+        self.assertEqual(lib_test.exchange(client, address, b"question"), b"answer")
+        self.assertIsNone(lib_test.receive_within(client, 0.1))
 
     def test_exchange_needs_a_timeout(self):
         sock = self.client()
