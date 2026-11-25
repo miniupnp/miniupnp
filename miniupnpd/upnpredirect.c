@@ -320,7 +320,7 @@ void lease_file_rewrite(void)
 
 /* upnp_redirect()
  * calls OS/fw dependent implementation of the redirection.
- * protocol should be the string "TCP" or "UDP"
+ * protocol should be the string "TCP" or "UDP" (or "UDPLITE" if supported)
  * returns: 0 on success
  *          -1 failed to redirect
  *          -2 already redirected
@@ -341,6 +341,10 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	unsigned int timestamp;
 
 	proto = proto_atoi(protocol);
+	if(proto < 0) {
+		syslog(LOG_WARNING, "unknown protocol : \"%s\"", protocol);
+		return -1;
+	}
 	if(inet_aton(iaddr, &address) <= 0) {
 		syslog(LOG_ERR, "inet_aton(%s) FAILED", iaddr);
 		return -1;
@@ -482,15 +486,19 @@ upnp_get_redirection_infos(unsigned short eport, const char * protocol,
                            char * rhost, int rhostlen,
                            unsigned int * leaseduration)
 {
+	int proto;
 	int r;
 	unsigned int timestamp;
 	time_t current_time;
 
+	proto = proto_atoi(protocol);
+	if(proto < 0)	/* protocol unknown */
+		return -1;
 	if(desc && (desclen > 0))
 		desc[0] = '\0';
 	if(rhost && (rhostlen > 0))
 		rhost[0] = '\0';
-	r = get_redirect_rule(ext_if_name, eport, proto_atoi(protocol),
+	r = get_redirect_rule(ext_if_name, eport, proto,
 	                      iaddr, iaddrlen, iport, desc, desclen,
 	                      rhost, rhostlen, &timestamp,
 	                      0, 0);
@@ -791,6 +799,8 @@ upnp_get_portmappings_in_range(unsigned short startport,
 {
 	int proto;
 	proto = proto_atoi(protocol);
+	if(proto<0)
+		return NULL;
 	if(!number)
 		return NULL;
 	return get_portmappings_in_range(startport, endport, proto, iaddr, number);
