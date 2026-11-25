@@ -82,6 +82,7 @@ start_runner_host() {
 }
 start_runner_host "$RUNNER_LAN" "$LAN" "$LAN4.2" "${LAN6}2"
 start_runner_host "$RUNNER_WAN" "$WAN" "$WAN4.2" "${WAN6}2"
+daemon_lines() { "$DOCKER" logs "$ROUTER" 2>&1 | wc -l; }
 daemon_listening() {
   "$DOCKER" logs "$ROUTER" 2>&1 | grep -Ec 'Listening for NAT-PMP|HTTP listening on port' || true
 }
@@ -147,7 +148,14 @@ start_router() {
     { echo "FAIL: the router container did not start" >&2; exit 1; }
   for _attempt in $(seq 1 50); do
     if "$DOCKER" logs "$ROUTER" 2>&1 | grep -Eq 'Listening for NAT-PMP|HTTP listening on port'; then
-      sleep 1     # the other protocol's sockets open right after
+      # the other protocols' sockets open right after: until the log is quiet for 0.2 s, at most 1 s
+      lines=$(daemon_lines)
+      for _quiet in 1 2 3 4 5; do
+        sleep 0.2
+        now=$(daemon_lines)
+        [ "$now" != "$lines" ] || break
+        lines=$now
+      done
       # a new router container has a new MAC address: the runner hosts forget the old one
       for runner_host in "$RUNNER_LAN" "$RUNNER_WAN"; do
         "$DOCKER" exec "$runner_host" ip neigh flush all >/dev/null 2>&1 || true
