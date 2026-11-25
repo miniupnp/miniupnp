@@ -13,8 +13,8 @@ name: 'miniupnpd: Regression report'
 # A separate workflow, as the run of a fork's pull request has a read-only token. This
 # one runs master's copy with a write token and runs no code of the pull request: it
 # reads the artifacts as data and checks the pull request's head is the tested commit.
-# The run is skipped for a push to master and for a cancelled run (a newer push of the
-# pull request has its own run).
+# The run is skipped for a push to master, for a cancelled run (a newer push of the
+# pull request has its own run) and for a pull request closed meanwhile.
 
 'on':
   workflow_run:
@@ -64,7 +64,13 @@ jobs:
             echo "::error::no pull request number in the run's artifacts"
             exit 1
           fi
-          pr_head=$(gh api "repos/$REPOSITORY/pulls/$number" --jq .head.sha)
+          pr=$(gh api "repos/$REPOSITORY/pulls/$number" --jq '"\(.state) \(.head.sha)"')
+          read -r pr_state pr_head <<< "$pr"
+          # GitHub answers a review on a closed pull request with an empty HTTP 500
+          if [ "$pr_state" != open ]; then
+            echo "pull request #$number is $pr_state; no review"
+            exit 0
+          fi
           if [ "$pr_head" != "$HEAD_SHA" ]; then
             echo "pull request #$number moved on to $pr_head; its own run reports that commit"
             exit 0
