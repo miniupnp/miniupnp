@@ -360,39 +360,45 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		       "delete_redirect_and_filter_rules", eport, proto);
 	}
 
-	iaddr = 0;
-	iport = 0;
-
-	refresh_nft_cache_peer();
-	// Delete Peer Rule
-	LIST_FOREACH(p, &head_peer, entry) {
-		if (p->nat_port == eport && p->proto == proto &&
-		    (p->type == RULE_NAT && p->nat_type == NFT_NAT_SNAT)) {
-			iaddr = p->daddr;
-			iport = p->dport;
-
-			r = rule_del_handle(p);
-			/* Todo: send bulk request */
-			nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_PEER);
-			break;
-		}
-	}
-
-	if (iaddr != 0 && iport != 0) {
-		refresh_nft_cache_filter();
-		// Delete Forward Rule
-		LIST_FOREACH(p, &head_filter, entry) {
-			if (p->dport == iport &&
-				p->daddr == iaddr && p->type == RULE_FILTER) {
-				r = rule_del_handle(p);
-				/* Todo: send bulk request */
-				nft_send_rule(r, NFT_MSG_DELRULE, RULE_CHAIN_FILTER);
-				break;
-			}
-		}
-	}
-
 	return 0;
+}
+
+/* The SNAT rule of each key, from one read of the peer chain, deleted in
+ * one batch. The rule holds the internal side as its destination and the
+ * remote one as its source (rule_set_snat()). */
+int
+outgoing_rule_delete(struct outgoing_rule_key * keys, int n)
+{
+	struct nftnl_rule *rules[OUTGOING_RULE_DELETE_MAX];
+	rule_t *p;
+	int i, found = 0;
+
+	if (n > OUTGOING_RULE_DELETE_MAX)
+		return -1;
+	refresh_nft_cache_peer();
+	for (i = 0; i < n; i++) {
+		keys[i].result = -2;
+		LIST_FOREACH(p, &head_peer, entry) {
+			if (p->type == RULE_NAT && p->nat_type == NFT_NAT_SNAT &&
+			    p->proto == keys[i].proto && p->nat_port == keys[i].eport &&
+			    p->daddr == keys[i].iaddr && p->dport == keys[i].iport &&
+			    p->saddr == keys[i].raddr && p->sport == keys[i].rport)
+				break;
+		}
+		if (p == NULL)
+			continue;
+		rules[found] = rule_del_handle(p);
+		if (rules[found] == NULL) {
+			while (found > 0)
+				nftnl_rule_free(rules[--found]);
+			return -1;
+		}
+		found++;
+		keys[i].result = 0;
+	}
+	if (found == 0)
+		return 0;
+	return nft_send_rules(rules, found, NFT_MSG_DELRULE, RULE_CHAIN_PEER) < 0 ? -1 : 0;
 }
 
 /*

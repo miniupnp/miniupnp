@@ -812,13 +812,12 @@ delete_filter_rule(const char * ifname, unsigned short port, int proto)
 int
 delete_redirect_and_filter_rules(unsigned short eport, int proto)
 {
-	int r = -1, r2 = -1;
+	int r = -1;
 	unsigned index = 0;
 	unsigned i = 0;
 	IPTC_HANDLE h;
 	const struct ipt_entry * e;
 	const struct ipt_entry_target * target;
-	const struct ip_nat_multi_range * mr;
 	const struct ipt_entry_match *match;
 	unsigned short iport = 0;
 	uint32_t iaddr = 0;
@@ -943,115 +942,200 @@ delete_redirect_and_filter_rules(unsigned short eport, int proto)
 		}
 	}
 
-	/*delete PEER rule*/
-	if((h = iptc_init("nat")))
-	{
-		i = 0;
-		/* we must find the right index for the filter rule */
-#ifdef IPTABLES_143
-		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, h);
-		    e;
-			e = iptc_next_rule(e, h), i++)
-#else
-		for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, &h);
-		    e;
-			e = iptc_next_rule(e, &h), i++)
-#endif
-		{
-			if(proto==e->ip.proto)
-			{
-				target = (void *)e + e->target_offset;
-				mr = (const struct ip_nat_multi_range *)&target->data[0];
-				syslog(LOG_DEBUG, "postrouting rule #%u: %s %s %hu",
-				       i, target->u.user.name, inet_ntoa(e->ip.src), ntohs(mr->range[0].min.all));
-				/* target->u.user.name SNAT / MASQUERADE */
-				if (eport != ntohs(mr->range[0].min.all)) {
-					continue;
-				}
-				iaddr = e->ip.src.s_addr;
-				match = (const struct ipt_entry_match *)&e->elems;
-				if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
-				{
-					const struct ipt_tcp * info;
-					info = (const struct ipt_tcp *)match->data;
-					iport = info->spts[0];
-				}
-				else
-				{
-					const struct ipt_udp * info;
-					info = (const struct ipt_udp *)match->data;
-					iport = info->spts[0];
-				}
-
-				index = i;
-				syslog(LOG_INFO, "Trying to delete peer rule at index %u", index);
-				r2 = delete_rule_and_commit(index, h, miniupnpd_nat_postrouting_chain, "delete_peer_rule");
-				h = NULL;
-				break;
-			}
-		}
-	}
-
-	if(h)
-#ifdef IPTABLES_143
-		iptc_free(h);
-#else
-		iptc_free(&h);
-#endif
-	/*delete DSCP rule*/
-	if((r2==0)&&(h = iptc_init("mangle")))
-	{
-		i = 0;
-		index = -1;
-		/* we must find the right index for the filter rule */
-#ifdef IPTABLES_143
-		for(e = iptc_first_rule(miniupnpd_nat_chain, h);
-		    e;
-			e = iptc_next_rule(e, h), i++)
-#else
-		for(e = iptc_first_rule(miniupnpd_nat_chain, &h);
-		    e;
-			e = iptc_next_rule(e, &h), i++)
-#endif
-		{
-			if(proto==e->ip.proto)
-			{
-				match = (const struct ipt_entry_match *)&e->elems;
-				/*syslog(LOG_DEBUG, "filter rule #%u: %s %s",
-				       i, match->u.user.name, inet_ntoa(e->ip.dst));*/
-				if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN))
-				{
-					const struct ipt_tcp * info;
-					info = (const struct ipt_tcp *)match->data;
-					if(iport != info->spts[0])
-						continue;
-				}
-				else
-				{
-					const struct ipt_udp * info;
-					info = (const struct ipt_udp *)match->data;
-					if(iport != info->spts[0])
-						continue;
-				}
-				if(iaddr != e->ip.src.s_addr)
-					continue;
-				index = i;
-				syslog(LOG_INFO, "Trying to delete dscp rule at index %u", index);
-				r2 = delete_rule_and_commit(index, h, miniupnpd_nat_chain, "delete_dscp_rule");
-				h = NULL;
-				break;
-			}
-		}
-		if (h)
-#ifdef IPTABLES_143
-			iptc_free(h);
-#else
-			iptc_free(&h);
-#endif
-	}
-
 	del_redirect_desc(eport, proto);
-	return r*r2;
+	/* 0, or 1 when the rules were not there or did not go: the callers
+	 * take that as deleted. The PEER rules are not touched: see
+	 * outgoing_rule_delete(). */
+	return r < 0 ? 1 : 0;
+}
+
+/* the source and destination ports of the tcp or udp match of e */
+static void
+entry_ports(const struct ipt_entry * e, unsigned short * sport, unsigned short * dport)
+{
+	const struct ipt_entry_match * match = (const struct ipt_entry_match *)&e->elems;
+
+	if(0 == strncmp(match->u.user.name, "tcp", IPT_FUNCTION_MAXNAMELEN)) {
+		const struct ipt_tcp * info = (const struct ipt_tcp *)match->data;
+		*sport = info->spts[0];
+		*dport = info->dpts[0];
+	} else {
+		const struct ipt_udp * info = (const struct ipt_udp *)match->data;
+		*sport = info->spts[0];
+		*dport = info->dpts[0];
+	}
+}
+
+/* The place in chain of the rule of proto from src:sport to dst:dport,
+ * and with eport != 0 whose SNAT port is eport. -1 if there is none. */
+static int
+find_flow_rule(IPTC_HANDLE h, const char * chain, int proto,
+               in_addr_t src, unsigned short sport,
+               in_addr_t dst, unsigned short dport, unsigned short eport)
+{
+	const struct ipt_entry * e;
+	const struct ipt_entry_target * target;
+	const struct ip_nat_multi_range * mr;
+	unsigned short s, d;
+	int i = 0;
+
+#ifdef IPTABLES_143
+	for(e = iptc_first_rule(chain, h); e; e = iptc_next_rule(e, h), i++)
+#else
+	for(e = iptc_first_rule(chain, &h); e; e = iptc_next_rule(e, &h), i++)
+#endif
+	{
+		if(e->ip.proto != proto || e->ip.src.s_addr != src || e->ip.dst.s_addr != dst)
+			continue;
+		entry_ports(e, &s, &d);
+		if(s != sport || d != dport)
+			continue;
+		if(eport != 0) {
+			target = (void *)e + e->target_offset;
+			mr = (const struct ip_nat_multi_range *)&target->data[0];
+			if(ntohs(mr->range[0].min.all) != eport)
+				continue;
+		}
+		return i;
+	}
+	return -1;
+}
+
+/* 1 if a rule of the nat table still uses eport: a PEER rule SNATs to it,
+ * or a redirect rule takes it. Both keep their description under it. */
+static int
+nat_port_used(IPTC_HANDLE h, unsigned short eport, int proto)
+{
+	const struct ipt_entry * e;
+	const struct ipt_entry_target * target;
+	const struct ip_nat_multi_range * mr;
+	unsigned short s, d;
+
+#ifdef IPTABLES_143
+	for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, h); e; e = iptc_next_rule(e, h))
+#else
+	for(e = iptc_first_rule(miniupnpd_nat_postrouting_chain, &h); e; e = iptc_next_rule(e, &h))
+#endif
+	{
+		target = (void *)e + e->target_offset;
+		mr = (const struct ip_nat_multi_range *)&target->data[0];
+		if(e->ip.proto == proto && ntohs(mr->range[0].min.all) == eport)
+			return 1;
+	}
+#ifdef IPTABLES_143
+	for(e = iptc_first_rule(miniupnpd_nat_chain, h); e; e = iptc_next_rule(e, h))
+#else
+	for(e = iptc_first_rule(miniupnpd_nat_chain, &h); e; e = iptc_next_rule(e, &h))
+#endif
+	{
+		entry_ports(e, &s, &d);
+		if(e->ip.proto == proto && d == eport)
+			return 1;
+	}
+	return 0;
+}
+
+#ifdef IPTABLES_143
+#define IPTC_DELETE(chain, i, h)	iptc_delete_num_entry(chain, i, h)
+#define IPTC_COMMIT(h)			iptc_commit(h)
+#define IPTC_FREE(h)			iptc_free(h)
+#else
+#define IPTC_DELETE(chain, i, h)	iptc_delete_num_entry(chain, i, &h)
+#define IPTC_COMMIT(h)			iptc_commit(&h)
+#define IPTC_FREE(h)			iptc_free(&h)
+#endif
+
+#ifdef PCP_FLOWP
+/* The DSCP rules of the keys deleted, both ways, in one commit of the
+ * mangle table. A rule which stays is logged: the PEER rule is gone. */
+static void
+delete_peer_dscp_rules(const struct outgoing_rule_key * keys, int n)
+{
+	IPTC_HANDLE h;
+	int i, idx, changed = 0;
+
+	h = iptc_init("mangle");
+	if(!h) {
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "outgoing_rule_delete", iptc_strerror(errno));
+		return;
+	}
+	for(i = 0; i < n; i++) {
+		if(keys[i].result != 0)
+			continue;
+		idx = find_flow_rule(h, miniupnpd_nat_chain, keys[i].proto,
+		                     keys[i].iaddr, keys[i].iport,
+		                     keys[i].raddr, keys[i].rport, 0);
+		if(idx >= 0 && IPTC_DELETE(miniupnpd_nat_chain, idx, h))
+			changed = 1;
+		idx = find_flow_rule(h, miniupnpd_nat_chain, keys[i].proto,
+		                     keys[i].raddr, keys[i].rport,
+		                     keys[i].iaddr, keys[i].iport, 0);
+		if(idx >= 0 && IPTC_DELETE(miniupnpd_nat_chain, idx, h))
+			changed = 1;
+	}
+	if(changed && !IPTC_COMMIT(h))
+		syslog(LOG_WARNING, "%s() : DSCP rules stay, iptc_commit(): %s",
+		       "outgoing_rule_delete", iptc_strerror(errno));
+	IPTC_FREE(h);
+}
+#endif
+
+/* One read of the nat table, the SNAT rule of each key deleted in it, one
+ * commit. */
+int
+outgoing_rule_delete(struct outgoing_rule_key * keys, int n)
+{
+	IPTC_HANDLE h;
+	int i, idx, found = 0;
+	unsigned char drop_desc[OUTGOING_RULE_DELETE_MAX];
+
+	if(n > OUTGOING_RULE_DELETE_MAX)
+		return -1;
+	h = iptc_init("nat");
+	if(!h) {
+		syslog(LOG_ERR, "%s() : iptc_init() failed : %s",
+		       "outgoing_rule_delete", iptc_strerror(errno));
+		return -1;
+	}
+	for(i = 0; i < n; i++) {
+		keys[i].result = -2;
+		idx = find_flow_rule(h, miniupnpd_nat_postrouting_chain, keys[i].proto,
+		                     keys[i].iaddr, keys[i].iport,
+		                     keys[i].raddr, keys[i].rport, keys[i].eport);
+		if(idx < 0)
+			continue;
+		if(!IPTC_DELETE(miniupnpd_nat_postrouting_chain, idx, h)) {
+			syslog(LOG_ERR, "%s() : iptc_delete_num_entry(): %s",
+			       "outgoing_rule_delete", iptc_strerror(errno));
+			IPTC_FREE(h);
+			return -1;
+		}
+		keys[i].result = 0;
+		found++;
+	}
+	if(found == 0) {
+		IPTC_FREE(h);
+		return 0;
+	}
+	/* the description of a port goes with the last rule on it */
+	for(i = 0; i < n; i++)
+		drop_desc[i] = keys[i].result == 0 &&
+		               !nat_port_used(h, keys[i].eport, keys[i].proto);
+	if(!IPTC_COMMIT(h)) {
+		syslog(LOG_ERR, "%s() : iptc_commit(): %s",
+		       "outgoing_rule_delete", iptc_strerror(errno));
+		IPTC_FREE(h);
+		return -1;
+	}
+	IPTC_FREE(h);
+	for(i = 0; i < n; i++)
+		if(drop_desc[i])
+			del_redirect_desc(keys[i].eport, keys[i].proto);
+#ifdef PCP_FLOWP
+	delete_peer_dscp_rules(keys, n);
+#endif
+	return 0;
 }
 
 /* ==================================== */

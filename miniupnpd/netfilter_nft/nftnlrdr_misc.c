@@ -1316,6 +1316,96 @@ nft_mnl_batch_put(char *buf, uint16_t type, uint32_t seq)
 	nfg->res_id = NFNL_SUBSYS_NFTABLES;
 }
 
+static int batch_sendto(struct mnl_nlmsg_batch *batch);
+
+/* Read the answers to a batch of n messages which each asked for an ack:
+ * one ack or error each. 0, -3 if the socket failed, -4 if a message
+ * failed. */
+static int
+read_acks(int n)
+{
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	const struct nlmsghdr *nlh;
+	const struct nlmsgerr *err;
+	int len, r = 0;
+
+	while (n > 0) {
+		len = (int)mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));
+		if (len <= 0) {
+			log_error("mnl_socket_recvfrom() FAILED: %m");
+			return -3;
+		}
+		for (nlh = (const struct nlmsghdr *)buf; mnl_nlmsg_ok(nlh, len);
+		     nlh = mnl_nlmsg_next(nlh, &len)) {
+			if (nlh->nlmsg_type != NLMSG_ERROR)
+				continue;
+			err = mnl_nlmsg_get_payload(nlh);
+			if (err->error != 0) {
+				errno = -err->error;
+				syslog(LOG_ERR, "%s: message %u failed: %m",
+				       "nft_send_rules", (unsigned)nlh->nlmsg_seq);
+				r = -4;
+			}
+			n--;
+		}
+	}
+	return r;
+}
+
+/* Send rules[0..n-1] in one batch: the kernel takes all of them or none.
+ * The rules are freed. 0, or < 0 as send_batch(), also when they do not
+ * fit in one batch. */
+int
+nft_send_rules(struct nftnl_rule ** rules, int n, uint16_t cmd,
+               enum rule_chain_type chain_type)
+{
+	int result = -1, i;
+	struct nlmsghdr *nlh;
+	struct mnl_nlmsg_batch *batch;
+	/* a delete by handle is some 100 bytes: 64 fit */
+	char buf[MNL_SOCKET_BUFFER_SIZE*4];
+
+	batch = start_batch(buf, MNL_SOCKET_BUFFER_SIZE*2);
+	if (batch != NULL) {
+		switch (chain_type) {
+			case RULE_CHAIN_FILTER:
+				rule_list_filter_validate = RULE_CACHE_INVALID;
+				break;
+			case RULE_CHAIN_PEER:
+				rule_list_peer_validate = RULE_CACHE_INVALID;
+				break;
+			case RULE_CHAIN_REDIRECT:
+				rule_list_redirect_validate = RULE_CACHE_INVALID;
+				break;
+		}
+		for (i = 0; i < n; i++) {
+			if (i > 0 && !mnl_nlmsg_batch_next(batch))
+				break;
+			nlh = nftnl_rule_nlmsg_build_hdr(mnl_nlmsg_batch_current(batch),
+			                                 cmd,
+			                                 nftnl_rule_get_u32(rules[i], NFTNL_RULE_FAMILY),
+			                                 NLM_F_APPEND|NLM_F_CREATE|NLM_F_ACK,
+			                                 mnl_seq++);
+			nftnl_rule_nlmsg_build_payload(nlh, rules[i]);
+		}
+		if (i < n) {
+			syslog(LOG_ERR, "%s: %d rules do not fit in one batch",
+			       "nft_send_rules", n);
+			mnl_nlmsg_batch_stop(batch);
+		} else {
+			result = batch_sendto(batch);
+			if (result == 0)
+				result = read_acks(n);
+			if (result < 0)
+				syslog(LOG_ERR, "%s(%d, %d, %d) failed %d",
+				       "nft_send_rules", n, (int)cmd, (int)chain_type, result);
+		}
+	}
+	for (i = 0; i < n; i++)
+		nftnl_rule_free(rules[i]);
+	return result;
+}
+
 int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type chain_type)
 {
@@ -1498,12 +1588,11 @@ start_batch(char *buf, size_t buf_size)
  * -3 : mnl_socket_recvfrom() error
  * -4 : mnl_cb_run() error
  */
-int
-send_batch(struct mnl_nlmsg_batch *batch)
+/* End the batch and send it: 0, or as send_batch() */
+static int
+batch_sendto(struct mnl_nlmsg_batch *batch)
 {
-	int ret;
 	ssize_t n;
-	char buf[MNL_SOCKET_BUFFER_SIZE];
 
 	mnl_nlmsg_batch_next(batch);
 
@@ -1522,6 +1611,19 @@ send_batch(struct mnl_nlmsg_batch *batch)
 		return -2;
 	}
 	mnl_nlmsg_batch_stop(batch);
+	return 0;
+}
+
+int
+send_batch(struct mnl_nlmsg_batch *batch)
+{
+	int ret;
+	ssize_t n;
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+
+	ret = batch_sendto(batch);
+	if (ret < 0)
+		return ret;
 
 	do {
 		n = mnl_socket_recvfrom(mnl_sock, buf, sizeof(buf));

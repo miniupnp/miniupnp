@@ -779,14 +779,33 @@ next_to_clean(unsigned int ts)
 		nextruletoclean_timestamp = ts;
 }
 
+#ifdef PCP_PEER
+/* Delete the PEER rules of the keys of expired peers: one transaction. */
+static void
+expire_peer_rules(struct outgoing_rule_key * keys, int n)
+{
+	int i;
+
+	if(outgoing_rule_delete(keys, n) < 0) {
+		syslog(LOG_WARNING, "%d expired PEER mappings, their rules were not deleted", n);
+		return;
+	}
+	for(i = 0; i < n; i++)
+		if(keys[i].result != 0)
+			syslog(LOG_INFO, "expired PEER mapping %hu %s had no rule",
+			       keys[i].eport, proto_itoa(keys[i].proto));
+}
+#endif
+
 void
 upnp_expire_mappings(void)
 {
 	struct lease_entry * e, * next;
 	unsigned int now = (unsigned int)upnp_time();
 #ifdef PCP_PEER
+	struct outgoing_rule_key keys[OUTGOING_RULE_DELETE_MAX], * k;
 	struct outgoing_entry * b;
-	int i;
+	int i, n = 0;
 #endif
 
 	nextruletoclean_timestamp = 0;
@@ -809,6 +828,8 @@ upnp_expire_mappings(void)
 		memmap_delete(e->proto, e->family, &e->iaddr, e->iport, e->eport);
 	}
 #ifdef PCP_PEER
+	/* the PEER peers: the rule of each peer, never the port mapping on the
+	 * same external port, nor the other peers of its binding. */
 	for(b = outgoing_table_next(NULL); b != NULL; b = outgoing_table_next(b)) {
 		for(i = 0; i < b->npeers; i++) {
 			if(b->peers[i].timestamp == 0)
@@ -819,10 +840,25 @@ upnp_expire_mappings(void)
 			}
 			syslog(LOG_NOTICE, "remove PEER mapping %hu %s because it has expired",
 			       b->eport, proto_itoa(b->proto));
-			_upnp_delete_redir(b->eport, b->proto);
+			if(!IN6_IS_ADDR_V4MAPPED(&b->iaddr) ||
+			   !IN6_IS_ADDR_V4MAPPED(&b->peers[i].raddr))
+				continue;	/* no IPv6 PEER rules */
+			k = &keys[n++];
+			memcpy(&k->iaddr, &b->iaddr.s6_addr[12], sizeof(k->iaddr));
+			memcpy(&k->raddr, &b->peers[i].raddr.s6_addr[12], sizeof(k->raddr));
+			k->iport = b->iport;
+			k->rport = b->peers[i].rport;
+			k->eport = b->eport;
+			k->proto = b->proto;
+			if(n == OUTGOING_RULE_DELETE_MAX) {
+				expire_peer_rules(keys, n);
+				n = 0;
+			}
 		}
 	}
-	/* the expired PEER rules went above */
+	if(n > 0)
+		expire_peer_rules(keys, n);
+	/* the peers go also if their rules do not, as the port mappings do */
 	memmap_outgoing_expired(now);
 #endif
 }
