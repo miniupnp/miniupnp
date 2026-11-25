@@ -22,6 +22,7 @@
 #include "macros.h"
 #include "config.h"
 #include "upnpredirect.h"
+#include "memmap.h"
 #include "upnpglobalvars.h"
 #include "upnpevents.h"
 #include "portinuse.h"
@@ -191,7 +192,8 @@ int reload_from_lease_file(void)
 	time_t current_unix_time;
 #endif
 	char line[320];
-	int r;
+	int r, family;
+	struct lease_entry * req;
 
 	if(!lease_file) return -1;
 	fd = fopen( lease_file, "r");
@@ -277,7 +279,28 @@ int reload_from_lease_file(void)
 		} else {
 			leaseduration = 0;	/* default value */
 		}
-		r = upnp_redirect(rhost, eport, iaddr, iport, proto, desc, leaseduration);
+		req = lease_table_new(1);
+		if(req == NULL)
+			continue;
+		lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
+		if(map_pton(iaddr, &family, &req->iaddr) < 0 || family != AF_INET ||
+		   map_filter_set(&req->filters[0], rhost, 0) < 0) {
+			syslog(LOG_WARNING, "ignoring lease file line with an invalid address (%hu=>%s:%hu %s)",
+			       eport, iaddr, iport, proto);
+			lease_table_free(req);
+			continue;
+		}
+		req->family = AF_INET;
+		req->proto = proto_atoi(proto);
+		req->iport = iport;
+		req->eport = eport;
+		/* any remote host: no filter */
+		req->nfilters = req->filters[0].prefix != 0 ? 1 : 0;
+		lease_entry_from_desc(req, desc);
+		req->timestamp = leaseduration > 0 ? timestamp : 0;
+		r = upnp_redirect(req);
+		if(r != 0)
+			lease_table_free(req);	/* on success the lease table took it */
 		if(r == -1) {
 			syslog(LOG_ERR, "Failed to redirect %hu -> %s:%hu protocol %s",
 			       eport, iaddr, iport, proto);
@@ -328,33 +351,31 @@ void lease_file_rewrite(void)
  *          -4 already redirected (other mechanism)
  */
 int
-upnp_redirect(const char * rhost, unsigned short eport,
-              const char * iaddr, unsigned short iport,
-              const char * protocol, const char * desc,
-              unsigned int leaseduration)
+upnp_redirect(struct lease_entry * req)
 {
-	int proto, r;
+	int r;
+	char desc_buf[64];
+	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
+	char iaddr[INET_ADDRSTRLEN];
+	char rhost_buf[INET6_ADDRSTRLEN];
+	const char * rhost;
 	char iaddr_old[32];
 	char rhost_old[32];
 	unsigned short iport_old;
-	struct in_addr address;
 	unsigned int timestamp;
+	const unsigned short eport = req->eport;
+	const unsigned short iport = req->iport;
+	const int proto = req->proto;
+	const char * protocol = proto_itoa(proto);
 
-	proto = proto_atoi(protocol);
-	if(inet_aton(iaddr, &address) <= 0) {
-		syslog(LOG_ERR, "inet_aton(%s) FAILED", iaddr);
-		return -1;
-	}
+	map_ntop(AF_INET, &req->iaddr, iaddr, sizeof(iaddr));
+	rhost = map_rhost(req, rhost_buf, sizeof(rhost_buf));
 
-	if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm,
-	                                        eport, address, iport, desc)) {
+	if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, req)) {
 		syslog(LOG_INFO, "redirection permission check failed for "
 		                 "%hu->%s:%hu %s %s", eport, iaddr, iport, protocol, desc);
 		return -3;
 	}
-
-	if (desc == NULL)
-		desc = "";	/* assume empty description */
 
 	/* IGDv1 (WANIPConnection:1 Service Template Version 1.01 / Nov 12, 2001)
 	 * - 2.2.20.PortMappingDescription :
@@ -395,11 +416,10 @@ upnp_redirect(const char * rhost, unsigned short eport,
 	if(r == 0) {
 		if(strcmp(iaddr, iaddr_old)==0 &&
 		   ((rhost == NULL && rhost_old[0]=='\0') ||
-		    (rhost && (strcmp(rhost, "*") == 0) && rhost_old[0]=='\0') ||
 		    (rhost && (strcmp(rhost, rhost_old) == 0)))) {
 			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
 				eport, protocol, rhost_old, iaddr_old, iport_old);
-			timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
+			timestamp = req->timestamp;
 			if(iport != iport_old) {
 				r = update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
 			} else {
@@ -411,6 +431,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 				lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
 			}
 #endif /* ENABLE_LEASEFILE */
+			if(r == 0)
+				memmap_update(req, iport_old);	/* the table takes req */
 			return r;
 		} else {
 			syslog(LOG_INFO, "port %hu %s (rhost '%s') already redirected to %s:%hu",
@@ -424,22 +446,26 @@ upnp_redirect(const char * rhost, unsigned short eport,
 		return -4;
 #endif /* CHECK_PORTINUSE */
 	} else {
-		timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
 		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
 			eport, iaddr, iport, protocol, desc);
-		return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
-		                              desc, timestamp);
+		return upnp_redirect_internal(req);
 	}
 }
 
 int
-upnp_redirect_internal(const char * rhost, unsigned short eport,
-                       const char * iaddr, unsigned short iport,
-                       int proto, const char * desc,
-                       unsigned int timestamp)
+upnp_redirect_internal(struct lease_entry * req)
 {
-	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-		eport, iaddr, iport, protocol, desc);			*/
+	char desc_buf[64];
+	const char * desc = map_rule_desc(req, desc_buf, sizeof(desc_buf));
+	char iaddr[INET_ADDRSTRLEN];
+	char rhost_buf[INET6_ADDRSTRLEN];
+	const char * rhost = map_rhost(req, rhost_buf, sizeof(rhost_buf));
+	const unsigned short eport = req->eport;
+	const unsigned short iport = req->iport;
+	const int proto = req->proto;
+	const unsigned int timestamp = req->timestamp;
+
+	map_ntop(AF_INET, &req->iaddr, iaddr, sizeof(iaddr));
 	if(disable_port_forwarding)
 		return -1;
 	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
@@ -468,6 +494,7 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 	 * inform the subscribers */
 	upnp_event_var_change_notify(EWanIPC);
 #endif
+	memmap_add(req);	/* the table takes req */
 	return 0;
 }
 
@@ -595,7 +622,15 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
 int
 _upnp_delete_redir(unsigned short eport, int proto)
 {
-	int r;
+	int r, family = 0, known;
+	char iaddr_s[INET6_ADDRSTRLEN];
+	unsigned short iport;
+	struct in6_addr iaddr;
+
+	/* the internal side of the rule: the key of its row in the lease table */
+	known = get_redirect_rule(ext_if_name, eport, proto, iaddr_s, sizeof(iaddr_s), &iport,
+	                          0, 0, 0, 0, NULL, 0, 0) == 0 &&
+	        map_pton(iaddr_s, &family, &iaddr) == 0;
 #if defined(__linux__)
 	r = delete_redirect_and_filter_rules(eport, proto);
 #elif defined(USE_PF)
@@ -607,6 +642,8 @@ _upnp_delete_redir(unsigned short eport, int proto)
 #ifdef ENABLE_LEASEFILE
 	lease_file_remove(eport, proto);
 #endif
+	if(r >= 0 && known)
+		memmap_delete(proto, family, &iaddr, iport, eport);
 
 #ifdef ENABLE_EVENTS
 	upnp_event_var_change_notify(EWanIPC);
@@ -614,11 +651,37 @@ _upnp_delete_redir(unsigned short eport, int proto)
 	return r;
 }
 
+/* called from natpmp.c and pcpserver.c */
 int
-upnp_delete_redirection(unsigned short eport, const char * protocol)
+upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr)
 {
-	syslog(LOG_INFO, "removing redirect rule port %hu %s", eport, protocol);
-	return _upnp_delete_redir(eport, proto_atoi(protocol));
+	static const int protos[] = { IPPROTO_TCP, IPPROTO_UDP };
+	char iaddr_old[INET6_ADDRSTRLEN];
+	unsigned short iport_old;
+	size_t i;
+
+	for(i = 0; i < sizeof(protos)/sizeof(protos[0]); i++) {
+		if(protos[i] == proto)
+			continue;	/* the caller looks it up */
+		if(get_redirect_rule(ext_if_name, eport, protos[i],
+		                     iaddr_old, sizeof(iaddr_old), &iport_old,
+		                     0, 0, 0, 0, NULL, 0, 0) != 0)
+			continue;
+		if(strcmp(iaddr, iaddr_old) == 0)
+			continue;	/* the client's own mapping */
+		syslog(LOG_INFO, "external port %hu is used by %s (%s)",
+		       eport, iaddr_old, proto_itoa(protos[i]));
+		return 1;
+	}
+	return 0;
+}
+
+int
+upnp_delete_redirection(const struct lease_entry * req)
+{
+	syslog(LOG_INFO, "removing redirect rule port %hu %s", req->eport,
+	       proto_itoa(req->proto));
+	return _upnp_delete_redir(req->eport, req->proto);
 }
 
 /* upnp_get_portmapping_number_of_entries() */
@@ -731,6 +794,10 @@ get_upnp_rules_state_list(int max_rules_number_target)
 			p = &(tmp->next);
 		}
 	}
+#ifdef PCP_PEER
+	/* the expired PEER rules went with the others */
+	memmap_outgoing_expired((unsigned int)current_time);
+#endif
 	/* return empty list if not enough redirections */
 	if(i<=max_rules_number_target)
 		while(list)

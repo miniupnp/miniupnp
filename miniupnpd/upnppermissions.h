@@ -48,14 +48,18 @@ read_permission_line(struct upnpperm * perm,
 void
 free_permission_line(struct upnpperm * perm);
 
+struct lease_entry;
+
 /* check_upnp_rule_against_permissions()
+ * The IPv4 mapping req of any protocol, with the external port it would
+ * get: its eport, iaddr and iport. The regex of a rule applies to the label
+ * of req only, which only UPnP fills; without a label it does not apply.
  * returns: 0 if the upnp rule should be rejected,
  *          1 if it could be accepted */
 int
 check_upnp_rule_against_permissions(const struct upnpperm * permary,
                                     int n_perms,
-                                    u_short eport, struct in_addr address,
-                                    u_short iport, const char * desc);
+                                    const struct lease_entry * req);
 
 /**
  * Build an array of all allowed external ports (for the address and internal port)

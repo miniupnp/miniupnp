@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 
 #include "config.h"
+#include "mapreq.h"
 
 /*! \file upnpredirect.h
  * \brief backend independent functions for redirection
@@ -29,38 +30,25 @@ void lease_file_rewrite(void);
 
 /*! \brief add a port mapping.
  * calls OS/fw dependent implementation of the port mapping (redirection).
- * \param[in] rhost Remote host or NULL
- * \param[in] eport external port
- * \param[in] iaddr internal IPv4 address
- * \param[in] iport internal port
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
- * \param[in] desc port mapping description
- * \param[in] leaseduration lease duration in seconds (0 for infinite)
+ * \param[in] req the IPv4 mapping: iaddr, iport, eport, proto, timestamp
+ *            (0 for infinite) and at most one filter, the remote host.
+ *            On success the lease table takes a row of lease_table_new()
+ *            (memmap_add(), or memmap_update() for the rule there was): the
+ *            caller frees req only on failure.
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */
 int
-upnp_redirect(const char * rhost, unsigned short eport,
-              const char * iaddr, unsigned short iport,
-              const char * protocol, const char * desc,
-              unsigned int leaseduration);
+upnp_redirect(struct lease_entry * req);
 
 /*! \brief same as upnp_redirect() without any check
- * \param[in] rhost Remote host or NULL
- * \param[in] eport external port
- * \param[in] iaddr internal IPv4 address
- * \param[in] iport internal port
- * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
- * \param[in] desc port mapping description
- * \param[in] timestamp unix epoch of the end of the port mapping, or 0 for infinite duration
+ * \param[in] req the IPv4 mapping, as for upnp_redirect(), which the
+ *            lease table takes on success
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */
 int
-upnp_redirect_internal(const char * rhost, unsigned short eport,
-                       const char * iaddr, unsigned short iport,
-                       int proto, const char * desc,
-                       unsigned int timestamp);
+upnp_redirect_internal(struct lease_entry * req);
 
 /*! \brief get port mapping from (external port, protocol)
  * \param[in] eport external port
@@ -125,21 +113,31 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
                                      char * rhost, int rhostlen,
                                      unsigned int * leaseduration);
 
-/*! \brief delete a port mapping based on (external port, protocol)
- * \param[in] eport external port
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
+/*! \brief delete the port mapping a client asks to delete
+ * \param[in] req the request: the mapping is found by eport and proto
  * \return 0 on success, -1 on failure*/
 int
-upnp_delete_redirection(unsigned short eport, const char * protocol);
+upnp_delete_redirection(const struct lease_entry * req);
 
 /*! \brief delete a port mapping based on (external port, protocol).
  *
- * same as _upnp_delete_redir()
+ * For the daemon's own deletes, which no client asked for: expiry,
+ * unused rules, the Tomato delete file, PCP PEER.
  * \param[in] eport external port
  * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
  * \return 0 on success, -1 on failure*/
 int
 _upnp_delete_redir(unsigned short eport, int proto);
+
+/* upnp_eport_used_by_other()
+ * is the external port eport mapped (TCP or UDP, other than proto) to
+ * another internal address than iaddr ?  RFC 6886 section 3.3: such a
+ * port is reserved for the client which maps it, on both protocols, so
+ * another client gets another port.  The client's own mappings do not
+ * count.  The caller looks proto up itself.
+ * return value : 1 when used by another client, 0 otherwise */
+int
+upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr);
 
 /* Periodic cleanup functions
  */

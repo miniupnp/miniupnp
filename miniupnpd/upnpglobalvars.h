@@ -30,6 +30,10 @@ extern const char * ext_stun_host;
 /*! \brief STUN server port */
 extern uint16_t ext_stun_port;
 
+/* file the lease table and the outgoing table are written to on SIGUSR2,
+ * for debugging. NULL : none */
+extern const char * table_dump_file;
+
 /* file to store all leases */
 #ifdef ENABLE_LEASEFILE
 extern const char * lease_file;

@@ -30,6 +30,14 @@ teststun
 testifacewatcher
 testupnphttp
 validateupnphttp
+testleasetable
+validateleasetable
+testoutgoingtable
+validateoutgoingtable
+testmemmap
+testpinhole
+validatepinhole
+validatememmap
 dox/
 bsdmake.inc
 upnpstun
@@ -40,3 +48,4 @@ netfilter_nft/testnftpinhole
 netfilter_nft/test_nfct_get
 .configure.cache
 doxygen/
+build-*/

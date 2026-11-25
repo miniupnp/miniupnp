@@ -60,6 +60,11 @@ done
 # retrieve return status from subshell
 r=$?
 
+# the rules applied to mappings, see check_requests()
+if [ $r -eq 0 ] ; then
+	./testupnppermissions --requests || r=$?
+fi
+
 if [ $r -eq 0 ] ; then
 	echo "testupnppermissions tests OK"
 else

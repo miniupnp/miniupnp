@@ -23,6 +23,7 @@
 #include "upnpglobalvars.h"
 #include "getifaddr.h"
 #include "upnpredirect.h"
+#include "lease_table.h"
 #include "commonrdr.h"
 #include "upnputils.h"
 #include "portinuse.h"
@@ -66,7 +67,31 @@ int OpenAndConfNATPMPSocket(in_addr_t addr)
 			return -1;
 		}
 	}
+	/* multicast (PCP ANNOUNCE, NAT-PMP address change) goes out
+	 * through this LAN interface, never through the external one */
+	if(addr != INADDR_ANY) {
+		struct in_addr mc_if;
+		mc_if.s_addr = addr;
+		if(setsockopt(snatpmp, IPPROTO_IP, IP_MULTICAST_IF,
+		              &mc_if, sizeof(mc_if)) < 0)
+		{
+			syslog(LOG_WARNING, "%s: setsockopt(IP_MULTICAST_IF): %m",
+			       "OpenAndConfNATPMPSocket");
+		}
+	}
 	return snatpmp;
+}
+
+/* 1 if the LAN of sockets[i] of OpenAndConfNATPMPSockets() has an IPv4
+ * address. An IPv6-only LAN (0.0.0.0) has no IPv4 interface to send
+ * multicast on: the datagram would go out by the default one, maybe the
+ * WAN */
+int natpmp_socket_has_ipv4(int i)
+{
+	struct lan_addr_s * lan_addr = lan_addrs.lh_first;
+	while(lan_addr != NULL && i-- > 0)
+		lan_addr = lan_addr->list.le_next;
+	return lan_addr != NULL && lan_addr->addr.s_addr != INADDR_ANY;
 }
 
 int OpenAndConfNATPMPSockets(int * sockets)
@@ -214,6 +239,22 @@ int ReceiveNATPMPOrPCPPacket(int s, struct sockaddr * senderaddr,
 	return n;
 }
 
+/* Fill mreq, an empty entry (a row of lease_table_new(), or a request of
+ * lease_entry_init()), as a NAT-PMP mapping: the internal client is the
+ * sender (RFC 6886 section 3.3). The caller sets the external address of a
+ * row it adds, the one the client is told. */
+static void natpmp_request(struct lease_entry * mreq,
+                           const struct sockaddr_in * senderaddr, int proto,
+                           unsigned short iport, unsigned short eport)
+{
+	lease_entry_set_kind(mreq, MAP_KIND_NATPMP, NULL);
+	mreq->family = AF_INET;
+	mreq->proto = proto;
+	map_addr_v4(&mreq->iaddr, &senderaddr->sin_addr);
+	mreq->iport = iport;
+	mreq->eport = eport;
+}
+
 /** read the request from the socket, process it and then send the
  * response back.
  */
@@ -222,9 +263,12 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 {
 	unsigned char *req=msg_buff;	/* request udp packet */
 	unsigned char resp[32];	/* response udp packet */
+	unsigned char *response = resp;
 	int resplen;
 	int n = len;
 	char senderaddrstr[16];
+	struct lease_entry mreq;	/* a delete, or a permission check */
+	struct lease_entry * row;	/* an add */
 
 	if(!inet_ntop(AF_INET, &senderaddr->sin_addr,
 			senderaddrstr, sizeof(senderaddrstr))) {
@@ -314,7 +358,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						/* (iport == 0) => remove all the mappings for this client
 						 * using the requested protocol (RFC 6886 section 3.4) */
 						if((proto == proto2) && ((iport == 0) || (iport == iport2))) {
-							r = _upnp_delete_redir(eport2, proto2);
+							lease_entry_init(&mreq, 0, NULL);
+							natpmp_request(&mreq, senderaddr, proto2, iport2, eport2);
+							r = upnp_delete_redirection(&mreq);
 							if(r < 0) {
 								syslog(LOG_ERR, "Failed to remove NAT-PMP mapping eport %hu, protocol %s",
 								       eport2, (proto2==IPPROTO_TCP)?"TCP":"UDP");
@@ -334,6 +380,34 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
+				int index, proto_old, foreign = 0;
+				unsigned short eport_old, eport_own = 0;
+				/* RFC 6886 section 3.3: a retry is identified by its
+				 * internal tuple, regardless of the suggested port.
+				 * The client's own mapping wins over another owner's
+				 * rule for the same tuple, wherever it is listed. Some
+				 * backends fill desc only with a timestamp (ipf), or
+				 * leave it as it was for a rule without one (nft). */
+				for (index = 0, desc[0] = '\0';
+				     get_redirect_rule_by_index(index, NULL, &eport_old,
+				                                iaddr_old, sizeof(iaddr_old),
+				                                &iport_old, &proto_old,
+				                                desc, sizeof(desc), NULL, 0,
+				                                &timestamp, NULL, NULL) >= 0;
+				     index++, desc[0] = '\0') {
+					if (proto_old != proto || iport_old != iport ||
+					    strcmp(senderaddrstr, iaddr_old) != 0)
+						continue;
+					if (strncmp(desc, "NAT-PMP ", 8) != 0) {
+						foreign = 1;
+						continue;
+					}
+					eport = eport_old;
+					eport_own = eport_old;
+					break;
+				}
+				if (eport_own == 0 && foreign)
+					resp[3] = 2; /* Not Authorized/Refused */
 				if(eport==0)	/* if no suggested external port, use same a internal port */
 					eport = iport;
 				while(resp[3] == 0) {
@@ -351,7 +425,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						}
 						break;
 					}
-					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, eport, senderaddr->sin_addr, iport, "NAT-PMP")) {
+					lease_entry_init(&mreq, 0, NULL);
+					natpmp_request(&mreq, senderaddr, proto, iport, eport);
+					if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm, &mreq)) {
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
 						continue;
@@ -366,6 +442,16 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						continue;
 					}
 #endif
+					/* RFC 6886 section 3.3: an external port another
+					 * client maps, on either protocol, is reserved for it
+					 * (the companion port); this client gets the next port.
+					 * A port the client already holds is kept on renewal. */
+					if(eport != eport_own &&
+					   upnp_eport_used_by_other(eport, proto, senderaddrstr)) {
+						eport++;
+						if(eport == 0) eport++; /* skip port zero */
+						continue;
+					}
 					r = get_redirect_rule(ext_if_name, eport, proto,
 					                      iaddr_old, sizeof(iaddr_old),
 					                      &iport_old, desc, sizeof(desc), 0, 0,
@@ -382,7 +468,9 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
 							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
 							/* remove and then add again */
-							if(_upnp_delete_redir(eport, proto) < 0) {
+							lease_entry_init(&mreq, 0, NULL);
+							natpmp_request(&mreq, senderaddr, proto, iport, eport);
+							if(upnp_delete_redirection(&mreq) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");
 								break;
 							}
@@ -394,18 +482,41 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					}
 					/* do the redirection */
 					timestamp = upnp_time() + lifetime;
-					snprintf(desc, sizeof(desc), "NAT-PMP %hu %s",
-					         eport, proto_itoa(proto));
 					/* TODO : check return code */
-					if(upnp_redirect_internal(NULL, eport, senderaddrstr,
-					                          iport, proto, desc,
-					                          timestamp) < 0) {
-						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu '%s'",
-						       eport, proto_itoa(proto), senderaddrstr, iport, desc);
+					row = lease_table_new(0);
+					if(row == NULL) {
+						resp[3] = 3;  /* Failure */
+						break;
+					}
+					natpmp_request(row, senderaddr, proto, iport, eport);
+					row->timestamp = timestamp;
+					{
+						/* the external address the client is told: the
+						 * row keeps it */
+						unsigned char pub[12];
+						struct in_addr ext;
+						memset(pub, 0, sizeof(pub));
+						FillPublicAddressResponse(pub, senderaddr->sin_addr.s_addr);
+						if(pub[3] == 0) {
+							memcpy(&ext, pub + 8, sizeof(ext));
+							map_addr_v4(&row->eaddr, &ext);
+						}
+					}
+					if(upnp_redirect_internal(row) < 0) {
+						/* on success the lease table took it */
+						lease_table_free(row);
+						syslog(LOG_ERR, "Failed to add NAT-PMP %hu %s->%s:%hu",
+						       eport, proto_itoa(proto), senderaddrstr, iport);
 						resp[3] = 3;  /* Failure */
 					}
 					break;
 				}
+			}
+			/* RFC 6886 section 3.3: no external port or lifetime was
+			 * assigned when the request failed. */
+			if (resp[3] != 0) {
+				eport = 0;
+				lifetime = 0;
 			}
 			WRITENU16(resp+8, iport);	/* private port */
 			WRITENU16(resp+10, eport);	/* public port */
@@ -415,8 +526,15 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 		break;
 	default:
 		resp[3] = 5;	/* Unsupported OPCODE */
+		/* RFC 6886 section 3.5: return the entire request, with only
+		 * the response bit of the opcode and the result code set. */
+		if (n > 8) {
+			memcpy(msg_buff, resp, 4);
+			response = msg_buff;
+			resplen = n;
+		}
 	}
-	n = sendto_or_schedule(s, resp, resplen, 0,
+	n = sendto_or_schedule(s, response, resplen, 0,
 	           (struct sockaddr *)senderaddr, sizeof(*senderaddr));
 	if(n<0) {
 		syslog(LOG_ERR, "sendto(natpmp): %m");
@@ -460,7 +578,7 @@ void SendNATPMPPublicAddressChangeNotification(int * sockets, int n_sockets)
 
 	for(j=0; j<n_sockets; j++)
 	{
-		if(sockets[j] < 0)
+		if(sockets[j] < 0 || !natpmp_socket_has_ipv4(j))
 			continue;
 #ifdef MULTIPLE_EXTERNAL_IP
 		{

@@ -76,6 +76,7 @@
 #include "options.h"
 #include "minissdp.h"
 #include "upnpredirect.h"
+#include "memmap.h"
 #include "upnppinhole.h"
 #include "upnpstun.h"
 #include "miniupnpdtypes.h"
@@ -135,6 +136,9 @@ volatile sig_atomic_t should_send_public_address_change_notif = 0;
 #if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 volatile sig_atomic_t should_rewrite_leasefile = 0;
 #endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#ifndef TOMATO
+static volatile sig_atomic_t should_dump_tables = 0;
+#endif /* !TOMATO */
 
 #ifdef TOMATO
 #if 1
@@ -198,8 +202,9 @@ tomato_load(void)
 	time_t current_time;
 	char proto[4];
 	char iaddr[32];
-	char *rhost;
 	char *a, *b;
+	int family;
+	struct lease_entry * req;
 
 	if ((f = fopen("/etc/upnp/data", "r")) != NULL)
 	{
@@ -222,10 +227,25 @@ tomato_load(void)
 						leaseduration = 0;	/* default value */
 					}
 					*b = 0;
-					rhost = NULL;
 					syslog(LOG_DEBUG, "Read redirection [%s] from file: %s port %hu to %s port %hu, timestamp: %u (%u)",
 						a + 1, proto, eport, iaddr, iport, timestamp, leaseduration);
-					upnp_redirect(rhost, eport, iaddr, iport, proto, a + 1, leaseduration);
+					req = lease_table_new(0);
+					if (req == NULL)
+						continue;
+					lease_entry_set_kind(req, MAP_KIND_UPNP, NULL);
+					if (map_pton(iaddr, &family, &req->iaddr) < 0 || family != AF_INET) {
+						syslog(LOG_ERR, "inet_aton(%s) FAILED", iaddr);
+						lease_table_free(req);
+						continue;
+					}
+					req->family = AF_INET;
+					req->proto = proto_atoi(proto);
+					req->iport = iport;
+					req->eport = eport;
+					req->label = a + 1;
+					req->timestamp = leaseduration > 0 ? upnp_time() + leaseduration : 0;
+					if (upnp_redirect(req) != 0)
+						lease_table_free(req);	/* on success the lease table took it */
 				}
 			}
 		}
@@ -267,14 +287,14 @@ tomato_delete(void)
 					{
 						if (upnp_get_redirection_infos_by_index(n, &eport, proto, &iport, iaddr, sizeof(iaddr), desc, sizeof(desc), rhost, sizeof(rhost), &leaseduration) == 0)
 						{
-							upnp_delete_redirection(eport, proto);
+							_upnp_delete_redir(eport, proto_atoi(proto));
 						}
 					}
 					break;
 				}
 				else
 				{
-					upnp_delete_redirection(eport, proto);
+					_upnp_delete_redir(eport, proto_atoi(proto));
 				}
 			}
 		}
@@ -824,15 +844,19 @@ sigusr1(int sig)
 	should_send_public_address_change_notif = 1;
 }
 
-#if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
-/* Handler for the SIGUSR2 signal to request rewrite of lease_file */
+#ifndef TOMATO
+/* Handler for the SIGUSR2 signal: write the tables to table_dump_file, and
+ * rewrite lease_file */
 static void
 sigusr2(int sig)
 {
 	UNUSED(sig);
+	should_dump_tables = 1;
+#if defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
 	should_rewrite_leasefile = 1;
+#endif /* ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
 }
-#endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#endif /* !TOMATO */
 
 /* record the startup time, for returning uptime */
 static void
@@ -1669,6 +1693,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 				break;
 #endif	/* ENABLE_UPNPPINHOLE */
 #endif	/* ENABLE_LEASEFILE */
+			case UPNPTABLEDUMPFILE:
+				table_dump_file = ary_options[i].value;
+				break;
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
@@ -2198,13 +2225,13 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	{
 		syslog(LOG_NOTICE, "Failed to set %s handler", "SIGUSR1");
 	}
-#if !defined(TOMATO) && defined(ENABLE_LEASEFILE) && defined(LEASEFILE_USE_REMAINING_TIME)
+#ifndef TOMATO
 	sa.sa_handler = sigusr2;
 	if(sigaction(SIGUSR2, &sa, NULL) < 0)
 	{
 		syslog(LOG_NOTICE, "Failed to set %s handler", "SIGUSR2");
 	}
-#endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#endif /* !TOMATO */
 
 	/* initialize random number generator */
 	srandom((unsigned int)time(NULL));
@@ -2765,6 +2792,14 @@ main(int argc, char * * argv)
 			should_rewrite_leasefile = 0;
 		}
 #endif /* !TOMATO && ENABLE_LEASEFILE && LEASEFILE_USE_REMAINING_TIME */
+#ifndef TOMATO
+		if(should_dump_tables)
+		{
+			if(table_dump_file != NULL)
+				memmap_dump(table_dump_file);
+			should_dump_tables = 0;
+		}
+#endif /* !TOMATO */
 		/* send public address change notifications if needed */
 		if(should_send_public_address_change_notif)
 		{
@@ -2885,6 +2920,17 @@ main(int argc, char * * argv)
 			timeout.tv_usec = 0;
 		}
 #endif /* ENABLE_UPNPPINHOLE */
+
+#ifdef ENABLE_PCP
+		if(GETFLAG(ENABLENATPMPMASK))
+		{
+#ifdef ENABLE_IPV6
+			PCPAnnounceRetransmit(snatpmp, addr_count, spcp_v6, &timeout);
+#else /* IPv4 only */
+			PCPAnnounceRetransmit(snatpmp, addr_count, &timeout);
+#endif
+		}
+#endif /* ENABLE_PCP */
 
 		/* select open sockets (SSDP, HTTP listen, and all HTTP soap sockets) */
 		FD_ZERO(&readset);
