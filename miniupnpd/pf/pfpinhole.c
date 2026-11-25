@@ -88,15 +88,13 @@ key_addrs(const char * rem_host, const char * int_client,
 int add_map6_rule(const char * ifname,
                      const char * rem_host, unsigned short rem_port,
                      const char * int_client, unsigned short int_port,
-                     int proto, const char * desc, unsigned int timestamp)
+                     int proto)
 {
 	struct pfioc_rule pr;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
 #endif
 
-	UNUSED(desc);		/* the map holds the description */
-	UNUSED(timestamp);	/* and the expiry */
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -367,8 +365,7 @@ int
 get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
-                    unsigned short * int_port, int * proto,
-                    char * desc, int desclen)
+                    unsigned short * int_port, int * proto)
 {
 	int i, n;
 	unsigned int tnum;
@@ -446,8 +443,6 @@ get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
 			*int_port = ntohs(RULE.dst.port[0]);
 		if(proto)
 			*proto = RULE.proto;
-		if(desc && desclen > 0)
-			desc[0] = '\0';	/* the rule holds none */
 		release_ticket(dev, tnum);
 		return 0;
 	}

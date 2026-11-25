@@ -18,9 +18,7 @@ int add_redirect_rule2(
 	unsigned short eport,	/* src port (external) */
 	const char * iaddr,	/* dst address (internal) */
 	unsigned short iport,	/* dst port (internal) */
-	int proto,
-	const char * desc,
-	unsigned int timestamp);
+	int proto);
 
 int add_filter_rule2(
 	const char * ifname,
@@ -28,8 +26,7 @@ int add_filter_rule2(
 	const char * iaddr,
 	unsigned short eport,
 	unsigned short iport,
-	int proto,
-	const char * desc);
+	int proto);
 
 #if 0
 

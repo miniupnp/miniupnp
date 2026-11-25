@@ -206,17 +206,15 @@ int
 add_map6_rule(const char * ifname,
                  const char * rem_host, unsigned short rem_port,
                  const char * int_client, unsigned short int_port,
-                 int proto, const char * desc, unsigned int timestamp)
+                 int proto)
 {
 	struct nftnl_rule *r;
 	struct in6_addr rhost_addr, ihost_addr;
 	struct in6_addr *rhost_addr_p = NULL;
 
-	UNUSED(desc);		/* the map holds the description */
-	UNUSED(timestamp);	/* and the expiry */
 
-	d_printf(("add_map6_rule(%s, %s, %hu, %s, %hu, %d, %s, %u)\n",
-	          ifname, rem_host, rem_port, int_client, int_port, proto, desc, timestamp));
+	d_printf(("add_map6_rule(%s, %s, %hu, %s, %hu, %d)\n",
+	          ifname, rem_host, rem_port, int_client, int_port, proto));
 
 	if (!map6_any_remote(rem_host)) {
 		if (inet_pton(AF_INET6, rem_host, &rhost_addr) == 1) {
@@ -268,8 +266,7 @@ int
 get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
-                    unsigned short * int_port, int * proto,
-                    char * desc, int desclen)
+                    unsigned short * int_port, int * proto)
 {
 	rule_t *p;
 	static const struct in6_addr any;
@@ -309,8 +306,6 @@ get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
 			*int_port = p->dport;
 		if (proto)
 			*proto = p->proto;
-		if (desc && desclen > 0)
-			desc[0] = '\0';	/* the rule holds none */
 		return 0;
 	}
 	last = NULL;

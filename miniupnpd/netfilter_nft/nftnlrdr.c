@@ -121,15 +121,13 @@ set_rdr_name(rdr_name_type param, const char *string)
 int
 add_redirect_rule2(const char * ifname,
 		   const char * rhost, unsigned short eport,
-		   const char * iaddr, unsigned short iport, int proto,
-		   const char * desc, unsigned int timestamp)
+		   const char * iaddr, unsigned short iport, int proto)
 {
 	struct nftnl_rule *r;
 	in_addr_t rhost_addr = 0;
 
-	UNUSED(desc); UNUSED(timestamp);	/* the lease table has them */
-	d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
-	          ifname, rhost, eport, iaddr, iport, proto, desc));
+	d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d)!\n",
+	          ifname, rhost, eport, iaddr, iport, proto));
 
 	if (rhost != NULL && strcmp(rhost, "") != 0 && strcmp(rhost, "*") != 0) {
 		rhost_addr = inet_addr(rhost);
@@ -151,11 +149,10 @@ int
 add_peer_redirect_rule2(const char * ifname,
 			const char * rhost, unsigned short rport,
 			const char * eaddr, unsigned short eport,
-			const char * iaddr, unsigned short iport, int proto,
-			const char * desc, unsigned int timestamp)
+			const char * iaddr, unsigned short iport, int proto)
 {
 	struct nftnl_rule *r;
-	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
+	UNUSED(ifname);
 
 	d_printf(("add peer redirect rule2()!\n"));
 
@@ -177,14 +174,13 @@ int
 add_filter_rule2(const char * ifname,
 		 const char * rhost, const char * iaddr,
 		 unsigned short eport, unsigned short iport,
-		 int proto, const char * desc)
+		 int proto)
 {
 	struct nftnl_rule *r = NULL;
 	in_addr_t rhost_addr = 0;
 
-	UNUSED(desc);	/* the lease table has it */
-	d_printf(("add_filter_rule2(%s, %s, %s, %d, %d, %d, %s)\n",
-	          ifname, rhost, iaddr, eport, iport, proto, desc));
+	d_printf(("add_filter_rule2(%s, %s, %s, %d, %d, %d)\n",
+	          ifname, rhost, iaddr, eport, iport, proto));
 
 	if (rhost != NULL && strcmp(rhost, "") != 0 && strcmp(rhost, "*") != 0) {
 		rhost_addr = inet_addr(rhost);
@@ -204,12 +200,10 @@ int
 add_peer_dscp_rule2(const char * ifname,
 		    const char * rhost, unsigned short rport,
 		    unsigned char dscp,
-		    const char * iaddr, unsigned short iport, int proto,
-		    const char * desc, unsigned int timestamp)
+		    const char * iaddr, unsigned short iport, int proto)
 {
 	UNUSED(ifname); UNUSED(rhost); UNUSED(rport);
 	UNUSED(dscp); UNUSED(iaddr); UNUSED(iport); UNUSED(proto);
-	UNUSED(desc); UNUSED(timestamp);
 	syslog(LOG_ERR, "add_peer_dscp_rule2: not supported");
 	return 0;
 }
@@ -356,9 +350,8 @@ int
 get_peer_rule_by_index(int index,
 		       char * ifname, unsigned short * eport,
 		       char * iaddr, int iaddrlen, unsigned short * iport,
-		       int * proto, char * desc, int desclen,
+		       int * proto,
 		       char * rhost, int rhostlen, unsigned short * rport,
-		       unsigned int * timestamp,
 		       u_int64_t * packets, u_int64_t * bytes)
 {
 	rule_t *r;
@@ -407,9 +400,6 @@ get_peer_rule_by_index(int index,
 				*rport = r->sport;
 			}
 
-			if (desc != NULL && desclen > 0) {
-				desc[0] = '\0';	/* the rule holds none */
-			}
 
 			if (packets) {
 				*packets = r->packets;
@@ -418,9 +408,6 @@ get_peer_rule_by_index(int index,
 				*bytes = r->bytes;
 			}
 
-			if (timestamp) {
-				*timestamp = 0;
-			}
 
 			return 0;
 		}
@@ -437,17 +424,13 @@ get_peer_rule_by_index(int index,
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 		  char * iaddr, int iaddrlen, unsigned short * iport,
-		  char * desc, int desclen,
 		  char * rhost, int rhostlen,
-		  unsigned int * timestamp,
 		  u_int64_t * packets, u_int64_t * bytes)
 {
 	return get_nat_redirect_rule(nft_prerouting_chain,
 	                             ifname, eport, proto,
 	                             iaddr, iaddrlen, iport,
-	                             desc, desclen,
-	                             rhost, rhostlen,
-	                             timestamp, packets, bytes);
+	                             rhost, rhostlen, packets, bytes);
 }
 
 /*
@@ -458,9 +441,8 @@ int
 get_redirect_rule_by_index(int index,
 			   char * ifname, unsigned short * eport,
 			   char * iaddr, int iaddrlen, unsigned short * iport,
-			   int * proto, char * desc, int desclen,
+			   int * proto,
 			   char * rhost, int rhostlen,
-			   unsigned int * timestamp,
 			   u_int64_t * packets, u_int64_t * bytes)
 {
 	rule_t *r;
@@ -505,13 +487,7 @@ get_redirect_rule_by_index(int index,
 				}
 			}
 
-			if (desc != NULL && desclen > 0) {
-				desc[0] = '\0';	/* the rule holds none */
-			}
 
-			if (timestamp != NULL) {
-				*timestamp = 0;
-			}
 
 			if (packets)
 				*packets = r->packets;
@@ -533,9 +509,7 @@ int
 get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 		      unsigned short eport, int proto,
 		      char * iaddr, int iaddrlen, unsigned short * iport,
-		      char * desc, int desclen,
 		      char * rhost, int rhostlen,
-		      unsigned int * timestamp,
 		      u_int64_t * packets, u_int64_t * bytes)
 {
 	rule_t *p;
@@ -571,15 +545,10 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 				}
 			}
 
-			if (desc != NULL && desclen > 0) {
-				desc[0] = '\0';	/* the rule holds none */
-			}
 
 			if (iport)
 				*iport = p->nat_port;
 
-			if(timestamp != NULL)
-				*timestamp = 0;
 
 			if(packets)
 				*packets = p->packets;
@@ -594,19 +563,8 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 }
 
 int
-update_portmapping_desc_timestamp(const char * ifname,
-                   unsigned short eport, int proto,
-                   const char * desc, unsigned int timestamp)
-{
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
-	UNUSED(desc); UNUSED(timestamp);
-	return 0;
-}
-
-int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
-                   unsigned short iport, const char * desc,
-                   unsigned int timestamp)
+                   unsigned short iport)
 {
 	char iaddr_str[INET_ADDRSTRLEN];
 	char rhost[INET_ADDRSTRLEN];
@@ -616,18 +574,17 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 
 	iaddr_str[0] = '\0';
 	rhost[0] = '\0';
-	if (get_redirect_rule(NULL, eport, proto, iaddr_str, INET_ADDRSTRLEN, NULL, NULL, 0, rhost, INET_ADDRSTRLEN, NULL, 0, 0) < 0)
+	if (get_redirect_rule(NULL, eport, proto, iaddr_str, INET_ADDRSTRLEN, NULL, rhost, INET_ADDRSTRLEN, 0, 0) < 0)
 		return -1;
 
 	r = delete_redirect_and_filter_rules(eport, proto);
 	if (r < 0)
 		return -1;
 
-	if (add_redirect_rule2(ifname, rhost, eport, iaddr_str, iport, proto,
-						  desc, timestamp) < 0)
+	if (add_redirect_rule2(ifname, rhost, eport, iaddr_str, iport, proto) < 0)
 		return -1;
 
-	if (add_filter_rule2(ifname, rhost, iaddr_str, eport, iport, proto, desc) < 0)
+	if (add_filter_rule2(ifname, rhost, iaddr_str, eport, iport, proto) < 0)
 		return -1;
 
 	return 0;

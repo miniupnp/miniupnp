@@ -39,9 +39,7 @@
 struct fw_rule {
 	char iaddr[INET6_ADDRSTRLEN];
 	char rhost_buf[INET6_ADDRSTRLEN];
-	char desc_buf[64];
 	const char * rhost;	/* NULL : any remote */
-	const char * desc;
 	unsigned short eport;
 	unsigned short iport;
 	int proto;
@@ -53,7 +51,6 @@ rule_of(const struct lease_entry * e, struct fw_rule * r)
 	if(map_ntop(e->family, &e->iaddr, r->iaddr, sizeof(r->iaddr)) == NULL)
 		r->iaddr[0] = '\0';
 	r->rhost = map_rhost(e, r->rhost_buf, sizeof(r->rhost_buf));
-	r->desc = map_rule_desc(e, r->desc_buf, sizeof(r->desc_buf));
 	r->eport = e->eport;
 	r->iport = e->iport;
 	r->proto = e->proto;
@@ -88,7 +85,7 @@ fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * by
 	unsigned short iport;
 
 	return redirect_result(get_redirect_rule(ext_if_name, eport, proto, NULL, 0,
-	                                         &iport, NULL, 0, NULL, 0, NULL,
+	                                         &iport, NULL, 0,
 	                                         packets, bytes));
 }
 
@@ -105,8 +102,7 @@ fw_each_map_counters(fw_counters_fn fn, void * arg)
 	int i, proto;
 
 	for(i = 0; get_redirect_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr),
-	                                      &iport, &proto, NULL, 0, NULL, 0,
-	                                      NULL, &packets, &bytes) >= 0; i++)
+	                                      &iport, &proto, NULL, 0, &packets, &bytes) >= 0; i++)
 		fn(eport, proto, packets, bytes, arg);
 	return 0;
 #endif
@@ -180,15 +176,13 @@ delete_map6_rules(const struct lease_entry * e)
 static int
 add_map6_rules(const struct lease_entry * e, int * half)
 {
-	char desc[64];
 	struct map6_rule r;
 	int i, j;
 
-	map_rule_desc(e, desc, sizeof(desc));
 	for(i = 0; i < map6_rules(e); i++) {
 		map6_rule_of(e, i, &r);
 		if(add_map6_rule(ext_if_name6, r.rhost, r.rport, r.iaddr, e->iport,
-		                 e->proto, desc, e->timestamp) < 0)
+		                 e->proto) < 0)
 			break;
 	}
 	if(i == map6_rules(e))
@@ -270,8 +264,7 @@ add_map4_rules(const struct lease_entry * e, int * half, int fresh)
 	struct fw_rule r;
 
 	rule_of(e, &r);
-	if(add_redirect_rule2(ext_if_name, r.rhost, r.eport, r.iaddr, r.iport, r.proto,
-	                      r.desc, 0) < 0) {
+	if(add_redirect_rule2(ext_if_name, r.rhost, r.eport, r.iaddr, r.iport, r.proto) < 0) {
 		/* A backend which adds more than one rule takes back the first
 		 * when a later one fails, and that can fail too: iptables adds a
 		 * MASQUERADE rule after the DNAT rule */
@@ -282,8 +275,7 @@ add_map4_rules(const struct lease_entry * e, int * half, int fresh)
 		}
 		return -1;
 	}
-	if(add_filter_rule2(ext_if_name, r.rhost, r.iaddr, r.eport, r.iport, r.proto,
-	                    r.desc) >= 0)
+	if(add_filter_rule2(ext_if_name, r.rhost, r.iaddr, r.eport, r.iport, r.proto) >= 0)
 		return 0;
 	/* the redirect rule goes again. Only that rule: the filter rule of
 	 * another mapping to the same iaddr:iport, or a PEER rule on eport,
@@ -314,9 +306,11 @@ update_rules(const struct lease_entry * from, const struct lease_entry * to)
 	if(to->family == AF_INET6)
 		return 0;
 	rule_of(to, &r);
-	if(from->iport != to->iport)
-		return update_portmapping(ext_if_name, r.eport, r.proto, r.iport, r.desc, 0);
-	return update_portmapping_desc_timestamp(ext_if_name, r.eport, r.proto, r.desc, 0);
+	/* the rule holds no expiry: a renewal changes it only for a new
+	 * internal port */
+	if(from->iport == to->iport)
+		return 0;
+	return update_portmapping(ext_if_name, r.eport, r.proto, r.iport);
 }
 
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
@@ -329,7 +323,6 @@ add_peer_rules(const struct fw_out_change * c, int * half)
 	const struct outgoing_entry * b = c->b;
 	const struct outgoing_peer * p = &b->peers[c->peer];
 	char iaddr[INET6_ADDRSTRLEN], eaddr[INET6_ADDRSTRLEN], raddr[INET6_ADDRSTRLEN];
-	char desc[64];
 	const char * ifname = ext_if_name;
 
 #ifdef ENABLE_IPV6
@@ -340,21 +333,20 @@ add_peer_rules(const struct fw_out_change * c, int * half)
 	   map_ntop(b->family, &b->eaddr, eaddr, sizeof(eaddr)) == NULL ||
 	   map_ntop(b->family, &p->raddr, raddr, sizeof(raddr)) == NULL)
 		return -1;
-	outgoing_rule_desc(b, desc, sizeof(desc));
 #ifdef PCP_FLOWP
 	if(c->dscp_up &&
 	   add_peer_dscp_rule2(ifname, raddr, p->rport, c->dscp_up, iaddr, b->iport,
-	                       b->proto, desc, p->timestamp) < 0)
+	                       b->proto) < 0)
 		return -1;
 	if(c->dscp_down &&
 	   add_peer_dscp_rule2(ifname, iaddr, b->iport, c->dscp_down, raddr, p->rport,
-	                       b->proto, desc, p->timestamp) < 0) {
+	                       b->proto) < 0) {
 		*half = c->dscp_up != 0;
 		return -1;
 	}
 #endif
 	if(add_peer_redirect_rule2(ifname, raddr, p->rport, eaddr, b->eport, iaddr,
-	                           b->iport, b->proto, desc, p->timestamp) < 0) {
+	                           b->iport, b->proto) < 0) {
 		*half = c->dscp_up != 0 || c->dscp_down != 0;
 		return -1;
 	}
@@ -555,7 +547,7 @@ map_row_of_rule(struct lease_entry * e, const char * iaddr, unsigned short iport
 }
 
 int
-fw_read_map(struct lease_entry * e, char * desc, int desclen)
+fw_read_map(struct lease_entry * e)
 {
 	char iaddr[INET6_ADDRSTRLEN];
 	char rhost[INET6_ADDRSTRLEN];
@@ -563,12 +555,8 @@ fw_read_map(struct lease_entry * e, char * desc, int desclen)
 	int r;
 
 	iaddr[0] = rhost[0] = '\0';
-	if(desc != NULL && desclen > 0)
-		desc[0] = '\0';
 	r = redirect_result(get_redirect_rule(ext_if_name, e->eport, e->proto,
-	                                      iaddr, sizeof(iaddr), &iport,
-	                                      desc, desclen, rhost, sizeof(rhost),
-	                                      NULL, 0, 0));
+	                                      iaddr, sizeof(iaddr), &iport, rhost, sizeof(rhost), 0, 0));
 	if(r != 0)
 		return r;
 	return map_row_of_rule(e, iaddr, iport, rhost);
@@ -585,8 +573,7 @@ fw_map_rule_at(int i, struct lease_entry * e)
 
 	iaddr[0] = rhost[0] = '\0';
 	if(get_redirect_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr), &iport,
-	                              &proto, NULL, 0, rhost, sizeof(rhost),
-	                              NULL, &packets, &bytes) < 0)
+	                              &proto, rhost, sizeof(rhost), &packets, &bytes) < 0)
 		return -1;
 	e->eport = eport;
 	e->proto = proto;
@@ -604,7 +591,7 @@ fw_map6_rule_at(int i, struct lease_entry * e)
 
 	rhost[0] = iaddr[0] = '\0';
 	if(get_map6_rule_at(i, rhost, sizeof(rhost), &rport, iaddr, sizeof(iaddr),
-	                    &iport, &proto, NULL, 0) < 0)
+	                    &iport, &proto) < 0)
 		return -1;
 	if(map_ipv4_to_ipv6_af(iaddr, AF_INET6, &e->iaddr) < 0 ||
 	   e->filters_alloc < 1 || map_filter_set(&e->filters[0], rhost, rport) < 0)
@@ -628,8 +615,7 @@ fw_peer_rule_at(int i, struct outgoing_entry * b)
 	int proto;
 
 	iaddr[0] = rhost[0] = '\0';
-	if(get_peer_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr), &iport, &proto,
-	                          NULL, 0, rhost, sizeof(rhost), &rport, NULL,
+	if(get_peer_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr), &iport, &proto, rhost, sizeof(rhost), &rport,
 	                          NULL, NULL) < 0)
 		return -1;
 	if(map_ipv4_to_ipv6_af(iaddr, AF_INET, &b->iaddr) < 0 ||
@@ -667,7 +653,7 @@ check_map4(struct lease_entry * e)
 		fw_change_init(&c[n++], FW_DELETE, NULL, e);
 		r = -2;
 	} else {
-		r = fw_read_map(fw, NULL, 0);
+		r = fw_read_map(fw);
 		if(r == -1 || (r == 0 && IN6_ARE_ADDR_EQUAL(&fw->iaddr, &e->iaddr) &&
 		               fw->iport == e->iport))
 			return r;	/* unreadable, or as the row says */

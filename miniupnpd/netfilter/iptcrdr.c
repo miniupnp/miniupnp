@@ -249,26 +249,14 @@ static int snprintip(char * dst, size_t size, uint32_t ip)
 	       (ip >> 8) & 0xff, ip & 0xff);
 }
 
-/* The lease table has the description and the expiry of a mapping: a
- * read gives none */
-static void
-no_desc(char * desc, int desclen, unsigned int * timestamp)
-{
-	if(desc != NULL && desclen > 0)
-		desc[0] = '\0';
-	if(timestamp != NULL)
-		*timestamp = 0;
-}
-
 /* add_redirect_rule2() */
 int
 add_redirect_rule2(const char * ifname,
                    const char * rhost, unsigned short eport,
-                   const char * iaddr, unsigned short iport, int proto,
-				   const char * desc, unsigned int timestamp)
+                   const char * iaddr, unsigned short iport, int proto)
 {
 	int r;
-	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
+	UNUSED(ifname);
 
 	r = addnatrule(proto, eport, iaddr, iport, rhost);
 	if(r >= 0) {
@@ -295,10 +283,9 @@ int
 add_peer_redirect_rule2(const char * ifname,
                    const char * rhost, unsigned short rport,
                    const char * eaddr, unsigned short eport,
-                   const char * iaddr, unsigned short iport, int proto,
-                   const char * desc, unsigned int timestamp)
+                   const char * iaddr, unsigned short iport, int proto)
 {
-	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
+	UNUSED(ifname);
 
 	return addpeernatrule(proto, eaddr, eport, iaddr, iport, rhost, rport);
 }
@@ -307,13 +294,10 @@ int
 add_peer_dscp_rule2(const char * ifname,
                    const char * rhost, unsigned short rport,
                    unsigned char dscp,
-                   const char * iaddr, unsigned short iport, int proto,
-                   const char * desc, unsigned int timestamp)
+                   const char * iaddr, unsigned short iport, int proto)
 {
 	int r;
 	UNUSED(ifname);
-	UNUSED(desc);
-	UNUSED(timestamp);
 
 	r = addpeerdscprule(proto, dscp, iaddr, iport, rhost, rport);
 	return r;
@@ -323,11 +307,10 @@ int
 add_filter_rule2(const char * ifname,
                  const char * rhost, const char * iaddr,
                  unsigned short eport, unsigned short iport,
-                 int proto, const char * desc)
+                 int proto)
 {
 	UNUSED(ifname);
 	UNUSED(eport);
-	UNUSED(desc);
 
 	return add_filter_rule(proto, rhost, iaddr, iport);
 }
@@ -338,25 +321,19 @@ add_filter_rule2(const char * ifname,
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,
-                  char * desc, int desclen,
                   char * rhost, int rhostlen,
-                  unsigned int * timestamp,
                   u_int64_t * packets, u_int64_t * bytes)
 {
 	return get_nat_redirect_rule(miniupnpd_nat_chain,
 	                             ifname, eport, proto,
 	                             iaddr, iaddrlen, iport,
-	                             desc, desclen,
-	                             rhost, rhostlen,
-	                             timestamp, packets, bytes);
+	                             rhost, rhostlen, packets, bytes);
 }
 
 int
 get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,
-                  char * desc, int desclen,
                   char * rhost, int rhostlen,
-                  unsigned int * timestamp,
                   u_int64_t * packets, u_int64_t * bytes)
 {
 	int r = -2;	/* not found */
@@ -412,7 +389,6 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname, unsigned
 				/* target = ipt_get_target(e); */
 				get_dnat_target_addr_port(target, &daddr, iport);
 				snprintip(iaddr, iaddrlen, ntohl(daddr));
-				no_desc(desc, desclen, timestamp);
 				if(packets)
 					*packets = e->counters.pcnt;
 				if(bytes)
@@ -441,9 +417,8 @@ int
 get_redirect_rule_by_index(int index,
                            char * ifname, unsigned short * eport,
                            char * iaddr, int iaddrlen, unsigned short * iport,
-                           int * proto, char * desc, int desclen,
+                           int * proto,
                            char * rhost, int rhostlen,
-                           unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes)
 {
 	int r = -1;
@@ -497,7 +472,6 @@ get_redirect_rule_by_index(int index,
 				target = (void *)e + e->target_offset;
 				get_dnat_target_addr_port(target, &daddr, iport);
 				snprintip(iaddr, iaddrlen, ntohl(daddr));
-				no_desc(desc, desclen, timestamp);
 				if(packets)
 					*packets = e->counters.pcnt;
 				if(bytes)
@@ -585,9 +559,8 @@ int
 get_peer_rule_by_index(int index,
                            char * ifname, unsigned short * eport,
                            char * iaddr, int iaddrlen, unsigned short * iport,
-                           int * proto, char * desc, int desclen,
+                           int * proto,
                            char * rhost, int rhostlen, unsigned short * rport,
-                           unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes)
 {
 	int r = -1;
@@ -647,7 +620,6 @@ get_peer_rule_by_index(int index,
 				target = (void *)e + e->target_offset;
 				mr = (const struct ip_nat_multi_range *)&target->data[0];
 				*eport = ntohs(mr->range[0].min.all);
-				no_desc(desc, desclen, timestamp);
 				if(packets)
 					*packets = e->counters.pcnt;
 				if(bytes)
@@ -1958,16 +1930,6 @@ add_filter_rule(int proto, const char * rhost,
 	return r;
 }
 
-int
-update_portmapping_desc_timestamp(const char * ifname,
-                   unsigned short eport, int proto,
-                   const char * desc, unsigned int timestamp)
-{
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
-	UNUSED(desc); UNUSED(timestamp);
-	return 0;
-}
-
 static int
 update_rule_and_commit(const char * table, const char * chain,
                        unsigned index, const struct ipt_entry * e)
@@ -2012,8 +1974,7 @@ update_rule_and_commit(const char * table, const char * chain,
 
 int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
-                   unsigned short iport, const char * desc,
-                   unsigned int timestamp)
+                   unsigned short iport)
 {
 	int r = 0;
 	int found = 0;
@@ -2297,7 +2258,7 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 
 skip:
 #endif /* ENABLE_PORT_TRIGGERING */
-	return update_portmapping_desc_timestamp(ifname, eport, proto, desc, timestamp);
+	return 0;
 }
 
 /* ================================ */

@@ -126,17 +126,6 @@ static const char group_name[] = "miniupnpd";
 static int dev = -1;
 static int dev_ipl = -1;
 
-/* The lease table has the description and the expiry of a mapping: a
- * read gives none */
-static void
-no_desc(char * desc, int desclen, unsigned int * timestamp)
-{
-	if (desc != NULL && desclen > 0)
-		desc[0] = '\0';
-	if (timestamp != NULL)
-		*timestamp = 0;
-}
-
 int init_redirect(void)
 {
 
@@ -170,13 +159,12 @@ void shutdown_redirect(void)
 int
 add_redirect_rule2(const char * ifname, const char * rhost,
     unsigned short eport, const char * iaddr, unsigned short iport,
-    int proto, const char * desc, unsigned int timestamp)
+    int proto)
 {
 	struct ipnat ipnat;
 	struct ipfobj obj;
 	int r;
 
-	UNUSED(desc); UNUSED(timestamp);
 	if (dev < 0) {
 		syslog(LOG_ERR, "%s not open", IPNAT_NAME);
 		return -1;
@@ -262,9 +250,7 @@ add_redirect_rule2(const char * ifname, const char * rhost,
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
     char * iaddr, int iaddrlen, unsigned short * iport,
-    char * desc, int desclen,
     char * rhost, int rhostlen,
-    unsigned int * timestamp,
     u_int64_t * packets, u_int64_t * bytes)
 {
 	ipfgeniter_t iter;
@@ -308,7 +294,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 		    ipn.in_p == proto)
 #endif
 		{
-			strlcpy(desc, "", desclen);
 			if (packets != NULL)
 				*packets = 0;
 			if (bytes != NULL)
@@ -319,7 +304,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 #else
 				*iport = ntohs(ipn.in_pnext);
 #endif
-			no_desc(desc, desclen, timestamp);
 			if ((rhost != NULL) && (rhostlen > 0))
 #if IPFILTER_VERSION >= 5000000
 				inet_ntop(AF_INET, &ipn.in_nsrc.na_addr[0].in4, rhost, rhostlen);	/* in_nsrcip */
@@ -342,9 +326,8 @@ int
 get_redirect_rule_by_index(int index,
     char * ifname, unsigned short * eport,
     char * iaddr, int iaddrlen, unsigned short * iport,
-    int * proto, char * desc, int desclen,
+    int * proto,
     char * rhost, int rhostlen,
-    unsigned int * timestamp,
     u_int64_t * packets, u_int64_t * bytes)
 {
 	ipfgeniter_t iter;
@@ -405,7 +388,6 @@ get_redirect_rule_by_index(int index,
 				*packets = 0;
 			if (bytes != NULL)
 				*bytes = 0;
-			no_desc(desc, desclen, timestamp);
 			if ((rhost != NULL) && (rhostlen > 0))
 #if IPFILTER_VERSION >= 5000000
 				inet_ntop(AF_INET, &ipn.in_nsrc.na_addr[0].in4, rhost, rhostlen);	/* in_nsrcip */
@@ -499,13 +481,13 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 int
 add_filter_rule2(const char * ifname, const char * rhost,
     const char * iaddr, unsigned short eport, unsigned short iport,
-    int proto, const char * desc)
+    int proto)
 {
 	ipfobj_t obj;
 	frentry_t fr;
 	fripf_t ipffr;
 	int r;
-	UNUSED(ifname); UNUSED(desc);
+	UNUSED(ifname);
 	UNUSED(iport);
 
 	if (dev_ipl < 0) {
@@ -661,27 +643,15 @@ delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 	return r;
 }
 
-/* update the port mapping internal port, description and timestamp */
+/* update the port mapping internal port */
 int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
-                   unsigned short iport, const char * desc,
-                   unsigned int timestamp)
+                   unsigned short iport)
 {
 	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
-	UNUSED(iport); UNUSED(desc); UNUSED(timestamp);
+	UNUSED(iport);
 	/* TODO: implement update_portmapping() */
 	syslog(LOG_ERR, __FILE__ " update_portmapping() is not implemented");
 	return -1;
-}
-
-/* update the port mapping description and timestamp */
-int
-update_portmapping_desc_timestamp(const char * ifname,
-                   unsigned short eport, int proto,
-                   const char * desc, unsigned int timestamp)
-{
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
-	UNUSED(desc); UNUSED(timestamp);
-	return 0;
 }
 

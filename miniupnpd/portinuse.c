@@ -399,8 +399,7 @@ static struct nlist list[] = {
 		int i;
 		for (i = 0; chains_to_check[i]; i++) {
 			if (get_nat_redirect_rule(chains_to_check[i], if_name, eport, proto,
-					iaddr_old, sizeof(iaddr_old), &iport_old,
-					0, 0, 0, 0, 0, 0, 0) == 0)
+					iaddr_old, sizeof(iaddr_old), &iport_old, 0, 0, 0, 0) == 0)
 			{
 				syslog(LOG_DEBUG, "port_in_use check port %d on nat chain %s redirected to %s port %d", eport,
 						chains_to_check[i], iaddr_old, iport_old);

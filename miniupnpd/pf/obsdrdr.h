@@ -17,8 +17,7 @@
 int
 add_redirect_rule2(const char * ifname,
                    const char * rhost, unsigned short eport,
-                   const char * iaddr, unsigned short iport, int proto,
-                   const char * desc, unsigned int timestamp);
+                   const char * iaddr, unsigned short iport, int proto);
 
 /* add_filter_rule2() uses DIOCCHANGERULE ioctl
  * proto can take the values IPPROTO_UDP or IPPROTO_TCP
@@ -27,7 +26,7 @@ int
 add_filter_rule2(const char * ifname,
                  const char * rhost, const char * iaddr,
                  unsigned short eport, unsigned short iport,
-                 int proto, const char * desc);
+                 int proto);
 
 
 /* get_redirect_rule() gets internal IP and port from

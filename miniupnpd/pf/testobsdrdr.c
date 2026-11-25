@@ -29,19 +29,16 @@ test_index(void)
 {
 	char ifname[16/*IFNAMSIZ*/];
 	char iaddr[32];
-	char desc[64];
 	char rhost[32];
 	unsigned short iport = 0;
 	unsigned short eport = 0;
 	int proto = 0;
-	unsigned int timestamp;
 	ifname[0] = '\0';
 	iaddr[0] = '\0';
 	rhost[0] = '\0';
 	if(get_redirect_rule_by_index(0, ifname, &eport, iaddr, sizeof(iaddr),
-	                              &iport, &proto, desc, sizeof(desc),
-	                              rhost, sizeof(rhost),
-                                  &timestamp, 0, 0) < 0)
+	                              &iport, &proto,
+	                              rhost, sizeof(rhost), 0, 0) < 0)
 	{
 		printf("get.._by_index : no rule\n");
 	}
@@ -49,7 +46,6 @@ test_index(void)
 	{
 		printf("%s %u -> %s:%u proto %d\n", ifname, (unsigned int)eport,
 		       iaddr, (unsigned int)iport, proto);
-		printf("description: \"%s\"\n", desc);
 	}
 }
 
@@ -57,11 +53,9 @@ int
 main(int argc, char * * argv)
 {
 	char buf[32];
-	char desc[64];
 	char rhost[64];
 	/*char rhost[32];*/
 	unsigned short iport;
-	unsigned int timestamp;
 	u_int64_t packets = 0;
 	u_int64_t bytes = 0;
 	int clear = 0;
@@ -82,28 +76,26 @@ main(int argc, char * * argv)
 	add_redirect_rule2("ep0", 12155, "192.168.1.155", 1255, IPPROTO_TCP);
 #endif
 	if(add_redirect_rule2("ep0", NULL/*"8.8.8.8"*/, 12123, "192.168.1.125", 1234,
-	                   IPPROTO_UDP, "test description", 0) < 0)
+	                   IPPROTO_UDP) < 0)
 		printf("add_redirect_rule2() #3 failed\n");
 	use_ext_ip_addr = NULL;
 	if(add_redirect_rule2("em0", NULL, 12123, "127.1.2.3", 1234,
-	                   IPPROTO_TCP, "test description tcp", 0) < 0)
+	                   IPPROTO_TCP) < 0)
 		printf("add_redirect_rule2() #4 failed\n");
-	if(add_filter_rule2("em0", NULL, "127.1.2.3", 12123, 1234, IPPROTO_TCP,
-	                 "test description tcp") < 0)
+	if(add_filter_rule2("em0", NULL, "127.1.2.3", 12123, 1234, IPPROTO_TCP) < 0)
 		printf("add_filter_rule2() #1 failed\n");
 
 	list_rules();
 
 
 	if(get_redirect_rule("xl1", 4662, IPPROTO_TCP,
-	                     buf, sizeof(buf), &iport, desc, sizeof(desc),
+	                     buf, sizeof(buf), &iport,
 	                     rhost, sizeof(rhost),
-	                     &timestamp,
 	                     &packets, &bytes) < 0)
 		printf("get_redirect_rule() failed\n");
 	else
 	{
-		printf("\n%s:%d '%s' packets=%" PRIu64 " bytes=%" PRIu64 "\n", buf, (int)iport, desc,
+		printf("\n%s:%d packets=%" PRIu64 " bytes=%" PRIu64 "\n", buf, (int)iport,
 		       packets, bytes);
 	}
 

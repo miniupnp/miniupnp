@@ -30,7 +30,7 @@ static int
 add_filter_rule(int proto, const char * rhost,
 		const char * iaddr, unsigned short iport)
 {
-	return add_filter_rule2(NULL/* ifname */, rhost, iaddr, 0/* eport */, iport, proto, NULL/* desc */);
+	return add_filter_rule2(NULL/* ifname */, rhost, iaddr, 0/* eport */, iport, proto);
 }
 
 static int
@@ -38,7 +38,7 @@ addnatrule(int proto, unsigned short eport,
 	   const char * iaddr, unsigned short iport,
 	   const char * rhost)
 {
-	return add_redirect_rule2(NULL/* ifname */, rhost, eport, iaddr, iport, proto, NULL/* desc */, 0/* timestamp */);
+	return add_redirect_rule2(NULL/* ifname */, rhost, eport, iaddr, iport, proto);
 }
 
 int
@@ -73,18 +73,14 @@ main(int argc, char ** argv)
 		unsigned short p1, p2;
 		char addr[16];
 		int proto2;
-		char desc[256];
 		char rhost[256];
-		unsigned int timestamp;
 		u_int64_t packets, bytes;
 
-		desc[0] = '\0';
 		printf("test0\n");
 		if(get_redirect_rule_by_index(0/* index */, NULL/* ifname */, &p1/* eport */,
 		                              addr, sizeof(addr), &p2/* iport */,
-		                              &proto2, desc, sizeof(desc),
+		                              &proto2,
 		                              rhost, sizeof(rhost),
-		                              &timestamp,
 		                              &packets, &bytes) < 0)
 		{
 			printf("rule not found\n");
@@ -93,7 +89,6 @@ main(int argc, char ** argv)
 		{
 			printf("redirected port %hu to %s:%hu proto %d   packets=%" PRIu64 " bytes=%" PRIu64 "\n",
 			       p1, addr, p2, proto2, packets, bytes);
-			printf("timestamp=%u desc=\"%s\"\n", timestamp, desc);
 		}
 		printf("test\n");
 	}

@@ -27,11 +27,10 @@ int rules_listed = -1;	/* get_redirect_rule_by_index(): -1 FAKE_RULES */
 
 int
 add_redirect_rule2(const char * ifname, const char * rhost, unsigned short eport,
-                   const char * iaddr, unsigned short iport, int proto,
-                   const char * desc, unsigned int timestamp)
+                   const char * iaddr, unsigned short iport, int proto)
 {
 	(void)ifname; (void)rhost; (void)eport; (void)iaddr; (void)iport;
-	(void)proto; (void)desc; (void)timestamp;
+	(void)proto;
 	if(++redirect_calls == fail_add_redirect)
 		return -1;
 	adds++;
@@ -40,11 +39,10 @@ add_redirect_rule2(const char * ifname, const char * rhost, unsigned short eport
 
 int
 add_filter_rule2(const char * ifname, const char * rhost, const char * iaddr,
-                 unsigned short eport, unsigned short iport, int proto,
-                 const char * desc)
+                 unsigned short eport, unsigned short iport, int proto)
 {
 	(void)ifname; (void)rhost; (void)iaddr; (void)eport; (void)iport;
-	(void)proto; (void)desc;
+	(void)proto;
 	return fail_add_filter ? -1 : 0;
 }
 
@@ -97,20 +95,16 @@ delete_redirect_rule(const char * ifname, unsigned short eport, int proto)
 
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
-                  char * iaddr, int iaddrlen, unsigned short * iport,
-                  char * desc, int desclen, char * rhost, int rhostlen,
-                  unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+                  char * iaddr, int iaddrlen, unsigned short * iport, char * rhost, int rhostlen, u_int64_t * packets, u_int64_t * bytes)
 {
 	(void)ifname; (void)eport; (void)proto;
-	(void)timestamp; (void)packets; (void)bytes;
+ (void)packets; (void)bytes;
 	if(rule_present <= 0)
 		return rule_present == 0 ? -2 : -1;
 	if(iaddr != NULL && iaddrlen > 0)
 		snprintf(iaddr, (size_t)iaddrlen, "%s", rule_iaddr);
 	if(iport != NULL)
 		*iport = rule_iport;
-	if(desc != NULL && desclen > 0)
-		desc[0] = '\0';
 	if(rhost != NULL && rhostlen > 0)
 		rhost[0] = '\0';
 	return 0;
@@ -132,11 +126,11 @@ get_redirect_rules_counters(void (*fn)(unsigned short eport, int proto,
 int
 get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
                            char * iaddr, int iaddrlen, unsigned short * iport,
-                           int * proto, char * desc, int desclen,
-                           char * rhost, int rhostlen, unsigned int * timestamp,
+                           int * proto,
+                           char * rhost, int rhostlen,
                            u_int64_t * packets, u_int64_t * bytes)
 {
-	(void)ifname; (void)desc; (void)desclen; (void)timestamp;
+	(void)ifname;
 	if(index >= (rules_listed >= 0 ? rules_listed : FAKE_RULES))
 		return -1;
 	*eport = (unsigned short)(5000 + index);
@@ -153,20 +147,11 @@ get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
 
 int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
-                   unsigned short iport, const char * desc, unsigned int timestamp)
+                   unsigned short iport)
 {
-	(void)ifname; (void)eport; (void)proto; (void)desc; (void)timestamp;
+	(void)ifname; (void)eport; (void)proto;
 	updates++;
 	last_update_iport = iport;
-	return 0;
-}
-
-int
-update_portmapping_desc_timestamp(const char * ifname, unsigned short eport, int proto,
-                                  const char * desc, unsigned int timestamp)
-{
-	(void)ifname; (void)eport; (void)proto; (void)desc; (void)timestamp;
-	updates++;
 	return 0;
 }
 
@@ -177,11 +162,10 @@ int peer_present;	/* get_peer_rule_by_index() lists the PEER rule */
 int
 add_peer_redirect_rule2(const char * ifname, const char * rhost, unsigned short rport,
                         const char * eaddr, unsigned short eport,
-                        const char * iaddr, unsigned short iport, int proto,
-                        const char * desc, unsigned int timestamp)
+                        const char * iaddr, unsigned short iport, int proto)
 {
 	(void)ifname; (void)rhost; (void)rport; (void)eaddr; (void)eport;
-	(void)iaddr; (void)iport; (void)proto; (void)desc; (void)timestamp;
+	(void)iaddr; (void)iport; (void)proto;
 	if(peer_adds + 1 == fail_peer_add)
 		return -1;
 	peer_adds++;
@@ -208,22 +192,21 @@ outgoing_rule_delete(struct outgoing_rule_key * keys, int n)
 int
 add_peer_dscp_rule2(const char * ifname, const char * rhost, unsigned short rport,
                     unsigned char dscp, const char * iaddr, unsigned short iport,
-                    int proto, const char * desc, unsigned int timestamp)
+                    int proto)
 {
 	(void)ifname; (void)rhost; (void)rport; (void)dscp; (void)iaddr;
-	(void)iport; (void)proto; (void)desc; (void)timestamp;
+	(void)iport; (void)proto;
 	return 0;
 }
 
 int
 get_peer_rule_by_index(int index, char * ifname, unsigned short * eport,
                        char * iaddr, int iaddrlen, unsigned short * iport,
-                       int * proto, char * desc, int desclen,
-                       char * rhost, int rhostlen, unsigned short * rport,
-                       unsigned int * timestamp, u_int64_t * packets, u_int64_t * bytes)
+                       int * proto,
+                       char * rhost, int rhostlen, unsigned short * rport, u_int64_t * packets, u_int64_t * bytes)
 {
-	(void)ifname; (void)desc; (void)desclen;
-	(void)timestamp; (void)packets; (void)bytes;
+	(void)ifname;
+ (void)packets; (void)bytes;
 	if(index > 0 || !peer_present)
 		return -1;
 	if(iaddr != NULL && iaddrlen > 0)
@@ -246,10 +229,10 @@ int map6_listed;	/* get_map6_rule_at() lists this many rules */
 int
 add_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
               const char * int_client, unsigned short int_port,
-              int proto, const char * desc, unsigned int timestamp)
+              int proto)
 {
 	(void)ifname; (void)rem_host; (void)rem_port; (void)int_client;
-	(void)int_port; (void)proto; (void)desc; (void)timestamp;
+	(void)int_port; (void)proto;
 	if(map6_adds + 1 == fail_map6_add_at)
 		return -1;
 	map6_adds++;
@@ -289,10 +272,8 @@ int
 get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                  unsigned short * rem_port,
                  char * int_client, int int_clientlen,
-                 unsigned short * int_port, int * proto,
-                 char * desc, int desclen)
+                 unsigned short * int_port, int * proto)
 {
-	(void)desc; (void)desclen;
 	if(index >= map6_listed)
 		return -1;
 	if(rem_host != NULL && rem_hostlen > 0)

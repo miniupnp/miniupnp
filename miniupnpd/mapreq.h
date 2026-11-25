@@ -113,8 +113,7 @@ struct lease_entry {
 	unsigned int timestamp;	/* the expiry on the clock of upnp_time(),
 				 * 0 : none */
 	const char * label;	/* the text of the client: the UPnP description,
-				 * the PCP DESCRIPTION option. NULL : none.
-				 * The rule gets map_rule_desc() */
+				 * the PCP DESCRIPTION option. NULL : none */
 };
 
 /* One remote of an outgoing binding, with its own expiry. */
@@ -289,19 +288,6 @@ map_rule_desc(const struct lease_entry * r, char * buf, size_t len)
 			return "IGD2 pinhole";
 		return r->label != NULL ? r->label : "";
 	}
-}
-
-/* TEMPORARY, as map_rule_desc(): the description of the firewall rule of
- * r, "PCP PEER <nonce>", in buf of len bytes. */
-static inline const char *
-outgoing_rule_desc(const struct outgoing_entry * r, char * buf, size_t len)
-{
-	uint32_t w[MAP_NONCE_LEN / 4];
-
-	/* each word of the nonce in host order, as PCP prints it */
-	memcpy(w, r->nonce, sizeof(w));
-	snprintf(buf, len, "PCP PEER %08x%08x%08x", w[0], w[1], w[2]);
-	return buf;
 }
 
 /* For the lease file reloads only. Set the kind, nonce and label of r from

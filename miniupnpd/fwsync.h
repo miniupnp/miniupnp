@@ -94,10 +94,9 @@ int fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t 
 
 /* The redirect rule of the IPv4 port e->eport, e->proto, as a row: its
  * internal address and port and its remote host into e, a row of
- * lease_table_new(1), and the description of the rule into desc. 0, -2 if
- * the firewall has no such rule, or -1 if it could not be read. For the
- * rules of an earlier run, at startup. */
-int fw_read_map(struct lease_entry * e, char * desc, int desclen);
+ * lease_table_new(1). 0, -2 if the firewall has no such rule, or -1 if it
+ * could not be read. For the rules of an earlier run, at startup. */
+int fw_read_map(struct lease_entry * e);
 
 /* Walk the rules of the daemon's chains or anchors, to find those of an
  * earlier run at startup. Each takes the place i, from 0, and gives the

@@ -540,7 +540,7 @@ int perform_stun(const char *if_name, const char *if_addr, const char *stun_host
 
 	/* Unblock local ports */
 	for (i = 0; i < 4; ++i) {
-		if (add_filter_rule2(if_name, NULL, if_addr, local_ports[i], local_ports[i], IPPROTO_UDP, "stun test") < 0) {
+		if (add_filter_rule2(if_name, NULL, if_addr, local_ports[i], local_ports[i], IPPROTO_UDP) < 0) {
 			syslog(LOG_ERR, "%s: add_filter_rule2(..., %hu, ...) FAILED",
 			       "perform_stun", local_ports[i]);
 		}

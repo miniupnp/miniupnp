@@ -53,32 +53,27 @@ main(int argc, char ** argv)
 			fprintf(stderr, "addpeenatrule failed\n");
 	}
 #endif
-	/*update_portmapping_desc_timestamp(NULL, eport, proto, "updated desc", time(NULL)+42);*/
-	update_portmapping(NULL, eport, proto, iport+1, "updated rule", time(NULL)+42);
+	update_portmapping(NULL, eport, proto, iport+1);
 	/* test */
 	{
 		unsigned short p1, p2;
 		char addr[16];
 		int proto2;
-		char desc[256];
 		char rhost[256];
-		unsigned int timestamp;
 		u_int64_t packets, bytes;
 
-		desc[0] = '\0';
 		if(get_redirect_rule_by_index(0, "", &p1,
 		                              addr, sizeof(addr), &p2,
-		                              &proto2, desc, sizeof(desc),
+		                              &proto2,
 		                              rhost, sizeof(rhost),
-		                              &timestamp,
 									  &packets, &bytes) < 0)
 		{
 			printf("rule not found\n");
 		}
 		else
 		{
-			printf("redirected port %hu to %s:%hu proto %d   packets=%" PRIu64 " bytes=%" PRIu64 " ts=%u desc='%s'\n",
-			       p1, addr, p2, proto2, packets, bytes, timestamp, desc);
+			printf("redirected port %hu to %s:%hu proto %d   packets=%" PRIu64 " bytes=%" PRIu64 "\n",
+			       p1, addr, p2, proto2, packets, bytes);
 		}
 	}
 	printf("trying to list nat rules :\n");

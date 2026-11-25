@@ -52,9 +52,7 @@ struct outgoing_rule_key {
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,
-                  char * desc, int desclen,
                   char * rhost, int rhostlen,
-                  unsigned int * timestamp,
                   u_int64_t * packets, u_int64_t * bytes);
 
 /*! \brief get port mapping by index
@@ -64,35 +62,19 @@ int
 get_redirect_rule_by_index(int index,
                            char * ifname, unsigned short * eport,
                            char * iaddr, int iaddrlen, unsigned short * iport,
-                           int * proto, char * desc, int desclen,
+                           int * proto,
                            char * rhost, int rhostlen,
-                           unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes);
 
-/*! \brief update the port mapping internal port, description and timestamp
+/*! \brief update the port mapping internal port
  * \param[in] ifname WAN interface name
  * \param[in] eport external port
  * \param[in] proto IPPROTO_TCP/IPPROTO_UDP/etc.
  * \param[in] iport internal port to set
- * \param[in] desc new description to set
- * \param[in] timestamp new end of port mapping timestamp to set
  * \return 0 on success, -1 on failure */
 int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
-                   unsigned short iport, const char * desc,
-                   unsigned int timestamp);
-
-/*! \brief update the port mapping description and timestamp
- * \param[in] ifname WAN interface name
- * \param[in] eport external port
- * \param[in] proto IPPROTO_TCP/IPPROTO_UDP/etc.
- * \param[in] desc new description to set
- * \param[in] timestamp new end of port mapping timestamp to set
- * \return 0 on success, -1 on failure */
-int
-update_portmapping_desc_timestamp(const char * ifname,
-                   unsigned short eport, int proto,
-                   const char * desc, unsigned int timestamp);
+                   unsigned short iport);
 
 #if defined(USE_NETFILTER)
 /*

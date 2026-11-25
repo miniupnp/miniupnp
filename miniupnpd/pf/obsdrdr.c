@@ -574,8 +574,7 @@ delete_nat_rule(const char * ifname, unsigned short eport, unsigned short iport,
 int
 add_redirect_rule2(const char * ifname,
                    const char * rhost, unsigned short eport,
-                   const char * iaddr, unsigned short iport, int proto,
-                   const char * desc, unsigned int timestamp)
+                   const char * iaddr, unsigned short iport, int proto)
 {
 	int r;
 	struct pfioc_rule pcr;
@@ -584,7 +583,6 @@ add_redirect_rule2(const char * ifname,
 	struct pf_pooladdr *a;
 #endif
 
-	UNUSED(desc); UNUSED(timestamp);	/* the lease table has them */
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -745,13 +743,13 @@ int
 add_filter_rule2(const char * ifname,
                  const char * rhost, const char * iaddr,
                  unsigned short eport, unsigned short iport,
-				 int proto, const char * desc)
+				 int proto)
 {
 #ifndef PF_ENABLE_FILTER_RULES
 	UNUSED(ifname);
 	UNUSED(rhost); UNUSED(iaddr);
 	UNUSED(eport); UNUSED(iport);
-	UNUSED(proto); UNUSED(desc);
+	UNUSED(proto);
 	return 0;
 #else
 	int r;
@@ -762,7 +760,7 @@ add_filter_rule2(const char * ifname,
 #ifndef USE_IFNAME_IN_RULES
 	UNUSED(ifname);
 #endif
-	UNUSED(eport); UNUSED(desc);
+	UNUSED(eport);
 	if(dev<0) {
 		syslog(LOG_ERR, "pf device is not open");
 		return -1;
@@ -857,9 +855,7 @@ add_filter_rule2(const char * ifname,
 int
 get_redirect_rule(const char * ifname, unsigned short eport, int proto,
                   char * iaddr, int iaddrlen, unsigned short * iport,
-                  char * desc, int desclen,
                   char * rhost, int rhostlen,
-                  unsigned int * timestamp,
                   u_int64_t * packets, u_int64_t * bytes)
 {
 	int i, n, r;
@@ -942,8 +938,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 #else
 			*iport = RULE.rdr.proxy_port[0];
 #endif
-			if(desc && desclen > 0)
-				desc[0] = '\0';	/* the rule holds none */
 #ifdef PFRULE_INOUT_COUNTS
 			if(packets)
 				*packets = RULE.packets[0] + RULE.packets[1];
@@ -1016,8 +1010,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 #endif
 				}
 			}
-			if(timestamp)
-				*timestamp = 0;
 			r = 0;
 			break;
 		}
@@ -1314,9 +1306,8 @@ int
 get_redirect_rule_by_index(int index,
                            char * ifname, unsigned short * eport,
                            char * iaddr, int iaddrlen, unsigned short * iport,
-                           int * proto, char * desc, int desclen,
+                           int * proto,
                            char * rhost, int rhostlen,
-                           unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes)
 {
 	int n, r;
@@ -1407,8 +1398,6 @@ get_redirect_rule_by_index(int index,
 #endif
 	if(ifname)
 		strlcpy(ifname, RULE.ifname, IFNAMSIZ);
-	if(desc && desclen > 0)
-		desc[0] = '\0';	/* the rule holds none */
 #ifdef PFRULE_INOUT_COUNTS
 	if(packets)
 		*packets = RULE.packets[0] + RULE.packets[1];
@@ -1478,21 +1467,18 @@ get_redirect_rule_by_index(int index,
 #endif
 		}
 	}
-	if(timestamp)
-		*timestamp = 0;
 	r = 0;
 error:
 	release_ticket(dev, tnum);
 	return r;
 }
 
-/* update the port mapping internal port, description and timestamp
+/* update the port mapping internal port
  * returns:  0 : OK
  *          -1 : Error */
 int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
-                   unsigned short iport, const char * desc,
-                   unsigned int timestamp)
+                   unsigned short iport)
 {
 	unsigned short old_iport;
 	in_addr_t iaddr;
@@ -1509,23 +1495,11 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 		return -1;
 	}
 
-	if(add_redirect_rule2(ifname, rhost, eport, iaddr_str, iport, proto,
-	                      desc, timestamp) < 0)
+	if(add_redirect_rule2(ifname, rhost, eport, iaddr_str, iport, proto) < 0)
 		return -1;
-	if(add_filter_rule2(ifname, rhost, iaddr_str, eport, iport, proto, desc) < 0)
+	if(add_filter_rule2(ifname, rhost, iaddr_str, eport, iport, proto) < 0)
 		return -1;
 
-	return 0;
-}
-
-/* the rules hold neither the description nor the expiry: nothing to change */
-int
-update_portmapping_desc_timestamp(const char * ifname,
-                   unsigned short eport, int proto,
-                   const char * desc, unsigned int timestamp)
-{
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
-	UNUSED(desc); UNUSED(timestamp);
 	return 0;
 }
 

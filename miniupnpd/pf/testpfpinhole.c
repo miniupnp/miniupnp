@@ -37,18 +37,15 @@ static void print_pinholes(void)
 	char int_client[64];
 	unsigned short int_port;
 	int proto;
-	unsigned int timestamp;
 	u_int64_t packets;
-	char desc[64];
 
 	for(i = 0; get_map6_rule_at(i, rem_host, sizeof(rem_host), &rem_port,
 	                               int_client, sizeof(int_client), &int_port,
-	                               &proto, desc, sizeof(desc)) == 0; i++) {
+	                               &proto) == 0; i++) {
 		packets = 0;
 		get_map6_packets(rem_host, rem_port, int_client, int_port, proto, &packets);
-		printf("pinhole %d : [%s]:%hu => [%s]:%hu proto=%d ts=%u\n",
-		       i, rem_host, rem_port, int_client, int_port, proto, timestamp);
-		printf("    desc='%s'\n", desc);
+		printf("pinhole %d : [%s]:%hu => [%s]:%hu proto=%d\n",
+		       i, rem_host, rem_port, int_client, int_port, proto);
 		printf("    packets=%" PRIu64 "\n", packets);
 	}
 }
@@ -69,9 +66,9 @@ int main(int argc, char * *argv)
 		return 1;
 	}
 
-	ret = add_map6_rule("ep0", "2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP, "description test 1", 424242);
+	ret = add_map6_rule("ep0", "2001::1:2:3", 12345, "123::ff", 54321, IPPROTO_UDP);
 	printf("add_map6_rule() returned %d\n", ret);
-	ret = add_map6_rule("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP, "description test 2", 4321000);
+	ret = add_map6_rule("ep0", NULL, 0, "dead:beef::42:42", 8080, IPPROTO_UDP);
 	printf("add_map6_rule() returned %d\n", ret);
 
 	print_pinholes();

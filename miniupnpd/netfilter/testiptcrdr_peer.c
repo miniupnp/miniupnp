@@ -46,17 +46,13 @@ main(int argc, char ** argv)
 		unsigned short p1, p2;
 		char addr[16];
 		int proto2;
-		char desc[256];
 		char rhost[256];
-		unsigned int timestamp;
 		u_int64_t packets, bytes;
 
-		desc[0] = '\0';
 		if(get_redirect_rule_by_index(0, "", &p1,
 									  addr, sizeof(addr), &p2,
-									  &proto2, desc, sizeof(desc),
+									  &proto2,
 									  rhost, sizeof(rhost),
-									  &timestamp,
 									  &packets, &bytes) < 0)
 		{
 			printf("rule not found\n");

@@ -39,7 +39,7 @@ static int
 add_peer(unsigned short rport)
 {
 	return add_peer_redirect_rule2(IFNAME, RADDR, rport, EADDR, EPORT,
-	                               IADDR, IPORT, IPPROTO_TCP, "peer", 0);
+	                               IADDR, IPORT, IPPROTO_TCP);
 }
 
 static void
@@ -59,14 +59,13 @@ key_of(struct outgoing_rule_key * k, unsigned short rport)
 static int
 count_peers(unsigned short * rport)
 {
-	char iaddr[INET_ADDRSTRLEN], rhost[INET_ADDRSTRLEN], desc[64];
+	char iaddr[INET_ADDRSTRLEN], rhost[INET_ADDRSTRLEN];
 	unsigned short eport, iport, p;
-	unsigned int timestamp;
 	int proto, i, n = 0;
 
 	for(i = 0; get_peer_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr),
-	                                  &iport, &proto, desc, sizeof(desc),
-	                                  rhost, sizeof(rhost), &p, &timestamp,
+	                                  &iport, &proto,
+	                                  rhost, sizeof(rhost), &p,
 	                                  NULL, NULL) >= 0; i++) {
 		if(strcmp(rhost, RADDR) != 0)
 			continue;
@@ -91,14 +90,14 @@ main(void)
 	}
 
 	/* a port mapping and two peers of one binding on EPORT */
-	CHECK(add_redirect_rule2(IFNAME, "", EPORT, IADDR, IPORT, IPPROTO_TCP, "map", 0) >= 0);
+	CHECK(add_redirect_rule2(IFNAME, "", EPORT, IADDR, IPORT, IPPROTO_TCP) >= 0);
 	CHECK(add_peer(6001) >= 0);
 	CHECK(add_peer(6002) >= 0);
 	CHECK(count_peers(&rport) == 2);
 #ifndef USE_NFTABLES
 	/* the DSCP rules of peer 6001, both ways (PCP FLOWDATA): nft has none */
-	CHECK(add_peer_dscp_rule2(IFNAME, RADDR, 6001, 46, IADDR, IPORT, IPPROTO_TCP, "up", 0) >= 0);
-	CHECK(add_peer_dscp_rule2(IFNAME, IADDR, IPORT, 46, RADDR, 6001, IPPROTO_TCP, "down", 0) >= 0);
+	CHECK(add_peer_dscp_rule2(IFNAME, RADDR, 6001, 46, IADDR, IPORT, IPPROTO_TCP) >= 0);
+	CHECK(add_peer_dscp_rule2(IFNAME, IADDR, IPORT, 46, RADDR, 6001, IPPROTO_TCP) >= 0);
 #endif
 
 	/* one peer goes, by its remote: the other one and the mapping stay */
@@ -107,8 +106,7 @@ main(void)
 	CHECK(keys[0].result == 0);
 	CHECK(count_peers(&rport) == 1);
 	CHECK(rport == 6002);
-	CHECK(get_redirect_rule(IFNAME, EPORT, IPPROTO_TCP, iaddr, sizeof(iaddr), &iport,
-	                        NULL, 0, NULL, 0, NULL, NULL, NULL) == 0);
+	CHECK(get_redirect_rule(IFNAME, EPORT, IPPROTO_TCP, iaddr, sizeof(iaddr), &iport, NULL, 0, NULL, NULL) == 0);
 
 	/* a peer without a rule says so */
 	CHECK(outgoing_rule_delete(keys, 1) == 0);

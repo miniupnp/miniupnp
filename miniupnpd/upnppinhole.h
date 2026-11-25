@@ -38,7 +38,7 @@ upnp_find_inboundpinhole(struct lease_entry * req);
 
 /* add an inbound pinhole, or renew the one of the same remote and
  * internal endpoint. req: the IPv6 iaddr, iport, proto, timestamp and its
- * filter, the remote, or none for any remote. The rule gets map_rule_desc(). On success *uid_out
+ * filter, the remote, or none for any remote. On success *uid_out
  * (if not NULL) is the uid of the pinhole, and the lease table takes a row
  * of lease_table_new() (memmap_add(), or memmap_update() for the pinhole
  * there was): the caller frees req only on failure. req->eport is the

@@ -26,18 +26,16 @@ static void print_infos(void)
 	char int_client[64];
 	unsigned short int_port;
 	int proto, i;
-	char desc[256];
-	unsigned int timestamp;
 	u_int64_t packets;
 
 	for (i = 0; get_map6_rule_at(i, rem_host, sizeof(rem_host), &rem_port,
 	                                int_client, sizeof(int_client), &int_port,
-	                                &proto, desc, sizeof(desc)) == 0; i++) {
+	                                &proto) == 0; i++) {
 		packets = 0;
 		get_map6_packets(rem_host, rem_port, int_client, int_port, proto, &packets);
-		syslog(LOG_INFO, "pinhole %d : [%s]:%hu => [%s]:%hu %s desc \"%s\" ts=%u packets=%llu",
+		syslog(LOG_INFO, "pinhole %d : [%s]:%hu => [%s]:%hu %s packets=%llu",
 		       i, rem_host, rem_port, int_client, int_port,
-		       proto == IPPROTO_TCP ? "tcp" : "udp", desc, timestamp,
+		       proto == IPPROTO_TCP ? "tcp" : "udp",
 		       (long long unsigned)packets);
 	}
 }
@@ -59,8 +57,7 @@ int main(int argc, char * * argv)
 		return 1;
 	}
 
-	r = add_map6_rule(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP,
-	                     "dummy description", upnp_time() + 60 /* timestamp */);
+	r = add_map6_rule(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP);
 	syslog(LOG_INFO, "add_map6_rule() returned %d", r);
 	print_infos();
 

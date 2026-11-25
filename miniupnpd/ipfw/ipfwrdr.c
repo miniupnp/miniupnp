@@ -87,17 +87,6 @@ void shutdown_redirect(void) {
 	ipfw_exec(IP_FW_TERM, NULL, 0);
 }
 
-/* The lease table has the description and the expiry of a mapping: a
- * read gives none */
-static void
-no_desc(char * desc, int desclen, unsigned int * timestamp)
-{
-	if(desc != NULL && desclen > 0)
-		desc[0] = '\0';
-	if(timestamp != NULL)
-		*timestamp = 0;
-}
-
 /* --- */
 int add_redirect_rule2(
 	const char * ifname,
@@ -105,13 +94,10 @@ int add_redirect_rule2(
 	unsigned short eport,
 	const char * iaddr,
 	unsigned short iport,
-	int proto,
-	const char * desc,
-	unsigned int timestamp)
+	int proto)
 {
 	struct ip_fw rule;
 
-	UNUSED(desc); UNUSED(timestamp);
 	if (ipfw_validate_protocol(proto) < 0)
 		return -1;
 	if (ipfw_validate_ifname(ifname) < 0)
@@ -162,11 +148,8 @@ int get_redirect_rule(
 	char * iaddr,
 	int iaddrlen,
 	unsigned short * iport,
-	char * desc,
-	int desclen,
 	char * rhost,
 	int rhostlen,
-	unsigned int * timestamp,
 	u_int64_t * packets,
 	u_int64_t * bytes)
 {
@@ -177,8 +160,6 @@ int get_redirect_rule(
 		return -1;
 	if (ipfw_validate_ifname(ifname) < 0)
 		return -1;
-	if (timestamp)
-		*timestamp = 0;
 
 	do {
 		count_rules = ipfw_fetch_ruleset(&rules, &total_rules, 10);
@@ -213,7 +194,6 @@ int get_redirect_rule(
 			}
 			/* And what if we found more than 1 matching rule? */
 			ipfw_free_ruleset(&rules);
-			no_desc(desc, desclen, timestamp);
 			return 0;
 		}
 	}
@@ -266,8 +246,7 @@ int add_filter_rule2(
 	const char * iaddr,
 	unsigned short eport,
 	unsigned short iport,
-	int proto,
-	const char * desc)
+	int proto)
 {
 	UNUSED(ifname);
 	UNUSED(rhost);
@@ -275,7 +254,6 @@ int add_filter_rule2(
 	UNUSED(eport);
 	UNUSED(iport);
 	UNUSED(proto);
-	UNUSED(desc);
 	return 0; /* nothing to do, always success */
 }
 
@@ -298,11 +276,8 @@ int get_redirect_rule_by_index(
 	int iaddrlen,
 	unsigned short * iport,
 	int * proto,
-	char * desc,
-	int desclen,
 	char * rhost,
 	int rhostlen,
-	unsigned int * timestamp,
 	u_int64_t * packets,
 	u_int64_t * bytes)
 {
@@ -312,8 +287,6 @@ int get_redirect_rule_by_index(
 	if (index < 0) /* TODO shouldn't we also validate the maximum? */
 		return -1;
 
-	if(timestamp)
-		*timestamp = 0;
 
 	ipfw_fetch_ruleset(&rules, &total_rules, index + 1);
 
@@ -352,7 +325,6 @@ int get_redirect_rule_by_index(
 			}
 		}
 		ipfw_free_ruleset(&rules);
-		no_desc(desc, desclen, timestamp);
 		return 0;
 	}
 
@@ -363,19 +335,8 @@ error:
 }
 
 int
-update_portmapping_desc_timestamp(const char * ifname,
-                   unsigned short eport, int proto,
-                   const char * desc, unsigned int timestamp)
-{
-	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
-	UNUSED(desc); UNUSED(timestamp);
-	return 0;
-}
-
-int
 update_portmapping(const char * ifname, unsigned short eport, int proto,
-                   unsigned short iport, const char * desc,
-                   unsigned int timestamp)
+                   unsigned short iport)
 {
 	int i, count_rules, total_rules = 0;
 	struct ip_fw * rules = NULL;
@@ -421,7 +382,7 @@ update_portmapping(const char * ifname, unsigned short eport, int proto,
 	rules = NULL;
 
 	if(found)
-		r = add_redirect_rule2(ifname, rhost, eport, iaddr, iport, proto, desc, timestamp);
+		r = add_redirect_rule2(ifname, rhost, eport, iaddr, iport, proto);
 
 error:
 	if (rules != NULL)

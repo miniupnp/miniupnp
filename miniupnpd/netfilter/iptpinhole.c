@@ -211,7 +211,7 @@ int
 add_map6_rule(const char * ifname,
               const char * rem_host, unsigned short rem_port,
               const char * int_client, unsigned short int_port,
-              int proto, const char * desc, unsigned int timestamp)
+              int proto)
 {
 	struct ip6t_entry * e;
 	struct ip6t_entry * tmp;
@@ -219,7 +219,6 @@ add_map6_rule(const char * ifname,
 	struct ip6t_entry_target *target = NULL;
 	int r;
 
-	UNUSED(desc); UNUSED(timestamp);	/* the lease table has them */
 	e = calloc(1, sizeof(struct ip6t_entry));
 	if(!e) {
 		syslog(LOG_ERR, "%s: calloc(%d) failed",
@@ -334,8 +333,7 @@ int
 get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * rem_port,
                     char * int_client, int int_clientlen,
-                    unsigned short * int_port, int * proto,
-                    char * desc, int desclen)
+                    unsigned short * int_port, int * proto)
 {
 	IP6TC_HANDLE h;
 	const struct ip6t_entry * e;
@@ -371,8 +369,6 @@ get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
 			*int_port = info->dpts[0];
 		if(proto)
 			*proto = e->ipv6.proto;
-		if(desc && desclen > 0)
-			desc[0] = '\0';	/* the rule holds none */
 		r = 0;
 		break;
 	}

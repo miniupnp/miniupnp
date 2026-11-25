@@ -19,7 +19,7 @@
 int add_map6_rule(const char * ifname,
                      const char * rem_host, unsigned short rem_port,
                      const char * int_client, unsigned short int_port,
-                     int proto, const char * desc, unsigned int timestamp);
+                     int proto);
 
 /* Delete the rule of a map6. 0, -2 if there is no such rule, or < 0 */
 int delete_map6_rule(const char * rem_host, unsigned short rem_port,
@@ -34,13 +34,12 @@ int get_map6_packets(const char * rem_host, unsigned short rem_port,
 
 /* The map6 rule at this place, to find the rules of an earlier run at
  * startup. rem_host is "" for none. A map6 rule is an IPv6 forward rule of
- * the daemon's chain or anchor: it holds no label, so desc is always "".
+ * the daemon's chain or anchor.
  * 0, or -1 past the end or when the rules cannot be read */
 int get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                         unsigned short * rem_port,
                         char * int_client, int int_clientlen,
-                        unsigned short * int_port, int * proto,
-                        char * desc, int desclen);
+                        unsigned short * int_port, int * proto);
 
 /* 1 if rem_host stands for no remote */
 static inline int
