@@ -2453,6 +2453,7 @@ def add_e2e_arguments(parser):
                              "(lib_test.router_call)")
     parser.add_argument("--route-through-router", action="store_true",
                         help="route the WAN subnet through the router (replies of the LAN echo service)")
+    parser.add_argument("--results", help="write the outcomes of the run to this file, for --write-status")
 
 
 def prepare_e2e_run(args):
@@ -2475,6 +2476,28 @@ def e2e_socket(args):
     sock.settimeout(2)
     sock.bind((args.client_address, 0))
     return sock
+
+
+def run_e2e_cases(args, cases, run, flag=None):
+    """Run the cases of an e2e runner the driver starts once per family: any error fails the case (a
+    harness error too), the run goes on with the next one. With --router-call-dir, the router calls
+    case-start:SECTION<TAB>CASE<TAB>FLAG (flag(case), else false) before a case and case-end after it
+    let the driver take its snapshots and logs of each case. With --results, the outcomes go there."""
+
+    @contextlib.contextmanager
+    def driver_steps(case):
+        mark = str(flag(case)).lower() if flag else "false"
+        router_call(args.router_call_dir, "case-start:" + "\t".join((case["section"], case["name"], mark)))
+        try:
+            yield
+        finally:
+            router_call(args.router_call_dir, "case-end")
+
+    outcomes = run_cases(cases, run, failures=(Exception,), timestamps=True,
+                         around=driver_steps if args.router_call_dir else None)
+    if args.results:
+        write_results_tsv(args.results, args.family, cases, outcomes)
+    return outcomes
 
 
 ROUTER_CALL_TIMEOUT = 60
