@@ -10,7 +10,6 @@
 #include <syslog.h>
 #include <errno.h>
 #include <arpa/inet.h>
-#include <sys/queue.h>
 
 #include "config.h"
 #include "../macros.h"
@@ -26,95 +25,17 @@
 
 #define IP6TC_HANDLE struct ip6tc_handle *
 
-static int next_uid = 1;
-/* the entries of pinhole_list: each holds one of the uids 1 to 65535 */
-static unsigned int pinhole_count;
-
 static const char * miniupnpd_v6_filter_chain = "MINIUPNPD";
 
-static LIST_HEAD(pinhole_list_t, pinhole_t) pinhole_list;
-
-static struct pinhole_t *
-get_pinhole(unsigned short uid);
-
-struct pinhole_t {
-	struct in6_addr saddr;
-	struct in6_addr daddr;
-	LIST_ENTRY(pinhole_t) entries;
-	unsigned int timestamp;
-	unsigned short sport;
-	unsigned short dport;
-	unsigned short uid;
-	unsigned char proto;
-	char desc[];
-};
-
+/* the rules of the chain are the record: nothing is kept in memory */
 void init_iptpinhole(void)
 {
-	LIST_INIT(&pinhole_list);
+	return;
 }
 
 void shutdown_iptpinhole(void)
 {
-	struct pinhole_t * p;
-	while(pinhole_list.lh_first != NULL) {
-		p = pinhole_list.lh_first;
-		LIST_REMOVE(p, entries);
-		free(p);
-	}
-	pinhole_count = 0;
-}
-
-/* return uid */
-static int
-add_to_pinhole_list(struct in6_addr * saddr, unsigned short sport,
-                    struct in6_addr * daddr, unsigned short dport,
-                    int proto, const char *desc, unsigned int timestamp)
-{
-	struct pinhole_t * p;
-
-	/* with every uid in use, the search below would never end */
-	if(pinhole_count >= 65535) {
-		syslog(LOG_WARNING, "add_to_pinhole_list: all %u pinhole uids are in use",
-		       pinhole_count);
-		return -1;
-	}
-	p = calloc(1, sizeof(struct pinhole_t) + strlen(desc) + 1);
-	if(!p) {
-		syslog(LOG_ERR, "add_to_pinhole_list calloc() error");
-		return -1;
-	}
-	strcpy(p->desc, desc);
-	memcpy(&p->saddr, saddr, sizeof(struct in6_addr));
-	p->sport = sport;
-	memcpy(&p->daddr, daddr, sizeof(struct in6_addr));
-	p->dport = dport;
-	p->timestamp = timestamp;
-	p->proto = (unsigned char)proto;
-	LIST_INSERT_HEAD(&pinhole_list, p, entries);
-	pinhole_count++;
-	while(get_pinhole(next_uid) != NULL) {
-		next_uid++;
-		if(next_uid > 65535)
-			next_uid = 1;
-	}
-	p->uid = next_uid;
-	next_uid++;
-	if(next_uid > 65535)
-		next_uid = 1;
-	return p->uid;
-}
-
-static struct pinhole_t *
-get_pinhole(unsigned short uid)
-{
-	struct pinhole_t * p;
-
-	for(p = pinhole_list.lh_first; p != NULL; p = p->entries.le_next) {
-		if(p->uid == uid)
-			return p;
-	}
-	return NULL;	/* not found */
+	return;
 }
 
 /* new_match()
@@ -215,38 +136,103 @@ error:
 	return -1;
 }
 
+/* The key of a map6 rule, as the rule holds it: no remote host is the
+ * address :: and no remote port is 0. 0, or -2 if an address does not parse */
+static int
+rule_key(const char * rem_host, const char * int_client,
+         struct in6_addr * saddr, struct in6_addr * daddr)
+{
+	memset(saddr, 0, sizeof(*saddr));
+	if(!map6_any_remote(rem_host) && inet_pton(AF_INET6, rem_host, saddr) < 1) {
+		syslog(LOG_WARNING, "failed to parse INET6 address \"%s\"", rem_host);
+		return -2;
+	}
+	if(inet_pton(AF_INET6, int_client, daddr) < 1) {
+		syslog(LOG_WARNING, "failed to parse INET6 address \"%s\"", int_client);
+		return -2;
+	}
+	return 0;
+}
+
+/* The rule of the key in the chain of h, and its index in *index. NULL if
+ * there is none */
+static const struct ip6t_entry *
+find_rule(IP6TC_HANDLE h, const struct in6_addr * saddr, unsigned short sport,
+          const struct in6_addr * daddr, unsigned short dport, int proto,
+          unsigned int * index)
+{
+	const struct ip6t_entry * e;
+	const struct ip6t_entry_match * match;
+	const struct ip6t_tcp * info;
+	unsigned int i = 0;
+
+	for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
+	    e;
+	    e = ip6tc_next_rule(e, h), i++) {
+		if((e->ipv6.proto != proto) ||
+		   (0 != memcmp(&e->ipv6.src, saddr, sizeof(e->ipv6.src))) ||
+		   (0 != memcmp(&e->ipv6.dst, daddr, sizeof(e->ipv6.dst))))
+			continue;
+		match = (const struct ip6t_entry_match *)&e->elems;
+		info = (const struct ip6t_tcp *)&match->data;
+		if((info->spts[0] == sport) && (info->dpts[0] == dport)) {
+			if(index)
+				*index = i;
+			return e;
+		}
+	}
+	return NULL;
+}
+
+/* the filter table, with the chain of the daemon. NULL on an error */
+static IP6TC_HANDLE
+init_filter(void)
+{
+	IP6TC_HANDLE h;
+
+	h = ip6tc_init("filter");
+	if(!h) {
+		syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
+		return NULL;
+	}
+	if(!ip6tc_is_chain(miniupnpd_v6_filter_chain, h)) {
+		syslog(LOG_ERR, "chain %s not found", miniupnpd_v6_filter_chain);
+		ip6tc_free(h);
+		return NULL;
+	}
+	return h;
+}
+
 /*
 ip6tables -I %s %d -p %s -i %s -s %s --sport %hu -d %s --dport %hu -j ACCEPT
 ip6tables -I %s %d -p %s -i %s --sport %hu -d %s --dport %hu -j ACCEPT
-
-miniupnpd_forward_chain, line_number, proto, ext_if_name, raddr, rport, iaddr, iport
-
-ip6tables -t raw -I PREROUTING %d -p %s -i %s -s %s --sport %hu -d %s --dport %hu -j TRACE
-ip6tables -t raw -I PREROUTING %d -p %s -i %s --sport %hu -d %s --dport %hu -j TRACE
 */
-int add_pinhole(const char * ifname,
-                const char * rem_host, unsigned short rem_port,
-                const char * int_client, unsigned short int_port,
-                int proto, const char * desc, unsigned int timestamp)
+int
+add_map6_rule(const char * ifname,
+              const char * rem_host, unsigned short rem_port,
+              const char * int_client, unsigned short int_port,
+              int proto, const char * desc, unsigned int timestamp)
 {
-	int uid;
 	struct ip6t_entry * e;
 	struct ip6t_entry * tmp;
 	struct ip6t_entry_match *match = NULL;
 	struct ip6t_entry_target *target = NULL;
+	int r;
 
-	/* with every uid in use, add_to_pinhole_list() would look for a free
-	 * one forever, after the rule is in the chain */
-	if(pinhole_count >= 65535) {
-		syslog(LOG_WARNING, "add_pinhole: all %u pinhole uids are in use", pinhole_count);
-		return -1;
-	}
+	UNUSED(desc); UNUSED(timestamp);	/* the lease table has them */
 	e = calloc(1, sizeof(struct ip6t_entry));
 	if(!e) {
 		syslog(LOG_ERR, "%s: calloc(%d) failed",
-		       "add_pinhole", (int)sizeof(struct ip6t_entry));
+		       "add_map6_rule", (int)sizeof(struct ip6t_entry));
 		return -1;
 	}
+	if(rule_key(rem_host, int_client, &e->ipv6.src, &e->ipv6.dst) < 0) {
+		free(e);
+		return -1;
+	}
+	if(!map6_any_remote(rem_host))
+		memset(&e->ipv6.smsk, 0xff, sizeof(e->ipv6.smsk));
+	memset(&e->ipv6.dmsk, 0xff, sizeof(e->ipv6.dmsk));
 	e->ipv6.proto = proto;
 	if (proto)
 		e->ipv6.flags |= IP6T_F_PROTO;
@@ -254,26 +240,11 @@ int add_pinhole(const char * ifname,
 	/* TODO: check if enforcing USE_IFNAME_IN_RULES is needed */
 	if(ifname)
 		strncpy(e->ipv6.iniface, ifname, IFNAMSIZ);
-	if(rem_host && (rem_host[0] != '\0')) {
-		if(inet_pton(AF_INET6, rem_host, &e->ipv6.src) < 1) {
-			syslog(LOG_WARNING, "failed to parse INET6 address \"%s\"", rem_host);
-		} else {
-			memset(&e->ipv6.smsk, 0xff, sizeof(e->ipv6.smsk));
-		}
-	}
-	if (inet_pton(AF_INET6, int_client, &e->ipv6.dst) < 1) {
-		syslog(LOG_WARNING, "failed to parse INET6 address \"%s\"", int_client);
-	} else {
-		memset(&e->ipv6.dmsk, 0xff, sizeof(e->ipv6.dmsk));
-	}
-
-	/*e->nfcache = NFC_IP_DST_PT;*/
-	/*e->nfcache |= NFC_UNKNOWN;*/
 
 	match = new_match(proto, rem_port, int_port);
 	target = get_accept_target();
 	if(!match || !target) {
-		syslog(LOG_ERR, "%s: failed to build match/target", "add_pinhole");
+		syslog(LOG_ERR, "%s: failed to build match/target", "add_map6_rule");
 		free(match);
 		free(target);
 		free(e);
@@ -284,7 +255,7 @@ int add_pinhole(const char * ifname,
 	               + target->u.target_size);
 	if(!tmp) {
 		syslog(LOG_ERR, "%s: realloc(%d) failed",
-		       "add_pinhole", (int)(sizeof(struct ip6t_entry) + match->u.match_size + target->u.target_size));
+		       "add_map6_rule", (int)(sizeof(struct ip6t_entry) + match->u.match_size + target->u.target_size));
 		free(e);
 		free(match);
 		free(target);
@@ -301,298 +272,62 @@ int add_pinhole(const char * ifname,
 	free(match);
 	free(target);
 
-	if(ip6tc_init_verify_append("filter", miniupnpd_v6_filter_chain, e) < 0) {
-		free(e);
-		return -1;
-	}
-	uid = add_to_pinhole_list(&e->ipv6.src, rem_port,
-	                          &e->ipv6.dst, int_port,
-	                          proto, desc, timestamp);
+	r = ip6tc_init_verify_append("filter", miniupnpd_v6_filter_chain, e);
 	free(e);
-	return uid;
-}
-
-int
-find_pinhole(const char * ifname,
-             const char * rem_host, unsigned short rem_port,
-             const char * int_client, unsigned short int_port,
-             int proto,
-             char *desc, int desc_len, unsigned int * timestamp)
-{
-	struct pinhole_t * p;
-	struct in6_addr saddr;
-	struct in6_addr daddr;
-	UNUSED(ifname);
-
-	if(rem_host && (rem_host[0] != '\0')) {
-		if (inet_pton(AF_INET6, rem_host, &saddr) < 1) {
-			syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", rem_host);
-			memset(&saddr, 0, sizeof(struct in6_addr));
-		}
-	} else {
-		memset(&saddr, 0, sizeof(struct in6_addr));
-	}
-	if (inet_pton(AF_INET6, int_client, &daddr) < 1) {
-		syslog(LOG_WARNING, "Failed to parse INET6 address \"%s\"", int_client);
-		memset(&daddr, 0, sizeof(struct in6_addr));
-	}
-	for(p = pinhole_list.lh_first; p != NULL; p = p->entries.le_next) {
-		if((proto == p->proto) && (rem_port == p->sport) &&
-		   (0 == memcmp(&saddr, &p->saddr, sizeof(struct in6_addr))) &&
-		   (int_port == p->dport) &&
-		   (0 == memcmp(&daddr, &p->daddr, sizeof(struct in6_addr)))) {
-			if(desc) strncpy(desc, p->desc, desc_len);
-			if(timestamp) *timestamp = p->timestamp;
-			return (int)p->uid;
-		}
-	}
-	return -2;	/* not found */
-}
-
-int
-delete_pinhole(unsigned short uid)
-{
-	struct pinhole_t * p;
-	IP6TC_HANDLE h;
-	const struct ip6t_entry * e;
-	const struct ip6t_entry_match *match = NULL;
-	/*const struct ip6t_entry_target *target = NULL;*/
-	unsigned int index;
-	xt_chainlabel chainlabel;
-
-	p = get_pinhole(uid);
-	if(!p)
-		return -2;	/* not found */
-
-	h = ip6tc_init("filter");
-	if(!h) {
-		syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
-		return -1;
-	}
-	strncpy(chainlabel, miniupnpd_v6_filter_chain, sizeof(chainlabel));
-	if(!ip6tc_is_chain(chainlabel, h)) {
-		syslog(LOG_ERR, "chain %s not found", miniupnpd_v6_filter_chain);
-		goto error;
-	}
-	index = 0;
-	for(e = ip6tc_first_rule(chainlabel, h);
-	    e;
-	    e = ip6tc_next_rule(e, h)) {
-		if((e->ipv6.proto == p->proto) &&
-		   (0 == memcmp(&e->ipv6.src, &p->saddr, sizeof(e->ipv6.src))) &&
-		   (0 == memcmp(&e->ipv6.dst, &p->daddr, sizeof(e->ipv6.dst)))) {
-			const struct ip6t_tcp * info;
-			match = (const struct ip6t_entry_match *)&e->elems;
-			info = (const struct ip6t_tcp *)&match->data;
-			if((info->spts[0] == p->sport) && (info->dpts[0] == p->dport)) {
-				if(!ip6tc_delete_num_entry(chainlabel, index, h)) {
-					syslog(LOG_ERR, "ip6tc_delete_num_entry(%s,%u,...): %s",
-					       miniupnpd_v6_filter_chain, index, ip6tc_strerror(errno));
-					goto error;
-				}
-				if(!ip6tc_commit(h)) {
-					syslog(LOG_ERR, "ip6tc_commit(): %s",
-					       ip6tc_strerror(errno));
-					goto error;
-				}
-				ip6tc_free(h);
-				LIST_REMOVE(p, entries);
-				pinhole_count--;
-				return 0;	/* ok */
-			}
-		}
-		index++;
-	}
-	ip6tc_free(h);
-	syslog(LOG_WARNING, "delete_pinhole() rule with PID=%hu not found", uid);
-	LIST_REMOVE(p, entries);
-	pinhole_count--;
-	return -2;	/* not found */
-error:
-	ip6tc_free(h);
-	return -1;
-}
-
-int
-update_pinhole(unsigned short uid, unsigned int timestamp)
-{
-	struct pinhole_t * p;
-
-	p = get_pinhole(uid);
-	if(p) {
-		p->timestamp = timestamp;
-		return 0;
-	} else {
-		return -2;	/* Not found */
-	}
-}
-
-int
-get_pinhole_info(unsigned short uid,
-                 char * rem_host, int rem_hostlen,
-                 unsigned short * rem_port,
-                 char * int_client, int int_clientlen,
-                 unsigned short * int_port,
-                 int * proto, char * desc, int desclen,
-                 unsigned int * timestamp,
-                 u_int64_t * packets, u_int64_t * bytes)
-{
-	struct pinhole_t * p;
-
-	p = get_pinhole(uid);
-	if(!p)
-		return -2;	/* Not found */
-	if(rem_host && (rem_host[0] != '\0')) {
-		if(inet_ntop(AF_INET6, &p->saddr, rem_host, rem_hostlen) == NULL)
-			return -1;
-	}
-	if(rem_port)
-		*rem_port = p->sport;
-	if(int_client) {
-		if(inet_ntop(AF_INET6, &p->daddr, int_client, int_clientlen) == NULL)
-			return -1;
-	}
-	if(int_port)
-		*int_port = p->dport;
-	if(proto)
-		*proto = p->proto;
-	if(timestamp)
-		*timestamp = p->timestamp;
-	if (desc)
-		strncpy(desc, p->desc, desclen);
-	if(packets || bytes) {
-		/* theses informations need to be read from netfilter */
-		IP6TC_HANDLE h;
-		const struct ip6t_entry * e;
-		const struct ip6t_entry_match * match;
-		int found = 0;
-		h = ip6tc_init("filter");
-		if(!h) {
-			syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
-			return -1;
-		}
-		for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
-		    e;
-		    e = ip6tc_next_rule(e, h)) {
-			if((e->ipv6.proto == p->proto) &&
-			   (0 == memcmp(&e->ipv6.src, &p->saddr, sizeof(e->ipv6.src))) &&
-			   (0 == memcmp(&e->ipv6.dst, &p->daddr, sizeof(e->ipv6.dst)))) {
-				const struct ip6t_tcp * info;
-				match = (const struct ip6t_entry_match *)&e->elems;
-				info = (const struct ip6t_tcp *)&match->data;
-				if((info->spts[0] == p->sport) && (info->dpts[0] == p->dport)) {
-					if(packets)
-						*packets = e->counters.pcnt;
-					if(bytes)
-						*bytes = e->counters.bcnt;
-					found = 1;
-					break;
-				}
-			}
-		}
-		ip6tc_free(h);
-		/* the list has the pinhole, but the chain lost its rule */
-		if(!found)
-			return -2;
-	}
-	return 0;
-}
-
-/* 1 if the chain has an ACCEPT rule of the key, 0 if not, -1 if it could
- * not be read */
-static int
-chain_has_rule(const struct in6_addr * saddr, unsigned short sport,
-               const struct in6_addr * daddr, unsigned short dport, int proto)
-{
-	IP6TC_HANDLE h;
-	const struct ip6t_entry * e;
-	const struct ip6t_entry_match * match;
-	const struct ip6t_tcp * info;
-	int found = 0;
-
-	h = ip6tc_init("filter");
-	if(!h) {
-		syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
-		return -1;
-	}
-	if(!ip6tc_is_chain(miniupnpd_v6_filter_chain, h)) {
-		ip6tc_free(h);
-		return -1;
-	}
-	for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
-	    e && !found;
-	    e = ip6tc_next_rule(e, h)) {
-		if((e->ipv6.proto != proto) ||
-		   (0 != memcmp(&e->ipv6.src, saddr, sizeof(e->ipv6.src))) ||
-		   (0 != memcmp(&e->ipv6.dst, daddr, sizeof(e->ipv6.dst))))
-			continue;
-		match = (const struct ip6t_entry_match *)&e->elems;
-		info = (const struct ip6t_tcp *)&match->data;
-		found = (info->spts[0] == sport) && (info->dpts[0] == dport);
-	}
-	ip6tc_free(h);
-	return found;
-}
-
-/* The key-based API of fwmap6.h, on top of the list of pinholes, which
- * keeps its own uids. The list lives in memory only: a rule of the key
- * which is in the chain but not in the list, as after a restart which left
- * the rules in place, goes into the list, so the rule is found and not
- * added a second time. */
-static int
-key_uid(const char * rem_host, unsigned short rem_port,
-        const char * int_client, unsigned short int_port, int proto)
-{
-	struct in6_addr saddr, daddr;
-	int uid;
-
-	if(map6_any_remote(rem_host))
-		rem_host = NULL;
-	uid = find_pinhole(NULL, rem_host, rem_port, int_client, int_port, proto,
-	                   NULL, 0, NULL);
-	if(uid >= 0)
-		return uid;
-	memset(&saddr, 0, sizeof(saddr));
-	if(rem_host != NULL && inet_pton(AF_INET6, rem_host, &saddr) < 1)
-		return -2;
-	if(inet_pton(AF_INET6, int_client, &daddr) < 1)
-		return -2;
-	if(chain_has_rule(&saddr, rem_port, &daddr, int_port, proto) != 1)
-		return -2;
-	return add_to_pinhole_list(&saddr, rem_port, &daddr, int_port, proto, "", 0);
-}
-
-int
-add_map6_rule(const char * ifname,
-                 const char * rem_host, unsigned short rem_port,
-                 const char * int_client, unsigned short int_port,
-                 int proto, const char * desc, unsigned int timestamp)
-{
-	return add_pinhole(ifname, map6_any_remote(rem_host) ? NULL : rem_host, rem_port,
-	                   int_client, int_port, proto, desc, timestamp) < 0 ? -1 : 0;
+	return r < 0 ? -1 : 0;
 }
 
 int
 delete_map6_rule(const char * rem_host, unsigned short rem_port,
-                    const char * int_client, unsigned short int_port, int proto)
+                 const char * int_client, unsigned short int_port, int proto)
 {
-	int uid = key_uid(rem_host, rem_port, int_client, int_port, proto);
-	return uid < 0 ? -2 : delete_pinhole((unsigned short)uid);
+	IP6TC_HANDLE h;
+	struct in6_addr saddr, daddr;
+	unsigned int index;
+
+	if(rule_key(rem_host, int_client, &saddr, &daddr) < 0)
+		return -2;
+	h = init_filter();
+	if(!h)
+		return -1;
+	if(!find_rule(h, &saddr, rem_port, &daddr, int_port, proto, &index)) {
+		ip6tc_free(h);
+		return -2;	/* not found */
+	}
+	if(!ip6tc_delete_num_entry(miniupnpd_v6_filter_chain, index, h)) {
+		syslog(LOG_ERR, "ip6tc_delete_num_entry(%s,%u,...): %s",
+		       miniupnpd_v6_filter_chain, index, ip6tc_strerror(errno));
+		ip6tc_free(h);
+		return -1;
+	}
+	if(!ip6tc_commit(h)) {
+		syslog(LOG_ERR, "ip6tc_commit(): %s", ip6tc_strerror(errno));
+		ip6tc_free(h);
+		return -1;
+	}
+	ip6tc_free(h);
+	return 0;
 }
 
 int
 get_map6_packets(const char * rem_host, unsigned short rem_port,
-                    const char * int_client, unsigned short int_port,
-                    int proto, u_int64_t * packets)
+                 const char * int_client, unsigned short int_port,
+                 int proto, u_int64_t * packets)
 {
-	int uid = key_uid(rem_host, rem_port, int_client, int_port, proto);
-	int r;
-	if(uid < 0)
+	IP6TC_HANDLE h;
+	const struct ip6t_entry * e;
+	struct in6_addr saddr, daddr;
+
+	if(rule_key(rem_host, int_client, &saddr, &daddr) < 0)
 		return -2;
-	/* -2 also when the chain lost the rule of the pinhole */
-	r = get_pinhole_info((unsigned short)uid, NULL, 0, NULL, NULL, 0, NULL,
-	                     NULL, NULL, 0, NULL, packets, NULL);
-	return r < 0 ? r : 0;
+	h = init_filter();
+	if(!h)
+		return -1;
+	e = find_rule(h, &saddr, rem_port, &daddr, int_port, proto, NULL);
+	if(e && packets)
+		*packets = e->counters.pcnt;
+	ip6tc_free(h);
+	return e ? 0 : -2;
 }
 
 int
@@ -602,23 +337,15 @@ get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
                     unsigned short * int_port, int * proto,
                     char * desc, int desclen)
 {
-	/* the chain, not the list: the list in memory does not have the
-	 * rules of an earlier run */
 	IP6TC_HANDLE h;
 	const struct ip6t_entry * e;
 	const struct ip6t_entry_match * match;
 	const struct ip6t_tcp * info;
 	int r = -1;
 
-	h = ip6tc_init("filter");
-	if(!h) {
-		syslog(LOG_ERR, "ip6tc_init error : %s", ip6tc_strerror(errno));
+	h = init_filter();
+	if(!h)
 		return -1;
-	}
-	if(!ip6tc_is_chain(miniupnpd_v6_filter_chain, h)) {
-		ip6tc_free(h);
-		return -1;
-	}
 	for(e = ip6tc_first_rule(miniupnpd_v6_filter_chain, h);
 	    e;
 	    e = ip6tc_next_rule(e, h)) {

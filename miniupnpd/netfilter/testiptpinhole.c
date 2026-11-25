@@ -11,17 +11,22 @@
 #include <syslog.h>
 
 #include "../config.h"
+#include "../macros.h"
 #include "iptpinhole.h"
 #include "../commonrdr.h"
 
 
 int main(int argc, char * * argv)
 {
-	int uid;
+	int r;
+	UNUSED(argc); UNUSED(argv);
 
 	openlog("testiptpinhole", LOG_PERROR|LOG_CONS, LOG_LOCAL0);
 
-	uid = add_pinhole("eth0", NULL, 0, "ff::123", 54321, IPPROTO_TCP);
+	r = add_map6_rule("eth0", NULL, 0, "ff::123", 54321, IPPROTO_TCP, NULL, 0);
+	syslog(LOG_INFO, "add_map6_rule() returned %d", r);
+	r = delete_map6_rule(NULL, 0, "ff::123", 54321, IPPROTO_TCP);
+	syslog(LOG_INFO, "delete_map6_rule() returned %d", r);
 	return 0;
 }
 

@@ -7,8 +7,7 @@
  * A rule holds no label: a map6 of the daemon is an IPv6 forward rule of
  * its chain or anchor.
  *
- * nftables and pf implement this. iptables keeps its own list of map6s,
- * and implements it on top of that list. */
+ * nftables, pf and iptables implement this. */
 #ifndef FWMAP6_H_INCLUDED
 #define FWMAP6_H_INCLUDED
 
