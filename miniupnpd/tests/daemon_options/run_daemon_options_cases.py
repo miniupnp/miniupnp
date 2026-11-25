@@ -186,9 +186,10 @@ def main():
     args.config = [config_line(word) for word in args.config]
     try:
         sections, cases, profiles, earlier_cases = read_corpus()
+        option_names = option_names_of_tree()
         if args.list_runs:
             listed = [case for case in cases if (not args.case or case["name"] in args.case)
-                      and on_platform(case, args.platform) and not missing_option(case, option_names_of_tree())]
+                      and on_platform(case, args.platform) and not missing_option(case, option_names)]
             for config, side, family in config_runs(listed):
                 print(" ".join((side, family) + tuple(config_word(line) for line in config)))
             return 0
@@ -200,7 +201,7 @@ def main():
         return 0
     try:
         outcomes = run_selected(args, selected)
-        outcomes.update(missing_option_outcomes(cases, args, option_names_of_tree()))
+        outcomes.update(missing_option_outcomes(cases, args, option_names))
     except KeyboardInterrupt:
         print("Interrupted: no status report written.", file=sys.stderr)
         return 130
