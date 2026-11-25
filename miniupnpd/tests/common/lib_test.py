@@ -2901,6 +2901,19 @@ def receive_ssdp(sock, seconds, accept=None, enough=None):
             messages.append({"start": start, "headers": headers, "source": source[0]})
 
 
+def ssdp_wait(request, expect, strict):
+    """How long an M-SEARCH step collects replies: its `wait`, or MX+1 s (msearch_wait). A step that
+    expects no reply (count: 0) waits only SSDP_QUIET s on a build without --strict: that build answers
+    a search after 50 ms or not at all. The strict build delays each reply by up to MX
+    (DELAY_MSEARCH_RESPONSE), so there the step keeps its full window."""
+    wait = request.get("wait")
+    if wait is None:
+        wait = msearch_wait(request.get("mx", 1))
+    if not strict and expect.get("count") == 0:
+        wait = min(wait, SSDP_QUIET)
+    return wait
+
+
 def ssdp_msearch(sock, target, st, mx=1, extra_headers=(), man='"ssdp:discover"', host=None, raw=None, wait=None,
                  enough=None):
     """Send an M-SEARCH to `target` and return the responses received within MX+1 s (msearch_wait)."""
@@ -3385,7 +3398,8 @@ def run_ssdp_step(step, variables):
             host = f"{host_literal(variables['router'])}:{SSDP_PORT}"
         messages = ssdp_msearch(sock, target, request.get("st"), request.get("mx", 1),
                                 [tuple(item) for item in request.get("headers", [])],
-                                request.get("man", '"ssdp:discover"'), host, request.get("raw"), request.get("wait"),
+                                request.get("man", '"ssdp:discover"'), host, request.get("raw"),
+                                ssdp_wait(request, step.get("expect", {}), variables.get("strict")),
                                 # the strict build delays each reply by a random time up to MX
                                 # (DELAY_MSEARCH_RESPONSE): an extra reply can come after the quiet
                                 # time, so an exact count waits the whole window there

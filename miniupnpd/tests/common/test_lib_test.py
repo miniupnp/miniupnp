@@ -2041,6 +2041,18 @@ class SsdpTests(unittest.TestCase):
         self.assertFalse(enough([alive, alive]))
         self.assertTrue(enough([alive, byebye, alive]))
 
+    def test_ssdp_wait_short_for_no_reply_without_strict(self):
+        quiet = lib_test.SSDP_QUIET
+        self.assertEqual(lib_test.ssdp_wait({}, {"count": 0}, strict=False), quiet)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 1.5}, {"count": 0}, strict=False), quiet)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 0.2}, {"count": 0}, strict=False), 0.2)
+        # the strict build delays its replies up to MX: the full window stays
+        self.assertEqual(lib_test.ssdp_wait({"mx": 3}, {"count": 0}, strict=True), 4)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 1.5}, {"count": 0}, strict=True), 1.5)
+        # a step that expects replies keeps its window (enough ends it early)
+        self.assertEqual(lib_test.ssdp_wait({}, {"count": 1}, strict=False), 2)
+        self.assertEqual(lib_test.ssdp_wait({"wait": 1.5}, {}, strict=False), 1.5)
+
     def test_receive_ssdp_stops_after_enough_and_quiet(self):
         """Once enough: a message within the quiet time still counts, and the wait ends well before
         `seconds`."""

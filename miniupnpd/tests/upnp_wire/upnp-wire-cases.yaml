@@ -9,6 +9,8 @@
 # both), and runs `steps` (then `cleanup`, also after a failure) with lib_test.run_upnp_step:
 #
 #   kind: ssdp         an M-SEARCH (st, mx, man, host; null leaves a header out; target: multicast | unicast)
+#                      collects replies for `wait` s (default MX+1); a step expecting none (count: 0) waits
+#                      0.5 s without --strict, which answers within 50 ms or never
 #   kind: ssdp-listen  the NOTIFY messages on the group within `seconds` (restart: around a daemon restart)
 #   kind: http         a request: raw bytes ({host} is the router's host:port) or method/path/headers/body;
 #                      parse: description | scpd adds desc.* / scpd.* values
