@@ -2324,7 +2324,7 @@ list_redirect_rule(const char * ifname)
 			IPT_MATCH_ITERATE(e, print_match);
 			/*printf("\n");*/
 		}
-		printf("target = %s :\n", target_str);
+		printf("target = %s (rev%d) :\n", target_str, target->u.user.revision);
 		target = (void *)e + e->target_offset;
 #ifdef ENABLE_DNAT_REVISION2
 		if(target->u.user.revision == 2) {
