@@ -235,10 +235,12 @@ Set `PCP_E2E_KEEP=1` to retain containers and networks for debugging. Set
 `PCP_E2E_ARTIFACT_DIR` to change the output root (default: `.tmp/pcp-e2e/`).
 Each run stores daemon startup and final logs. Per-case artifacts are grouped
 under `<run>/<family>/<section>/<case>/`; for example,
-`ipv4/MAP/map-single-udp-only/`. That folder contains the packet capture
-(`packet-capture.pcap`), tcpdump diagnostics, runner and daemon logs, and
-before/after daemon snapshots containing the process, config, interfaces,
-routes, nftables ruleset, daemon state files, and lease files. The runner
+`ipv4/MAP/map-single-udp-only/`. That folder contains the runner and daemon
+logs, and before/after daemon snapshots containing the process, config,
+interfaces, routes, nftables ruleset, daemon state files, and lease files.
+Set `PCAP_CAPTURE=1` for a packet capture of each case as well
+(`packet-capture.pcap` and its tcpdump diagnostics; on FreeBSD and OpenBSD
+`packet-capture-IF.pcap`, one per router interface). The runner
 pauses after each PCP response so `daemon-expect-N.txt` captures daemon state
 immediately before the expected-result assertion. The status report includes
 the run artifact directory; browse its nested folders for per-case artifacts.

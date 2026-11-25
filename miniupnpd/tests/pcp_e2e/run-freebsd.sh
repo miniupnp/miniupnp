@@ -19,9 +19,9 @@
 # PCP_TEST_FREEBSD_CACHE, PCP_TEST_FREEBSD_MEMORY, PCP_TEST_FREEBSD_SSH_PORT (as for
 # ../common/freebsd_vm.sh, whose cached prepared image is shared; the VM steps are those of
 # ../common/vm_lib.sh),
-# PCP_E2E_KEEP=1, PCP_E2E_ARTIFACT_DIR, E2E_STATUS_FILE (default status.md
-# beside this script: the freebsd column of the report run-docker.sh fills the linux
-# column of), DOCKER.
+# PCP_E2E_KEEP=1, PCAP_CAPTURE=1 (a packet capture per case), PCP_E2E_ARTIFACT_DIR,
+# E2E_STATUS_FILE (default status.md beside this script: the freebsd column of the report
+# run-docker.sh fills the linux column of), DOCKER.
 #
 # Keeping the fixture between runs (the VM, the Docker networks, the relay and the
 # peers, and the build tree in the VM), so a later run copies in only what changed:
@@ -580,10 +580,10 @@ run_family() {
     case_dir=$family_dir/$section_name/$case_name
     mkdir -p "$case_dir"
     snapshot_daemon_state "$case_dir/daemon-before.txt"
-    start_packet_capture
+    [ "${PCAP_CAPTURE:-0}" != 1 ] || start_packet_capture
     e2e_start_runner
     e2e_wait_runner
-    stop_packet_capture "$case_dir"
+    [ "${PCAP_CAPTURE:-0}" != 1 ] || stop_packet_capture "$case_dir"
     snapshot_daemon_state "$case_dir/daemon-after.txt"
     $SSH "$PRIV cat /tmp/pcp-e2e/miniupnpd.log" >"$case_dir/daemon.log" 2>&1 || true
     e2e_record_result "$family/$section_name/$case_name"

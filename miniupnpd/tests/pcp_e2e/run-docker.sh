@@ -231,12 +231,17 @@ run_family() {
     case_dir=$family_dir/$section_name/$case_name
     mkdir -p "$case_dir"
     snapshot_daemon_state "$case_dir/daemon-before.txt"
-    start_packet_capture "/pcp-e2e-artifacts/$family/$section_name/$case_name/packet-capture.pcap"
+    case_path=$family/$section_name/$case_name
+    case_artifacts=
+    if [ "${PCAP_CAPTURE:-0}" = 1 ]; then
+      start_packet_capture "/pcp-e2e-artifacts/$case_path/packet-capture.pcap"
+      case_artifacts="$case_path/packet-capture.pcap; $case_path/packet-capture.pcap.log; "
+    fi
     e2e_start_runner
     e2e_wait_runner
-    stop_packet_capture "/pcp-e2e-artifacts/$family/$section_name/$case_name/packet-capture.pcap"
+    [ "${PCAP_CAPTURE:-0}" != 1 ] || stop_packet_capture "/pcp-e2e-artifacts/$case_path/packet-capture.pcap"
     snapshot_daemon_state "$case_dir/daemon-after.txt"
-    case_artifacts="$family/$section_name/$case_name/packet-capture.pcap; $family/$section_name/$case_name/packet-capture.pcap.log; $family/$section_name/$case_name/daemon-before.txt; $family/$section_name/$case_name/daemon-expect-*.txt; $family/$section_name/$case_name/daemon-after.txt; $family/$section_name/$case_name/runner.log; $family/$section_name/$case_name/daemon.log"
+    case_artifacts="$case_artifacts$case_path/daemon-before.txt; $case_path/daemon-expect-*.txt; $case_path/daemon-after.txt; $case_path/runner.log; $case_path/daemon.log"
     e2e_record_result "$case_artifacts"
     "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" \
       > "$case_dir/daemon.log" 2>&1 || true
