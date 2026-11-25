@@ -96,6 +96,7 @@ static const struct {
 	{ UPNPQUICKRULES, "quickrules" },
 #endif
 	{ UPNPTABLEDUMPFILE, "table_dump_file"},
+	{ UPNPTABLESTATSFILE, "table_stats_file"},
 #ifdef ENABLE_LEASEFILE
 	{ UPNPLEASEFILE, "lease_file"},
 #ifdef ENABLE_UPNPPINHOLE

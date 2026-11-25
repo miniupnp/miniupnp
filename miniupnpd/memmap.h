@@ -124,4 +124,21 @@ memmap_peer_port_used_by_other(int family, const struct in6_addr * eaddr,
  * text. 0, or -1 if the file could not be written. */
 int memmap_dump(const char * path);
 
+/* Write the sizes of the tables to path, a "name value" line each, to
+ * compare with the rules of the firewall:
+ *   map                the rows of the lease table, of any family
+ *   map_pcp, map_natpmp, map_upnp   the rows of each protocol
+ *   map_ipv4, map_ipv6 the rows by the family of their internal side
+ *   map_expired        rows whose expiry is before now, still in the table
+ *   map_filters        the filters of all maps
+ *   outgoing_bindings  PCP PEER bindings
+ *   outgoing_bindings_ipv4, outgoing_bindings_ipv6   the same by family
+ *   outgoing           their remotes: an SNAT rule each
+ *   next_expiry        seconds from now to next_expiry, < 0 if it is past;
+ *                      no line if next_expiry is 0 (nothing to expire)
+ * now and next_expiry are on the clock of the expiries (upnp_time()). The
+ * file is replaced whole: a reader sees the old one or the new one. 0, or
+ * -1 if it could not be written. */
+int memmap_stats(const char * path, unsigned int now, unsigned int next_expiry);
+
 #endif

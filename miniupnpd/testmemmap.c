@@ -508,6 +508,69 @@ test_dump(void)
 	lease_table_clear();
 }
 
+/* the sizes: a "name value" line each, written whole */
+static void
+test_stats(void)
+{
+	char path[] = "/tmp/testmemmap.XXXXXX";
+	char tmp[sizeof(path) + 4];
+	char text[256];
+	struct outgoing_entry * b;
+	struct lease_entry * e;
+	FILE * f;
+	size_t n;
+	int fd, i;
+
+	lease_table_clear();
+	outgoing_table_clear();
+	memmap_add(row4(MAP_KIND_NATPMP, 5000, "::ffff:192.0.2.10", 80));
+	e = row4(MAP_KIND_UPNP, 5001, "::ffff:192.0.2.11", 81);
+	e->timestamp = 100;	/* past at 200 */
+	memmap_add(e);
+	memmap_add(row6("2001:db8::10", 4000, "2001:db8:1::1", 5, 300));
+	for(i = 0; i < 2; i++) {
+		b = outgoing_table_new(1);
+		assert(b != NULL);
+		b->family = AF_INET;
+		b->proto = IPPROTO_UDP;
+		b->iaddr = addr("::ffff:192.0.2.10");
+		b->iport = 5000;
+		b->eaddr = addr("::ffff:0.0.0.0");
+		b->eport = 6000;
+		b->peers[0].raddr = addr(i ? "::ffff:203.0.113.2" : "::ffff:203.0.113.1");
+		b->peers[0].rport = 80;
+		memmap_link_outgoing(b);
+	}
+	fd = mkstemp(path);
+	assert(fd >= 0);
+	close(fd);
+	assert(memmap_stats(path, 200, 250) == 0);
+	f = fopen(path, "r");
+	assert(f != NULL);
+	n = fread(text, 1, sizeof(text) - 1, f);
+	text[n] = '\0';
+	fclose(f);
+	assert(strcmp(text, "map 3\nmap_pcp 0\nmap_natpmp 1\nmap_upnp 2\n"
+	                    "map_ipv4 2\nmap_ipv6 1\nmap_expired 1\nmap_filters 1\n"
+	                    "outgoing_bindings 1\noutgoing_bindings_ipv4 1\n"
+	                    "outgoing_bindings_ipv6 0\noutgoing 2\n"
+	                    "next_expiry 50\n") == 0);
+	/* nothing to expire: no next_expiry line */
+	assert(memmap_stats(path, 200, 0) == 0);
+	f = fopen(path, "r");
+	assert(f != NULL);
+	n = fread(text, 1, sizeof(text) - 1, f);
+	text[n] = '\0';
+	fclose(f);
+	assert(strstr(text, "next_expiry") == NULL);
+	snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+	assert(access(tmp, F_OK) != 0);	/* renamed into place */
+	unlink(path);
+	assert(memmap_stats("/nonexistent/dir/stats", 200, 0) == -1);
+	lease_table_clear();
+	outgoing_table_clear();
+}
+
 int
 main(void)
 {
@@ -522,6 +585,7 @@ main(void)
 	test_client_maps();
 	test_outgoing();
 	test_dump();
+	test_stats();
 	printf("testmemmap: OK\n");
 	return 0;
 }
