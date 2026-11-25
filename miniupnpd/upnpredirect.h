@@ -141,6 +141,16 @@ upnp_delete_redirection(unsigned short eport, const char * protocol);
 int
 _upnp_delete_redir(unsigned short eport, int proto);
 
+/* upnp_eport_used_by_other()
+ * is the external port eport mapped (TCP or UDP, other than proto) to
+ * another internal address than iaddr ?  RFC 6886 section 3.3: such a
+ * port is reserved for the client which maps it, on both protocols, so
+ * another client gets another port.  The client's own mappings do not
+ * count.  The caller looks proto up itself.
+ * return value : 1 when used by another client, 0 otherwise */
+int
+upnp_eport_used_by_other(unsigned short eport, int proto, const char * iaddr);
+
 /* Periodic cleanup functions
  */
 struct rule_state
