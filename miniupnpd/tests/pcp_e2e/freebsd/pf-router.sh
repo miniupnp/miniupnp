@@ -33,7 +33,7 @@ OS=$(uname)
 if [ "$OS" = OpenBSD ]; then LAN_IF=vio1; WAN_IF=vio2; else LAN_IF=vtnet1; WAN_IF=vtnet2; fi
 
 WORK=/tmp/pcp-e2e
-. "$(dirname -- "$0")/../../common/freebsd_lib.sh"
+. "$(dirname -- "$0")/../../common/guest_lib.sh"
 PF=$WORK/pf.conf
 
 write_pf() {

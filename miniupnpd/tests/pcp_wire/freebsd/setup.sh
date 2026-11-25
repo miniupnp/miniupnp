@@ -10,7 +10,7 @@
 set -eu
 
 WORK=/tmp/pcp-fixture
-. "$(dirname -- "$0")/../../common/freebsd_lib.sh"
+. "$(dirname -- "$0")/../../common/guest_lib.sh"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 
