@@ -136,7 +136,7 @@ get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
                            char * rhost, int rhostlen, unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes)
 {
-	(void)ifname; (void)desc; (void)desclen;
+	(void)ifname; (void)desc; (void)desclen; (void)timestamp;
 	if(index >= (rules_listed >= 0 ? rules_listed : FAKE_RULES))
 		return -1;
 	*eport = (unsigned short)(5000 + index);
@@ -146,7 +146,6 @@ get_redirect_rule_by_index(int index, char * ifname, unsigned short * eport,
 	if(rhost != NULL && rhostlen > 0)
 		rhost[0] = '\0';
 	*proto = IPPROTO_TCP;
-	*timestamp = 0;
 	*packets = (u_int64_t)(10 * index);
 	*bytes = (u_int64_t)(100 * index);
 	return 0;

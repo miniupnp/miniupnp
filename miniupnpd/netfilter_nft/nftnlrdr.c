@@ -53,16 +53,6 @@
 #define d_printf(x)
 #endif
 
-/* list to keep timestamps for port mappings having a lease duration */
-struct timestamp_entry {
-	struct timestamp_entry * next;
-	unsigned int timestamp;
-	unsigned short eport;
-	short protocol;
-};
-
-static struct timestamp_entry * timestamp_list = NULL;
-
 #define NAT_CHAIN_TYPE		"nat"
 #define FILTER_CHAIN_TYPE	"filter"
 
@@ -128,74 +118,16 @@ set_rdr_name(rdr_name_type param, const char *string)
 	return 0;
 }
 
-static unsigned int
-get_timestamp(unsigned short eport, int proto)
-{
-	struct timestamp_entry * e;
-	e = timestamp_list;
-	while(e) {
-		if(e->eport == eport && e->protocol == (short)proto) {
-			syslog(LOG_DEBUG, "timestamp entry found (%hu, %d, %u)", eport, proto, e->timestamp);
-			return e->timestamp;
-		}
-		e = e->next;
-	}
-	syslog(LOG_WARNING, "get_timestamp(%hu, %d) no entry found", eport, proto);
-	return 0;
-}
-
-static void
-remove_timestamp_entry(unsigned short eport, int proto)
-{
-	struct timestamp_entry * e;
-	struct timestamp_entry * * p;
-	p = &timestamp_list;
-	e = *p;
-	while(e) {
-		if(e->eport == eport && e->protocol == (short)proto) {
-			syslog(LOG_DEBUG, "timestamp entry removed (%hu, %d, %u)", eport, proto, e->timestamp);
-			/* remove the entry */
-			*p = e->next;
-			free(e);
-			return;
-		}
-		p = &(e->next);
-		e = *p;
-	}
-	syslog(LOG_WARNING, "remove_timestamp_entry(%hu, %d) no entry found", eport, proto);
-}
-
-static void
-add_timestamp_entry(unsigned short eport, int proto, unsigned timestamp)
-{
-	struct timestamp_entry * tmp;
-	tmp = malloc(sizeof(struct timestamp_entry));
-	if(tmp)
-	{
-		tmp->next = timestamp_list;
-		tmp->timestamp = timestamp;
-		tmp->eport = eport;
-		tmp->protocol = (short)proto;
-		timestamp_list = tmp;
-		syslog(LOG_DEBUG, "timestamp entry added (%hu, %d, %u)", eport, proto, timestamp);
-	}
-	else
-	{
-		syslog(LOG_ERR, "add_timestamp_entry() malloc(%lu) error",
-		       sizeof(struct timestamp_entry));
-	}
-}
-
 int
 add_redirect_rule2(const char * ifname,
 		   const char * rhost, unsigned short eport,
 		   const char * iaddr, unsigned short iport, int proto,
 		   const char * desc, unsigned int timestamp)
 {
-	int ret;
 	struct nftnl_rule *r;
 	in_addr_t rhost_addr = 0;
 
+	UNUSED(timestamp);	/* the lease table has the expiry */
 	d_printf(("add redirect rule2(%s, %s, %u, %s, %u, %d, %s)!\n",
 	          ifname, rhost, eport, iaddr, iport, proto, desc));
 
@@ -206,11 +138,7 @@ add_redirect_rule2(const char * ifname,
 	                  rhost_addr, eport,
 	                  inet_addr(iaddr), iport,  desc, NULL);
 
-	ret = nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
-	if (ret >= 0) {
-		add_timestamp_entry(eport, proto, timestamp);
-	}
-	return ret;
+	return nft_send_rule(r, NFT_MSG_NEWRULE, RULE_CHAIN_REDIRECT);
 }
 
 /*
@@ -491,7 +419,7 @@ get_peer_rule_by_index(int index,
 			}
 
 			if (timestamp) {
-				*timestamp = get_timestamp(r->dport, r->proto);
+				*timestamp = 0;
 			}
 
 			return 0;
@@ -598,7 +526,7 @@ get_redirect_rule_by_index(int index,
 			}
 
 			if (timestamp != NULL) {
-				*timestamp = get_timestamp(*eport, *proto);
+				*timestamp = 0;
 			}
 
 			if (packets)
@@ -667,7 +595,7 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 				*iport = p->nat_port;
 
 			if(timestamp != NULL)
-				*timestamp = get_timestamp(eport, proto);
+				*timestamp = 0;
 
 			if(packets)
 				*packets = p->packets;
@@ -739,10 +667,8 @@ update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,
                    const char * desc, unsigned int timestamp)
 {
-	UNUSED(ifname);
-	UNUSED(desc);
-	remove_timestamp_entry(eport, proto);
-	add_timestamp_entry(eport, proto, timestamp);
+	UNUSED(ifname); UNUSED(eport); UNUSED(proto);
+	UNUSED(desc); UNUSED(timestamp);
 	return 0;
 }
 

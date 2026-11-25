@@ -45,7 +45,6 @@ struct fw_rule {
 	unsigned short eport;
 	unsigned short iport;
 	int proto;
-	unsigned int timestamp;
 };
 
 static void
@@ -58,7 +57,6 @@ rule_of(const struct lease_entry * e, struct fw_rule * r)
 	r->eport = e->eport;
 	r->iport = e->iport;
 	r->proto = e->proto;
-	r->timestamp = e->timestamp;
 }
 
 void
@@ -88,10 +86,9 @@ int
 fw_map_rule(unsigned short eport, int proto, u_int64_t * packets, u_int64_t * bytes)
 {
 	unsigned short iport;
-	unsigned int timestamp;
 
 	return redirect_result(get_redirect_rule(ext_if_name, eport, proto, NULL, 0,
-	                                         &iport, NULL, 0, NULL, 0, &timestamp,
+	                                         &iport, NULL, 0, NULL, 0, NULL,
 	                                         packets, bytes));
 }
 
@@ -104,13 +101,12 @@ fw_each_map_counters(fw_counters_fn fn, void * arg)
 #else
 	char iaddr[INET6_ADDRSTRLEN];
 	unsigned short eport, iport;
-	unsigned int timestamp;
 	u_int64_t packets, bytes;
 	int i, proto;
 
 	for(i = 0; get_redirect_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr),
 	                                      &iport, &proto, NULL, 0, NULL, 0,
-	                                      &timestamp, &packets, &bytes) >= 0; i++)
+	                                      NULL, &packets, &bytes) >= 0; i++)
 		fn(eport, proto, packets, bytes, arg);
 	return 0;
 #endif
@@ -275,7 +271,7 @@ add_map4_rules(const struct lease_entry * e, int * half, int fresh)
 
 	rule_of(e, &r);
 	if(add_redirect_rule2(ext_if_name, r.rhost, r.eport, r.iaddr, r.iport, r.proto,
-	                      r.desc, r.timestamp) < 0) {
+	                      r.desc, 0) < 0) {
 		/* A backend which adds more than one rule takes back the first
 		 * when a later one fails, and that can fail too: iptables adds a
 		 * MASQUERADE rule after the DNAT rule */
@@ -319,10 +315,8 @@ update_rules(const struct lease_entry * from, const struct lease_entry * to)
 		return 0;
 	rule_of(to, &r);
 	if(from->iport != to->iport)
-		return update_portmapping(ext_if_name, r.eport, r.proto, r.iport, r.desc,
-		                          r.timestamp);
-	return update_portmapping_desc_timestamp(ext_if_name, r.eport, r.proto, r.desc,
-	                                         r.timestamp);
+		return update_portmapping(ext_if_name, r.eport, r.proto, r.iport, r.desc, 0);
+	return update_portmapping_desc_timestamp(ext_if_name, r.eport, r.proto, r.desc, 0);
 }
 
 #if defined(PCP_PEER) && defined(USE_NETFILTER)
@@ -586,14 +580,13 @@ fw_map_rule_at(int i, struct lease_entry * e)
 	char iaddr[INET6_ADDRSTRLEN];
 	char rhost[INET6_ADDRSTRLEN];
 	unsigned short eport, iport;
-	unsigned int timestamp;
 	u_int64_t packets, bytes;
 	int proto;
 
 	iaddr[0] = rhost[0] = '\0';
 	if(get_redirect_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr), &iport,
 	                              &proto, NULL, 0, rhost, sizeof(rhost),
-	                              &timestamp, &packets, &bytes) < 0)
+	                              NULL, &packets, &bytes) < 0)
 		return -1;
 	e->eport = eport;
 	e->proto = proto;
@@ -632,12 +625,11 @@ fw_peer_rule_at(int i, struct outgoing_entry * b)
 	char iaddr[INET6_ADDRSTRLEN];
 	char rhost[INET6_ADDRSTRLEN];
 	unsigned short eport, iport, rport;
-	unsigned int timestamp;
 	int proto;
 
 	iaddr[0] = rhost[0] = '\0';
 	if(get_peer_rule_by_index(i, NULL, &eport, iaddr, sizeof(iaddr), &iport, &proto,
-	                          NULL, 0, rhost, sizeof(rhost), &rport, &timestamp,
+	                          NULL, 0, rhost, sizeof(rhost), &rport, NULL,
 	                          NULL, NULL) < 0)
 		return -1;
 	if(map_ipv4_to_ipv6_af(iaddr, AF_INET, &b->iaddr) < 0 ||
