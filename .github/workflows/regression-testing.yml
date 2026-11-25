@@ -5,6 +5,7 @@ name: 'miniupnpd: Regression testing'
 # for each other, so they run at the same time. "wire" is the request / response
 # suite (pcp_wire), "end2end" the forwarding suite (pcp_e2e):
 #   self-test       the harness's own checks (common/run_self_tests.sh)
+#   pull-request    the pull request's number, for the review regression-report.yml posts
 #   wire-linux      the wire suite on Docker, master's daemon against the pull request's
 #   wire-freebsd    the wire suite, its daemon-restart and lease cases on FreeBSD 14.5 and 15.1 (pf),
 #                   master's daemon against the pull request's
@@ -94,6 +95,27 @@ jobs:
         # the same file run-docker.sh and run-freebsd.sh run before their cases
         run: sh miniupnpd/tests/common/run_self_tests.sh
 
+  pull-request:
+    # The number of the pull request, for regression-report.yml: the run of a fork's pull
+    # request does not name it. The report reads every comparison's review.md from the
+    # review-* artifacts of the jobs below.
+    name: Pull request number for the report
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write the number
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "$NUMBER" > pull-request-number
+
+      - name: Upload the number
+        uses: actions/upload-artifact@v7
+        with:
+          name: pull-request
+          path: pull-request-number
+          retention-days: 14
+
   end2end-linux:
     # run-docker.sh with master's daemon and with the pull request's (both with the
     # pull request's harness); a case that passed on master and fails now fails the job
@@ -147,6 +169,15 @@ jobs:
         with:
           name: end2end-linux-${{ github.run_id }}-${{ github.run_attempt }}
           path: end2end-linux/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-end2end-linux
+          path: end2end-linux/review.md
           if-no-files-found: warn
           retention-days: 14
 
@@ -233,6 +264,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-end2end-freebsd-${{ matrix.release }}
+          path: end2end-freebsd/review.md
+          if-no-files-found: warn
+          retention-days: 14
+
   end2end-openbsd:
     # end2end-freebsd with an OpenBSD QEMU VM as the router (pcp_e2e/run-openbsd.sh). OpenBSD
     # publishes no cloud image: the image is installed once and cached.
@@ -313,6 +353,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-end2end-openbsd-${{ matrix.release }}
+          path: end2end-openbsd/review.md
+          if-no-files-found: warn
+          retention-days: 14
+
   wire-linux:
     name: wire-linux (Docker, master against the pull request)
     runs-on: ubuntu-latest
@@ -370,6 +419,15 @@ jobs:
         with:
           name: wire-linux-${{ github.run_id }}-${{ github.run_attempt }}
           path: pcp-wire-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-wire-linux
+          path: pcp-wire-artifacts/review.md
           if-no-files-found: warn
           retention-days: 14
 
@@ -455,6 +513,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-wire-freebsd-${{ matrix.release }}
+          path: freebsd-results/comparison/review.md
+          if-no-files-found: warn
+          retention-days: 14
+
   options-linux:
     # daemon_options/run-docker.sh with master's daemon and with the pull request's (both with
     # the pull request's harness); a case that passed on master and fails now fails the job
@@ -508,6 +575,15 @@ jobs:
         with:
           name: options-linux-${{ github.run_id }}-${{ github.run_attempt }}
           path: options-linux/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-options-linux
+          path: options-linux/review.md
           if-no-files-found: warn
           retention-days: 14
 
@@ -587,6 +663,15 @@ jobs:
         with:
           name: options-freebsd-${{ matrix.release }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: options-freebsd/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-options-freebsd-${{ matrix.release }}
+          path: options-freebsd/review.md
           if-no-files-found: warn
           retention-days: 14
 
@@ -670,6 +755,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-options-openbsd-${{ matrix.release }}
+          path: options-openbsd/review.md
+          if-no-files-found: warn
+          retention-days: 14
+
   upnp-wire-linux:
     # upnp_wire/run-docker.sh on every daemon build, with master's daemon and with the pull request's
     # (both with the pull request's harness). The corpus has FAILs (spec gaps): only a case that
@@ -727,6 +821,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-upnp-wire-linux
+          path: upnp-wire-linux/review.md
+          if-no-files-found: warn
+          retention-days: 14
+
   upnp-e2e-linux:
     # upnp_e2e/run-docker.sh on every daemon build, with master's daemon and with the pull request's
     # (both with the pull request's harness). The corpus has FAILs (spec gaps): only a case that
@@ -781,5 +884,14 @@ jobs:
         with:
           name: upnp-e2e-linux-${{ github.run_id }}-${{ github.run_attempt }}
           path: upnp-e2e-linux/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload review.md for the review on the pull request
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-upnp-e2e-linux
+          path: upnp-e2e-linux/review.md
           if-no-files-found: warn
           retention-days: 14
