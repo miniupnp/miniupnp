@@ -45,7 +45,6 @@ defaults:
     shell: bash
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -261,6 +260,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
+    # trusted publishing to PyPI
+    permissions:
+      id-token: write
     needs: build
 
     steps:
