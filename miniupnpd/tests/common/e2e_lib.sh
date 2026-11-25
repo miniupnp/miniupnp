@@ -4,6 +4,9 @@
 # drivers differ in how they start the daemon, take snapshots and capture packets,
 # not in how a case is run and reported.
 
+# Python writes no bytecode caches into the source tree.
+export PYTHONDONTWRITEBYTECODE=1
+
 # e2e_timestamp_output "$@": when stdout is a terminal, re-run the calling script
 # with every output line prefixed by the time (HH:MM:SS) and exit with its status.
 # PCP_E2E_TIMESTAMPS=0 disables it. Call first, before any other output.
