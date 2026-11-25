@@ -54,9 +54,10 @@ the first free one, so it runs beside the other suites.
 2. For each configuration, the driver starts a fresh router container on a LAN and a WAN bridge
    (`PCP_TEST_REAL_WAN=1`), with the configuration lines in `PCP_TEST_EXTRA_CONF` and
    `PCP_TEST_CONF_REPLACE=1`. It is ready when its log says it listens (NAT-PMP/PCP or HTTP).
-3. For each side and family of that configuration, it runs the runner in a container: from the
-   LAN client (`.2` of the slot's LAN) to the router's LAN address, or from a host on the
-   WAN link (`.2` of its WAN) to the router's WAN address. The runner selects the
+3. For each side and family of that configuration, it runs the runner (`docker exec`) in one of
+   two containers that stay for the whole run: the LAN client (`.2` of the slot's LAN), which
+   sends to the router's LAN address, or a host on the WAN link (`.2` of its WAN), which sends
+   to the router's WAN address. They forget the router's old MAC address after each start. The runner selects the
    cases whose `config:` is exactly the `--config` lines and whose `from:` is `--side`, runs them
    and merges their results into `status.md`; the cases of other runs keep their results.
 
