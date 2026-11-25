@@ -7,7 +7,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <syslog.h>
 
 #include "iptcrdr.h"
@@ -68,7 +70,19 @@ main(int argc, char ** argv)
 	printf("trying to list nat rules :\n");
 	list_redirect_rule(argv[1]);
 	printf("deleting\n");
-	delete_redirect_and_filter_rules(eport, IPPROTO_TCP);
+	{
+		struct outgoing_rule_key k;
+
+		memset(&k, 0, sizeof(k));
+		k.iaddr = inet_addr(iaddr);
+		k.raddr = inet_addr(rhost);
+		k.iport = iport;
+		k.rport = rport;
+		k.eport = eport;
+		k.proto = IPPROTO_TCP;
+		if(outgoing_rule_delete(&k, 1) < 0 || k.result != 0)
+			return -1;
+	}
 	return 0;
 }
 

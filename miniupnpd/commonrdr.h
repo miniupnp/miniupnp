@@ -34,6 +34,24 @@ get_redirect_rule_count(const char * ifname);
 
 
 
+#include <netinet/in.h>
+
+/*! \brief the key of a PEER rule (SNAT) of netfilter: iaddr:iport out to
+ * raddr:rport on eport. Addresses in network order, ports in host order. */
+struct outgoing_rule_key {
+	in_addr_t iaddr;
+	in_addr_t raddr;
+	unsigned short iport;
+	unsigned short rport;
+	unsigned short eport;
+	unsigned char proto;
+	signed char result;	/*!< set by outgoing_rule_delete(): 0 deleted,
+				 * -2 the firewall has no such rule */
+};
+
+/*! \brief the most keys of one outgoing_rule_delete() */
+#define OUTGOING_RULE_DELETE_MAX 64
+
 /*! \brief get port mapping by external port and protocol
  * \param[in] ifname WAN interface name
  * \param[in] eport external port

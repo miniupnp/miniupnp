@@ -99,7 +99,7 @@ int main(int argc, char * *argv)
 
 	print_pinhole(1);
 	print_pinhole(2);
-	clean_pinhole_list(NULL);
+	clean_pinhole_list(NULL, NULL);
 
 	ret = delete_pinhole(1);
 	printf("delete_pinhole() returned %d\n", ret);

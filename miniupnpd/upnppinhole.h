@@ -10,6 +10,7 @@
 #define UPNPPINHOLE_H_INCLUDED
 
 #include "config.h"
+#include "mapreq.h"
 
 #ifdef ENABLE_UPNPPINHOLE
 
@@ -19,7 +20,8 @@ int lease_file6_expire(void);
 #endif
 
 /* functions to be used by WANIPv6_FirewallControl implementation
- * and PCP (IPv6) */
+ * and PCP (IPv6). A UPnP req has one filter, filters[0]: the remote, and the
+ * uid of the pinhole. A PCP req has none: its one rule lets any remote in. */
 
 #if 0
 /* retrieve outbound pinhole timeout */
@@ -27,29 +29,35 @@ int
 upnp_check_outbound_pinhole(int proto, int * timeout);
 #endif
 
-/* find an inbound pinhole base on remove host:port / local host:port
+/* find the inbound pinhole of req in the lease table: the remote of its
+ * filter (any remote if it has none), and its internal side. Sets the uid
+ * of the filter, and *row to the row of the pinhole (its owner and expiry)
+ * if row is not NULL. A PCP map has no uid in the table: the firewall gives
+ * that of its rule.
  * return the (positive) uid or a negative value if not found */
 int
-upnp_find_inboundpinhole(const char * raddr, unsigned short rport,
-                         const char * iaddr, unsigned short iport,
-                         int proto,
-                         char * desc, int desc_len, unsigned int * leasetime);
+upnp_find_inboundpinhole(struct lease_entry * req, const struct lease_entry ** row);
 
 
-/* add an inbound pinehole
+/* add an inbound pinhole, or renew the one of the same remote and
+ * internal endpoint. req: the IPv6 iaddr, iport, proto, timestamp and its
+ * filter, the remote, or none for any remote. The rule gets map_rule_desc(). On success *uid_out
+ * (if not NULL) is the uid of the pinhole, and the lease table takes a row
+ * of lease_table_new() (memmap_add(), or memmap_update() for the pinhole
+ * there was): the caller frees req only on failure.
  * return value :
  *  1 = success
  * -1 = Pinhole space exhausted
  * .. = error */
 int
-upnp_add_inboundpinhole(const char * raddr, unsigned short rport,
-                        const char * iaddr, unsigned short iport,
-                        int proto, char * desc,
-                        unsigned int leasetime, int * uid);
+upnp_add_inboundpinhole(struct lease_entry * req, unsigned short * uid_out);
 
-/* get from uid
+/* get from uid, in the lease table: a UPnP pinhole. packets is the
+ * counter of the rule, read from the firewall when it is not NULL.
  * return values :
- *  -1 not found
+ *   0 OK
+ *  -1 the firewall did not give the counter
+ *  -2 not found
  * */
 int
 upnp_get_pinhole_info(unsigned short uid,
@@ -69,13 +77,13 @@ upnp_get_pinhole_info(unsigned short uid,
 int
 upnp_get_pinhole_uid_by_index(int index);
 
-/* update the lease time */
+/* renew the pinhole uid of req to req->timestamp */
 int
-upnp_update_inboundpinhole(unsigned short uid, unsigned int leasetime);
+upnp_update_inboundpinhole(const struct lease_entry * req, unsigned short uid);
 
-/* remove the inbound pinhole */
+/* remove the inbound pinhole uid of req, which a client asks to delete */
 int
-upnp_delete_inboundpinhole(unsigned short uid);
+upnp_delete_inboundpinhole(const struct lease_entry * req, unsigned short uid);
 
 /* ... */
 #if 0

@@ -1,8 +1,8 @@
 # (c) 2020-2026 Thomas BERNARD
 
 check:	validateupnppermissions validategetifaddr validatessdppktgen \
-	validateupnphttp \
-	validateversion
+	validateupnphttp validateleasetable validateoutgoingtable validatememmap \
+	validatepinhole validateversion
 
 validateversion:	miniupnpd $(SRCDIR)/VERSION
 	./miniupnpd --version
@@ -14,5 +14,21 @@ validate%:	$(SRCDIR)/test%.sh test%
 	touch $@
 
 validatessdppktgen:	testssdppktgen
+	./$<
+	touch $@
+
+validateleasetable:	testleasetable
+	./$<
+	touch $@
+
+validateoutgoingtable:	testoutgoingtable
+	./$<
+	touch $@
+
+validatememmap:	testmemmap
+	./$<
+	touch $@
+
+validatepinhole:	testpinhole
 	./$<
 	touch $@

@@ -2304,6 +2304,7 @@ def upnp_soap_body(spec, client):
 
 
 UPNP_ADD_ACTIONS = ("AddPortMapping", "AddAnyPortMapping", "AddPinhole")
+UPNP_PORT_MAPPING_ADDS = ("AddPortMapping", "AddAnyPortMapping")
 UPNP_PINHOLE_ACTIONS = ("AddPinhole", "UpdatePinhole", "DeletePinhole")
 UPNP_PINHOLE_SERVICE = "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1"
 
@@ -2618,6 +2619,9 @@ def cleanup_request(original, port=None):
         return dict(original, action="DeletePortMapping", external_port=port or original["external_port"])
     if family == "NAT-PMP":
         return dict(original, public_port=0, lifetime=0)
+    if original.get("opcode") == "PEER":
+        # RFC 6887 section 11.1: a PEER can not delete a mapping (lifetime 0); it expires
+        return None
     delete = dict(original, lifetime=0)
     for field in PCP_ONLY_FIELDS:
         delete.pop(field, None)
@@ -2731,10 +2735,17 @@ class CaseRun:
                 and port != self.args.external_address):
             raise AssertionError(f"NAT-PMP public address expected {self.args.external_address}, got {port}")
         if result == "SUCCESS" and (spec.get("lifetime", 0) or spec.get("action") in UPNP_ADD_ACTIONS):
+            if spec.get("action") in UPNP_PORT_MAPPING_ADDS:
+                # UPnP names a port mapping by its external port: an add on the port of a
+                # mapping of another internal port moved that mapping, it made no second one
+                for other in [other for other, (added, assigned, _id) in self.active.items()
+                              if other != key and other[0] == protocol and assigned == port
+                              and added.get("action") in UPNP_PORT_MAPPING_ADDS]:
+                    self.active.pop(other)
             self.active[key] = (spec, port, nonce)
         elif result == "SUCCESS" and spec.get("action") == "DeletePortMappingRange":
             for other in [other for other, (added, assigned, _id) in self.active.items()
-                          if added.get("action") in ("AddPortMapping", "AddAnyPortMapping")
+                          if added.get("action") in UPNP_PORT_MAPPING_ADDS
                           and other[0] == protocol and spec["start_port"] <= assigned <= spec["end_port"]]:
                 self.active.pop(other)
         elif result == "SUCCESS" and spec.get("action") != "UpdatePinhole":

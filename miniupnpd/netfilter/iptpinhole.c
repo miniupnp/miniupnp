@@ -486,7 +486,11 @@ int get_pinhole_uid_by_index(int index)
 }
 
 int
-clean_pinhole_list(unsigned int * next_timestamp)
+clean_pinhole_list(unsigned int * next_timestamp,
+                   void (*expired)(int proto, const struct in6_addr * iaddr,
+                                   unsigned short iport,
+                                   const struct in6_addr * raddr,
+                                   unsigned short rport, unsigned short uid))
 {
 	unsigned int min_ts = UINT_MAX;
 	struct pinhole_t * p;
@@ -499,6 +503,8 @@ clean_pinhole_list(unsigned int * next_timestamp)
 		if(p->timestamp <= (unsigned int)current_time) {
 			unsigned short uid = p->uid;
 			syslog(LOG_INFO, "removing expired pinhole with uid=%hu", uid);
+			if(expired != NULL)
+				expired(p->proto, &p->daddr, p->dport, &p->saddr, p->sport, uid);
 			p = p->entries.le_next;
 			if(delete_pinhole(uid) == 0)
 				n++;

@@ -43,6 +43,14 @@ add_peer_dscp_rule2(const char * ifname,
                    const char * iaddr, unsigned short iport, int proto,
                    const char * desc, unsigned int timestamp);
 
+/* Delete the PEER rules of keys[0..n-1], and their DSCP rules, in one
+ * firewall transaction. Each key is one peer: the other peers of its
+ * binding, and a port mapping on its external port, keep their rules. n is
+ * at most OUTGOING_RULE_DELETE_MAX. 0: the transaction went through, and
+ * each key has its result. -1: nothing changed. */
+int
+outgoing_rule_delete(struct outgoing_rule_key * keys, int n);
+
 int get_nat_ext_addr(struct sockaddr* src, struct sockaddr *dst, uint8_t proto,
                      struct sockaddr* ret_ext);
 int

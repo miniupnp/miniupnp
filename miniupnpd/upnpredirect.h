@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 
 #include "config.h"
+#include "mapreq.h"
 
 /*! \file upnpredirect.h
  * \brief backend independent functions for redirection
@@ -29,40 +30,29 @@ void lease_file_rewrite(void);
 
 /*! \brief add a port mapping.
  * calls OS/fw dependent implementation of the port mapping (redirection).
- * \param[in] rhost Remote host or NULL
- * \param[in] eport external port
- * \param[in] iaddr internal IPv4 address
- * \param[in] iport internal port
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
- * \param[in] desc port mapping description
- * \param[in] leaseduration lease duration in seconds (0 for infinite)
+ * \param[in] req the IPv4 mapping: iaddr, iport, eport, proto, timestamp
+ *            (0 for infinite) and at most one filter, the remote host.
+ *            On success the lease table takes a row of lease_table_new()
+ *            (memmap_add(), or memmap_update() for the rule there was): the
+ *            caller frees req only on failure.
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */
 int
-upnp_redirect(const char * rhost, unsigned short eport,
-              const char * iaddr, unsigned short iport,
-              const char * protocol, const char * desc,
-              unsigned int leaseduration);
+upnp_redirect(struct lease_entry * req);
 
 /*! \brief same as upnp_redirect() without any check
- * \param[in] rhost Remote host or NULL
- * \param[in] eport external port
- * \param[in] iaddr internal IPv4 address
- * \param[in] iport internal port
- * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
- * \param[in] desc port mapping description
- * \param[in] timestamp unix epoch of the end of the port mapping, or 0 for infinite duration
+ * \param[in] req the IPv4 mapping, as for upnp_redirect(), which the
+ *            lease table takes on success
  * \return 0 on success, -1 failed to redirect,
  *         -2 already redirected, -3 permission check failed
  */
 int
-upnp_redirect_internal(const char * rhost, unsigned short eport,
-                       const char * iaddr, unsigned short iport,
-                       int proto, const char * desc,
-                       unsigned int timestamp);
+upnp_redirect_internal(struct lease_entry * req);
 
 /*! \brief get port mapping from (external port, protocol)
+ * \param[in] eaddr the external address the client is told, as
+ *            memmap_find_map() takes it
  * \param[in] eport external port
  * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
  * \param[out] iport internal port
@@ -75,7 +65,8 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
  * \param[out] leaseduration lease duration in seconds (0 for infinite)
  * \return 0 on success, -1 failed to get the port mapping entry or no entry exists */
 int
-upnp_get_redirection_infos(unsigned short eport, const char * protocol,
+upnp_get_redirection_infos(const struct in6_addr * eaddr,
+                           unsigned short eport, const char * protocol,
                            unsigned short * iport, char * iaddr, int iaddrlen,
                            char * desc, int desclen,
                            char * rhost, int rhostlen,
@@ -125,21 +116,50 @@ upnp_get_redirection_infos_by_ituple(unsigned short iport,
                                      char * rhost, int rhostlen,
                                      unsigned int * leaseduration);
 
-/*! \brief delete a port mapping based on (external port, protocol)
- * \param[in] eport external port
- * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
- * \return 0 on success, -1 on failure*/
+/*! \brief delete the port mapping a client asks to delete
+ * \param[in] req the request: the mapping is found in the lease table by
+ *            proto, family, eaddr and eport (memmap_find_map())
+ * \return 0 on success, -1 on failure or if there is no such mapping */
 int
-upnp_delete_redirection(unsigned short eport, const char * protocol);
+upnp_delete_redirection(const struct lease_entry * req);
 
-/*! \brief delete a port mapping based on (external port, protocol).
- *
- * same as _upnp_delete_redir()
+/*! \brief the row e of a mapping, if the firewall still has its rule.
+ * Else the rule went without the daemon (a flush, another program): the
+ * row goes, and NULL. One firewall read, for a mapping a request is about
+ * to change. e NULL: NULL. */
+struct lease_entry *
+upnp_check_map(struct lease_entry * e);
+
+/*! \brief delete the mapping of a row of the lease table: its rules, then
+ * the row, if the firewall deleted them. e is no longer valid then.
+ * \return 0 on success, -1 on failure */
+int
+upnp_delete_map(struct lease_entry * e);
+
+/*! \brief delete the IPv4 port mapping of proto on eport, on any external
+ * address: for a caller which knows the port only, as the Tomato delete
+ * file. \return 0 on success, -1 on failure or if there is none */
+int
+upnp_delete_port(unsigned short eport, int proto);
+
+/*! \brief delete the rules of (external port, protocol) and their lease
+ * file line, and nothing in the lease table: the firewall part of
+ * upnp_delete_map(), and the delete of a PCP PEER, which has no row there.
  * \param[in] eport external port
  * \param[in] proto IPPROTO_TCP or IPPROTO_UDP (or IPPROTO_UDPLITE if supported)
  * \return 0 on success, -1 on failure*/
 int
 _upnp_delete_redir(unsigned short eport, int proto);
+
+/* upnp_eport_used_by_other()
+ * is the external port req->eport of req->eaddr mapped, on any protocol,
+ * to another internal address than req->iaddr ?  RFC 6886 section 3.3:
+ * such a port is reserved for the client which maps it, on both
+ * protocols, so another client gets another port.  The client's own
+ * mappings do not count.
+ * return value : 1 when used by another client, 0 otherwise */
+int
+upnp_eport_used_by_other(const struct lease_entry * req);
 
 /* Periodic cleanup functions
  */
@@ -153,9 +173,16 @@ struct rule_state
 	unsigned char to_remove;
 };
 
-/* return a linked list of all rules
- * or an empty list if there are not enough
- * As a "side effect", delete rules which are expired */
+/* Remove the expired port mappings, and the expired PEER peers, from the
+ * firewall and the tables, and set nextruletoclean_timestamp to the next
+ * expiry, 0 : none. */
+void
+upnp_expire_mappings(void);
+
+/* Expire the mappings, then return a linked list of the UPnP port
+ * mappings with their counters, or NULL if there are not more than
+ * max_rules_number_target mappings. PCP and NAT-PMP mappings are not
+ * listed: they last the lifetime their client asked for. */
 struct rule_state *
 get_upnp_rules_state_list(int max_rules_number_target);
 

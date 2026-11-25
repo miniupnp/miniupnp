@@ -22,6 +22,14 @@ testminissdp:	testminissdp.o minissdp.o upnputils.o upnpglobalvars.o \
 
 testifacewatcher:	testifacewatcher.o ifacewatcher.o
 
+testleasetable:	testleasetable.o lease_table.o
+
+testoutgoingtable:	testoutgoingtable.o outgoing_table.o
+
+testmemmap:	testmemmap.o memmap.o lease_table.o outgoing_table.o
+
+testpinhole:	testpinhole.o upnppinhole.o memmap.o lease_table.o outgoing_table.o
+
 testupnphttp:	testupnphttp.o upnphttp.o upnputils.o getroute.o \
 	getosversion.o
 

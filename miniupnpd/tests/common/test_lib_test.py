@@ -1417,9 +1417,10 @@ class SecondClientTests(unittest.TestCase):
         with lib_test.client_sockets(SimpleNamespace(second_client=None, family="ipv4")) as clients:
             self.assertEqual(clients, {})
 
-    def test_cleanup_deletes_a_peer_mapping_with_lifetime_zero(self):
+    def test_cleanup_leaves_a_peer_mapping_to_expire(self):
+        # RFC 6887 section 11.1: a PEER with lifetime 0 can not delete
         peer = {"opcode": "PEER", "lifetime": 100, "remote_peer": "allowed-peer", "filter": {}}
-        self.assertEqual(lib_test.cleanup_request(peer), {"opcode": "PEER", "lifetime": 0, "remote_peer": "allowed-peer"})
+        self.assertIsNone(lib_test.cleanup_request(peer))
 
     def case_run(self, send, traffic=None):
         args = SimpleNamespace(client_address="10.0.0.2", family="ipv4", external_address="198.51.100.1")
@@ -1446,6 +1447,24 @@ class SecondClientTests(unittest.TestCase):
         finally:
             lib_test.router_call = original
         self.assertEqual(calls, ["snapshot:1", "restart", "snapshot:2", "snapshot:1"])
+
+    def test_a_upnp_mapping_moved_to_another_internal_port_is_one_mapping(self):
+        run = self.case_run(lambda spec, _nonce: ("SUCCESS", spec["external_port"], None))
+        run.args.router_call_dir = None
+        run.active = {}
+        for internal_port in (41255, 41256):
+            run.run_request(1, {"action": "AddPortMapping", "protocol": "udp",
+                                "internal_port": internal_port, "external_port": 41255}, "SUCCESS")
+        self.assertEqual(list(run.active), [("udp", 41256)])
+        run.run_request(2, {"action": "DeletePortMapping", "protocol": "udp",
+                            "internal_port": 41256, "external_port": 41255}, "SUCCESS")
+        self.assertEqual(run.active, {})
+        # another external port of the same internal port stays a mapping of its own
+        for external_port in (41255, 41257):
+            run.run_request(3, {"action": "AddPortMapping", "protocol": "udp",
+                                "internal_port": 41255 if external_port == 41255 else 41256,
+                                "external_port": external_port}, "SUCCESS")
+        self.assertEqual(len(run.active), 2)
 
     def test_cleanup_tries_every_mapping_and_reports_the_failures(self):
         sent = []

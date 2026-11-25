@@ -84,6 +84,8 @@ enum upnpconfigoptions {
 	UPNPLEASEFILE6,			/*!< lease_file v6 */
 #endif
 #endif
+	UPNPTABLEDUMPFILE,		/*!< table_dump_file */
+	UPNPTABLESTATSFILE,		/*!< table_stats_file */
 	UPNPMINISSDPDSOCKET,	/*!< minissdpdsocket */
 #ifdef IGD_V2
 	UPNPFORCEIGDDESCV1,		/*!< force_igd_desc_v1 */
