@@ -132,9 +132,6 @@ new_match(int proto, unsigned short sport, unsigned short dport)
 	case IPPROTO_UDP:
 		name = "udp";
 		break;
-	case IPPROTO_UDPLITE:
-		name = "udplite";
-		break;
 	default:
 		name = NULL;
 	}

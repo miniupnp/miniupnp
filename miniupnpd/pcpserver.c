@@ -1274,6 +1274,19 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 		return 0;
 	}
 
+	/* Only TCP, UDP, and the "all protocols" value 0 are supported by
+	 * any backend. Anything else (including UDPLITE, see #924) would
+	 * otherwise reach add_filter_rule()/add_pinhole() unchecked. */
+	if (pcp_msg_info->protocol != 0 &&
+	    pcp_msg_info->protocol != IPPROTO_TCP &&
+	    pcp_msg_info->protocol != IPPROTO_UDP) {
+		syslog(LOG_INFO, "PCP %s: unsupported protocol %hhu",
+		       getPCPOpCodeStr(pcp_msg_info->opcode),
+		       pcp_msg_info->protocol);
+		pcp_msg_info->result_code = PCP_ERR_UNSUPP_PROTOCOL;
+		return 0;
+	}
+
 	if (pcp_msg_info->pfailure_present) {
 		/* RFC 6887 section 13.2 requires a nonzero suggested port,
 		 * even when a suggested external address is supplied. */
