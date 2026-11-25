@@ -1,7 +1,5 @@
-# This is a basic workflow to help you get started with Actions
-
 ---
-name: miniupnpc, minissdpd
+name: minissdpd
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -9,47 +7,24 @@ name: miniupnpc, minissdpd
   push:
     branches: [master]
     paths:
-      - 'miniupnpc/**'
       - 'minissdpd/**'
-      - '.github/workflows/main.yml'
+      - '.github/workflows/minissdpd.yml'
   pull_request:
     branches: [master]
     paths:
-      - 'miniupnpc/**'
       - 'minissdpd/**'
-      - '.github/workflows/main.yml'
+      - '.github/workflows/minissdpd.yml'
 
 permissions:
   contents: read
 
 # A newer run of the same pull request or branch cancels the one still running.
 concurrency:
-  group: main-${{ github.event.pull_request.number || github.ref }}
+  group: minissdpd-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  build-miniupnpc:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v7
-
-      - name: build miniupnpc with make
-        run: make -C miniupnpc all check
-
-      - name: install miniupnpc with make
-        run: make -C miniupnpc install DESTDIR=/tmp/miniupnpc_install
-
-      - name: build miniupnpc with cmake
-        run: mkdir miniupnpc/cmake-build && cd miniupnpc/cmake-build && cmake .. && make && make test
-
-      - name: install miniupnpc with cmake
-        run: cd miniupnpc/cmake-build && make DESTDIR=/tmp/miniupnpc_cmake_install install
-
   build-minissdpd:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
