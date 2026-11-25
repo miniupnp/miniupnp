@@ -2,7 +2,7 @@
 /* vim: tabstop=4 shiftwidth=4 noexpandtab
  * MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2025 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -1587,7 +1587,7 @@ get_redirect_rule_by_index(int index,
 	inet_ntop(AF_INET, &pp.addr.addr.v.a.addr.v4.s_addr,
 	          iaddr, iaddrlen);
 #endif
-#else
+#else /* PF_NEWSTYLE */
 	inet_ntop(AF_INET, &RULE.rdr.addr.v.a.addr.v4.s_addr,
 	          iaddr, iaddrlen);
 #endif
@@ -1624,7 +1624,7 @@ error:
  * a port mapping. number is the size of the array */
 unsigned short *
 get_portmappings_in_range(unsigned short startport, unsigned short endport,
-                          int proto, unsigned int * number)
+                          int proto, in_addr_t iaddr, unsigned int * number)
 {
 	unsigned short * array;
 	unsigned int capacity, tnum;
@@ -1703,6 +1703,44 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 		  && (RULE.proto == proto)
 		  && (startport <= eport) && (eport <= endport) )
 		{
+			if (iaddr != 0) {
+#ifndef PF_NEWSTYLE
+				struct pfioc_pooladdr pp;
+				memset(&pp, 0, sizeof(pp));
+				strlcpy(pp.anchor, anchor_name, MAXPATHLEN);
+				pp.r_action = PF_RDR;
+				pp.r_num = i;
+#ifdef USE_LIBPFCTL
+				pp.ticket = ri.ticket;
+#else /* USE_LIBPFCTL */
+				pp.ticket = pr.ticket;
+#endif /* USE_LIBPFCTL */
+				if(ioctl(dev, DIOCGETADDRS, &pp) < 0)
+				{
+					syslog(LOG_ERR, "ioctl(dev, DIOCGETADDRS, ...): %m");
+					break;
+				}
+				if(pp.nr != 1)
+				{
+					syslog(LOG_NOTICE, "No address associated with pf rule");
+					break;
+				}
+				pp.nr = 0;	/* first */
+				if(ioctl(dev, DIOCGETADDR, &pp) < 0)
+				{
+					syslog(LOG_ERR, "ioctl(dev, DIOCGETADDR, ...): %m");
+					break;
+				}
+#ifdef PFVAR_NEW_STYLE
+				if (iaddr != pp.addr.addr.v.a.addr.v4addr.s_addr)
+#else
+				if (iaddr != pp.addr.addr.v.a.addr.v4.s_addr)
+#endif
+#else /* PF_NEWSTYLE */
+				if (iaddr != RULE.rdr.addr.v.a.addr.v4.s_addr)
+#endif
+					continue;
+			}
 			if(*number >= capacity)
 			{
 				/* need to increase the capacity of the array */

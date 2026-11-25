@@ -11,6 +11,8 @@
 
 /* for u_int64_t */
 #include <sys/types.h>
+/* for in_addr_t */
+#include <netinet/in.h>
 
 #include "config.h"
 
@@ -172,6 +174,7 @@ remove_unused_rules(struct rule_state * list);
  * \param[in] startport lowest port in the interval
  * \param[in] endport highest port in theinterval
  * \param[in] protocol "TCP" or "UDP" (or "UDPLITE" if supported)
+ * \param[in] iaddr only return ports mapping to this internal client (0 for wildcard)
  * \param[out] number number of ports in the returned array
  * \return a malloc'ed array of ports or NULL for error
  */
@@ -179,6 +182,7 @@ unsigned short *
 upnp_get_portmappings_in_range(unsigned short startport,
                                unsigned short endport,
                                const char * protocol,
+                               in_addr_t iaddr,
                                unsigned int * number);
 
 /* stuff for responding to miniupnpdctl */

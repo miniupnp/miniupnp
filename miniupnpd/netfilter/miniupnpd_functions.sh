@@ -1,18 +1,22 @@
 #! /bin/sh
 # $Id: miniupnpd_functions.sh,v 1.2 2018/05/29 10:25:44 nanard Exp $
 
-IP=$(which ip) || {
+IP=$(command -v ip) || {
 	echo "Can't find ip" >&2
 	exit 1
 }
+# prefer iptables-legacy / ip6tables-legacy
+# because iptables could be a symlink to iptables-nft
 if [ -z "$IPV6" ]; then
-	IPTABLES=$(which iptables) || {
+	IPTABLES=$(command -v iptables-legacy) || \
+	IPTABLES=$(command -v iptables) || {
 		echo "Can't find iptables" >&2
 		exit 1
 	}
 	IP="$IP -4"
 else
-	IPTABLES=$(which ip6tables) || {
+	IPTABLES=$(command -v ip6tables-legacy) || \
+	IPTABLES=$(command -v ip6tables) || {
 		echo "Can't find ip6tables" >&2
 		exit 1
 	}

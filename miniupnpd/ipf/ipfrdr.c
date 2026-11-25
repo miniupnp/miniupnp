@@ -727,7 +727,7 @@ delete_filter_rule(const char * ifname, unsigned short eport, int proto)
 
 unsigned short *
 get_portmappings_in_range(unsigned short startport, unsigned short endport,
-                          int proto, unsigned int * number)
+                          int proto, in_addr_t iaddr, unsigned int * number)
 {
 	unsigned short *array, *array2;
 	unsigned int capacity;
@@ -783,6 +783,7 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 		  && (startport <= eport) && (eport <= endport) )
 #endif
 		{
+			/* TODO : filter if iaddr != 0 */
 			if(*number >= capacity)
 			{
 				/* need to increase the capacity of the array */

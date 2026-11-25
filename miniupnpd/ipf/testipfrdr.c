@@ -17,7 +17,7 @@ list_eports_tcp(void)
 	unsigned short * port_list;
 	unsigned int number = 0;
 	unsigned int i;
-	port_list = get_portmappings_in_range(0, 65535, IPPROTO_TCP, &number);
+	port_list = get_portmappings_in_range(0, 65535, IPPROTO_TCP, 0, &number);
 	printf("%u ports redirected (TCP) :", number);
 	for(i = 0; i < number; i++)
 	{
@@ -25,7 +25,7 @@ list_eports_tcp(void)
 	}
 	printf("\n");
 	free(port_list);
-	port_list = get_portmappings_in_range(0, 65535, IPPROTO_UDP, &number);
+	port_list = get_portmappings_in_range(0, 65535, IPPROTO_UDP, 0, &number);
 	printf("%u ports redirected (UDP) :", number);
 	for(i = 0; i < number; i++)
 	{

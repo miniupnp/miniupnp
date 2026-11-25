@@ -1105,7 +1105,9 @@ DeletePortMappingRange(struct upnphttp * h, const char * action, const char * ns
 	       action, startport, endport, protocol);
 
 	port_list = upnp_get_portmappings_in_range(startport, endport,
-	                                           protocol, &number);
+	                                           protocol,
+	                                           GETFLAG(SECUREMODEMASK) ? h->clientaddr.s_addr : 0,
+	                                           &number);
 	if(number == 0)
 	{
 		SoapError(h, 730, "PortMappingNotFound");
@@ -1345,7 +1347,7 @@ http://www.upnp.org/schemas/gw/WANIPConnection-v2.xsd">
 	bodylen += (sizeof(list_start) - 1);
 
 	port_list = upnp_get_portmappings_in_range(startport, endport,
-	                                           protocol, &list_size);
+	                                           protocol, 0, &list_size);
 	/* loop through port mappings */
 	for(i = 0; number > 0 && i < list_size; i++)
 	{
