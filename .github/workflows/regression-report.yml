@@ -1,0 +1,179 @@
+---
+name: 'miniupnpd: Regression report'
+
+# Posts the result of a regression-testing.yml run on its pull request, as one review
+# (event COMMENT): the changed cases of each comparison and how to reproduce them, from the
+# review-* artifact of each comparison job (its review.md alone, not the logs). The
+# comparisons without a change share one line. A table of the totals comes first, the
+# boxes of each module and platform under "Show details". Colour follows ISA-101: normal
+# states stay gray or plain, red marks regressions down to their cases, ⚠️ an incomplete
+# comparison. The earlier reports on the
+# pull request are hidden as outdated.
+#
+# A separate workflow, as the run of a fork's pull request has a read-only token. This
+# one runs master's copy with a write token and runs no code of the pull request: it
+# reads the artifacts as data and checks the pull request's head is the tested commit.
+# The run is skipped for a push to master and for a cancelled run (a newer push of the
+# pull request has its own run).
+
+'on':
+  workflow_run:
+    workflows: ['miniupnpd: Regression testing']
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  review:
+    name: Post the regression report on the pull request
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download the pull request number
+        uses: actions/download-artifact@v8
+        with:
+          name: pull-request
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: artifacts/pull-request
+
+      - name: Download each comparison's review.md
+        uses: actions/download-artifact@v8
+        with:
+          pattern: review-*
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: artifacts
+
+      - name: Post the review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          number=$(cat artifacts/pull-request/pull-request-number)
+          if ! printf '%s\n' "$number" | grep -qxE '[0-9]+'; then
+            echo "::error::no pull request number in the run's artifacts"
+            exit 1
+          fi
+          pr_head=$(gh api "repos/$REPOSITORY/pulls/$number" --jq .head.sha)
+          if [ "$pr_head" != "$HEAD_SHA" ]; then
+            echo "pull request #$number moved on to $pr_head; its own run reports that commit"
+            exit 0
+          fi
+          python3 - <<'EOF' > body.md
+          import os, re
+          from pathlib import Path
+
+          # artifacts/review-<module>-<platform>/review.md: the counts on the first line
+          # ("Regressions: N. Improvements: M. New coverage: C. Other changes: O. Unchanged: K."
+          # or "Incomplete comparison.")
+          # and the tool's <details> boxes
+          # the shown name of a module (its artifact's name before the platform)
+          NAMES = {'end2end': 'PCP/NAT-PMP e2e', 'wire': 'PCP/NAT-PMP wire', 'options': 'Daemon options',
+                   'upnp-e2e': 'UPnP e2e', 'upnp-wire': 'UPnP wire'}
+          modules = {}
+          for path in sorted(Path('artifacts').glob('review-*/review.md')):
+              name = path.parent.name[len('review-'):]
+              for os_name in ('linux', 'freebsd', 'openbsd'):    # upnp-wire-linux: upnp-wire, linux
+                  if f'-{os_name}' in name:
+                      module, platform = name.split(f'-{os_name}', 1)
+                      platform = os_name + platform
+                      break
+              text = path.read_text()
+              found = re.match(r'Regressions: (\d+)\. Improvements: (\d+)\. New coverage: (\d+)\. '
+                               r'Other changes: (\d+)\. Unchanged: (\d+)\.', text)
+              counts = tuple(int(n) for n in found.groups()) if found else None
+              modules.setdefault(NAMES.get(module, module), []).append((platform, counts, ''.join(text.split('\n', 2)[2:]) if found else text))
+
+          def plural(n, one, many):
+              return f'{n} {one if n == 1 else many}'
+
+          def summary(counts):
+              if counts is None:
+                  return 'incomplete comparison'
+              names = (('regression', 'regressions'), ('improvement', 'improvements'),
+                       ('new coverage', 'new coverage'), ('other change', 'other changes'))
+              shown = [plural(n, *name) for n, name in zip(counts, names) if n]
+              return ', '.join(shown) or 'no changes'
+
+          def mark(counts):
+              """The mark on the way down to a regression (or an incomplete comparison)."""
+              return '⚠️ ' if counts is None else '🔴 ' if counts[0] else ''
+
+          def latex(colour, text):
+              """Coloured text (none for no colour); GitHub renders LaTeX in headers and table
+              cells, not in <summary>."""
+              return f'$\\color{{{colour}}}{{\\textsf{{{text}}}}}$' if colour else text
+
+          def indent(level):
+              """GitHub does not indent nested <details>, and HTML folds spaces: one em space per level."""
+              return '&emsp;' * level
+
+          def body(full):
+              runs = [run for platforms in modules.values() for run in platforms]
+              total = [sum(c[n] for _, c, _ in runs if c) for n in range(5)]
+              incomplete = [f'{m} {p}' for m, platforms in sorted(modules.items()) for p, c, _ in platforms if c is None]
+              # the heading tells what the comparisons found; the run's conclusion only when it
+              # failed outside them (the self-tests, a job which wrote no review.md)
+              if total[0]:
+                  found = latex('red', plural(total[0], 'regression', 'regressions'))
+              elif incomplete:
+                  found = '⚠️ incomplete'
+              elif os.environ['CONCLUSION'] != 'success':
+                  found = '⚠️ ' + os.environ['CONCLUSION']
+              else:
+                  found = 'no regressions'
+              out = ['<!-- regression-report -->', f'## Regression testing: {found}', '']
+              if incomplete:
+                  out += [f'⚠️ Incomplete comparisons: {", ".join(incomplete)}.', '']
+              out += ['| | ' + ' | '.join(latex(colour, name) for colour, name in (
+                          ('gray', 'Improvements'), ('red' if total[0] else 'gray', 'Regressions'), ('gray', 'New coverage'),
+                          ('gray', 'Other'), ('gray', 'Unchanged'))) + ' |',
+                      '|:--|--:|--:|--:|--:|--:|',
+                      f'| Cases | {total[1]} | {total[0]} | {total[2]} | {total[3]} | {total[4]} |', '']
+              out += [f"Master's daemon against `{os.environ['HEAD_SHA'][:12]}`. Full tables, logs and "
+                      f"captures: [the run]({os.environ['RUN_URL']}).", '',
+                      '<details>', '<summary>Show details</summary>', '']
+              for module, platforms in sorted(modules.items()):
+                  clean = [p for p, c, _ in platforms if c and not any(c[:4])]
+                  changed = [(p, c, text) for p, c, text in platforms if p not in clean]
+                  open_box = any(c is None or c[0] for _, c, _ in changed)
+                  counts = (None if any(c is None for _, c, _ in changed)
+                            else tuple(sum(c[n] for _, c, _ in changed) for n in range(5)))
+                  out += ['<details open>' if open_box else '<details>',
+                          f'<summary>{indent(1)}{mark(counts)}<b>{module}</b>: {summary(counts)}</summary>', '']
+                  if clean:
+                      out += [f'No changes: {", ".join(clean)}.', '']
+                  for platform, c, text in changed:
+                      out += ['<details open>' if c is None or c[0] else '<details>',
+                              f'<summary>{indent(2)}{mark(c)}{platform}: {summary(c)}</summary>', '',
+                              # the boxes of review.md sit one level deeper
+                              text.replace('<summary>', '<summary>' + indent(3)) if full
+                              else '(Too long for a review: see the run.)', '', '</details>', '']
+                  out += ['</details>', '']
+              out += ['</details>', '']
+              return '\n'.join(out)
+
+          text = body(True)
+          # a review body holds at most 65536 characters
+          print(text if len(text) < 60000 else body(False))
+          EOF
+          new=$(gh api --method POST "repos/$REPOSITORY/pulls/$number/reviews" \
+                  -f commit_id="$HEAD_SHA" -f event=COMMENT -F body=@body.md --jq .node_id)
+          # hide the earlier reports as outdated: only the newest is about the head
+          gh api --paginate "repos/$REPOSITORY/pulls/$number/reviews" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and .node_id != \"$new\"
+                         and (.body | startswith(\"<!-- regression-report -->\"))) | .node_id" |
+          while read -r id; do
+            gh api graphql -f id="$id" -f query='mutation($id: ID!) {
+              minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) { clientMutationId } }' > /dev/null
+          done
