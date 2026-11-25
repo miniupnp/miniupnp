@@ -59,4 +59,4 @@ jobs:
           make all check
 
       - name: install miniupnpd(nftables)
-        run: cd miniupnpd/build-nft && make DESTDIR=/tmp/miniupnpd_iptables install
+        run: cd miniupnpd/build-nft && make DESTDIR=/tmp/miniupnpd_nftables install
