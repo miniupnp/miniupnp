@@ -113,6 +113,9 @@ print_redirect_rules(const char * ifname);
 
 int
 nft_send_rule(struct nftnl_rule * rule, uint16_t cmd, enum rule_chain_type type);
+int
+nft_send_rules(struct nftnl_rule ** rules, int n, uint16_t cmd,
+               enum rule_chain_type type);
 struct nftnl_rule *
 rule_set_dnat(uint8_t family, const char * ifname, uint8_t proto,
 	      in_addr_t rhost, unsigned short eport,
