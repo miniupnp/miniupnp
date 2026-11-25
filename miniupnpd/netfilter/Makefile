@@ -1,9 +1,11 @@
 # $Id: Makefile,v 1.6 2012/04/26 13:50:48 nanard Exp $
 CFLAGS?=-Wall -g -D_GNU_SOURCE -DDEBUG -Wstrict-prototypes -Wdeclaration-after-statement
+CFLAGS+=-I../build
 CC = gcc
 
 #LIBS = -liptc
-LIBS = -lip4tc
+#LIBS = -lip4tc
+LDLIBS = -lip4tc -lip6tc
 
 ARCH := $(shell uname -m | grep -q "x86_64" && echo 64)
 ifdef IPTABLESPATH
@@ -38,7 +40,7 @@ endif
 endif
 endif
 
-LIBS +=  /lib/libip4tc.so /lib/libip6tc.so
+#LIBS +=  /lib/libip4tc.so /lib/libip6tc.so
 
 all:	iptcrdr.o testiptcrdr iptpinhole.o \
         testiptcrdr_peer testiptcrdr_dscp test_nfct_get
@@ -69,7 +71,7 @@ iptcrdr.o:	iptcrdr.c iptcrdr.h
 iptpinhole.o:	iptpinhole.c iptpinhole.h
 
 upnpglobalvars.o:	../upnpglobalvars.c ../upnpglobalvars.h
-	$(CC) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 
 #depends
