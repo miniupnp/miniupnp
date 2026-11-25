@@ -1,7 +1,7 @@
 /* $Id: testobsdrdr.c,v 1.32 2024/06/22 16:48:54 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2024 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <syslog.h>
 
 #include "obsdrdr.h"
@@ -25,12 +26,16 @@ void
 list_rules(void);
 
 void
-list_eports_tcp(void)
+list_eports_tcp(const char * iaddr)
 {
 	unsigned short * port_list;
 	unsigned int number = 0;
 	unsigned int i;
-	port_list = get_portmappings_in_range(0, 65535, IPPROTO_TCP, &number);
+	port_list = get_portmappings_in_range(0, 65535, IPPROTO_TCP, iaddr != NULL ? inet_addr(iaddr) : 0, &number);
+	if(iaddr == NULL)
+		printf("not filtered          ");
+	else
+		printf("iaddr=%-15s ", iaddr);
 	printf("%u ports redirected (TCP) :", number);
 	for(i = 0; i < number; i++)
 	{
@@ -109,7 +114,8 @@ main(int argc, char * * argv)
 		printf("add_filter_rule2() #1 failed\n");
 
 	list_rules();
-	list_eports_tcp();
+	list_eports_tcp(NULL);
+	list_eports_tcp("127.1.2.3");
 
 
 	if(get_redirect_rule("xl1", 4662, IPPROTO_TCP,
