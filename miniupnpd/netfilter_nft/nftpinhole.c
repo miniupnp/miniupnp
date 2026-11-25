@@ -250,21 +250,6 @@ delete_map6_rule(const char * rem_host, unsigned short rem_port,
 	return delete_found(p);
 }
 
-/* The rule holds neither the description nor the expiry, so an update has
- * nothing to change in it: it only checks that the rule is there. */
-int
-update_map6_rule(const char * ifname,
-                    const char * rem_host, unsigned short rem_port,
-                    const char * int_client, unsigned short int_port,
-                    int proto, const char * desc, unsigned int timestamp)
-{
-	rule_t *p;
-
-	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
-	d_printf(("update_map6_rule()\n"));
-	return find_rule(rem_host, rem_port, int_client, int_port, proto, &p);
-}
-
 int
 get_map6_packets(const char * rem_host, unsigned short rem_port,
                     const char * int_client, unsigned short int_port,

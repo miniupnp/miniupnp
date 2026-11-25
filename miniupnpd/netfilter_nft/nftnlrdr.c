@@ -450,22 +450,6 @@ get_redirect_rule(const char * ifname, unsigned short eport, int proto,
 	                             timestamp, packets, bytes);
 }
 
-/* get_redirect_rule_count()
- * return value : -1 for error or the number of redirection rules */
-int
-get_redirect_rule_count(const char * ifname)
-{
-	rule_t *r;
-	int n = 0;
-	UNUSED(ifname);
-
-	refresh_nft_cache_redirect();
-	LIST_FOREACH(r, &head_redirect, entry) {
-		n++;
-	}
-	return n;
-}
-
 /*
  * get_redirect_rule_by_index()
  * return -1 when the rule was not found
@@ -607,59 +591,6 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
 	}
 
 	return -2;	/* not found */
-}
-
-/*
- * return an (malloc'ed) array of "external" port for which there is
- * a port mapping. number is the size of the array
- */
-unsigned short *
-get_portmappings_in_range(unsigned short startport, unsigned short endport,
-			  int proto, unsigned int * number)
-{
-	uint32_t capacity;
-	rule_t *p;
-	unsigned short *array;
-	unsigned short *tmp;
-
-	d_printf(("get_portmappings_in_range()\n"));
-
-	*number = 0;
-	capacity = 128;
-	array = calloc(capacity, sizeof(unsigned short));
-
-	if (array == NULL) {
-		syslog(LOG_ERR, "get_portmappings_in_range(): calloc error");
-		return NULL;
-	}
-
-	refresh_nft_cache_redirect();
-
-	LIST_FOREACH(p, &head_redirect, entry) {
-		if (p->proto == proto &&
-		    startport <= p->dport &&
-		    p->dport <= endport) {
-
-			if (*number >= capacity) {
-				capacity += 128;
-				tmp = realloc(array,
-					      sizeof(unsigned short)*capacity);
-				if (tmp == NULL) {
-					syslog(LOG_ERR,
-					       "get_portmappings_in_range(): "
-					       "realloc(%u) error",
-					       (unsigned)sizeof(unsigned short)*capacity);
-					*number = 0;
-					free(array);
-					return NULL;
-				}
-				array = tmp;
-			}
-			array[*number] = p->dport;
-			(*number)++;
-		}
-	}
-	return array;
 }
 
 int

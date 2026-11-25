@@ -256,16 +256,6 @@ add_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_por
 	return 0;
 }
 
-int
-update_map6_rule(const char * ifname, const char * rem_host, unsigned short rem_port,
-                 const char * int_client, unsigned short int_port,
-                 int proto, const char * desc, unsigned int timestamp)
-{
-	(void)ifname; (void)rem_host; (void)rem_port; (void)int_client;
-	(void)int_port; (void)proto; (void)desc; (void)timestamp;
-	return 0;
-}
-
 /* the first map6_gone deletes find no rule (-2) */
 int
 delete_map6_rule(const char * rem_host, unsigned short rem_port,

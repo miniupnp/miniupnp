@@ -456,16 +456,4 @@ get_map6_rule_at(int index, char * rem_host, int rem_hostlen,
 	return -1;
 }
 
-/* The rule holds neither the description nor the expiry, so an update has
- * nothing to change in it, and keeps its counters: it only checks that the
- * rule is there. */
-int update_map6_rule(const char * ifname,
-                        const char * rem_host, unsigned short rem_port,
-                        const char * int_client, unsigned short int_port,
-                        int proto, const char * desc, unsigned int timestamp)
-{
-	UNUSED(ifname); UNUSED(desc); UNUSED(timestamp);
-	return get_map6_packets(rem_host, rem_port, int_client, int_port, proto, NULL);
-}
-
 #endif /* ENABLE_UPNPPINHOLE */

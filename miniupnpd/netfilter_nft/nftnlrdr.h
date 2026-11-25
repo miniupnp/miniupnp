@@ -85,10 +85,6 @@ get_redirect_rule_by_index(int index,
 			   unsigned int * timestamp,
 			   u_int64_t * packets, u_int64_t * bytes);
 
-unsigned short *
-get_portmappings_in_range(unsigned short startport, unsigned short endport,
-			  int proto, unsigned int * number);
-
 /* in nfct_get.c */
 int get_nat_ext_addr(struct sockaddr* src, struct sockaddr *dst, uint8_t proto,
 		     struct sockaddr* ret_ext);

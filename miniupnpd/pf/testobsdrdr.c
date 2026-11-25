@@ -25,22 +25,6 @@ void
 list_rules(void);
 
 void
-list_eports_tcp(void)
-{
-	unsigned short * port_list;
-	unsigned int number = 0;
-	unsigned int i;
-	port_list = get_portmappings_in_range(0, 65535, IPPROTO_TCP, &number);
-	printf("%u ports redirected (TCP) :", number);
-	for(i = 0; i < number; i++)
-	{
-		printf(" %hu", port_list[i]);
-	}
-	printf("\n");
-	free(port_list);
-}
-
-void
 test_index(void)
 {
 	char ifname[16/*IFNAMSIZ*/];
@@ -109,7 +93,6 @@ main(int argc, char * * argv)
 		printf("add_filter_rule2() #1 failed\n");
 
 	list_rules();
-	list_eports_tcp();
 
 
 	if(get_redirect_rule("xl1", 4662, IPPROTO_TCP,

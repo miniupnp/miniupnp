@@ -64,11 +64,6 @@ int main(int argc, char * * argv)
 	syslog(LOG_INFO, "add_map6_rule() returned %d", r);
 	print_infos();
 
-	r = update_map6_rule(ifname, rem_host, rem_port, int_client, int_port, IPPROTO_TCP,
-	                        "dummy description", upnp_time() + 3600);
-	syslog(LOG_INFO, "update_map6_rule() returned %d", r);
-	print_infos();
-
 	r = delete_map6_rule(rem_host, rem_port, int_client, int_port, IPPROTO_TCP);
 	syslog(LOG_INFO, "delete_map6_rule() returned %d", r);
 	print_infos();

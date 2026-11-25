@@ -362,63 +362,6 @@ error:
 	return -1;
 }
 
-/* upnp_get_portmappings_in_range()
- * return a list of all "external" ports for which a port
- * mapping exists */
-unsigned short *
-get_portmappings_in_range(unsigned short startport,
-                          unsigned short endport,
-                          int proto,
-                          unsigned int * number)
-{
-	unsigned short *array = NULL, *array2 = NULL;
-	unsigned int capacity = 128;
-	int i, count_rules, total_rules = 0;
-	struct ip_fw * rules = NULL;
-
-	if (ipfw_validate_protocol(proto) < 0)
-		return NULL;
-
-	do {
-		count_rules = ipfw_fetch_ruleset(&rules, &total_rules, 10);
-		if (count_rules < 0)
-			goto error;
-	} while (count_rules == 10);
-
-	array = calloc(capacity, sizeof(unsigned short));
-	if(!array) {
-		syslog(LOG_ERR, "get_portmappings_in_range() : calloc error");
-                goto error;
-	}
-	*number = 0;
-
-	for (i=0; i<total_rules-1; i++) {
-		const struct ip_fw const * ptr = &rules[i];
-		unsigned short eport = ptr->fw_uar.fw_pts[0];
-		if (proto == ptr->fw_prot
-		    && startport <= eport
-		    && eport <= endport) {
-			if(*number >= capacity) {
-				capacity += 128;
-				array2 = realloc(array, sizeof(unsigned short)*capacity);
-				if(!array2) {
-					syslog(LOG_ERR, "get_portmappings_in_range() : realloc(%lu) error", sizeof(unsigned short)*capacity);
-					*number = 0;
-					free(array);
-					goto error;
-				}
-				array = array2;
-			}
-			array[*number] = eport;
-			(*number)++;
-		}
-	}
-error:
-	if (rules != NULL)
-		ipfw_free_ruleset(&rules);
-	return array;
-}
-
 int
 update_portmapping_desc_timestamp(const char * ifname,
                    unsigned short eport, int proto,

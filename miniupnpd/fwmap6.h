@@ -22,13 +22,6 @@ int add_map6_rule(const char * ifname,
                      const char * int_client, unsigned short int_port,
                      int proto, const char * desc, unsigned int timestamp);
 
-/* Give the rule of a map6 a new expiry and description. 0, -2 if there is
- * no such rule, or < 0 */
-int update_map6_rule(const char * ifname,
-                        const char * rem_host, unsigned short rem_port,
-                        const char * int_client, unsigned short int_port,
-                        int proto, const char * desc, unsigned int timestamp);
-
 /* Delete the rule of a map6. 0, -2 if there is no such rule, or < 0 */
 int delete_map6_rule(const char * rem_host, unsigned short rem_port,
                         const char * int_client, unsigned short int_port,

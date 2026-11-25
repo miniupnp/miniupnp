@@ -573,17 +573,6 @@ add_map6_rule(const char * ifname,
 }
 
 int
-update_map6_rule(const char * ifname,
-                    const char * rem_host, unsigned short rem_port,
-                    const char * int_client, unsigned short int_port,
-                    int proto, const char * desc, unsigned int timestamp)
-{
-	int uid = key_uid(rem_host, rem_port, int_client, int_port, proto);
-	UNUSED(ifname); UNUSED(desc);
-	return uid < 0 ? -2 : update_pinhole((unsigned short)uid, timestamp);
-}
-
-int
 delete_map6_rule(const char * rem_host, unsigned short rem_port,
                     const char * int_client, unsigned short int_port, int proto)
 {

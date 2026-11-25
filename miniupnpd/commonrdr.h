@@ -25,14 +25,6 @@ init_redirect(void);
 void
 shutdown_redirect(void);
 
-/*!
- * \param[in] ifname external interface name
- * \return -1 for error or the number of redirection rules
- */
-int
-get_redirect_rule_count(const char * ifname);
-
-
 
 #include <netinet/in.h>
 
@@ -76,16 +68,6 @@ get_redirect_rule_by_index(int index,
                            char * rhost, int rhostlen,
                            unsigned int * timestamp,
                            u_int64_t * packets, u_int64_t * bytes);
-
-/*! \brief get "external" ports for which there is a mapping
- * \param[in] startport start of port range
- * \param[in] endport end of port range
- * \param[in] proto IPPROTO_TCP/IPPROTO_UDP/etc.
- * \param[out] size of the returned array
- * \return an (malloc'ed) array */
-unsigned short *
-get_portmappings_in_range(unsigned short startport, unsigned short endport,
-                          int proto, unsigned int * number);
 
 /*! \brief update the port mapping internal port, description and timestamp
  * \param[in] ifname WAN interface name
