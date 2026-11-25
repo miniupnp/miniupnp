@@ -1,0 +1,6 @@
+SUBSCRIBE /evt/IPConn HTTP/1.1
+HOST: 192.168.1.1:5000
+CALLBACK: <http://192.168.1.100:4000/cb>
+NT: upnp:event
+TIMEOUT: Second-1800
+

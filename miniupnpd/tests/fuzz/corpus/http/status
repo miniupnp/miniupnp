@@ -1,0 +1,8 @@
+POST /ctl/IPConn HTTP/1.1
+HOST: 192.168.1.1:5000
+CONTENT-TYPE: text/xml; charset="utf-8"
+CONTENT-LENGTH: 271
+SOAPACTION: "urn:schemas-upnp-org:service:WANIPConnection:2#GetStatusInfo"
+
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetStatusInfo xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:2"></u:GetStatusInfo></s:Body></s:Envelope>

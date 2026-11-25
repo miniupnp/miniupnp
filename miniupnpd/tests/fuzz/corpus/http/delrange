@@ -1,0 +1,8 @@
+POST /ctl/IPConn HTTP/1.1
+HOST: 192.168.1.1:5000
+CONTENT-TYPE: text/xml; charset="utf-8"
+CONTENT-LENGTH: 402
+SOAPACTION: "urn:schemas-upnp-org:service:WANIPConnection:2#DeletePortMappingRange"
+
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:DeletePortMappingRange xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:2"><NewStartPort>1</NewStartPort><NewEndPort>9000</NewEndPort><NewProtocol>TCP</NewProtocol><NewManage>1</NewManage></u:DeletePortMappingRange></s:Body></s:Envelope>
