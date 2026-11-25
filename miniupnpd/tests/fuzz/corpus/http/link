@@ -1,0 +1,8 @@
+POST /ctl/CmnIfCfg HTTP/1.1
+HOST: 192.168.1.1:5000
+CONTENT-TYPE: text/xml; charset="utf-8"
+CONTENT-LENGTH: 300
+SOAPACTION: "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1#GetCommonLinkProperties"
+
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetCommonLinkProperties xmlns:u="urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1"></u:GetCommonLinkProperties></s:Body></s:Envelope>

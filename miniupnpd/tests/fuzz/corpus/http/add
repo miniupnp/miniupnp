@@ -1,0 +1,8 @@
+POST /ctl/IPConn HTTP/1.1
+HOST: 192.168.1.1:5000
+CONTENT-TYPE: text/xml; charset="utf-8"
+CONTENT-LENGTH: 588
+SOAPACTION: "urn:schemas-upnp-org:service:WANIPConnection:2#AddPortMapping"
+
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:AddPortMapping xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:2"><NewRemoteHost></NewRemoteHost><NewExternalPort>8081</NewExternalPort><NewProtocol>TCP</NewProtocol><NewInternalPort>80</NewInternalPort><NewInternalClient>192.168.1.100</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>test</NewPortMappingDescription><NewLeaseDuration>3600</NewLeaseDuration></u:AddPortMapping></s:Body></s:Envelope>

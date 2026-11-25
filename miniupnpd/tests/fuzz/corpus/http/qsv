@@ -1,0 +1,8 @@
+POST /ctl/IPConn HTTP/1.1
+HOST: 192.168.1.1:5000
+CONTENT-TYPE: text/xml; charset="utf-8"
+CONTENT-LENGTH: 302
+SOAPACTION: "urn:schemas-upnp-org:control-1-0#QueryStateVariable"
+
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:QueryStateVariable xmlns:u="urn:schemas-upnp-org:control-1-0"><varName>ConnectionStatus</varName></u:QueryStateVariable></s:Body></s:Envelope>

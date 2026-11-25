@@ -1,0 +1,6 @@
+GET /rootDesc.xml HTTP/1.1
+Host: 192.168.1.1:5000
+Callback: <http://192.168.1.2:4000/>
+NT: upnp:event
+Timeout: Second-1800
+

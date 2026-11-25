@@ -1,0 +1,9 @@
+POST /ctl/IPConn HTTP/1.1
+HOST: 192.168.1.1:5000
+Transfer-Encoding: chunked
+SOAPACTION: "urn:schemas-upnp-org:service:WANIPConnection:2#GetExternalIPAddress"
+
+10
+<s:Envelope></s>
+0
+

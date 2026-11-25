@@ -1,0 +1,8 @@
+POST /ctl/IP6FCtl HTTP/1.1
+HOST: 192.168.1.1:5000
+CONTENT-TYPE: text/xml; charset="utf-8"
+CONTENT-LENGTH: 333
+SOAPACTION: "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1#UpdatePinhole"
+
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:UpdatePinhole xmlns:u="urn:schemas-upnp-org:service:WANIPv6FirewallControl:1"><UniqueID>7</UniqueID><NewLeaseTime>3600</NewLeaseTime></u:UpdatePinhole></s:Body></s:Envelope>
