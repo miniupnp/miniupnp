@@ -63,6 +63,8 @@ RUNNER=pcp-e2e-fbsd-runner-$SUFFIX
 KEEP=${PCP_E2E_KEEP:-0}
 # the router daemon runs with enable_upnp=yes, so the UPnP cases can run
 E2E_UPNP=1
+# the client and router addresses of the IPv6 cases of a NAT66 section (the pcp_e2e runner's options)
+E2E_NAT66="--nat66-client fd42:1::2 --nat66-router fd42:1::1"
 ARTIFACTS=${PCP_E2E_ARTIFACT_DIR:-$ROOT/.tmp/pcp-e2e}
 STATUS_FILE=${E2E_STATUS_FILE:-$DIR/status.md}
 E2E_PLATFORM=freebsd
@@ -558,40 +560,30 @@ run_family() {
   deny_url=http://$LAN4.13:18080
   third_url=http://$LAN4.14:18080
 
-  family_dir=$RUN_DIR/$family
-  mkdir -p "$family_dir"
-  case_rows=$(e2e_case_rows "$family")
   active_section=
   active_section_nat66=0
-  while IFS="$(printf '\t')" read -r section_name case_name section_nat66 <&3; do
-    [ -n "$case_name" ] || continue
-    e2e_case_selected "$case_name" || continue
-    if [ "$section_name" != "$active_section" ]; then
-      [ "$active_section_nat66" = 1 ] && set_nat66 off
-      active_section=$section_name
-      active_section_nat66=0
-      if [ "$section_nat66" = true ]; then set_nat66 on; active_section_nat66=1; fi
-    fi
-    case_client=$lanip; case_router=$router; runner_ula=skip
-    if [ "$family" = ipv6 ] && [ "$section_nat66" = true ]; then
-      case_client=fd42:1::2; case_router=fd42:1::1; runner_ula=add
-    fi
-    EXECUTED=$((EXECUTED + 1))
-    case_dir=$family_dir/$section_name/$case_name
-    mkdir -p "$case_dir"
-    snapshot_daemon_state "$case_dir/daemon-before.txt"
-    [ "${PCAP_CAPTURE:-0}" != 1 ] || start_packet_capture
-    e2e_start_runner
-    e2e_wait_runner
-    [ "${PCAP_CAPTURE:-0}" != 1 ] || stop_packet_capture "$case_dir"
-    snapshot_daemon_state "$case_dir/daemon-after.txt"
-    $SSH "$PRIV cat /tmp/pcp-e2e/miniupnpd.log" >"$case_dir/daemon.log" 2>&1 || true
-    e2e_record_result "$family/$section_name/$case_name"
-  done 3<<EOT
-$case_rows
-EOT
+  # shellcheck disable=SC2086 # E2E_NAT66 is a list of options
+  e2e_run_family "$family" $E2E_NAT66
   if [ "$active_section_nat66" = 1 ]; then set_nat66 off; fi
   return 0
+}
+
+# e2e_case_start / e2e_case_end (router_call case-start, case-end): the NAT66 rule of the case's section,
+# the daemon snapshots before and after it, its capture and the daemon log.
+e2e_case_start() {
+  if [ "$section_name" != "$active_section" ]; then
+    if [ "$active_section_nat66" = 1 ]; then set_nat66 off; fi
+    active_section=$section_name
+    active_section_nat66=0
+    if [ "$case_flag" = true ]; then set_nat66 on; active_section_nat66=1; fi
+  fi
+  snapshot_daemon_state "$case_dir/daemon-before.txt"
+  [ "${PCAP_CAPTURE:-0}" != 1 ] || start_packet_capture
+}
+e2e_case_end() {
+  [ "${PCAP_CAPTURE:-0}" != 1 ] || stop_packet_capture "$case_dir"
+  snapshot_daemon_state "$case_dir/daemon-after.txt"
+  $SSH "$PRIV cat /tmp/pcp-e2e/miniupnpd.log" >"$case_dir/daemon.log" 2>&1 || true
 }
 
 # Restart check : the lease-restart cases of the pcp_wire corpus (lease-restart-ipv4 and

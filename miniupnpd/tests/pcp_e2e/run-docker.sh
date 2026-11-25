@@ -41,7 +41,7 @@ cleanup() {
   trap - EXIT INT TERM
   set_nat66 0 >/dev/null 2>&1 || true
   if [ "$KEEP" != 1 ]; then
-    "$DOCKER" rm -f "$RUNNER" >/dev/null 2>&1 || true
+    "$DOCKER" rm -f "$RUNNER-ipv4" "$RUNNER-ipv6" >/dev/null 2>&1 || true
     e2e_compose down --timeout 1 >/dev/null 2>&1 || true
   else
     echo "Retaining fixture: remove it with: SLOT=$SLOT ... docker compose -p pcp-e2e-$SLOT down" >&2
@@ -198,65 +198,46 @@ run_family() {
   deny_url=http://$LAN4.13:18080
   third_url=http://$LAN4.14:18080
 
-  family_dir=$RUN_DIR/$family
-  mkdir -p "$family_dir"
-  case_rows=$(e2e_case_rows "$family")
   active_section=
   active_section_nat66=0
-  while IFS="$(printf '\t')" read -r section_name case_name section_nat66; do
-    [ -n "$case_name" ] || continue
-    e2e_case_selected "$case_name" || continue
-    if [ "$section_name" != "$active_section" ]; then
-      if [ "$active_section_nat66" = 1 ]; then
-        set_nat66 0
-      fi
-      active_section=$section_name
-      active_section_nat66=0
-      if [ "$section_nat66" = true ]; then
-        set_nat66 1
-        active_section_nat66=1
-      fi
-    fi
-    case_client=$lanip
-    case_router=$router
-    if [ "$family" = ipv6 ] && [ "$section_nat66" = true ]; then
-    case_client=fd42:1::2
-    case_router=fd42:1::1
-      runner_ula=add
-    else
-      runner_ula=skip
-    fi
-    case_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    EXECUTED=$((EXECUTED + 1))
-    case_dir=$family_dir/$section_name/$case_name
-    mkdir -p "$case_dir"
-    snapshot_daemon_state "$case_dir/daemon-before.txt"
-    case_path=$family/$section_name/$case_name
-    case_artifacts=
-    if [ "${PCAP_CAPTURE:-0}" = 1 ]; then
-      start_packet_capture "/pcp-e2e-artifacts/$case_path/packet-capture.pcap"
-      case_artifacts="$case_path/packet-capture.pcap; $case_path/packet-capture.pcap.log; "
-    fi
-    e2e_start_runner
-    e2e_wait_runner
-    [ "${PCAP_CAPTURE:-0}" != 1 ] || stop_packet_capture "/pcp-e2e-artifacts/$case_path/packet-capture.pcap"
-    snapshot_daemon_state "$case_dir/daemon-after.txt"
-    case_artifacts="$case_artifacts$case_path/daemon-before.txt; $case_path/daemon-expect-*.txt; $case_path/daemon-after.txt; $case_path/runner.log; $case_path/daemon.log"
-    e2e_record_result "$case_artifacts"
-    "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" \
-      > "$case_dir/daemon.log" 2>&1 || true
-  done <<EOF
-$case_rows
-EOF
+  e2e_run_family "$family" --nat66-client fd42:1::2 --nat66-router fd42:1::1
   if [ "$active_section_nat66" = 1 ]; then
     set_nat66 0
   fi
 }
 
+# e2e_case_start / e2e_case_end (router_call case-start, case-end): the NAT66 rule of the case's section,
+# the daemon snapshots before and after it, its capture and the daemon log.
+e2e_case_start() {
+  if [ "$section_name" != "$active_section" ]; then
+    if [ "$active_section_nat66" = 1 ]; then
+      set_nat66 0
+    fi
+    active_section=$section_name
+    active_section_nat66=0
+    if [ "$case_flag" = true ]; then
+      set_nat66 1
+      active_section_nat66=1
+    fi
+  fi
+  case_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  snapshot_daemon_state "$case_dir/daemon-before.txt"
+  if [ "${PCAP_CAPTURE:-0}" = 1 ]; then
+    start_packet_capture "/pcp-e2e-artifacts/$family/$section_name/$case_name/packet-capture.pcap"
+  fi
+}
+e2e_case_end() {
+  if [ "${PCAP_CAPTURE:-0}" = 1 ]; then
+    stop_packet_capture "/pcp-e2e-artifacts/$family/$section_name/$case_name/packet-capture.pcap"
+  fi
+  snapshot_daemon_state "$case_dir/daemon-after.txt"
+  "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" > "$case_dir/daemon.log" 2>&1 || true
+}
+
 run_family ipv4
 run_family ipv6
 "$DOCKER" logs --timestamps "$ROUTER" > "$RUN_DIR/daemon-final.log" 2>&1 || true
-e2e_write_status "${RUN_DIR#"$ROOT"/} (daemon startup/final logs and per-case captures/snapshots)" \
+e2e_write_status "${RUN_DIR#"$ROOT"/} (daemon startup/final logs and per-case snapshots)" \
   "router=Linux nftables"
 echo "Daemon logs: $RUN_DIR (startup, per-case snapshots, final)"
 e2e_result "$STATUS"

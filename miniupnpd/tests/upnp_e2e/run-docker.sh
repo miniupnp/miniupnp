@@ -41,7 +41,7 @@ RUN_DIR=$RUN_ROOT
 export COMPOSE_PROFILES=agents PCP_TEST_ENABLE_UPNP=yes
 
 cleanup_fixture() {
-  "$DOCKER" rm -f "$RUNNER" >/dev/null 2>&1 || true
+  "$DOCKER" rm -f "$RUNNER-ipv4" "$RUNNER-ipv6" >/dev/null 2>&1 || true
   e2e_compose down --timeout 1 >/dev/null 2>&1 || true
 }
 cleanup() {
@@ -62,6 +62,12 @@ snapshot_daemon_state() {
 
 # restart_daemon (router_call restart, which a requires: [restart] case sends after its first request):
 # the same container, so the lease file stays; its entrypoint rebuilds the ruleset.
+# e2e_case_start / e2e_case_end (router_call case-start, case-end): the daemon log of each case.
+e2e_case_start() { case_start=$(date -u +%Y-%m-%dT%H:%M:%SZ); }
+e2e_case_end() {
+  "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" > "$case_dir/daemon.log" 2>&1 || true
+}
+
 restart_daemon() {
   "$DOCKER" restart "$ROUTER" >/dev/null
   e2e_wait_upnp "$ROUTER" "$LAN4.1"
@@ -92,22 +98,7 @@ run_build() {
       allow_ip=${WAN6}2 deny_ip=${WAN6}130 third_ip=${WAN6}200
     fi
     allow_url=http://$LAN4.12:18080 deny_url=http://$LAN4.13:18080 third_url=http://$LAN4.14:18080 unowned_ip=$external
-    rows=$(e2e_case_rows "$family")
-    while IFS="$(printf '\t')" read -r section_name case_name _flag; do
-      [ -n "$case_name" ] || continue
-      e2e_case_selected "$case_name" || continue
-      EXECUTED=$((EXECUTED + 1))
-      case_client=$lanip case_router=$router runner_ula=skip
-      case_dir=$RUN_DIR/$family/$section_name/$case_name
-      mkdir -p "$case_dir"
-      case_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-      e2e_start_runner
-      e2e_wait_runner
-      "$DOCKER" logs --timestamps --since "$case_start" "$ROUTER" > "$case_dir/daemon.log" 2>&1 || true
-      e2e_record_result "$family/$section_name/$case_name/runner.log; daemon.log; daemon-expect-*.txt"
-    done <<EOF
-$rows
-EOF
+    e2e_run_family "$family"
   done
   "$DOCKER" logs --timestamps "$ROUTER" > "$RUN_DIR/daemon-final.log" 2>&1 || true
   e2e_write_report "${RUN_DIR#"$ROOT"/}" "router=Linux nftables"

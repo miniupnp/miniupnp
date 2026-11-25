@@ -895,6 +895,27 @@ class RunCasesTests(unittest.TestCase):
         self.assertRegex(text, r"CASE END \S+ a\n")
         self.assertEqual(entered, ["a"])
 
+    def test_an_e2e_runner_frames_each_case_with_router_calls_and_writes_its_results(self):
+        calls = []
+        cases = [{"protocol": "pcp", "name": "a", "section": "MAP"},
+                 {"protocol": "pcp", "name": "b", "section": "NAT66"}]
+
+        def run(case):
+            calls.append("run " + case["name"])
+            if case["name"] == "b":
+                raise RuntimeError("boom")
+        with tempfile.TemporaryDirectory() as directory:
+            args = argparse.Namespace(router_call_dir=directory, family="ipv6",
+                                      results=os.path.join(directory, "results.tsv"))
+            with patch.object(lib_test, "router_call", lambda _directory, command: calls.append(command)), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                lib_test.run_e2e_cases(args, cases, run, lambda case: case["section"] == "NAT66")
+            with open(args.results, encoding="utf-8") as handle:
+                rows = [line.split("\t")[:5] for line in handle.read().splitlines()]
+        self.assertEqual(calls, ["case-start:MAP\ta\tfalse", "run a", "case-end",
+                                 "case-start:NAT66\tb\ttrue", "run b", "case-end"])
+        self.assertEqual(rows, [["ipv6", "MAP", "a", "PASS", ""], ["ipv6", "NAT66", "b", "FAIL", "boom"]])
+
 
 class RunnerOptionsTests(unittest.TestCase):
     def test_a_runner_gets_its_corpus_options(self):
