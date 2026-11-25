@@ -20,6 +20,11 @@ name: 'miniupnpd: Regression testing'
 # The comparisons build both daemons with the pull request's harness; a case that passed
 # with master's daemon and fails with the pull request's fails the job. On a push to
 # master, "master" is the commit before the push.
+# A comparison that runs master's daemon keeps master's outcomes in the cache
+# (.github/actions/outcomes-restore and outcomes-save), keyed on master's commit and the
+# harness: a later push of the same pull request runs only its own daemon. A push to
+# master keeps its own outcomes too, for the pull requests based on it. A workflow_dispatch
+# run uses no cache.
 
 'on':
   pull_request:
@@ -120,6 +125,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-yaml
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: end2end-linux
+
       - name: Compare master with pull request on linux
         env:
           CASE_NAME: ${{ inputs.end2end_case }}
@@ -132,7 +143,16 @@ jobs:
             --suite end2end --platform linux \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output end2end-linux "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: end2end-linux
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -202,6 +222,12 @@ jobs:
           key: >-
             end2end-freebsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/freebsd/prepare.sh') }}
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: end2end-freebsd-${{ matrix.release }}
+
       - name: Compare master with pull request on freebsd
         env:
           CASE_NAME: ${{ inputs.end2end_case }}
@@ -215,7 +241,16 @@ jobs:
             --suite end2end --platform freebsd \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output end2end-freebsd "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: end2end-freebsd-${{ matrix.release }}
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -282,6 +317,12 @@ jobs:
           key: >-
             end2end-openbsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/openbsd_image.sh', 'candidate/miniupnpd/tests/common/openbsd/prepare.sh') }}
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: end2end-openbsd-${{ matrix.release }}
+
       - name: Compare master with pull request on openbsd
         env:
           CASE_NAME: ${{ inputs.end2end_case }}
@@ -295,7 +336,16 @@ jobs:
             --suite end2end --platform openbsd \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output end2end-openbsd "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: end2end-openbsd-${{ matrix.release }}
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -337,6 +387,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-yaml
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: wire-linux
+
       - name: Compare master with pull request (no packet capture)
         env:
           PCP_CASE: ${{ inputs.wire_case }}
@@ -355,7 +411,16 @@ jobs:
             --master-source master \
             --candidate-source candidate \
             --profile "$PCP_PROFILE" \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output pcp-wire-artifacts "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: wire-linux
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -423,12 +488,6 @@ jobs:
 
       - name: Compare master with pull request on FreeBSD ${{ matrix.release }}
         run: |
-          python3 candidate/miniupnpd/tests/common/tools/compare_daemon_branches.py \
-            --suite wire --platform freebsd \
-            --results freebsd-results/master freebsd-results/candidate \
-            --master-source master \
-            --candidate-source candidate \
-            --output freebsd-results/comparison
 
       - name: Publish FreeBSD summary
         if: always()
@@ -481,6 +540,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-yaml
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: options-linux
+
       - name: Compare master with pull request on linux
         env:
           CASE_NAME: ${{ inputs.options_case }}
@@ -493,7 +558,16 @@ jobs:
             --suite daemon_options --platform linux \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output options-linux "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: options-linux
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -559,6 +633,12 @@ jobs:
           key: >-
             end2end-freebsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/freebsd/prepare.sh') }}
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: options-freebsd-${{ matrix.release }}
+
       - name: Compare master with pull request on freebsd
         env:
           CASE_NAME: ${{ inputs.options_case }}
@@ -572,7 +652,16 @@ jobs:
             --suite daemon_options --platform freebsd \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output options-freebsd "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: options-freebsd-${{ matrix.release }}
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -639,6 +728,12 @@ jobs:
           key: >-
             end2end-openbsd-keyed-${{ matrix.release }}-${{ hashFiles('candidate/miniupnpd/tests/common/openbsd_image.sh', 'candidate/miniupnpd/tests/common/openbsd/prepare.sh') }}
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: options-openbsd-${{ matrix.release }}
+
       - name: Compare master with pull request on openbsd
         env:
           CASE_NAME: ${{ inputs.options_case }}
@@ -652,7 +747,16 @@ jobs:
             --suite daemon_options --platform openbsd \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output options-openbsd "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: options-openbsd-${{ matrix.release }}
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -697,6 +801,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-yaml
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: upnp-wire-linux
+
       - name: Compare master with pull request on linux
         env:
           CASE_NAME: ${{ inputs.upnp_wire_case }}
@@ -709,7 +819,16 @@ jobs:
             --suite upnp-wire --platform linux \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output upnp-wire-linux "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: upnp-wire-linux
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
@@ -754,6 +873,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-yaml
 
+      - name: Restore master's outcomes of an earlier run
+        id: outcomes
+        uses: ./candidate/.github/actions/outcomes-restore
+        with:
+          comparison: upnp-e2e-linux
+
       - name: Compare master with pull request on linux
         env:
           CASE_NAME: ${{ inputs.upnp_e2e_case }}
@@ -766,7 +891,16 @@ jobs:
             --suite upnp-e2e --platform linux \
             --master-source master \
             --candidate-source candidate \
+            --master-outcomes outcomes/master.json --candidate-outcomes outcomes/candidate.json \
             --output upnp-e2e-linux "${args[@]}"
+
+      - name: Save the outcomes for later runs
+        if: always()
+        uses: ./candidate/.github/actions/outcomes-save
+        with:
+          comparison: upnp-e2e-linux
+          hit: ${{ steps.outcomes.outputs.hit }}
+          harness: ${{ steps.outcomes.outputs.harness }}
 
       - name: Publish comparison summary
         if: always()
