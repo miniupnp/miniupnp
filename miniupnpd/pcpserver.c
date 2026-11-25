@@ -793,11 +793,17 @@ static int add_peer_rules(pcp_info_t *pcp_msg_info, struct outgoing_entry *b)
 			pcp_msg_info->error_lifetime = end - now;
 		return PCP_ERR_NOT_AUTHORIZED;
 	}
-	/* the client's own peer: its renewal keeps the external port */
+	/* the client's own peer: a renewal. Its rule is in the firewall: a
+	 * second one would stay when the peer expires. It keeps the external
+	 * port, and outgoing_table_link() gives the peer its new expiry. */
 	old = memmap_find_peer(b->proto, b->family, &b->iaddr, b->iport,
 	                       &b->peers[0].raddr, b->peers[0].rport);
-	if (old != NULL)
-		eport = old->eport;
+	if (old != NULL) {
+		b->eaddr = old->eaddr;
+		b->eport = old->eport;
+		pcp_msg_info->ext_port = old->eport;
+		return PCP_SUCCESS;
+	}
 
 	/* check if connection with given peer exists, if it was */
 	/* already established use this external port */
