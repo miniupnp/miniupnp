@@ -1754,7 +1754,7 @@ add_filter_rule(int proto, const char * rhost,
  * a port mapping. number is the size of the array */
 unsigned short *
 get_portmappings_in_range(unsigned short startport, unsigned short endport,
-                          int proto, unsigned int * number)
+                          int proto, in_addr_t iaddr, unsigned int * number)
 {
 	unsigned short * array;
 	unsigned int capacity;
@@ -1762,6 +1762,8 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	IPTC_HANDLE h;
 	const struct ipt_entry * e;
 	const struct ipt_entry_match *match;
+	struct ipt_entry_target * target;
+	uint32_t iaddr_rule;
 
 	*number = 0;
 	capacity = 128;
@@ -1813,7 +1815,10 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 					info = (const struct ipt_udp *)match->data;
 					eport = info->dpts[0];
 				}
-				if(startport <= eport && eport <= endport)
+				target = (void *)e + e->target_offset;
+				get_dnat_target_addr_port(target, &iaddr_rule, NULL);
+				/* filter by iaddr if iaddr != 0 */
+				if(startport <= eport && eport <= endport && (iaddr == 0 || iaddr == iaddr_rule))
 				{
 					if(*number >= capacity)
 					{

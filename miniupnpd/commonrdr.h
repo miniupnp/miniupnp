@@ -1,6 +1,6 @@
 /* $Id: commonrdr.h,v 1.17 2025/04/03 21:11:34 nanard Exp $ */
 /* MiniUPnP project
- * (c) 2006-2025 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
@@ -63,11 +63,12 @@ get_redirect_rule_by_index(int index,
  * \param[in] startport start of port range
  * \param[in] endport end of port range
  * \param[in] proto IPPROTO_TCP/IPPROTO_UDP/etc.
+ * \param[in] iaddr only return ports mapping to this internal client (0 for wildcard)
  * \param[out] size of the returned array
  * \return an (malloc'ed) array */
 unsigned short *
 get_portmappings_in_range(unsigned short startport, unsigned short endport,
-                          int proto, unsigned int * number);
+                          int proto, in_addr_t iaddr, unsigned int * number);
 
 /*! \brief update the port mapping internal port, description and timestamp
  * \param[in] ifname WAN interface name

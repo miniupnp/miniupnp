@@ -660,14 +660,14 @@ get_nat_redirect_rule(const char * nat_chain_name, const char * ifname,
  */
 unsigned short *
 get_portmappings_in_range(unsigned short startport, unsigned short endport,
-			  int proto, unsigned int * number)
+			  int proto, in_addr_t iaddr, unsigned int * number)
 {
 	uint32_t capacity;
 	rule_t *p;
 	unsigned short *array;
 	unsigned short *tmp;
 
-	d_printf(("get_portmappings_in_range()\n"));
+	d_printf(("get_portmappings_in_range(%hu, %hu, %d, %08x, ...)\n", startport, endport, proto, iaddr));
 
 	*number = 0;
 	capacity = 128;
@@ -683,7 +683,8 @@ get_portmappings_in_range(unsigned short startport, unsigned short endport,
 	LIST_FOREACH(p, &head_redirect, entry) {
 		if (p->proto == proto &&
 		    startport <= p->dport &&
-		    p->dport <= endport) {
+		    p->dport <= endport &&
+		    (iaddr == 0 || iaddr == p->nat_addr)) {
 
 			if (*number >= capacity) {
 				capacity += 128;

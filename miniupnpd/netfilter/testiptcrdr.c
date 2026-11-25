@@ -1,7 +1,7 @@
 /* $Id: testiptcrdr.c,v 1.21 2016/02/12 12:35:50 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2016 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -16,6 +16,41 @@
 #ifndef PRIu64
 #define PRIu64 "llu"
 #endif
+
+void print_range(const unsigned short * range, unsigned int number)
+{
+	unsigned int i;
+	printf("get_portmappings_in_range() returned %u port%s : [", number, number > 1 ? "s" : "");
+	for (i = 0; i < number; i++) {
+		if (i != 0) printf(", ");
+		printf("%hu", range[i]);
+	}
+	printf("]\n");
+}
+
+void test_range(int proto, const char * iaddr)
+{
+	unsigned short * range;
+	unsigned int number;
+
+	/* without internal client filtering */
+	range = get_portmappings_in_range(0, 65535, proto, 0, &number);
+	if (range == NULL) {
+		fprintf(stderr, "get_portmappings_in_range() failed\n");
+		return;
+	}
+	print_range(range, number);
+	free(range);
+
+	/* with the internal client filtering */
+	range = get_portmappings_in_range(0, 65535, proto, inet_addr(iaddr), &number);
+	if (range == NULL) {
+		fprintf(stderr, "get_portmappings_in_range() failed\n");
+		return;
+	}
+	print_range(range, number);
+	free(range);
+}
 
 int
 main(int argc, char ** argv)
@@ -81,6 +116,7 @@ main(int argc, char ** argv)
 			       p1, addr, p2, proto2, packets, bytes, timestamp, desc);
 		}
 	}
+	test_range(proto, iaddr);
 	printf("trying to list nat rules :\n");
 	list_redirect_rule(NULL);
 	printf("deleting\n");
