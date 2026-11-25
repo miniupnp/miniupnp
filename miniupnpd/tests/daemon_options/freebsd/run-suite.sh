@@ -116,15 +116,11 @@ enable_upnp=no
 enable_pcp_pmp=yes
 lease_file=/var/tmp/miniupnpd.leases
 max_lifetime=600
-log_level=info
 secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
-# log_level only for a daemon which has the option: one without it refuses to start
-if ! grep -q '"log_level"' miniupnpd/options.c; then
-	sed -i.bak '/^log_level=/d' "$WORK/base.conf" && rm -f "$WORK/base.conf.bak"
-fi
+known_option log_level=info >>"$WORK/base.conf"
 
 listening() { grep -Ec 'Listening for|HTTP listening' "$LOG" || true; }
 
