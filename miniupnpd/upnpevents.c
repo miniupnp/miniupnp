@@ -268,6 +268,9 @@ upnp_event_create_notify(struct subscriber * sub)
 	if(obj->s<0) {
 		syslog(LOG_ERR, "%s: socket(): %m", "upnp_event_create_notify");
 		goto error;
+	} else if(obj->s >= FD_SETSIZE) {
+		syslog(LOG_ERR, "%s: fd %d is >= FD_SETSIZE", "upnp_event_create_notify");
+		goto error;
 	}
 #if 0 /* does not work for non blocking connect() */
 	/* set timeout to 3 seconds */

@@ -3,6 +3,7 @@ $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 2026/11/25:
   add internal address filtering to upnp_get_portmappings_in_range()
     and fix DeletePortMappingRange in secure mode.
+  Check that sockets file descriptors are < FD_SETSIZE
 
 2026/11/13:
   upnpredirect.c: add upnp_get_redirection_infos_by_ituple()

@@ -483,6 +483,11 @@ ProcessIncomingHTTP(int shttpl, const char * protocol)
 		if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
 			syslog(LOG_ERR, "accept(http): %m");
 	}
+	else if (shttp >= FD_SETSIZE)
+	{
+		syslog(LOG_ERR, "fd %d >= FD_SETSIZE, closing", shttp);
+		close(shttp);
+	}
 	else
 	{
 		struct upnphttp * tmp = 0;
@@ -3100,17 +3105,29 @@ main(int argc, char * * argv)
 			/*syslog(LOG_DEBUG, "sctl!");*/
 			s = accept(sctl, (struct sockaddr *)&clientname,
 			           &clientnamelen);
-			syslog(LOG_DEBUG, "sctl! : '%s'", clientname.sun_path);
-			tmp = malloc(sizeof(struct ctlelem));
-			if (tmp == NULL)
+			if (s < 0)
 			{
-				syslog(LOG_ERR, "Unable to allocate memory for ctlelem in main()");
+				syslog(LOG_ERR, "accept(sctl) failed: %m");
+			}
+			else if (s >= FD_SETSIZE)
+			{
+				syslog(LOG_ERR, "fd %d >= FD_SETSIZE (unix socket), closing", s);
 				close(s);
 			}
 			else
 			{
-				tmp->socket = s;
-				LIST_INSERT_HEAD(&ctllisthead, tmp, entries);
+				syslog(LOG_DEBUG, "sctl! : '%s'", clientname.sun_path);
+				tmp = malloc(sizeof(struct ctlelem));
+				if (tmp == NULL)
+				{
+					syslog(LOG_ERR, "Unable to allocate memory for ctlelem in main()");
+					close(s);
+				}
+				else
+				{
+					tmp->socket = s;
+					LIST_INSERT_HEAD(&ctllisthead, tmp, entries);
+				}
 			}
 		}
 #endif
