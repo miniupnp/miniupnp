@@ -14,17 +14,18 @@
 
 # copied from https://github.com/Chia-Network/build-wheels/blob/52e183920e3ec44017ed767c65e9b204536c0f13/.github/workflows/miniupnpc.yml
 
+---
 name: "build miniupnpc wheels"
 
-on:
+'on':
   push:
     branches:
-    - master
+      - master
     tags:
-    - '**'
+      - '**'
   pull_request:
     branches:
-    - '**'
+      - '**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || format('{0}-{1}-{2}', github.ref, github.event_name, github.ref == 'refs/heads/main' && github.sha || '') }}
@@ -168,7 +169,7 @@ jobs:
       CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=${{ matrix.os.macosx-deployment-target[matrix.arch.matrix] }}
       CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.python.manylinux['arm'] }}
       CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.python.manylinux['intel'] }}
-      CIBW_PRERELEASE_PYTHONS: True
+      CIBW_PRERELEASE_PYTHONS: true
       CIBW_SKIP: '*-manylinux_i686 *-win32 *-musllinux_*'
 
     steps:
@@ -220,7 +221,7 @@ jobs:
         run: |
           python -m pip install twine
           twine check dist/*
-        
+
       - uses: ./cloned/.github/actions/create-venv
         id: create-test-venv
 

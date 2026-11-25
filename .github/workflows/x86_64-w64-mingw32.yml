@@ -1,10 +1,11 @@
+---
 name: x86_64-w64-mingw32
 
-on:
+'on':
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   build:
