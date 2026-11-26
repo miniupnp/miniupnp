@@ -68,16 +68,18 @@ e2e_compose up --no-start --quiet-pull router >/dev/null
   --entrypoint sh "$IMAGE" -c "ip route replace default via $ROUTER_LAN4; \
     mkdir -p /srv && echo neighbour-served > /srv/index.html && cd /srv && exec python3 -m http.server 45300" >/dev/null
 
+# daemon_listening: miniupnpd in the router listens on TCP (UPnP) or on the PCP/NAT-PMP port.
+# The sockets, not the log: a pull request may reword the log lines.
 daemon_listening() {
-  "$DOCKER" logs "$ROUTER" 2>&1 | grep -Ec 'Listening for NAT-PMP|HTTP listening on port' || true
+  { "$DOCKER" exec "$ROUTER" ss -Hltnp; "$DOCKER" exec "$ROUTER" ss -Hlunp 'sport = :5351'; } 2>/dev/null |
+    grep -q '"miniupnpd"'
 }
 
-# restart_router: the same container, so the lease file stays; ready at its next listening line
+# restart_router: the same container, so the lease file stays; ready when the new daemon listens
 restart_router() {
-  before=$(daemon_listening)
   "$DOCKER" restart -t 2 "$ROUTER" >/dev/null
   for _attempt in $(seq 1 100); do
-    [ "$(daemon_listening)" -le "$before" ] || { sleep 1; echo restarted; return 0; }
+    daemon_listening && { sleep 1; echo restarted; return 0; }
     sleep 0.2
   done
   echo "restart timed out"
@@ -132,7 +134,7 @@ start_router() {
   e2e_compose up --detach --force-recreate --no-deps router >/dev/null 2>&1 ||
     { echo "FAIL: the router container did not start" >&2; exit 1; }
   for _attempt in $(seq 1 50); do
-    if "$DOCKER" logs "$ROUTER" 2>&1 | grep -Eq 'Listening for NAT-PMP|HTTP listening on port'; then
+    if daemon_listening; then
       sleep 1     # the other protocol's sockets open right after
       "$DOCKER" exec "$ROUTER" cat /etc/miniupnpd.conf > "$router_log.conf" 2>&1 || true
       return 0
