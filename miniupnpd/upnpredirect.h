@@ -141,33 +141,16 @@ upnp_delete_redirection(unsigned short eport, const char * protocol);
 int
 _upnp_delete_redir(unsigned short eport, int proto);
 
-/* Periodic cleanup functions
- */
-struct rule_state
-{
-	u_int64_t packets;
-	u_int64_t bytes;
-	struct rule_state * next;
-	unsigned short eport;
-	unsigned char proto;
-	unsigned char to_remove;
-};
-
-/* return a linked list of all rules
- * or an empty list if there are not enough
- * As a "side effect", delete rules which are expired */
-struct rule_state *
-get_upnp_rules_state_list(int max_rules_number_target);
+/* remove_expired_rules() :
+ * delete the rules whose lease has expired
+ * and set nextruletoclean_timestamp to the next expiry */
+void
+remove_expired_rules(void);
 
 /*! \brief return the number of port mapping entries
  * \return the number of port mapping entries */
 int
 upnp_get_portmapping_number_of_entries(void);
-
-/* remove_unused_rules() :
- * also free the list */
-void
-remove_unused_rules(struct rule_state * list);
 
 /*! \brief returns a list of all "external" ports for which a port
  * mapping exists
