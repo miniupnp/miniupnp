@@ -913,6 +913,14 @@ GetSpecificPortMappingEntry(struct upnphttp * h, const char * action, const char
 #ifdef ENABLE_PCP
 		hide_pcp_nonce(desc);
 #endif
+#ifdef IGD_V2
+		/* Workaround to list port maps with the Windows IGDv2-incompatible client
+		 * by returning an infinite (0) lease duration. To fix listing and editing
+		 * via GUI (Explorer/Network), if daemon was compiled with IGDv2 */
+		if (h->respflags & FLAG_MS_CLIENT) {
+			leaseduration = 0;
+		}
+#endif
 		bodylen = snprintf(body, sizeof(body), resp,
 				action, ns/*SERVICE_TYPE_WANIPC*/,
 				(unsigned int)iport, int_ip, desc, leaseduration,
@@ -1204,6 +1212,14 @@ GetGenericPortMappingEntry(struct upnphttp * h, const char * action, const char 
 		char body[512+MINIUPNPD_DESC_SIZE];
 #ifdef ENABLE_PCP
 		hide_pcp_nonce(desc);
+#endif
+#ifdef IGD_V2
+		/* Workaround to list port maps with the Windows IGDv2-incompatible client
+		 * by returning an infinite (0) lease duration. To fix listing and editing
+		 * via GUI (Explorer/Network), if daemon was compiled with IGDv2 */
+		if (h->respflags & FLAG_MS_CLIENT) {
+			leaseduration = 0;
+		}
 #endif
 		bodylen = snprintf(body, sizeof(body), resp,
 			action, ns, /*SERVICE_TYPE_WANIPC,*/ rhost,

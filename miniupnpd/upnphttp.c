@@ -321,9 +321,22 @@ ParseHttpHeaders(struct upnphttp * h)
 			}
 			else if(strncasecmp(line, "user-agent:", 11) == 0)
 			{
-				/* - User-Agent: Microsoft-Windows/10.0 UPnP/1.0
-				 * - User-Agent: FDSSDP                           */
-				if(strcasestr(line + 11, "microsoft") != NULL || strstr(line + 11, "FDSSDP") != NULL) {
+				/* Detect Microsoft UPnP IGDv2-incompatible clients that only support IGDv1 routers,
+				 * and Windows requires extra UDA 1.x (Win XP 1.0), via User-Agent SOAP/HTTP header:
+				 * - Microsoft-Windows/10.0 UPnP/1.0 (Win >=10)
+				 * - Microsoft-Windows/6.1 UPnP/1.0 (Win 7)
+				 * - FDSSDP (Win >=Vista for GET)
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows NT/5.1) (Win XP/Vista for GET)
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows 9x) (Win XP/Vista for POST)
+				 * - Xbox/2.0.17559.0 UPnP/1.0 Xbox/2.0.17559.0
+				 * Detect Apple UPnP IGDv2-incompatible clients that only support IGDv1 routers:
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows NT/5.1) (for GET)
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows 9x) (for POST) */
+				if (((strstr(line + 11, "Microsoft-Windows/") != NULL ||
+							strstr(line + 11, "Xbox/") != NULL) &&
+						 strstr(line + 11, " UPnP/1.0") != NULL) ||
+						strstr(line + 11, "FDSSDP") != NULL ||
+						strstr(line + 11, "Mozilla/4.0 (compatible; UPnP/1.0; Windows") != NULL) {
 					h->respflags |= FLAG_MS_CLIENT;
 				}
 			}
