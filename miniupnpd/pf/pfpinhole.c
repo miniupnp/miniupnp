@@ -589,9 +589,9 @@ int clean_pinhole_list(unsigned int * next_timestamp)
 			pr.ticket = ri.ticket;
 			pr.nr = i;
 			strlcpy(pr.anchor, anchor_name, MAXPATHLEN);
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label[0]);
+			syslog(LOG_INFO, "Expire IPv6 port map [?]:?/?");
 #else /* USE_LIBPFCTL */
-			syslog(LOG_INFO, "removing expired pinhole '%s'", RULE.label);
+			syslog(LOG_INFO, "Expire IPv6 port map [?]:?/?");
 #endif /* USE_LIBPFCTL */
 			pr.action = PF_CHANGE_GET_TICKET;
 			if(ioctl(dev, DIOCCHANGERULE, &pr) < 0) {

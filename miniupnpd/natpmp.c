@@ -281,10 +281,6 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			eport = READNU16(req+6);
 			lifetime = READNU32(req+8);
 			proto = (req[1]==1)?IPPROTO_UDP:IPPROTO_TCP;
-			syslog(LOG_INFO, "NAT-PMP port mapping request : "
-			                 "%hu->%s:%hu %s lifetime=%us",
-			                 eport, senderaddrstr, iport,
-			                 (req[1]==1)?"udp":"tcp", lifetime);
 			/* TODO: accept port mapping if iport ok but eport not ok
 			 * (and set eport correctly) */
 			if(lifetime == 0) {
@@ -321,8 +317,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								resp[3] = 2;	/* Not Authorized/Refused */
 								break;
 							} else {
-								syslog(LOG_INFO, "NAT-PMP %s port %hu mapping removed",
-								       proto2==IPPROTO_TCP?"TCP":"UDP", eport2);
+								syslog(LOG_INFO, "Delete IPv4 port map %hu:%s:%hu/%s via NAT-PMP",
+									eport2, senderaddrstr, iport, proto2 == IPPROTO_TCP ? "TCP" : "UDP");
 								index--;
 							}
 						}
@@ -341,8 +337,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 						eport_first = eport;
 					} else if(eport == eport_first) { /* no eport available */
 						if(any_eport_allowed == 0) { /* all eports rejected by permissions */
-							syslog(LOG_INFO, "No allowed eport for NAT-PMP %hu %s->%s:%hu",
-							       eport, proto_itoa(proto), senderaddrstr, iport);
+							syslog(LOG_INFO, "Reject IPv4 port map %hu:%s:%hu/%s via NAT-PMP reason ACL/default-min/max-port",
+								eport, senderaddrstr, iport, proto_itoa(proto));
 							resp[3] = 2;	/* Not Authorized/Refused */
 						} else { /* at least one eport allowed (but none available) */
 							syslog(LOG_ERR, "Failed to find available eport for NAT-PMP %hu %s->%s:%hu",
@@ -359,7 +355,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					any_eport_allowed = 1;	/* at lease one eport is allowed */
 #ifdef CHECK_PORTINUSE
 					if (port_in_use(ext_if_name, eport, proto, senderaddrstr, iport) > 0) {
-						syslog(LOG_INFO, "port %hu protocol %s already in use",
+						syslog(LOG_INFO, "Reject IPv4 port map %hu:?:?/%s via NAT-PMP reason port in use",
 						       eport, proto_itoa(proto));
 						eport++;
 						if(eport == 0) eport++; /* skip port zero */
@@ -379,8 +375,8 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 								break;
 							}
 							/* redirection already existing */
-							syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
-							       eport, (proto==IPPROTO_TCP)?"tcp":"udp", iaddr_old, iport_old);
+							syslog(LOG_INFO, "Renew IPv4 port map %hu:%s:%hu/%s lifetime %u via NAT-PMP",
+								eport, iaddr_old, iport_old, proto_itoa(proto), lifetime);
 							/* remove and then add again */
 							if(_upnp_delete_redir(eport, proto) < 0) {
 								syslog(LOG_ERR, "failed to remove port mapping");
@@ -407,6 +403,10 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 					break;
 				}
 			}
+			if (resp[3] == 0 && lifetime) {
+				syslog(LOG_INFO, "Add IPv4 port map %hu:%s:%hu/%s lifetime %u via NAT-PMP",
+					eport, senderaddrstr, iport, req[1] == 1 ? "UDP" : "TCP", lifetime);
+			}
 			WRITENU16(resp+8, iport);	/* private port */
 			WRITENU16(resp+10, eport);	/* public port */
 			WRITENU32(resp+12, lifetime);	/* Port Mapping lifetime */
@@ -416,6 +416,7 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 	default:
 		resp[3] = 5;	/* Unsupported OPCODE */
 	}
+
 	n = sendto_or_schedule(s, resp, resplen, 0,
 	           (struct sockaddr *)senderaddr, sizeof(*senderaddr));
 	if(n<0) {
