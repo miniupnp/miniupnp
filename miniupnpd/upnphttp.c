@@ -321,9 +321,22 @@ ParseHttpHeaders(struct upnphttp * h)
 			}
 			else if(strncasecmp(line, "user-agent:", 11) == 0)
 			{
-				/* - User-Agent: Microsoft-Windows/10.0 UPnP/1.0
-				 * - User-Agent: FDSSDP                           */
-				if(strcasestr(line + 11, "microsoft") != NULL || strstr(line + 11, "FDSSDP") != NULL) {
+				/* Detect Microsoft UPnP IGDv2-incompatible clients that only support IGDv1 routers,
+				 * and Windows requires extra UDA 1.x (Win XP 1.0), via User-Agent SOAP/HTTP header:
+				 * - Microsoft-Windows/10.0 UPnP/1.0 (Win >=10)
+				 * - Microsoft-Windows/6.1 UPnP/1.0 (Win 7)
+				 * - FDSSDP (Win >=Vista for GET)
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows NT/5.1) (Win XP/Vista for GET)
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows 9x) (Win XP/Vista for POST)
+				 * - Xbox/2.0.17559.0 UPnP/1.0 Xbox/2.0.17559.0
+				 * Detect Apple UPnP IGDv2-incompatible clients that only support IGDv1 routers:
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows NT/5.1) (for GET)
+				 * - Mozilla/4.0 (compatible; UPnP/1.0; Windows 9x) (for POST) */
+				if (((strstr(line + 11, "Microsoft-Windows/") != NULL ||
+							strstr(line + 11, "Xbox/") != NULL) &&
+						 strstr(line + 11, " UPnP/1.0") != NULL) ||
+						strstr(line + 11, "FDSSDP") != NULL ||
+						strstr(line + 11, "Mozilla/4.0 (compatible; UPnP/1.0; Windows") != NULL) {
 					h->respflags |= FLAG_MS_CLIENT;
 				}
 			}
@@ -541,7 +554,7 @@ ProcessHTTPPOST_upnphttp(struct upnphttp * h)
 		if(h->req_soapActionOff > 0)
 		{
 			/* we can process the request */
-			syslog(LOG_INFO, "SOAPAction: %.*s",
+			syslog(LOG_DEBUG, "SOAPAction: %.*s",
 			       h->req_soapActionLen, h->req_buf + h->req_soapActionOff);
 			ExecuteSoapAction(h,
 				h->req_buf + h->req_soapActionOff,
@@ -846,7 +859,7 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 	for(i = 0; i<15 && *p != '\r'; i++)
 		HttpVer[i] = *(p++);
 	HttpVer[i] = '\0';
-	syslog(LOG_INFO, "HTTP REQUEST from %s : %s %s (%s)",
+	syslog(LOG_DEBUG, "HTTP REQUEST from %s : %s %s (%s)",
 	       h->clientaddr_str, HttpCommand, HttpUrl, HttpVer);
 	ParseHttpHeaders(h);
 	if(h->req_contentlen > CONTENT_LENGTH_LIMIT) {
@@ -932,7 +945,7 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 			return;
 		}
 #endif
-		syslog(LOG_NOTICE, "%s not found, responding ERROR 404", HttpUrl);
+		syslog(LOG_DEBUG, "%s not found, responding ERROR 404", HttpUrl);
 		Send404(h);
 	}
 #ifdef ENABLE_EVENTS

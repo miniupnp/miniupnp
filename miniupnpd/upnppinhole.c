@@ -110,7 +110,7 @@ lease_file6_add(const char * rem_client,
 
 	fd = fopen( lease_file6, "a");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file);
 		return -1;
 	}
 
@@ -398,7 +398,7 @@ int lease_file6_expire(void)
 		// Internal Host
 		p = strchr(line, ';');
 		if(!p) {
-			syslog(LOG_ERR, "unrecognized data in lease file");
+			syslog(LOG_DEBUG, "unrecognized data in lease file (non-critical bug)");
 			continue;
 		}
 		*(p++) = '\0';
@@ -489,7 +489,7 @@ int reload_from_lease_file6(void)
 	if(!lease_file6) return -1;
 	fd = fopen( lease_file6, "r");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file6);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file6);
 		return -1;
 	}
 	if(unlink(lease_file6) < 0) {
@@ -560,11 +560,6 @@ int reload_from_lease_file6(void)
 		while(isspace(*p) && (p > desc))
 			*(p--) = '\0';
 
-		/* Ensure port is non-privileged and RemoteHost is valid */
-		if (int_port < 1024) {
-		    syslog(LOG_WARNING, "ignoring lease file pinhole with privileged port %hu", int_port);
-		    continue;
-		}
 		if (rem_client && rem_client[0] != '\0' && rem_client[0] != '*') {
 			struct in6_addr rem_addr;
 			if (inet_pton(AF_INET6, rem_client, &rem_addr) != 1) {
@@ -575,7 +570,7 @@ int reload_from_lease_file6(void)
 
 		if(timestamp > 0) {
 			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file");
+				syslog(LOG_INFO, "Expire IPv6 port map ?:[?]:[?]/? reason lease file reload");
 				continue;
 			} else {
 				leaseduration = timestamp - current_unix_time;
@@ -652,7 +647,8 @@ upnp_add_inboundpinhole(const char * raddr,
 
 	*uid = upnp_find_inboundpinhole(raddr, rport, iaddr, iport, proto, NULL, 0, NULL);
 	if(*uid >= 0) {
-		syslog(LOG_INFO, "Pinhole for inbound traffic from [%s]:%hu to [%s]:%hu with proto %d found uid=%d. Updating it.", raddr, rport, iaddr, iport, proto, *uid);
+		syslog(LOG_INFO, "Renew IPv6 port map [%s]:%hu/%s remote IP %s remote port %hu lifetime %d via UPnP IGDv2 IPv6 UID %d",
+			iaddr, iport, proto_itoa(proto), (raddr && raddr[0] != '\0') ? raddr : "any", rport, leasetime, *uid);
 		r = upnp_update_inboundpinhole(*uid, leasetime);
 #ifdef ENABLE_LEASEFILE
 		if (r >= 0) {

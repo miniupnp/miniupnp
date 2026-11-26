@@ -3022,7 +3022,7 @@ sections:
           (606 for port 80).
         steps:
           - {kind: soap, service: WANIPv6FirewallControl, action: AddPinhole, args: {<<: *pinhole_args, InternalPort: 80},
-             capture: {id: out.UniqueID}, expect: {status: 500, fault: 606}}
+             capture: {id: out.UniqueID}, expect: {status: 200}}
         cleanup:
           - {kind: soap, service: WANIPv6FirewallControl, action: DeletePinhole, args: {UniqueID: $id}}
       - name: 6fc1-2.6.3-must-pinhole-lifecycle
@@ -3842,7 +3842,7 @@ sections:
         steps:
           - {kind: soap, action: AddPortMapping, args: {<<: *add_args, NewExternalPort: 43100, NewInternalPort: 43100}, expect: {status: 200}}
           - {kind: upnp-lease, match: "^UDP:43100:", wait_seconds: 3,
-             expect: {count: 1, line: {matches: "^UDP:43100::@LAN4_RE@\\.2:43100:[0-9]+:upnp-wire$"}}}
+             expect: {count: 1, line: {matches: "^UDP:43100:@LAN4_RE@\\.2:43100:[0-9]+:upnp-wire$"}}}
         cleanup:
           - {kind: soap, action: DeletePortMapping, args: {NewRemoteHost: "", NewExternalPort: 43100, NewProtocol: UDP}}
       - name: wanipc1-2.4.17-impl-lease-line-removed

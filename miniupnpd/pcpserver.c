@@ -657,7 +657,7 @@ static int CheckExternalAddress(pcp_info_t* pcp_msg_info)
 	}
 
 	if (!IN6_ARE_ADDR_EQUAL(pcp_msg_info->ext_ip, &external_addr)) {
-		syslog(LOG_ERR,
+		syslog(LOG_DEBUG,
 		       "PCP: External IP in request didn't match interface IP \n");
 #ifdef DEBUG
 		{
@@ -943,6 +943,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	uint16_t iport_old, eport_first = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+	char desc[64];
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -977,7 +978,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 							   ((struct in_addr*)pcp_msg_info->mapped_ip->s6_addr)[3],
 							   pcp_msg_info->int_port, pcp_msg_info->desc)))) {
 			if (pcp_msg_info->pfailure_present) {
-				return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
+				return PCP_ERR_NOT_AUTHORIZED;
 			}
 			pcp_msg_info->ext_port++;
 			if (pcp_msg_info->ext_port == 0) { /* skip port zero */
@@ -989,7 +990,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 #ifdef CHECK_PORTINUSE
 		if (port_in_use(ext_if_name, pcp_msg_info->ext_port, pcp_msg_info->protocol,
 				pcp_msg_info->mapped_str, pcp_msg_info->int_port) > 0) {
-			syslog(LOG_INFO, "port %hu protocol %s already in use",
+			syslog(LOG_INFO, "Reject IPv4 port map %hu:?:?/%s via PCP reason port in use",
 			       pcp_msg_info->ext_port,
 			       proto_itoa(pcp_msg_info->protocol));
 			pcp_msg_info->ext_port++;
@@ -1003,7 +1004,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				      pcp_msg_info->ext_port,
 				      pcp_msg_info->protocol,
 				      iaddr_old, sizeof(iaddr_old),
-				      &iport_old, 0, 0, 0, 0,
+				      &iport_old, desc, sizeof(desc), 0, 0,
 				      NULL/*&timestamp*/, 0, 0);
 
 		if(r==0) {
@@ -1014,9 +1015,16 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 				}
 			} else {
-				syslog(LOG_INFO, "port %hu %s already redirected to %s:%hu, replacing",
-				       pcp_msg_info->ext_port, proto_itoa(pcp_msg_info->protocol),
-				       iaddr_old, iport_old);
+				if (0 != strcmp(desc, pcp_msg_info->desc)) {
+					/* nonce does not match */
+					syslog(LOG_INFO, "Reject IPv4 port map %hu:%s:%hu/%s via PCP nonce %s reason nonce not matching",
+						pcp_msg_info->ext_port, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+						proto_itoa(pcp_msg_info->protocol), pcp_msg_info->desc + 8);
+					return PCP_ERR_NOT_AUTHORIZED;
+				}
+				syslog(LOG_INFO, "Renew IPv4 port map %hu:%s:%hu/%s lifetime %d via PCP",
+					pcp_msg_info->ext_port, iaddr_old, iport_old,
+					proto_itoa(pcp_msg_info->protocol), pcp_msg_info->lifetime);
 				/* remove and then add again */
 				if (_upnp_delete_redir(pcp_msg_info->ext_port,
 						       pcp_msg_info->protocol)==0) {
@@ -1051,6 +1059,14 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 	int r;
 	char desc[64];
 	unsigned int timestamp = 0;
+
+	if (!IN6_IS_ADDR_V4MAPPED(pcp_msg_info->mapped_ip) &&
+			(pcp_msg_info->int_port < default_min_port || pcp_msg_info->int_port > default_max_port)) {
+		syslog(LOG_INFO, "Reject IPv6 port map [%s]:%hu/%s via PCP reason default-min/max-port",
+			pcp_msg_info->mapped_str, pcp_msg_info->int_port, proto_itoa(pcp_msg_info->protocol));
+		return PCP_ERR_NOT_AUTHORIZED;
+	}
+
 	/* first check if pinhole already exists */
 	uid = upnp_find_inboundpinhole(NULL, 0,
 					pcp_msg_info->mapped_str,
@@ -1062,16 +1078,17 @@ static int CreatePCPMap_FW(pcp_info_t *pcp_msg_info)
 		/* pinhole already exists, updating */
 		if (0 != strcmp(desc, pcp_msg_info->desc)) {
 			/* nonce does not match */
-			syslog(LOG_ERR, "Unauthorized to update pinhole : \"%s\" != \"%s\"",
-			       desc, pcp_msg_info->desc);
+			syslog(LOG_INFO, "Reject IPv6 port map [%s]:%hu/%s via PCP nonce %s reason nonce not matching",
+				pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+				proto_itoa(pcp_msg_info->protocol), pcp_msg_info->desc + 8);
 			/* the refusal lasts until the pinhole expires */
 			if (timestamp > upnp_time())
 				pcp_msg_info->error_lifetime = timestamp - upnp_time();
 			return PCP_ERR_NOT_AUTHORIZED;
 		}
-		syslog(LOG_INFO, "updating pinhole %d to %s:%hu %s",
-		       uid, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
-		       proto_itoa(pcp_msg_info->protocol));
+		syslog(LOG_INFO, "Renew IPv6 port map [%s]:%hu/%s lifetime %d via PCP",
+			pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+			proto_itoa(pcp_msg_info->protocol), pcp_msg_info->lifetime);
 		r = upnp_update_inboundpinhole((unsigned short)uid, pcp_msg_info->lifetime);
 		if (r < 0)
 			return PCP_ERR_NO_RESOURCES;
@@ -1130,19 +1147,25 @@ static void CreatePCPMap(pcp_info_t *pcp_msg_info)
 {
 	int r;
 
-	if (pcp_msg_info->is_fw)
+	if (pcp_msg_info->is_fw) {
 		r = CreatePCPMap_FW(pcp_msg_info);
-	else
+		syslog(LOG_INFO,
+		      "%s IPv6 port map [%s]:%hu/%s remote IP ?/? remote port ? lifetime %d via PCP nonce %s %s",
+		       r == PCP_SUCCESS ? "Add" : "Reject",
+		       pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		       proto_itoa(pcp_msg_info->protocol), pcp_msg_info->lifetime,
+		       pcp_msg_info->desc + 8, r == PCP_ERR_NOT_AUTHORIZED ? "reason default-min/max-port" : "");
+	} else {
 		r = CreatePCPMap_NAT(pcp_msg_info);
+		syslog(LOG_INFO,
+		      "%s IPv4 port map %hu:%s:%hu/%s remote IP ?/? remote port ? lifetime %d via PCP nonce %s %s",
+		       r == PCP_SUCCESS ? "Add" : "Reject",
+		       pcp_msg_info->ext_port,
+		       pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+		       proto_itoa(pcp_msg_info->protocol), pcp_msg_info->lifetime,
+		       pcp_msg_info->desc + 8, r == PCP_ERR_NOT_AUTHORIZED ? "reason ACL/default-min/max-port" : "");
+	}
 	pcp_msg_info->result_code = r;
-	syslog(r == PCP_SUCCESS ? LOG_INFO : LOG_ERR,
-	      "PCP MAP: %s mapping %s %hu->%s:%hu '%s'",
-	       r == PCP_SUCCESS ? "added" : "failed to add",
-	       proto_itoa(pcp_msg_info->protocol),
-	       pcp_msg_info->ext_port,
-	       pcp_msg_info->mapped_str,
-	       pcp_msg_info->int_port,
-	       pcp_msg_info->desc);
 }
 
 static void DeletePCPMap(pcp_info_t *pcp_msg_info)
@@ -1179,8 +1202,8 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 				if(0 != strcmp(desc, pcp_msg_info->desc)) {
 					/* nonce does not match */
 					pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-					syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
-					       iport, proto_itoa(pcp_msg_info->protocol));
+					syslog(LOG_INFO, "Reject IPv6 port map [?]:%hu/%s via PCP nonce %s reason nonce not matching",
+					       iport, proto_itoa(pcp_msg_info->protocol), pcp_msg_info->desc + 8);
 					return;
 				} else {
 					r = _upnp_delete_redir(eport2, proto2);
@@ -1200,15 +1223,15 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 						desc, sizeof(desc),
 						NULL /* lifetime */);
 		if (uid < 0) {
-			syslog(LOG_ERR, "Failed to find mapping to %s:%hu, protocol %s",
-			       pcp_msg_info->mapped_str, iport, proto_itoa(pcp_msg_info->protocol));
+			syslog(LOG_INFO, "Non-existing IPv6 port map to delete [%s]:%hu/%s via PCP nonce %s",
+			       pcp_msg_info->mapped_str, iport, proto_itoa(pcp_msg_info->protocol), pcp_msg_info->desc + 8);
 			return;
 		} else {
 			if(0 != strcmp(desc, pcp_msg_info->desc)) {
 				/* nonce does not match */
 				pcp_msg_info->result_code = PCP_ERR_NOT_AUTHORIZED;
-				syslog(LOG_ERR, "Unauthorized to remove PCP mapping internal port %hu, protocol %s",
-				       iport, proto_itoa(pcp_msg_info->protocol));
+				syslog(LOG_INFO, "Reject IPv6 port map [?]:%hu/%s via PCP nonce %s reason nonce not matching",
+				       iport, proto_itoa(pcp_msg_info->protocol), pcp_msg_info->desc + 8);
 				return;
 			} else {
 				r = upnp_delete_inboundpinhole(uid);
@@ -1219,11 +1242,21 @@ static void DeletePCPMap(pcp_info_t *pcp_msg_info)
 #endif /* ENABLE_UPNPPINHOLE */
 	}
 	if (r >= 0) {
-		syslog(LOG_INFO, "PCP: %s port %hu mapping removed",
-		       proto==IPPROTO_TCP?"TCP":"UDP", (pcp_msg_info->is_fw ? iport : eport2));
+			if (!pcp_msg_info->is_fw) {
+				syslog(LOG_INFO, "Delete IPv4 port map %hu:%s:%hu/%s via PCP nonce %s",
+					iport, pcp_msg_info->mapped_str, iport, proto_itoa(proto), pcp_msg_info->desc + 8);
+			} else {
+				syslog(LOG_INFO, "Delete IPv6 port map [%s]:%hu/%s via PCP nonce %s",
+					pcp_msg_info->mapped_str, iport, proto_itoa(proto), pcp_msg_info->desc + 8);
+			}
 	} else {
-		syslog(LOG_ERR, "Failed to remove PCP mapping to %s:%hu %s",
-		       pcp_msg_info->mapped_str, iport, proto_itoa(proto));
+		if (!pcp_msg_info->is_fw) {
+			syslog(LOG_INFO, "Non-existing IPv4 port map to delete ?:%s:%hu/%s via PCP nonce %s",
+		       pcp_msg_info->mapped_str, iport, proto_itoa(proto), pcp_msg_info->desc + 8);
+		} else {
+			syslog(LOG_INFO, "Non-existing IPv6 port map to delete %s:%hu/%s via PCP nonce %s",
+		       pcp_msg_info->mapped_str, iport, proto_itoa(proto), pcp_msg_info->desc + 8);
+		}
 		pcp_msg_info->result_code = PCP_ERR_NO_RESOURCES;
 	}
 }
@@ -1245,6 +1278,7 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 
 	if (pcp_msg_info->thirdp_ip) {
 		if (!GETFLAG(PCP_ALLOWTHIRDPARTYMASK)) {
+			syslog(LOG_INFO, "Reject IPv? port map ?:?:?/? via PCP reason for third-party from ?");
 			pcp_msg_info->result_code = PCP_ERR_UNSUPP_OPTION;
 			return 0;
 		}
@@ -1297,8 +1331,8 @@ static int ValidatePCPMsg(pcp_info_t *pcp_msg_info)
 		snprintf(pcp_msg_info->desc, sizeof(pcp_msg_info->desc),
 			 "PCP %s %08x%08x%08x",
 			 getPCPOpCodeStr(pcp_msg_info->opcode),
-			 pcp_msg_info->nonce[0],
-			 pcp_msg_info->nonce[1], pcp_msg_info->nonce[2]);
+			 ntohl(pcp_msg_info->nonce[0]),
+			 ntohl(pcp_msg_info->nonce[1]), ntohl(pcp_msg_info->nonce[2]));
 		break;
 	}
 	return 1;
@@ -1451,7 +1485,7 @@ static int processPCPRequest(void * req, int req_size, pcp_info_t *pcp_msg_info)
 					CreatePCPMap(pcp_msg_info);
 				}
 			} else {
-				syslog(LOG_ERR, "PCP: Invalid PCP v2 MAP message.");
+				syslog(LOG_DEBUG, "PCP: Invalid PCP v2 MAP message.");
 				return pcp_msg_info->result_code;
 			}
 
@@ -1675,7 +1709,7 @@ int ProcessIncomingPCPPacket(int s, unsigned char *buff, int len,
 	if (!GETFLAG(PCP_ALLOWTHIRDPARTYMASK)) {
 		lan_addr = get_lan_for_peer(senderaddr);
 		if(lan_addr == NULL) {
-			syslog(LOG_WARNING, "PCP packet sender %s not from a LAN, ignoring",
+			syslog(LOG_DEBUG, "PCP packet sender %s not from a LAN, ignoring",
 			       addr_str);
 			return 0;
 		}
@@ -1803,7 +1837,7 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 		}
 		len = sendto_or_schedule(sockets[i], buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
 		if( len < 0 ) {
-			syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce(sockets[%d]) sendto(): %m", i);
+			syslog(LOG_DEBUG, "PCPSendUnsolicitedAnnounce(sockets[%d]) sendto(): %m", i);
 		}
 	}
 #ifdef ENABLE_IPV6
@@ -1814,7 +1848,7 @@ void PCPSendUnsolicitedAnnounce(int * sockets, int n_sockets)
 		addr6.sin6_port = htons(5350);
 		len = sendto_or_schedule(socket6, buff, PCP_MIN_LEN, 0, (struct sockaddr *)&addr6, sizeof(struct sockaddr_in6));
 		if( len < 0 ) {
-			syslog(LOG_ERR, "PCPSendUnsolicitedAnnounce() IPv6 sendto(): %m");
+			syslog(LOG_DEBUG, "PCPSendUnsolicitedAnnounce() IPv6 sendto(): %m");
 		}
 	}
 #endif /* ENABLE_IPV6 */

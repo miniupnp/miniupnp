@@ -45,7 +45,7 @@ report system uptime instead of daemon uptime to clients.
 disable "secure" mode so clients can only add mappings to other IPs
 .TP
 .B \-N
-enable NAT-PMP and PCP functionality.
+enable PCP and NAT-PMP protocols.
 .TP
 .BI \-u " uuid"
 set the uuid of the UPnP Internet Gateway Device.
@@ -83,7 +83,7 @@ examples :
 sets the value of BOOTID.UPNP.ORG SSDP header
 .TP
 .B \-1
-force reporting IGDv1 in rootDesc when compiled as IGDv2 *use with care*
+force reporting IGDv1 in rootDesc, available if --igd2/IGD_V2 set at build
 .SH "SEE ALSO"
 minissdpd(1) miniupnpc(3)
 .SH BUGS

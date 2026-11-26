@@ -67,7 +67,7 @@ lease_file_add(const char * rhost,
 
 	fd = fopen( lease_file, "a");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file);
 		return -1;
 	}
 
@@ -80,7 +80,7 @@ lease_file_add(const char * rhost,
 #endif
 	}
 
-#ifdef SUPPORT_REMOTEHOST
+#if 0 // ifdef SUPPORT_REMOTEHOST Disabled until 2.4.0 to maintain backwards compatibility in patch release
 	/* PROTO:eport:rhost:iaddr:iport:timestamp:desc */
 	fprintf(fd, "%s:%hu:",
 	        proto_itoa(proto), eport);
@@ -196,7 +196,7 @@ int reload_from_lease_file(void)
 	if(!lease_file) return -1;
 	fd = fopen( lease_file, "r");
 	if (fd==NULL) {
-		syslog(LOG_ERR, "could not open lease file: %s", lease_file);
+		syslog(LOG_DEBUG, "could not open lease file: %s", lease_file);
 		return -1;
 	}
 	if(unlink(lease_file) < 0) {
@@ -217,7 +217,7 @@ int reload_from_lease_file(void)
 		}
 		*(p++) = '\0';
 		eport = (unsigned short)atoi(p);
-#ifdef SUPPORT_REMOTEHOST
+#if 0 // ifdef SUPPORT_REMOTEHOST Disabled until 2.4.0 to maintain backwards compatibility in patch release
 		p = strchr(p, ':');
 		if(!p) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
@@ -266,7 +266,7 @@ int reload_from_lease_file(void)
 			timestamp += current_time;	/* convert to our time */
 #else
 			if(timestamp <= (unsigned int)current_unix_time) {
-				syslog(LOG_NOTICE, "already expired lease in lease file (%hu=>%s:%hu %s)",
+				syslog(LOG_INFO, "Expire IPv4 port map %hu:%s:%hu/%s reason lease file reload",
 				       eport, iaddr, iport, proto);
 				continue;
 			} else {
@@ -348,8 +348,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 
 	if(!check_upnp_rule_against_permissions(upnppermlist, num_upnpperm,
 	                                        eport, address, iport, desc)) {
-		syslog(LOG_INFO, "redirection permission check failed for "
-		                 "%hu->%s:%hu %s %s", eport, iaddr, iport, protocol, desc);
+		syslog(LOG_INFO, "Reject IPv4 port map %hu:%s:%hu/%s via UPnP IGD reason ACL/default-min/max-port",
+			eport, iaddr, iport, protocol);
 		return -3;
 	}
 
@@ -397,8 +397,8 @@ upnp_redirect(const char * rhost, unsigned short eport,
 		   ((rhost == NULL && rhost_old[0]=='\0') ||
 		    (rhost && (strcmp(rhost, "*") == 0) && rhost_old[0]=='\0') ||
 		    (rhost && (strcmp(rhost, rhost_old) == 0)))) {
-			syslog(LOG_INFO, "updating existing port mapping %hu %s (rhost '%s') => %s:%hu",
-				eport, protocol, rhost_old, iaddr_old, iport_old);
+			syslog(LOG_INFO, "Renew IPv4 port map %hu:%s:%hu/%s remote IP %s lifetime %d via UPnP IGD",
+				eport, iaddr_old, iport_old, protocol, rhost_old[0] != '\0' ? rhost_old : "any", leaseduration);
 			timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
 			if(iport != iport_old) {
 				r = update_portmapping(ext_if_name, eport, proto, iport, desc, timestamp);
@@ -413,19 +413,19 @@ upnp_redirect(const char * rhost, unsigned short eport,
 #endif /* ENABLE_LEASEFILE */
 			return r;
 		} else {
-			syslog(LOG_INFO, "port %hu %s (rhost '%s') already redirected to %s:%hu",
-				eport, protocol, rhost_old, iaddr_old, iport_old);
+			syslog(LOG_INFO, "Reject IPv4 port map %hu:%s:%hu/%s via UPnP IGD reason port in use",
+				eport, iaddr_old, iport_old, protocol);
 			return -2;
 		}
 #ifdef CHECK_PORTINUSE
 	} else if (port_in_use(ext_if_name, eport, proto, iaddr, iport) > 0) {
-		syslog(LOG_INFO, "port %hu protocol %s already in use",
-		       eport, protocol);
+		syslog(LOG_INFO, "Reject IPv4 port map %hu:%s:%hu/%s via UPnP IGD reason port in use",
+			eport, iaddr, iport, protocol);
 		return -4;
 #endif /* CHECK_PORTINUSE */
 	} else {
 		timestamp = (leaseduration > 0) ? upnp_time() + leaseduration : 0;
-		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
+		syslog(LOG_DEBUG, "redirecting port %hu to %s:%hu protocol %s for: %s",
 			eport, iaddr, iport, protocol, desc);
 		return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
 		                              desc, timestamp);
@@ -438,8 +438,6 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
                        int proto, const char * desc,
                        unsigned int timestamp)
 {
-	/*syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-		eport, iaddr, iport, protocol, desc);			*/
 	if(disable_port_forwarding)
 		return -1;
 	if(add_redirect_rule2(ext_if_name, rhost, eport, iaddr, iport, proto,
@@ -450,8 +448,6 @@ upnp_redirect_internal(const char * rhost, unsigned short eport,
 #ifdef ENABLE_LEASEFILE
 	lease_file_add(rhost, eport, iaddr, iport, proto, desc, timestamp);
 #endif
-/*	syslog(LOG_INFO, "creating pass rule to %s:%hu protocol %s for: %s",
-		iaddr, iport, protocol, desc);*/
 	if(add_filter_rule2(ext_if_name, rhost, iaddr, eport, iport, proto, desc) < 0) {
 		/* clean up the redirect rule */
 #if !defined(__linux__)
@@ -617,7 +613,7 @@ _upnp_delete_redir(unsigned short eport, int proto)
 int
 upnp_delete_redirection(unsigned short eport, const char * protocol)
 {
-	syslog(LOG_INFO, "removing redirect rule port %hu %s", eport, protocol);
+	syslog(LOG_INFO, "Delete IPv4 port map %hu:?:?/%s via UPnP IGD", eport, protocol);
 	return _upnp_delete_redir(eport, proto_atoi(protocol));
 }
 
@@ -721,7 +717,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	{
 		if(tmp->to_remove)
 		{
-			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
+			syslog(LOG_INFO, "Expire IPv4 port map %hu:?:?/%s",
 			       tmp->eport, proto_itoa(tmp->proto));
 			_upnp_delete_redir(tmp->eport, tmp->proto);
 			*p = tmp->next;
