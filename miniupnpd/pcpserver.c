@@ -943,6 +943,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 	uint16_t iport_old, eport_first = 0;
 	int any_eport_allowed = 0;
 	unsigned int timestamp = upnp_time() + pcp_msg_info->lifetime;
+	char desc[64];
 
 	if (pcp_msg_info->ext_port == 0) {
 		pcp_msg_info->ext_port = pcp_msg_info->int_port;
@@ -1003,7 +1004,7 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 				      pcp_msg_info->ext_port,
 				      pcp_msg_info->protocol,
 				      iaddr_old, sizeof(iaddr_old),
-				      &iport_old, 0, 0, 0, 0,
+				      &iport_old, desc, sizeof(desc), 0, 0,
 				      NULL/*&timestamp*/, 0, 0);
 
 		if(r==0) {
@@ -1014,6 +1015,13 @@ static int CreatePCPMap_NAT(pcp_info_t *pcp_msg_info)
 					return PCP_ERR_CANNOT_PROVIDE_EXTERNAL;
 				}
 			} else {
+				if (0 != strcmp(desc, pcp_msg_info->desc)) {
+					/* nonce does not match */
+					syslog(LOG_INFO, "Reject IPv4 port map %hu:%s:%hu/%s via PCP nonce %s reason nonce not matching",
+						pcp_msg_info->ext_port, pcp_msg_info->mapped_str, pcp_msg_info->int_port,
+						proto_itoa(pcp_msg_info->protocol), pcp_msg_info->desc + 8);
+					return PCP_ERR_NOT_AUTHORIZED;
+				}
 				syslog(LOG_INFO, "Renew IPv4 port map %hu:%s:%hu/%s lifetime %d via PCP",
 					pcp_msg_info->ext_port, iaddr_old, iport_old,
 					proto_itoa(pcp_msg_info->protocol), pcp_msg_info->lifetime);
