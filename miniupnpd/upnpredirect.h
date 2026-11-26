@@ -164,11 +164,6 @@ get_upnp_rules_state_list(int max_rules_number_target);
 int
 upnp_get_portmapping_number_of_entries(void);
 
-/* remove_unused_rules() :
- * also free the list */
-void
-remove_unused_rules(struct rule_state * list);
-
 /*! \brief returns a list of all "external" ports for which a port
  * mapping exists
  * \param[in] startport lowest port in the interval

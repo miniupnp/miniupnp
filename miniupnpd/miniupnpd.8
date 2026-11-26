@@ -8,7 +8,7 @@ miniupnpd \- UPnP Internet Gateway Device Daemon
 .RB [ "\-a \fIlistening_ip" "] [" "\-p \fIport" "] [" \-d "] [" \-U "] [" \-S0 "] [" \-N ]
 .RB [ "\-u \fIuuid" "] [" "\-s \fIserial" "] [" "\-m \fImodel_number" ]
 .RB [ "\-t \fInotify_interval" "] [" "\-P \fIpid_filename" ]
-.RB [ "\-B \fIdown up" "] [" "\-w \fIurl" "] [" "\-r \fIclean_ruleset_interval" ]
+.RB [ "\-B \fIdown up" "] [" "\-w \fIurl" ]
 .RB [ "\-A \fIpermission rule" "] [" "\-b \fIBOOTID" "] [" \-1 ]
 .SH DESCRIPTION
 miniupnpd act as a UPnP Internet Gateway Device. It is designed
@@ -67,9 +67,6 @@ download and upload bitrates reported to clients.
 .TP
 .BI \-w " url"
 presentation url. default is first address on LAN, port 80.
-.TP
-.BI \-r " clean_ruleset_interval"
-(minimum) interval between unused rules cleaning checks.
 .TP
 .BI \-A " permission rule"
 use following syntax for permission rules :
