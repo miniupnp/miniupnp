@@ -412,18 +412,9 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 	else
 	{
 		struct in_addr addr;
-		if(getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0)
-		{
-			syslog(LOG_ERR, "Failed to get ip address for interface %s",
-				ext_if_name);
-			ext_ip_addr[0] = '\0';
-		} else if (addr_is_reserved(&addr)) {
-			if (GETFLAG(ALLOWPRIVATEIPV4MASK)) {
-				syslog(LOG_WARNING, "IGNORED : private/reserved address %s is not suitable for external IP", ext_ip_addr);
-			} else {
-				syslog(LOG_NOTICE, "private/reserved address %s is not suitable for external IP", ext_ip_addr);
+		if (getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0 ||
+			(addr_is_reserved(&addr) && !GETFLAG(ALLOWPRIVATEIPV4MASK))) {
 				ext_ip_addr[0] = '\0';
-			}
 		}
 	}
 #else
