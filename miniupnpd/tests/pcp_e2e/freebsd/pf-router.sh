@@ -33,7 +33,7 @@ OS=$(uname)
 if [ "$OS" = OpenBSD ]; then LAN_IF=vio1; WAN_IF=vio2; else LAN_IF=vtnet1; WAN_IF=vtnet2; fi
 
 WORK=/tmp/pcp-e2e
-. "$(dirname -- "$0")/../../common/freebsd_lib.sh"
+. "$(dirname -- "$0")/../../common/guest_lib.sh"
 PF=$WORK/pf.conf
 
 write_pf() {
@@ -288,6 +288,7 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+	known_option log_level=info >>"$WORK/miniupnpd.conf"
 	sed -i.bak "s/=WAN_IF\$/=$WAN_IF/; s/=LAN_IF\$/=$LAN_IF/" "$WORK/miniupnpd.conf" && rm -f "$WORK/miniupnpd.conf.bak"
 	# extra configuration lines, separated by commas (a suite on this fixture)
 	printf '%s\n' "${1:-}" | tr ',' '\n' >>"$WORK/miniupnpd.conf"

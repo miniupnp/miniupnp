@@ -339,7 +339,7 @@ sync_tree() {
   # freebsd/*.sh from the copy.
   checkout_files() {
     (cd "$ROOT" && git ls-files -co --exclude-standard -z
-     cd "$ROOT" && find miniupnpd/tests/pcp_e2e/freebsd miniupnpd/tests/pcp_e2e/debian miniupnpd/tests/pcp_e2e/run-freebsd.sh miniupnpd/tests/common/freebsd_lib.sh \
+     cd "$ROOT" && find miniupnpd/tests/pcp_e2e/freebsd miniupnpd/tests/pcp_e2e/debian miniupnpd/tests/pcp_e2e/run-freebsd.sh miniupnpd/tests/common/guest_lib.sh \
        -type f ! -name '*.pyc' -print0) | sort -z -u
   }
   vmlib_copy "$ROOT" checkout_files -rlpc

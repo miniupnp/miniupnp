@@ -10,7 +10,7 @@
 set -eu
 
 WORK=/tmp/pcp-fixture
-. "$(dirname -- "$0")/../../common/freebsd_lib.sh"
+. "$(dirname -- "$0")/../../common/guest_lib.sh"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 
@@ -82,5 +82,6 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+known_option log_level=info >>"$WORK/miniupnpd.conf"
 
 echo "FreeBSD fixture ready"

@@ -135,7 +135,7 @@ else
 	--name "$CONTAINER" \
 	--network "$NETWORK" \
 	--network-alias pcp-router --env "PCP_TEST_WAN4=$WAN4" --env "PCP_TEST_WAN6_PREFIX=$WAN6_PREFIX" \
-	--cap-add NET_ADMIN \
+	--cap-add NET_ADMIN --env MINIUPNPD_LOG_LEVEL \
 	--volume "$STATE_DIR:/var/lib/miniupnpd" --volume "$DAEMON_MOUNT" \
 	"$IMAGE"
 fi
@@ -284,7 +284,7 @@ run_profile() {
 	"$DOCKER_BIN" run --rm --volume "$STATE_DIR:/state" --entrypoint sh "$IMAGE" \
 		-c 'rm -rf /state/* /state/.[!.]*' >/dev/null 2>&1 || true
 	"$DOCKER_BIN" run --detach --name "$CONTAINER" --network "$NETWORK" --network-alias pcp-router --env "PCP_TEST_WAN4=$WAN4" --env "PCP_TEST_WAN6_PREFIX=$WAN6_PREFIX" \
-		--cap-add NET_ADMIN --env "PCP_TEST_EXTRA_CONF=$extra_conf" \
+		--cap-add NET_ADMIN --env "PCP_TEST_EXTRA_CONF=$extra_conf" --env MINIUPNPD_LOG_LEVEL \
 		--volume "$STATE_DIR:/var/lib/miniupnpd" --volume "$DAEMON_MOUNT" "$IMAGE" >/dev/null
 	wait_for_daemon || return 1
 	case_args=

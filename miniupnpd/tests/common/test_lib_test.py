@@ -2423,6 +2423,16 @@ class DaemonOptionTests(unittest.TestCase):
                 lib_test.check_case_config(bad, names)
         lib_test.check_case_config(option_case("a", ["unknown_option=1"]))     # no names: not checked
 
+    def test_a_required_option_the_tree_lacks_skips_the_case(self):
+        names = {"lease_file"}
+        case = dict(option_case("a", ["lease_file6=/tmp/x"]), requires=["option:lease_file6"])
+        lib_test.check_case_config(case, names)                 # required: no corpus error
+        self.assertEqual(lib_test.missing_option(case, names), "lease_file6")
+        self.assertIsNone(lib_test.missing_option(case, names | {"lease_file6"}))
+        self.assertIsNone(lib_test.missing_option(case, None))  # no options.c: not checked
+        with self.assertRaises(CorpusError):                    # not required: a typo still fails
+            lib_test.check_case_config(option_case("a", ["lease_file6=/tmp/x"]), names)
+
     def test_upnp_cases_are_checked(self):
         lib_test.check_upnp_case(upnp_case("a"))
         lib_test.check_upnp_case(upnp_case("a", config=["enable_upnp=no", "port=5000"], result=["NO_LISTENER"]))

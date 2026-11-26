@@ -1,7 +1,8 @@
-# Shared steps of the scripts that run inside a FreeBSD or OpenBSD VM (pcp_wire/freebsd, pcp_e2e/freebsd,
-# daemon_options/freebsd). They run as root from a daemon tree, which need not hold these tests (ci.sh
-# runs master's): source this file by the path of the script, not from the working directory. The
-# freebsd_* functions are for FreeBSD; the bsd_* functions work on both.
+# Shared steps of the scripts that run inside a test VM (pcp_wire/freebsd, pcp_e2e/freebsd,
+# pcp_e2e/debian, daemon_options/freebsd). They run as root from a daemon tree, which need not hold
+# these tests (ci.sh runs master's): source this file by the path of the script, not from the working
+# directory. The freebsd_* functions are for FreeBSD, the bsd_* functions for FreeBSD and OpenBSD; the
+# others work on every guest.
 
 # freebsd_link_pfctl: run in miniupnpd/ after configure. On FreeBSD 14 libpfctl is a private base
 # library in /usr/lib/private, not on the default linker path; pfctl_dir stays set for the caller.
@@ -133,4 +134,10 @@ bsd_fetch() {
 # daemon of master has PEER only on netfilter and stops at an #error with it.
 freebsd_peer_option() {
 	grep -q 'only supported with NETFILTER' miniupnpd/pcpserver.c || echo --pcp-peer
+}
+
+# known_option NAME=VALUE: print the configuration line when the daemon has the option NAME (a daemon
+# refuses to start with an option it lacks). Run from the root of the tree.
+known_option() {
+	if grep -q "\"${1%%=*}\"" miniupnpd/options.c; then echo "$1"; fi
 }

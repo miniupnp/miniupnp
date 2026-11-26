@@ -27,7 +27,7 @@ python3 miniupnpd/tests/daemon_options/run_daemon_options_cases.py --self-test
 `run-freebsd.sh` boots a throwaway VM, runs `freebsd/run-suite.sh` there (epair and vnet jails) and
 copies the results out. `run-openbsd.sh` runs the same script in an OpenBSD VM, with pair(4)
 interfaces in routing domains for the hosts, as OpenBSD has no vnet jail (`bsd_host` in
-`../common/freebsd_lib.sh`); a case may list several platforms (`platform: [freebsd, openbsd]`). The `platform: linux` cases stay out. It builds the daemon of the tree with
+`../common/guest_lib.sh`); a case may list several platforms (`platform: [freebsd, openbsd]`). The `platform: linux` cases stay out. It builds the daemon of the tree with
 pf as pcp_e2e does: PCP PEER only where pf supports it, and no `PF_ENABLE_FILTER_RULES`.
 
 In CI, the `options-linux`, `options-freebsd` and `options-openbsd` jobs of

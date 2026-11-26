@@ -3,7 +3,7 @@
 #
 #   run-suite.sh RESULTS_DIR
 #
-# The topology, with hosts that share the root filesystem (bsd_host in common/freebsd_lib.sh: vnet
+# The topology, with hosts that share the root filesystem (bsd_host in common/guest_lib.sh: vnet
 # jails on FreeBSD, as pcp_wire/freebsd, routing domains on OpenBSD):
 #   LAN 172.28.41.1: host client (.2), host neighbour (.3, an HTTP server)
 #   WAN 198.51.100.1: host wan (.3, the runner; .5, the STUN server)
@@ -25,7 +25,7 @@ OS=$(uname)
 PLATFORM=$(echo "$OS" | tr '[:upper:]' '[:lower:]')
 rm -rf "$WORK"
 mkdir -p "$CALLS"
-. "$HERE/../common/freebsd_lib.sh"
+. "$HERE/../common/guest_lib.sh"
 . "$HERE/../common/e2e_lib.sh"
 
 # the build of run-docker.sh, as pcp_e2e builds it: PCP PEER only where pf supports it, and no
@@ -85,7 +85,7 @@ import http.server, socketserver
 socketserver.TCPServer(('$LAN4.3', 45300), http.server.SimpleHTTPRequestHandler).serve_forever()\"" >/dev/null 2>&1 &
 bsd_exec wan python3 "$HERE/stun_server.py" >/dev/null 2>&1 &
 attempt=0
-until bsd_exec client sh -c ". '$HERE/../common/freebsd_lib.sh' && bsd_fetch http://$LAN4.3:45300/"; do
+until bsd_exec client sh -c ". '$HERE/../common/guest_lib.sh' && bsd_fetch http://$LAN4.3:45300/"; do
 	attempt=$((attempt + 1))
 	[ "$attempt" -lt 100 ] || { echo "FAIL: the neighbour's HTTP server did not start" >&2; exit 1; }
 	sleep 0.1
@@ -120,6 +120,7 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+known_option log_level=info >>"$WORK/base.conf"
 
 listening() { grep -Ec 'Listening for|HTTP listening' "$LOG" || true; }
 

@@ -16,7 +16,7 @@ HERE=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 RESULTS=$(CDPATH='' cd -- "$1" && pwd)
 WORK=/tmp/pcp-fixture
 JAIL=pcpclient
-. "$HERE/../common/freebsd_lib.sh"
+. "$HERE/../common/guest_lib.sh"
 
 daemon=
 cleanup() {

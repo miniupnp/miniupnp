@@ -1247,6 +1247,44 @@ static void complete_uuidvalues(void)
 	}
 }
 
+/* the names of log_level= and --log-level */
+static const struct {
+	const char * name;
+	int level;
+} log_levels[] = {
+	{ "error", LOG_ERR },
+	{ "err", LOG_ERR },
+	{ "warning", LOG_WARNING },
+	{ "warn", LOG_WARNING },
+	{ "notice", LOG_NOTICE },
+	{ "info", LOG_INFO },
+	{ "debug", LOG_DEBUG },
+};
+
+/* The syslog level a name stands for, or -1 */
+static int
+log_level_of(const char * name)
+{
+	size_t i;
+
+	for(i = 0; i < sizeof(log_levels) / sizeof(log_levels[0]); i++)
+		if(strcasecmp(name, log_levels[i].name) == 0)
+			return log_levels[i].level;
+	return -1;
+}
+
+/* The name of a syslog level */
+static const char *
+log_level_name(int level)
+{
+	size_t i;
+
+	for(i = 0; i < sizeof(log_levels) / sizeof(log_levels[0]); i++)
+		if(log_levels[i].level == level)
+			return log_levels[i].name;
+	return "?";
+}
+
 void print_usage(FILE * out, const char * argv0) {
 	fprintf(out, "Usage:\n\t"
 	        "%s --version\n\t"
@@ -1268,7 +1306,7 @@ void print_usage(FILE * out, const char * argv0) {
 #ifdef ENABLE_HTTPS
 			" [-H https_port]"
 #endif
-			" [-p port] [-d] [-v]"
+			" [-p port] [-d] [-v] [--log-level level]"
 #if defined(USE_PF) || defined(USE_IPF)
 			" [-L]"
 #endif
@@ -1304,7 +1342,7 @@ void print_usage(FILE * out, const char * argv0) {
 			"\tDefault pid file is '%s'.\n"
 #endif
 			"\tDefault config file is '%s'.\n"
-			"\t-d starts miniupnpd in foreground in debug mode.\n"
+			"\t-d starts miniupnpd in foreground, with its log on stderr too.\n"
 #ifdef USE_SYSTEMD
 	                "\t-D starts miniupnpd in foreground as a systemd service.\n"
 #endif
@@ -1344,7 +1382,12 @@ void print_usage(FILE * out, const char * argv0) {
 #ifdef IGD_V2
 			"\t-1 force reporting IGDv1 in rootDesc *use with care*\n"
 #endif
-			"\t-v enables LOG_INFO messages, -vv LOG_DEBUG as well (default with -d)\n"
+			"\t-v, -vv, -vvv raise the log level by one each, from the environment\n"
+			"\t  variable MINIUPNPD_LOG_LEVEL, else from log_level=, else from\n"
+			"\t  LOG_NOTICE (LOG_WARNING with -d), up to LOG_DEBUG.\n"
+			"\t--log-level (or -l) sets the log level: error, warning, notice,\n"
+			"\t  info or debug, as log_level= does. It takes precedence over -v,\n"
+			"\t  MINIUPNPD_LOG_LEVEL and log_level=.\n"
 			"\t-h / --help prints this help and quits.\n"
 	        "", argv0, argv0, argv0,
 #ifndef NO_BACKGROUND_NO_PIDFILE
@@ -1376,7 +1419,11 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #ifdef USE_SYSTEMD
 	int systemd_flag = 0;
 #endif
-	int verbosity_level = 0;	/* for determining setlogmask() */
+	int verbosity_level = 0;	/* -v, -vv, -vvv: levels above the base */
+	int log_level = -1;		/* --log-level, -l */
+	int conf_log_level = -1;	/* log_level= */
+	int env_log_level = -1;		/* MINIUPNPD_LOG_LEVEL */
+	const char * env_value;
 	int openlog_option;
 	struct in_addr addr;
 	struct sigaction sa;
@@ -1677,6 +1724,14 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPMINISSDPDSOCKET:
 				minissdpdsocketpath = ary_options[i].value;
 				break;
+			case UPNPLOGLEVEL:
+				conf_log_level = log_level_of(ary_options[i].value);
+				if(conf_log_level < 0) {
+					INIT_PRINT_ERR("log_level=%s: use error, warning, notice, info or debug\n",
+					               ary_options[i].value);
+					return 1;
+				}
+				break;
 #ifdef IGD_V2
 			case UPNPFORCEIGDDESCV1:
 				if (strcmp(ary_options[i].value, "yes") == 0)
@@ -1714,6 +1769,20 @@ init(int argc, char * * argv, struct runtime_vars * v)
 		{
 			INIT_PRINT_ERR("Unknown option: %s\n", argv[i]);
 			goto print_usage;
+		}
+		else if(0 == strcmp(argv[i], "--log-level") || 0 == strcmp(argv[i], "-l"))
+		{
+			if(i+1 >= argc) {
+				INIT_PRINT_ERR("Option %s takes one argument.\n", argv[i]);
+				goto print_usage;
+			}
+			log_level = log_level_of(argv[i+1]);
+			if(log_level < 0) {
+				INIT_PRINT_ERR("%s %s: use error, warning, notice, info or debug\n",
+				               argv[i], argv[i+1]);
+				goto print_usage;
+			}
+			i++;
 		}
 		else switch(argv[i][1])
 		{
@@ -2058,6 +2127,30 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			goto print_usage;
 		}
 	}
+	/* MINIUPNPD_LOG_LEVEL, for a run under systemd (Environment=) or in a
+	 * container, where the command line is fixed */
+	env_value = getenv("MINIUPNPD_LOG_LEVEL");
+	if(env_value != NULL && env_value[0] != '\0') {
+		env_log_level = log_level_of(env_value);
+		if(env_log_level < 0) {
+			INIT_PRINT_ERR("MINIUPNPD_LOG_LEVEL=%s: use error, warning, notice, info or debug\n",
+			               env_value);
+			return 1;
+		}
+	}
+	/* The log level, as soon as the command line is read: --log-level, or
+	 * MINIUPNPD_LOG_LEVEL, or log_level= (else the base: LOG_NOTICE, and
+	 * LOG_WARNING with -d, whose log is on stderr) raised by one for each -v */
+	if(log_level < 0)
+	{
+		log_level = env_log_level >= 0 ? env_log_level
+		            : conf_log_level >= 0 ? conf_log_level
+		            : debug_flag ? LOG_WARNING : LOG_NOTICE;
+		log_level += verbosity_level;
+		if(log_level > LOG_DEBUG)
+			log_level = LOG_DEBUG;
+	}
+	setlogmask(LOG_UPTO(log_level));
 	if(!ext_if_name || !lan_addrs.lh_first) {
 		/* bad configuration */
 		if(!ext_if_name)
@@ -2129,22 +2222,12 @@ init(int argc, char * * argv, struct runtime_vars * v)
 	}
 #endif
 
-	if(!debug_flag)
-	{
-		switch (verbosity_level)
-		{
-		case 0:
-			/* speed things up and ignore LOG_INFO and LOG_DEBUG */
-			setlogmask(LOG_UPTO(LOG_NOTICE));
-			break;
-		case 1:
-			/* ignore LOG_DEBUG */
-			setlogmask(LOG_UPTO(LOG_INFO));
-			break;
-		case 2:
-			setlogmask(LOG_UPTO(LOG_DEBUG));
-		}
-	}
+	/* the one line written at any level: what the level is, and how to
+	 * change it */
+	setlogmask(LOG_UPTO(LOG_INFO));
+	syslog(LOG_INFO, "log level %s: --log-level, MINIUPNPD_LOG_LEVEL or log_level= sets it",
+	       log_level_name(log_level));
+	setlogmask(LOG_UPTO(log_level));
 
 #ifndef NO_BACKGROUND_NO_PIDFILE
 	if(checkforrunning(pidfilename) < 0)

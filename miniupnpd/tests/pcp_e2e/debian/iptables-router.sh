@@ -20,6 +20,7 @@
 # The first NIC is QEMU's management NIC (ssh). Debian names the others by their PCI slot, so
 # they are found by the MAC addresses the driver gives them, and renamed lan0 and wan0.
 set -u
+. "$(dirname -- "$0")/../../common/guest_lib.sh"
 
 WORK=/tmp/pcp-e2e
 SCRIPTS=miniupnpd/netfilter
@@ -205,6 +206,7 @@ secure_mode=yes
 allow 1024-65535 0.0.0.0/0 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 CONF
+	known_option log_level=info >>"$WORK/miniupnpd.conf"
 	# extra configuration lines, separated by commas (a suite on this fixture)
 	printf '%s\n' "${1:-}" | tr ',' '\n' >>"$WORK/miniupnpd.conf"
 	nohup miniupnpd/miniupnpd -d -f "$WORK/miniupnpd.conf" >"$WORK/miniupnpd.log" 2>&1 &

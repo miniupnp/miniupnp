@@ -28,6 +28,7 @@ from lib_test import (  # noqa: E402
     config_runs,
     config_word,
     daemon_option_names,
+    missing_option,
     option_coverage_line,
     option_status_sections,
     permission_line_kinds,
@@ -50,10 +51,15 @@ TITLE = "Daemon options"
 SUITE = "daemon_options"
 
 
+def option_names_of_tree():
+    """The option names of options.c, or None when it is not there."""
+    return daemon_option_names(OPTIONS_C) if OPTIONS_C else None
+
+
 def read_corpus():
     """(sections, cases, profiles, earlier_cases) of daemon-options-cases.yaml, expanded and checked;
     the config keys are checked against options.c when it is there. Needs PyYAML."""
-    option_names = daemon_option_names(OPTIONS_C) if OPTIONS_C else None
+    option_names = option_names_of_tree()
     return read_checked_corpus(CORPUS, lambda cases, profiles: validate_option_cases(cases, profiles, option_names))
 
 
@@ -63,6 +69,19 @@ def selection(args, cases, profiles, earlier_cases):
     run = [case for case in cases_of_run(cases, args.config, args.side)
            if not args.case or case["name"] in args.case]
     return select_cases(argparse.Namespace(**dict(vars(args), case=None)), run, profiles, earlier_cases)
+
+
+def missing_option_outcomes(cases, args, option_names):
+    """SKIP for the cases of this family and platform which require an option this tree lacks: no run
+    lists their configuration (--list-runs), so a run reports them."""
+    outcomes = {}
+    for case in cases:
+        option = missing_option(case, option_names)
+        if option and on_platform(case, args.platform) and args.family in case["families"]:
+            reason = f"requires {option}, not an option of this miniupnpd (options.c)"
+            print(f"SKIP {case['protocol']}/{case['name']}: {reason}")
+            outcomes[(case["protocol"], case["name"])] = ("SKIP", reason)
+    return outcomes
 
 
 def run_selected(args, selected):
@@ -167,9 +186,10 @@ def main():
     args.config = [config_line(word) for word in args.config]
     try:
         sections, cases, profiles, earlier_cases = read_corpus()
+        option_names = option_names_of_tree()
         if args.list_runs:
             listed = [case for case in cases if (not args.case or case["name"] in args.case)
-                      and on_platform(case, args.platform)]
+                      and on_platform(case, args.platform) and not missing_option(case, option_names)]
             for config, side, family in config_runs(listed):
                 print(" ".join((side, family) + tuple(config_word(line) for line in config)))
             return 0
@@ -181,6 +201,7 @@ def main():
         return 0
     try:
         outcomes = run_selected(args, selected)
+        outcomes.update(missing_option_outcomes(cases, args, option_names))
     except KeyboardInterrupt:
         print("Interrupted: no status report written.", file=sys.stderr)
         return 130
