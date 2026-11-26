@@ -108,7 +108,8 @@ class LanEcho:
 # Sending requests to a daemon, and building their bytes from the expanded YAML of the PCP test corpora
 
 
-TIMEOUT = 2.0
+# seconds a request waits for its reply; a refused NAT-PMP MAP scans every external port first
+TIMEOUT = 8.0
 
 
 def exchange(sock, address, request):
