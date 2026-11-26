@@ -124,7 +124,9 @@ CONF
 listening() { grep -Ec 'Listening for|HTTP listening' "$LOG" || true; }
 
 # start_process: the daemon of $WORK/opt.conf; ready at a listening line it wrote after this call.
-# The rules go, as after a reboot, and the lease file stays.
+# The rules go, as after a reboot, and the lease file stays. A daemon which exits fails; one which
+# runs without a listening line stops the whole run (the main shell, $$, also from the router
+# call loop): the harness cannot tell whether it works, so it writes no case results.
 start_process() {
 	pkill -x miniupnpd 2>/dev/null || true
 	sleep 0.3
@@ -139,6 +141,9 @@ start_process() {
 		attempt=$((attempt + 1))
 		sleep 0.1
 	done
+	kill -0 "$process" 2>/dev/null || return 1
+	echo "ERROR: the daemon runs but logged no listening line; stopping the run" >&2
+	kill -TERM $$
 	return 1
 }
 

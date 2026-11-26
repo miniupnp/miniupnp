@@ -75,14 +75,29 @@ daemon_listening() {
     grep -q '"miniupnpd"'
 }
 
-# restart_router: the same container, so the lease file stays; ready when the new daemon listens
+router_running() {
+  [ "$("$DOCKER" inspect -f '{{.State.Running}}' "$ROUTER" 2>/dev/null)" = true ]
+}
+
+# harness_lost WHAT: the daemon runs, but without a listening socket. The harness cannot tell
+# whether it works, so stop the run: no results, an incomplete comparison, never case results.
+harness_lost() {
+  echo "ERROR: $1 runs but has no listening socket; stopping the run" >&2
+}
+
+# restart_router: the same container, so the lease file stays; ready when the new daemon listens.
+# It runs in the router call loop, a subshell: a lost daemon stops the main shell ($$).
 restart_router() {
   "$DOCKER" restart -t 2 "$ROUTER" >/dev/null
   for _attempt in $(seq 1 100); do
     daemon_listening && { sleep 1; echo restarted; return 0; }
+    router_running || break
     sleep 0.2
   done
   echo "restart timed out"
+  router_running || return 0
+  harness_lost "the restarted daemon"
+  kill -TERM $$
 }
 
 # a TCP connection from a host on the WAN to the router's WAN address
@@ -125,7 +140,8 @@ chmod 700 "$CALL_DIR"
 CALL_LOOP=$!
 
 # start_router RUN-NUMBER CONFIG-LINE...: a fresh router daemon with these configuration lines,
-# ready when it listens (at least one protocol is on, or miniupnpd exits).
+# ready when it listens (at least one protocol is on). A daemon which exits fails the cases of
+# the run; one which runs without listening stops the whole run (harness_lost).
 start_router() {
   router_log=$RUN_DIR/daemon-$1.log
   shift
@@ -139,11 +155,15 @@ start_router() {
       "$DOCKER" exec "$ROUTER" cat /etc/miniupnpd.conf > "$router_log.conf" 2>&1 || true
       return 0
     fi
-    [ "$("$DOCKER" inspect -f '{{.State.Running}}' "$ROUTER" 2>/dev/null)" = true ] || break
+    router_running || break
     sleep 0.2
   done
   "$DOCKER" logs "$ROUTER" > "$router_log" 2>&1 || true
-  echo "FAIL: the daemon with [$*] did not start listening; see $router_log" >&2
+  if router_running; then
+    harness_lost "the daemon with [$*] (see $router_log)"
+    exit 2
+  fi
+  echo "FAIL: the daemon with [$*] exited at start; see $router_log" >&2
   return 1
 }
 
