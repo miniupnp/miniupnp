@@ -1,5 +1,8 @@
 $Id: Changelog.txt,v 1.535 2025/04/26 13:07:53 nanard Exp $
 
+2026/11/xx:
+  supports UDPLITE only if explicitly enabled via --enable-udplite
+
 2026/11/25:
   add internal address filtering to upnp_get_portmappings_in_range()
     and fix DeletePortMappingRange in secure mode.

@@ -37,7 +37,8 @@ void lease_file_rewrite(void);
  * \param[in] desc port mapping description
  * \param[in] leaseduration lease duration in seconds (0 for infinite)
  * \return 0 on success, -1 failed to redirect,
- *         -2 already redirected, -3 permission check failed
+ *         -2 already redirected, -3 permission check failed,
+ *         -4 already redirected (other mechanism)
  */
 int
 upnp_redirect(const char * rhost, unsigned short eport,

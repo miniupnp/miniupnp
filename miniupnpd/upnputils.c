@@ -1,7 +1,7 @@
 /* $Id: upnputils.c,v 1.16 2025/04/21 22:56:49 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or https://miniupnp.tuxfamily.org/
- * (c) 2006-2025 Thomas Bernard
+ * (c) 2006-2026 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -247,14 +247,19 @@ int upnp_gettimeofday(struct timeval * tv)
 int
 proto_atoi(const char * protocol)
 {
-	int proto = IPPROTO_TCP;
 	if(strcasecmp(protocol, "UDP") == 0)
-		proto = IPPROTO_UDP;
+		return IPPROTO_UDP;
+	else if(strcasecmp(protocol, "TCP") == 0)
+		return IPPROTO_TCP;
+#ifdef ENABLE_UDPLITE
 #ifdef IPPROTO_UDPLITE
 	else if(strcasecmp(protocol, "UDPLITE") == 0)
-		proto = IPPROTO_UDPLITE;
+		return IPPROTO_UDPLITE;
+#else
+#error "ENABLE_UDPLITE is defined but IPPROTO_UDPLITE is not"
 #endif /* IPPROTO_UDPLITE */
-	return proto;
+#endif /* ENABLE_UDPLITE */
+	return -1;	// unknown
 }
 
 const char *
@@ -268,7 +273,7 @@ proto_itoa(int proto)
 	case IPPROTO_TCP:
 		protocol = "TCP";
 		break;
-#ifdef IPPROTO_UDPLITE
+#if defined(IPPROTO_UDPLITE) && defined(ENABLE_UDPLITE)
 	case IPPROTO_UDPLITE:
 		protocol = "UDPLITE";
 		break;
