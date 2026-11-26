@@ -1,28 +1,41 @@
-# This is a basic workflow to help you get started with Actions
-
-name: miniupnpc, minissdpd
+---
+name: miniupnpc
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
-on:
+'on':
   push:
+    branches: [master]
     paths:
-    - 'miniupnpc/**'
-    - 'minissdpd/**'
-    - '.github/workflows/main.yml'
+      - 'miniupnpc/**'
+      - '.github/workflows/miniupnpc.yml'
   pull_request:
-    branches: [ master ]
+    branches: [master]
+    paths:
+      - 'miniupnpc/**'
+      - '.github/workflows/miniupnpc.yml'
+
+permissions:
+  contents: read
+
+# A newer run of the same pull request or branch cancels the one still running.
+concurrency:
+  group: miniupnpc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build-miniupnpc:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: build miniupnpc with make
         run: make -C miniupnpc all check
@@ -35,21 +48,3 @@ jobs:
 
       - name: install miniupnpc with cmake
         run: cd miniupnpc/cmake-build && make DESTDIR=/tmp/miniupnpc_cmake_install install
-
-  build-minissdpd:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v7
-
-      - name: install packages
-        run: sudo apt-get install libnfnetlink-dev
-
-      - name: build minissdpd
-        run: make -C minissdpd all check
-
-      - name: install minissdpd
-        run: make -C minissdpd DESTDIR=/tmp/minissdpd_install install

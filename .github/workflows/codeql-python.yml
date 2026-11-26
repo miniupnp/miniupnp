@@ -1,0 +1,52 @@
+---
+name: "CodeQL Python"
+
+# The Python half of codeql-analysis.yml. Python needs no build, so this
+# workflow skips the C build and runs only when Python files change.
+'on':
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+    # push and schedule stay unfiltered: code scanning wants full runs of master
+    paths:
+      - '**.py'
+      - '.github/workflows/codeql-python.yml'
+  schedule:
+    - cron: '15 5 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+# A newer run of the same pull request cancels the one still running;
+# runs on master always finish.
+concurrency:
+  group: codeql-python-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: python
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          # the category the matrix job in codeql-analysis.yml reported, so
+          # code scanning keeps matching the existing Python alerts
+          category: '.github/workflows/codeql-analysis.yml:analyze/language:python'
