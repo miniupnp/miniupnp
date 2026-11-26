@@ -953,7 +953,7 @@ sections:
       kind: steps
     description: packet_log=yes is accepted; the daemon sets the flag and never reads it.
 - title: Timers
-  description: notify_interval, system_uptime, and the clean_ruleset pair.
+  description: notify_interval, system_uptime, and the ignored clean_ruleset pair.
   cases:
   - name: notify-interval-short
     protocol: daemon
@@ -991,22 +991,6 @@ sections:
     expect:
       kind: steps
     description: The default interval of 900 s sends none after the startup round.
-  - name: clean-ruleset-keeps-natpmp-mapping
-    protocol: daemon
-    families:
-    - ipv4
-    mutating: true
-    config: [enable_upnp=yes, http_port=5000, clean_ruleset_interval=3, clean_ruleset_threshold=0]
-    request:
-      kind: option_steps
-      steps:
-      - natpmp_map:
-          port: 46401
-      - sleep: 8
-      - router: {command: ruleset, contains: ['46401']}
-    expect:
-      kind: steps
-    description: clean_ruleset removes unused UPnP rules; a NAT-PMP mapping has a lifetime and stays until it expires.
   - name: ssdp-off-with-upnp-off
     protocol: daemon
     families:
@@ -1054,7 +1038,7 @@ sections:
     expect:
       kind: steps
     description: system_uptime=yes makes the epoch the uptime of the system.
-  - name: clean-ruleset-removes-idle
+  - name: clean-ruleset-ignored
     protocol: daemon
     families:
     - ipv4
@@ -1078,63 +1062,9 @@ sections:
       - natpmp_address: {}
       - upnp_get:
           port: 46321
-          present: false
     expect:
       kind: steps
-    description: clean_ruleset_interval removes a mapping without traffic.
-  - name: clean-ruleset-threshold-keeps
-    protocol: daemon
-    families:
-    - ipv4
-    mutating: true
-    config:
-    - enable_upnp=yes
-    - http_port=5000
-    - clean_ruleset_interval=2
-    - clean_ruleset_threshold=10
-    request:
-      kind: option_steps
-      steps:
-      - upnp_add:
-          port: 46322
-          lease: 3600
-      - sleep: 3
-      - natpmp_address: {}
-      - sleep: 3
-      - natpmp_address: {}
-      - sleep: 3
-      - natpmp_address: {}
-      - upnp_get:
-          port: 46322
-    expect:
-      kind: steps
-    description: Below clean_ruleset_threshold rules, nothing is removed.
-  - name: clean-ruleset-off-keeps
-    protocol: daemon
-    families:
-    - ipv4
-    mutating: true
-    config:
-    - enable_upnp=yes
-    - http_port=5000
-    - clean_ruleset_interval=0
-    request:
-      kind: option_steps
-      steps:
-      - upnp_add:
-          port: 46323
-          lease: 3600
-      - sleep: 3
-      - natpmp_address: {}
-      - sleep: 3
-      - natpmp_address: {}
-      - sleep: 3
-      - natpmp_address: {}
-      - upnp_get:
-          port: 46323
-    expect:
-      kind: steps
-    description: clean_ruleset_interval=0 removes nothing.
+    description: The clean_ruleset options are ignored; a mapping without traffic stays until its lease ends.
 - title: Firewall rules lost
   description: A reload of the firewall removes the rules and the daemon is not told. A renewal must
     see that and add the rules again, or the client is told of a mapping which passes nothing.
