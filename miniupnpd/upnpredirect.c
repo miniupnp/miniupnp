@@ -80,7 +80,7 @@ lease_file_add(const char * rhost,
 #endif
 	}
 
-#ifdef SUPPORT_REMOTEHOST
+#if 0 // ifdef SUPPORT_REMOTEHOST Disabled until 2.4.0 to maintain backwards compatibility in patch release
 	/* PROTO:eport:rhost:iaddr:iport:timestamp:desc */
 	fprintf(fd, "%s:%hu:",
 	        proto_itoa(proto), eport);
@@ -217,7 +217,7 @@ int reload_from_lease_file(void)
 		}
 		*(p++) = '\0';
 		eport = (unsigned short)atoi(p);
-#ifdef SUPPORT_REMOTEHOST
+#if 0 // ifdef SUPPORT_REMOTEHOST Disabled until 2.4.0 to maintain backwards compatibility in patch release
 		p = strchr(p, ':');
 		if(!p) {
 			syslog(LOG_ERR, "unrecognized data in lease file");
