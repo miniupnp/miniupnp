@@ -19,8 +19,10 @@ name: 'miniupnpd: Regression testing'
 #   upnp-wire-linux, upnp-e2e-linux  the UPnP suites on Docker (every daemon build), master's
 #                   daemon against the pull request's
 # The comparisons build both daemons with the pull request's harness; a case that passed
-# with master's daemon and fails with the pull request's fails the job. On a push to
-# master, "master" is the commit before the push.
+# with master's daemon and fails with the pull request's fails the job. The pull request
+# side is GitHub's test merge onto master (github.sha), whose first parent is the "master"
+# side (base.sha): a branch behind master does not show master's later fixes as its
+# regressions. On a push to master, "master" is the commit before the push.
 
 'on':
   pull_request:
@@ -123,10 +125,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -195,10 +197,10 @@ jobs:
       matrix:
         release: ['14.5', '15.1']
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -284,10 +286,10 @@ jobs:
       matrix:
         release: ['8.0']
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -367,10 +369,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.wan_peer && 60 || 30 }}
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -442,10 +444,10 @@ jobs:
       matrix:
         release: ['14.5', '15.1']
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -529,10 +531,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -598,10 +600,10 @@ jobs:
       matrix:
         release: ['14.5', '15.1']
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -686,10 +688,10 @@ jobs:
       matrix:
         release: ['8.0']
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -772,10 +774,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -838,10 +840,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Check out pull request head
+      - name: Check out the pull request merged onto master
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
