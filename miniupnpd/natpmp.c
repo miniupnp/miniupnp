@@ -330,8 +330,13 @@ void ProcessIncomingNATPMPPacket(int s, unsigned char *msg_buff, int len,
 			} else { /* iport > 0 && lifetime > 0 */
 				unsigned short eport_first = 0;
 				int any_eport_allowed = 0;
-				if(eport==0)	/* if no suggested external port, use same a internal port */
-					eport = iport;
+				if (eport == 0) {
+					if (iport >= 1024) {
+						eport = iport;
+					} else {
+						eport = 1024;
+					}
+				}
 				while(resp[3] == 0) {
 					if(eport_first == 0) { /* first time in loop */
 						eport_first = eport;
