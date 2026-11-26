@@ -413,7 +413,7 @@ GetExternalIPAddress(struct upnphttp * h, const char * action, const char * ns)
 	{
 		struct in_addr addr;
 		if (getifaddr(ext_if_name, ext_ip_addr, INET_ADDRSTRLEN, &addr, NULL) < 0 ||
-			(addr_is_reserved(&addr) && !GETFLAG(ALLOWPRIVATEIPV4MASK))) {
+			(addr_is_reserved(&addr) && !GETFLAG(REPORTPRIVATEIPV4MASK))) {
 				ext_ip_addr[0] = '\0';
 		}
 	}
