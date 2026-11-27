@@ -61,12 +61,14 @@ static int next_uid = 1;
 
 #define RULE (pr.rule)
 
-int add_pinhole(const char * ifname,
-                const char * rem_host, unsigned short rem_port,
-                const char * int_client, unsigned short int_port,
-                int proto, const char * desc, unsigned int timestamp)
+/* add the pass rule of pinhole uid at the tail of the anchor
+ * return 0 on success, -1 on error */
+static int
+add_pinhole_rule(int uid, const char * ifname,
+                 const char * rem_host, unsigned short rem_port,
+                 const char * int_client, unsigned short int_port,
+                 int proto, const char * desc, unsigned int timestamp)
 {
-	int uid;
 	struct pfioc_rule pr;
 #ifndef PF_NEWSTYLE
 	struct pfioc_pooladdr pp;
@@ -116,7 +118,6 @@ int add_pinhole(const char * ifname,
 		RULE.onrdomain = -1;	/* first appeared in OpenBSD 5.0 */
 #endif
 		RULE.keep_state = 1;
-		uid = next_uid;
 		snprintf(RULE.label, PF_RULE_LABEL_SIZE,
 		         PINEHOLE_LABEL_FORMAT, uid, timestamp, desc);
 		if(queue)
@@ -159,7 +160,20 @@ int add_pinhole(const char * ifname,
 			}
 		}
 	}
+	return 0;
+}
 
+int add_pinhole(const char * ifname,
+                const char * rem_host, unsigned short rem_port,
+                const char * int_client, unsigned short int_port,
+                int proto, const char * desc, unsigned int timestamp)
+{
+	int uid;
+
+	uid = next_uid;
+	if(add_pinhole_rule(uid, ifname, rem_host, rem_port, int_client, int_port,
+	                    proto, desc, timestamp) < 0)
+		return -1;
 	if(++next_uid >= 65535) {
 		next_uid = 1;
 	}
@@ -373,13 +387,14 @@ int delete_pinhole(unsigned short uid)
 	return -2;
 }
 
-int
-get_pinhole_info(unsigned short uid,
-                 char * rem_host, int rem_hostlen, unsigned short * rem_port,
-                 char * int_client, int int_clientlen, unsigned short * int_port,
-                 int * proto, char * desc, int desclen,
-                 unsigned int * timestamp,
-                 u_int64_t * packets, u_int64_t * bytes)
+/* get_pinhole_info(), also returning the interface name of the rule */
+static int
+get_pinhole_rule_info(unsigned short uid, char * ifname, int ifnamelen,
+                      char * rem_host, int rem_hostlen, unsigned short * rem_port,
+                      char * int_client, int int_clientlen, unsigned short * int_port,
+                      int * proto, char * desc, int desclen,
+                      unsigned int * timestamp,
+                      u_int64_t * packets, u_int64_t * bytes)
 {
 	int i, n;
 	unsigned int tnum;
@@ -449,6 +464,8 @@ get_pinhole_info(unsigned short uid,
 		p = tmp_label;
 		strsep(&p, " ");
 		if(0 == strcmp(tmp_label, label_start)) {
+			if(ifname)
+				strlcpy(ifname, RULE.ifname, ifnamelen);
 			if(rem_host && (inet_ntop(AF_INET6, &RULE.src.addr.v.a.addr.v6, rem_host, rem_hostlen) == NULL)) {
 				release_ticket(dev, tnum);
 				return -1;
@@ -493,15 +510,47 @@ get_pinhole_info(unsigned short uid,
 	return -2;
 }
 
+int
+get_pinhole_info(unsigned short uid,
+                 char * rem_host, int rem_hostlen, unsigned short * rem_port,
+                 char * int_client, int int_clientlen, unsigned short * int_port,
+                 int * proto, char * desc, int desclen,
+                 unsigned int * timestamp,
+                 u_int64_t * packets, u_int64_t * bytes)
+{
+	return get_pinhole_rule_info(uid, NULL, 0, rem_host, rem_hostlen, rem_port,
+	                             int_client, int_clientlen, int_port,
+	                             proto, desc, desclen, timestamp, packets, bytes);
+}
+
 int update_pinhole(unsigned short uid, unsigned int timestamp)
 {
-	/* TODO :
-	 * As it is not possible to change rule label, we should :
-	 * 1 - delete
-	 * 2 - Add new
-	 * the stats of the rule will then be reset :( */
-	UNUSED(uid); UNUSED(timestamp);
-	return -42; /* not implemented */
+	/* A rule label cannot be changed, so add a new rule with the same uid
+	 * and the new timestamp, then delete the old one, which comes first in
+	 * the anchor. Adding first leaves no moment without the pinhole.
+	 * The packet and byte counters of the pinhole are reset. */
+	char ifname[IFNAMSIZ];
+	char rem_host[INET6_ADDRSTRLEN];
+	char int_client[INET6_ADDRSTRLEN];
+	char desc[PF_RULE_LABEL_SIZE];
+	unsigned short rem_port, int_port;
+	int proto;
+	int r;
+
+	r = get_pinhole_rule_info(uid, ifname, sizeof(ifname),
+	                          rem_host, sizeof(rem_host), &rem_port,
+	                          int_client, sizeof(int_client), &int_port,
+	                          &proto, desc, sizeof(desc), NULL, NULL, NULL);
+	if(r < 0)
+		return r;
+	/* get_pinhole_info() reports an unrestricted remote host as "::" */
+	if(add_pinhole_rule(uid, ifname[0] != '\0' ? ifname : NULL,
+	                    strcmp(rem_host, "::") == 0 ? NULL : rem_host, rem_port,
+	                    int_client, int_port, proto, desc, timestamp) < 0)
+		return -1;
+	if(delete_pinhole(uid) < 0)
+		syslog(LOG_WARNING, "update_pinhole(%hu): failed to delete the old rule", uid);
+	return 0;
 }
 
 /* return the number of rules removed
